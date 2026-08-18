@@ -26,7 +26,19 @@ export function BrandingPanel() {
   const [busy, setBusy] = useState<null | "save" | "favicon" | "logo">(null)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  /** Bumped after an upload so the browser re-fetches a URL that did not change. */
+  /**
+   * A CACHE-BUSTER THAT DOES NOT REPEAT ITSELF.
+   *
+   * The favicon URL is stable by design — only the bytes behind it change — so the preview
+   * needs a changing query or it shows the mark you just replaced. This was a counter
+   * starting at 0, and it starts at 0 again on every mount: upload, leave the page, come
+   * back, upload a different file, and the URL is `?v=1` for the second time. The browser
+   * serves the FIRST image out of cache, and the panel says nothing has changed while the
+   * server holds the new mark. That is exactly what "I changed it and it didn't save" looks
+   * like when the save worked.
+   *
+   * A timestamp cannot collide with the previous one.
+   */
   const [bust, setBust] = useState(0)
   const faviconRef = useRef<HTMLInputElement>(null)
   const logoRef = useRef<HTMLInputElement>(null)
@@ -65,7 +77,7 @@ export function BrandingPanel() {
       const r = await uploadBrandingAsset(kind, dataUrl)
       if (r.error || !r.url) throw new Error(r.error || "Upload failed.")
       setB((p) => ({ ...(p ?? {}), [kind === "favicon" ? "faviconUrl" : "logoUrl"]: r.url }))
-      setBust((n) => n + 1)
+      setBust(Date.now())
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Upload failed.")
@@ -104,6 +116,13 @@ export function BrandingPanel() {
                 {busy === "favicon" ? "Uploading…" : "Replace"}
               </Button>
             </div>
+            {/* SAID WHERE IT HAPPENED. One "Saved" chip at the bottom of a panel with three
+                controls cannot tell you WHICH of them saved, and it is 40cm from the mark
+                you just replaced. */}
+            <p className="mt-1.5 text-2xs text-muted-foreground">
+              Saves the moment you upload — no Save needed. The tab may take a minute to
+              catch up, and a hard reload is instant.
+            </p>
           </div>
 
           {/* LOGO */}
@@ -138,8 +157,17 @@ export function BrandingPanel() {
         {err && <p className="text-sm text-destructive">{err}</p>}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={save} disabled={busy === "save" || appName === (b?.appName ?? "")}>
-            {busy === "save" ? "Saving…" : "Save"}
+          {/* SAVE IS FOR THE NAME, and it has to say so. It was one unlabelled Save under a
+              panel with three controls, disabled whenever the name had not been edited — so
+              after replacing a mark it sat greyed out, and the only reading available was
+              "this panel refuses to save". The uploads write immediately and always did;
+              the button never governed them. */}
+          <Button
+            size="sm" onClick={save}
+            disabled={busy === "save" || appName === (b?.appName ?? "")}
+            title={appName === (b?.appName ?? "") ? "The app name hasn't changed. Marks save the moment you upload them." : undefined}
+          >
+            {busy === "save" ? "Saving…" : "Save app name"}
           </Button>
           {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
         </div>
