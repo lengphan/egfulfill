@@ -18,6 +18,104 @@ import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
 import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
 import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
+import { printZoneOf, type PrintZone } from "@/lib/print-zone"
+
+const clampPct = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+/**
+ * THE DASHED PRINT AREA, draggable and resizable, over one side's mockup.
+ *
+ * `printAreas[side]` has been read by print-zone.ts all along and written by nothing, so
+ * every product fell back to a hardcoded zone keyed off its garment type — which is why the
+ * box sat in the same place on every t-shirt and could not be moved.
+ *
+ * Percentages of the mockup, not pixels: the same rectangle has to hold on a 112px tile and
+ * on the Design Maker's full-size stage.
+ */
+function PrintAreaEditor({ src, zone, onChange, onReset }: {
+  src: string
+  zone: PrintZone
+  onChange: (z: PrintZone) => void
+  onReset: () => void
+}) {
+  const box = useRef<HTMLDivElement | null>(null)
+  // One handler for both gestures: move keeps the size and shifts the origin, resize pins
+  // the origin and grows. Pointer capture, so a drag that leaves the box still tracks.
+  const start = (e: React.PointerEvent, mode: "move" | "size") => {
+    e.preventDefault(); e.stopPropagation()
+    const el = box.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const x0 = e.clientX, y0 = e.clientY
+    const z0 = { ...zone }
+    ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+    const move = (ev: PointerEvent) => {
+      const dx = ((ev.clientX - x0) / r.width) * 100
+      const dy = ((ev.clientY - y0) / r.height) * 100
+      if (mode === "move") {
+        onChange({ ...z0, x: clampPct(z0.x + dx, 0, 100 - z0.w), y: clampPct(z0.y + dy, 0, 100 - z0.h) })
+      } else {
+        onChange({ ...z0, w: clampPct(z0.w + dx, 5, 100 - z0.x), h: clampPct(z0.h + dy, 5, 100 - z0.y) })
+      }
+    }
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up) }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+  }
+  const num = (k: keyof PrintZone, label: string) => (
+    <label className="flex items-center gap-1 text-xs text-muted-foreground">
+      {label}
+      <Input
+        value={String(Math.round(zone[k]))}
+        onChange={(e) => {
+          const v = Number(e.target.value.replace(/[^0-9]/g, ""))
+          if (Number.isNaN(v)) return
+          const next = { ...zone, [k]: v }
+          // Clamped on the same rules the drag uses, so typing can't put the box off the
+          // garment in a way dragging cannot.
+          next.w = clampPct(next.w, 5, 100 - next.x)
+          next.h = clampPct(next.h, 5, 100 - next.y)
+          next.x = clampPct(next.x, 0, 100 - next.w)
+          next.y = clampPct(next.y, 0, 100 - next.h)
+          onChange(next)
+        }}
+        className="h-7 w-14 text-xs"
+        inputMode="numeric"
+        aria-label={`Print area ${label}`}
+      />
+    </label>
+  )
+  return (
+    <div className="flex flex-wrap items-start gap-4">
+      <div ref={box} className="relative size-64 shrink-0 select-none overflow-hidden rounded-lg border border-border bg-muted">
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt="" className="pointer-events-none size-full object-contain" />
+        ) : (
+          <span className="grid size-full place-items-center text-xs text-muted-foreground">No photo for this side</span>
+        )}
+        <div
+          onPointerDown={(e) => start(e, "move")}
+          className="absolute cursor-move rounded-[2px] border-2 border-dashed border-primary bg-primary/5"
+          style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.w}%`, height: `${zone.h}%` }}
+        >
+          <span
+            onPointerDown={(e) => start(e, "size")}
+            className="absolute -bottom-1.5 -right-1.5 size-3.5 cursor-nwse-resize rounded-full border-2 border-background bg-primary"
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <p className="max-w-xs text-xs text-muted-foreground">
+          Drag the box to move it, the corner to resize. Everything outside it is trimmed in
+          production. Values are percentages of the photo.
+        </p>
+        <div className="flex flex-wrap gap-2">{num("x", "X")}{num("y", "Y")}{num("w", "W")}{num("h", "H")}</div>
+        <Button type="button" variant="outline" size="sm" onClick={onReset}>Reset to the type default</Button>
+      </div>
+    </div>
+  )
+}
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
 // surcharges cannot drift apart again.
@@ -162,6 +260,11 @@ export function ProductEditorDialog({
    * everything that never disagreed with it.
    */
   const [sideMockups, setSideMockups] = useState<Record<string, string>>({})
+  /** The dashed print area per side, 0–100% of the mockup. Empty = follow the garment-type
+   *  fallback in print-zone.ts, which is what every product did before this could be set. */
+  const [printAreas, setPrintAreas] = useState<Record<string, PrintZone>>({})
+  /** Which side's area is open in the editor below the tiles. */
+  const [areaSide, setAreaSide] = useState<string | null>(null)
   useEffect(() => {
     const t = setTimeout(() => { getFactorySettings().then((r) => { const t = r.product_types ?? []; setTypes(t); setTypeMockups(t) }).catch(() => {}) }, 0)
     return () => clearTimeout(t)
@@ -345,6 +448,8 @@ export function ProductEditorDialog({
         setImgColor(tags)
       }
       setSideMockups({ ...((p?.side_mockups ?? p?.sideMockups ?? {}) as Record<string, string>) })
+      setPrintAreas({ ...((p?.printAreas ?? p?.print_areas ?? {}) as Record<string, PrintZone>) })
+      setAreaSide(null)
       setStatus(p?.status ?? "Active")
       setFeatured(p?.featured === true)
       setImg(p ? imageOf(p) : "")
@@ -686,6 +791,9 @@ export function ProductEditorDialog({
       // Only send overrides that exist. An empty map means "inherit the type", and
       // writing {} explicitly is how a product goes back to following settings.
       side_mockups: Object.fromEntries(Object.entries(sideMockups).filter(([, v]) => !!v)),
+      // Same rule as side_mockups: only what this product actually overrides. An absent
+      // side keeps following the type's fallback zone.
+      printAreas,
       img, // the hero — what the catalog shows
       /**
        * THE VARIANT SKUS THIS PRODUCT OWNS, written onto the product so the rest of the
@@ -1585,10 +1693,36 @@ export function ProductEditorDialog({
                         />
                       </label>
                       <span className="truncate text-xs font-medium capitalize">{sd}</span>
+                      {/* The print area for THIS side. A tile is 112px — too small to place
+                          a rectangle on — so it opens the editor below rather than trying
+                          to be one. The dot says this side has an area of its own. */}
+                      <button
+                        type="button"
+                        onClick={() => setAreaSide(areaSide === sd ? null : sd)}
+                        className={"flex items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-2xs font-medium transition-colors " +
+                          (areaSide === sd ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}
+                      >
+                        Print area
+                        {printAreas[sd] && <span className="size-1.5 rounded-full bg-primary" />}
+                      </button>
                     </div>
                   )
                 })}
               </div>
+
+              {areaSide && (
+                <div className="rounded-lg border border-border p-3">
+                  <div className="mb-2 text-xs font-medium capitalize">{areaSide} print area</div>
+                  <PrintAreaEditor
+                    src={sideMockups[areaSide] || typeMockupOf({ type } as CatalogProduct, areaSide) || ""}
+                    // The type's fallback is the starting rectangle, so the first drag adjusts
+                    // what is already there rather than starting from a box in the corner.
+                    zone={printAreas[areaSide] ?? printZoneOf({ type, name } as CatalogProduct, areaSide)}
+                    onChange={(z) => setPrintAreas((m) => ({ ...m, [areaSide]: z }))}
+                    onReset={() => setPrintAreas((m) => { const n = { ...m }; delete n[areaSide]; return n })}
+                  />
+                </div>
+              )}
             </div>
           )}
 

@@ -944,6 +944,10 @@ export type CatalogProduct = {
   mockup?: string
   sideMockups?: Record<string, string>
   side_mockups?: Record<string, string>
+  /** The dashed print area per side, 0–100% of the mockup. Read by lib/print-zone.ts;
+   *  absent means "use the garment-type fallback". Set in the product editor. */
+  printAreas?: Record<string, { x: number; y: number; w: number; h: number }>
+  print_areas?: Record<string, { x: number; y: number; w: number; h: number }>
   // Explicit per-variant SKUs ([{sku,color,size}] | string[]) — how a marketplace
   // listing's SKU resolves back to this product. Matched by pricing.js + the variant picker.
   variantSkus?: (string | { sku?: string; SKU?: string; color?: string; size?: string })[]
