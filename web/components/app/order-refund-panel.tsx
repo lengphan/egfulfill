@@ -211,7 +211,12 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
                 disabled={busy || !selected.length}
               >
                 {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
-                Refund {usd(isEverything ? state.refundable : planned)}
+                {/* Every part ticked is not "refund $38.41", it is the whole order going
+                    back — and saying so is the difference between reading a number and
+                    understanding the action. The figure is not lost: the card header states
+                    "$38.41 refundable" directly above this. A partial refund still names
+                    its amount, because there the amount IS the decision. */}
+                {isEverything ? "Full refund" : `Refund ${usd(planned)}`}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
