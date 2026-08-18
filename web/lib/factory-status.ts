@@ -177,9 +177,10 @@ export function lineProgress(items: { factory_status?: string | null }[]): { tot
 // An operator may accept work INTO production; they still cannot claim it left. The zone
 // used to end at "awaiting_scan" — with that stage gone, "working" is the same boundary
 // under the name that survived.
-/* Approved is IN the operator zone — confirming the blank is the operator's job, and
-   the stage exists to record that they did it. */
-const OP_ZONE = new Set(["", "in_review", "approved", "working"])
+/* Approved is IN the operator zone — confirming the blank is the operator's job, and the
+   stage exists to record that they did it. Working is NOT: starting production is the
+   warehouse's call, tested explicitly above so the refusal can say why. */
+const OP_ZONE = new Set(["", "in_review", "approved"])
 const OP_STOPS = new Set(["on_hold"])
 const MONEY_STAGES = new Set(["cancelled", "refunded"])
 
@@ -246,7 +247,19 @@ export function stageDenialReason(role: string, current: string | null | undefin
 
   if (role === "admin") return null
   if (role === "warehouse") {
-    return MONEY_STAGES.has(to) ? "Cancelling or refunding is an admin decision." : null
+    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision."
+    /**
+     * PRODUCTION STARTS FROM APPROVED, and only from there.
+     *
+     * Approved means an operator has confirmed the blank on every line — the whole reason
+     * the stage exists. Starting from Pending would be the warehouse making that judgement
+     * itself, on an order whose variants may still be unset, which is the case Approved was
+     * added to catch. Admin is past this check already and may skip.
+     */
+    if (to === "working" && at !== "approved") {
+      return "Start it from Approved — an operator confirms the blank first."
+    }
+    return null
   }
   if (role === "operator") {
     if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
@@ -260,8 +273,18 @@ export function stageDenialReason(role: string, current: string | null | undefin
     if (!isFactory && (to === "" || to === "new" || to === "draft") && ai > 0) {
       return "This order has been paid for — only warehouse or admin can send it back."
     }
+    /**
+     * AN OPERATOR APPROVES; THE WAREHOUSE STARTS.
+     *
+     * The operator's job on this line is the BLANK — confirming it is theirs, and Approved
+     * is where that judgement is recorded. Committing the order to production is the
+     * warehouse's call, and it is a different decision made by whoever is going to make the
+     * thing. So Working is out of reach here even though Approved is not: the handover is
+     * the point of having two stages rather than one.
+     */
+    if (to === "working") return "Approving is yours — the warehouse starts production from there."
     if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
-    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Working."
+    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Approved."
     return null
   }
   return "Your role cannot change production status."

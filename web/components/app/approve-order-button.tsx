@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle, CircleNotch } from "@phosphor-icons/react"
+import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { updateOrder, postItemStatus, type OrderRow, type CatalogProduct } from "@/lib/api"
-import { normalizeStage, isFactoryOrder } from "@/lib/factory-status"
+import { getUser } from "@/lib/auth"
+import { normalizeStage, isFactoryOrder, canSetStage } from "@/lib/factory-status"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
 
 /**
@@ -43,10 +44,26 @@ export function ApproveOrderButton({
   size?: "sm" | "default"
 }) {
   const [busy, setBusy] = useState(false)
+  const role = getUser()?.role ?? ""
   if (!isApprovable(order)) return null
 
   const incomplete = orderNeedsSetup(order.items, catalog)
   const blocked = incomplete > 0
+  /**
+   * The next stage THIS role may set from here, and nothing else shown.
+   *
+   * An operator's move is Approved; the warehouse's is Working. A role that may set
+   * neither gets no button at all rather than one that would be refused — an affordance
+   * that 403s is worse than an absent one, because it reads as breakage rather than as
+   * somebody else's job.
+   */
+  const fac = isFactoryOrder(order)
+  const at = order.factory_status ?? ""
+  const target = canSetStage(role, at, "approved", fac) ? "approved"
+    : canSetStage(role, at, "working", fac) ? "working"
+      : null
+  if (!target) return null
+  const word = target === "approved" ? "Approve" : "Start"
 
   const approve = async () => {
     setBusy(true)
@@ -57,7 +74,19 @@ export function ApproveOrderButton({
       for (const it of order.items ?? []) {
         if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "working", it.line_id)
       }
-      const r = await updateOrder(order.id, { factoryStatus: "working" })
+      /**
+       * APPROVE MEANS APPROVED, and Start means Working — they are two stages now.
+       *
+       * This wrote `working` under the word "Start" for everybody, which was right while the
+       * pipeline had nothing between a submission and production. It does now: an operator
+       * confirms the blank (Approved) and the warehouse commits it (Working). Writing
+       * `working` from here would let an operator start production with one press of a
+       * button whose own permission check no longer permits it — the server would refuse,
+       * and the refusal would read as a bug.
+       *
+       * So the button writes the next stage this ROLE may actually set, and says which.
+       */
+      const r = await updateOrder(order.id, { factoryStatus: target })
       if ((r as { error?: string })?.error) throw new Error((r as { error?: string }).error)
       onDone()
     } catch (e) {
@@ -73,14 +102,16 @@ export function ApproveOrderButton({
       title={blocked
         ? `${incomplete} item${incomplete === 1 ? "" : "s"} still need a blank, colour, size & method — set them before starting.`
         : isFactoryOrder(order)
-          ? "Put this into production — moves it to Awaiting scan"
-          : "Accept this seller's order into production — moves it to Awaiting scan"}
+          ? target === "approved" ? "Confirm the blank on every line" : "Put this into production"
+          : target === "approved"
+            ? "Confirm the blank on every line — the warehouse starts production from there"
+            : "Accept this order into production"}
     >
       {/* ONE WORD, both kinds of order. "Approve" and "Start" were the same write with two
           names, and the row in the hub had a third ("Next stage") for the same act on a
           Pending order — three labels for one decision, which is what made it unreadable.
           Who is waiting is already on the row: a seller's order says Pending. */}
-      {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Start</>}
+      {busy ? <CircleNotch size={14} className="animate-spin" /> : word}
     </Button>
   )
 }

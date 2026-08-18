@@ -1659,9 +1659,15 @@ export function OrdersHub() {
               <Button size="sm" variant="outline" onClick={doBulkSlips} disabled={pushing || !!buying}>
                 Packing slips
               </Button>
-              <Button size="sm" variant="outline" onClick={doBulkStart} disabled={pushing || !!buying}>
-                Start
-              </Button>
+              {/* HIDDEN, not disabled, for a role that cannot start. The per-row and per-item
+                  Start buttons have always checked canSetStage; this bulk one never did, so
+                  an operator could select forty orders and press a button the server would
+                  refuse one at a time. Starting production is the warehouse's call. */}
+              {canSetStage(role, "approved", "working") && (
+                <Button size="sm" variant="outline" onClick={doBulkStart} disabled={pushing || !!buying}>
+                  Start
+                </Button>
+              )}
               <Button size="sm" onClick={doPush} disabled={pushing}>
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
                 {pushing ? "Sending…" : `Send ${selected.size} to dispatch board`}
