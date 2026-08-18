@@ -152,7 +152,7 @@ export function SampleOrderDialog({
           {/* Only when this was opened FROM an order — otherwise there is nothing being
               read and a status line about reading would be describing nothing. */}
           {tradeId && (
-            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground">
               <DownloadSimple size={13} weight="bold" className="mr-1 inline" />
               {/* Supplier names routinely END in a full stop ("… Co., Ltd."), so a sentence
                   joined straight on gives "Ltd.. Everything". Separated instead. */}
@@ -307,7 +307,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
           </table>
         </div>
       )}
-      <div className="flex items-start gap-2 border-t border-border bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
         <Warning size={14} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
         Booked at place time, so a sample that never arrives still shows as spent — which it is.
         It appears in Finance under <span className="font-medium text-foreground">Sample</span>, and in the

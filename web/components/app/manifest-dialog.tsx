@@ -132,7 +132,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
             ) : (
               <>
                 {groups && groups.length > 1 && (
-                  <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                     These labels span {groups.length} carrier accounts, so they need {groups.length} separate
                     forms — USPS requires one account per form. All {groups.length} are created together.
                   </p>

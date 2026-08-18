@@ -277,7 +277,7 @@ export function SupplierOrderingDialog({
                         ))}
                       </select>
                     ) : (
-                      <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                         {opts.suppliers.ss.paymentProfiles?.reason ?? "No saved cards on this account — S&S will bill the account on file."}
                       </p>
                     )}
@@ -445,7 +445,7 @@ function KeyRow({ label, shown, isAdmin, editing, value, busy, onEdit, onChange,
   onEdit: () => void; onChange: (v: string) => void; onSave: () => void; onCancel: () => void
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+    <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs">
       <span className="w-32 shrink-0 text-muted-foreground">{label}</span>
       {editing ? (
         <>

@@ -719,7 +719,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   /** WHAT IS ABOUT TO HAPPEN, one row per file, before anything is written. */
   const queue = staged.length > 0 && (
     <div className="rounded-xl border border-border">
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <span className="text-xs font-semibold text-muted-foreground">
           {staged.length} file{staged.length === 1 ? "" : "s"} ready — check where each one goes
         </span>

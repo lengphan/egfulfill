@@ -1636,7 +1636,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   <p className="text-xs text-destructive">{destErr}</p>
                 ) : dests.length === 0 ? (
                   // Not an empty picker — an empty picker looks like a broken feature.
-                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                     No shop is connected to your account yet, so there&apos;s nowhere to publish this.
                     Connect one under <a href="/stores" className="font-medium text-primary hover:underline">Stores</a>.
                   </div>

@@ -54,9 +54,10 @@ const imageFor = (p: CatalogProduct | null, variant?: string | null): string => 
  * published.
  */
 const VIS: { id: SkuVisibility; label: string; pill: string }[] = [
-  { id: "factory", label: "Factory only", pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  { id: "seller", label: "Sellers", pill: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300" },
-  { id: "public", label: "Public", pill: "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" },
+  /* `pill` is kept for the summary row's plain label; the control itself no longer tints. */
+  { id: "factory", label: "Factory only", pill: "text-muted-foreground" },
+  { id: "seller", label: "Sellers", pill: "text-sky-700 dark:text-sky-400" },
+  { id: "public", label: "Public", pill: "text-violet-700 dark:text-violet-400" },
 ]
 const visOf = (it: InventoryItem): SkuVisibility => (it.visibility === "seller" || it.visibility === "public" ? it.visibility : "factory")
 const avail = (it: InventoryItem) => num(it.in_stock) - num(it.reserved)
@@ -335,7 +336,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus size={14} weight="bold" /> Add item</Button>
         </div>
 
-        <div className="border-b border-border bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground">
+        <div className="border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Factory only</span> never leaves the building — stock arrives this way,
           because receiving a blank is not a decision to sell it.{" "}
           <span className="font-medium text-foreground">Sellers</span> publishes the SKU in the partner stock feed.{" "}
@@ -590,7 +591,12 @@ function ProductGroup({
           value={visOf(it)}
           onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
           aria-label={`Visibility for ${it.sku}`}
-          className={"eg-select h-7 rounded-full border-0 py-0 pl-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (VIS.find((v) => v.id === visOf(it))?.pill ?? "")}
+          /* NO TINTED CAPSULE, and no fixed-height pill for a control that has to hold
+             "Factory only" plus a caret. The fill was clipped by the table's own
+             horizontal scroll box at the right edge, and it was the last coloured pill in
+             a table whose statuses are now words. A bordered select, like every other
+             select in the app. */
+          className="eg-select h-7 w-full min-w-[8.5rem] rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>

@@ -1654,7 +1654,7 @@ export function OrdersHub() {
               paragraph of options above a list you were already looking at. Rows carry
               their own checkbox, so bulk selection was never the only way in. */}
           {selected.size > 0 && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5">
+            <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-2.5">
               <span className="text-sm text-muted-foreground">{selected.size} selected</span>
               <Button size="sm" variant="outline" onClick={doBulkSlips} disabled={pushing || !!buying}>
                 Packing slips

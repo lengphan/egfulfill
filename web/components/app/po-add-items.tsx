@@ -553,7 +553,7 @@ export function POAddItems({
                   {/* Already-synced styles, expandable to the variants we hold. */}
                   {ssStyles.map(renderLocalStyle)}
                   {extraStyleHits.length > 0 && ss.length > 0 && (
-                    <div className="border-y border-border bg-muted/40 px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                    <div className="border-y border-border px-4 py-1.5 text-xs font-medium text-muted-foreground">
                       More from S&amp;S — open one to load its colours and sizes
                     </div>
                   )}

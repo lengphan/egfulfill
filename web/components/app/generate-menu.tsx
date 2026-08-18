@@ -194,7 +194,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
             {cfg?.enabled && (
               <div className="space-y-2.5">
                 {priceNote && (
-                  <div className="rounded-md bg-muted/60 px-2 py-1.5 text-2xs text-muted-foreground">{priceNote}</div>
+                  <div className="rounded-md px-2 py-1.5 text-2xs text-muted-foreground">{priceNote}</div>
                 )}
                 <div className={allowVideo ? undefined : "hidden"}>
                   <div className="mb-1 text-2xs text-muted-foreground">What are we making?</div>

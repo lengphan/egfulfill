@@ -566,7 +566,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
           </Button>
         </div>
         {pending.length > 0 && (
-          <div className="border-b border-border bg-muted/30 px-4 py-3">
+          <div className="border-b border-border px-4 py-3">
             <div className="mb-2 eg-label text-muted-foreground">Awaiting confirmation</div>
             <div className="space-y-1.5">
               {pending.map((p) => {

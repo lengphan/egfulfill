@@ -251,7 +251,7 @@ export function PartnerSheets() {
                 const preview = blockRows(block, m, (rows ?? []).slice(0, 3))
                 return (
                   <div key={block.id} className="rounded-lg border border-border">
-                    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
                       <span className="text-sm font-medium">{block.title || `Table at row ${block.headerRow + 1}`}</span>
                       <span className="text-xs text-muted-foreground">{block.columns.length} columns</span>
                       <select className={`${SELECT} ml-auto`} value={m.mode}

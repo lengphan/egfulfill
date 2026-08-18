@@ -49,7 +49,7 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
   if (!s) return null
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5 text-sm">
+    <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-2.5 text-sm">
       <Storefront size={15} weight="duotone" className="text-muted-foreground" />
       {s.total === 0 ? (
         <span className="text-muted-foreground">Nothing in the catalogue yet.</span>

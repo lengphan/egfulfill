@@ -166,7 +166,7 @@ export function CardEntryDialog({
 
           {/* The way out of this window. Ticked, the card goes to the same browser store
               Order settings › Payment writes, and placement reads it from there. */}
-          <label className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+          <label className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-xs">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
                    className="mt-0.5 size-3.5 accent-[var(--primary)]" />
             <span>

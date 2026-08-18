@@ -118,7 +118,7 @@ export function ShopAnalyzer() {
           )}
 
           {!sales && (
-            <div className="flex items-start gap-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <div className="flex items-start gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
               <Info size={13} className="mt-0.5 shrink-0" />
               <span>No synced Etsy orders yet, so sales are <b>estimated</b> from favorites &amp; listing age. Etsy publishes no views or conversion data — once your orders sync, this switches to your real numbers.</span>
             </div>

@@ -65,7 +65,7 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
           {/* USPS is on by default in Shippo; UPS only shows once a UPS carrier account is
               connected there. If nothing UPS came back, say why rather than leave a gap. */}
           {rates && rates.length > 0 && !rates.some((r) => (r.carrier || "").toLowerCase().includes("ups") && !(r.carrier || "").toLowerCase().includes("usps")) && (
-            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-2xs text-muted-foreground">
+            <div className="rounded-lg border border-border px-3 py-2 text-2xs text-muted-foreground">
               No UPS rates came back. Connect a UPS account in your Shippo dashboard (Settings → Carriers → UPS) and they’ll appear here automatically.
             </div>
           )}

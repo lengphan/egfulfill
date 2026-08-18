@@ -1385,7 +1385,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           const wontPay = !!card.claimed_by && !!claimedRole && claimedRole !== "designer"
           if (wontPay) {
             return (
-              <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+              <div className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground">
                 No payout — claimed by {claimedRole}
               </div>
             )

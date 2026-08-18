@@ -350,7 +350,7 @@ export function SourcingView() {
           </div>
         )}
 
-        {msg && <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs">{msg}</div>}
+        {msg && <div className="border-b border-border px-4 py-2 text-xs">{msg}</div>}
 
         {pickerOpen && (
           <div className="border-b border-border p-4">
@@ -617,7 +617,7 @@ export function SourcingView() {
                   // Honesty rule: an empty state must not look like a working feature. Without a
                   // unit price the "profit" is just fees on nothing, so say what's missing rather
                   // than render a confident number.
-                  <div className="border-b border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                  <div className="border-b border-border px-4 py-3 text-xs text-muted-foreground">
                     Add {missing.join(" and ")} to see profit. Everything below is incomplete until then.
                   </div>
                 )}

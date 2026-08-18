@@ -382,7 +382,7 @@ export function ShipmentDetailDialog({
               in shape and unreal in consequence — real tracking, real-looking price, never
               charged. Reading the price without knowing that is the trap. */}
           {s.test && (
-            <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
               Bought on a test key: the tracking number and price are real in shape but nothing was
               ever charged, and the parcel will never move.
             </p>

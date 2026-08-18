@@ -568,7 +568,7 @@ export function StoresManager() {
               new orders always sync automatically afterward.
             </p>
             {pending === "tiktok" && tiktokRegion && (
-              <div className="mt-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
                 login. If your shop is {tiktokRegion === "us" ? "not US" : "US"} and it can&apos;t find your account, the
                 server&apos;s <code className="font-mono">TIKTOK_REGION</code> is set to the wrong region.
@@ -577,7 +577,7 @@ export function StoresManager() {
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
                 every greyed row. */}
             {syncedWindowFor(pending) !== null && (
-              <div className="mt-3 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 This shop already imported{" "}
                 <span className="font-medium text-foreground">
                   {SCOPE_OPTIONS.find((o) => o.days === syncedWindowFor(pending))?.label.toLowerCase() ?? `${syncedWindowFor(pending)} days`}

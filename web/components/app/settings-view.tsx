@@ -1656,7 +1656,7 @@ function PlatformPanel() {
         </p>
 
         <div className="mb-3 overflow-hidden rounded-lg border border-border">
-          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 eg-label text-muted-foreground">
+          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border px-3 py-1.5 eg-label text-muted-foreground">
             <span className="w-6" />
             <span>Code</span>
             <span>Name</span>
