@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
 import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -49,6 +49,80 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
     img.onerror = () => resolve(null)   // a broken layer is skipped, never fatal to the flatten
     img.src = src
   })
+}
+
+/** The meter's three states. Amber and red are the reserved warning/alert hues and this is
+ *  a warning about work, so it uses them rather than inventing a fourth signal colour. */
+const QUALITY_TONE: Record<string, string> = {
+  ok: "text-success",
+  warn: "text-amber-600 dark:text-amber-500",
+  bad: "text-destructive",
+  unknown: "text-muted-foreground",
+}
+
+/** One face's worth of design. The editor holds a map of these keyed by side. */
+export type SideStack = { images: ImageLayer[]; texts: TextLayer[] }
+/** Shared, frozen, module-scope: a fresh `{ images: [], texts: [] }` per render would be a
+ *  new object every time and defeat every equality check that reads it. */
+const EMPTY_STACK: SideStack = Object.freeze({ images: [], texts: [] }) as SideStack
+
+/**
+ * WHAT A PLACED LAYER WOULD PRINT AT, in DPI.
+ *
+ * The one number a print-on-demand editor owes the person using it, and we published a
+ * 300 DPI guideline on the marketing site while checking nothing at all.
+ *
+ * `pos.w` is a percentage of the STAGE, and the print area is a percentage of the same
+ * stage — so the layer's share of the printable rectangle is pos.w / zone.w, and its
+ * printed width in inches is that share of the area's real width. Pixels over inches is
+ * the DPI. Nothing here is about the file's own DPI tag: a 500px image labelled 300 DPI
+ * still only has 500 pixels to spend, which is the thing that actually goes soft.
+ */
+export function layerDpi(naturalW: number, posW: number, zoneW: number, areaInW: number): number | null {
+  if (!(naturalW > 0) || !(posW > 0) || !(zoneW > 0) || !(areaInW > 0)) return null
+  const printedInches = (posW / zoneW) * areaInW
+  if (!(printedInches > 0)) return null
+  return naturalW / printedInches
+}
+
+/** Green / amber / red, and what to say about it. 300 is the guideline we publish; 150 is
+ *  the floor most DTG and DTF work is still acceptable at. */
+export function dpiVerdict(dpi: number | null): { tone: "ok" | "warn" | "bad" | "unknown"; label: string } {
+  if (dpi == null) return { tone: "unknown", label: "Measuring…" }
+  if (dpi >= 300) return { tone: "ok", label: "Print quality: good" }
+  if (dpi >= 150) return { tone: "warn", label: "Print quality: usable" }
+  return { tone: "bad", label: "Print quality: too low" }
+}
+
+/**
+ * THE PIXELS A PLACED IMAGE ACTUALLY HAS.
+ *
+ * Module-scope and content-keyed by src, so the same artwork on three layers is measured
+ * once and a re-render never re-measures anything. Decoding is the whole cost here.
+ */
+const naturalCache = new Map<string, { w: number; h: number }>()
+
+function useNaturalSizes(srcs: string[]): Map<string, { w: number; h: number }> {
+  const key = srcs.join("\u0000")
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const missing = key.split("\u0000").filter((u) => u && !naturalCache.has(u))
+    if (!missing.length) return
+    let live = true
+    Promise.all(missing.map((u) => new Promise<void>((res) => {
+      const im = new window.Image()
+      im.crossOrigin = "anonymous"
+      // A 0×0 entry is still an ANSWER — it stops this retrying a broken URL every render,
+      // and layerDpi reads it as "can't tell" rather than as a quality verdict.
+      im.onload = () => { naturalCache.set(u, { w: im.naturalWidth, h: im.naturalHeight }); res() }
+      im.onerror = () => { naturalCache.set(u, { w: 0, h: 0 }); res() }
+      im.src = u
+    // Re-render once the whole batch is in, not once per image: a ten-layer design would
+    // otherwise re-render ten times on open.
+    }))).then(() => { if (live) setTick((n) => n + 1) })
+    return () => { live = false }
+  }, [key])
+  return naturalCache
 }
 
 async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 900): Promise<string> {
@@ -161,7 +235,11 @@ export function DesignMaker() {
   // Which face of the garment we're designing. A blank with back/sleeve/hood mockups has
   // a different print zone on each, so the side has to drive BOTH the image and the zone —
   // designing a back print against the front's zone puts the artwork in the wrong place.
-  const [side, setSide] = useState("front")
+  const [side, setSideRaw] = useState("front")
+  /** Switching face CLEARS the selection. A layer id belongs to one side's stack, so a
+   *  selection carried across would name a layer that isn't on the canvas — the action
+   *  strip would sit there acting on something invisible. */
+  const setSide = (s: string) => { setSideRaw(s); setSelected(null) }
   // A product's OWN photo wins PER SIDE, and the category's outline stands in on every side
   // it hasn't got one for — which is the point of defining them once per type: fifty hats
   // inherit four faces without fifty uploads, and a hat that disagrees about its back still
@@ -192,7 +270,57 @@ export function DesignMaker() {
    * about the editor as much as the storage: a layer list you cannot read is not a layer list.
    */
   const MAX_LAYERS = 10
-  const [images, setImages] = useState<ImageLayer[]>([])
+  /**
+   * ONE STACK PER SIDE — and this is the fix for a page that was quietly lying.
+   *
+   * `images` and `texts` were single arrays, and `side` changed nothing but the mockup
+   * behind them and the print zone drawn on it. So a seller who pressed Back saw the back
+   * of the garment carrying the FRONT's artwork, moved it, and moved the front print. The
+   * faces looked like four designs and were one.
+   *
+   * The whole editor below still reads `images`/`texts` and writes through `setImages`/
+   * `setTexts` — they are now the CURRENT side's, and the setters keep React's own
+   * signature (value or updater) so nothing downstream had to learn about sides.
+   *
+   * The cap is per side. Ten layers is where a layer list stops being readable, and that
+   * is true of one face at a time, not of a garment (server side: maxSideLayers).
+   */
+  const [stacks, setStacks] = useState<Record<string, SideStack>>({})
+  const stack = stacks[side] ?? EMPTY_STACK
+  const images = stack.images
+  const texts = stack.texts
+  const setImages: Dispatch<SetStateAction<ImageLayer[]>> = (v) =>
+    setStacks((prev) => {
+      const c = prev[side] ?? EMPTY_STACK
+      const next = typeof v === "function" ? (v as (p: ImageLayer[]) => ImageLayer[])(c.images) : v
+      return { ...prev, [side]: { images: next, texts: c.texts } }
+    })
+  const setTexts: Dispatch<SetStateAction<TextLayer[]>> = (v) =>
+    setStacks((prev) => {
+      const c = prev[side] ?? EMPTY_STACK
+      const next = typeof v === "function" ? (v as (p: TextLayer[]) => TextLayer[])(c.texts) : v
+      return { ...prev, [side]: { images: c.images, texts: next } }
+    })
+  /** The front's stack, by name rather than by "whichever side is open" — the legacy
+   *  single-artwork fields mean the front, and a reader that predates sides can't ask. */
+  const frontStack = stacks.front ?? EMPTY_STACK
+  /** Which sides actually carry artwork — what the extra-side surcharge is counted from. */
+  const paintedSides = Object.keys(stacks).filter((k) => (stacks[k]?.images.length ?? 0) > 0 || (stacks[k]?.texts.length ?? 0) > 0)
+  /**
+   * THE QUALITY METER. Printify has one; we published a 300 DPI guideline on the marketing
+   * site and checked nothing at all, which is the worse of the two positions — a seller
+   * finds out the artwork was too small when a customer holds the shirt.
+   *
+   * Read off the WORST layer on this side, not an average: one soft layer prints soft
+   * whatever the rest of the stack does.
+   */
+  const areaIn = { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h }
+  const zone = printZoneOf(product, side, areaIn)
+  const natural = useNaturalSizes(images.map((im) => im.src))
+  const dpiOf = (im: ImageLayer) => layerDpi(natural.get(im.src)?.w ?? 0, im.pos.w, zone.w, areaIn.w)
+  const measured = images.map(dpiOf).filter((d): d is number => d != null)
+  const worstDpi = measured.length ? Math.min(...measured) : null
+  const quality = dpiVerdict(images.length === 0 ? null : worstDpi)
   const nextLayerId = useRef(1)
   /**
    * EVERYTHING DECIDED BEFORE ANY STATE IS SET.
@@ -239,7 +367,6 @@ export function DesignMaker() {
     setImages((prev) => (v ? (prev.length ? prev.map((im, i) => (i === 0 ? { ...im, src: v } : im))
       : [{ id: `img-${nextLayerId.current++}`, src: v, name: null, pos: { ...DEFAULT_POS } }]) : prev.slice(1)))
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
-  const [texts, setTexts] = useState<TextLayer[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   /** The selected image layer, when the selection is one.
    *
@@ -317,21 +444,37 @@ export function DesignMaker() {
    * puts the artwork back centred and looks like the template never saved it.
    */
   const applyTemplate = (t: ProductTemplate) => {
-    const l = (t.layers ?? {}) as { images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
+    const l = (t.layers ?? {}) as { sides?: Record<string, SideStack>; images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
     const d = (t.data ?? {}) as { blank?: string | null; printArea?: { w?: number; h?: number } }
     templateId.current = String(t.id)
     if (t.name) setName(t.name)
     // A template saved BEFORE the stack has one artwork and a position; one saved
     // after has the list. Reading images first means a new template never falls back
     // to its own compatibility fields and loses its upper layers.
-    if (Array.isArray(l.images) && l.images.length) {
-      setImages(l.images)
-      nextLayerId.current = l.images.length + 1
-    } else if (l.designUrl) {
-      setImages([{ id: `img-${nextLayerId.current++}`, src: l.designUrl, name: null, pos: l.pos ?? { ...DEFAULT_POS } }])
+    // THREE GENERATIONS, newest first. `sides` is the whole design; `images` is one face's
+    // stack; `designUrl` is a single artwork. Reading in this order means a newer template
+    // never falls through to its own compatibility fields and loses the rest of itself.
+    if (l.sides && typeof l.sides === "object" && Object.keys(l.sides).length) {
+      const restored: Record<string, SideStack> = {}
+      let n = 1
+      for (const [sd, v] of Object.entries(l.sides)) {
+        restored[sd] = { images: Array.isArray(v?.images) ? v.images : [], texts: Array.isArray(v?.texts) ? v.texts : [] }
+        n += restored[sd].images.length
+      }
+      setStacks(restored)
+      nextLayerId.current = n
+    } else {
+      const front: SideStack = { images: [], texts: [] }
+      if (Array.isArray(l.images) && l.images.length) {
+        front.images = l.images
+        nextLayerId.current = l.images.length + 1
+      } else if (l.designUrl) {
+        front.images = [{ id: `img-${nextLayerId.current++}`, src: l.designUrl, name: null, pos: l.pos ?? { ...DEFAULT_POS } }]
+      }
+      if (Array.isArray(l.texts)) front.texts = l.texts
+      setStacks({ front })
     }
     if (l.pos) setPos(l.pos)
-    if (Array.isArray(l.texts)) setTexts(l.texts)
     if (d.printArea?.w) setPaW(String(d.printArea.w))
     if (d.printArea?.h) setPaH(String(d.printArea.h))
     const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
@@ -433,10 +576,13 @@ export function DesignMaker() {
         name: name.trim() || "Untitled template",
         composite: composed,
         data: { blank: product?.name ?? null, blankSku: product?.sku ?? null, printArea: { w: Number(paW), h: Number(paH) } },
-        // BOTH shapes. `images` is the truth; `designUrl`/`pos` are the bottom layer, kept
-        // so a template saved today still opens in anything that reads the old fields —
-        // including this file's own loader, and the publish prefill below.
-        layers: { images, texts, designUrl, pos: images[0]?.pos ?? pos },
+        // EVERY SIDE, plus the old flat fields describing the FRONT.
+        // `sides` is the truth now — a template of a two-sided design that saved only the
+        // face you happened to be looking at is a template of half a design. The flat
+        // fields stay so a template saved today still opens in anything that reads them,
+        // and they are the front rather than "the current side": a reader that predates
+        // sides has no way to know which face it is being handed.
+        layers: { sides: stacks, images: frontStack.images, texts: frontStack.texts, designUrl: frontStack.images[0]?.src ?? "", pos: frontStack.images[0]?.pos ?? pos },
       })
       if (r.error) throw new Error(r.error)
       setMsg({ tone: "ok", text: "Saved as a template." })
@@ -508,6 +654,20 @@ export function DesignMaker() {
               <span className="text-xs text-muted-foreground">x</span>
               <Input value={paH} onChange={(e) => setPaH(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area height in inches" />
             </div>
+            {/* Only once there is something to judge. An empty stage showing "too low"
+                would be reporting on nothing, and a meter that is wrong while idle is one
+                nobody reads when it matters. */}
+            {images.length > 0 && (
+              <div className={"flex items-start gap-1.5 text-2xs " + QUALITY_TONE[quality.tone]} role="status">
+                <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
+                <span>
+                  {quality.label}
+                  {worstDpi != null && <span className="tabular-nums"> · {Math.round(worstDpi)} DPI at {areaIn.w}&quot;</span>}
+                  {quality.tone === "bad" && <> — scale it down, or send a larger file. Under 150 DPI shows as soft edges on the garment.</>}
+                  {quality.tone === "warn" && <> — fine for DTG and DTF; embroidery and fine detail want 300.</>}
+                </span>
+              </div>
+            )}
           </div>
           {/* Images — your reusable uploads + buyer art from your orders. Upload keeps a
               copy in "Your uploads"; click any thumbnail to drop it on the design. */}
@@ -590,6 +750,12 @@ export function DesignMaker() {
                     }
                   >
                     {f.side}
+                    {/* A dot on a face that carries work. With one stack per side the pills
+                        are now the only way to see that the back has anything on it — the
+                        stage shows one face at a time. */}
+                    {((stacks[f.side]?.images.length ?? 0) + (stacks[f.side]?.texts.length ?? 0)) > 0 && (
+                      <span className={"ml-1.5 inline-block size-1.5 rounded-full align-middle " + (side === f.side ? "bg-primary-foreground/80" : "bg-primary")} />
+                    )}
                   </button>
                 ))}
               </div>
@@ -618,7 +784,7 @@ export function DesignMaker() {
                 eraseBusy={bg.busy}
                 onUndoErase={selImage && bg.canUndo ? bg.undo : undefined}
                 selected={selected} onSelect={setSelected}
-                printZone={printZoneOf(product, side, { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h })}
+                printZone={zone}
                 printLabel={`${Number(paW) || BASE_PRINT_IN.w}" x ${Number(paH) || BASE_PRINT_IN.h}" print area`}
               />
               {dragOver && (
@@ -678,14 +844,24 @@ export function DesignMaker() {
                 <span className="text-2xs tabular-nums text-muted-foreground">{images.length + texts.length} / {MAX_LAYERS}</span>
               </div>
               <div className="space-y-1">
-                {[...images].reverse().map((im) => (
-                  <button key={im.id} onClick={() => setSelected(im.id)}
-                    className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={im.src} alt="" className="eg-checker size-7 shrink-0 rounded border border-border object-contain" />
-                    <span className="truncate">{im.name || "Image"}</span>
-                  </button>
-                ))}
+                {[...images].reverse().map((im) => {
+                  // Per LAYER, because the summary above names the worst one and this is
+                  // how you find out which one that is.
+                  const d = dpiOf(im)
+                  const v = dpiVerdict(d)
+                  return (
+                    <button key={im.id} onClick={() => setSelected(im.id)}
+                      className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={im.src} alt="" className="eg-checker size-7 shrink-0 rounded border border-border object-contain" />
+                      <span className="truncate">{im.name || "Image"}</span>
+                      <span
+                        className={"ml-auto size-1.5 shrink-0 rounded-full bg-current " + QUALITY_TONE[v.tone]}
+                        title={d == null ? "Measuring this layer" : `${Math.round(d)} DPI as placed — ${v.label.replace("Print quality: ", "")}`}
+                      />
+                    </button>
+                  )
+                })}
                 {texts.map((t) => (
                   <button key={t.id} onClick={() => setSelected(t.id)}
                     className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === t.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
@@ -720,16 +896,40 @@ export function DesignMaker() {
             <Button
               className="w-full"
               onClick={async () => {
-                const composed = await composeDesign(images, texts, 1200)
-                // images[] is the composite the BUYER sees; designUrl is the artwork the
-                // FACTORY needs. Sending only the composite is why published listings
-                // produced orders with nothing to digitise.
+                // 2000px, which is Etsy's own floor for a listing photo. 1200 was under it,
+                // so the picture a buyer judges the product by arrived soft on the one
+                // channel most of these listings go to.
+                const composed = await composeDesign(frontStack.images, frontStack.texts, 2000)
+                /**
+                 * THE FACTORY GETS THE WHOLE FRONT, not the bottom of the stack.
+                 *
+                 * `designUrl` was `images[0].src` — layer one and nothing else. A design of
+                 * a logo, a name and a badge published a correct-looking listing and sent
+                 * production a lone logo; every text layer was lost outright, because text
+                 * is not in `images` at all.
+                 *
+                 * Flattened only when there is something to flatten. A single image with no
+                 * text is passed through AS THE ORIGINAL FILE — re-rastering it would throw
+                 * away resolution the uploaded file has and the canvas doesn't, and that is
+                 * the common case.
+                 *
+                 * 2400px is the ceiling on the flattened one on purpose: this travels to the
+                 * publish page through sessionStorage, which is a few megabytes, and a
+                 * failed stash is reported below rather than swallowed.
+                 */
+                const single = frontStack.images.length === 1 && frontStack.texts.length === 0
+                const art = single
+                  ? frontStack.images[0].src
+                  : await composeDesign(frontStack.images, frontStack.texts, 2400)
+                // A flattened front is already placed — it IS the print area — so it must
+                // not carry the bottom layer's offset a second time.
+                const artPos = single ? (frontStack.images[0]?.pos ?? pos) : { ...DEFAULT_POS, w: 100 }
                 // Publishing is its own PAGE now, so the listing travels through
                 // sessionStorage rather than as a prop — see lib/publish-draft.ts. A failed
                 // stash is said out loud: navigating to a page whose draft was never stored
                 // would land on an empty form with no explanation.
                 const id = stashPublishDraft({
-                  prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl, designPos: pos },
+                  prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl: art, designPos: artPos },
                   returnTo: "/design/maker",
                   returnLabel: "Back to Design",
                   title: "Publish product",
@@ -742,6 +942,17 @@ export function DesignMaker() {
               Publish product
             </Button>
             {pubErr && <p className="text-xs text-destructive">{pubErr}</p>}
+            {/* SAID OUT LOUD, because the listing carries the front only. The sides are real
+                in the editor and in a saved template now, but published_listings holds one
+                artwork and the order sync writes it as side 'front' — so a back print would
+                travel no further than this page without saying so. Honest beats silent: a
+                seller who is told can save the template and hand the back to the factory
+                through the order, which does support per-side artwork. */}
+            {paintedSides.filter((sd) => sd !== "front").length > 0 && (
+              <p className="text-2xs text-amber-600 dark:text-amber-500">
+                Publishing sends the FRONT. {paintedSides.filter((sd) => sd !== "front").join(", ")} {paintedSides.filter((sd) => sd !== "front").length === 1 ? "is" : "are"} saved with the template but not with the listing.
+              </p>
+            )}
           </div>
         </aside>
       </div>
