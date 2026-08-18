@@ -75,6 +75,19 @@ export function BoldProduct({ product, shipping }: {
   // carries no photo — it is a choice a buyer genuinely makes — but the hero only swaps for a
   // colour that actually has an image, rather than blanking to a placeholder mid-browse.
   const [colorIdx, setColorIdx] = useState<number | null>(null)
+  /**
+   * THE SIZE A VISITOR IS ASKING ABOUT.
+   *
+   * The sizes were a read-only list beside a single figure, on a product whose price MOVES
+   * by size — so the page showed "from $7.16" and no way to find out what the 3XL you
+   * actually sell costs. A chart of measurements answered a different question entirely.
+   */
+  const [size, setSize] = useState<string | null>(null)
+  /** What one costs in a given size. A size with no tier of its own is charged the base —
+   *  the same rule the server prices the order by. */
+  const priceOfSize = (s: string | null) =>
+    (s ? product.sizePrices?.find((t) => t.size === s)?.price : undefined) ?? product.price
+  const shown = priceOfSize(size)
   const chosen = colorIdx == null ? null : product.colors[colorIdx] ?? null
   const hero = chosen?.image ?? product.image
   // The chart, pivoted from the supplier's flat {size, spec, value} rows into columns.
@@ -199,8 +212,15 @@ export function BoldProduct({ product, shipping }: {
             </h1>
 
             <div className="mt-7 border-y border-black/[0.09] py-6">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-black tracking-tight tabular-nums">{usd(product.price)}</span>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                {/* "from" ONLY while no size is chosen. Once one is, this is not a range any
+                    more — it is the price of that size, and still calling it "from" would be
+                    hedging a number we now know exactly. */}
+                {product.priceVaries && !size && (
+                  <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-black/45">from</span>
+                )}
+                <span className="text-4xl font-black tracking-tight tabular-nums">{usd(size ? shown : (product.priceFrom ?? product.price))}</span>
+                {size && <span className="text-sm font-semibold text-black/55">for {size}</span>}
               </div>
               {/* Say WHOSE price this is. It's what a seller pays us to make and ship one —
                   not a retail price, and not our cost. Leaving that ambiguous on a public
@@ -275,7 +295,45 @@ export function BoldProduct({ product, shipping }: {
             )}
             {product.sizes.length > 0 && (
               <>
-                <Spec label="Sizes" items={product.sizes} />
+                {/* A PICKER, because there is now something to say back. This was a Spec —
+                    deliberately inert, on the argument that a marketing page has nowhere to
+                    submit a choice to. That held while every size cost the same; it stopped
+                    holding the moment the price moved by size, because the answer to "what
+                    does a 2XL cost" is a fact, not a submission. */}
+                <div className="mt-6">
+                  <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
+                    <span>Sizes <span className="text-black/30">· {product.sizes.length}</span></span>
+                    {product.priceVaries && <span className="normal-case tracking-normal text-black/40">pick one for its price</span>}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {product.sizes.map((s) => {
+                      const on = size === s
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          // Pressing the chosen one again clears it, so a visitor can get
+                          // back to the range without reloading the page.
+                          onClick={() => setSize(on ? null : s)}
+                          aria-pressed={on}
+                          className={
+                            "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
+                            (on
+                              ? "border-[#0B0B0C] bg-[#0B0B0C] text-[#FAF8F3]"
+                              : "border-black/[0.14] text-black/70 hover:border-black/50 hover:text-[#0B0B0C]")
+                          }
+                        >
+                          {s}
+                          {product.priceVaries && (
+                            <span className={"ml-2 text-xs font-medium tabular-nums " + (on ? "text-[#FAF8F3]/70" : "text-black/40")}>
+                              {usd(priceOfSize(s))}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
                 {/**
                   * THE SIZE CHART, WHERE SIZES ARE.
                   *

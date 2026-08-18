@@ -14,7 +14,6 @@ import { parseBlock } from "@/lib/address-paste"
 import { ProductCombobox } from "@/components/app/product-combobox"
 import { createOrder, getOrders, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
-import { orderTotal } from "@/lib/pricing"
 
 // Best-effort parse of a pasted US address block → structured fields.
 // Last non-empty line is expected as "City, ST 12345" (comma optional).
@@ -49,7 +48,6 @@ const emptyLine = (): Line => ({ name: "", sku: "", blank: "", img: "", qty: "1"
 // free-typed.
 const METHOD_LABELS = PRODUCT_METHODS.map((m) => m.label)
 
-const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function NewOrderPage() {
   const router = useRouter()
@@ -96,17 +94,6 @@ export default function NewOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parsed.addr.street, parsed.addr.street2, parsed.addr.city, parsed.addr.state, parsed.addr.zip])
 
-  // Canonical order total: Σ(unit × qty) + first-item/additional shipping.
-  const pricing = useMemo(
-    () =>
-      orderTotal(
-        lines
-          .filter((l) => l.name.trim())
-          .map((l) => ({ qty: Number(l.qty) || 1, unitPrice: Number(l.price) || 0, size: l.size })),
-        []
-      ),
-    [lines]
-  )
 
   /**
    * WHAT THE BUYER PAID, TYPED — when the lines do not add up to it.
@@ -123,9 +110,6 @@ export default function NewOrderPage() {
    * Never mandatory: an order whose sale price nobody recorded is a real order, and "not
    * recorded" is a truthful thing for it to say.
    */
-  const [paidTyped, setPaidTyped] = useState("")
-  const paidValue = paidTyped.trim() === "" ? pricing.subtotal : Number(paidTyped) || 0
-  const paidIsTyped = paidTyped.trim() !== ""
 
   const setLine = (i: number, patch: Partial<Line>) =>
     setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
@@ -224,8 +208,10 @@ export default function NewOrderPage() {
         // otherwise whatever the create form happened to add up; see the note on `revenue`
         // in orders/[id]). Left unflagged when no price was typed, so "nothing recorded"
         // stays distinguishable from "sold for $0".
-        total: paidValue,
-        meta: paidValue > 0 ? { retail_set: true } : undefined,
+        // No sale price is collected here any more, so nothing is claimed about one.
+        // retail_set stays UNSET — it is the flag that says "a human typed this", and
+        // sending it with a zero would assert the buyer paid nothing.
+        total: 0,
         items,
       })
       if (r.error) throw new Error(r.error)
@@ -391,14 +377,6 @@ export default function NewOrderPage() {
                 <span className="text-xs text-muted-foreground">Qty</span>
                 <Input value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value.replace(/[^0-9]/g, "") })} className="h-9" inputMode="numeric" />
               </label>
-              {/* "Sold for", not "Price" — one word decides which pot of money this is,
-                  and the ambiguous one is why the blank's base cost was being typed (and
-                  prefilled) here and read back as the buyer's payment. Optional: an order
-                  with nothing here is one whose sale price nobody recorded. */}
-              <label className="flex flex-col gap-1" title="What the buyer paid per unit — your records. It does not set what we charge to make this; that is quoted on the order.">
-                <span className="text-xs text-muted-foreground">Sold for</span>
-                <Input value={l.price} onChange={(e) => setLine(i, { price: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="—" className="h-9" inputMode="decimal" />
-              </label>
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">Color</span>
                 {l.colors.length > 0 ? (
@@ -438,38 +416,17 @@ export default function NewOrderPage() {
             </div>
           ))}
         </div>
-        {/* TWO POTS OF MONEY, AND THIS FORM ONLY HOLDS ONE.
-            It read "Subtotal / Shipping / Total" — Σ(item price × qty) plus OUR fulfilment
-            shipping fee — which quietly added the buyer's money to our charge and called
-            the sum a total. Nothing is billed off it either: the charge is the quote at
-            submit, computed from the blank, the size and the technique. So the card states
-            the sale, and says where the other number comes from. */}
-        <div className="space-y-1.5 border-t border-border px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 font-semibold">
-            <span>Customer paid</span>
-            <span className="flex items-center gap-2">
-              {/* The sum of the lines is the PLACEHOLDER, so leaving this alone keeps the
-                  old behaviour and typing in it is visibly an override rather than a
-                  correction of something. "not recorded" when there is nothing either way. */}
-              <span className="text-sm font-normal text-muted-foreground">$</span>
-              <Input
-                value={paidTyped}
-                onChange={(e) => setPaidTyped(e.target.value.replace(/[^0-9.]/g, ""))}
-                placeholder={pricing.subtotal > 0 ? pricing.subtotal.toFixed(2) : "not recorded"}
-                inputMode="decimal"
-                aria-label="What the customer paid for this order"
-                className="h-9 w-32 text-right text-base tabular-nums"
-              />
-            </span>
-          </div>
-          {paidIsTyped && pricing.subtotal > 0 && Math.abs(paidValue - pricing.subtotal) >= 0.01 && (
-            // SAID OUT LOUD, because the two numbers disagree and only one is being saved.
-            // Silence here is how a discount becomes a bug report.
-            <p className="text-xs text-muted-foreground">
-              The lines add up to {usd(pricing.subtotal)}; {usd(paidValue)} is recorded.
-            </p>
-          )}
-        </div>
+        {/* NO SALE PRICE ON THIS FORM.
+            "Sold for" per line and "Customer paid" for the order both recorded what the
+            BUYER paid — our records, never a charge; the fulfilment quote is computed at
+            submit from the blank, the size and the technique, and is unaffected by their
+            absence. They are gone at the owner's request: a manual order is raised to get
+            something made, and being asked for the retail figure first is friction in the
+            way of that.
+            THE CONSEQUENCE, so nobody rediscovers it: a manual order now carries no
+            revenue, so profit reporting has cost and no sale for these lines. `total` is
+            sent as 0 and `retail_set` is not claimed, which is the honest shape — reports
+            can tell "nobody recorded it" from "it sold for nothing". */}
       </SectionCard>
 
       {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}

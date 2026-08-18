@@ -1106,6 +1106,9 @@ export type PublicProduct = {
   /** True when sizes are priced differently — the page says "from" only then, because a
    *  single-price product dressed as a range is the other half of getting this wrong. */
   priceVaries?: boolean
+  /** What each priced size costs. Allow-listed to {size, price} server-side — the stored
+   *  tier also carries our cost. A size missing from this list is charged `price`. */
+  sizePrices?: { size: string; price: number }[]
   /** Hand-picked for the front of the catalogue, set in the product editor. */
   featured?: boolean
   /** What THIS product ships for as the first item in a parcel — its own fee if it carries

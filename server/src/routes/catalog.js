@@ -401,6 +401,18 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       priceFrom,
       priceVaries,
       /**
+       * PER-SIZE PRICES, so the page can answer "what does a 3XL cost" instead of quoting a
+       * range and leaving the reader to guess where in it their size falls.
+       *
+       * Allow-listed by hand like everything else here: `size` and `price` only. The tier
+       * also carries `cost` and `shipping`, and `cost` is OUR margin — publishing it would
+       * hand a buyer the number we buy at. Rebuilt field by field rather than spread, so a
+       * field added to the tier upstream cannot ride out onto the public site.
+       */
+      sizePrices: (Array.isArray(d.sizePrices) ? d.sizePrices : [])
+        .filter((t) => t && typeof t.size === 'string' && Number(t.price) > 0)
+        .map((t) => ({ size: t.size, price: Number(t.price) })),
+      /**
        * HAND-PICKED FOR THE FRONT OF THE CATALOGUE.
        *
        * A boolean set in the product editor, published by NAME like everything else here.

@@ -123,6 +123,10 @@ export default function ProductDetailPage() {
   // sizesOf, not product.sizes — many catalog rows carry sizes only as per-size price
   // tiers, which is why some products showed no sizes at all.
   const sizes = sizesOf(product)
+  /** The size being asked about. Sizes were inert chips on a product whose price moves by
+   *  size, so the one figure on the page was true for some of them and not the rest. */
+  const tierOf = (sz: string) => product.sizePrices?.find((t) => t.size === sz)
+  const priceOfSize = (sz: string) => Number(tierOf(sz)?.price ?? 0) || priceOf(product)
   const status = product.status ?? "Active"
   const techs = techsOf(product)
   const shipFee = Number(product.shippingFee ?? product.shipping_fee ?? 0) || 0
@@ -271,9 +275,22 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {sizes.length ? (
-                    sizes.map((s) => (
-                      <span key={s} className="rounded border border-border px-2 py-1 text-xs font-medium">{s}</span>
-                    ))
+                    sizes.map((s) => {
+                      // The price rides ON the chip rather than behind a click. There is
+                      // nothing to select on this page — it is a record, not an order form —
+                      // so a chip that had to be pressed to reveal a number would be a
+                      // control that looks live and submits nothing. Nine sizes, nine prices,
+                      // all readable at once.
+                      const own = tierOf(s)
+                      return (
+                        <span key={s} className="flex items-center gap-1.5 rounded border border-border px-2 py-1 text-xs font-medium">
+                          {s}
+                          <span className={"tabular-nums " + (own ? "text-foreground" : "text-muted-foreground")} title={own ? `This size is priced on its own` : "No tier of its own — charged the base price"}>
+                            {usd(priceOfSize(s))}
+                          </span>
+                        </span>
+                      )
+                    })
                   ) : (
                     <span className="text-sm text-muted-foreground">—</span>
                   )}
