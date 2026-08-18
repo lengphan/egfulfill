@@ -2203,8 +2203,19 @@ export function getOrderQuote(id: string) {
 
 // Set a line item's variant picks (blank/colour/size/method). Keyed by line_id when
 // available, else sku. Rejected (409) once the order is submitted — its cost is frozen.
-export function postItemSetup(id: string, body: { line_id?: string; sku?: string; blank?: string; color?: string; size?: string; printType?: string; variant?: string }) {
+export function postItemSetup(id: string, body: { line_id?: string; sku?: string; blank?: string; color?: string; size?: string; printType?: string; variant?: string; qty?: number }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/item-setup`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+
+/**
+ * Add a line to an order that is still being set up. STAFF ONLY, and refused (409) once
+ * the order is approved. It adds something to MAKE — the charge was frozen at submit and
+ * is not reopened, so an added line is produced and not invoiced.
+ */
+export function addOrderItem(id: string, body: { name?: string; sku?: string; blank?: string; color?: string; size?: string; printType?: string; qty?: number }) {
+  return api<{ ok?: boolean; lineId?: string; error?: string }>(`/api/orders/${encodeURIComponent(id)}/items`, {
     method: "POST", body: JSON.stringify(body),
   })
 }

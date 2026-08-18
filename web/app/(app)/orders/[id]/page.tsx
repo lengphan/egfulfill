@@ -8,7 +8,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
-import { getOrderDesignStatus, getOrderDesignCards, cardForLine, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
+import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -177,9 +177,39 @@ export default function OrderDetailPage() {
    * `one` is what `order` resolves from first, so refreshing it alone moves the quote (and
    * therefore the Summary) as soon as the single-order fetch returns.
    */
+  /** Whatever the last row action refused with. Shown at the Items card rather than
+   *  swallowed: a quantity that snaps back with no explanation reads as a broken field. */
+  const [rowErr, setRowErr] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+
   const reloadOne = useCallback(() => {
     getOrder(String(id)).then((o) => { if (o && !o.error) setOne(o) }).catch(() => {})
   }, [id])
+
+  /** Save a line's quantity. Clamped client-side too, so the field can't send the server
+   *  something it will only reject — and reloaded either way, because the row must show
+   *  what was stored, not what was typed. */
+  const setQty = async (it: OrderItem, raw: string) => {
+    const n = Math.max(1, Math.min(999, Math.round(Number(String(raw).replace(/[^0-9]/g, "")) || 0)))
+    if (n === (Number(it.qty) || 1)) return
+    try {
+      const r = await postItemSetup(String(id), { line_id: it.line_id ?? undefined, sku: it.line_id ? undefined : (it.sku ?? undefined), qty: n })
+      if (r?.error) throw new Error(r.error)
+    } catch (e) {
+      setRowErr(e instanceof Error ? e.message : "Couldn't change the quantity.")
+    } finally { reloadOne() }
+  }
+
+  /** Add a blank line for staff to fill in with the pickers already on every row. */
+  const addItem = async () => {
+    setAdding(true); setRowErr(null)
+    try {
+      const r = await addOrderItem(String(id), { name: "New item", qty: 1 })
+      if (r?.error) throw new Error(r.error)
+    } catch (e) {
+      setRowErr(e instanceof Error ? e.message : "Couldn't add an item.")
+    } finally { setAdding(false); reloadOne() }
+  }
 
   const reloadDesigns = () => {
     getDesignFiles(id).then((r) => setDfiles(r ?? [])).catch(() => {})
@@ -517,7 +547,19 @@ export default function OrderDetailPage() {
       <div className="grid gap-5 lg:grid-cols-[2.1fr_1fr]">
         {/* items + timeline */}
         <div className="min-w-0 space-y-5">
-          <SectionCard title={`Items (${items.length})`}>
+          <SectionCard
+                title={`Items (${items.length})`}
+                actions={canAddItem ? (
+                  <Button size="sm" variant="outline" onClick={() => void addItem()} disabled={adding}
+                    title="Add a line to this order — set its blank and variants with the pickers on the row">
+                    {adding ? "Adding…" : "Add item"}
+                  </Button>
+                ) : undefined}
+              >
+                {/* AN ADDED LINE IS MADE, NOT BILLED. unit_cost/ship_fee froze at submit, so
+                    a line added afterwards is produced and the charge is not reopened. Said
+                    here rather than discovered in a reconciliation. */}
+                {rowErr && <p className="px-5 pt-3 text-xs text-destructive">{rowErr}</p>}
             {items.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">No line items on this order.</div>
             ) : (
@@ -638,8 +680,28 @@ export default function OrderDetailPage() {
                                     at four is one multiplication shown as two rows. The
                                     total is the sum at the foot of the order; what a row has
                                     to say is what this item costs and how many there are. */}
-                                <div className="font-medium tabular-nums">
-                                  {usd(unit)} <span className="text-muted-foreground">× {qty}</span>
+                                <div className="flex items-center justify-end gap-1.5 font-medium tabular-nums">
+                                  {usd(unit)}
+                                  <span className="text-muted-foreground">×</span>
+                                  {/* EDITABLE WHERE IT IS READ. The quantity was a number in
+                                      a sentence, and changing one meant cancelling the order
+                                      and raising it again. Only while the line is still
+                                      editable; after approval it goes back to being text.
+                                      Uncontrolled + keyed on the value, so a save that fails
+                                      re-mounts with what the server actually holds rather
+                                      than leaving a typed number that never landed. */}
+                                  {canEditVariants ? (
+                                    <input
+                                      key={`qty-${it.line_id ?? it.sku}-${qty}`}
+                                      defaultValue={qty}
+                                      inputMode="numeric"
+                                      aria-label={`Quantity for ${it.name || it.sku || "this item"}`}
+                                      title="How many of this line to make"
+                                      onBlur={(e) => void setQty(it, e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur() }}
+                                      className="h-7 w-12 rounded-md border border-border bg-background px-1 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-ring/40"
+                                    />
+                                  ) : qty}
                                 </div>
                                 {/* The "$17.46 blank + $5.00 Embroidery" breakdown was here.
                                     It answered a question the row wasn't asking — the row is
@@ -1076,13 +1138,12 @@ export default function OrderDetailPage() {
                     </div>
                   )}
 
-                  {/* Only when there is nothing to work out. A profit figure needs no essay
-                      beside it; a missing one needs a reason. */}
-                  {!hasRevenue && (
-                    <p className="pt-1 text-xs text-muted-foreground">
-                      No retail price recorded, so profit can&apos;t be worked out.
-                    </p>
-                  )}
+                  {/* The "no retail price recorded" line is gone. It was written for an
+                      occasional order nobody had typed a sale price on; the manual order
+                      form no longer asks for one at all, so it appeared under EVERY total —
+                      a permanent apology for a field that was deliberately removed. The
+                      dash beside Estimated profit already says there is nothing to work
+                      out. */}
                 </>
               )}
               {/* The unpriced lines say so on the rows themselves ("Not priced · pick a

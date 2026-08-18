@@ -1842,8 +1842,29 @@ export function ordersRoutes(app, requireAuth) {
     // factory_status outside ''/new/draft), so there is no second charge for edited
     // variants to be priced into. The old wording promised "cancel it first to change
     // variants", which reads as a way out and is one the code has never had.
+    /**
+     * THE FLOOR MAY CORRECT A LINE UNTIL IT IS APPROVED.
+     *
+     * The lock used to be "charged", which put it at SUBMIT — before an operator had so
+     * much as looked at the order. They are the ones who spot the wrong colour on the way
+     * in, and they had to ask an admin to change it.
+     *
+     * Approved is the honest boundary: it is the stage where a human has confirmed the
+     * blank on every line, so after it a change contradicts the check rather than being
+     * part of it. Draft and Pending stay open to staff; approved, working and shipped are
+     * closed to everyone bar the admin carve-out below.
+     *
+     * WHAT THIS DOES NOT DO: re-price anything. unit_cost/ship_fee are frozen on the line
+     * at submit, so an edit here changes what we MAKE, never what was billed — the same
+     * thing that was already true of the admin correction. A costlier blank or a raised
+     * quantity is absorbed, not invoiced, and the client says so where it is offered.
+     */
+    const stageNow = await q('select factory_status from orders where id=$1', [req.params.id])
+      .then((r) => normalizeStage(r.rows[0] && r.rows[0].factory_status)).catch(() => '');
+    const beforeApproval = stageNow === '' || stageNow === 'in_review';
+    const staffMayEdit = isStaff(req.user) && beforeApproval;
     const charged = await chargedAmount(req.params.id);
-    if (charged > 0) {
+    if (charged > 0 && !staffMayEdit) {
       /**
        * ADMIN MAY STILL CORRECT A LINE UNTIL THE BLANKS ARE ORDERED.
        *
@@ -1872,6 +1893,13 @@ export function ordersRoutes(app, requireAuth) {
     for (const [key, col] of [['blank', 'blank'], ['color', 'color'], ['size', 'size'], ['printType', 'print_type'], ['variant', 'variant']]) {
       if (b[key] !== undefined) { sets.push(`${col}=$${n++}`); vals.push(b[key] === '' ? null : String(b[key])); }
     }
+    // QTY, clamped rather than trusted. A line of 0 is a line that should have been
+    // removed, and there is no order on this platform for ten thousand of one item — an
+    // unbounded number here reaches pricing, purchase orders and the floor's pick list.
+    if (b.qty !== undefined) {
+      const qn = Math.max(1, Math.min(999, Math.round(Number(b.qty) || 0)));
+      sets.push(`qty=$${n++}`); vals.push(qn);
+    }
     if (!sets.length) { reply.code(400); return { error: 'nothing to set' }; }
     let where = `order_id=$${n++}`; vals.push(req.params.id);
     if (lineId) { where += ` and line_id=$${n++}`; vals.push(lineId); }
@@ -1881,6 +1909,49 @@ export function ordersRoutes(app, requireAuth) {
     audit(req, 'item.setup', { entityType: 'order', entityId: req.params.id, after: { line_id: lineId, sku, ...b } });
     egBroadcast({ type: 'orders' });
     return { ok: true };
+  });
+
+  /**
+   * ADD A LINE TO AN ORDER THAT IS STILL BEING SET UP.
+   *
+   * An order arrives with what the buyer bought, and sometimes that is not what has to be
+   * made — a second garment, a replacement for one that can't be sourced. The only way to
+   * add one was to raise a whole new order, which splits one parcel into two.
+   *
+   * Same boundary as item-setup: staff, until the order is approved. It writes a line with
+   * NO unit_cost, so nothing about the money changes — an added line is produced, and the
+   * charge, which was frozen at submit, is not reopened. That is a deliberate asymmetry and
+   * the client says so at the button.
+   */
+  app.post('/api/orders/:id/items', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    // Staff only. A seller adding a line to an order they have already been charged for
+    // would be asking to be produced something nobody billed them for.
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
+    const stageNow = await q('select factory_status from orders where id=$1', [req.params.id])
+      .then((r) => (r.rowCount ? normalizeStage(r.rows[0].factory_status) : null)).catch(() => null);
+    if (stageNow === null) { reply.code(404); return { error: 'order not found' }; }
+    if (!(stageNow === '' || stageNow === 'in_review')) {
+      reply.code(409);
+      return { error: 'This order has been approved — add a line before approval, or raise a new order.' };
+    }
+    const b = req.body || {};
+    const qty = Math.max(1, Math.min(999, Math.round(Number(b.qty) || 1)));
+    // EVERY LINE IS ADDRESSABLE. line_id is the identity the designer, the artwork rows and
+    // the pick list all key on; a line without one collides with its own siblings (see the
+    // backfill at the top of this file).
+    const lineId = `L${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    await q(
+      `insert into order_items (order_id, sku, name, print_type, qty, color, size, blank, line_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [req.params.id, b.sku ? String(b.sku) : null, b.name ? String(b.name) : 'New item',
+       b.printType ? String(b.printType) : null, qty,
+       b.color ? String(b.color) : null, b.size ? String(b.size) : null,
+       b.blank ? String(b.blank) : null, lineId]
+    );
+    audit(req, 'item.add', { entityType: 'order', entityId: req.params.id, after: { line_id: lineId, name: b.name || 'New item', qty } });
+    egBroadcast({ type: 'orders' });
+    return { ok: true, lineId };
   });
 
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
