@@ -329,13 +329,39 @@ export async function readReturnAddress() {
   } catch { return null; }
 }
 
+/*
+ * A SHOP NAME AS A CARRIER SEES IT.
+ *
+ * The name goes on a label and through Shippo to a carrier, and marketplace shop names are
+ * not written for that: they carry emoji, decorative unicode, newlines from a paste, and
+ * they run long. Carriers cap the name line (~35 chars is the safe floor across USPS, UPS
+ * and FedEx) and reject or silently truncate what they cannot print — and a rejected label
+ * is an order that cannot ship.
+ *
+ * So: strip anything that is not printable ASCII, collapse the spaces, cap the length. If
+ * nothing usable survives — a shop written entirely in emoji or a non-Latin script — fall
+ * back to the configured name rather than sending an empty one, because a label with no
+ * sender is worse than one that does not say the shop.
+ */
+const NAME_MAX = 35;
+export function shipNameFor(shop, fallback) {
+  const cleaned = String(shop || '')
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')     // printable ASCII only — emoji, CJK and control chars go
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, NAME_MAX)
+    .trim();
+  return cleaned.length >= 2 ? cleaned : (fallback || '');
+}
+
 export async function shipFromForOrder(orderId) {
   const base = await readShipFrom();
   if (!base || base.blind === false || !orderId) return base;
   try {
     const r = await q('select store from orders where id=$1', [String(orderId)]);
     const store = String((r.rows[0] && r.rows[0].store) || '').trim();
-    return store ? { ...base, name: store } : base;
+    return store ? { ...base, name: shipNameFor(store, base.name) } : base;
   } catch { return base; }
 }
 
