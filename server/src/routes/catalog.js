@@ -1988,6 +1988,57 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       audit(req, 'inventory.auto_tracked', { entityType: 'inventory', entityId: 'auto',
         after: { rows: tracked, products: freshlyAdded.length } });
     }
-    return { ok: true, count: keep.length, priceChanges: priceChanges.length, tracked };
+
+    /**
+     * A PRODUCT THAT SAYS WHERE IT IS BOUGHT BECOMES A SOURCING ROW.
+     *
+     * Sourcing is the cost book — what a blank lands at per unit once freight is spread over
+     * the MOQ. Every hand-bought product belongs in it, and every one of them was being
+     * typed in twice: once as a product, again as a sourcing row, with the same link and the
+     * same cost. The second typing is the one that doesn't happen, and then the comparison
+     * everyone reasons about is missing exactly the blanks nobody has a contract for.
+     *
+     * NOT creation-only, unlike the inventory rows: the link is often added later, on the
+     * edit that follows the first order. Idempotent on `product_id` instead, so re-saving a
+     * product never files a second row.
+     *
+     * INSERT ONLY, NEVER UPDATE. Cost, MOQ, freight and payment terms on that row are
+     * somebody's negotiated notes; a product save must not restate them. Deleting a sourcing
+     * row ARCHIVES it (stage='archived'), so the row still matches here and re-saving the
+     * product cannot resurrect something that was deliberately put away.
+     *
+     * Wrapped in its own try: manual_suppliers is created at that module's route load, and a
+     * catalogue save must not fail because a cost book was not ready.
+     */
+    let sourced = 0;
+    for (const p of products) {
+      const url = String(p.supplierUrl || '').trim();
+      // Absolute http(s) only, the same rule the sourcing route enforces — this string is
+      // rendered as a link and fetched by the price reader.
+      if (!/^https?:\/\//i.test(url)) continue;
+      const pid = String(p.id != null ? p.id : '');
+      if (!pid) continue;
+      try {
+        const dup = await q('select 1 from manual_suppliers where product_id=$1 limit 1', [pid]);
+        if (dup.rowCount) continue;
+        let shop = null;
+        try { shop = new URL(url).hostname.replace(/^www\./, ''); } catch { /* not fatal */ }
+        // The product's own cost is what we pay, which is the cost book's first column.
+        // Null when unset — a fabricated 0 would read as "free" in a landed-cost comparison.
+        const cost = p.productCost == null || p.productCost === '' ? null : Math.max(0, Number(p.productCost) || 0);
+        await q(
+          `insert into manual_suppliers (title, url, shop, product_id, cost, note, stage, created_by)
+           values ($1,$2,$3,$4,$5,$6,'prospect',$7)`,
+          [String(p.name || pid).slice(0, 200), url.slice(0, 1000), shop, pid, cost,
+           p.supplier ? `Supplier: ${String(p.supplier).trim().slice(0, 120)}` : null,
+           (req.user && req.user.sub) || null]
+        );
+        sourced++;
+      } catch { /* the cost book is not ready, or the row is gone — never fail the save */ }
+    }
+    if (sourced) {
+      audit(req, 'sourcing.auto_added', { entityType: 'manual_supplier', entityId: 'auto', after: { rows: sourced } });
+    }
+    return { ok: true, count: keep.length, priceChanges: priceChanges.length, tracked, sourced };
   });
 }
