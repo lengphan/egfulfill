@@ -28,7 +28,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { setInternalNote } from "@/lib/api"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, variantOf, itemsLabel, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
+import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -1869,15 +1869,18 @@ export function OrdersHub() {
                   </div>
                 ),
                 customer: <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>,
+                /* THE PICTURES ARE THE CELL. The name beside them was truncated to
+                   "Cust…" in the width this column gets — a word that identifies nothing —
+                   and under it a count the Items column already carries. Two lines of
+                   text competing with three thumbnails, in a cell whose whole job is
+                   "what is in this order", which the photographs answer better than any
+                   truncation of a marketplace title ever will. Expanding the row shows
+                   every line in full, named. */
                 items: (
                   <div className="flex min-w-0 items-center gap-2.5">
-                    {items.length > 0 && <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />}
-                    <div className="min-w-0">
-                      <div className="truncate text-sm">{itemsLabel(o)}</div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}
-                      </div>
-                    </div>
+                    {items.length > 0
+                      ? <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />
+                      : <span className="text-xs text-muted-foreground">—</span>}
                   </div>
                 ),
                 ready: (
