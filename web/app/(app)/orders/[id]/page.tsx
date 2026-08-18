@@ -54,6 +54,7 @@ import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { LineDownloads } from "@/components/app/line-downloads"
+import { TrackingNumber } from "@/components/app/tracking-number"
 
 // Same fallbacks as the boards' toAddrOf — marketplace payloads spell the address a dozen
 // ways, so the ship-to a label uses must read them all. Kept identical on purpose.
@@ -845,7 +846,7 @@ export default function OrderDetailPage() {
                     )
                   })()}
                   {order.carrier && <div className="font-medium">{order.carrier}</div>}
-                  {order.tracking && <div className="text-xs tabular-nums text-muted-foreground">{order.tracking}</div>}
+                  <TrackingNumber carrier={order.carrier} tracking={order.tracking} />
                   {canFetchTiktokLabel(order) && (
                     <>
                       <button
