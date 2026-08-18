@@ -166,7 +166,8 @@ export async function autoReplenish(orderId) {
       // WHERE TO BUY IT, when the product says. A hand-bought blank reaches the cart with
       // a name and nothing else, and the person holding it then has to remember where it
       // came from. Carried per line so the cart can link straight out.
-      shownAs.set(sku, { name: d.name || row?.name || '', image: image || '', url: String(d.supplierUrl || '').trim() });
+      shownAs.set(sku, { name: d.name || row?.name || '', image: image || '', url: String(d.supplierUrl || '').trim(),
+                         supplier: String(d.supplier || '').trim() });
     }
     if (!byVariant.has(sku)) byVariant.set(sku, new Map());
     const v = byVariant.get(sku);
@@ -244,7 +245,20 @@ export async function autoReplenish(orderId) {
      * gets you twelve of one colour and none of the other.
      */
     let left = available;
-    const supplier = row.supplier || 'Unassigned';
+    /**
+     * THE PRODUCT KNOWS WHO SELLS IT, even when the shelf row does not.
+     *
+     * This read `inventory.supplier` alone, so a blank whose PRODUCT plainly says "S&S"
+     * still reached the cart as "Unassigned · order by hand" if its stock row happened to
+     * be filed before the supplier was recorded there — which is every row created before
+     * that field started being carried. The person looking at the cart can see the supplier
+     * on the product page; the cart could not.
+     *
+     * The shelf row still WINS when it has one: somebody typed that against this specific
+     * sku, and a product-level default must not override a per-sku fact. This is the
+     * fallback, not the answer.
+     */
+    const supplier = row.supplier || shownAs.get(sku)?.supplier || 'Unassigned';
     if (!bySupplier.has(supplier)) bySupplier.set(supplier, []);
     for (const [variant, units] of (byVariant.get(sku) || new Map())) {
       const covered = Math.min(left, units);
