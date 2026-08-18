@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MagnifyingGlassPlus, Check } from "@phosphor-icons/react"
+import { TextAa, Check } from "@phosphor-icons/react"
 
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import { ZOOM_LEVELS, DEFAULT_ZOOM, loadZoom, applyZoom, zoomLabel } from "@/lib/zoom"
@@ -40,7 +40,12 @@ export function ZoomControl() {
           (on ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")
         }
       >
-        <MagnifyingGlassPlus size={18} />
+        {/* Aa, NOT a magnifying glass with a plus in it. This sat one button away from
+            Search wearing nearly the same glyph — two magnifiers side by side, and the
+            one that finds things is the one people reach for, so the other read as a
+            second search rather than as page zoom. Aa is what browsers put on their own
+            zoom control, so it arrives already learned. */}
+        <TextAa size={18} />
         {on && (
           <span className="absolute -bottom-0.5 -right-0.5 rounded bg-primary px-1 text-2xs font-bold leading-[1.4] text-primary-foreground">
             {Math.round(zoom * 100)}
