@@ -355,7 +355,30 @@ export function SupportBubble() {
           </p>
         )}
         {notice && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{notice}</p>}
-        {done && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
+        {/**
+          * BEING TRANSFERRED — but only while that is TRUE.
+          *
+          * The rule the sentence above sets still holds: a live indicator promises "seconds
+          * away", so it may only run when someone is actually there to connect to. Inside
+          * office hours a handover is genuinely in progress and the pulse says so; outside
+          * them the same animation would be a lie with a nice animation on it, so the closed
+          * case keeps its plain sentence about when the team is back.
+          *
+          * It never says "an agent is typing". Nobody is typing — we know a request was
+          * passed on, not that a person has opened it, and inventing that presence is the
+          * same class of thing as a placeholder avatar beside an invented number.
+          */}
+        {done && office?.open !== false && (
+          <p className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">
+            <span aria-hidden className="flex shrink-0 gap-0.5">
+              <span className="size-1.5 animate-bounce rounded-full bg-emerald-600 [animation-delay:-300ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-emerald-600 [animation-delay:-150ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-emerald-600" />
+            </span>
+            Connecting you with an agent…
+          </p>
+        )}
+        {done && office?.open === false && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
       </div>
 
       {needIdentity ? (
