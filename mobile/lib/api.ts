@@ -117,6 +117,20 @@ export const getOrders = () => request<Order[]>("/api/orders")
 export const getOrder = (id: string) => request<Order>(`/api/orders/${encodeURIComponent(id)}`)
 export const getWallet = () => request<WalletResponse>("/api/wallet")
 
+/**
+ * Move an order's factory stage.
+ *
+ * The SERVER decides whether the move is allowed — stageDenial() refuses a skip for
+ * everyone including admin, and refuses a stage outside a role's reach. The phone offers
+ * only the next step and reports whatever comes back; re-deciding any of that here is how
+ * the floor and the phone would come to disagree about who may do what.
+ */
+export const setOrderStage = (id: string, factoryStatus: string) =>
+  request<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ factoryStatus }),
+  })
+
 /* ── Order activity ───────────────────────────────────────────────────────────
  * The same thread the web order page shows. `sender_role` is taken from what the
  * CLIENT sends (`b.role || 'seller'` server-side), so the caller's real role has to be

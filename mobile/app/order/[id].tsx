@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from "react-native"
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking, Alert } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { getOrder, getOrderMessages, getMe, type Order, type ChatEntry, type User } from "@/lib/api"
-import { normalizeStage, units, isOverdue, numOf, platformOf } from "@/lib/orders"
+import { getOrder, getOrderMessages, getMe, setOrderStage, type Order, type ChatEntry, type User } from "@/lib/api"
+import { normalizeStage, units, isOverdue, numOf, platformOf, nextStage, STAGE_LABEL } from "@/lib/orders"
 import { C } from "@/lib/theme"
 import { PackagePhoto, ActivityRow } from "@/components/package-photo"
 
@@ -50,6 +50,7 @@ export default function OrderDetail() {
   const [err, setErr] = useState<string | null>(null)
   const [activity, setActivity] = useState<ChatEntry[] | null>(null)
   const [me, setMe] = useState<User | null>(null)
+  const [moving, setMoving] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -66,6 +67,25 @@ export default function OrderDetail() {
 
   useEffect(() => { load(); loadActivity() }, [load, loadActivity])
   useEffect(() => { getMe().then(setMe).catch(() => setMe(null)) }, [])
+
+  const advance = useCallback(async () => {
+    if (!o) return
+    const to = nextStage(o)
+    if (!to) return
+    setMoving(true)
+    try {
+      const r = await setOrderStage(String(o.id), to)
+      // The refusal sentence is the SERVER's — it names which stages would be skipped, or
+      // why this role may not go there. Rewriting it here would lose that.
+      if (r.error) { Alert.alert("Not moved", r.error); return }
+      await load()
+      await loadActivity()
+    } catch (e) {
+      Alert.alert("Not moved", e instanceof Error ? e.message : "Try again.")
+    } finally {
+      setMoving(false)
+    }
+  }, [o, load, loadActivity])
 
   const code = o?.tracking ?? null
   const link = trackingLink(o?.carrier, code)
@@ -129,6 +149,33 @@ export default function OrderDetail() {
             {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
             {o.total != null ? <Row label="Total" value={`$${(Number(o.total) || 0).toFixed(2)}`} /> : null}
           </View>
+
+          {/* MOVE IT ON — one step, and only ever the next one. The server refuses a skip
+              for everyone, so offering a list of stages would mostly be offering refusals. */}
+          {(() => {
+            if (!me?.role || me.role === "seller") return null
+            const to = nextStage(o)
+            if (!to) return null
+            return (
+              <Pressable
+                onPress={advance}
+                disabled={moving}
+                style={({ pressed }) => ({
+                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+                  marginTop: 28, height: 54, borderRadius: 14,
+                  borderWidth: 1.5, borderColor: C.primary,
+                  opacity: pressed || moving ? 0.6 : 1,
+                })}
+              >
+                {moving
+                  ? <ActivityIndicator color={C.primary} />
+                  : <Ionicons name="arrow-forward-circle" size={20} color={C.primary} />}
+                <Text style={{ color: C.primary, fontWeight: "800", fontSize: 16 }}>
+                  Move to {STAGE_LABEL[to] ?? to}
+                </Text>
+              </Pressable>
+            )
+          })()}
 
           {/* THE PROOF SHOT. Lives on the order screen because that is where the parcel is
               when the photo is worth taking. */}
