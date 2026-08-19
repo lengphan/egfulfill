@@ -105,6 +105,21 @@ export const storeOf = (o: OrderRow) => {
 }
 
 export const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
+
+/**
+ * WHAT A LINE IS, when the line itself is what you're identifying — blank first.
+ *
+ * `variantOf` above answers "which variant of this product", so it starts at colour and
+ * takes the blank as read. This answers "which item is this", which is a different
+ * question and needs the garment named: a file being attached to "Sport Grey · L" tells
+ * you nothing on an order whose lines are all Sport Grey L.
+ *
+ * Returns "" when nothing is set, and that is a REAL state, not a failure — marketplace
+ * orders arrive with variants unset and only the factory's own picks pre-fill them. A
+ * caller must say so rather than render the empty string as a blank line.
+ */
+export const lineFactsOf = (it: OrderItem) =>
+  [it.blank, it.color, it.print_type, it.size].filter(Boolean).join(" · ")
 export const unitsOf = (o: OrderRow) => (o.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
 export const lineTotal = (it: OrderItem) => (Number(it.unit_price) || 0) * (Number(it.qty) || 1)
 

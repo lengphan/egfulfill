@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
 import { designSrc } from "@/lib/order-image"
+import { lineFactsOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { VariantField } from "@/components/app/variant-field"
@@ -552,8 +553,32 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * shows every decision at once, which is what makes a wrong guess obvious while it is
    * still free to fix.
    */
-  type Staged = { file: File; name: string; target: string; image: boolean }
+  /** `preview` is an object URL and only images have one — a .pes has no picture to show,
+   *  and inventing a placeholder that looks like artwork is worse than the glyph. It must
+   *  be revoked when the row goes; see the effect below. */
+  type Staged = { file: File; name: string; target: string; image: boolean; preview?: string }
   const [staged, setStaged] = useState<Staged[]>([])
+
+  /**
+   * ONE OWNER FOR THE PREVIEW URLS, because there are four ways a row leaves.
+   *
+   * A staged row is dropped by Clear, by its own ✕, by a successful attach, and by the
+   * panel unmounting. Revoking inside each of those is four chances to miss one, and a
+   * missed `URL.revokeObjectURL` pins the whole file in memory — which on this card means
+   * a 50MB artwork that is never released. So nothing revokes at the call site: this
+   * reconciles what is alive against what was minted, whatever removed it.
+   */
+  const previewUrls = useRef(new Set<string>())
+  useEffect(() => {
+    const live = new Set(staged.map((s) => s.preview).filter(Boolean) as string[])
+    for (const u of previewUrls.current) {
+      if (!live.has(u)) { URL.revokeObjectURL(u); previewUrls.current.delete(u) }
+    }
+  }, [staged])
+  useEffect(() => {
+    const held = previewUrls.current
+    return () => { for (const u of held) URL.revokeObjectURL(u); held.clear() }
+  }, [])
   /**
    * A CEILING ON THE QUEUE, and it is about legibility rather than bytes.
    *
@@ -600,7 +625,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     const rows = fresh.slice(0, room).map((f) => {
       const image = isImg(f)
       const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
-      return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image }
+      // Registered as it is minted, so the effect below owns every URL from birth — a
+      // preview created here and only revoked at one of the three removal paths is the
+      // shape that leaks the ones taken out by the other two.
+      const preview = image ? URL.createObjectURL(f) : undefined
+      if (preview) previewUrls.current.add(preview)
+      return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image, preview }
     })
     if (rows.length) setStaged((prev) => [...prev, ...rows])
   }
@@ -753,27 +783,83 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     return it ? targetLabel(it, numberOf(it)) : allLabel(image)
   }
 
-  /** WHAT IS ABOUT TO HAPPEN, one row per file, before anything is written. */
+  /**
+   * WHICH ITEM THIS FILE LANDS ON, in the item's own words.
+   *
+   * The row used to restate the file ("artwork — placed on the item"), which the icon and
+   * the picker beside it already say. The thing that cannot be read off the file name is
+   * WHAT it is about to be printed on, so that is what the line carries now.
+   *
+   * The empty case is spelled out rather than left blank: marketplace lines arrive with
+   * their variants unset, so this is routine, and an empty second line under a file name
+   * reads as a lookup that failed.
+   */
+  const targetFacts = (s: Staged) => {
+    if (s.target === ALL) return `every ${s.image ? "item" : "embroidery item"} on this order`
+    const it = items.find((x) => (x.line_id || x.sku) === s.target)
+    if (!it) return ""
+    /*
+     * PRINT METHOD ALONE IS NOT AN ANSWER.
+     *
+     * A marketplace line arrives with its variants unset but its method already known — the
+     * order SKU carries a -EMB/-DTG suffix, so print_type is populated when blank, colour
+     * and size are not. That made this line read "EMB" and stop, which looks like a
+     * complete description of the item rather than the only field anyone has filled in.
+     * The three that actually identify a garment decide whether this is a real answer.
+     */
+    const identified = !!(it.blank || it.color || it.size)
+    const facts = lineFactsOf(it)
+    return identified ? facts : [facts, "variants not set up yet"].filter(Boolean).join(" · ")
+  }
+
+  /**
+   * WHAT IS ABOUT TO HAPPEN, one row per file, before anything is written.
+   *
+   * NO BOX. This was a rounded border holding a ruled header, ruled rows and a ruled
+   * footer — four sets of lines, sitting directly beneath the dashed drop zone, inside the
+   * panel's own card. Five nested frames to show one file. The list of attached files
+   * above it stopped being boxes-in-a-box for exactly this reason ("rows and hairlines for
+   * both"); the staging list never got the same treatment, so the two lists of files on
+   * one order still did not look like the same kind of thing. Now they do.
+   */
   const queue = staged.length > 0 && (
-    <div className="rounded-xl border border-border">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-muted-foreground">
           {staged.length} file{staged.length === 1 ? "" : "s"} ready — check where each one goes
         </span>
         <button onClick={() => setStaged([])} className="text-2xs text-muted-foreground underline-offset-2 hover:underline">Clear</button>
       </div>
-      <div className="divide-y divide-border">
+      <div>
         {staged.map((s) => (
-          <div key={s.name} className="flex flex-wrap items-center gap-2 px-3 py-2">
-            <span className={"flex size-7 shrink-0 items-center justify-center rounded-lg " + (s.image ? "bg-sky-100 text-sky-700" : "bg-violet-100 text-violet-700")}>
-              {s.image ? <ImageIcon size={13} weight="fill" /> : <Sparkle size={13} weight="fill" />}
+          <div key={s.name} className="flex flex-wrap items-center gap-3 border-t border-border py-2.5 first:border-t-0">
+            {/* BIG ENOUGH TO RECOGNISE. It was a 28px tinted square holding a generic
+                picture glyph — the same mark for every image, so a queue of four files
+                showed four identical tiles and the only way to tell them apart was to read
+                the names. This is the actual file. A machine file keeps a glyph because it
+                genuinely has no preview, and the two must not be made to look alike. */}
+            <span className={"flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border " + (s.image ? "bg-muted" : "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300")}>
+              {s.preview
+                /* A blob: URL for a file already in this browser's memory — there is no
+                   request to optimise, and next/image cannot take one anyway. */
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={s.preview} alt="" className="size-full object-contain" />
+                : s.image ? <ImageIcon size={22} weight="fill" className="text-muted-foreground" />
+                : <Sparkle size={22} weight="fill" />}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">{s.name}</div>
-              {/* Says what it will BECOME, because the two kinds land in different places
-                  and only one of them shows up on the mockup. */}
-              <div className="text-2xs text-muted-foreground">
-                {s.image ? "artwork — placed on the item" : "machine file — we check it instead of digitising"}
+              {/* WRAPPED, NOT TRUNCATED. These names are how someone tells their own eight
+                  files apart, and they are long and end-loaded — "…-Crewneck-Sweat.png" cut
+                  to "…-Crewneck-Swea…" removes the extension too, so the row stops saying
+                  whether it is artwork or a stitch file. Clamped at two lines; break-WORDS,
+                  not break-all, so it wraps at the hyphens these names are full of instead
+                  of splitting "Sweat.png" across the break and hiding the extension again. */}
+              <div className="line-clamp-2 break-words text-sm font-medium">{s.name}</div>
+              {/* The item, not the file. "matched by name" stays: the picker beside this was
+                  PRE-FILLED by a guess, and a suggestion that doesn't say it guessed is an
+                  auto-attach with extra steps. */}
+              <div className="truncate text-xs text-muted-foreground">
+                {targetFacts(s)}
                 {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
               </div>
             </div>
@@ -803,7 +889,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-end gap-2 border-t border-border px-3 py-2">
+      <div className="flex items-center justify-end gap-2">
         <Button size="sm" onClick={() => void attach()} disabled={!!busy}>
           {busy ? <><CircleNotch size={13} className="animate-spin" /> Sending {busy}…</> : `Attach ${staged.length} file${staged.length === 1 ? "" : "s"}`}
         </Button>
