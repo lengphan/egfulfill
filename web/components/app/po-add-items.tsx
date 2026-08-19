@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input"
 import { driveImg } from "@/lib/supplier-catalog"
 import { clickableProps } from "@/lib/a11y"
 import {
+  getCatalogProducts, type CatalogProduct,
   getSsProducts, getOttoProducts, getSsStyleSkus, getSsStylesAll, type SsStyle, type OttoVariant, getOttoStyle,
   getSanmarCatalog, getSanmarCatalogStyle, type SanmarCatalogStyle, resolveSuppliers,
   type InventoryItem, type PurchaseOrder, type POLine, type SsProduct, type OttoStyle,
 } from "@/lib/api"
+import { supplierSkusOf, mappingGap } from "@/lib/supplier-sku"
 
 type Tab = "inventory" | "ss" | "otto" | "sanmar"
 
@@ -235,6 +237,10 @@ export function POAddItems({
   const [term, setTerm] = useState("")
   const [q, setQ] = useState("")
   const [picked, setPicked] = useState<Record<string, POLine>>({})
+  /** Our catalogue, for translating a supplier's variant code into ours. Loaded once. */
+  const [catalogRows, setCatalogRows] = useState<CatalogProduct[]>([])
+  /** The last variant we could not translate — shown, not swallowed. */
+  const [unmapped, setUnmapped] = useState<{ supplierSku: string; name: string; variant: string | null; product: string | null } | null>(null)
 
   const [ss, setSs] = useState<SsProduct[] | null>(null)
   const [otto, setOtto] = useState<OttoStyle[] | null>(null)
@@ -364,13 +370,47 @@ export function POAddItems({
     return inventory.filter((i) => !t || `${i.sku} ${i.name ?? ""} ${i.variant ?? ""}`.toLowerCase().includes(t)).slice(0, 300)
   }, [inventory, q])
 
-  const toggle = (line: POLine) =>
-    setPicked((p) => {
-      const next = { ...p }
-      if (next[line.sku]) delete next[line.sku]
-      else next[line.sku] = line
-      return next
+  /**
+   * ADD A LINE — but never one the shelf will not recognise.
+   *
+   * A supplier's catalogue is keyed by THEIR variant code (S&S `B49795660`); ours is
+   * `EG-CAP-ORN-ADJ`. Adding straight from a supplier style put their code on the purchase
+   * line, so receiving credited an inventory row that no order line can ever resolve to —
+   * the goods arrive, the shelf shows them under a name nothing reads, and the stock chip
+   * stays amber forever. That is the island this refuses to create.
+   *
+   * A line whose sku is already one of ours passes untouched, which is every restock raised
+   * from Inventory. A supplier line is translated first, and if nobody has recorded what we
+   * call that colour in that size, it is REFUSED — with the product named, because we
+   * usually do hold the garment and only this pairing is missing.
+   */
+  useEffect(() => {
+    const id = setTimeout(() => { getCatalogProducts().then((r) => setCatalogRows(r ?? [])).catch(() => setCatalogRows([])) }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  const toggle = (line: POLine) => {
+    if (picked[line.sku]) { setPicked((p) => { const n = { ...p }; delete n[line.sku]; return n }); return }
+    const isOurs = catalogRows.some((p) =>
+      String(p.sku ?? "").toUpperCase() === line.sku.toUpperCase()
+      || Object.keys(supplierSkusOf(p)).includes(line.sku.toUpperCase()))
+    if (isOurs) { setPicked((p) => ({ ...p, [line.sku]: line })); return }
+
+    const { mapped, styleMatch } = mappingGap(catalogRows, { supplierSku: line.sku, name: line.name ?? null })
+    if (mapped) {
+      // OUR sku on the line, THEIRS kept beside it: the shelf and the vendor need different
+      // strings for the same physical thing.
+      setPicked((p) => ({ ...p, [mapped.sku]: { ...line, sku: mapped.sku, supplierSku: line.sku } }))
+      setUnmapped(null)
+      return
+    }
+    setUnmapped({
+      supplierSku: line.sku,
+      name: line.name ?? line.sku,
+      variant: line.variant ?? null,
+      product: styleMatch?.name ?? null,
     })
+  }
 
   /** Set a picked line's quantity. Picking a colourway and then typing "24" is the whole
    *  job here — sending every line at 1 and fixing the numbers on the draft afterwards is
@@ -496,6 +536,32 @@ export function POAddItems({
         <DialogHeader>
           <DialogTitle>Add items{po?.supplier ? ` · ${po.supplier}` : ""}</DialogTitle>
         </DialogHeader>
+
+        {/**
+          * SAID OUT LOUD, because a click that does nothing reads as a broken button.
+          *
+          * The refusal is the point — a line carrying a supplier's own variant code would be
+          * received onto a shelf row no order can see — but a refusal with no reason is just
+          * as useless as the island it prevents. It names the exact code, and the product
+          * when we hold the style, because that is nearly always the fix: the garment is in
+          * the catalogue and only this colour-and-size pairing was never recorded.
+          */}
+        {unmapped && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs dark:border-amber-900/40 dark:bg-amber-950/20">
+            <div className="font-medium text-amber-900 dark:text-amber-200">
+              {unmapped.name}{unmapped.variant ? ` · ${unmapped.variant}` : ""} isn&apos;t linked to one of our products yet.
+            </div>
+            <p className="mt-1 text-amber-800 dark:text-amber-300">
+              {unmapped.product
+                ? <>We stock <span className="font-medium">{unmapped.product}</span>, but nothing records that its{unmapped.variant ? ` ${unmapped.variant}` : " variant"} is <span className="font-mono">{unmapped.supplierSku}</span> at this supplier. Open that product and add the supplier code to this variant, then add it here again.</>
+                : <>Add it to Products first — with <span className="font-mono">{unmapped.supplierSku}</span> recorded as the supplier code for this variant — so what arrives can be booked onto the right shelf.</>}
+            </p>
+            <button type="button" onClick={() => setUnmapped(null)}
+              className="mt-1.5 font-medium text-amber-900 underline underline-offset-2 dark:text-amber-200">
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-1 rounded-lg bg-muted p-1">
           {([["inventory", "Inventory"], ["ss", "S&S"], ["otto", "Otto Cap"], ["sanmar", "SanMar"]] as [Tab, string][]).map(([k, label]) => (

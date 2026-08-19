@@ -892,6 +892,14 @@ export type CatalogProduct = {
    *  print method. Null when we don't sell this one as a blank, which leaves the printed
    *  base cost in charge; it is never 0, because 0 would mean giving the garment away. */
   sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null; blank?: number | null }[]
+  /**
+   * OUR variant sku → the SUPPLIER's code for that same variant ("EG-CAP-ORN-ADJ" →
+   * "B49795660"). Per variant, because a supplier's catalogue is keyed by colour AND size
+   * while `supplierSku` on this product is the style — which cannot say what was in the box.
+   * See lib/supplier-sku.ts; this is what lets a purchase cart line carry OUR sku so the
+   * shelf it credits is the one order lines read.
+   */
+  supplierSkus?: Record<string, string>
   /** Product cost for the whole product, when sizes don't differ. Same role as tier.cost. */
   productCost?: number | string | null
   /** Shipping physicals for label buying + the dim-weight check. Weight in ounces, box in
@@ -1679,6 +1687,11 @@ export type POLine = {
    *  single word, so the picture is what confirms the right sku was chosen. Lines without
    *  one (auto-replenished from inventory) resolve it by sku at render time. */
   image?: string | null
+  /** THE SUPPLIER'S code for this same variant, when the line came from their catalogue.
+   *  `sku` is always OURS — it is what receiving credits and what order lines resolve to —
+   *  and this is what the supplier's own order needs to name. Keeping both is the whole
+   *  point: one string for the shelf, one for the vendor. */
+  supplierSku?: string
   /** How many of this line have actually arrived. Absent on every line raised before
    *  receiving existed, which reads as none — the honest default, since nothing was
    *  recorded either way. `qty - received` is what is still outstanding. */
