@@ -385,6 +385,59 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   const removeLine = (po: PurchaseOrder, sku: string) =>
     patchPO(po, po.items.filter((l) => l.sku !== sku))
 
+  /** What a line is still waiting on, in the unit it was ORDERED in. */
+  const owedOn = (l: POLine) => Math.max(0, (Number(l.qty) || 0) - (Number(l.received) || 0))
+
+  /**
+   * BOOK THE WHOLE DELIVERY IN.
+   *
+   * Blanks are bought as singles here — a purchase order is commonly a dozen lines of one
+   * or two pieces, raised because those variants ran out. Pressing a button per line to
+   * book in one box is the work software is for.
+   *
+   * Every line still owed goes in one call; the server clamps each to its own outstanding,
+   * so a line somebody already booked is skipped and SAID, never doubled.
+   */
+  const receiveAll = async (po: PurchaseOrder) => {
+    const owed = po.items.map((l) => ({ sku: l.sku, qty: owedOn(l) })).filter((l) => l.qty > 0)
+    if (!owed.length) return
+    setBusy(`recv:${po.num}`)
+    try {
+      const r = await receivePurchaseOrder(po.num, owed)
+      if (r?.error) throw new Error(r.error)
+      const n = r.received?.length ?? 0
+      const pieces = (r.received ?? []).reduce((t, g) => t + (Number(g.eaches) || 0), 0)
+      setMsg(r.problems?.length
+        ? { ok: false, text: r.problems.join("; ") }
+        : { ok: true, text: `${n} line${n === 1 ? "" : "s"} received — ${pieces} onto the shelf.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't receive this delivery." })
+    } finally { setBusy(null) }
+  }
+
+  /** One line, for a part delivery — the rest of the box turns up later. */
+  const receiveLine = async (po: PurchaseOrder, l: POLine) => {
+    const owed = owedOn(l)
+    if (owed <= 0) return
+    setBusy(`recv:${po.num}:${l.sku}`)
+    try {
+      const r = await receivePurchaseOrder(po.num, [{ sku: l.sku, qty: owed }])
+      if (r?.error) throw new Error(r.error)
+      const g = r.received?.[0]
+      // Ordered units and shelf pieces are the same for singles and differ when a line has
+      // a pack — saying only one is how "I received 2" becomes "why does it say 48".
+      setMsg(r.problems?.length
+        ? { ok: false, text: r.problems.join("; ") }
+        : { ok: true, text: g
+            ? `${g.qty} × ${l.sku}${(g.pack ?? 1) > 1 ? ` (${g.pack} per pack = ${g.eaches})` : ""} received — ${g.inStock} on the shelf.`
+            : `Received ${owed} × ${l.sku}.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't receive that line." })
+    } finally { setBusy(null) }
+  }
+
   // Persist the shared saved-for-later list. Optimistic: the UI moves immediately,
   // the blob is replaced wholesale (that's the factory_lists contract).
   //
@@ -1370,7 +1423,25 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-sky-700">Placed</span>
                       : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
                         : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
-                    <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
+                    {/**
+              * RECEIVE THE WHOLE DELIVERY, at the top where a box gets opened.
+              *
+              * Blanks are bought as singles here — a purchase order is a dozen lines of one
+              * or two pieces, raised because those variants ran out — so a button per line
+              * is a dozen presses for one carton. Each line keeps its own Receive for the
+              * part delivery; this is the ordinary case.
+              *
+              * Hidden once nothing is owed, and the server clamps every line to its own
+              * outstanding regardless, so pressing it twice books nothing the second time.
+              */}
+            {po.items.some((l) => owedOn(l) > 0) && (
+              <Button size="sm" variant="outline" onClick={() => void receiveAll(po)}
+                disabled={busy === `recv:${po.num}` || busy === po.num}
+                title="Book in everything this order is still waiting on and add it to the shelf">
+                {busy === `recv:${po.num}` ? "Receiving…" : "Receive all"}
+              </Button>
+            )}
+                        <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
                       Reorder
                     </Button>
                     {/* Only where it makes sense: an order already settled is IN history. */}
@@ -1518,9 +1589,29 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                             </div>
                             <SourceTags line={l} />
                           </div>
-                          {/* A single line can be re-ordered on its own — restocking one
-                              short blank shouldn't drag the whole past PO along with it. */}
-                          <span className="text-muted-foreground">×{num(l.qty)}</span>
+                          {/* WHAT HAS LANDED, when any has. A bare ×12 cannot tell a line
+                              nobody has touched from one that is fully in — which is the
+                              question this panel exists to answer. */}
+                          {num(l.received) > 0 ? (
+                            <span className={"shrink-0 tabular-nums " + (owedOn(l) === 0 ? "text-success" : "text-amber-700 dark:text-amber-400")}
+                              title={`${num(l.received)} of ${num(l.qty)} received`}>
+                              {num(l.received)}/{num(l.qty)}
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-muted-foreground">×{num(l.qty)}</span>
+                          )}
+                          {/* Only while something is owed. A button that receives nothing is
+                              a way to double-count a delivery. */}
+                          {owedOn(l) > 0 && (
+                            <Button
+                              size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs"
+                              disabled={busy === `recv:${po.num}:${l.sku}` || busy === `recv:${po.num}`}
+                              onClick={() => void receiveLine(po, l)}
+                              title={`Book in the ${owedOn(l)} still owed and add them to the shelf`}
+                            >
+                              {busy === `recv:${po.num}:${l.sku}` ? "…" : "Receive"}
+                            </Button>
+                          )}
                           {/* THE RECORDED PRICE, and only that. A placed PO is not re-costed
                               from today's catalogue — what it cost is a fact. The title says
                               when the figure was our own catalogue snapshot rather than a

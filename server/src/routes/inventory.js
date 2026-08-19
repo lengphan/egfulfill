@@ -337,11 +337,24 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
       if (owed <= 0) { problems.push(`${items[idx].sku} is already fully received on ${num}`); continue; }
       const take = Math.min(qty, owed);
 
+      /**
+       * CASES IN, EACHES ON THE SHELF.
+       *
+       * Suppliers sell blanks by the case, so a line of "2" against a pack of 24 is 48
+       * garments. `qty`/`received` stay in the unit the PO was RAISED in — you ordered two
+       * cases and two cases arrived — while the shelf only ever counts eaches, because that
+       * is what an order line asks for and what a picker takes off a rack.
+       *
+       * Crediting the ordered number directly was wrong by a factor of the pack, in the
+       * direction that reads as "we are out" while a full case sits in the building.
+       */
+      const pack = Math.max(1, Math.round(Number(items[idx].pack) || 1));
+      const eaches = take * pack;
       // The shelf. Same statement the scan gun runs, so the two can never disagree about
       // what receiving means.
       const upd = await q(
         'update inventory set in_stock = coalesce(in_stock,0) + $1, updated_at = now() where sku = $2 returning sku, in_stock',
-        [take, items[idx].sku]
+        [eaches, items[idx].sku]
       );
       if (!upd.rows.length) {
         // NOT created blind. An inventory row carries a name, a category and a reorder
@@ -357,11 +370,14 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
 
       await q(
         'insert into scan_history (sku, direction, qty, order_ref, by_id) values ($1,$2,$3,$4,$5)',
-        [items[idx].sku, 'in', take, num, req.user?.sub || null]
+        [items[idx].sku, 'in', eaches, num, req.user?.sub || null]
       ).catch(() => {});
       // `qty` is what was ASKED for, `take` what was allowed — a short-ship that over-sends
       // should read as "3 of the 5 you asked for", not silently as 3.
-      received.push({ sku: items[idx].sku, qty: take, asked: qty, inStock: Number(upd.rows[0].in_stock) || 0, received: items[idx].received });
+      // `qty` is in ordered units (what you press Receive on), `eaches` is what the shelf
+      // gained — a caller that shows one and means the other is the bug this fixes.
+      received.push({ sku: items[idx].sku, qty: take, asked: qty, pack, eaches,
+                      inStock: Number(upd.rows[0].in_stock) || 0, received: items[idx].received });
       if (take < qty) problems.push(`${items[idx].sku}: only ${owed} were still owed, so ${take} went in`);
     }
 

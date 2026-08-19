@@ -1687,6 +1687,19 @@ export type POLine = {
    *  single word, so the picture is what confirms the right sku was chosen. Lines without
    *  one (auto-replenished from inventory) resolve it by sku at render time. */
   image?: string | null
+  /**
+   * HOW MANY EACHES ARE IN ONE OF WHAT YOU ORDERED.
+   *
+   * Suppliers sell blanks by the case. A line reading "2" against a case of 24 is 48
+   * garments, and the shelf counts garments — so receiving that line as 2 puts a number on
+   * the shelf that is wrong by a factor of the pack, silently, in the direction that makes
+   * you think you are out of stock.
+   *
+   * `qty` stays in the unit you ORDER in (cases), `pack` converts it to the unit you STORE
+   * in (eaches). Absent or 1 means they are the same thing, which is every line raised from
+   * Inventory and most direct buys.
+   */
+  pack?: number
   /** THE SUPPLIER'S code for this same variant, when the line came from their catalogue.
    *  `sku` is always OURS — it is what receiving credits and what order lines resolve to —
    *  and this is what the supplier's own order needs to name. Keeping both is the whole
@@ -1740,7 +1753,7 @@ export function savePurchaseOrder(po: PurchaseOrder) {
  */
 export function receivePurchaseOrder(num: string, lines: { sku: string; qty: number }[]) {
   return api<{ ok?: boolean; num?: string; status?: string; error?: string; problems?: string[]
-               received?: { sku: string; qty: number; inStock: number; received: number }[] }>(
+               received?: { sku: string; qty: number; asked?: number; pack: number; eaches: number; inStock: number; received: number }[] }>(
     `/api/purchase/${encodeURIComponent(num)}/receive`,
     { method: "POST", body: JSON.stringify({ lines }) },
   )
