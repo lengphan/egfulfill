@@ -297,6 +297,21 @@ export const getOrderDesigns = (id: string) =>
   request<OrderDesign[]>(`/api/orders/${encodeURIComponent(id)}/designs`)
 
 /**
+ * THE LABEL PDF, THROUGH US — the address to hand a printer.
+ *
+ * NOT `order.tracking_label_url`. That is the carrier's or the aggregator's own CDN and it
+ * is not always a fetchable address at all: the USPS-direct path stores the bytes as a
+ * `data:` URL, which no opener and no print module can resolve. `/api/shipments/:id/label`
+ * normalises both — it decodes an inline label and streams a remote one back same-origin,
+ * with the real content-type, so the caller gets a file either way.
+ *
+ * Staff only (the PDF carries the buyer's full address), so it needs the Bearer token —
+ * see printOrderLabel in lib/print-label.ts, which is the only caller.
+ */
+export const labelFileUrl = (id: string) =>
+  `${API_BASE}/api/shipments/${encodeURIComponent(id)}/label`
+
+/**
  * Stamp the label as printed — a custody claim, so WAREHOUSE OR ADMIN only.
  *
  * The 403 is the server's and is worth showing rather than hiding the button: an operator

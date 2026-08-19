@@ -16,6 +16,7 @@ import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
 import { BuyLabel } from "@/components/buy-label"
+import { printOrderLabel, printWasCancelled } from "@/lib/print-label"
 
 /**
  * ONE ORDER — the job, on the floor, in the hand.
@@ -123,24 +124,40 @@ export default function OrderDetail() {
   }, [o, load, loadActivity])
 
   /**
-   * PRINT THE LABEL — hand the PDF to the OS.
+   * PRINT THE LABEL — the system print sheet, on the phone in your hand.
    *
-   * There is no print module in this app, and it does not need one: opening the carrier's
-   * PDF puts it in the system viewer, whose share sheet holds AirPrint (and every
-   * network printer the phone knows). The stamp is ours, and it is best-effort — the label
-   * really was opened whether or not the stamp is allowed, and only warehouse/admin may
-   * make that custody claim, so an operator gets told rather than silently ignored.
+   * This opened the carrier's PDF in the browser and left the human to find Share → Print.
+   * It now goes through expo-print (see lib/print-label.ts, which documents exactly what a
+   * resolved print means on each platform, because it is weaker on Android).
+   *
+   * The stamp moved to AFTER the print, not after the file opened. On iOS that makes
+   * `label_printed_at` true: dismissing the print sheet rejects, and nothing is stamped.
+   *
+   * The browser is still here as the FALLBACK, because a phone with no printer set up is a
+   * normal state on a factory floor and the label still has to be reachable — but it is now
+   * something offered when printing failed, not the whole feature. A `data:` label has no
+   * address to open, so it is not offered for one.
    */
   const printLabel = useCallback(async () => {
     if (!o?.tracking_label_url) return
     setPrinting(true)
     try {
-      await Linking.openURL(o.tracking_label_url)
+      await printOrderLabel(String(o.id))
       const r = await markLabelPrinted(String(o.id))
-      if (r.error) Alert.alert("Label opened", `Not stamped as printed: ${r.error}`)
+      if (r.error) Alert.alert("Sent to the printer", `Not stamped as printed: ${r.error}`)
       else await load()
     } catch (e) {
-      Alert.alert("Couldn't open the label", e instanceof Error ? e.message : "Try again.")
+      if (printWasCancelled(e)) return
+      const msg = e instanceof Error ? e.message : "Try again."
+      const url = o.tracking_label_url
+      const openable = /^https?:\/\//i.test(String(url))
+      Alert.alert(
+        "Couldn't print the label",
+        openable ? `${msg}\n\nYou can still open the PDF and print it from there.` : msg,
+        openable
+          ? [{ text: "Cancel", style: "cancel" }, { text: "Open the PDF", onPress: () => Linking.openURL(String(url)) }]
+          : [{ text: "OK" }],
+      )
     } finally { setPrinting(false) }
   }, [o, load])
 
