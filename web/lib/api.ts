@@ -1241,7 +1241,11 @@ export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<s
    *  no quantity in our data: absent means UNKNOWN, never zero. */
   stockByColor?: Record<string, number>
   stockByVariant?: Record<string, Record<string, number>>
-  stockTotal?: number }
+  stockTotal?: number
+  /** Ounces PER SIZE, heaviest variant of that size. Absent, or an empty map, means S&S sent
+   *  no weight — UNKNOWN, never zero, because a zero-ounce garment quotes free postage and
+   *  the carrier corrects it days later. */
+  weightBySize?: Record<string, number> }
 export function getSsStatus() {
   return api<{ configured?: boolean; synced_count?: number; last_sync?: string | null }>(`/api/ss/status`)
 }
@@ -1375,7 +1379,11 @@ export function sanmarOrder(lines: SanmarOrderLine[], shipTo: SanmarShipTo, extr
 /** `image` is the SMALL grid photo (~7KB) — browse serves card_image here on purpose.
  *  `fullImage` is the 1200x1800 original, for anything that keeps or enlarges the photo. */
 export type SanmarCatalogStyle = { style: string; brand?: string | null; name: string | null; description?: string | null; category?: string | null; price: number | string | null; price_max?: number | string | null; image: string | null; fullImage?: string | null; colors: string[] | null; sizes: string[] | null; qty?: number | null; favorited?: boolean }
-export type SanmarCatalogVariant = { color: string | null; size: string | null; sku: string; inventoryKey: string | null; sizeIndex: string | null; price: number | null; image: string | null }
+export type SanmarCatalogVariant = { color: string | null; size: string | null; sku: string; inventoryKey: string | null; sizeIndex: string | null; price: number | null; image: string | null
+  /** SanMar's per-piece weight in ounces, or null when the import predates us reading that
+   *  column. Null is UNKNOWN and must never be treated as zero — a zero-ounce garment quotes
+   *  free postage and the carrier corrects it days later. */
+  weightOz?: number | null }
 export type SanmarCatalogDetail = { style: string; name: string | null; brand?: string | null; category?: string | null; description?: string | null; price: number | null; image: string | null; colors: string[]; sizes: string[]; colorImages: Record<string, string>; variants: SanmarCatalogVariant[]; skus: string[]; error?: string }
 export function getSanmarCatalog(p: { search?: string; limit?: number; offset?: number }) {
   const s = new URLSearchParams()

@@ -1045,6 +1045,10 @@ export function sanmarRoutes(app, requireAuth, requireStaff, requireAdmin, requi
         // SanMar's canonical variant handle is the inventory key; fall back to unique_key.
         sku: v.k || v.u, inventoryKey: v.k || null, sizeIndex: v.i || null,
         price: v.p != null ? Number(v.p) : null,
+        /* THE PIECE WEIGHT, out to the caller — what postage is quoted against. It rides in
+           the fold as `w` (see the aggregator) and is null for anything imported before that
+           column was read, which the client must treat as "unknown", never as zero. */
+        weightOz: v.w != null && isFinite(Number(v.w)) ? Number(v.w) : null,
         // Per-colour photos are not kept: those columns are bare names under a dated imglib
         // path the file gives no way to rebuild (they 302). The style image stands in.
         image: styleImage,

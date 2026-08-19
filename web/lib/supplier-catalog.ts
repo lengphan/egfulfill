@@ -67,6 +67,15 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
     // margin. Base is left blank so it derives as productCost + the base_markup setting.
     productCost: d.price ?? fb.price ?? undefined,
     sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0] ?? fb.colors?.[0],
+    /* THE WEIGHTS, PER SIZE — see the note on the SanMar builder below. Empty when S&S sent
+       none, which leaves the rows out entirely rather than writing zeros: absent means "use
+       the product weight, and the label dialog says it is a guess". */
+    sizePrices: (() => {
+      const rows = Object.entries(d.weightBySize ?? {})
+        .filter(([, w]) => Number(w) > 0)
+        .map(([size, w]) => ({ size, price: 0, shipping: null, weightOz: Number(w) }))
+      return rows.length ? rows : undefined
+    })(),
     /**
      * THEIRS, IN THE FIELD FOR THEIRS. `sku` is left UNSET on purpose.
      *
@@ -120,6 +129,34 @@ export async function sanmarCatalogProduct(style: string, fb: SanmarFb): Promise
     id: "SANMAR-" + style, name: d?.name || fb.name || style, type: typeFromName(d?.name || fb.name || ""), method: "DTG", status: "Active",
     productCost: Number(d?.price ?? fb.price) || undefined,
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
+    /**
+     * THE WEIGHTS COME ACROSS, PER SIZE — the whole point of keeping SanMar's piece weight
+     * through the import.
+     *
+     * Postage is priced in bands (4 / 8 / 12 / 15.999oz, then 1lb on Ground Advantage), and
+     * a 3XL sits a band above an S, so one figure for a style under-declares the big sizes
+     * and gets corrected by the carrier days later. Typing these by hand for 4,081 styles is
+     * not a plan; SanMar publishes them and we now read them.
+     *
+     * The HEAVIEST variant of a size wins. Colours differ by a fraction of an ounce and the
+     * expensive direction is under-declaring — over by 0.2oz costs nothing until it crosses
+     * a band, under by 0.2oz can cross one.
+     *
+     * A size with no weight recorded is LEFT OUT rather than written as 0: absent means "use
+     * the product weight, and the label dialog warns you"; zero would quote free postage.
+     * Nothing else is set on the tier, so it stays a weight-only row until someone prices it.
+     */
+    sizePrices: (() => {
+      const by = new Map<string, number>()
+      for (const v of d?.variants ?? []) {
+        const size = String(v?.size ?? "").trim()
+        const w = Number(v?.weightOz)
+        if (!size || !isFinite(w) || w <= 0) continue
+        by.set(size, Math.max(by.get(size) ?? 0, w))
+      }
+      const rows = [...by.entries()].map(([size, weightOz]) => ({ size, price: 0, shipping: null, weightOz }))
+      return rows.length ? rows : undefined
+    })(),
     // THEIRS — see the note in ssCatalogProduct. SanMar's style code ("PC61") identifies the
     // blank on their side; ours is assigned by the editor.
     img: (d?.image ?? fb.image) || undefined, supplierSku: style,

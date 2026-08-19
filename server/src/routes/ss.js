@@ -19,7 +19,20 @@ const SS_KEY     = (process.env.SS_API_KEY || '').trim();
 const SS_BASE    = (process.env.SS_API_BASE || 'https://api.ssactivewear.com/v2').trim().replace(/\/$/, '');
 
 // Field list we ask S&S for — keeps payloads small (product feed is huge).
-const PRODUCT_FIELDS = 'sku,gtin,styleID,brandName,styleName,colorName,colorCode,sizeName,piecePrice,dozenPrice,casePrice,salePrice,customerPrice,mapPrice,qty,warehouses,colorFrontImage,colorSwatchImage,baseCategory';
+/**
+ * `weight` IS ASKED FOR NOW, and it is the field postage is quoted against.
+ *
+ * It was never requested, so every S&S blank reached the label dialog with no weight and the
+ * parcel was declared at the stock 8oz — a garment that weighs a pound is then re-weighed by
+ * USPS and billed the band it actually fell in, days later, per parcel.
+ *
+ * UNVERIFIED AGAINST A LIVE ACCOUNT: their docs list a weight on the product record, but
+ * this account's response has not been read with the field in the list. Asking for a field
+ * S&S does not return is harmless — the API ignores unknown names and the column simply
+ * stays null — which is why this is worth doing before it can be confirmed, and why nothing
+ * downstream may treat a missing value as zero.
+ */
+const PRODUCT_FIELDS = 'sku,gtin,styleID,brandName,styleName,colorName,colorCode,sizeName,piecePrice,dozenPrice,casePrice,salePrice,customerPrice,mapPrice,weight,qty,warehouses,colorFrontImage,colorSwatchImage,baseCategory';
 
 // S&S returns RELATIVE image paths (e.g. "Images/Color/19561_f_fm.jpg") → prefix their CDN.
 const SS_CDN = 'https://cdn.ssactivewear.com/';
@@ -167,6 +180,8 @@ function mapProduct(p, meta) {
     // "yourPrice"/piece is the per-unit cost; fall back through the price fields S&S may return.
     price: num(p.customerPrice ?? p.piecePrice ?? p.salePrice),
     map_price: num(p.mapPrice),
+    // OUNCES. Null when they don't send one — never 0, which would quote free postage.
+    weight_oz: num(p.weight),
     qty: int(p.qty),
     warehouses: JSON.stringify(Array.isArray(p.warehouses) ? p.warehouses : []),
     // NOT resized. The doc promises _fs/_fm/_fl for brandImage and styleImage only —
@@ -519,13 +534,17 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
        sku text primary key,
        style_id text, brand text, style_name text,
        color text, color_code text, size text,
-       price numeric, map_price numeric,
+       price numeric, map_price numeric, weight_oz numeric,
        qty integer default 0,
        warehouses jsonb default '[]',
        image text, category text,
        data jsonb,
        synced_at timestamptz default now()
      )`).catch(() => {});
+  /* CREATE TABLE ONLY RUNS ON A FRESH DB — every live deployment already has this table, so
+     the column has to be added on its own or the sync writes a field the row has no room
+     for. Same pattern as every other late column in this codebase. */
+  q('alter table ss_products add column if not exists weight_oz numeric').catch(() => {});
 
   // Resolved style thumbnails. styleImage is null on this account, so the New In grid resolves the
   // first product's colorFrontImage per card — expensive live. Cache it here so the FIRST viewer
@@ -1025,7 +1044,10 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         // `qty` is ASKED FOR, not assumed. It was absent from this list while the code below
         // summed p.qty, so every colour and size reported a confident 0 — a number nobody had
         // requested, printed as fact. One more field on a call already being made.
-        '&fields=sku,colorName,sizeName,qty,piecePrice,customerPrice,colorFrontImage,colorBackImage,colorSideImage,colorOnModelFrontImage,colorOnModelBackImage,styleName,brandName');
+        // `weight` rides along for the same reason it is in PRODUCT_FIELDS: this endpoint is
+        // what "Add to catalog" reads, so the weights have to arrive with the sizes or the
+        // product is created without them and somebody types them by hand.
+        '&fields=sku,colorName,sizeName,qty,piecePrice,customerPrice,weight,colorFrontImage,colorBackImage,colorSideImage,colorOnModelFrontImage,colorOnModelBackImage,styleName,brandName');
       if (!pr.ok || !Array.isArray(pr.data)) { reply.code(pr.status || 502); return { error: 'S&S style fetch failed (' + pr.status + ')' }; }
       const rows = pr.data;
 
@@ -1046,7 +1068,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
        * decides whether a colourway is worth adding at all, and the per-size breakdown is
        * what tells you the 2XL is the one that will hold up the order.
        */
-      const stockByColor = {}, stockByVariant = {};
+      const stockByColor = {}, stockByVariant = {}, weightBySize = {};
       let stockTotal = 0;
       for (const p of rows) {
         const c = p.colorName; if (c && !cseen.has(c)) { cseen.add(c); colors.push(c); }
@@ -1062,6 +1084,13 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         }
         const cp = num(p.customerPrice ?? p.piecePrice);
         if (cp != null && (price == null || cp < price)) price = cp;
+        /* WEIGHT PER SIZE, heaviest variant wins. Colours differ by a fraction of an ounce
+           and under-declaring is the expensive direction: over by 0.2oz costs nothing until
+           it crosses a price band, under by 0.2oz can cross one. Sizes with no weight are
+           simply absent — "unknown", which the product editor shows as the product-level
+           fallback, never as zero. */
+        const wz = num(p.weight);
+        if (s && wz != null && wz > 0) weightBySize[s] = Math.max(weightBySize[s] || 0, wz);
         if (!brand && p.brandName) brand = p.brandName;
         if (!styleName && p.styleName) styleName = p.styleName;
         const front = ssImg(p.colorFrontImage);
@@ -1130,7 +1159,11 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         if (list.length) colorExtrasProx[c] = list;
       }
       const out = { styleID: id, styleName: styleName || null, partNumber, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages,
-                    colorExtras: colorExtrasProx, stockByColor, stockByVariant, stockTotal };
+                    colorExtras: colorExtrasProx, stockByColor, stockByVariant, stockTotal,
+                    /* Per SIZE, so "Add to catalog" can fill the weight column it now has.
+                       Empty when S&S returned no weight — unverified against this account,
+                       and an empty map is the honest reading of "they didn't say". */
+                    weightBySize };
       _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
       return out;
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
@@ -1227,16 +1260,19 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   async function upsertProduct(p) {
     if (!p || !p.sku) return false;
     await q(
-      `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, data, synced_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+      `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, weight_oz, qty, warehouses, image, category, data, synced_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now())
        on conflict (sku) do update set
          style_id=excluded.style_id, brand=excluded.brand, style_name=excluded.style_name,
          color=excluded.color, color_code=excluded.color_code, size=excluded.size,
-         price=excluded.price, map_price=excluded.map_price, qty=excluded.qty,
+         price=excluded.price, map_price=excluded.map_price,
+         -- COALESCE, not overwrite: if a later response omits the field the weight we
+         -- already have is better than the null that would replace it.
+         weight_oz=coalesce(excluded.weight_oz, ss_products.weight_oz), qty=excluded.qty,
          warehouses=excluded.warehouses, image=excluded.image, category=excluded.category,
          data=excluded.data, synced_at=now()`,
       [p.sku, p.style_id, p.brand, p.style_name, p.color, p.color_code, p.size,
-       p.price, p.map_price, p.qty, p.warehouses, p.image, p.category, p.data]
+       p.price, p.map_price, p.weight_oz, p.qty, p.warehouses, p.image, p.category, p.data]
     );
     return true;
   }
@@ -1514,16 +1550,17 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         if (!p.sku) continue;
         try {
           await q(
-            `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, data, synced_at)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+            `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, weight_oz, qty, warehouses, image, category, data, synced_at)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now())
              on conflict (sku) do update set
                style_id=excluded.style_id, brand=excluded.brand, style_name=excluded.style_name,
                color=excluded.color, color_code=excluded.color_code, size=excluded.size,
-               price=excluded.price, map_price=excluded.map_price, qty=excluded.qty,
+               price=excluded.price, map_price=excluded.map_price,
+               weight_oz=coalesce(excluded.weight_oz, ss_products.weight_oz), qty=excluded.qty,
                warehouses=excluded.warehouses, image=excluded.image, category=excluded.category,
                data=excluded.data, synced_at=now()`,
             [p.sku, p.style_id, p.brand, p.style_name, p.color, p.color_code, p.size,
-             p.price, p.map_price, p.qty, p.warehouses, p.image, p.category, p.data]
+             p.price, p.map_price, p.weight_oz, p.qty, p.warehouses, p.image, p.category, p.data]
           );
           n++;
         } catch (e) {}
