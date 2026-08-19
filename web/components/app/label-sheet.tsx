@@ -48,6 +48,20 @@ export function LabelSheet({
   // Global multiplier on top of each label's own `copies` — for "print the whole
   // sheet twice" without editing every row.
   const [multiplier, setMultiplier] = useState(1)
+  /**
+   * HOW MANY OF EACH VARIANT — moved here from a column in the inventory table.
+   *
+   * It sat in the table as an input that was disabled until its row was ticked, so it was
+   * a control that did nothing on almost every row, in a column that was hidden below
+   * 1280px anyway. A sticker count only means something once you are printing stickers,
+   * and this is where that happens: the number is beside the preview that shows what it
+   * does.
+   *
+   * Reset by REMOUNTING (the caller keys this on `open`), not by an effect — an effect
+   * that clears on open renders one frame of the previous sheet's numbers first.
+   */
+  const [per, setPer] = useState<Record<string, number>>({})
+  const copiesOf = (l: LabelSpec) => Math.max(1, per[l.sku] ?? l.copies ?? 1)
   // Label stock. A thermal printer feeds ONE label at a time, so the page must BE the
   // label — an A4 grid sent to a 2×1 roll prints one clipped label per sticker and wastes
   // the rest of the roll. Sizes are the common thermal stocks; "A4 sheet" keeps the old
@@ -94,7 +108,7 @@ export function LabelSheet({
   // Expand into one entry per physical sticker.
   const sheet: { key: string; l: LabelSpec }[] = []
   labels.forEach((l, i) => {
-    const n = Math.max(1, (l.copies ?? 1) * multiplier)
+    const n = Math.max(1, copiesOf(l) * multiplier)
     for (let c = 0; c < n; c++) sheet.push({ key: `${l.sku}-${i}-${c}`, l })
   })
 
@@ -138,6 +152,28 @@ export function LabelSheet({
             <Button size="sm" variant="outline" className="size-7 p-0" onClick={() => setMultiplier((m) => Math.min(50, m + 1))} aria-label="More copies"><Plus size={12} weight="bold" /></Button>
           </span>
         </label>
+
+        {/* Only when there is a choice to make. One variant already has "Copies of each"
+            directly above, and a list of one restates it. */}
+        {labels.length > 1 && (
+          <div className="space-y-1.5">
+            <div className="text-xs text-muted-foreground">Per variant</div>
+            <div className="max-h-44 space-y-1 overflow-auto pr-1">
+              {labels.map((l) => (
+                <label key={l.sku} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-mono text-2xs" title={l.sku}>{l.sku}</span>
+                  <input
+                    value={String(copiesOf(l))}
+                    onChange={(e) => setPer((m) => ({ ...m, [l.sku]: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) }))}
+                    inputMode="numeric"
+                    aria-label={`Copies of ${l.sku}`}
+                    className="h-7 w-12 shrink-0 rounded-md border border-border bg-card text-center text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {/* Which code, said out loud. A gun cannot read a QR and a phone fights a 1D

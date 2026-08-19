@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown, QrCode as QrCodeIcon } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown, QrCode as QrCodeIcon, DotsThree } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
@@ -10,6 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
@@ -88,7 +89,6 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   // Printing the whole filtered list one-each wasted a roll every time.
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [zoomSku, setZoomSku] = useState<string | null>(null)
-  const [copies, setCopies] = useState<Record<string, number>>({})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** The catalogue, for the row photo and for "Add from catalogue". Read once; a product's
    *  picture doesn't change while a stock count is being typed. */
@@ -396,22 +396,28 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                         }}
                       />
                     </th>
+                    {/*
+                      * SIX COLUMNS, NOT ELEVEN.
+                      *
+                      * Eleven never fitted, and the table had been coping by hiding five of
+                      * them at breakpoints — Labels under xl, SKU and Visibility under md,
+                      * Reserved and Reorder-at under 1536px. So a laptop showed a different
+                      * table from the one the design assumed, and the columns that vanished
+                      * were picked by what could be spared rather than by what the row is.
+                      *
+                      * Folded instead of dropped. Stock, Reserved and Available were three
+                      * columns holding one sentence — 40, 2 held, 38 to sell — where only
+                      * the first is typed and the third is arithmetic on the other two.
+                      * Labels belongs to printing and now lives in the print sheet, which
+                      * is the only place a sticker count means anything. Reorder-at and
+                      * Visibility are set once and read rarely; they are on the row's own
+                      * menu, and Visibility still shows on the row when it is NOT the
+                      * default, because "this sku is public" is worth seeing unasked.
+                      */}
                     <th className="px-4 py-2.5 whitespace-nowrap">Item</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap hidden md:table-cell">SKU</th>
-                    {/* LABELS waits for a wide screen. It is the sticker count, which only matters
-                        once something is ticked for printing — and it was taking 90px of a laptop
-                        away from the column that holds the row's only control. */}
-                    <th className="hidden px-2 py-2.5 whitespace-nowrap text-center xl:table-cell">Labels</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap text-center">In stock</th>
-                    {/* RESERVED and REORDER AT stand down under 1536px. Eleven columns did not fit a
-                        laptop, so the table scrolled sideways and Visibility — the one CONTROL in
-                        the row — sat off the right edge where nobody found it. These two are
-                        reference numbers you look up, not ones you scan down. */}
-                    <th className="hidden px-4 py-2.5 whitespace-nowrap text-center 2xl:table-cell">Reserved</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap text-center">Available</th>
-                    <th className="hidden px-4 py-2.5 whitespace-nowrap text-center 2xl:table-cell">Reorder&nbsp;at</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap">SKU</th>
+                    <th className="px-4 py-2.5 whitespace-nowrap text-center">Stock</th>
                     <th className="px-4 py-2.5 whitespace-nowrap">Status</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap hidden md:table-cell">Visibility</th>
                     <th className="sticky right-0 z-10 bg-card px-4 py-2.5 whitespace-nowrap" />
                   </tr>
                 </thead>
@@ -447,7 +453,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                         }}
                         single={one}
                         meta={meta}
-                        sel={sel} setSel={setSel} copies={copies} setCopies={setCopies}
+                        sel={sel} setSel={setSel}
                         edit={edit} setVisibility={setVisibility} remove={remove} onHistory={setHistSku} onZoom={setZoomSku}
                         onOrder={onOrder}
                       />
@@ -470,10 +476,11 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       {/* Selected variants only — or the whole filtered list if nothing is ticked,
           which keeps the old one-click behaviour for "print everything". */}
       <LabelSheet
+        key={printOpen ? "print-open" : "print-closed"}
         open={printOpen}
         onClose={() => setPrintOpen(false)}
         labels={(sel.size ? filtered.filter((i) => sel.has(i.sku)) : filtered).map((i) => ({
-          sku: i.sku, name: i.name, variant: i.variant, copies: copies[i.sku] ?? 1,
+          sku: i.sku, name: i.name, variant: i.variant,
         }))}
       />
       <BarcodeZoom sku={zoomSku} onClose={() => setZoomSku(null)} />
@@ -512,7 +519,7 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
  * which is where the count is actually held.
  */
 function ProductGroup({
-  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, copies, setCopies, edit, setVisibility, remove, onHistory, onZoom, onOrder,
+  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, edit, setVisibility, remove, onHistory, onZoom, onOrder,
 }: {
   group: Group
   open: boolean
@@ -523,8 +530,6 @@ function ProductGroup({
   meta: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>
   sel: Set<string>
   setSel: (s: Set<string>) => void
-  copies: Record<string, number>
-  setCopies: (c: Record<string, number>) => void
   edit: (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => void
   setVisibility: (sku: string, v: SkuVisibility) => void
   remove: (sku: string) => void
@@ -612,7 +617,7 @@ function ProductGroup({
           </div>
         </div>
       </td>
-      <td className="px-4 py-2 hidden md:table-cell">
+      <td className="px-4 py-2">
         {/* SKU as TEXT, and the code is one click on it. The inline barcode was a 22px
             thumbnail no scanner could read, and a separate icon column was too much width
             for it — that reasoning still holds and the column is still not coming back.
@@ -627,41 +632,60 @@ function ProductGroup({
           type="button"
           onClick={() => onZoom(it.sku)}
           title={`Show a scannable code for ${it.sku}`}
-          className="group/sku flex w-[8.5rem] items-start gap-1.5 text-left transition-colors hover:text-primary"
+          /* 8.5rem was sized for the eleven-column table, where this cell was competing with
+             five others for a laptop's width — every sku broke across two lines because of
+             it. Folding the columns gave the width back; a 30-character sku now sits on one
+             line, and break-all still catches anything longer. */
+          className="group/sku flex w-[15rem] max-w-full items-start gap-1.5 text-left transition-colors hover:text-primary"
         >
           <span className="break-all font-mono text-xs font-medium underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 group-hover/sku:decoration-primary">
             {it.sku}
           </span>
           <QrCodeIcon size={13} weight="bold" className="mt-px shrink-0 text-muted-foreground transition-colors group-hover/sku:text-primary" aria-hidden />
         </button>
+        {/* VISIBILITY SPEAKS UP ONLY WHEN IT IS NOT THE DEFAULT.
+            The control moved to the row menu, and a setting behind a menu is a setting
+            nobody audits — but "Factory only" is what almost every row is, and printing it
+            on all of them is the column we just removed. So the quiet default stays quiet
+            and the two that let a sku out of the building say so. */}
+        {visOf(it) !== "factory" && (
+          <span className={"mt-0.5 block text-2xs font-medium " + (VIS.find((v) => v.id === visOf(it))?.pill ?? "")}>
+            {VIS.find((v) => v.id === visOf(it))?.label}
+          </span>
+        )}
       </td>
-      <td className="hidden px-2 py-2 text-center xl:table-cell">
-        {/* How many stickers for THIS variant. Only meaningful once it's ticked, so it's
-            disabled until then. */}
-        <Input
-          value={String(copies[it.sku] ?? 1)}
-          onChange={(e) => setCopies({ ...copies, [it.sku]: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) })}
-          disabled={!sel.has(it.sku)}
-          inputMode="numeric"
-          aria-label={`Label copies for ${it.sku}`}
-          className="mx-auto h-8 w-14 text-center"
-        />
+      {/*
+        * ONE CELL, ONE SENTENCE: what is here, what is spoken for, what is left.
+        *
+        * These were three columns and a fourth off-screen, and only the first is a fact
+        * anyone types. Reserved is held by the system — accepting an order into production
+        * reserves its blanks and shipping or cancelling releases them — and Available is
+        * arithmetic on the other two. Three headings for one answer, two of which stood
+        * down on a laptop, so the number people actually act on was the one most often
+        * missing.
+        *
+        * The held/available line only appears when something IS held: on a shelf with
+        * nothing reserved, "0 held → 40 available" is two numbers restating the one above.
+        */}
+      <td className="px-4 py-2">
+        <div className="flex flex-col items-center gap-0.5">
+          <Input
+            value={String(num(it.in_stock))}
+            onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+            inputMode="numeric"
+            aria-label={`In stock for ${it.sku}`}
+            className="relative z-[1] h-8 w-16 text-center"
+          />
+          {num(it.reserved) > 0 && (
+            <span
+              className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums"
+              title={`${num(it.reserved)} held for orders in production`}
+            >
+              {num(it.reserved)} held → <span className="font-medium text-foreground">{avail(it)}</span> free
+            </span>
+          )}
+        </div>
       </td>
-      <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-14 text-center" /></td>
-      {/* RESERVED IS NOT TYPED ANY MORE — the system holds it. Accepting an order into
-          production reserves its blanks and shipping or cancelling releases them, tracked
-          per order, so a number typed here would be silently corrected the next time either
-          happens. Shown, because it is the difference between In stock and Available. */}
-      <td className="hidden px-2 py-2 text-center 2xl:table-cell">
-        <span
-          className={"inline-block w-14 text-center tabular-nums " + (num(it.reserved) > 0 ? "font-medium" : "text-muted-foreground")}
-          title={num(it.reserved) > 0 ? `${num(it.reserved)} held for orders in production` : "Nothing held for production"}
-        >
-          {num(it.reserved)}
-        </span>
-      </td>
-      <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
-      <td className="hidden px-2 py-2 text-center 2xl:table-cell"><Input value={String(it.reorder_at ?? 25)} onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-14 text-center" /></td>
       <td className="px-4 py-2">
         {/* nowrap: the visibility column narrowed this one enough that "In stock" wrapped
             onto two lines and the row grew a step. */}
@@ -678,26 +702,67 @@ function ProductGroup({
           </span>
         )}
       </td>
-      <td className={"sticky right-14 z-10 hidden bg-card px-4 py-2 md:table-cell" + stickyTint(it, indented)}>
-        <select
-          value={visOf(it)}
-          onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
-          aria-label={`Visibility for ${it.sku}`}
-          /* NO TINTED CAPSULE, and no fixed-height pill for a control that has to hold
-             "Factory only" plus a caret. The fill was clipped by the table's own
-             horizontal scroll box at the right edge, and it was the last coloured pill in
-             a table whose statuses are now words. A bordered select, like every other
-             select in the app. */
-          /* relative z-[1]: above the row-tint pseudo-element painted on this sticky cell. */
-          className="eg-select relative z-[1] h-7 w-full min-w-[8.5rem] rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-        >
-          {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-        </select>
-      </td>
+      {/*
+        * THE SETTINGS THAT ARE SET ONCE LIVE ON THE ROW'S OWN MENU.
+        *
+        * Reorder-at and Visibility each held a column all day for a value that is chosen
+        * when a sku is created and then read a handful of times a year — and both were
+        * hidden on a laptop anyway, so the columns were paying rent on a wide monitor and
+        * disappearing on the machine most of this work happens on.
+        *
+        * Not a DropdownMenu: these are a number field and a select, which is a form, and a
+        * menu is a list of commands. Scan history and Remove come along because this is now
+        * the one place a row's actions are, rather than two loose glyphs beside a select.
+        */}
       <td className={"sticky right-0 z-10 bg-card px-4 py-2" + stickyTint(it, indented)}>
-        <div className="relative z-[1] flex items-center justify-end gap-1">
-          <button onClick={() => onHistory(it.sku)} title="Scan history" className="text-muted-foreground hover:text-foreground"><ClockCounterClockwise size={15} /></button>
-          <button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button>
+        <div className="relative z-[1] flex items-center justify-end">
+          <Popover>
+            <PopoverTrigger
+              aria-label={`Settings and actions for ${it.sku}`}
+              title="Reorder point, visibility, history, remove"
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <DotsThree size={18} weight="bold" />
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 space-y-3 p-3">
+              <div className="truncate font-mono text-2xs text-muted-foreground">{it.sku}</div>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs font-medium">Reorder at</span>
+                <Input
+                  value={String(it.reorder_at ?? 25)}
+                  onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                  inputMode="numeric"
+                  aria-label={`Reorder point for ${it.sku}`}
+                  className="h-8 w-16 text-center"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium">Visibility</span>
+                <select
+                  value={visOf(it)}
+                  onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
+                  aria-label={`Visibility for ${it.sku}`}
+                  className="eg-select h-8 w-full rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                >
+                  {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+                </select>
+              </label>
+              <div className="flex items-center justify-between border-t border-border pt-2">
+                <button
+                  onClick={() => onHistory(it.sku)}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <ClockCounterClockwise size={14} /> Scan history
+                </button>
+                <button
+                  onClick={() => remove(it.sku)}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-red-600"
+                >
+                  <Trash size={14} /> Remove
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </td>
     </tr>
@@ -739,27 +804,36 @@ function ProductGroup({
             </span>
           </button>
         </td>
-        <td className="px-4 py-2 text-xs text-muted-foreground hidden md:table-cell">
+        <td className="px-4 py-2 text-xs text-muted-foreground">
           {/* NOT one of the variants' skus. Printing the first would read as the product's
               own code and get scanned as one. */}
           <span className="font-mono">{group.rows.length} SKUs</span>
+          {/* VISIBILITY ONLY WHEN IT IS NOT THE DEFAULT, and only when the variants agree.
+              Showing the first row's setting as if it were the product's is how a public
+              sku hides behind a "Factory only" label — so disagreement says so instead. */}
+          {(() => {
+            const same = group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
+            if (!same) return <span className="block text-2xs text-amber-700">Mixed visibility</span>
+            const v = visOf(group.rows[0])
+            if (v === "factory") return null
+            const meta = VIS.find((x) => x.id === v)
+            return <span className={"block text-2xs font-medium " + (meta?.pill ?? "")}>{meta?.label}</span>
+          })()}
         </td>
-        <td className="px-2 py-2 hidden md:table-cell" />
-        <td className="px-2 py-2 text-center font-semibold tabular-nums">{stock}</td>
-        <td className="px-2 py-2 text-center tabular-nums hidden md:table-cell">{reserved}</td>
-        <td className="px-4 py-2 text-center font-semibold tabular-nums">{stock - reserved}</td>
-        <td className="px-2 py-2 hidden md:table-cell" />
+        <td className="px-4 py-2">
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="font-semibold tabular-nums">{stock}</span>
+            {reserved > 0 && (
+              <span className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums">
+                {reserved} held → <span className="font-medium text-foreground">{stock - reserved}</span> free
+              </span>
+            )}
+          </div>
+        </td>
         <td className="px-4 py-2">
           {out === group.rows.length ? <span className="whitespace-nowrap text-xs font-medium text-red-700">All out</span>
             : out || low ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">{out ? `${out} out` : `${low} low`}</span>
               : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
-        </td>
-        <td className="px-4 py-2 text-xs text-muted-foreground hidden md:table-cell">
-          {/* One word only when the variants agree. Showing the first row's setting as if it
-              were the product's is how a public sku hides behind a "Factory only" label. */}
-          {group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
-            ? (VIS.find((v) => v.id === visOf(group.rows[0]))?.label ?? "")
-            : "Mixed"}
         </td>
         <td className="px-4 py-2" />
       </tr>
