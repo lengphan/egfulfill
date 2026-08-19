@@ -1685,13 +1685,19 @@ export function DesignCanvasDialog({
          * insisted on 924px inside a 791px dialog: the rail ran off the right edge and the
          * whole thing scrolled sideways. The track is minmax(0,1fr) now, so the stage gives
          * way and this only has to say how wide the window may get.
+         *
+         * 620px, DOWN from 940. It was sized for two columns and kept that width after one
+         * of them went, so a 418px garment sat in the middle of a window nearly a metre of
+         * pixels wide with air on both sides — which reads as a big window that forgot to
+         * fill itself, not as a focused one. The dialog is now roughly the stage plus its
+         * rail, which is all there is to show.
          */
         /* A ceiling AND its own scrollbar — belt and braces. The sizes above are meant to fit
            without either, but an embroidered line carrying threads and a machine file has more
            under the stage than a DTG one, and it should scroll INSIDE the window rather than
            pushing the action bar off the screen. Plain block comment: this is an attribute
            list, where a JSX-style comment is a syntax error. */
-        className="max-h-[92vh] overflow-y-auto sm:max-w-2xl lg:max-w-[min(96vw,940px)]"
+        className="max-h-[92vh] overflow-y-auto sm:max-w-lg lg:max-w-[min(94vw,620px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
