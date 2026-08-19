@@ -417,7 +417,17 @@ export function DesignStage({
    * Rotate stays a POINTER-DRAG rather than a click: it is a continuous gesture, and a button
    * that rotates by a fixed step is a different, worse control.
    */
-  const stripBtn = "flex size-7 items-center justify-center rounded-md text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+  /**
+   * SIZED TO BE AIMED AT. These were 28px boxes holding 14px marks — fine for a toolbar you
+   * read, small for one you USE, and this strip is the whole control surface of the
+   * designer: it is what rotates, locks, cleans and deletes the thing under your cursor.
+   * 36px with 18px marks is the same scale the rest of the app gives a real action, and it
+   * clears the 44px touch guidance on a trackpad-and-finger machine.
+   *
+   * One constant, one strip, both designers — the maker renders this same DesignStage.
+   */
+  const stripBtn = "flex size-9 items-center justify-center rounded-md text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+  const stripIcon = 18
   const handles = (target: string) => {
     // Per LAYER. The design maker puts text on this same stage, and a single flag would
     // freeze the lettering because somebody pinned the picture.
@@ -428,14 +438,14 @@ export function DesignStage({
     <>
       <div className="pointer-events-none absolute inset-0 rounded-sm outline outline-2 -outline-offset-1 outline-primary/70" />
       <div
-        className="absolute -top-11 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-md"
+        className="absolute -top-14 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-md"
         // The strip is chrome, not canvas: a drag that starts here must never also start a
         // move on the layer underneath it.
         onPointerDown={(e) => e.stopPropagation()}
       >
         {onCopy && (
           <button type="button" onClick={onCopy} title={copyLabel ?? "Copy to the other sides"} aria-label={copyLabel ?? "Copy to the other sides"} className={stripBtn}>
-            <Copy size={14} weight="bold" />
+            <Copy size={stripIcon} weight="bold" />
           </button>
         )}
         <button
@@ -444,7 +454,7 @@ export function DesignStage({
           title={locked ? "Locked" : "Drag to rotate"} aria-label="Rotate"
           className={stripBtn + " touch-none " + (locked ? "" : "cursor-grab")}
         >
-          <ArrowClockwise size={14} weight="bold" />
+          <ArrowClockwise size={stripIcon} weight="bold" />
         </button>
         <button
           type="button"
@@ -454,23 +464,23 @@ export function DesignStage({
           aria-pressed={locked}
           className={stripBtn + (locked ? " bg-primary/10 text-primary" : "")}
         >
-          {locked ? <Lock size={14} weight="fill" /> : <LockOpen size={14} weight="bold" />}
+          {locked ? <Lock size={stripIcon} weight="fill" /> : <LockOpen size={stripIcon} weight="bold" />}
         </button>
         {onEraseBg && (
           <button type="button" onClick={onEraseBg} disabled={eraseBusy}
             title="Remove the background — clears the backdrop connected to the edges, in your browser"
             aria-label="Remove background" className={stripBtn}>
-            {eraseBusy ? <CircleNotch size={14} className="animate-spin" /> : <Eraser size={14} weight="bold" />}
+            {eraseBusy ? <CircleNotch size={stripIcon} className="animate-spin" /> : <Eraser size={stripIcon} weight="bold" />}
           </button>
         )}
         {onUndoErase && (
           <button type="button" onClick={onUndoErase} title="Put the background back" aria-label="Undo background removal" className={stripBtn}>
-            <ArrowCounterClockwise size={14} weight="bold" />
+            <ArrowCounterClockwise size={stripIcon} weight="bold" />
           </button>
         )}
         {onRemove && (
           <button type="button" onClick={onRemove} title="Remove this layer" aria-label="Remove this layer" className={stripBtn + " hover:bg-destructive hover:text-destructive-foreground"}>
-            <Trash size={14} weight="bold" />
+            <Trash size={stripIcon} weight="bold" />
           </button>
         )}
       </div>
@@ -1776,6 +1786,13 @@ export function DesignCanvasDialog({
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
             pos={pos} setPos={setPos}
             onRemove={() => void removeArtwork()}
+            /* ON THE LAYER, WITH THE REST. This was a labelled button parked in the corner of
+               the stage while rotate, lock and delete sat in one strip above the selection —
+               so the one tool that changes the ARTWORK was the only one not with the artwork
+               tools. The strip has always been able to carry it; nothing passed it. */
+            onEraseBg={bg.run}
+            eraseBusy={bg.busy}
+            onUndoErase={bg.canUndo ? bg.undo : undefined}
             // Only when there IS another face to copy to — a one-sided blank gets no button.
             onCopy={faces.length > 1 && designUrl ? copyToOtherFaces : undefined}
             copyLabel={`Copy to the other ${faces.length - 1 === 1 ? "side" : "sides"}`}
@@ -1796,26 +1813,9 @@ export function DesignCanvasDialog({
               the artwork usually sits centred, so this is the one corner it doesn't cover. */}
           {designUrl && (
             <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={bg.run}
-                disabled={bg.busy}
-                title="Clear a flat backdrop — no AI, nothing leaves your browser"
-                className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent disabled:opacity-60"
-              >
-                {bg.busy ? <CircleNotch size={12} className="animate-spin" /> : <Eraser size={12} weight="bold" />}
-                {bg.busy ? "Working…" : "Remove background"}
-              </button>
-              {bg.canUndo && (
-                <button
-                  type="button"
-                  onClick={bg.undo}
-                  title="Put the background back"
-                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent"
-                >
-                  Undo
-                </button>
-              )}
+              {/* The background BUTTONS moved onto the selection strip (see the stage props
+                  above). What stays here is what the strip cannot say: the sentence the
+                  eraser leaves behind when it finds nothing flat to cut. */}
               {bg.msg && (
                 <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">{bg.msg}</span>
               )}
