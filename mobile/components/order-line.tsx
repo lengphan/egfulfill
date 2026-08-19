@@ -161,28 +161,37 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
             {lineTitle(item)}
           </Text>
 
-          {/* The variant, as separate chips rather than one long dot-joined sentence. Three
-              facts on one line read as three facts; strung together they read as a title
-              that has overflowed. */}
-          {facts.length > 0 && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-              {facts.map((f) => (
-                <View key={f} style={{
-                  paddingHorizontal: 8, paddingVertical: 4, borderRadius: R.pill,
-                  borderWidth: 1, borderColor: C.border,
-                }}>
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: C.fg }}>{f}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* The BLANK, quietly and last. It is the stock/purchasing handle, not a name. */}
+          {/* THE BLANK COMES BEFORE THE VARIANTS, because it is what they are variants OF.
+              It was last — under the colour and size that describe it — so the card read
+              "Black, Adjustable, DTG… of what?" and answered on the line after. The
+              marketplace title above is a keyword list on an Etsy order and names nothing
+              the floor picks; the blank is the garment, and it is the second thing read. */}
           {item.blank ? (
-            <Text style={{ fontSize: 12, color: C.muted, marginTop: 8, letterSpacing: 0.4 }}>
-              BLANK {item.blank}
+            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: C.fg, marginTop: 6 }}>
+              {item.blank}
             </Text>
           ) : null}
+
+          {/* THE VARIANT CHIPS, READABLE. They were 12pt on a hairline border with no fill —
+              the lightest marks on the card, carrying the three facts someone picking a
+              garment actually needs. Filled, larger, and the print method is separated from
+              the colour and size because it is a different KIND of fact: those two describe
+              the blank, the method describes the work. */}
+          {facts.length > 0 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {facts.map((f, i) => {
+                const method = i === facts.length - 1 && !!String(item.print_type || "").trim()
+                return (
+                  <View key={f} style={{
+                    paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.pill,
+                    backgroundColor: method ? C.ink : C.accent,
+                  }}>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: method ? C.lime : C.fg }}>{f}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          )}
         </View>
       </View>
 

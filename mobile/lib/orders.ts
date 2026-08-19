@@ -142,7 +142,24 @@ const PLATFORM_NAMES: Record<string, string> = {
   ebay: "eBay", woo: "WooCommerce", walmart: "Walmart", manual: "Manual",
 }
 export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, "")
-export const numOf = (o: Order) => (o.seq ? `#${o.seq}` : plainNum(String(o.id)))
+/**
+ * A READABLE REF WHEN THERE IS NO SEQ — ported from web/lib/order-format.ts, not invented.
+ *
+ * Our own orders are minted client-side as `FF-<account tag>-<ms base36>-<random>` so two
+ * sellers cannot collide without asking a server. That is a KEY, not a number: printed raw
+ * it is two dozen characters of base36 matching nothing the reader has seen before. The web
+ * shortens it to its last segment — the part that distinguishes it — and the phone was
+ * printing the whole thing, which is why a manual order looked wrong next to an Etsy one.
+ */
+export const shortOrderRef = (id: string) => {
+  const raw = String(id ?? "")
+  if (!raw) return ""
+  const plain = plainNum(raw)
+  if (plain !== raw) return plain                   // etsy-4148231554 → 4148231554
+  const m = raw.match(/^FF-.*-([A-Za-z0-9]+)$/)     // FF-ombao6-msyfrdqn-2mfrc → FF-2mfrc
+  return m ? `FF-${m[1]}` : raw
+}
+export const numOf = (o: Order) => (o.seq ? `#${o.seq}` : shortOrderRef(String(o.id)))
 export const platformOf = (o: Order) => {
   const raw = (String(o.id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
   return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))

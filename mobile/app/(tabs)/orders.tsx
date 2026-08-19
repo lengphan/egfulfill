@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { View, Text, TextInput, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { router } from "expo-router"
+import { router, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
@@ -35,9 +35,21 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<Filter>("Open")
+  /**
+   * OPENED FROM TODAY, with the question already asked.
+   *
+   * The tiles on Today were four counts that did nothing. They each name a slice this
+   * screen can already show, so they now arrive as params rather than as a new screen —
+   * "Overdue" is this queue with the Late lens on, "In production" is this queue at
+   * Working. Read once as the INITIAL state, not held in sync: after landing, the chips
+   * are the user's, and re-imposing the param on every render would fight every tap.
+   */
+  const params = useLocalSearchParams<{ lens?: string; stage?: string }>()
+  const [filter, setFilter] = useState<Filter>(
+    () => (FILTERS as readonly string[]).includes(String(params.lens)) ? (params.lens as Filter) : "Open",
+  )
   /** null = every stage. A chosen stage narrows the lens above it. */
-  const [stage, setStage] = useState<string | null>(null)
+  const [stage, setStage] = useState<string | null>(() => (params.stage ? String(params.stage) : null))
   const [search, setSearch] = useState("")
   const [me, setMe] = useState<User | null>(null)
   const [picked, setPicked] = useState<string[]>([])

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getOrders, type Order } from "@/lib/api"
+import { router } from "expo-router"
 import { isOpen, isOverdue, normalizeStage } from "@/lib/orders"
 import { C, S } from "@/lib/theme"
 
@@ -15,7 +16,14 @@ import { C, S } from "@/lib/theme"
  * The counts come from the same /api/orders every board reads, through the same rules, so
  * a number here cannot disagree with the console.
  */
-type Job = { key: string; label: string; count: number; tone: keyof typeof TONE; urgent?: boolean }
+type Job = {
+  key: string; label: string; count: number; tone: keyof typeof TONE; urgent?: boolean
+  /** WHERE THE TILE GOES. Every one of these names a slice the Orders queue can already
+   *  show, so a tile is a question asked of that screen rather than a screen of its own —
+   *  which is also why they were pressable with no handler for so long: the destination
+   *  did not exist until the queue grew a stage filter. */
+  to: { lens?: string; stage?: string }
+}
 
 const TONE = { alert: C.alert, warn: C.warn, work: C.primary, quiet: C.muted } as const
 
@@ -39,13 +47,17 @@ export default function Today() {
   const open = (orders ?? []).filter(isOpen)
   const jobs: Job[] = [
     { key: "overdue", label: "Overdue", tone: "alert", urgent: true,
-      count: open.filter(isOverdue).length },
+      count: open.filter(isOverdue).length, to: { lens: "Late" } },
+    /* Rush has no filter of its own on the queue yet, so this opens the open orders and is
+       honest about being one step short rather than pretending to a slice that isn't there. */
     { key: "rush", label: "Rush", tone: "warn", urgent: true,
-      count: open.filter((o) => o.rush).length },
+      count: open.filter((o) => o.rush).length, to: { lens: "Open" } },
     { key: "working", label: "In production", tone: "work",
-      count: open.filter((o) => normalizeStage(o.factory_status) === "working").length },
+      count: open.filter((o) => normalizeStage(o.factory_status) === "working").length,
+      to: { lens: "Open", stage: "working" } },
     { key: "scan", label: "Awaiting scan", tone: "quiet",
-      count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length },
+      count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length,
+      to: { lens: "Open" } },
   ]
   const needsYou = jobs.filter((j) => j.urgent).reduce((n, j) => n + j.count, 0)
 
@@ -84,6 +96,10 @@ export default function Today() {
         {jobs.map((j, i) => (
           <Pressable
             key={j.key}
+            onPress={() => router.push({ pathname: "/(tabs)/orders", params: j.to })}
+            /* Nothing to press when the count is zero — a tile that opens an empty list is
+               a worse answer than the zero already on it. */
+            disabled={j.count === 0}
             /* Press feedback on touch-DOWN, which is the tell people read as "native". */
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: S.md,
