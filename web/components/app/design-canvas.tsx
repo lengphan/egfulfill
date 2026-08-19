@@ -1274,11 +1274,19 @@ export function DesignCanvasDialog({
         title: item.name || item.sku || "Design",
         data: designUrl || undefined,
         sku: item.sku || undefined,
-        /* IN PROGRESS, not Incoming. Incoming is the queue embroidery designers pick their
-           own new work out of; a card whose artwork we just cut here and handed straight on
-           is not waiting to be picked up, and sitting there it read as unclaimed to exactly
-           the people whose queue it is. */
-        col: "inprogress",
+        /**
+         * INCOMING. Owner's call, and it reverses what this used to do.
+         *
+         * It filed as `inprogress` on the reasoning that a card handed straight over is not
+         * waiting to be picked up, and sitting in Incoming it reads as unclaimed to the
+         * people whose queue that is. The counter-argument is the stronger one: Incoming is
+         * where a designer LOOKS for new work, and a card that skips it starts in a lane
+         * nobody is watching — arriving already "in progress" with nobody progressing it.
+         *
+         * Kept as a note rather than deleted, because both readings are reasonable and the
+         * next person to wonder should see that it was decided rather than defaulted.
+         */
+        col: "incoming",
       })
       if (card.error) throw new Error(card.error)
       // Assign separately: creating and attaching are two calls, and a card that exists but
@@ -1928,7 +1936,21 @@ export function DesignCanvasDialog({
             only limit left is a HEIGHT one, because the stage is square and this dialog must
             never scroll: 62vh is what still leaves room for the header, the embroidery line
             and the action bar on a laptop's 800px. On a taller screen it simply fills. */}
-        <div className="relative mx-auto w-full max-w-[min(100%,62vh)]">
+        {/**
+          * THE STAGE GIVES WAY WHEN THE DRAWER OPENS.
+          *
+          * 62vh fits — with the drawer SHUT, which is the only state that was ever measured
+          * and is why "it doesn't scroll" was said and then found to be false. Opening
+          * Embroidery adds the file card, the Send row and a thread list, and the window went
+          * 139px past the viewport: exactly the scrolling this window was cut down to avoid.
+          *
+          * The garment yields rather than the panel, because the panel is what was just
+          * asked for. It comes back to full size the moment the drawer closes.
+          */}
+        {/* STICKY, so the garment is still there when the drawer under it is being read. The
+            window is sized not to scroll at all — this is what holds if a long thread list or
+            a narrow screen makes it scroll anyway. */}
+        <div className={"relative mx-auto w-full self-start md:sticky md:top-2 " + (embOpen ? "max-w-[min(100%,38vh)]" : "max-w-[min(100%,62vh)]")}>
           <DesignStage
             className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -2524,10 +2546,11 @@ export function DesignCanvasDialog({
                 * Staff get the lane and who claimed it (that is how they chase it); a seller
                 * gets "with our team", because the lane names are our internal board.
                 */}
+              {/* NO SECOND HEADING. The drawer's own row says "Embroidery · no machine file ·
+                  2 threads" two inches above, so "Embroidery file" under it was the same word
+                  twice and a status line restating a status line. What is left is what the
+                  summary cannot do: the button, and the stitch toggle when there is one. */}
               <div className="flex min-w-0 items-baseline gap-2">
-                <span className="shrink-0 text-sm font-medium">
-                  Embroidery file{!isStaff && <span className="font-normal text-muted-foreground"> (optional)</span>}
-                </span>
                 {/**
                   * SHOW STITCHES — and NOTHING when there are none to show.
                   *
@@ -2553,13 +2576,17 @@ export function DesignCanvasDialog({
                     {stitchState === "loading" ? "Rendering…" : showStitch ? "Show image" : "Show stitches"}
                   </button>
                 )}
-                <span className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || attached || undefined}>
-                  {hasMachineFile ? (latestMachine?.name || attached || "Added")
-                    : boardCard ? (isStaff
-                        ? `Sent · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
-                        : "Sent — with our team")
-                    : ""}
-                </span>
+                {/* WHERE THE CARD WENT, and only that. The file's own name went with the
+                    heading — the drawer summary carries it — but "Sent · Incoming · Hai Anh"
+                    is a fact about somebody else's queue that nothing else on this screen
+                    reports, and it is the answer to "did that button do anything". */}
+                {!hasMachineFile && boardCard && (
+                  <span className="truncate text-2xs text-muted-foreground">
+                    {isStaff
+                      ? `Sent · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+                      : "Sent — with our team"}
+                  </span>
+                )}
               </div>
               {/* THE FILE ROWS ARE GONE — "Embroidery file · pant.EMB" over [Replace file]
                   [Download] [Remove].
