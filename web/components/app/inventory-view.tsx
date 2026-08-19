@@ -16,6 +16,7 @@ import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, getPurchaseOrders, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
+import { getFactoryList, saveFactoryList, type SavedPOLine } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { variantSku, variantLabel, productSizes, productColors } from "@/lib/variant-sku"
@@ -70,6 +71,15 @@ const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reord
 export function InventoryView({ embedded = false, pool }: { embedded?: boolean; pool?: "own" | "consigned" }) {
   const [items, setItems] = useState<InventoryItem[] | null>(null)
   const [search, setSearch] = useState("")
+  /** Restocking asks one question — what is short — so the Low and Out counts are a filter,
+   *  not a readout. Null is "everything", which is what you want when receiving. */
+  const [needs, setNeeds] = useState<null | "low" | "out">(null)
+  const [queuing, setQueuing] = useState(false)
+  /** What the last bulk action did. This view had no message channel of its own — the one
+   *  `err` in this file belongs to another component — and an action that quietly moves rows
+   *  to a different screen has to say so. */
+  const [notice, setNotice] = useState<string | null>(null)
+
   const [cat, setCat] = useState("")
   const [vis, setVis] = useState<"" | SkuVisibility>("")
   /** Show only the rows no supplier catalogue still lists — the ones to review and clear. */
@@ -148,6 +158,38 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       .finally(() => setSaving(false))
   }, [])
 
+  /**
+   * Park the selected variants in Purchasing's saved pool.
+   *
+   * Merged, never replaced — the pool is a shared factory list and another person's parked
+   * lines are not this page's to discard. A sku already parked is left alone rather than
+   * duplicated: two rows for one blank is how a PO ends up ordering it twice.
+   */
+  const queueForPurchase = async () => {
+    const picked = (items ?? []).filter((it) => sel.has(it.sku))
+    if (!picked.length) return
+    setQueuing(true)
+    try {
+      const pool = (await getFactoryList<SavedPOLine[]>("po_saved").catch(() => null)) ?? []
+      const have = new Set(pool.map((l) => String(l.sku).toUpperCase()))
+      const add: SavedPOLine[] = picked
+        .filter((it) => !have.has(String(it.sku).toUpperCase()))
+        .map((it) => ({
+          sku: it.sku, name: it.name ?? undefined, variant: it.variant ?? undefined,
+          // One is a placeholder, not a guess at how many to buy — the quantity is decided
+          // on the purchase order, where the supplier's price breaks are visible.
+          qty: 1, supplier: meta[it.sku]?.supplier ?? null, savedAt: new Date().toISOString(),
+        }))
+      if (add.length) await saveFactoryList("po_saved", [...pool, ...add])
+      setSel(new Set())
+      setNotice(add.length
+        ? `${add.length} added to Purchasing — parked, ready to put on an order.`
+        : "Those are already parked in Purchasing.")
+    } catch {
+      setNotice("Couldn't add those to Purchasing.")
+    } finally { setQueuing(false) }
+  }
+
   const edit = (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => {
     setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, [field]: value } : it)))
     pending.current.set(sku, { ...(pending.current.get(sku) ?? {}), [field]: value })
@@ -186,6 +228,8 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
 
   const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category).filter(Boolean))).sort() as string[], [items])
   const filtered = useMemo(() => (items ?? []).filter((it) => {
+    if (needs === "low" && !isLow(it)) return false
+    if (needs === "out" && !isOut(it)) return false
     if (cat && it.category !== cat) return false
     if (vis && visOf(it) !== vis) return false
     // Only rows we have ASKED about and been told nothing for. A row still resolving is
@@ -193,7 +237,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
     if (onlyUnavailable && !(meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier)) return false
     if (!search) return true
     return `${it.sku} ${it.name ?? ""} ${it.variant ?? ""}`.toLowerCase().includes(search.toLowerCase())
-  }), [items, cat, vis, search, onlyUnavailable, meta])
+  }), [items, cat, vis, search, onlyUnavailable, meta, needs])
 
   const stats = useMemo(() => {
     const list = items ?? []
@@ -317,8 +361,22 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       <>
       <StatGrid>
         <StatCard label="SKUs" value={String(stats.total)} sub="variants tracked" />
-        <StatCard label="Low stock" value={String(stats.low)} sub="at/below reorder" tone={stats.low ? "neg" : undefined} />
-        <StatCard label="Out of stock" value={String(stats.out)} sub="need reorder" tone={stats.out ? "neg" : undefined} />
+        {/**
+          * THE COUNTS ARE THE FILTER.
+          *
+          * "74 out of stock" is the answer to the question this page is opened with —
+          * restocking — and it was a number you could only read. Every route to acting on
+          * it went through typing something into the search box or scrolling 77 skus, so
+          * the figure that names the job was the one thing on the page you could not press.
+          */}
+        <button type="button" onClick={() => setNeeds(needs === "low" ? null : "low")} className="text-left">
+          <StatCard label="Low stock" value={String(stats.low)} sub={needs === "low" ? "showing these" : "at/below reorder"}
+            tone={stats.low ? "neg" : undefined} />
+        </button>
+        <button type="button" onClick={() => setNeeds(needs === "out" ? null : "out")} className="text-left">
+          <StatCard label="Out of stock" value={String(stats.out)} sub={needs === "out" ? "showing these" : "need reorder"}
+            tone={stats.out ? "neg" : undefined} />
+        </button>
         <StatCard label="Reserved" value={String(stats.reserved)} sub="on open orders" />
       </StatGrid>
 
@@ -354,9 +412,30 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               sat in the middle of the things that narrow the list — and the eye has no way
               to know which half of a row it is in. ml-auto is the whole separation: a gap
               says "these do something to the list, those do something to the world". */}
+          {notice && (
+            <span className="text-xs text-muted-foreground">
+              {notice}{" "}
+              <button type="button" onClick={() => setNotice(null)} className="underline underline-offset-2">dismiss</button>
+            </span>
+          )}
           <div className="ml-auto flex items-center gap-2">
             {sel.size > 0 && (
               <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
+            )}
+            {/**
+              * RESTOCKING ENDS SOMEWHERE. This page names what is short and, until now,
+              * offered no way to act on it — you read the shortage here and then found the
+              * same skus again in Purchasing, by hand, from memory. The two halves of one
+              * job were two screens with nothing between them.
+              *
+              * They go to the SAVED pool rather than straight onto a draft PO, because the
+              * supplier is a decision and this page does not know it. Purchasing picks them
+              * up parked and ready, which is where that choice belongs.
+              */}
+            {sel.size > 0 && (
+              <Button variant="outline" disabled={queuing} onClick={() => void queueForPurchase()}>
+                {queuing ? "Adding…" : `Add ${sel.size} to purchase`}
+              </Button>
             )}
             <Button variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
               {sel.size ? `Print ${sel.size} selected` : "Print labels"}
@@ -1068,15 +1147,22 @@ function StockMatrix({ group, edit, lowAt }: {
              it: at(oneSize, oneColor) }]
     return (
       <div className="space-y-2 px-4 py-3">
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {/* COLUMNS, NOT A WRAP. Ragged chips put every label at a different x, so seventeen
+            of them are seventeen things to find rather than a list to read down. A fixed
+            grid lines the names up and the numbers up, which is the whole reason a table
+            beats a sentence. */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-6 gap-y-1.5">
           {axis.map(({ label, it }) => (
-            <span key={label} className="flex items-center gap-1.5 text-xs">
-              <span className="whitespace-nowrap text-muted-foreground">{label}</span>
+            <span key={label} className="flex items-center justify-between gap-2 text-xs">
+              <span className="truncate text-muted-foreground">{label}</span>
               {cell(it, label)}
             </span>
           ))}
         </div>
-        {leftover.length > 0 && <LeftoverNote rows={leftover} />}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <EmptyToggle hidden={hidden} showAll={showAll} onToggle={() => setShowAll((v) => !v)} />
+          {leftover.length > 0 && <LeftoverNote rows={leftover} />}
+        </div>
       </div>
     )
   }
@@ -1101,7 +1187,10 @@ function StockMatrix({ group, edit, lowAt }: {
           </tbody>
         </table>
       </div>
-      {leftover.length > 0 && <LeftoverNote rows={leftover} />}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <EmptyToggle hidden={hidden} showAll={showAll} onToggle={() => setShowAll((v) => !v)} />
+        {leftover.length > 0 && <LeftoverNote rows={leftover} />}
+      </div>
     </div>
   )
 }
