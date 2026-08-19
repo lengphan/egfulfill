@@ -873,7 +873,7 @@ export function DispatchBoard() {
                   <Printer size={14} weight="bold" /> Open labels
                 </DropdownMenuItem>
                 {canScanOut && (
-                  <DropdownMenuItem disabled={!manifestable.length || busy} onClick={() => setManifestOpen(true)} title={manifestTooltip(chosen)}>
+                  <DropdownMenuItem disabled={!chosen.length || busy} onClick={() => setManifestOpen(true)} title={manifestTooltip(chosen)}>
                     <Barcode size={14} weight="bold" /> Create SCAN form
                   </DropdownMenuItem>
                 )}
@@ -1296,8 +1296,14 @@ export function DispatchBoard() {
       {/* Keyed on the selection so reopening after a different pick can't show the
           previous batch's preview for a frame. */}
       <ManifestDialog
-        key={manifestable.map((o) => o.id).join(",")}
-        orderIds={manifestable.map((o) => o.id)}
+        /* THE WHOLE SELECTION, not just the eligible part.
+           Passing only eligible orders meant the dialog could not mention the rest: pick
+           ten, have nine filtered out here, and it opened talking about one — or, when
+           none qualified, the item was disabled and clicking it did nothing at all, which
+           is indistinguishable from a broken button. The preview already returns a reason
+           per skipped order; it just was never given them to explain. */
+        key={chosen.map((o) => o.id).join(",")}
+        orderIds={chosen.map((o) => o.id)}
         open={manifestOpen}
         onOpenChange={setManifestOpen}
         onDone={() => { setPicked(new Set()); load() }}

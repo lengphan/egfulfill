@@ -137,9 +137,19 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                     forms — USPS requires one account per form. All {groups.length} are created together.
                   </p>
                 )}
+                {/* NOTHING ELIGIBLE IS A SENTENCE, not an empty panel reading "0 labels go
+                    on 0 forms". Every order in the selection is listed below with its own
+                    reason, so this says which situation it is rather than looking broken. */}
+                {eligible === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    None of the {skipped.length} selected {skipped.length === 1 ? "order" : "orders"} can go on a SCAN form
+                    — see why below.
+                  </div>
+                ) : (
                 <div className="text-sm">
                   <strong>{eligible}</strong> {eligible === 1 ? "label goes" : "labels go"} on {groups && groups.length > 1 ? `${groups.length} forms` : "this form"}.
                 </div>
+                )}
                 {skipped.length > 0 && (
                   <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50 p-2.5">
                     <div className="text-xs font-medium text-amber-900">
