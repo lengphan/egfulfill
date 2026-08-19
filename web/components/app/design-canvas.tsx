@@ -541,7 +541,7 @@ export function DesignStage({
         // left wide dead margins around a portrait mockup.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={mockup} alt="" className={"pointer-events-none absolute inset-0 size-full " +
-          (mockupFill ? "object-cover" : "object-contain p-[5%] drop-shadow-[0_10px_28px_rgba(0,0,0,0.16)]")} />
+          (mockupFill ? "object-cover" : "object-contain p-[1%] drop-shadow-[0_10px_28px_rgba(0,0,0,0.16)]")} />
       ) : (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
           <ImageIcon size={38} weight="duotone" className="opacity-40" />
@@ -1761,7 +1761,7 @@ export function DesignCanvasDialog({
            under the stage than a DTG one, and it should scroll INSIDE the window rather than
            pushing the action bar off the screen. Plain block comment: this is an attribute
            list, where a JSX-style comment is a syntax error. */
-        className="max-h-[92vh] overflow-y-auto sm:max-w-lg lg:max-w-[min(94vw,720px)]"
+        className="max-h-[92vh] overflow-y-auto sm:max-w-md lg:max-w-[min(94vw,600px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -2067,8 +2067,12 @@ export function DesignCanvasDialog({
             * the garment stays in view. Enter saves, Escape closes — the two keys a
             * one-field form should answer to.
             */}
+          {/* CENTRED, not tucked against the rail. Pinned to the top-left it overlapped the
+              artwork it was naming and read as a tooltip that had come loose; in the middle it
+              is plainly a small form, and the field is wide enough to show the end of a name
+              rather than scrolling it out of sight while you type. */}
           {tplName !== null && (
-            <div className="absolute left-14 top-2 z-30 w-56 rounded-xl border border-border bg-card p-2 shadow-lg">
+            <div className="absolute left-1/2 top-1/2 z-30 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-3 shadow-xl">
               <label className="block text-2xs font-medium text-muted-foreground">Save as template</label>
               <input
                 autoFocus
@@ -2080,7 +2084,7 @@ export function DesignCanvasDialog({
                 }}
                 placeholder={defaultTplName}
                 aria-label="Template name"
-                className="mt-1 h-8 w-full rounded-lg border border-input bg-background px-2 text-xs outline-none focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30"
+                className="mt-1.5 h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30"
               />
               <div className="mt-1.5 flex items-center justify-end gap-1.5">
                 <button type="button" onClick={() => setTplName(null)}
