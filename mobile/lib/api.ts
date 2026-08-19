@@ -370,6 +370,35 @@ export type VietqrPayment = {
   vaAccount?: string
   error?: string
 }
+/**
+ * TOP-UP REQUESTS — the thing the ledger cannot tell you.
+ *
+ * The phone showed top-up history off wallet_ledger, and a ledger row is only written when
+ * the money LANDS. So a request that has been created and not yet paid — the seller saved
+ * the QR, left for their banking app, came back — was structurally invisible: no row, no
+ * trace, nothing to say a payment was in flight.
+ *
+ * The server already keeps these and already answers correctly for both sides: staff see a
+ * VietQR row only once it is PAID, because an unpaid one is nothing for them to act on,
+ * while the seller keeps ALL of theirs including abandoned ones. Nothing was removed from
+ * the seller — the phone simply never asked.
+ *
+ * `abandoned` is a real status here even though the type above does not name it: closing
+ * the QR marks the request abandoned so it leaves the admin queue, and the seller still
+ * sees it because the virtual account is live and the reference still settles. It is an
+ * unpaid payment they can still make, not rubbish.
+ */
+export type TopupRequest = {
+  id: string
+  amount_usd: number | string
+  vnd?: number | string | null
+  method?: string | null
+  ref?: string | null
+  status: "pending" | "received" | "rejected" | "abandoned" | string
+  created_at: string
+}
+export const getMyTopups = () => request<TopupRequest[]>("/api/topups")
+
 export const getTopupConfig = () => request<TopupConfig>("/api/vietqr/rate")
 export const createVietqrPayment = (amount: number, amountUsd?: number) =>
   request<VietqrPayment>("/api/vietqr/create-payment", {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { getWallet, type WalletResponse, type LedgerRow } from "@/lib/api"
+import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { C } from "@/lib/theme"
@@ -22,10 +22,11 @@ export default function Wallet() {
   const insets = useSafeAreaInsets()
   const [w, setW] = useState<WalletResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [me, setMe] = useState<User | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
-    try { setW(await getWallet()); setErr(null) }
+    try { setW(await getWallet()); setErr(null); getMe().then(setMe).catch(() => {}) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load your wallet.") }
   }, [])
   /**
@@ -46,6 +47,11 @@ export default function Wallet() {
     setRefreshing(true); await load(); setRefreshing(false)
   }, [load])
 
+  /* Staff ROLE plus an empty ledger. Not a zero balance: a seller who has spent down to
+     nothing must still see their zero, their history and their way to add more. */
+  const staff = !!me?.role && me.role !== "seller"
+  const noWallet = staff && !!w && (w.ledger ?? []).length === 0 && Number(w.balance ?? 0) === 0
+
   if (w === null && !err) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
@@ -62,6 +68,31 @@ export default function Wallet() {
         {/* A BALANCE IS READ OFTEN, so it is a quiet card rather than a coloured block —
             and "low" is a chip, not a repaint. Turning the whole panel red made a working
             wallet look broken, and left no louder state for something that IS broken. */}
+        {/**
+          * A STAFF ACCOUNT HAS NO SELLER WALLET, and $0.00 is the wrong way to say so.
+          *
+          * /api/wallet answers for the signed-in account, and only sellers (and team
+          * members, who resolve to their owner) have one. An operator or admin therefore
+          * saw a balance of zero above an "Add funds" button — indistinguishable from a
+          * seller whose money has gone, and offering to top up an account that will never
+          * be charged for anything.
+          *
+          * The test is a staff ROLE with an empty ledger, not a zero balance: a seller who
+          * has genuinely spent down to nothing must still see their zero, their history and
+          * their way to add more.
+          */}
+        {noWallet ? (
+          <View style={{
+            marginTop: 16, borderRadius: 20, padding: 22,
+            backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+          }}>
+            <Text style={{ fontSize: 17, fontWeight: "800", color: C.fg }}>No wallet on this account</Text>
+            <Text style={{ fontSize: 14, color: C.muted, marginTop: 6, lineHeight: 20 }}>
+              Wallets belong to sellers — orders are charged to theirs. What the factory
+              spends on postage, blanks and design lives in Finance on the web.
+            </Text>
+          </View>
+        ) : (
         <View style={{
           marginTop: 16, borderRadius: 20, padding: 22,
           backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
@@ -81,6 +112,9 @@ export default function Wallet() {
           </Text>
         </View>
 
+        )}
+
+        {!noWallet && (
         <Pressable
           onPress={() => router.push("/topup")}
           style={({ pressed }) => ({
@@ -92,6 +126,7 @@ export default function Wallet() {
           <Ionicons name="add-circle" size={20} color={C.onPrimary} />
           <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 16 }}>Add funds</Text>
         </Pressable>
+        )}
 
         {err && <Text style={{ color: C.alert, fontSize: 14, marginTop: 16 }}>{err}</Text>}
 

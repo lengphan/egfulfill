@@ -7,8 +7,8 @@ import { router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import QRCode from "react-native-qrcode-svg"
 import {
-  getTopupConfig, createVietqrPayment, vietqrStatus, getWallet, abandonVietqr,
-  type TopupConfig, type VietqrPayment, type LedgerRow,
+  getTopupConfig, createVietqrPayment, vietqrStatus, getWallet, abandonVietqr, getMyTopups,
+  type TopupConfig, type VietqrPayment, type LedgerRow, type TopupRequest,
 } from "@/lib/api"
 import { C } from "@/lib/theme"
 
@@ -55,6 +55,9 @@ export default function TopUp() {
      PayPal, manual transfer) books the same `topup` row, so the ledger is the one place
      that has all of them and cannot disagree with the balance. */
   const [history, setHistory] = useState<LedgerRow[] | null>(null)
+  /** Requests that exist and have not been paid. See getMyTopups — these have no ledger
+   *  row yet, which is why the old history could not show them. */
+  const [open_, setOpen] = useState<TopupRequest[] | null>(null)
   /* The ref of a payment that is still open. Held in a ref, not state, because the cleanup
      below runs on unmount and would otherwise close over the value from first render. */
   const openRef = useRef<string | null>(null)
@@ -64,6 +67,9 @@ export default function TopUp() {
     getWallet()
       .then((w) => setHistory((w.ledger ?? []).filter((r) => String(r.type) === "topup").slice(0, 5)))
       .catch(() => setHistory([]))
+    getMyTopups()
+      .then((rows) => setOpen((rows ?? []).filter((r) => r.status === "pending" || r.status === "abandoned").slice(0, 5)))
+      .catch(() => setOpen([]))
     return () => {
       // Polling must stop when this screen goes away, or it keeps running against a closed
       // payment for as long as the app is open.
@@ -353,6 +359,56 @@ export default function TopUp() {
             {/* PAST TOP-UPS — short on purpose. This answers one question ("did my last
                 transfer land?") and anything longer belongs in the wallet's full ledger,
                 which is one screen away. Five rows, amount and date, nothing else. */}
+            {/*
+              * AWAITING PAYMENT — the state that had nowhere to appear.
+              *
+              * Saving the QR means leaving for a banking app, and coming back to a screen
+              * that shows nothing in flight reads as "my request vanished". These rows are
+              * the proof it did not.
+              *
+              * `abandoned` is shown too, and not as a failure: closing the QR only takes the
+              * request out of the ADMIN queue, because an unpaid VietQR is nothing for them
+              * to act on. The virtual account stays live and the reference still settles, so
+              * it is a payment the seller can still make.
+              */}
+            {open_ !== null && open_.length > 0 && (
+              <>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>
+                  AWAITING PAYMENT
+                </Text>
+                <View style={{ marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
+                  {open_.map((r, i) => (
+                    <View
+                      key={r.id}
+                      style={{
+                        flexDirection: "row", alignItems: "center", gap: 12,
+                        paddingHorizontal: 16, paddingVertical: 14,
+                        borderTopWidth: i ? 1 : 0, borderTopColor: C.border,
+                      }}
+                    >
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 16, fontWeight: "800", color: C.fg }}>
+                          {usd0(Number(r.amount_usd) || 0)}
+                          {r.vnd ? <Text style={{ fontSize: 13, fontWeight: "400", color: C.muted }}>{`  ${vnd0(Number(r.vnd))}`}</Text> : null}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                          {r.ref ? `Ref ${r.ref} · ` : ""}
+                          {new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        </Text>
+                      </View>
+                      <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: "#fdf3e3" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "800", color: C.warn }}>Awaiting payment</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <Text style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 19 }}>
+                  Pay one of these from your banking app and the balance updates on its own —
+                  the account and reference stay live.
+                </Text>
+              </>
+            )}
+
             {history !== null && history.length > 0 && (
               <View style={{ marginTop: 36 }}>
                 <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1 }}>
