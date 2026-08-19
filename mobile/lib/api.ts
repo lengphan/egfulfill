@@ -41,7 +41,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
-export type User = { id?: string; name?: string; email?: string; role?: string }
+/**
+ * WHO IS SIGNED IN. `/api/me` used to answer with the decoded JWT, which carries only
+ * sub/role/email — so `name` was always undefined and there was no username at all. It
+ * reads the users row now, so these fields are real.
+ */
+export type User = {
+  id?: string
+  sub?: string
+  name?: string | null
+  /** The second way to sign in. Null on an account that only has an email. */
+  username?: string | null
+  email?: string | null
+  role?: string
+}
 export type OrderItem = {
   id?: string
   qty?: number | null

@@ -228,7 +228,7 @@ export default function OrderDetail() {
               ends in a shipment, and a shipped order has nothing to press at all. */}
           {staff && (
             stage === "working" ? (
-              <ConfirmShipment orderId={String(o.id)} role={me?.role} by={me?.name} onDone={refresh} />
+              <ConfirmShipment orderId={String(o.id)} role={me?.role} by={me?.name ?? undefined} onDone={refresh} />
             ) : to ? (
               /*
                * ONE BUTTON, ONE SENTENCE. It was a 40pt circular icon tile, a title, a

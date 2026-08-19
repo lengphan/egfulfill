@@ -72,9 +72,22 @@ export default function Settings() {
           ? <Text style={{ color: C.alert, fontSize: 15, paddingVertical: 14 }}>{err}</Text>
           : (
             <>
-              <Line label="Name" value={me?.name || "—"} />
+              {/* Name and Username only appear when there IS one. A row of dashes is not
+                  an account summary — it reads as a screen that failed to load, which is
+                  exactly how this looked while /api/me was answering with the token. */}
+              {me?.name ? <Line label="Name" value={me.name} /> : null}
+              {me?.username ? <Line label="Username" value={me.username} /> : null}
               <Line label="Email" value={me?.email || "—"} />
               <Line label="Role" value={me?.role || "—"} />
+              {/* An account whose stored email is really a username predates signup
+                  validation, and it is worth saying so rather than labelling it Email —
+                  that person cannot reset a password, because nothing can be sent. */}
+              {me?.email && !/.+@.+\..+/.test(String(me.email)) ? (
+                <Text style={{ fontSize: 13, color: C.warn, paddingTop: 12 }}>
+                  That is a username in the email field, so password reset can&apos;t reach you.
+                  Add a real email on the web to fix it.
+                </Text>
+              ) : null}
             </>
           )}
       </View>

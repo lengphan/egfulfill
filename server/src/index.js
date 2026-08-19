@@ -350,7 +350,41 @@ app.post('/api/auth/login', async (req, reply) => {
   try { return await login(b); }
   catch (e) { reply.code(400); return { error: e.message }; }
 });
-app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
+/**
+ * WHO IS SIGNED IN — read from the users table, not echoed back off the token.
+ *
+ * This returned `req.user`, which IS the decoded JWT, and auth.js signs only
+ * { sub, role, email }. So `name` was never in the answer: every client asking "who am I"
+ * got a user with no name, and the phone's Settings screen showed a dash for it on every
+ * device for every person. `username` was never in it either, so nothing could show one.
+ *
+ * The PATCH directly below already assumed otherwise — its own comment says a name change
+ * "needs no re-issue, the client just refreshes its cached user", which could never work
+ * while the refresh handed back the same nameless token.
+ *
+ * ADDITIVE, not a replacement: the token's fields are spread FIRST and the row over them,
+ * so `sub` survives for the callers keyed on it (web/lib/order-id.ts reads id || sub) and
+ * everything else gains a real value. `select *` rather than a column list because
+ * username / avatar_emoji / avatar_color / notify_sound are added idempotently at route
+ * load and are not in schema.sql — naming them would 500 on a database that has not run
+ * auth.js yet. password_hash is destructured off and never leaves this function.
+ *
+ * A valid token whose row is gone (deleted account) falls back to the token rather than
+ * 500ing: the request is authenticated, and answering "who am I" with what we can prove is
+ * better than an error page.
+ */
+app.get('/api/me', { preHandler: requireAuth }, async (req) => {
+  try {
+    const r = await q('select * from users where id=$1', [req.user.sub]);
+    const row = r.rows[0];
+    if (!row) return req.user;
+    const { password_hash, ...safe } = row;   // eslint-disable-line no-unused-vars
+    return { ...req.user, ...safe };
+  } catch {
+    // A column-shape surprise must not take out the one route every client calls on boot.
+    return req.user;
+  }
+});
 
 // Update the signed-in user's own profile (currently just the display name). The JWT
 // carries sub/role/email (not name), so a name change needs no re-issue — the client
