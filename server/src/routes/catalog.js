@@ -1819,6 +1819,41 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     return out;
   }
 
+  /**
+   * RECORD ONE SUPPLIER CODE AGAINST ONE OF OUR VARIANTS.
+   *
+   * The purchase cart refuses a supplier variant it cannot translate — otherwise the line
+   * carries THEIR code, receiving credits a shelf row no order line can read, and the goods
+   * sit in the building under a name nothing resolves. That refusal was a dead end though:
+   * the pairing could only be written by resaving the whole product.
+   *
+   * DELIBERATELY NOT THE WHOLE-ARRAY UPSERT. That route takes the entire catalogue and
+   * DELETES every id missing from the payload, which is a catastrophic way to record one
+   * string — a stale list in a browser tab would take the catalogue with it. This touches
+   * one product and one key.
+   */
+  app.patch('/api/catalog_products/:id/supplier-sku', { preHandler: requireStaff }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    const ours = String(req.body?.ourSku || '').trim().toUpperCase();
+    const theirs = String(req.body?.supplierSku || '').trim().toUpperCase();
+    if (!id || !ours) { reply.code(400); return { error: 'product id and our variant sku are required' }; }
+
+    const row = await q('select data from catalog_products where id=$1', [id]).then((r) => r.rows[0]);
+    if (!row) { reply.code(404); return { error: 'Product not found' }; }
+    const data = row.data && typeof row.data === 'object' ? row.data : {};
+    const map = data.supplierSkus && typeof data.supplierSkus === 'object' ? { ...data.supplierSkus } : {};
+
+    // An empty supplier code CLEARS the pairing rather than storing "", so a mistake can be
+    // taken back from the same control that made it.
+    if (theirs) map[ours] = theirs; else delete map[ours];
+
+    await q('update catalog_products set data = $2, updated_at = now() where id = $1',
+      [id, JSON.stringify({ ...data, supplierSkus: map })]);
+    audit(req, 'product.supplier_sku', { entityType: 'product', entityId: id,
+      after: { ourSku: ours, supplierSku: theirs || null } });
+    return { ok: true, supplierSkus: map };
+  });
+
   app.post('/api/catalog_products', { preHandler: requireStaff }, async (req, reply) => {
     const products = await Promise.all((Array.isArray(req.body) ? req.body : []).map(fattenImages));
     // An empty list used to mean "delete every product", which is never what a full-list
