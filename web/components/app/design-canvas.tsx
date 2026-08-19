@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning } from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, saveTemplate, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
@@ -801,6 +801,11 @@ export function DesignCanvasDialog({
   // Resolve the REAL blank mockup from the catalog (per the chosen colour + its side
   // faces), not the raw order-line thumbnail. Falls back to item.img when the product
   // can't be resolved (e.g. an unmatched marketplace SKU).
+  /** One size for every mark on the rail — the same 36px target the selection strip uses,
+   *  so the two toolbars on this stage are one visual language rather than two. */
+  const railBtn = "flex size-9 items-center justify-center rounded-lg text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+  const [tplBusy, setTplBusy] = useState(false)
+
   const faces = useMemo(() => {
     const product = resolveProduct(item, catalog ?? [])
     const f = mockupFaces(product, item.color)
@@ -1273,23 +1278,17 @@ export function DesignCanvasDialog({
   const quote = item.design_quote_status ?? null
 
   /**
-   * The tier we RECOMMEND, from the one signal that actually distinguishes them: who cut
-   * the machine file.
+   * THE SUGGESTION IS GONE, deliberately, and this note is what is left of it.
    *
-   *   a machine file is on the line  → 'supplied'  — they brought it, we only check it
-   *   otherwise                      → 'standard'  — we cut it from their artwork
+   * A tier was recommended from one signal — a machine file on the line meant 'supplied',
+   * otherwise 'standard' — and shown as a highlighted chip with a fee beside it. It never
+   * charged anything, which was the care taken at the time, and it still sat in the place a
+   * real charge goes on the window where someone decides what to bill. Read at a glance,
+   * a guess in that position is indistinguishable from the amount.
    *
-   * 'complex' is deliberately NEVER suggested. It is the expensive tier AND it fires a
-   * quote that blocks the line until the seller accepts, so proposing it automatically
-   * would put a large charge and a stalled order behind nobody's judgement. Intricacy is
-   * the one thing here a person has to look at the artwork to decide.
-   *
-   * This only HIGHLIGHTS. It must never call setDesignTier on its own: that route debits
-   * the wallet, so an auto-applied suggestion would mean merely OPENING this window
-   * charged the seller. Staff still click; the suggestion just makes the common case the
-   * obvious one instead of a price list recalled from memory.
+   * `hasMachineFile` is still read elsewhere on this card; only the recommendation went.
+   * Bringing it back means answering how it reads as advice rather than as the figure.
    */
-  const suggested: DesignTier = hasMachineFile ? "supplied" : "standard"
 
   /**
    * File a MACHINE file against this line.
@@ -1467,6 +1466,36 @@ export function DesignCanvasDialog({
    * delete, so that case stays local and instant.
    */
   const [removing, setRemoving] = useState(false)
+  /**
+   * SAVE THIS PLACEMENT AS A TEMPLATE — the missing half of the library.
+   *
+   * LibraryPickerDialog has always been able to hand a template back and apply BOTH the
+   * artwork and where it sits ("a template brings its placement"), and there was no way to
+   * make one from here — so a placement worked out once on a garment had to be redone by
+   * eye on the next order.
+   *
+   * Written in the shape the picker reads: `layers.images[]` with each src and its pos. The
+   * blank is deliberately NOT stored — the picker refuses to apply one anyway, because this
+   * canvas belongs to a line whose garment is already decided.
+   */
+  const saveAsTemplate = async () => {
+    if (!designUrl) return
+    const name = window.prompt("Name this template", item.name || item.sku || "Placement")
+    if (name === null) return                      // cancelled — not an empty name
+    setTplBusy(true); setErr(null)
+    try {
+      const r = await saveTemplate({
+        id: `tpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        name: name.trim() || "Placement",
+        layers: { images: [{ src: designUrl, pos }] },
+      })
+      if (r?.error) throw new Error(r.error)
+      setAttached("Saved as a template — it is in the library for any order.")
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save that template.")
+    } finally { setTplBusy(false) }
+  }
+
   const removeArtwork = async () => {
     if (removing) return   // a second click would open a second confirm over the first
     const saved = !!artAtOpen && !!designUrl
@@ -1708,54 +1737,6 @@ export function DesignCanvasDialog({
           * A side is one print — one hooping, one platen pass — which is also how the
           * surcharge bills it, so the list is the job as the floor will run it.
           */}
-        {faces.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">
-            {faces.map((f, i) => {
-              const has = facesWithArt[(f.side || "front").toLowerCase()]
-              /**
-               * THE PILL ITSELF CARRIES THE STATE — no dot.
-               *
-               * A dot is a second mark inside a control that could just BE the mark, and next
-               * to a filled pill it read as a third state rather than as "this one has
-               * something on it". Three appearances, one property:
-               *
-               *   solid    — the face you are on
-               *   tinted   — has artwork, not selected
-               *   plain    — empty
-               *
-               * Primary, not a status colour: emerald/amber/red are spoken for on the floor
-               * (shipped, hold, alert) and a designer tab is not a floor status.
-               */
-              return (
-                <button key={f.side} onClick={() => goToSide(i)}
-                  title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
-                  className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors "
-                    + (i === side ? "bg-primary text-primary-foreground"
-                      : has ? "bg-primary/10 text-primary hover:bg-primary/15"
-                        : "bg-muted text-muted-foreground hover:bg-accent")}>
-                  {f.side}
-                  {/**
-                    * WHAT THIS FACE COSTS, before it is chosen.
-                    *
-                    * The surcharge is per ADDITIONAL face, so the first one printed is
-                    * included and every one after adds this per unit. A seller found that
-                    * out on the Summary AFTER placing the artwork; the pill is where the
-                    * decision is actually made.
-                    *
-                    * Shown on a face that already costs, and on an empty one that WOULD —
-                    * which is only true once something else is printed. Nothing at all when
-                    * the rate is 0: an empty "+$0.00" is noise.
-                    */}
-                  {!!sideFee && sideFee > 0 && (has ? costingFaces[(f.side || "front").toLowerCase()] : anyFaceHasArt) && (
-                    <span className={"tabular-nums " + (i === side ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
-                      +{sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
         {/* THE STAGE IS THE DROP TARGET.
             Empty, it was a mockup doing nothing while a separate Upload button did the
             work — so the biggest, most obvious surface in the window was the one thing you
@@ -1811,6 +1792,52 @@ export function DesignCanvasDialog({
 
               Bottom-left, over the stage: the top corners hold the stage's own remove and
               the artwork usually sits centred, so this is the one corner it doesn't cover. */}
+          {/**
+            * THE TOOL RAIL — on the artboard, the way a design tool puts it.
+            *
+            * These lived in the right-hand column as a NUMBERED STEP ("1 · Your design →
+            * Upload image · Library"), which framed placing artwork as a form to complete
+            * rather than something you do to a picture. The step told you where you were in
+            * a process; the rail tells you what you can do to the thing under your cursor,
+            * and it does it without your eye leaving the garment.
+            *
+            * Left edge, vertical, one column of marks: it is the edge with nothing on it —
+            * the selection strip floats above the artwork, the sides sit under the stage,
+            * and artwork lands centred — so the rail costs no view of what is being made.
+            */}
+          <div className="absolute left-2 top-2 flex flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
+            <button
+              type="button"
+              onClick={() => uploadRef.current?.click()}
+              title={designUrl ? "Replace the artwork" : "Upload artwork"}
+              aria-label={designUrl ? "Replace the artwork" : "Upload artwork"}
+              className={railBtn}
+            >
+              <UploadSimple size={18} weight="bold" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setLibOpen(true)}
+              title="Pick from the library — saved designs and templates"
+              aria-label="Open the design library"
+              className={railBtn}
+            >
+              <FolderOpen size={18} weight="bold" />
+            </button>
+            {/* SAVE THIS PLACEMENT AS A TEMPLATE. The library could always hand a template
+                back — artwork AND where it sits — and nothing here could put one in, so the
+                only way to reuse a placement was to redo it by eye on the next order. */}
+            <button
+              type="button"
+              onClick={() => void saveAsTemplate()}
+              disabled={!designUrl || tplBusy}
+              title={designUrl ? "Save this artwork and its placement as a template" : "Add artwork first"}
+              aria-label="Save as a template"
+              className={railBtn}
+            >
+              {tplBusy ? <CircleNotch size={18} className="animate-spin" /> : <BookmarkSimple size={18} weight="bold" />}
+            </button>
+          </div>
           {designUrl && (
             <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-1.5">
               {/* The background BUTTONS moved onto the selection strip (see the stage props
@@ -1870,6 +1897,60 @@ export function DesignCanvasDialog({
             </button>
           )}
         </div>
+        {/* THE SIDES, UNDER THE GARMENT.
+            They sat above it, which is where a page puts NAVIGATION — and these are not
+            navigation, they are the placement: which face of the shirt this artwork goes on,
+            what each face already carries, and what a second face costs. Under the stage
+            they read as controls for the thing above them, in the same place every design
+            tool puts its artboard row. */}
+        {faces.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {faces.map((f, i) => {
+              const has = facesWithArt[(f.side || "front").toLowerCase()]
+              /**
+               * THE PILL ITSELF CARRIES THE STATE — no dot.
+               *
+               * A dot is a second mark inside a control that could just BE the mark, and next
+               * to a filled pill it read as a third state rather than as "this one has
+               * something on it". Three appearances, one property:
+               *
+               *   solid    — the face you are on
+               *   tinted   — has artwork, not selected
+               *   plain    — empty
+               *
+               * Primary, not a status colour: emerald/amber/red are spoken for on the floor
+               * (shipped, hold, alert) and a designer tab is not a floor status.
+               */
+              return (
+                <button key={f.side} onClick={() => goToSide(i)}
+                  title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
+                  className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors "
+                    + (i === side ? "bg-primary text-primary-foreground"
+                      : has ? "bg-primary/10 text-primary hover:bg-primary/15"
+                        : "bg-muted text-muted-foreground hover:bg-accent")}>
+                  {f.side}
+                  {/**
+                    * WHAT THIS FACE COSTS, before it is chosen.
+                    *
+                    * The surcharge is per ADDITIONAL face, so the first one printed is
+                    * included and every one after adds this per unit. A seller found that
+                    * out on the Summary AFTER placing the artwork; the pill is where the
+                    * decision is actually made.
+                    *
+                    * Shown on a face that already costs, and on an empty one that WOULD —
+                    * which is only true once something else is printed. Nothing at all when
+                    * the rate is 0: an empty "+$0.00" is noise.
+                    */}
+                  {!!sideFee && sideFee > 0 && (has ? costingFaces[(f.side || "front").toLowerCase()] : anyFaceHasArt) && (
+                    <span className={"tabular-nums " + (i === side ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
+                      +{sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
         </div>
         {/* Right column — controls, in the order you work through them: what the buyer sent,
             the two upload steps, thread match, then the charge. */}
@@ -2134,14 +2215,12 @@ export function DesignCanvasDialog({
                   <span className="truncate font-mono text-2xs font-medium text-muted-foreground">DSN-{designNo}</span>
                 )}
               </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>{designUrl ? "Replace" : "Upload image"}</Button>
-                <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>Library</Button>
-                {/* Remove background is NOT here — it acts on the artwork, so it lives on
-                    the artwork (see the stage overlay). A control in this row described a
-                    step; on the image it describes the thing under your cursor, and you can
-                    see the result the moment it lands without looking away. */}
-              </div>
+              {/* NO BUTTONS HERE. Upload, replace, library and save-as-template are on the
+                  RAIL on the artboard — the same reason background removal moved onto the
+                  artwork. A control in this column described a step in a form; on the stage
+                  it describes the thing under your cursor, and the result lands where you
+                  are already looking. What is left is the one thing the stage cannot say:
+                  whether this line's design is settled, and which DSN it filed as. */}
             </div>
             {/* 2 — Machine file (the seller's own-file route, now discoverable).
                 EMBROIDERY ONLY. Every part of this step is stitch apparatus: the formats it
@@ -2367,12 +2446,26 @@ export function DesignCanvasDialog({
                 aria-expanded={chargeOpen}
                 className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-2 text-left transition-colors hover:bg-accent"
               >
+                {/**
+                  * WHAT WE CHARGE, NEVER WHAT WE GUESS.
+                  *
+                  * This line read "Suggested: Standard · $2.00 — not charged yet" on every
+                  * line that had no tier — a number that had been worked out by a rule of
+                  * thumb here, sitting in the place a real figure goes, on the window where
+                  * someone decides what to bill. Read quickly it is indistinguishable from
+                  * the charge, and it is not one: nothing is set and nothing has moved.
+                  *
+                  * A set tier still names its FEE, because that is a figure we configured
+                  * and the person setting it has to see it. Unset says exactly that. The
+                  * amount that is actually owed is read off the order's total, which is the
+                  * one place a number about money should live.
+                  */}
                 <span className="min-w-0">
                   <span className="block text-xs font-medium">Design charge</span>
                   <span className="block truncate text-2xs text-muted-foreground">
                     {tier
                       ? `${TIER_LABEL[tier]}${feeFor(tier, fees) !== null ? ` · ${usd(feeFor(tier, fees)!)}` : ""}${quote === "pending" ? " · awaiting the seller" : ""}`
-                      : `Suggested: ${TIER_LABEL[suggested]}${feeFor(suggested, fees) !== null ? ` · ${usd(feeFor(suggested, fees)!)}` : ""} — not charged yet`}
+                      : "Not set — nothing charged"}
                   </span>
                 </span>
                 <CaretDown size={14} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (chargeOpen ? "rotate-180" : "")} />
@@ -2383,9 +2476,11 @@ export function DesignCanvasDialog({
                   <div className="grid grid-cols-3 gap-1.5">
                     {(["standard", "complex", "supplied"] as DesignTier[]).map((id) => {
                       const isSet = tier === id
-                      // Highlighted, NOT applied. Nothing here has debited anything until
-                      // someone clicks — see the note on `suggested`.
-                      const isSuggested = !tier && id === suggested
+                      /* NO PRE-HIGHLIGHT. A tinted chip in a row of three reads as the one
+                         that is in force, and it was only ever a guess from a rule of thumb
+                         — on the control that decides what a seller is billed. The tiers
+                         carry their configured fees; picking one is a decision, not a
+                         confirmation of ours. */
                       const fee = feeFor(id, fees)
                       return (
                         <button
@@ -2425,7 +2520,6 @@ export function DesignCanvasDialog({
                           }}
                           className={"relative rounded-lg border px-2 py-1.5 text-2xs font-medium transition-colors disabled:opacity-50 " +
                             (isSet ? "border-primary bg-primary/10 text-primary"
-                              : isSuggested ? "border-primary/50 bg-primary/5 text-foreground"
                               : "border-border text-muted-foreground hover:bg-accent")}
                         >
                           {tierBusy === id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : (
