@@ -628,21 +628,13 @@ function ProductGroup({
             pick a type, which is three steps to answer "what do I point the phone at".
             The glyph is inside the cell, not beside it: it costs no column, and it is the
             thing that says a code is here. */}
-        <button
-          type="button"
-          onClick={() => onZoom(it.sku)}
-          title={`Show a scannable code for ${it.sku}`}
-          /* 8.5rem was sized for the eleven-column table, where this cell was competing with
-             five others for a laptop's width — every sku broke across two lines because of
-             it. Folding the columns gave the width back; a 30-character sku now sits on one
-             line, and break-all still catches anything longer. */
-          className="group/sku flex w-[15rem] max-w-full items-start gap-1.5 text-left transition-colors hover:text-primary"
-        >
-          <span className="break-all font-mono text-xs font-medium underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 group-hover/sku:decoration-primary">
-            {it.sku}
-          </span>
-          <QrCodeIcon size={13} weight="bold" className="mt-px shrink-0 text-muted-foreground transition-colors group-hover/sku:text-primary" aria-hidden />
-        </button>
+        {/* PLAIN TEXT AGAIN. The sku was a button carrying a small code glyph, so on
+            seventeen variants a column of data grew seventeen tiny marks and every sku
+            looked pressable for a reason nobody could guess. The code is a named item in
+            the row menu now — "Barcode" says what it is, which a 13px glyph never did. */}
+        <span className="block w-[15rem] max-w-full break-all font-mono text-xs font-medium">
+          {it.sku}
+        </span>
         {/* VISIBILITY SPEAKS UP ONLY WHEN IT IS NOT THE DEFAULT.
             The control moved to the row menu, and a setting behind a menu is a setting
             nobody audits — but "Factory only" is what almost every row is, and printing it
@@ -747,7 +739,23 @@ function ProductGroup({
                   {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
                 </select>
               </label>
-              <div className="flex items-center justify-between border-t border-border pt-2">
+              {/* BARCODE, NAMED. It used to be a 13px glyph welded to the sku, which said a
+                  code existed only if you already knew the mark. Here it is a word, next to
+                  the other two things you do to a row. */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2">
+                <button
+                  onClick={() => onZoom(it.sku)}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <QrCodeIcon size={14} /> Barcode
+                </button>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(it.sku).catch(() => {}) }}
+                  title="Copy this sku to the clipboard"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Copy SKU
+                </button>
                 <button
                   onClick={() => onHistory(it.sku)}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -821,14 +829,18 @@ function ProductGroup({
           })()}
         </td>
         <td className="px-4 py-2">
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="font-semibold tabular-nums">{stock}</span>
-            {reserved > 0 && (
-              <span className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums">
-                {reserved} held → <span className="font-medium text-foreground">{stock - reserved}</span> free
-              </span>
-            )}
-          </div>
+          {/* ONE NUMBER, AND THE SPLIT ON HOVER. "3 held → -3 free" was a second line
+              wedged under the count on every reserved row, so a column of numbers read as a
+              column of sentences and the figure you scan for stopped being the biggest
+              thing in the cell. The count is what the shelf holds; the split is a detail,
+              and a detail belongs in the title. */}
+          <span
+            className="font-semibold tabular-nums"
+            title={reserved > 0 ? `${stock} on the shelf · ${reserved} held for orders in production · ${stock - reserved} free` : `${stock} on the shelf`}
+          >
+            {stock}
+            {reserved > 0 && <span className="ml-1 align-super text-2xs font-normal text-muted-foreground">-{reserved}</span>}
+          </span>
         </td>
         <td className="px-4 py-2">
           {out === group.rows.length ? <span className="whitespace-nowrap text-xs font-medium text-red-700">All out</span>
