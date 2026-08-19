@@ -59,6 +59,54 @@ function ImagePeek({ shots, index, onClose }: {
   )
 }
 
+type Action = { label: string; icon: keyof typeof Ionicons.glyphMap; run: () => void; strong?: boolean } | null
+
+/**
+ * A SHEET OF WHAT YOU CAN DO TO THIS ORDER.
+ *
+ * Rises from the bottom because that is where the thumb is, and closes on anything — the
+ * backdrop, an action, the hardware back. Actions are grouped as one block of plain rows
+ * rather than buttons: this is a menu, and a menu of five buttons reads as five decisions
+ * of equal weight. Only the stage advance is set in ink, because it is the one that changes
+ * the order rather than just showing it to you.
+ */
+function RowMenu({ open, onClose, title, actions }: {
+  open: boolean; onClose: () => void; title: string; actions: Action[]
+}) {
+  const live = actions.filter(Boolean) as Exclude<Action, null>[]
+  return (
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.4)", justifyContent: "flex-end" }}>
+        {/* Stops a tap INSIDE the sheet from closing it via the backdrop above. */}
+        <Pressable onPress={() => {}} style={{
+          backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          paddingTop: 10, paddingBottom: 34, paddingHorizontal: 18,
+        }}>
+          <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 12 }} />
+          <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, marginBottom: 4 }}>
+            {title.toUpperCase()}
+          </Text>
+          {live.map((a, i) => (
+            <Pressable
+              key={a.label}
+              onPress={() => { onClose(); a.run() }}
+              style={({ pressed }) => ({
+                flexDirection: "row", alignItems: "center", gap: 12,
+                paddingVertical: 15,
+                borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
+                opacity: pressed ? 0.55 : 1,
+              })}
+            >
+              <Ionicons name={a.icon} size={19} color={a.strong ? C.fg : C.muted} />
+              <Text style={{ fontSize: 16, fontFamily: a.strong ? F.semi : F.body, color: C.fg }}>{a.label}</Text>
+            </Pressable>
+          ))}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  )
+}
+
 /**
  * ONE ORDER IN THE LIST.
  *
@@ -106,12 +154,17 @@ function Chip({ label, fg, bg, solid }: { label: string; fg: string; bg?: string
   )
 }
 
-export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
+export function OrderRow({ order, selecting, selected, onPress, onLongPress, onAdvance, advanceLabel }: {
   order: Order
   selecting: boolean
   selected: boolean
   onPress: () => void
   onLongPress: () => void
+  /** Move this one order on a stage. Absent for a seller, who may not. */
+  onAdvance?: () => void
+  /** The verb for that move ("Start", "Mark packed") — supplied by the queue, which already
+   *  derives it from nextStage/STAGE_VERB, so the vocabulary is not re-invented here. */
+  advanceLabel?: string | null
 }) {
   const items = order.items ?? []
   const first = items[0]
@@ -119,6 +172,8 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
   const tone = toneOf(stage)
   const late = isOverdue(order)
   const [peek, setPeek] = useState<number | null>(null)
+  const [menu, setMenu] = useState(false)
+  const { width } = useWindowDimensions()
 
   /*
    * EVERY PICTURE IN THE ORDER, in a strip you slide.
@@ -185,6 +240,12 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
         </Text>
         {order.rush && <Chip solid label="RUSH" fg="#fff" bg={C.warn} />}
         {late && <Chip solid label="LATE" fg="#fff" bg={C.alert} />}
+        {/* THE QUIET WAY IN. Everything here is reachable by opening the order, which on a
+            queue of 800 means losing your place to do one thing and coming back. A sheet
+            keeps the scroll position and the hands where they are. */}
+        <Pressable onPress={() => setMenu(true)} hitSlop={12} style={{ paddingLeft: 6, paddingVertical: 2 }}>
+          <Ionicons name="ellipsis-horizontal" size={17} color={C.muted} />
+        </Pressable>
       </View>
 
       {/* WHAT — the one line to read. */}
@@ -212,8 +273,12 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
             <Pressable key={i} onPress={() => setPeek(i)}>
               <Image
                 source={{ uri: sh.uri }}
+                /* A PICTURE YOU CAN JUDGE, not a thumbnail that grew. A lone image takes the
+                   row's full width, which is what a Threads post does with a single photo;
+                   several sit side by side and you slide. */
                 style={{
-                  width: shots.length === 1 ? 268 : 152, height: 152,
+                  width: shots.length === 1 ? width - 36 : 210,
+                  height: shots.length === 1 ? 236 : 210,
                   borderRadius: 10, backgroundColor: C.accent,
                 }}
                 resizeMode="cover"
@@ -231,6 +296,17 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
       </View>
 
       <ImagePeek shots={shots} index={peek} onClose={() => setPeek(null)} />
+      <RowMenu
+        open={menu}
+        onClose={() => setMenu(false)}
+        title={numOf(order)}
+        actions={[
+          shots.length > 0 ? { label: shots.length > 1 ? `See all ${shots.length} pictures` : "See the picture", icon: "image-outline", run: () => setPeek(0) } : null,
+          { label: "Open the order", icon: "open-outline", run: onPress },
+          advanceLabel && onAdvance ? { label: advanceLabel, icon: "play-outline", run: onAdvance, strong: true } : null,
+          { label: selected ? "Deselect" : "Select this order", icon: "checkmark-circle-outline", run: onLongPress },
+        ]}
+      />
     </Pressable>
   )
 }

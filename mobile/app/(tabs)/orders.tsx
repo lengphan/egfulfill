@@ -137,6 +137,22 @@ export default function Orders() {
    * Every refusal is the SERVER's sentence and every one is reported. A batch that says
    * "done" while quietly skipping three orders is worse than no batch at all.
    */
+  /* THE SAME MOVE THE BATCH BAR MAKES, for a single order from its own menu. Deliberately
+     the same setOrderStage(nextStage(o)) call rather than a second implementation — the
+     stage ladder is shared with the server (see lib/factory-status) and two copies of it
+     here is how the phone and the floor start disagreeing. */
+  const advanceOne = useCallback(async (o: Order) => {
+    const to = nextStage(o)
+    if (!to) return
+    try {
+      const r = await setOrderStage(String(o.id), to)
+      if (r.error) Alert.alert("Not moved", r.error)
+    } catch (e) {
+      Alert.alert("Not moved", e instanceof Error ? e.message : "Try again.")
+    }
+    await load()
+  }, [load])
+
   const advanceSelected = useCallback(async () => {
     if (!movable.length) return
     setMoving(true)
@@ -303,6 +319,12 @@ export default function Orders() {
               // entering a mode and then having to press the same row again is the step
               // everyone forgets to design and everyone notices.
               onLongPress={() => { if (staff) { setSelecting(true); toggle(item.id) } }}
+              onAdvance={staff && nextStage(item) ? () => advanceOne(item) : undefined}
+              advanceLabel={
+                staff && nextStage(item)
+                  ? (STAGE_VERB[nextStage(item) as string] ?? `Move to ${STAGE_LABEL[nextStage(item) as string]}`)
+                  : null
+              }
             />
           )}
         />
