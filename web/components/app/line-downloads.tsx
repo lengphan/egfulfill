@@ -68,7 +68,7 @@ export function LineDownloads({ design, files, item }: {
     <Popover>
       <PopoverTrigger
         title={`${count} file${count === 1 ? "" : "s"} on this line — artwork${machine.length ? " and stitch file" : ""}`}
-        className="eg-tap absolute -bottom-1.5 -left-1.5 z-10 inline-flex items-center gap-0.5 rounded-full border border-border bg-card px-1.5 py-1 text-2xs font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary hover:text-primary"
+        className="eg-tap absolute -bottom-1.5 -left-1.5 z-10 inline-flex items-center gap-0.5 rounded-full border border-border bg-card px-1.5 py-1 text-xs font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary hover:text-primary"
       >
         <DownloadSimple size={12} weight="bold" />
         {count > 1 && count}

@@ -206,7 +206,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
           <IconButton label="Purchasing cart" onClick={() => router.push("/purchasing?tab=purchase")}>
             <ShoppingCart size={18} />
             {cartCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-bold leading-none text-primary-foreground">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold leading-none text-primary-foreground">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}

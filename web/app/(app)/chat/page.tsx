@@ -642,9 +642,11 @@ export default function ChatPage() {
               status, click to view/edit. Matches the inbox carve-out above. */}
           {isStaffUser && !isDesigner && (
             <button onClick={() => setHoursOpen(true)} title="Support hours"
-              className={"inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-2xs font-medium transition-colors hover:bg-accent " +
+              className={"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent " +
                 (office ? (office.open ? "border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-amber-300 text-amber-700 dark:text-amber-300") : "border-border text-muted-foreground")}>
-              <span className={"size-1.5 rounded-full " + (office ? (office.open ? "bg-emerald-500" : "bg-amber-500") : "bg-muted-foreground/50")} />
+              {/* NO DOT. The pill is already the colour the dot was — the border and the
+                  word both carry it — so a 6px disc of the same hue is the state said a
+                  third time, at the one size nobody can read it. */}
               {office ? (office.open ? "Open" : "Closed") : "Hours"}
             </button>
           )}
@@ -719,7 +721,7 @@ export default function ChatPage() {
                     clears on the next load, ignore it and it stays — a to-do, the way every
                     other messenger reads. */}
                 {!!c.count && (
-                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-2xs font-bold tabular-nums text-primary-foreground">
+                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-xs font-bold tabular-nums text-primary-foreground">
                     {c.count > 99 ? "99+" : c.count}
                   </span>
                 )}

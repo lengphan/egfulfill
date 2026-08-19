@@ -1526,7 +1526,7 @@ export function OrdersHub() {
                       where the number is the point — a badge on every pill is a row of
                       numbers nobody reads, and "Overdue 0" is as useful as "Overdue 12". */}
                   {(p.value === "overdue" || p.value === "rush") && (
-                    <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums " + (
+                    <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums " + (
                       on ? "bg-primary-foreground/20"
                         : p.value === "overdue" && stats.overdue ? "bg-destructive/10 text-destructive"
                         : "bg-muted text-muted-foreground"

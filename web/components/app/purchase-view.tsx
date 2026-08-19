@@ -1835,7 +1835,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         majority of rows saying nothing actionable; "order by hand" is the
                         one that changes what you do next. */}
                     {!placeable(g.api) && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">order by hand</span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">order by hand</span>
                     )}
                     {/* THEIR MINIMUM, said before it is keyed in rather than after they refuse
                         it. Amber, not an error: this cart is legal, it just cannot be sent yet,

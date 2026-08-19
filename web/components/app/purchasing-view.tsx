@@ -147,7 +147,7 @@ export function PurchasingView() {
             {/* Only on the tab it belongs to, and only when there IS something. A zero
                 beside every tab is a row of noughts pretending to be information. */}
             {t.id === "purchase" && cartCount > 0 && (
-              <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums " + (tab === t.id ? "bg-primary-foreground/20" : "bg-primary/10 text-primary")}>
+              <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums " + (tab === t.id ? "bg-primary-foreground/20" : "bg-primary/10 text-primary")}>
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}

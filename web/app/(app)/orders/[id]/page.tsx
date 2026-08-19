@@ -737,8 +737,10 @@ export default function OrderDetailPage() {
                                 is, and the lane in ink — the only part that changes as the
                                 job moves. */}
                             {card && (
-                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 text-2xs text-muted-foreground">
-                                <span className="size-1.5 rounded-full bg-violet-500" />
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
+                                {/* NO DOT — see the note in chat/page.tsx. The lane in ink
+                                    beside it is what changes as the job moves; a violet disc
+                                    was decoration on a pill that already reads. */}
                                 Design
                                 <span className="font-medium text-foreground">{card.lane_label || card.col || "Incoming"}</span>
                               </span>

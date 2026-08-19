@@ -68,7 +68,7 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
             e.preventDefault(); e.stopPropagation()   // Space would scroll the lane
             if (!busy) fetchPng()
           }}
-          className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-2xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
+          className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
         >
           {busy ? "Rendering…" : "Show stitches"}
         </span>

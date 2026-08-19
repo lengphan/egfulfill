@@ -326,7 +326,7 @@ export function RateCalculatorView() {
                       <span className="text-muted-foreground"> · {r.service}</span>
                     </span>
                     {r.days != null && <span className="shrink-0 text-xs text-muted-foreground">{r.days}d</span>}
-                    {i === 0 && <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-2xs font-medium text-success">cheapest</span>}
+                    {i === 0 && <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">cheapest</span>}
                   </div>
               ))}
             </div>

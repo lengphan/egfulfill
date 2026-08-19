@@ -194,7 +194,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-2">
               <span
                 className={
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-medium " +
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium " +
                   (status === "Active" ? "bg-emerald-500/15 text-emerald-700" : "bg-muted text-muted-foreground")
                 }
               >

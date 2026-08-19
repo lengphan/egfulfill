@@ -949,7 +949,7 @@ export function DesignMaker() {
                 type="button"
                 onClick={() => setZoom(1)}
                 title="Back to 100%"
-                className="absolute right-6 top-6 z-10 rounded-full border border-border bg-card/90 px-2.5 py-1 text-2xs font-medium tabular-nums backdrop-blur hover:text-primary"
+                className="absolute right-6 top-6 z-10 rounded-full border border-border bg-card/90 px-2.5 py-1 text-xs font-medium tabular-nums backdrop-blur hover:text-primary"
               >
                 {Math.round(zoom * 100)}% · reset
               </button>
