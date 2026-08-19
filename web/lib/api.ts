@@ -2812,7 +2812,13 @@ export function updateProfile(patch: { name?: string; username?: string | null; 
  * same moment, and a just-uploaded design lost to someone else's stale board is not
  * recoverable.
  */
-export function createDesignCard(body: { title: string; data?: string; type?: string; sku?: string }) {
+export function createDesignCard(body: {
+  title: string; data?: string; type?: string; sku?: string
+  /** Which lane it lands in. Validated server-side against design_lanes and falling back to
+   *  `incoming` — which is the embroidery designers' own pick-up queue, and therefore the
+   *  wrong home for work we have already actioned and handed on. */
+  col?: string
+}) {
   return api<DesignCard & { error?: string }>(`/api/design_cards/new`, {
     method: "POST", body: JSON.stringify(body),
   })

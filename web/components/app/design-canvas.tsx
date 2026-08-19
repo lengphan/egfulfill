@@ -1257,13 +1257,28 @@ export function DesignCanvasDialog({
   // pair the digitizer uses — the card carries the line's own artwork and sku so it lands
   // attached to the item rather than as a loose card someone has to match up by hand.
   const [sending, setSending] = useState(false)
+  /**
+   * ASK FIRST, AND SHOW WHAT IS GOING.
+   *
+   * "Send to Board" fired on the click — no confirmation, nothing shown, and the only sign
+   * it had worked was the button disappearing. Sending artwork to another person's queue is
+   * not an undoable UI action: they see it, they may start on it, and taking it back means
+   * explaining. It is worth one look at the picture that is about to leave.
+   */
+  const [confirmSend, setConfirmSend] = useState(false)
   const sendToBoard = async () => {
+    setConfirmSend(false)
     setSending(true); setErr(null)
     try {
       const card = await createDesignCard({
         title: item.name || item.sku || "Design",
         data: designUrl || undefined,
         sku: item.sku || undefined,
+        /* IN PROGRESS, not Incoming. Incoming is the queue embroidery designers pick their
+           own new work out of; a card whose artwork we just cut here and handed straight on
+           is not waiting to be picked up, and sitting there it read as unclaimed to exactly
+           the people whose queue it is. */
+        col: "inprogress",
       })
       if (card.error) throw new Error(card.error)
       // Assign separately: creating and attaching are two calls, and a card that exists but
@@ -2155,7 +2170,11 @@ export function DesignCanvasDialog({
             they read as controls for the thing above them, in the same place every design
             tool puts its artboard row. */}
         {faces.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">
+          /* CENTRED ON THE STAGE, ALWAYS. Left-aligned they hung off one edge of a garment
+             that is itself centred, so the row moved every time the canvas resized while the
+             thing it belongs to did not. Centring ties them to the artboard above rather
+             than to the panel's left margin. */
+          <div className="flex flex-wrap justify-center gap-1.5">
             {faces.map((f, i) => {
               const has = facesWithArt[(f.side || "front").toLowerCase()]
               /**
@@ -2554,14 +2573,18 @@ export function DesignCanvasDialog({
                   What stays here is the ROUTE that is not about a file we already hold: a
                   designer cutting one from the image. */}
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {isStaff && !hasMachineFile && !boardCard && (
+                {/* SENT IS A STATE, NOT AN ABSENCE. The button used to disappear once a
+                    card existed, so the only difference between "I sent it" and "the button
+                    was never there" was memory. It stays, disabled, saying what happened. */}
+                {isStaff && !hasMachineFile && (
                   <Button
                     size="sm"
-                    disabled={sending || !designUrl}
-                    title={designUrl ? undefined : "Add an image first — a designer needs something to work from"}
-                    onClick={() => void sendToBoard()}
+                    variant={boardCard ? "outline" : "default"}
+                    disabled={sending || !designUrl || !!boardCard}
+                    title={boardCard ? "Already on the design board" : designUrl ? undefined : "Add an image first — a designer needs something to work from"}
+                    onClick={() => setConfirmSend(true)}
                   >
-                    {sending ? "Sending…" : "Send to Board"}
+                    {boardCard ? "Sent" : sending ? "Sending…" : "Send to Board"}
                   </Button>
                 )}
 </div>
@@ -2728,6 +2751,35 @@ export function DesignCanvasDialog({
           artworkUrl={designUrl || undefined}
           onPushed={() => { setPinkOpen(false); void loadCards() }}
         />
+
+        {/* WHAT IS ABOUT TO LEAVE, before it leaves. Sending artwork into someone else's
+            queue is not an undoable UI action — they see it and may start on it — so the
+            picture, the line it belongs to and the lane it lands in are all shown once. */}
+        <Dialog open={confirmSend} onOpenChange={(v) => { if (!v) setConfirmSend(false) }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Send this to the design board?</DialogTitle></DialogHeader>
+            <div className="flex gap-3">
+              {designUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={designUrl} alt="" className="size-24 shrink-0 rounded-lg border border-border bg-muted object-contain" />
+              )}
+              <div className="min-w-0 space-y-1 text-sm">
+                <div className="font-medium">{item.name || item.sku || "This line"}</div>
+                <p className="text-muted-foreground">
+                  It lands in <span className="font-medium text-foreground">In progress</span> as
+                  work already under way — not in Incoming, which is where designers pick up
+                  new jobs of their own.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmSend(false)}>Cancel</Button>
+              <Button size="sm" disabled={sending} onClick={() => void sendToBoard()}>
+                {sending ? "Sending…" : "Send"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   )

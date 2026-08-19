@@ -203,6 +203,26 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
      * as the thumbnail — a card that renders someone else's copy beats a card that renders
      * nothing — and anything that is neither bytes nor a URL is refused out loud.
      */
+    /**
+     * WHICH LANE — asked for, then CHECKED, and 'incoming' only as the fallback it is.
+     *
+     * This was hardcoded to 'incoming', which is the queue embroidery designers pick their
+     * own new work out of. A card we have already actioned — artwork cut in the designer and
+     * handed straight on — is not new work waiting to be picked up; it is work in progress,
+     * and sitting in Incoming it looked unclaimed to the very people whose queue it is.
+     *
+     * Validated against design_lanes rather than trusted: lanes are user-editable rows, so a
+     * client naming one that has since been renamed or removed would otherwise write a col
+     * the board cannot render. An unknown value falls back to 'incoming', which is what the
+     * board already does with any col it does not recognise.
+     */
+    let col = 'incoming';
+    if (b.col) {
+      const want = String(b.col).trim();
+      const ok = await q('select 1 from design_lanes where id=$1', [want]).catch(() => ({ rowCount: 0 }));
+      if (ok.rowCount) col = want;
+    }
+
     let artKey = null, artHash = null, artData = null, thumbUrl = null;
     if (data && !/^data:/i.test(data)) {
       const remote = /^https?:\/\//i.test(data);
@@ -261,11 +281,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     const designNo = await designNoFor(artHash, null);
     const r = await q(
       `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id)
-       values ($1,$2,'incoming',$3,null,null,$4,$5,$6,$7,$8,$9)
+       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9)
        returning *`,
       [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
        artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || ''),
-       designNo == null ? null : String(designNo)]
+       designNo == null ? null : String(designNo), col]
     ).catch((e) => { reply.code(500); return { error: e.message }; });
     if (!r || r.error) return r || { error: 'Could not create the card.' };
 
