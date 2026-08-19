@@ -8,14 +8,14 @@ import {
   type Order, type OrderDesign, type ChatEntry, type User,
 } from "@/lib/api"
 import {
-  normalizeStage, units, isOverdue, numOf, platformOf, plainNum, nextStage,
+  normalizeStage, units, isOverdue, numOf, platformOf, nextStage,
   STAGE_LABEL, stageAction,
 } from "@/lib/orders"
 import { C, R, LIFT, toneOf } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
-import { Barcode } from "@/components/barcode"
+import { BuyLabel } from "@/components/buy-label"
 
 /**
  * ONE ORDER — the job, on the floor, in the hand.
@@ -265,16 +265,13 @@ export default function OrderDetail() {
             ) : null
           )}
 
-          {/* ── THE TICKET ─────────────────────────────────────────────────────────
-              The number as a scannable code, so the handset IS the work ticket for the
-              parcel in the other hand. */}
-          <Section title="WORK TICKET" right="Scan from the screen" />
-          <View style={{
-            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-            paddingVertical: 18, alignItems: "center", ...LIFT,
-          }}>
-            <Barcode value={plainNum(String(o.id))} height={62} />
-          </View>
+          {/* THE WORK TICKET IS GONE. It drew the ORDER NUMBER as Code-128 on the
+              reasoning that the handset becomes the ticket for the parcel in the other
+              hand — but nothing in this system scans an order number. The only scanner is
+              the Scan tab, which posts to /api/inventory/scan, and that route resolves a
+              SKU: an order number returns "Unknown SKU: 4149084185". So it was a barcode
+              whose only possible outcome was an error, printed under a heading for a
+              concept the floor does not have. */}
 
           {/* ── TRACKING ───────────────────────────────────────────────────────── */}
           <Section title="SHIPPING" />
@@ -324,7 +321,15 @@ export default function OrderDetail() {
             ) : (
               /* Not shipped is a FACT, not a blank. An empty panel here would be
                  indistinguishable from a screen that failed to load it. */
-              <Text style={{ fontSize: 15, color: C.muted }}>Not shipped yet — no tracking number.</Text>
+              /* NOT A DEAD END ANY MORE. This said "Not shipped yet — no tracking number"
+                 and stopped, on the one screen where somebody is standing over the packed
+                 parcel. The server refuses a ship it has no label for, so that sentence was
+                 also the reason the Confirm-shipment button below would fail — it just
+                 didn't say so, and it offered nothing to do about it. */
+              <View style={{ gap: 12 }}>
+                <Text style={{ fontSize: 15, color: C.muted }}>Not shipped yet — no tracking number.</Text>
+                {staff && <BuyLabel order={o} onDone={refresh} />}
+              </View>
             )}
           </View>
 

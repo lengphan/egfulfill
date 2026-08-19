@@ -118,11 +118,62 @@ export type Order = {
   tracking?: string | null
   status?: string | null
   total?: number | string | null
+  /** The buyer's address. STAFF ONLY in full — the server masks it to city/state/country
+   *  for a seller (maskBuyerPII), which is why buying a label is a staff action: the fields
+   *  a carrier needs are the ones a seller is never sent. */
+  address?: ShipAddress | null
   /** The carrier's label PDF. STAFF ONLY — the server nulls it for a seller, because the
    *  buyer's full address is printed on it and every masked field above would otherwise be
    *  cosmetic. So a missing value here is a permission, not an error. */
   tracking_label_url?: string | null
 }
+
+/* ── Shipping ─────────────────────────────────────────────────────────────────
+ * ALWAYS THROUGH THE AGGREGATOR. `/api/shipping/rates` and `/api/shipping/label` rate-shop
+ * across whichever of Shippo/EasyPost is configured; the USPS-direct path is a different
+ * route and taking it by accident is where "we can't validate your credit card" comes from
+ * (a USPS EPS billing error for an account the aggregator never touches).
+ */
+export type ShipAddress = {
+  name?: string | null; street1?: string | null; street?: string | null; street2?: string | null
+  city?: string | null; state?: string | null; zip?: string | null; country?: string | null
+  phone?: string | null; email?: string | null
+  /** Present when the server redacted it — a seller reading their own order. Never enough
+   *  to buy a label with, and the reason this screen is staff-only. */
+  masked?: boolean
+}
+export type ShippingRate = {
+  token: string; provider: string; carrier: string; service: string
+  amount: number; currency?: string; days?: number | null; carrierAccount?: string
+}
+/** The parcel. The server defaults to 9×6×2 at 8oz when a field is missing, so the phone
+ *  sends what it knows and never blocks on a dimension nobody has measured. */
+export type Parcel = { weightOz?: number; length?: number; width?: number; height?: number }
+
+export const getShippingRates = (orderId: string, to: ShipAddress, parcel: Parcel = {}) =>
+  request<{ rates?: ShippingRate[]; errors?: string[]; error?: string }>("/api/shipping/rates", {
+    method: "POST",
+    body: JSON.stringify({ orderId, to, parcel }),
+  })
+
+/**
+ * Buy ONE rate — the one a person tapped.
+ *
+ * `rate` rides along with `rateToken` deliberately: Shippo's transaction answers with the
+ * rate as an id string, so cost, carrier and service have to be handed back or the stored
+ * label comes back with a null cost and a blank carrier.
+ */
+export const buyShippingLabel = (orderId: string, rate: ShippingRate) =>
+  request<{ ok?: boolean; error?: string; labelUrl?: string; tracking?: string; carrier?: string; cost?: number }>(
+    "/api/shipping/label",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        orderId, rateToken: rate.token,
+        rate: { amount: rate.amount, carrier: rate.carrier, service: rate.service, carrierAccount: rate.carrierAccount },
+      }),
+    },
+  )
 
 export type LedgerRow = {
   id: number
