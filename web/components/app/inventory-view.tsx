@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown, QrCode as QrCodeIcon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
@@ -418,7 +418,20 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                 <tbody>
                   {paged.pageItems.map((g) => {
                     const one = g.rows.length === 1
-                    const isOpen = openKeys.has(g.key)
+                    /**
+                     * A SEARCH THAT MATCHES A VARIANT MUST SHOW THE VARIANT.
+                     *
+                     * The filter already reads `it.variant`, so typing "camo green" did
+                     * narrow the table correctly — to a COLLAPSED product row that named
+                     * the cap and said "17 variants", with nothing to say which one matched
+                     * or that anything had. The search worked and looked broken.
+                     *
+                     * Derived, not an effect that opens groups into `openKeys`: writing the
+                     * search's findings into the same state the caret uses means clearing
+                     * the box leaves those groups hanging open, and every keystroke
+                     * rewrites a set the user also controls.
+                     */
+                    const isOpen = openKeys.has(g.key) || (!!search && !one)
                     const allSel = g.rows.every((r) => sel.has(r.sku))
                     return (
                       <ProductGroup
@@ -520,8 +533,32 @@ function ProductGroup({
   /** sku (upper) → units on a placed purchase order. */
   onOrder: Record<string, number>
 }) {
+  /**
+   * THE ROW TINT HAS TO REACH THE STICKY COLUMNS.
+   *
+   * Visibility and the row actions are `position: sticky` and carry `bg-card`, because a
+   * sticky cell must be opaque or the columns scrolling under it show through. That
+   * background is painted on the CELL, and a cell's own background covers the row's — so a
+   * variant row's tint stopped dead at Status and the last two columns stayed white. On a
+   * 17-variant product that reads as a rendering fault, which is exactly what it looked
+   * like: the shading that says "these belong to the product above" simply gave up
+   * two-thirds of the way across.
+   *
+   * The tint goes on as a pseudo-element OVER the opaque base rather than as a second
+   * background (an element only gets one). Selected beats indented explicitly — both
+   * classes used to be emitted at once and which won was left to stylesheet order.
+   */
+  const tintOf = (it: InventoryItem, indented: boolean) =>
+    sel.has(it.sku) ? "bg-primary/[0.04]" : indented ? "bg-muted/30" : ""
+  const stickyTint = (it: InventoryItem, indented: boolean) =>
+    sel.has(it.sku)
+      ? " before:absolute before:inset-0 before:bg-primary/[0.04] before:content-['']"
+      : indented
+        ? " before:absolute before:inset-0 before:bg-muted/30 before:content-['']"
+        : ""
+
   const row = (it: InventoryItem, indented: boolean) => (
-    <tr key={it.sku} className={"border-t border-border " + (sel.has(it.sku) ? "bg-primary/[0.04]" : "") + (indented ? " bg-muted/30" : "")}>
+    <tr key={it.sku} className={"border-t border-border " + tintOf(it, indented)}>
       {/* THE DISCLOSURE LIVES BESIDE THE CHECKBOX, in its own column, on every row —
           expandable or not. It used to sit inside the Item cell, so a grouped product's
           photo started 20px right of a single product's and the thumbnails never lined up.
@@ -576,16 +613,26 @@ function ProductGroup({
         </div>
       </td>
       <td className="px-4 py-2 hidden md:table-cell">
-        {/* SKU as TEXT. The inline barcode was a 22px thumbnail no scanner could read, and
-            the icon beside it spent a column on a dialog nobody opened twice — the SKU
-            itself opens it, for the one moment someone wants to scan off the screen. */}
+        {/* SKU as TEXT, and the code is one click on it. The inline barcode was a 22px
+            thumbnail no scanner could read, and a separate icon column was too much width
+            for it — that reasoning still holds and the column is still not coming back.
+
+            WHAT IT LACKED WAS ANY SIGN OF BEING A CONTROL. Styled as plain mono text with
+            hover:underline and nothing at rest, so on a table of 17 variants it read as a
+            column of data — and the only visible route to a code was tick, Print labels,
+            pick a type, which is three steps to answer "what do I point the phone at".
+            The glyph is inside the cell, not beside it: it costs no column, and it is the
+            thing that says a code is here. */}
         <button
           type="button"
           onClick={() => onZoom(it.sku)}
           title={`Show a scannable code for ${it.sku}`}
-          className="block w-[8.5rem] break-all text-left font-mono text-xs font-medium underline-offset-2 hover:underline"
+          className="group/sku flex w-[8.5rem] items-start gap-1.5 text-left transition-colors hover:text-primary"
         >
-          {it.sku}
+          <span className="break-all font-mono text-xs font-medium underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 group-hover/sku:decoration-primary">
+            {it.sku}
+          </span>
+          <QrCodeIcon size={13} weight="bold" className="mt-px shrink-0 text-muted-foreground transition-colors group-hover/sku:text-primary" aria-hidden />
         </button>
       </td>
       <td className="hidden px-2 py-2 text-center xl:table-cell">
@@ -631,7 +678,7 @@ function ProductGroup({
           </span>
         )}
       </td>
-      <td className="sticky right-14 z-10 hidden bg-card px-4 py-2 md:table-cell">
+      <td className={"sticky right-14 z-10 hidden bg-card px-4 py-2 md:table-cell" + stickyTint(it, indented)}>
         <select
           value={visOf(it)}
           onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
@@ -641,13 +688,14 @@ function ProductGroup({
              horizontal scroll box at the right edge, and it was the last coloured pill in
              a table whose statuses are now words. A bordered select, like every other
              select in the app. */
-          className="eg-select h-7 w-full min-w-[8.5rem] rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          /* relative z-[1]: above the row-tint pseudo-element painted on this sticky cell. */
+          className="eg-select relative z-[1] h-7 w-full min-w-[8.5rem] rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>
       </td>
-      <td className="sticky right-0 z-10 bg-card px-4 py-2">
-        <div className="flex items-center justify-end gap-1">
+      <td className={"sticky right-0 z-10 bg-card px-4 py-2" + stickyTint(it, indented)}>
+        <div className="relative z-[1] flex items-center justify-end gap-1">
           <button onClick={() => onHistory(it.sku)} title="Scan history" className="text-muted-foreground hover:text-foreground"><ClockCounterClockwise size={15} /></button>
           <button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button>
         </div>
