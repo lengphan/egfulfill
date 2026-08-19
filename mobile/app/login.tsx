@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingVi
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import { login } from "@/lib/api"
-import { C, S } from "@/lib/theme"
+import { F,C, S } from "@/lib/theme"
 
 export default function Login() {
   const insets = useSafeAreaInsets()
@@ -30,7 +30,7 @@ export default function Login() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + S.xl, paddingHorizontal: S.xl }}
     >
-      <Text style={{ fontSize: 34, fontWeight: "900", letterSpacing: -0.8, color: C.fg }}>EGFUL</Text>
+      <Text style={{ fontSize: 34, fontFamily: F.bold, letterSpacing: -0.8, color: C.fg }}>EGFUL</Text>
       <Text style={{ marginTop: S.xs, fontSize: 15, color: C.muted }}>Sign in to your factory account.</Text>
 
       <View style={{ marginTop: S.xl * 1.4, gap: S.md }}>
@@ -66,7 +66,7 @@ export default function Login() {
           })}
         >
           {busy ? <ActivityIndicator color={C.onPrimary} />
-                : <Text style={{ color: C.onPrimary, fontSize: 16, fontWeight: "700" }}>Sign in</Text>}
+                : <Text style={{ color: C.onPrimary, fontSize: 16, fontFamily: F.semi }}>Sign in</Text>}
         </Pressable>
       </View>
     </KeyboardAvoidingView>

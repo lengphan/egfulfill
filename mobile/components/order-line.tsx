@@ -6,7 +6,7 @@ import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork,
 } from "@/lib/orders"
-import { C, R, LIFT } from "@/lib/theme"
+import { F,C, R, LIFT } from "@/lib/theme"
 import { ItemPhotos } from "@/components/item-photos"
 
 /**
@@ -53,9 +53,9 @@ function FileChip({ d }: { d: OrderDesign }) {
           <Ionicons name="document-text" size={16} color={C.lime} />
         </View>
       )}
-      <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: C.fg }} numberOfLines={1}>
+      <Text style={{ flex: 1, fontSize: 14, fontFamily: F.medium, color: C.fg }} numberOfLines={1}>
         {kind}{side ? ` · ${side}` : ""}
-        {d.name ? <Text style={{ fontWeight: "400", color: C.muted }}>{`  ${d.name}`}</Text> : null}
+        {d.name ? <Text style={{ fontFamily: F.body, color: C.muted }}>{`  ${d.name}`}</Text> : null}
       </Text>
       {openable && <Ionicons name="open-outline" size={16} color={C.muted} />}
     </Pressable>
@@ -144,7 +144,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text style={{ fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 1 }}>
+            <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
               {String(index + 1).padStart(2, "0")}
             </Text>
             {/* THE STATUS PILL IS GONE FROM THE LINE. 10pt letters on a pale tint, inside a
@@ -153,11 +153,11 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
                 (every line at the same stage) it repeated the order's own badge N times.
                 Where a line has no action left, the state is said in words below instead. */}
             {Number(item.qty ?? 1) > 1 && (
-              <Text style={{ fontSize: 12, fontWeight: "800", color: C.fg }}>×{Number(item.qty)}</Text>
+              <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.fg }}>×{Number(item.qty)}</Text>
             )}
           </View>
 
-          <Text numberOfLines={2} style={{ fontSize: 17, fontWeight: "800", color: C.fg, marginTop: 5, letterSpacing: -0.3 }}>
+          <Text numberOfLines={2} style={{ fontSize: 17, fontFamily: F.bold, color: C.fg, marginTop: 5, letterSpacing: -0.3 }}>
             {lineTitle(item)}
           </Text>
 
@@ -167,7 +167,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
               marketplace title above is a keyword list on an Etsy order and names nothing
               the floor picks; the blank is the garment, and it is the second thing read. */}
           {item.blank ? (
-            <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "700", color: C.fg, marginTop: 6 }}>
+            <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: F.semi, color: C.fg, marginTop: 6 }}>
               {item.blank}
             </Text>
           ) : null}
@@ -186,7 +186,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
                     paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.pill,
                     backgroundColor: method ? C.ink : C.accent,
                   }}>
-                    <Text style={{ fontSize: 13, fontWeight: "800", color: method ? C.lime : C.fg }}>{f}</Text>
+                    <Text style={{ fontSize: 13, fontFamily: F.bold, color: method ? C.lime : C.fg }}>{f}</Text>
                   </View>
                 )
               })}
@@ -222,7 +222,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
           {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
               second arrow on a card that already had one. */}
           {busy && <ActivityIndicator color={to === "working" ? C.onPrimary : C.lime} />}
-          <Text style={{ fontSize: 18, fontWeight: "800", color: to === "working" ? C.onPrimary : C.lime, letterSpacing: -0.2 }}>
+          <Text style={{ fontSize: 18, fontFamily: F.bold, color: to === "working" ? C.onPrimary : C.lime, letterSpacing: -0.2 }}>
             {stageActionLine(to)}
           </Text>
         </Pressable>
@@ -230,7 +230,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
         /* NO BUTTON MEANS THE LINE IS SOMEWHERE, and it still has to say where. A card that
            simply stops looks like one whose control failed to render — and this is the case
            the pill above used to cover. In words, full size, rather than 10pt on a tint. */
-        <Text style={{ marginTop: 10, fontSize: 15, fontWeight: "700", color: C.muted, textAlign: "center" }}>
+        <Text style={{ marginTop: 10, fontSize: 15, fontFamily: F.semi, color: C.muted, textAlign: "center" }}>
           {STAGE_LABEL[stage] ?? stage}
         </Text>
       ) : null}

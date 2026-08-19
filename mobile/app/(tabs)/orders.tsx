@@ -5,7 +5,7 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
-import { C, R, LIFT } from "@/lib/theme"
+import { F,C, R, LIFT } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 
 /**
@@ -176,14 +176,14 @@ export default function Orders() {
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 18, paddingBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 34, fontWeight: "900", color: C.fg, marginTop: 6, letterSpacing: -1.2 }}>Orders</Text>
+          <Text style={{ fontSize: 34, fontFamily: F.bold, color: C.fg, marginTop: 6, letterSpacing: -1.2 }}>Orders</Text>
           {staff && orders !== null && (
             <Pressable
               onPress={() => (selecting ? clearSelection() : setSelecting(true))}
               hitSlop={10}
               style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: selecting ? C.ink : C.accent }}
             >
-              <Text style={{ fontSize: 13, fontWeight: "800", color: selecting ? C.lime : C.primary }}>
+              <Text style={{ fontSize: 13, fontFamily: F.bold, color: selecting ? C.lime : C.primary }}>
                 {selecting ? "Done" : "Select"}
               </Text>
             </Pressable>
@@ -233,9 +233,9 @@ export default function Orders() {
                   backgroundColor: on ? C.ink : "transparent",
                 }}
               >
-                <Text style={{ fontSize: 13.5, fontWeight: "800", color: on ? C.onInk : C.muted }}>{f}</Text>
+                <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: on ? C.onInk : C.muted }}>{f}</Text>
                 <Text style={{
-                  fontSize: 12, fontWeight: "900",
+                  fontSize: 12, fontFamily: F.bold,
                   color: on ? C.lime : hot ? C.alert : C.muted,
                 }}>
                   {orders === null ? "" : n}
@@ -270,8 +270,8 @@ export default function Orders() {
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
-                  <Text style={{ fontSize: 13.5, fontWeight: "800", color: on ? C.onInk : C.fg }}>{label}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: "900", color: on ? C.lime : C.muted }}>{n}</Text>
+                  <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: on ? C.onInk : C.fg }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontFamily: F.bold, color: on ? C.lime : C.muted }}>{n}</Text>
                 </Pressable>
               )
             })}
@@ -320,7 +320,7 @@ export default function Orders() {
           backgroundColor: C.ink, borderRadius: R.lg, padding: 12, ...LIFT,
         }}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 16, fontWeight: "900", color: C.onInk }}>
+            <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onInk }}>
               {picked.length} selected
             </Text>
             <Text style={{ fontSize: 12, color: C.onInk, opacity: 0.6, marginTop: 1 }}>
@@ -342,7 +342,7 @@ export default function Orders() {
             {moving
               ? <ActivityIndicator color={C.ink} />
               : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.ink : C.muted} />}
-            <Text style={{ fontSize: 15, fontWeight: "900", color: movable.length ? C.ink : C.muted }}>
+            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? C.ink : C.muted }}>
               {batchLabel}
             </Text>
           </Pressable>

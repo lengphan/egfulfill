@@ -1,6 +1,6 @@
 import { View, Text } from "react-native"
 import Svg, { Rect } from "react-native-svg"
-import { C, R } from "@/lib/theme"
+import { F,C, R } from "@/lib/theme"
 
 /**
  * CODE 128-B, drawn natively.
@@ -94,7 +94,7 @@ export function Barcode({ value, height = 64, module = 2, showValue = true, dark
       </View>
       {showValue && (
         <Text style={{
-          marginTop: 8, fontSize: 13, letterSpacing: 3, fontWeight: "700",
+          marginTop: 8, fontSize: 13, letterSpacing: 3, fontFamily: F.semi,
           color: dark ? C.onInk : C.muted,
         }}>
           {value}

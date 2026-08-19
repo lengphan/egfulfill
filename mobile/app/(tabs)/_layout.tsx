@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { C } from "@/lib/theme"
+import { F,C } from "@/lib/theme"
 
 /**
  * The three things worth opening a phone for: what needs doing, a specific order, and the
@@ -15,7 +15,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: C.primary,
         tabBarInactiveTintColor: C.muted,
         tabBarStyle: { backgroundColor: C.card, borderTopColor: C.border },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: F.medium },
       }}
     >
       <Tabs.Screen

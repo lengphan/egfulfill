@@ -10,7 +10,7 @@ import {
   getTopupConfig, createVietqrPayment, vietqrStatus, getWallet, abandonVietqr, getMyTopups,
   type TopupConfig, type VietqrPayment, type LedgerRow, type TopupRequest,
 } from "@/lib/api"
-import { C } from "@/lib/theme"
+import { F,C } from "@/lib/theme"
 
 /**
  * ADD FUNDS — VietQR, mirroring the web dialog rather than reinventing it.
@@ -244,12 +244,12 @@ export default function TopUp() {
       </Pressable>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 32 }}>
-        <Text style={{ fontSize: 32, fontWeight: "900", color: C.fg }}>Add funds</Text>
+        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg }}>Add funds</Text>
 
         {phase === "paid" ? (
           <View style={{ alignItems: "center", marginTop: 48 }}>
             <Ionicons name="checkmark-circle" size={64} color="#0a7c42" />
-            <Text style={{ fontSize: 22, fontWeight: "800", color: C.fg, marginTop: 14 }}>Payment received</Text>
+            <Text style={{ fontSize: 22, fontFamily: F.bold, color: C.fg, marginTop: 14 }}>Payment received</Text>
             <Text style={{ fontSize: 15, color: C.muted, marginTop: 6, textAlign: "center" }}>
               {payment?.amountUsd ? `${usd0(payment.amountUsd)} is on its way to your balance.` : "Your balance is being updated."}
             </Text>
@@ -261,7 +261,7 @@ export default function TopUp() {
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 16 }}>Back to wallet</Text>
+              <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
             </Pressable>
           </View>
         ) : phase === "qr" && payment ? (
@@ -272,7 +272,7 @@ export default function TopUp() {
                 : <Text style={{ color: C.muted }}>No scannable code</Text>}
             </View>
 
-            <Text style={{ fontSize: 26, fontWeight: "900", color: C.fg, marginTop: 18 }}>
+            <Text style={{ fontSize: 26, fontFamily: F.bold, color: C.fg, marginTop: 18 }}>
               {vnd0(payment.amount ?? vndAmt)}
             </Text>
             <Text style={{ fontSize: 14, color: C.muted, marginTop: 2 }}>
@@ -308,7 +308,7 @@ export default function TopUp() {
               {saving
                 ? <ActivityIndicator color={C.primary} />
                 : <Ionicons name="download-outline" size={18} color={C.fg} />}
-              <Text style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>Save QR image</Text>
+              <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>Save QR image</Text>
             </Pressable>
 
             <Text style={{ fontSize: 13, color: C.muted, marginTop: 14, textAlign: "center", paddingHorizontal: 12 }}>
@@ -317,7 +317,7 @@ export default function TopUp() {
           </View>
         ) : (
           <>
-            <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>
+            <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 28 }}>
               AMOUNT (USD)
             </Text>
 
@@ -343,12 +343,12 @@ export default function TopUp() {
                 keyboardType="decimal-pad"
                 placeholder="0"
                 placeholderTextColor={C.muted}
-                style={{ height: 52, padding: 0, color: C.fg, fontSize: 30, fontWeight: "800" }}
+                style={{ height: 52, padding: 0, color: C.fg, fontSize: 30, fontFamily: F.bold }}
               />
               {/* Only once there is an amount to convert. "≈ 0 ₫" under a blank field is a
                   sum nobody asked for. */}
               <Text style={{
-                height: 16, textAlign: "right", fontSize: 12, fontWeight: "600",
+                height: 16, textAlign: "right", fontSize: 12, fontFamily: F.medium,
                 color: usdAmt > 0 && rate > 0 ? C.muted : "transparent",
               }}>
                 {usdAmt > 0 && rate > 0 ? `≈ ${vnd0(vndAmt)}` : "·"}
@@ -368,7 +368,7 @@ export default function TopUp() {
                     })}
                   >
                     <Text style={{
-                      fontSize: 15, fontWeight: "700",
+                      fontSize: 15, fontFamily: F.semi,
                       color: String(p) === amount ? C.onPrimary : C.fg,
                     }}>{usd0(p)}</Text>
                   </Pressable>
@@ -398,7 +398,7 @@ export default function TopUp() {
             >
               {busy
                 ? <ActivityIndicator color={C.onPrimary} />
-                : <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 16 }}>Show payment QR</Text>}
+                : <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
             </Pressable>
 
             {!cfg && !err && (
@@ -429,7 +429,7 @@ export default function TopUp() {
               */}
             {(entries.length > 0) && (
               <View style={{ marginTop: 36 }}>
-                <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1 }}>
+                <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
                   TOP-UPS
                 </Text>
                 <View style={{ marginTop: 6 }}>
@@ -442,7 +442,7 @@ export default function TopUp() {
                         }}
                       >
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={{ fontSize: 15, fontWeight: "800", color: C.fg }}>
+                          <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.fg }}>
                             {e.paid ? "+" : ""}{usd0(e.usd)}
                           </Text>
                           <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
@@ -454,7 +454,7 @@ export default function TopUp() {
                           paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
                           backgroundColor: e.paid ? "#e7f6ef" : "#fdf3e3",
                         }}>
-                          <Text style={{ fontSize: 12, fontWeight: "800", color: e.paid ? "#0a7c42" : C.warn }}>
+                          <Text style={{ fontSize: 12, fontFamily: F.bold, color: e.paid ? "#0a7c42" : C.warn }}>
                             {e.paid ? "Paid" : "Awaiting payment"}
                           </Text>
                         </View>
@@ -496,7 +496,7 @@ function Field({ label, value, last }: { label: string; value?: string | null; l
       borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border,
     }}>
       <Text style={{ fontSize: 14, color: C.muted }}>{label}</Text>
-      <Text selectable style={{ fontSize: 14, fontWeight: "700", color: C.fg, flexShrink: 1, textAlign: "right" }}>
+      <Text selectable style={{ fontSize: 14, fontFamily: F.semi, color: C.fg, flexShrink: 1, textAlign: "right" }}>
         {value || "—"}
       </Text>
     </View>

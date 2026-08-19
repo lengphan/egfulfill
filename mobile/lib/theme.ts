@@ -35,6 +35,30 @@ export const C = {
   success: "#0f8a5f",
 } as const
 
+/**
+ * THE FACES — the same pair the web carries, so one product has one letterform.
+ *
+ * React Native has NO global font default: loading a face does nothing until a style names
+ * it. So every piece of type in this app must come through here, and a bare `fontWeight`
+ * is now a bug — it silently renders the OS default, which is the look this replaced.
+ *
+ * Playfair is the DISPLAY face and it earns its place only at size: a high-contrast serif
+ * set at 13px is mud. Order numbers, screen titles, the one big figure on a card. Inter
+ * does everything else, and does most of it at 400 — the old app had 25 declarations at
+ * weight 900 and exactly one at 400, which is why nothing on a screen ever looked more
+ * important than anything else.
+ */
+export const F = {
+  display: "PlayfairDisplay_700Bold",
+  displaySemi: "PlayfairDisplay_600SemiBold",
+  displayMed: "PlayfairDisplay_500Medium",
+  /** Body. The default for anything a person reads a sentence of. */
+  body: "Inter_400Regular",
+  medium: "Inter_500Medium",
+  semi: "Inter_600SemiBold",
+  bold: "Inter_700Bold",
+} as const
+
 export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const
 
 /** One radius scale. Phones read big radii as "current"; 4px corners read as 2014. */

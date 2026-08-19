@@ -11,7 +11,7 @@ import {
   normalizeStage, units, isOverdue, numOf, platformOf, nextStage, addressLines,
   STAGE_LABEL, stageAction,
 } from "@/lib/orders"
-import { C, R, LIFT, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
+import { F,C, R, LIFT, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
@@ -52,8 +52,8 @@ function trackingLink(carrier?: string | null, code?: string | null) {
 function Section({ title, right }: { title: string; right?: string }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: 28, marginBottom: 12 }}>
-      <Text style={{ fontSize: 12, fontWeight: "900", color: C.fg, letterSpacing: 1.4 }}>{title}</Text>
-      {right ? <Text style={{ fontSize: 12, color: C.muted, fontWeight: "600" }}>{right}</Text> : null}
+      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.fg, letterSpacing: 1.4 }}>{title}</Text>
+      {right ? <Text style={{ fontSize: 12, color: C.muted, fontFamily: F.medium }}>{right}</Text> : null}
     </View>
   )
 }
@@ -65,7 +65,7 @@ function Row({ label, value }: { label: string; value: string }) {
       paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border,
     }}>
       <Text style={{ fontSize: 14, color: C.muted }}>{label}</Text>
-      <Text style={{ fontSize: 14, fontWeight: "700", color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
+      <Text style={{ fontSize: 14, fontFamily: F.semi, color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
     </View>
   )
 }
@@ -195,7 +195,7 @@ export default function OrderDetail() {
         hitSlop={8}
       >
         <Ionicons name="chevron-back" size={22} color={C.primary} />
-        <Text style={{ color: C.primary, fontSize: 16, fontWeight: "600" }}>Orders</Text>
+        <Text style={{ color: C.primary, fontSize: 16, fontFamily: F.medium }}>Orders</Text>
       </Pressable>
 
       {!o && !err ? (
@@ -212,28 +212,28 @@ export default function OrderDetail() {
           {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
           <View style={{ backgroundColor: C.ink, borderRadius: R.xl, padding: 22, ...LIFT }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 12, fontWeight: "800", color: C.lime, letterSpacing: 1.4 }}>
+              <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.lime, letterSpacing: 1.4 }}>
                 {platformOf(o).toUpperCase()}
               </Text>
               {o.rush && (
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.warn }}>
-                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff", letterSpacing: 0.6 }}>RUSH</Text>
+                  <Text style={{ fontSize: 10, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>RUSH</Text>
                 </View>
               )}
               {late && (
                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.alert }}>
-                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff", letterSpacing: 0.6 }}>LATE</Text>
+                  <Text style={{ fontSize: 10, fontFamily: F.bold, color: "#fff", letterSpacing: 0.6 }}>LATE</Text>
                 </View>
               )}
             </View>
 
-            <Text selectable style={{ fontSize: 42, fontWeight: "900", color: C.onInk, letterSpacing: -1.6, marginTop: 6 }}>
+            <Text selectable style={{ fontSize: 42, fontFamily: F.bold, color: C.onInk, letterSpacing: -1.6, marginTop: 6 }}>
               {numOf(o)}
             </Text>
 
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
               <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.pill, backgroundColor: tone.bg }}>
-                <Text style={{ fontSize: 11, fontWeight: "900", color: tone.fg, letterSpacing: 0.6 }}>
+                <Text style={{ fontSize: 11, fontFamily: F.bold, color: tone.fg, letterSpacing: 0.6 }}>
                   {(STAGE_LABEL[stage] ?? stage).toUpperCase()}
                 </Text>
               </View>
@@ -287,7 +287,7 @@ export default function OrderDetail() {
                 marginTop: 12, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
                 backgroundColor: C.card, padding: 16,
               }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: C.fg }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
                   Waiting on the seller
                 </Text>
                 <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
@@ -345,7 +345,7 @@ export default function OrderDetail() {
               </>
             ) : (
               <>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: C.fg }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
                   {o.customer?.name || "No name on this order"}
                 </Text>
                 <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
@@ -364,7 +364,7 @@ export default function OrderDetail() {
           }}>
             {code ? (
               <>
-                <Text selectable style={{ fontSize: 20, fontWeight: "900", color: C.fg, letterSpacing: -0.4 }}>{code}</Text>
+                <Text selectable style={{ fontSize: 20, fontFamily: F.bold, color: C.fg, letterSpacing: -0.4 }}>{code}</Text>
                 <Text style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
                   {[o.carrier ? String(o.carrier).toUpperCase() : null, o.label_printed_at ? "label printed" : null]
                     .filter(Boolean).join(" · ") || "Carrier unknown"}
@@ -379,7 +379,7 @@ export default function OrderDetail() {
                         backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
                       })}
                     >
-                      <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 15 }}>Track</Text>
+                      <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 15 }}>Track</Text>
                     </Pressable>
                   )}
                   {/* Staff only, and only when there is a PDF: the server nulls the label
@@ -395,7 +395,7 @@ export default function OrderDetail() {
                       })}
                     >
                       {printing && <ActivityIndicator color={C.ink} />}
-                      <Text style={{ color: C.ink, fontWeight: "800", fontSize: 15 }}>Print label</Text>
+                      <Text style={{ color: C.ink, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -429,7 +429,7 @@ export default function OrderDetail() {
                     })}
                   >
                     {printing && <ActivityIndicator color={C.ink} />}
-                    <Text style={{ color: C.ink, fontWeight: "800", fontSize: 15 }}>Print label</Text>
+                    <Text style={{ color: C.ink, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
                   </Pressable>
                 ) : staff ? (
                   <BuyLabel order={o} onDone={refresh} />

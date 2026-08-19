@@ -2,7 +2,7 @@ import { View, Text, Image, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order, type OrderItem } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, STAGE_LABEL } from "@/lib/orders"
-import { C, R, LIFT, toneOf } from "@/lib/theme"
+import { F,C, R, LIFT, toneOf } from "@/lib/theme"
 
 /**
  * ONE ORDER IN THE LIST.
@@ -44,7 +44,7 @@ function ItemStrip({ items }: { items: OrderItem[] }) {
         )
       })}
       {rest > 0 && (
-        <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, marginLeft: 2 }}>+{rest}</Text>
+        <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, marginLeft: 2 }}>+{rest}</Text>
       )}
     </View>
   )
@@ -61,7 +61,7 @@ function Chip({ label, fg, bg }: { label: string; fg: string; bg?: string }) {
       {/* NO DOT. The chip is already the colour the dot was — a 6pt disc of the same
           hue beside its own coloured word is the value stated twice, and at that size it
           reads as a rendering speck rather than a mark. */}
-      <Text style={{ fontSize: 11.5, fontWeight: "800", color: fg, letterSpacing: 0.2 }}>{label}</Text>
+      <Text style={{ fontSize: 11.5, fontFamily: F.bold, color: fg, letterSpacing: 0.2 }}>{label}</Text>
     </View>
   )
 }
@@ -126,7 +126,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
             order is. `o.id` is not `o.num`: numOf keeps a marketplace order reading as the
             number the buyer and the packing slip say. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 0.3 }} numberOfLines={1}>
+          <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 0.3 }} numberOfLines={1}>
             {numOf(order)}
           </Text>
           <Text style={{ fontSize: 12, color: C.muted }}>·</Text>
@@ -136,7 +136,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
         </View>
 
         {/* THE PRODUCT — the one thing to read. */}
-        <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: "800", color: C.fg, marginTop: 3, letterSpacing: -0.3 }}>
+        <Text numberOfLines={1} style={{ fontSize: 17, fontFamily: F.bold, color: C.fg, marginTop: 3, letterSpacing: -0.3 }}>
           {first ? lineTitle(first) : "No lines"}
         </Text>
 

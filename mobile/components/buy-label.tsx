@@ -3,7 +3,7 @@ import { View, Text, Pressable, ActivityIndicator, Alert, TextInput } from "reac
 import { Ionicons } from "@expo/vector-icons"
 import { getShippingRates, buyShippingLabel, type Order, type ShipAddress, type ShippingRate } from "@/lib/api"
 import { addressLines } from "@/lib/orders"
-import { C, R } from "@/lib/theme"
+import { F,C, R } from "@/lib/theme"
 
 /**
  * BUY THE LABEL HERE, because the parcel is here.
@@ -114,7 +114,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
 
   const field = (label: string, k: "name" | "street1" | "street2" | "city" | "state" | "zip" | "country") => (
     <View key={k} style={{ flex: 1, minWidth: 120, gap: 4 }}>
-      <Text style={{ fontSize: 11, fontWeight: "800", color: C.muted, letterSpacing: 0.6 }}>
+      <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 0.6 }}>
         {label.toUpperCase()}
       </Text>
       <TextInput
@@ -138,11 +138,11 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
         backgroundColor: C.card, padding: 14, gap: 10,
       }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ flex: 1, fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 1 }}>
+          <Text style={{ flex: 1, fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
             DELIVER TO
           </Text>
           <Pressable onPress={() => setEdit((v) => !v)} hitSlop={8}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: C.primary }}>
+            <Text style={{ fontSize: 13, fontFamily: F.semi, color: C.primary }}>
               {edit ? "Done" : "Edit"}
             </Text>
           </Pressable>
@@ -189,7 +189,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
           })}
         >
           {busy === "rates" && <ActivityIndicator color={C.onPrimary} />}
-          <Text style={{ fontSize: 16, fontWeight: "800", color: C.onPrimary }}>
+          <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onPrimary }}>
             {busy === "rates" ? "Getting rates…" : "Buy shipping label"}
           </Text>
         </Pressable>
@@ -211,7 +211,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
               })}
             >
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: C.fg }} numberOfLines={1}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }} numberOfLines={1}>
                   {r.carrier} {r.service}
                 </Text>
                 {r.days != null && (
@@ -222,7 +222,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
               </View>
               {busy === r.token
                 ? <ActivityIndicator color={C.primary} />
-                : <Text style={{ fontSize: 17, fontWeight: "900", color: C.fg }}>{money(r.amount)}</Text>}
+                : <Text style={{ fontSize: 17, fontFamily: F.bold, color: C.fg }}>{money(r.amount)}</Text>}
             </Pressable>
           ))}
           <Pressable onPress={() => { setRates(null); setErr(null) }} disabled={!!busy}>

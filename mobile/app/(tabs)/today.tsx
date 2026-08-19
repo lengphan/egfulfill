@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getOrders, type Order } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage } from "@/lib/orders"
-import { C, S } from "@/lib/theme"
+import { F,C, S } from "@/lib/theme"
 
 /**
  * TODAY — the same screen as the web shell, rebuilt with native primitives.
@@ -83,16 +83,16 @@ export default function Today() {
         <Text style={{ fontSize: 13, color: C.muted }}>
           {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </Text>
-        <Text style={{ marginTop: 2, fontSize: 32, fontWeight: "900", letterSpacing: -0.8, color: C.fg }}>Today</Text>
+        <Text style={{ marginTop: 2, fontSize: 32, fontFamily: F.bold, letterSpacing: -0.8, color: C.fg }}>Today</Text>
       </View>
 
       {/* The one number, and it is a door. */}
       <View style={{ paddingHorizontal: S.xl, marginTop: S.lg }}>
         <View style={{ borderRadius: 20, backgroundColor: C.primary, padding: S.xl }}>
-          <Text style={{ color: C.onPrimary, opacity: 0.85, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
+          <Text style={{ color: C.onPrimary, opacity: 0.85, fontSize: 11, fontFamily: F.semi, letterSpacing: 1 }}>
             NEEDS YOU NOW
           </Text>
-          <Text style={{ color: C.onPrimary, fontSize: 52, fontWeight: "900", marginTop: 6 }}>
+          <Text style={{ color: C.onPrimary, fontSize: 52, fontFamily: F.bold, marginTop: 6 }}>
             {orders === null ? "—" : needsYou}
           </Text>
           <Text style={{ color: C.onPrimary, opacity: 0.75, fontSize: 12, marginTop: 4 }}>
@@ -101,7 +101,7 @@ export default function Today() {
         </View>
       </View>
 
-      <Text style={{ paddingHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm, fontSize: 11, fontWeight: "700", letterSpacing: 1, color: C.muted }}>
+      <Text style={{ paddingHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm, fontSize: 11, fontFamily: F.semi, letterSpacing: 1, color: C.muted }}>
         WHAT NEEDS DOING
       </Text>
       <View style={{ marginHorizontal: S.xl, borderRadius: 20, borderWidth: 1, borderColor: C.border, overflow: "hidden" }}>
@@ -122,9 +122,9 @@ export default function Today() {
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: TONE[j.tone] }} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>{j.label}</Text>
+              <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>{j.label}</Text>
             </View>
-            <Text style={{ fontSize: 18, fontWeight: "800", color: TONE[j.tone] }}>
+            <Text style={{ fontSize: 18, fontFamily: F.bold, color: TONE[j.tone] }}>
               {orders === null ? "—" : j.count}
             </Text>
           </Pressable>

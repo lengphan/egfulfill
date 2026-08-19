@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { Ionicons } from "@expo/vector-icons"
 import { scanInventory, type ScanResult } from "@/lib/api"
-import { C } from "@/lib/theme"
+import { F,C } from "@/lib/theme"
 
 /**
  * SCAN — stock in and out, from the aisle instead of a station.
@@ -81,7 +81,7 @@ export default function Scan() {
   if (!perm.granted) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 40, paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 28, fontWeight: "900", color: C.fg }}>Scan stock</Text>
+        <Text style={{ fontSize: 28, fontFamily: F.bold, color: C.fg }}>Scan stock</Text>
         <Text style={{ fontSize: 16, color: C.muted, marginTop: 10, lineHeight: 22 }}>
           The camera reads the code on a shelf label or a carton, and moves that stock in or out.
         </Text>
@@ -92,7 +92,7 @@ export default function Scan() {
             backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 16 }}>Allow camera</Text>
+          <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
         </Pressable>
       </View>
     )
@@ -104,7 +104,7 @@ export default function Scan() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
-        <Text style={{ fontSize: 32, fontWeight: "900", color: C.fg, marginTop: 8 }}>Scan</Text>
+        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg, marginTop: 8 }}>Scan</Text>
 
         {/* The mode is the loudest thing here for a reason: everything scanned goes this
             way until it is changed, and a wrong mode is silent damage to a stock count. */}
@@ -127,7 +127,7 @@ export default function Scan() {
                   size={20}
                   color={on ? "#ffffff" : C.muted}
                 />
-                <Text style={{ fontSize: 17, fontWeight: "800", color: on ? "#ffffff" : C.muted }}>
+                <Text style={{ fontSize: 17, fontFamily: F.bold, color: on ? "#ffffff" : C.muted }}>
                   {d === "in" ? "Stock in" : "Stock out"}
                 </Text>
               </Pressable>
@@ -197,7 +197,7 @@ export default function Scan() {
                 color={e.ok ? (e.dir === "in" ? "#0a7c42" : C.alert) : C.warn}
               />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "700", color: C.fg }}>
+                <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
                   {e.code}
                 </Text>
                 {/* The direction is repeated on every line. A log that only says what

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { C } from "@/lib/theme"
+import { F,C } from "@/lib/theme"
 
 /**
  * WALLET — the balance, what moved it, and the way to add more.
@@ -63,7 +63,7 @@ export default function Wallet() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 20 }}>
-        <Text style={{ fontSize: 32, fontWeight: "900", color: C.fg, marginTop: 8 }}>Wallet</Text>
+        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg, marginTop: 8 }}>Wallet</Text>
 
         {/* A BALANCE IS READ OFTEN, so it is a quiet card rather than a coloured block —
             and "low" is a chip, not a repaint. Turning the whole panel red made a working
@@ -86,7 +86,7 @@ export default function Wallet() {
             marginTop: 16, borderRadius: 20, padding: 22,
             backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
           }}>
-            <Text style={{ fontSize: 17, fontWeight: "800", color: C.fg }}>No wallet on this account</Text>
+            <Text style={{ fontSize: 17, fontFamily: F.bold, color: C.fg }}>No wallet on this account</Text>
             <Text style={{ fontSize: 14, color: C.muted, marginTop: 6, lineHeight: 20 }}>
               Wallets belong to sellers — orders are charged to theirs. What the factory
               spends on postage, blanks and design lives in Finance on the web.
@@ -98,16 +98,16 @@ export default function Wallet() {
           backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
         }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ color: C.muted, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>BALANCE</Text>
+            <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.bold, letterSpacing: 1 }}>BALANCE</Text>
             {w?.low && (
               <View style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: "center", backgroundColor: "#fff4e5" }}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: C.warn }}>
+                <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.warn }}>
                   LOW{w.lowBelow != null ? ` · UNDER ${money(w.lowBelow)}` : ""}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={{ color: C.fg, fontSize: 46, fontWeight: "900", marginTop: 8 }}>
+          <Text style={{ color: C.fg, fontSize: 46, fontFamily: F.bold, marginTop: 8 }}>
             {err ? "—" : money(w?.balance ?? 0)}
           </Text>
         </View>
@@ -124,13 +124,13 @@ export default function Wallet() {
           })}
         >
           <Ionicons name="add-circle" size={20} color={C.onPrimary} />
-          <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 16 }}>Add funds</Text>
+          <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
         </Pressable>
         )}
 
         {err && <Text style={{ color: C.alert, fontSize: 14, marginTop: 16 }}>{err}</Text>}
 
-        <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 24 }}>
+        <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 24 }}>
           RECENT
         </Text>
       </View>
@@ -153,14 +153,14 @@ export default function Wallet() {
               paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border,
             }}>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: "600", color: C.fg }}>
+                <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>
                   {item.note || item.type}
                 </Text>
                 <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                   {new Date(item.created_at).toLocaleDateString()}
                 </Text>
               </View>
-              <Text style={{ fontSize: 15, fontWeight: "800", color: d < 0 ? C.fg : "#0a7c42" }}>
+              <Text style={{ fontSize: 15, fontFamily: F.bold, color: d < 0 ? C.fg : "#0a7c42" }}>
                 {d < 0 ? "−" : "+"}{money(Math.abs(d))}
               </Text>
             </View>

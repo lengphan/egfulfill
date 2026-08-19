@@ -1,7 +1,7 @@
 import { View, Text, Image, Pressable, Modal, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl } from "@/lib/api"
-import { C, R } from "@/lib/theme"
+import { F,C, R } from "@/lib/theme"
 
 /**
  * THE LINE'S PICTURES, BIG — and labelled, because they are two different things.
@@ -40,7 +40,7 @@ export function ItemPhotos({ open, onClose, title, art, listing }: {
           paddingHorizontal: 20, paddingVertical: 14,
           borderBottomWidth: 1, borderBottomColor: C.border,
         }}>
-          <Text numberOfLines={1} style={{ flex: 1, fontSize: 17, fontWeight: "800", color: C.fg, letterSpacing: -0.3 }}>
+          <Text numberOfLines={1} style={{ flex: 1, fontSize: 17, fontFamily: F.bold, color: C.fg, letterSpacing: -0.3 }}>
             {title}
           </Text>
           <Pressable
@@ -56,7 +56,7 @@ export function ItemPhotos({ open, onClose, title, art, listing }: {
         <ScrollView contentContainerStyle={{ padding: 20, gap: 24 }}>
           {shots.map((s) => (
             <View key={s.key} style={{ gap: 8 }}>
-              <Text style={{ fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 1 }}>
+              <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
                 {s.label.toUpperCase()}
               </Text>
               {s.url ? (

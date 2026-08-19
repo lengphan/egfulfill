@@ -5,7 +5,7 @@ import { router } from "expo-router"
 import Constants from "expo-constants"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, type User } from "@/lib/api"
-import { C } from "@/lib/theme"
+import { F,C } from "@/lib/theme"
 
 /**
  * SETTINGS — deliberately short.
@@ -29,7 +29,7 @@ function Line({ label, value }: { label: string; value: string }) {
       paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border,
     }}>
       <Text style={{ fontSize: 15, color: C.muted }}>{label}</Text>
-      <Text style={{ fontSize: 15, fontWeight: "600", color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
+      <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
     </View>
   )
 }
@@ -64,9 +64,9 @@ export default function Settings() {
       style={{ flex: 1, backgroundColor: C.bg }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 32 }}
     >
-      <Text style={{ fontSize: 32, fontWeight: "900", color: C.fg }}>Settings</Text>
+      <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg }}>Settings</Text>
 
-      <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>ACCOUNT</Text>
+      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 28 }}>ACCOUNT</Text>
       <View style={{ marginTop: 8 }}>
         {err
           ? <Text style={{ color: C.alert, fontSize: 15, paddingVertical: 14 }}>{err}</Text>
@@ -92,7 +92,7 @@ export default function Settings() {
           )}
       </View>
 
-      <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>APP</Text>
+      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 28 }}>APP</Text>
       <View style={{ marginTop: 8 }}>
         <Line label="Version" value={version} />
       </View>
@@ -106,7 +106,7 @@ export default function Settings() {
         })}
       >
         <Ionicons name="open-outline" size={18} color={C.fg} />
-        <Text style={{ fontSize: 16, fontWeight: "600", color: C.fg }}>Open the full app</Text>
+        <Text style={{ fontSize: 16, fontFamily: F.medium, color: C.fg }}>Open the full app</Text>
       </Pressable>
 
       <Pressable
@@ -116,7 +116,7 @@ export default function Settings() {
           borderWidth: 1, borderColor: C.border, opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Text style={{ fontSize: 16, fontWeight: "700", color: C.alert }}>Sign out</Text>
+        <Text style={{ fontSize: 16, fontFamily: F.semi, color: C.alert }}>Sign out</Text>
       </Pressable>
     </ScrollView>
   )
