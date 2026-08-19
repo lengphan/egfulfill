@@ -51,7 +51,7 @@ export default function TabsLayout() {
           // GROUP, and rounded to half its height so the shape is a lozenge rather than a
           // rectangle pretending. This is the one place a fully-round shape is right: it is
           // not a chip, it is the bar itself.
-          left: 40, right: 40, bottom,
+          left: 58, right: 58, bottom,
           height: TAB_BAR.height,
           borderRadius: TAB_BAR.height / 2,
           /*
@@ -84,7 +84,18 @@ export default function TabsLayout() {
             default: {},
           }),
         },
-        tabBarItemStyle: { height: TAB_BAR.height, paddingTop: 0 },
+        /* CENTRED, AND MEANT IT. With the labels hidden the item keeps the padding the
+           navigator reserves for a label, so every glyph sat high in the capsule rather than
+           in the middle of it. Zero the padding and centre on both axes. */
+        tabBarItemStyle: {
+          height: TAB_BAR.height,
+          justifyContent: "center",
+          alignItems: "center",
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingVertical: 0,
+        },
+        tabBarIconStyle: { marginTop: 0, marginBottom: 0 },
       }}
     >
       <Tabs.Screen
