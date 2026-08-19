@@ -833,23 +833,39 @@ function ProductGroup({
             return <span className={"block text-2xs font-medium " + (meta?.pill ?? "")}>{meta?.label}</span>
           })()}
         </td>
-        <td className="px-4 py-2">
-          {/* ONE NUMBER, AND THE SPLIT ON HOVER. "3 held → -3 free" was a second line
-              wedged under the count on every reserved row, so a column of numbers read as a
-              column of sentences and the figure you scan for stopped being the biggest
-              thing in the cell. The count is what the shelf holds; the split is a detail,
-              and a detail belongs in the title. */}
+        {/* ONE RIGHT EDGE FOR THE WHOLE COLUMN. A product row printed a bare number and a
+            variant row a centred pill, so the two never landed on the same x — a column
+            meant for comparing figures down the page could not be. */}
+        <td className="px-4 py-2 text-right">
+          {/* ONE FIGURE, AND THE SPLIT ON HOVER.
+              First it was a second line under the count ("3 held → -3 free"), which turned a
+              column of numbers into a column of sentences. Then it was a superscript, which
+              was worse in a different way: it hung above the baseline of the one column whose
+              job is to be read straight down, so no two figures sat on the same line.
+              What is held is in the title. The column is for the count. */}
           <span
             className="font-semibold tabular-nums"
             title={reserved > 0 ? `${stock} on the shelf · ${reserved} held for orders in production · ${stock - reserved} free` : `${stock} on the shelf`}
           >
             {stock}
-            {reserved > 0 && <span className="ml-1 align-super text-2xs font-normal text-muted-foreground">-{reserved}</span>}
           </span>
         </td>
         <td className="px-4 py-2">
-          {out === group.rows.length ? <span className="whitespace-nowrap text-xs font-medium text-red-700">All out</span>
-            : out || low ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">{out ? `${out} out` : `${low} low`}</span>
+          {/**
+            * THE SAME THREE WORDS AS A VARIANT ROW — Out, Low, In stock. A product and a
+            * variant are in the same three states and there is no reason to say them
+            * differently. This column read "All out" on one line and "Out" on the next,
+            * "3 out" here and "Low" below: four spellings of three states, stacked.
+            *
+            * The count is the DETAIL, so it sits beside the word in the quieter weight
+            * rather than replacing it.
+            */}
+          {out === group.rows.length ? <span className="whitespace-nowrap text-xs font-medium text-red-700">Out</span>
+            : out || low ? (
+              <span className="whitespace-nowrap text-xs font-medium text-amber-700">
+                Low <span className="font-normal text-muted-foreground">{out ? `· ${out} out` : `· ${low}`}</span>
+              </span>
+            )
               : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
         </td>
         <td className="px-4 py-2" />
@@ -861,9 +877,12 @@ function ProductGroup({
           place is named underneath it. */}
       {open && (matrixable ? (
         <tr className="border-t border-border">
-          {/* The group row above has four cells; the grid spans all of them so it reads as
-              this product's own panel rather than as another row in the table. */}
-          <td colSpan={4} className="bg-muted/20 p-0">
+          {/* SEVEN, which is how many the table has — a checkbox, the disclosure, the
+              picture, Item, SKU, Stock and Status. It said four, so the panel stopped
+              two-thirds across and the tinted band ended in mid-air with the Stock and
+              Status columns hanging past it. A panel that doesn't span its row reads as a
+              broken cell, not as the product's own area. */}
+          <td colSpan={7} className="bg-muted/20 p-0">
             <StockMatrix
               group={group}
               edit={(sku, _f, v) => edit(sku, "in_stock", v)}
