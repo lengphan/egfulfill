@@ -5,6 +5,7 @@ import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Meg
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment, getAiQuote, type AiQuote } from "@/lib/api"
+import { fileToUploadUrl, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
@@ -48,26 +49,6 @@ type MentionItem = { kind: "order"; o: OrderRow } | { kind: "person"; p: Mention
 // A small, practical emoji set for the composer — reactions, status, and the POD/shipping
 // bits that actually come up here. Not a full library; just the common ones.
 const EMOJIS = "😀 😄 😊 🙂 😉 😎 🤔 😅 😂 🤣 😭 😢 😡 🥳 🙏 👍 👎 👌 👏 🙌 💪 🔥 ✨ 🎉 ❤️ 💜 ✅ ❌ ⚠️ ❓ ‼️ 📦 🚚 🏷️ 💳 💰 📸 🎨 🧵 👕 🧢 ⏳ 🕐 👋".split(" ")
-
-// Prepare a file for upload: DOWNSIZE images in the browser first (longest edge capped,
-// re-encoded JPEG) so a phone photo doesn't eat storage or hit the proxy body limit.
-// Non-images (PDF) pass through as-is. Returns a data URL.
-async function fileToUploadUrl(file: File, maxEdge = 1800, quality = 0.82): Promise<string> {
-  const original = await new Promise<string>((res, rej) => {
-    const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("Couldn't read the file")); fr.readAsDataURL(file)
-  })
-  if (!file.type.startsWith("image/")) return original
-  try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("decode")); i.src = original })
-    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
-    if (scale === 1 && file.size < 500_000) return original
-    const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale))
-    const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h
-    const ctx = canvas.getContext("2d"); if (!ctx) return original
-    ctx.drawImage(img, 0, 0, w, h)
-    return canvas.toDataURL("image/jpeg", quality)
-  } catch { return original }
-}
 
 // Module scope, not a component defined in render (react-hooks/static-components).
 const convoIcon = (kind: Convo["kind"] | undefined, size = 16) => {
@@ -351,7 +332,7 @@ export default function ChatPage() {
   // Pick + upload an attachment (image downsized first). Held as `pendingAtt` until send.
   const onAttach = async (file: File | undefined) => {
     if (!file) return
-    if (file.size > 25 * 1024 * 1024) { setAiNote("That file is over 25MB — pick a smaller one."); return }
+    if (file.size > MAX_ATTACHMENT_BYTES) { setAiNote("That file is over 25MB — pick a smaller one."); return }
     setAttaching(true); setAiNote(null)
     try {
       const dataUrl = await fileToUploadUrl(file)
@@ -362,6 +343,14 @@ export default function ChatPage() {
       setAiNote(e instanceof Error ? e.message : "Couldn't attach that file.")
     } finally { setAttaching(false); if (attachRef.current) attachRef.current.value = "" }
   }
+
+  /**
+   * The stored NAME of an attachment, which is what the generation routes take — they are
+   * given an asset already on our side, never a URL to go and fetch. Null for anything that
+   * is not an image we hold, so a PDF can never be handed over as a reference frame.
+   */
+  const attachedImageName = (a: { url?: string; mime?: string } | null) =>
+    (a?.url && a.mime?.startsWith("image/") ? a.url.split("/api/support/asset/")[1] || null : null)
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -465,10 +454,9 @@ export default function ChatPage() {
     if (!gen || !text) return
     setSending(true); setAiNote(null)
     try {
+      const attached = attachedImageName(pendingAtt)
       if (gen.mode === "image") {
-        const refs = pendingAtt?.url && pendingAtt.mime?.startsWith("image/")
-          ? [pendingAtt.url.split("/api/support/asset/")[1]].filter(Boolean)
-          : []
+        const refs = attached ? [attached] : []
         const r = await generateDeskImage({
           prompt: text, aspectRatio: gen.ratio, imageSize: gen.size, model: gen.model,
           imageNames: refs.length ? refs : undefined,
@@ -483,12 +471,24 @@ export default function ChatPage() {
         setInput(""); setPendingAtt(null)
         await load()
       } else {
+        /**
+         * A DROPPED IMAGE IS A STILL TO ANIMATE, not just a file sitting in the composer.
+         *
+         * The only way to give video a frame was the Animate button on a picture already in
+         * the thread, so bringing your own meant sending it as a message first and then
+         * animating what you had just posted. An armed still still wins — pressing Animate
+         * on a specific picture is a more explicit choice than whatever happens to be
+         * attached — and anything that is not an image we hold contributes nothing.
+         */
         const r = await generateDeskVideo({
           prompt: text, aspectRatio: gen.ratio, resolution: gen.resolution,
-          durationSeconds: gen.seconds, model: gen.model, imageName: gen.imageName,
+          durationSeconds: gen.seconds, model: gen.model,
+          imageName: gen.imageName ?? attached ?? undefined,
         })
         if (!r.ok || !r.jobId) { setInput(text); setAiNote(r.error || "That didn't work."); return }
-        setInput("")
+        // Consumed — it is in the job now, and leaving it staged would silently ride along
+        // on whatever is generated next.
+        setInput(""); setPendingAtt(null)
         setVideoAt(nowMs())
         // Matches the server's 12-minute abandon ceiling, plus slack for the upload.
         setTimeout(() => setVideoAt(null), 13 * 60 * 1000)
@@ -762,7 +762,25 @@ export default function ChatPage() {
       </aside>
 
       {/* active thread */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card">
+      {/**
+        * THE WHOLE PANEL IS THE DROP TARGET, composer included.
+        *
+        * The handlers used to sit on the message list alone, which is the one part of a chat
+        * nobody aims at: a picture is dropped ON THE BOX YOU TYPE IN, and there the drag was
+        * simply refused by the browser's default — no overlay, no attachment, nothing to
+        * explain it. Hoisting them here covers the header, the thread, the staged
+        * attachment and the composer as one target.
+        *
+        * `relative` so the overlay below can cover the panel. onDragOver's preventDefault is
+        * load-bearing and not ceremony: without it the browser never fires a drop at all.
+        */}
+      <div
+        className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card"
+        onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; if (e.dataTransfer.types?.includes("Files")) setDragging(true) }}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
+        onDrop={onDrop}
+      >
         {/* header — also the mobile conversation switcher */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (isSupport ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
@@ -798,18 +816,10 @@ export default function ChatPage() {
         )}
 
         {/* messages */}
-        {/* The drop overlay must sit OUTSIDE the scrolling element: as a child it is
-            positioned against the scroll CONTENT, so it slides away the moment the thread is
-            scrolled. This wrapper doesn't scroll, so the overlay stays over what you can see.
-            Drag handlers live here too, covering the whole reading area rather than the strip
-            of it that happens to be in view. */}
-        <div
-          className="relative min-h-0 flex-1"
-          onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; if (e.dataTransfer.types?.includes("Files")) setDragging(true) }}
-          onDragOver={(e) => e.preventDefault()}
-          onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
-          onDrop={onDrop}
-        >
+        {/* The drag handlers used to live here. They are on the panel now — see the note
+            there — so a drop anywhere in the conversation lands, not only on the strip of
+            thread that happens to be scrolled into view. */}
+        <div className="relative min-h-0 flex-1">
           <div ref={scrollRef} className="h-full space-y-3 overflow-y-auto p-5">
           {signedOut ? (
             <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Sign in to chat.</div>
@@ -998,23 +1008,6 @@ export default function ChatPage() {
           )}
           </div>
 
-          {/* Opaque, not tinted. A translucent wash over live messages read as a glitch —
-              the thread was still legible underneath and the dashed box looked like it had
-              landed on top of a conversation. Covering it outright makes the target the only
-              thing on screen, which is the whole job of a drop zone.
-              pointer-events-none on purpose: the overlay must not generate its own
-              dragenter/dragleave, or the depth counter it depends on never returns to zero. */}
-          {dragging && (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background p-6">
-              <div className="flex w-full max-w-sm flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/40 px-8 py-12 text-center">
-                <Paperclip size={24} weight="duotone" className="text-primary" />
-                <span className="text-sm font-medium text-foreground">Drop to attach</span>
-                <span className="text-xs text-muted-foreground">
-                  {gen?.mode === "image" ? "It goes in as a reference for the image" : "Image or PDF, up to 25MB"}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* seller: escalate to a human on the support thread */}
@@ -1024,6 +1017,34 @@ export default function ChatPage() {
             <button onClick={escalate} className="inline-flex items-center gap-1 font-medium text-foreground hover:underline">
               Talk to a human
             </button>
+          </div>
+        )}
+
+        {/* THE OVERLAY COVERS WHAT ACCEPTS THE DROP — the whole panel, matching the handlers
+            above rather than the reading area alone. It was over the thread while the
+            composer beneath it silently refused, which is a target that lies about where it
+            ends.
+
+            Opaque, not tinted. A translucent wash over live messages read as a glitch — the
+            thread stayed legible underneath and the dashed box looked like it had landed on
+            top of a conversation. Covering it outright makes the target the only thing on
+            screen, which is the whole job of a drop zone. pointer-events-none on purpose:
+            the overlay must not generate its own dragenter/dragleave, or the depth counter
+            it depends on never returns to zero. */}
+        {dragging && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background p-6">
+            <div className="flex w-full max-w-sm flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/40 px-8 py-12 text-center">
+              <Paperclip size={24} weight="duotone" className="text-primary" />
+              <span className="text-sm font-medium text-foreground">Drop to attach</span>
+              {/* SAY WHAT IT WILL BE USED FOR. In the AI channel a dropped picture is not a
+                  file being sent, it is a reference frame, and which of the two it becomes
+                  depends on the mode that is armed. */}
+              <span className="text-xs text-muted-foreground">
+                {gen?.mode === "image" ? "It goes in as a reference for the image"
+                  : gen?.mode === "video" ? "It becomes the still the clip animates"
+                    : "Image or PDF, up to 25MB"}
+              </span>
+            </div>
           </div>
         )}
 
@@ -1074,7 +1095,18 @@ export default function ChatPage() {
                     <X size={11} weight="bold" />
                   </button>
                 </div>
-                {gen && <span className="self-end pb-1 text-2xs text-muted-foreground">used as a reference</span>}
+                {/* Named, not "used as a reference" for both — a still that will be animated
+                    and a reference the image borrows from are different jobs, and the armed
+                    mode is what decides which one this picture is about to do. An explicitly
+                    armed still (Animate on a picture in the thread) wins over this one, so
+                    say so rather than implying this attachment is the frame. */}
+                {gen && (
+                  <span className="self-end pb-1 text-2xs text-muted-foreground">
+                    {gen.mode === "image" ? "used as a reference"
+                      : gen.imageName ? "not used — a still is already armed"
+                        : "the still to animate"}
+                  </span>
+                )}
               </div>
             )}
 

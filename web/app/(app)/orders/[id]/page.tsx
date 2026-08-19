@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
-import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft } from "@phosphor-icons/react"
+import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
+import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -37,6 +38,8 @@ import {
   getOrderCharges,
   getCatalogProducts,
   postOrderMessage,
+  uploadChatAttachment,
+  type ChatAttachment,
   updateOrder,
   type OrderRow,
   type OrderItem,
@@ -262,18 +265,57 @@ export default function OrderDetailPage() {
     }
   }, [id])
 
+  /**
+   * ATTACHMENTS ON THE ORDER THREAD.
+   *
+   * This thread could RENDER an attachment — the mobile app's package photo arrives here —
+   * and had no way to send one, so a picture of the misprint being discussed had to go via
+   * some other channel and never sat with the order it was about. The support chat already
+   * had all of this; what it did not have was the order.
+   *
+   * Held staged until send, exactly as the chat composer does, so the picture and the
+   * sentence explaining it arrive as one message rather than two.
+   */
+  const [pendingAtt, setPendingAtt] = useState<ChatAttachment | null>(null)
+  const [attaching, setAttaching] = useState(false)
+  const [attErr, setAttErr] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
+  // A COUNTER, not a boolean: dragenter/dragleave fire for every child element crossed, so
+  // a flag flickers off the moment the cursor passes over a message bubble.
+  const dragDepth = useRef(0)
+  const attachRef = useRef<HTMLInputElement>(null)
+
+  const onAttach = useCallback(async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > MAX_ATTACHMENT_BYTES) { setAttErr("That file is over 25MB — pick a smaller one."); return }
+    setAttaching(true); setAttErr(null)
+    try {
+      const r = await uploadChatAttachment(await fileToUploadUrl(file), file.name)
+      if (r.error || !r.url) throw new Error(r.error || "Upload failed")
+      setPendingAtt({ url: r.url, name: r.name || file.name, mime: r.mime, size: r.size })
+    } catch (e) {
+      setAttErr(e instanceof Error ? e.message : "Couldn't attach that file.")
+    } finally {
+      setAttaching(false)
+      if (attachRef.current) attachRef.current.value = ""
+    }
+  }, [])
+
   const sendMsg = async () => {
     const text = msg.trim()
-    if (!text) return
+    // A picture with no words is a message. Requiring text meant dropping a photo and then
+    // having to invent a sentence for it.
+    if (!text && !pendingAtt) return
     setMsg("")
+    const att = pendingAtt; setPendingAtt(null); setAttErr(null)
     const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     // Attribute the optimistic bubble to whoever is actually typing. It was hardcoded to
     // "seller", so a warehouse message showed as coming from the seller — on the one
     // surface where who-said-what is the whole point.
     const myRole = getUser()?.role || "seller"
-    setMessages((prev) => [...prev, { id: clientId, role: myRole, text, ts: Date.now() }])
+    setMessages((prev) => [...prev, { id: clientId, role: myRole, text, ts: Date.now(), attachment: att ?? undefined }])
     try {
-      await postOrderMessage(id, text, { clientId })
+      await postOrderMessage(id, text, { clientId, attachment: att ?? undefined })
       const r = await getOrderMessages(id)
       setMessages(Array.isArray(r) ? r : [])
     } catch {
@@ -848,7 +890,33 @@ export default function OrderDetailPage() {
           )}
 
           <SectionCard title="Order activity">
-            <div className="flex flex-col">
+            {/* THE WHOLE CARD ACCEPTS A DROP — thread and composer alike. A picture gets
+                dropped on the box you type in, so a target that stops at the message list is
+                a target that refuses the aim everybody takes. `relative` carries the overlay;
+                onDragOver's preventDefault is load-bearing rather than ceremony — without it
+                the browser never fires a drop at all. */}
+            <div
+              className="relative flex flex-col"
+              onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; if (e.dataTransfer.types?.includes("Files")) setDragging(true) }}
+              onDragOver={(e) => e.preventDefault()}
+              onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
+              onDrop={(e) => {
+                e.preventDefault()
+                dragDepth.current = 0; setDragging(false)
+                void onAttach(firstDroppedFile(e.dataTransfer))
+              }}
+            >
+              {/* pointer-events-none: the overlay must not fire its own dragenter/dragleave,
+                  or the depth counter it depends on never returns to zero. */}
+              {dragging && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background p-6">
+                  <div className="flex w-full max-w-sm flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/40 px-8 py-10 text-center">
+                    <Paperclip size={22} weight="duotone" className="text-primary" />
+                    <span className="text-sm font-medium text-foreground">Drop to attach</span>
+                    <span className="text-xs text-muted-foreground">It posts on this order, with your message</span>
+                  </div>
+                </div>
+              )}
               <div className="max-h-72 min-h-[80px] flex-1 space-y-3 overflow-y-auto p-5">
                 {messages.length === 0 ? (
                   <div className="py-6 text-center text-sm text-muted-foreground">No messages yet — start the conversation.</div>
@@ -901,7 +969,50 @@ export default function OrderDetailPage() {
                   })
                 )}
               </div>
+              {/* WHAT IS ABOUT TO GO WITH THE MESSAGE, as a picture rather than a filename.
+                  You attached an image to look at it; a row of text asks you to take it on
+                  trust — the same call the chat composer makes. */}
+              {(pendingAtt || attErr) && (
+                <div className="flex items-center gap-2 border-t border-border px-3 pt-3">
+                  {pendingAtt && (
+                    <div className="relative">
+                      {pendingAtt.mime?.startsWith("image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={pendingAtt.url} alt={pendingAtt.name} className="size-14 rounded-lg border border-border object-cover" />
+                      ) : (
+                        <div className="flex size-14 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted/50 px-1">
+                          <FileText size={16} weight="duotone" className="text-muted-foreground" />
+                          <span className="w-full truncate text-center text-2xs text-muted-foreground">{pendingAtt.name}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setPendingAtt(null)} aria-label="Remove attachment"
+                        className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+                      >
+                        <X size={10} weight="bold" />
+                      </button>
+                    </div>
+                  )}
+                  {/* A failed upload SAYS SO. Silently attaching nothing is how a photo is
+                      believed to have been sent. */}
+                  {attErr && <span className="text-xs text-destructive">{attErr}</span>}
+                </div>
+              )}
               <div className="flex items-center gap-2 border-t border-border p-3">
+                <input
+                  ref={attachRef} type="file" className="hidden"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => void onAttach(e.target.files?.[0])}
+                />
+                <Button
+                  variant="ghost" size="icon" className="size-10 shrink-0"
+                  onClick={() => attachRef.current?.click()}
+                  disabled={attaching}
+                  title="Attach an image or PDF"
+                  aria-label="Attach a file"
+                >
+                  {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={17} />}
+                </Button>
                 <Input
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}
@@ -914,7 +1025,8 @@ export default function OrderDetailPage() {
                   placeholder="Add a message or note…"
                   className="h-10"
                 />
-                <Button size="icon" className="size-10" onClick={sendMsg} disabled={!msg.trim()}>
+                {/* Either half is a message: words, a picture, or both. */}
+                <Button size="icon" className="size-10" onClick={sendMsg} disabled={(!msg.trim() && !pendingAtt) || attaching}>
                   <PaperPlaneTilt size={16} weight="fill" />
                 </Button>
               </div>
