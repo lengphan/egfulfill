@@ -908,6 +908,17 @@ function cellTone(it: InventoryItem, lowAt: (x: InventoryItem) => number) {
   return "border-border"
 }
 
+/** "and N more with nothing on the shelf" — the way back to the empties. */
+function EmptyToggle({ hidden, showAll, onToggle }: { hidden: number; showAll: boolean; onToggle: () => void }) {
+  if (!hidden && !showAll) return null
+  return (
+    <button type="button" onClick={onToggle}
+      className="text-2xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">
+      {showAll ? "Hide the empty ones" : `Show ${hidden} more with nothing on the shelf`}
+    </button>
+  )
+}
+
 /** The variants a grid could not place — named, never dropped. */
 function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
   return (
@@ -923,6 +934,7 @@ function StockMatrix({ group, edit, lowAt }: {
   edit: (sku: string, field: "in_stock", value: number) => void
   lowAt: (it: InventoryItem) => number
 }) {
+  const [showAll, setShowAll] = useState(false)
   const p = group.product
   if (!p) return null
 
@@ -963,11 +975,28 @@ function StockMatrix({ group, edit, lowAt }: {
   }
   if (!placed.size) return null                       // nothing resolves — the list is honest
 
-  const sizes = [...new Set([...placed.values()].map((x) => x.size).filter(Boolean))].sort(bySize)
-  const colors = [...new Set([...placed.values()].map((x) => x.color).filter(Boolean))]
+  /**
+   * WHAT IS ON THE SHELF, NOT WHAT THE CATALOGUE COULD HOLD.
+   *
+   * A cap declares seventeen colours and stocks none of them; a hoodie declares sixty
+   * variants and stocks none. Drawing every one gave seventeen chips reading 0 and sixty
+   * cells reading 0 — pages of a number that means "nothing here", with the two or three
+   * that matter lost among them. Zero is the answer to a question nobody asked.
+   *
+   * So a row has to EARN its place: something on the shelf, or something held for an order.
+   * Everything else is behind one toggle, because you do still need it — setting a count on
+   * a variant that has never had one is exactly when you want the empties.
+   */
+  const has = (x: { it: InventoryItem }) => (Number(x.it.in_stock) || 0) !== 0 || (Number(x.it.reserved) || 0) !== 0
+  const stocked = [...placed.values()].filter(has)
+  const hidden = placed.size - stocked.length
+  const shown = showAll || !stocked.length ? [...placed.values()] : stocked
+
+  const sizes = [...new Set(shown.map((x) => x.size).filter(Boolean))].sort(bySize)
+  const colors = [...new Set(shown.map((x) => x.color).filter(Boolean))]
   const leftover = group.rows.filter((r) => !placed.has(norm(r.sku)))
   const at = (size: string, color: string) =>
-    [...placed.values()].find((x) => x.size === size && x.color === color)?.it ?? null
+    shown.find((x) => x.size === size && x.color === color)?.it ?? null
 
   const cell = (it: InventoryItem | null, key: string) =>
     it ? (
@@ -993,6 +1022,19 @@ function StockMatrix({ group, edit, lowAt }: {
    * wide, which is the pile of rows this exists to replace wearing a header. What matters
    * is which axis VARIES, not how many were found.
    */
+  /**
+   * NOTHING ON THE SHELF IS A SENTENCE, NOT A GRID. A product we stock none of drew
+   * seventeen zeros; one line says the same thing and leaves the row readable.
+   */
+  if (!stocked.length && !showAll) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs text-muted-foreground">
+        <span>Nothing on the shelf in any of the {placed.size} variants.</span>
+        <EmptyToggle hidden={placed.size} showAll={false} onToggle={() => setShowAll(true)} />
+      </div>
+    )
+  }
+
   if (sizes.length <= 1 || colors.length <= 1) {
     const oneSize = sizes[0] ?? ""
     const oneColor = colors[0] ?? ""
