@@ -172,19 +172,34 @@ export const getShippingRates = (orderId: string, to: ShipAddress, parcel: Parce
   })
 
 /**
- * Buy ONE rate — the one a person tapped.
+ * Buy ONE rate — through the SAME route the web uses, because of what that route does
+ * besides buying.
  *
- * `rate` rides along with `rateToken` deliberately: Shippo's transaction answers with the
- * rate as an id string, so cost, carrier and service have to be handed back or the stored
- * label comes back with a null cost and a blank carrier.
+ * This posted to /api/shipping/label, which buys a label and books NOTHING. The web posts
+ * to /api/usps/label, and that one calls recordLabel(): postage lands in wallet_ledger as
+ * `label-cost` factory spend, the order's factory stage advances, the marketplace is told,
+ * and it is audited. Same aggregator underneath — `rateToken` keeps it off the USPS-direct
+ * path — but every consequence of buying was missing, so a label bought on the phone was
+ * money spent that no report could see. dispatch.js carries a backfill that sweeps up
+ * exactly these orphans, which is evidence this has happened before rather than a reason
+ * to rely on it.
+ *
+ * `street` as well as `street1`: shipping.js reads either, usps.js validates `to.street`,
+ * and an address that satisfied one route would have been rejected by the other.
+ *
+ * `from` is deliberately not sent — usps.js resolves the ship-from for the order itself
+ * (blind shipping puts the seller's shop name at our address), and a phone carrying its own
+ * copy would print the wrong return address after an office move.
  */
-export const buyShippingLabel = (orderId: string, rate: ShippingRate) =>
-  request<{ ok?: boolean; error?: string; labelUrl?: string; tracking?: string; carrier?: string; cost?: number }>(
-    "/api/shipping/label",
+export const buyShippingLabel = (orderId: string, rate: ShippingRate, to: ShipAddress) =>
+  request<{ ok?: boolean; error?: string; labelUrl?: string; trackingNumber?: string; carrier?: string; cost?: number }>(
+    "/api/usps/label",
     {
       method: "POST",
       body: JSON.stringify({
-        orderId, rateToken: rate.token,
+        orderId,
+        to: { ...to, street: to.street || to.street1, street1: to.street1 || to.street },
+        rateToken: rate.token,
         rate: { amount: rate.amount, carrier: rate.carrier, service: rate.service, carrierAccount: rate.carrierAccount },
       }),
     },

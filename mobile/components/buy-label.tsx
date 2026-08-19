@@ -75,6 +75,10 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
   }
 
   const buy = (rate: ShippingRate) => {
+    /* `to` is non-null by the time a rate exists — rates cannot be fetched without one —
+       but the compiler cannot see that, and asserting it would be the wrong kind of
+       confident about an address a label gets printed with. */
+    if (!to) return
     Alert.alert(
       `Buy this label for ${money(rate.amount)}?`,
       `${rate.carrier} ${rate.service}${rate.days ? ` · about ${rate.days} day${rate.days === 1 ? "" : "s"}` : ""}\n\nThis charges the account now.`,
@@ -86,7 +90,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
           onPress: async () => {
             setBusy(rate.token); setErr(null)
             try {
-              const r = await buyShippingLabel(String(order.id), rate)
+              const r = await buyShippingLabel(String(order.id), rate, to)
               if (r.error) throw new Error(r.error)
               onDone()
             } catch (e) {
