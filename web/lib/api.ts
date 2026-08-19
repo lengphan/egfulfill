@@ -4231,7 +4231,14 @@ export function getOrderDesignStatus(id: string) {
  *  catalogs (authoritative — the sku IS theirs) then inventory.supplier. A sku in neither
  *  gets no api, so it's ordered by hand rather than guessed at from a PO's name. */
 export function resolveSuppliers(skus: string[]) {
-  return api<{ bySku: Record<string, { api: "ss" | "otto" | null; supplier: string | null; source: string; image?: string | null; variant?: string | null }> }>(
+  return api<{ bySku: Record<string, {
+    api: "ss" | "otto" | null; supplier: string | null; source: string
+    image?: string | null; variant?: string | null
+    /** The supplier catalogue's LAST SYNCED price per unit, or null when it has none.
+     *  Never 0 as a stand-in — free and unknown are different facts. It is a reference
+     *  figure, not a quote: both suppliers price an order at placement. */
+    price?: number | null
+  }> }>(
     `/api/purchase/resolve-suppliers`, { method: "POST", body: JSON.stringify({ skus }) })
 }
 

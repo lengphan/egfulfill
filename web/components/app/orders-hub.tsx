@@ -569,13 +569,17 @@ export function OrdersHub() {
           if (existing) {
             const srcs = existing.sources ?? []
             if (srcs.some((s) => s.order === o.id)) continue   // already on this PO for this order → skip
-            srcs.push({ order: o.id, qty: short })
+            // THE NUMBER GOES ON AT WRITE TIME. The id is the key and it is all this line
+            // used to keep, so the purchase board had nothing to print but `FF-<tag>-<ms>-
+            // <rand>` — a format that appears nowhere else in the product. numOf is what
+            // every other screen shows for this same order.
+            srcs.push({ order: o.id, num: numOf(o), qty: short })
             existing.sources = srcs
             existing.qty = (Number(existing.qty) || 0) + short
             existing.auto = true
             added++
           } else {
-            nextItems.push({ sku: l.sku, name: l.name, qty: short, auto: true, sources: [{ order: o.id, qty: short }] })
+            nextItems.push({ sku: l.sku, name: l.name, qty: short, auto: true, sources: [{ order: o.id, num: numOf(o), qty: short }] })
             added++
           }
         }

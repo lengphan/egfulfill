@@ -21,6 +21,7 @@ import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialo
 import { PoReturnDialog } from "@/components/app/po-return-dialog"
 import { StockSplitWarning } from "@/components/app/stock-split-warning"
 import { warehouseEta, fmtEta } from "@/lib/warehouse-eta"
+import { shortOrderRef } from "@/lib/order-format"
 import { ReceiveScanDialog } from "@/components/app/receive-scan-dialog"
 import { CardEntryDialog } from "@/components/app/card-entry-dialog"
 import { usableCard, type CardDetails } from "@/lib/otto-card"
@@ -110,9 +111,14 @@ function SourceTags({ line }: { line: POLine }) {
         // THE NUMBER, not the internal id. A marketplace order's id is "etsy-3311908445"
         // and its number is "#4099" — the number is what is on the packing slip, the
         // buyer's email and the shop's dashboard, so a chip showing the id asks a buyer to
-        // go and translate it before they know what they are buying for. Older parked
-        // lines have no `num`, and fall back to what they always showed.
-        const label = s.num || `#${s.order}`
+        // go and translate it before they know what they are buying for.
+        //
+        // Lines parked before `num` was recorded fall back to shortOrderRef, NOT to the raw
+        // id with a '#' bolted on. "#FF-ombao6-msyfrdqn-2mfrc" is not a number — the hash
+        // made a 24-character key look like one, and that format appears nowhere else in the
+        // product, because everywhere else holds the order row and shows its #seq. The full
+        // id stays in the title for anyone who needs to match it against the database.
+        const label = s.num || shortOrderRef(s.order)
         return (
           <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground"
                 title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
@@ -796,7 +802,9 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   const [split, setSplit] = useState<Record<string, string>>({})
   const [transit, setTransit] = useState<Record<string, { days: number | null; cutOff: string }>>({})
 
-  const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null }>>({})
+  /* `price` is the supplier catalogue's last synced per-unit figure — see unitPrice, and
+     the note on resolveSuppliers for why it is a reference and not a quote. */
+  const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null; price?: number | null }>>({})
   useEffect(() => {
     const skus = saved.map((l) => l.sku).filter(Boolean)
     if (!skus.length) return
@@ -846,6 +854,29 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     return () => clearTimeout(t)
   }, [saved, supByS])
 
+  /**
+   * WHAT ONE UNIT COSTS, and where the figure came from.
+   *
+   * A line's own `price` is what someone put on it — a browse row carries the price it was
+   * added at, and a hand-typed line carries what was typed. Lines drafted from a low-stock
+   * check or auto-added from an order shortfall carry NONE, so the cart showed "—" on real
+   * goods and the order total counted them as zero. The supplier catalogue has had a price
+   * per sku the whole time, and the cart already asks that catalogue about every sku on it.
+   *
+   * `from` is not decoration. "catalog" is the LAST SYNCED figure, not a quote — both
+   * suppliers price the order when it is placed — so it is shown in muted ink with the
+   * source in the title, and a total built on it says so. Reporting it as a firm price is
+   * how a $4.85 estimate becomes a complaint about a $5.40 invoice.
+   */
+  const unitPrice = useCallback((l: { sku: string; price?: number | null }) => {
+    const own = num(l.price)
+    if (own) return { unit: own, from: "line" as const }
+    const cat = supByS[l.sku]?.price
+    return cat != null && isFinite(Number(cat)) && Number(cat) > 0
+      ? { unit: Number(cat), from: "catalog" as const }
+      : { unit: 0, from: "none" as const }
+  }, [supByS])
+
   const toOrderGroups = useMemo(() => {
     const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
     for (const l of saved) {
@@ -854,10 +885,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       if (!g.has(key)) g.set(key, { key, api: r.api, supplier: r.supplier ?? l.supplier ?? null, lines: [], total: 0 })
       const grp = g.get(key)!
       grp.lines.push(l)
-      grp.total += num(l.price) * num(l.qty)
+      // The same figure the LINE shows. A total that silently counts an unpriced line as
+      // zero disagrees with the rows above it, and the row is the one people check.
+      grp.total += unitPrice(l).unit * num(l.qty)
     }
     return [...g.values()]
-  }, [saved, supByS])
+  }, [saved, supByS, unitPrice])
   const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
   /** Split by what this screen can actually send. Otto is in `handGroups` by rule, not by
    *  accident — see NO_AUTO_ORDER. */
@@ -1811,10 +1844,29 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         )}
                       </div>
                       {/* Line total — foreground weight so the money reads at a glance rather
-                          than hiding as muted micro-text. */}
-                      <span className="w-24 shrink-0 self-center text-right text-sm font-semibold tabular-nums">
-                        {num(l.price) ? usd(num(l.price) * num(l.qty)) : <span className="font-normal text-muted-foreground">—</span>}
-                      </span>
+                          than hiding as muted micro-text.
+
+                          A catalogue price is shown, and shown AS ONE: muted, with "catalog"
+                          under it and the per-unit figure and its source in the title. It is
+                          the last synced number rather than a quote, and the two must not
+                          look alike — but "—" on a line of real goods, with the order total
+                          counting it as zero, was the worse of the two lies. */}
+                      {(() => {
+                        const { unit, from } = unitPrice(l)
+                        if (!unit) return <span className="w-24 shrink-0 self-center text-right text-sm text-muted-foreground">—</span>
+                        return (
+                          <span
+                            title={from === "catalog"
+                              ? `${usd(unit)} each — last synced ${supByS[l.sku]?.supplier ?? "supplier"} catalogue price, not a quote`
+                              : `${usd(unit)} each`}
+                            className={"w-24 shrink-0 self-center text-right text-sm tabular-nums " +
+                              (from === "catalog" ? "font-normal text-muted-foreground" : "font-semibold")}
+                          >
+                            {usd(unit * num(l.qty))}
+                            {from === "catalog" && <span className="block text-2xs leading-none">catalog</span>}
+                          </span>
+                        )
+                      })()}
                       <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
                         className="self-center text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
                         <Trash size={14} />

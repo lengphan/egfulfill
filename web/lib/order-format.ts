@@ -54,6 +54,31 @@ const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
  *  (Shipments holds a parcel, not an order) can read it without a private copy of the regex. */
 export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, "")
 export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : plainNum(String(o.id)))
+
+/**
+ * A readable ref when ALL you hold is the id — no seq, no row to read it from.
+ *
+ * Our own orders are minted client-side as `FF-<account tag>-<ms base36>-<random>`
+ * (lib/order-id.ts) so two sellers can never collide without asking a server. That is a
+ * KEY, not a number: nothing else in the product ever shows it, because everywhere else
+ * has the row and shows `#seq`. Printed raw it is 24 characters of base36 that match
+ * nothing the reader has seen before or will see again.
+ *
+ * Where the row IS available, use numOf. This is for the places that stored a bare id
+ * months ago — a purchase-order line's `sources`, for one — and it does the only two
+ * honest things left: take the routing prefix off a marketplace id, which leaves the
+ * number the buyer and the marketplace both use; and shorten one of ours to its last
+ * segment, which is the part that distinguishes it. The full id belongs in a title
+ * attribute beside it, never as the label.
+ */
+export const shortOrderRef = (id: string) => {
+  const raw = String(id ?? "")
+  if (!raw) return ""
+  const plain = plainNum(raw)
+  if (plain !== raw) return plain                       // etsy-4148231554 → 4148231554
+  const m = raw.match(/^FF-.*-([A-Za-z0-9]+)$/)         // FF-ombao6-msyfrdqn-2mfrc → FF-2mfrc
+  return m ? `FF-${m[1]}` : raw
+}
 // Marketplaces capitalise their own names, and title-casing the raw source got two of them
 // wrong on every row and in every filter — "Tiktok" and "Ebay" are not how those brands are
 // written. Anything unlisted still falls back to title case, so a new source needs no entry.

@@ -189,9 +189,15 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
     // DryBlend Crewneck" against "Unisex Heavy Blend Crewneck" — so a picture on the line
     // is what makes a mis-picked sku obvious before it's ordered rather than after it
     // arrives. One query already runs here; taking the image with it costs nothing.
+    // THE PRICE COMES WITH IT. Both catalogues already carry a per-sku price (ss_products
+    // and otto_products are synced with one), and this is the one call the cart already
+    // makes per sku — so a line drafted from an order shortfall, which is created with no
+    // price at all, had a known cost sitting one column away from a query it was already
+    // running. Reading it here costs nothing and is what stops a cart of real goods
+    // totalling nothing.
     const [ss, otto, inv] = await Promise.all([
-      softQ('ss supplier lookup', 'select sku, image, color, size from ss_products where sku = any($1)', [skus]),
-      softQ('otto supplier lookup', 'select sku, image, color, size from otto_products where sku = any($1)', [skus]),
+      softQ('ss supplier lookup', 'select sku, image, color, size, price from ss_products where sku = any($1)', [skus]),
+      softQ('otto supplier lookup', 'select sku, image, color, size, price from otto_products where sku = any($1)', [skus]),
       softQ('inventory supplier lookup', 'select sku, supplier from inventory where sku = any($1)', [skus]),
     ]);
     const ssRow = new Map(ss.rows.map((r) => [String(r.sku), r]));
@@ -221,10 +227,14 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
       const r = ssRow.get(sku) || ottoRow.get(sku) || null;
       const variant = r ? [r.color, r.size].filter(Boolean).join(' / ') || null : null;
       const image = proxied(r ? r.image : null);
-      if (ssSet.has(sku)) { bySku[sku] = { api: 'ss', supplier: 'S&S Activewear', source: 'catalog', image, variant }; continue; }
-      if (ottoSet.has(sku)) { bySku[sku] = { api: 'otto', supplier: 'Otto Cap', source: 'catalog', image, variant }; continue; }
+      // The LAST SYNCED catalogue price, and it is labelled as that rather than as a quote:
+      // both suppliers price an order when it is placed, and a synced figure can be days
+      // old. Null when the catalogue has none — never 0, which reads as free.
+      const price = r && r.price != null && isFinite(Number(r.price)) ? Number(r.price) : null;
+      if (ssSet.has(sku)) { bySku[sku] = { api: 'ss', supplier: 'S&S Activewear', source: 'catalog', image, variant, price }; continue; }
+      if (ottoSet.has(sku)) { bySku[sku] = { api: 'otto', supplier: 'Otto Cap', source: 'catalog', image, variant, price }; continue; }
       const name = invSup.get(sku) || null;
-      bySku[sku] = { api: apiFromName(name), supplier: name, source: name ? 'inventory' : 'unknown', image: null, variant: null };
+      bySku[sku] = { api: apiFromName(name), supplier: name, source: name ? 'inventory' : 'unknown', image: null, variant: null, price: null };
     }
     return { bySku };
   });
