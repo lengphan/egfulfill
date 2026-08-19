@@ -29,15 +29,33 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
         tabBarStyle: {
           position: "absolute",
-          left: 0, right: 0, bottom: 0,
-          height: 74,
-          // NO PANEL. Not a floating capsule either — the glyphs simply sit on the page and
-          // the list runs beneath them, which is what the Threads feed does and what stops
-          // the bottom of the screen reading as a second, competing surface. The lists carry
-          // enough bottom padding that content comes to rest clear of them.
-          backgroundColor: "transparent",
+          left: 16, right: 16, bottom: 14,
+          height: 62,
+          borderRadius: 22,
+          /*
+           * TRANSLUCENT PAPER, not a panel and not nothing.
+           *
+           * Fully transparent was worse than the panel it replaced: rows scrolled straight
+           * through the glyphs and the bar stopped reading as a control at all. The floating
+           * shape needs a ground — it just must not be a second opaque surface welded to the
+           * bottom of the page.
+           *
+           * 94% of the page's own paper. Enough to carry the icons over anything scrolling
+           * beneath, little enough that the list is still faintly there and the bar reads as
+           * sitting ABOVE the page rather than ending it. A solid colour rather than a real
+           * blur on purpose: expo-blur is a native module and would need a fresh dev build
+           * before anyone could see it.
+           */
+          backgroundColor: "rgba(252,251,248,0.94)",
           borderTopWidth: 0,
-          elevation: 0,
+          borderWidth: 1,
+          borderColor: "rgba(11,11,12,0.06)",
+          paddingBottom: 0,
+          shadowColor: "#0B0B0C",
+          shadowOpacity: 0.09,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 8,
         },
         tabBarItemStyle: { height: 62, paddingTop: 0 },
       }}

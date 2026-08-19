@@ -254,7 +254,7 @@ export default function Orders() {
           >
             {[null, ...stageChips].map((k) => {
               const on = stage === k
-              const label = k === null ? "Any stage" : (STAGE_LABEL[k] ?? k)
+              const label = k === null ? "All" : (STAGE_LABEL[k] ?? k)
               const n = k === null ? all.length : (stageCounts[k] ?? 0)
               return (
                 <Pressable
