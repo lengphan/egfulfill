@@ -32,7 +32,7 @@ const clampPct = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo
  * every product fell back to a hardcoded zone keyed off its garment type — which is why the
  * box sat in the same place on every t-shirt and could not be moved.
  *
- * Percentages of the mockup, not pixels: the same rectangle has to hold on a 112px tile and
+ * Percentages of the mockup, not pixels: the same rectangle has to hold on a 160px tile and
  * on the Design Maker's full-size stage.
  */
 function PrintAreaEditor({ src, zone, onChange, onReset }: {
@@ -109,7 +109,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
   )
   return (
     <div className="flex flex-wrap items-start gap-4">
-      <div ref={box} className="relative size-64 shrink-0 select-none overflow-hidden rounded-lg border border-border bg-muted">
+      <div ref={box} className="relative size-80 shrink-0 select-none overflow-hidden rounded-lg border border-border bg-muted">
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={src} alt="" className="pointer-events-none size-full object-contain" />
@@ -1664,9 +1664,10 @@ export function ProductEditorDialog({
                   photo stands in whenever this product has nothing — is the reason clearing a
                   side is safe rather than destructive. */}
               <p className="text-xs text-muted-foreground">
-                Drop a photo on a side, or use ↑ to upload one; click a tile to pick from this
-                product&apos;s images. Anything you don&apos;t set falls back to the {type} photo from
-                Settings › Platform, and clearing a side returns it to that.
+                Click a side to set where the print goes on it. Drop a photo on a side, or use the
+                buttons in its corner to upload one or pick from this product&apos;s images. Anything you
+                don&apos;t set falls back to the {type} photo from Settings › Platform, and clearing a
+                side returns it to that.
               </p>
               <div className="flex flex-wrap gap-2">
                 {typeSides.map((sd) => {
@@ -1688,7 +1689,7 @@ export function ProductEditorDialog({
                        behaved differently for the same gesture. */
                     <div
                       key={sd}
-                      className="group/side relative flex w-28 flex-col gap-1.5"
+                      className="group/side relative flex w-40 flex-col gap-1.5"
                       onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
                       onDrop={(e) => {
                         // stopPropagation, or the panel's own handler ALSO catches this and
@@ -1697,12 +1698,28 @@ export function ProductEditorDialog({
                         setSideFromFiles(sd, Array.from(e.dataTransfer.files))
                       }}
                     >
-                      <label className="relative block cursor-pointer">
+                      {/* THE TILE OPENS THE PRINT AREA. It used to open the gallery picker,
+                          under a "Print area" button beneath it — so the biggest thing in the
+                          tile did the rarer job and the main one was a 20px strip of text. The
+                          picture IS the side, and what you come here to say about a side is
+                          where the print sits on it, so clicking it opens that below. Choosing
+                          which photo represents the side moved to the corner controls, next to
+                          upload, where the other "give this side a picture" gesture already was.
+                          160px, not 112: the mockups are letterboxed outlines with their own
+                          margin baked in, so at the Photo grid's size the garment itself came
+                          out half the size of a photo beside it. */}
+                      <button
+                        type="button"
+                        onClick={() => setAreaSide(areaSide === sd ? null : sd)}
+                        aria-pressed={areaSide === sd}
+                        title={`Set the print area for the ${sd}`}
+                        className="relative block cursor-pointer rounded-lg"
+                      >
                         {shown ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={shown} alt="" className={"size-28 rounded-lg border-2 object-contain transition-colors " + (override ? "border-primary" : "border-border opacity-70 hover:opacity-100")} />
+                          <img src={shown} alt="" className={"size-40 rounded-lg border-2 object-contain transition-colors " + (areaSide === sd ? "border-primary ring-2 ring-primary/30" : override ? "border-primary" : "border-border opacity-70 hover:opacity-100")} />
                         ) : (
-                          <span className="grid size-28 place-items-center rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/50"><ImageIcon size={20} /></span>
+                          <span className={"grid size-40 place-items-center rounded-lg border-2 border-dashed bg-muted/40 text-muted-foreground transition-colors " + (areaSide === sd ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/50")}><ImageIcon size={24} /></span>
                         )}
                         {/* Says "this one is ours", so the absence of a tag means it's
                             following the type — the common case stays silent. */}
@@ -1715,68 +1732,63 @@ export function ProductEditorDialog({
                              nothing of yours here to remove". */
                           <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-background/85 py-0.5 text-center text-xs text-muted-foreground">From {type}</span>
                         ) : null}
-                        {/* A real select, visually hidden — keeps keyboard and screen-reader
-                            behaviour while the tile is what you actually click. */}
-                        <select
-                          aria-label={`Mockup for ${sd}`}
-                          value={override}
-                          onChange={(e) => setSideMockups((m) => {
-                            const next = { ...m }
-                            if (e.target.value) next[sd] = e.target.value; else delete next[sd]
-                            return next
-                          })}
-                          className="absolute inset-0 cursor-pointer opacity-0"
-                        >
-                          <option value="">{inherited ? "Use settings" : "None set"}</option>
-                          {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
-                        </select>
-                        {/* Clear back to the type's mockup. Only when there IS an override —
-                            an X that undoes nothing is a trap. */}
-                        {override && (
-                          <button
-                            type="button"
-                            aria-label={`Clear the ${sd} mockup`}
-                            title="Remove this override — go back to the type's mockup"
-                            onClick={(e) => {
-                              e.preventDefault(); e.stopPropagation()
-                              setSideMockups((m) => { const n = { ...m }; delete n[sd]; return n })
-                            }}
-                            className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity group-hover/side:opacity-100 focus-visible:opacity-100"
-                          >
-                            <X size={12} weight="bold" />
-                          </button>
-                        )}
-                      </label>
-                      {/* UPLOAD, as a sibling of the tile's label rather than inside it —
-                          a label nested in a label is invalid, and the outer one already owns
-                          every click on the picture for the gallery picker. Its own hidden
-                          input, so no ref plumbing and no second click target on the tile.
-                          Left corner, because the right one is the clear button and a pair of
-                          controls that both live top-right is a mis-click waiting to happen. */}
-                      <label
-                        title="Upload a photo for this side"
-                        className="absolute -left-1.5 -top-1.5 z-10 grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity group-hover/side:opacity-100 focus-within:opacity-100"
-                      >
-                        <UploadSimple size={12} weight="bold" />
-                        <input
-                          type="file" accept="image/*" className="hidden"
-                          aria-label={`Upload a photo for the ${sd} side`}
-                          onChange={(e) => { setSideFromFiles(sd, Array.from(e.target.files ?? [])); e.target.value = "" }}
-                        />
-                      </label>
-                      <span className="truncate text-xs font-medium capitalize">{sd}</span>
-                      {/* The print area for THIS side. A tile is 112px — too small to place
-                          a rectangle on — so it opens the editor below rather than trying
-                          to be one. The dot says this side has an area of its own. */}
-                      <button
-                        type="button"
-                        onClick={() => setAreaSide(areaSide === sd ? null : sd)}
-                        className={"flex items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-2xs font-medium transition-colors " +
-                          (areaSide === sd ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground")}
-                      >
-                        Print area
-                        {printAreas[sd] && <span className="size-1.5 rounded-full bg-primary" />}
                       </button>
+                      {/* WHERE THE SIDE'S PICTURE COMES FROM — both ways, together, in the
+                          corner the upload already held. Siblings of the tile, never inside it:
+                          a control nested in a button is invalid and would swallow the click
+                          that opens the print area. Left, because the right corner is clear and
+                          two controls sharing one corner is a mis-click waiting to happen. */}
+                      <div className="absolute -left-1.5 -top-1.5 z-10 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/side:opacity-100">
+                        <label
+                          title="Upload a photo for this side"
+                          className="grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background"
+                        >
+                          <UploadSimple size={12} weight="bold" />
+                          <input
+                            type="file" accept="image/*" className="hidden"
+                            aria-label={`Upload a photo for the ${sd} side`}
+                            onChange={(e) => { setSideFromFiles(sd, Array.from(e.target.files ?? [])); e.target.value = "" }}
+                          />
+                        </label>
+                        {/* A real select, visually hidden over its own icon — keeps keyboard
+                            and screen-reader behaviour while the icon is what you click. */}
+                        <label
+                          title="Use one of this product's photos for this side"
+                          className="relative grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background"
+                        >
+                          <ImageIcon size={12} weight="bold" />
+                          <select
+                            aria-label={`Mockup for ${sd}`}
+                            value={override}
+                            onChange={(e) => setSideMockups((m) => {
+                              const next = { ...m }
+                              if (e.target.value) next[sd] = e.target.value; else delete next[sd]
+                              return next
+                            })}
+                            className="absolute inset-0 cursor-pointer opacity-0"
+                          >
+                            <option value="">{inherited ? "Use settings" : "None set"}</option>
+                            {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      {/* Clear back to the type's mockup. Only when there IS an override —
+                          an X that undoes nothing is a trap. */}
+                      {override && (
+                        <button
+                          type="button"
+                          aria-label={`Clear the ${sd} mockup`}
+                          title="Remove this override — go back to the type's mockup"
+                          onClick={(e) => {
+                            e.preventDefault(); e.stopPropagation()
+                            setSideMockups((m) => { const n = { ...m }; delete n[sd]; return n })
+                          }}
+                          className="absolute -right-1.5 -top-1.5 z-10 grid size-6 place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity focus-visible:opacity-100 group-hover/side:opacity-100"
+                        >
+                          <X size={12} weight="bold" />
+                        </button>
+                      )}
+                      <span className="truncate text-xs font-medium capitalize">{sd}</span>
                     </div>
                   )
                 })}
