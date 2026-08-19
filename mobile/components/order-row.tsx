@@ -218,7 +218,6 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
   const late = isOverdue(order)
   const [peek, setPeek] = useState<number | null>(null)
   const [menu, setMenu] = useState(false)
-  const { width } = useWindowDimensions()
 
   /*
    * EVERY PICTURE IN THE ORDER, in a strip you slide.
@@ -318,12 +317,14 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
             <Pressable key={i} onPress={() => setPeek(i)}>
               <Image
                 source={{ uri: sh.uri }}
-                /* A PICTURE YOU CAN JUDGE, not a thumbnail that grew. A lone image takes the
-                   row's full width, which is what a Threads post does with a single photo;
-                   several sit side by side and you slide. */
+                /* THE SAME SIZES THE ORDER PAGE USES, deliberately. A lone picture ran the
+                   full row width here, which on a QUEUE is too much: a feed wants one post
+                   to fill the view, a work list wants several rows visible at once so you
+                   can compare them without scrolling. Square, and the same square in both
+                   places, so an order does not change shape when you open it. */
                 style={{
-                  width: shots.length === 1 ? width - 36 : 210,
-                  height: shots.length === 1 ? 236 : 210,
+                  width: shots.length === 1 ? 200 : 168,
+                  height: shots.length === 1 ? 200 : 168,
                   borderRadius: 10, backgroundColor: C.accent,
                 }}
                 resizeMode="cover"
