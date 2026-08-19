@@ -8,9 +8,15 @@
  *
  * THE LOOK: ink and violet, with lime as the shock. The pair (--primary / its foreground)
  * is the brand's, not invented here — lime on violet is the one combination the web already
- * commits to, and it is what stops this reading as a default template. Paper is warm and
- * off-white so white CARDS lift off it; a floor tool that is white-on-white has no depth at
- * arm's length under warehouse lighting.
+ * commits to, and it is what stops this reading as a default template.
+ *
+ * PAPER, NOT CARDS (changed 2026-08-19). This used to say the warm page existed so white
+ * cards would lift off it. They did lift — and that was the problem: two near-identical
+ * surfaces, one warm and one not, held apart by a border, which reads as stuck-on rather
+ * than seamless. Cards also nest, and the queue ended up with four different left margins in
+ * one screen. Sections are divided by a hairline rule (SECTION) on one continuous paper
+ * surface now. Depth at arm's length comes from type contrast, which is stronger than a
+ * 1px border was.
  */
 export const C = {
   /** The page. Warm, so the white cards on top of it read as objects. */
@@ -18,6 +24,8 @@ export const C = {
   fg: "#141019",
   muted: "#7a7469",
   border: "#E6E1D8",
+  /** Still real, but only for surfaces that ARE surfaces: the login panel, the tab bar,
+   *  an image well. Never a content card — see the note above. */
   card: "#ffffff",
   accent: "#F1EEFD",
   /** A WELL IN THE PAPER, not a card on it. Warm paper with a white field on top was the

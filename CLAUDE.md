@@ -296,6 +296,50 @@ not violet, and it is split by JOB:
   meaning on the floor; a brand hue must not crowd them.
 - Dark mode is **selected**, not flipped — its own steps against the dark surface.
 
+**Chrome is reserved, not decorative (2026-08-19).** The app was counted and it carried 118
+hand-rolled pills, 490 outlined boxes and 390 filled buttons. When every label is a capsule,
+the capsule stops meaning anything — including on the status chips, which are the one place
+it has to.
+
+- **Tabs and filter rows are a rule under the live word.** `tabsListVariants` defaults to
+  `line`; the underline is the ONLY active treatment, so the two link-based bars
+  (`design-lab-tabs.tsx`, `api-playground.tsx`) match the real ones. They are a `<nav>`, not a
+  `Tabs` root, so a `group-data-*`-scoped rule never reaches them — position the indicator
+  horizontally by default and override for vertical, or they silently drift.
+- **`Button` is `rounded-lg`, not `rounded-full`.** Shape says "control", fill says "primary".
+  Fully-round is reserved for things that are genuinely round: count badges and avatars.
+- **A pill must carry meaning** — order stage, HTTP method, RUSH/LATE. Never a role, a count,
+  a tag or a toggle.
+- **Mono is for CODE only** — a payload, an endpoint, a key. It had spread to SKUs, tracking
+  numbers and counts ("17 SKUs"); those are `tabular-nums` Inter now, which is what actually
+  makes a column line up. 23 uses remain, all on developer surfaces.
+- The 490 outlined cards are **not yet done** — the canvas/border rule above still describes
+  the web app as it stands.
+
+### Mobile (`mobile/` — Expo · React Native)
+
+Its own theme (`mobile/lib/theme.ts`), because RN has neither CSS variables nor oklch. Same
+palette, converted once. **It does NOT follow the white-card rule above** — that was reversed
+here on 2026-08-19 and the two front-ends genuinely differ.
+
+- **There is no global font default in React Native.** A bare `fontWeight` renders the OS
+  face, which is why the app shipped for months in system sans at weight 800 with no
+  `useFonts` call and an empty `assets/fonts` — the look people call "AI-generated". Every
+  piece of type comes through `F` in the theme; a `fontWeight` without a `fontFamily` is a bug.
+- **Playfair Display for display, Inter for everything else** — the same pair the web loads.
+  Playfair earns its place at 30pt+ and is mud at 13, so it takes screen titles and nothing
+  else. Body is `F.body` (400). The app previously had 25 declarations at weight 900 and
+  exactly one at 400, which is why no line ever looked more important than another.
+- **Paper all the way down.** Warm paper, sections divided by a hairline rule via `SECTION` —
+  never a white card. White-on-warm is two near-identical surfaces held apart by a border,
+  and it reads as stuck-on. Cards also nest: the queue had four different left margins in one
+  screen (title, card inset, card padding, thumbnail) which is what "nothing is aligned" is.
+- **The dark hero block is the exception** and the only place a filled chip belongs.
+- **Seed a pushed screen from what the list already holds** (`lib/order-cache.ts`, wired
+  inside `getOrders`/`getOrder` so no screen can forget). `/api/orders` aggregates full
+  `order_items`, so the detail screen can draw everything immediately. Sliding into a spinner
+  is what reads as "the whole page flashes"; the native stack animation was never the problem.
+
 ### Honesty in UI
 No placeholder avatars beside invented numbers. No empty state that looks identical to a
 broken feature — if a thing can't be read versus doesn't exist, **say which**.
