@@ -104,20 +104,20 @@ export function ConfirmShipment({ orderId, role, by, onDone }: {
         opacity: pressed || busy ? 0.8 : 1,
       })}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <View style={{
-          width: 40, height: 40, borderRadius: R.md, backgroundColor: C.lime,
-          alignItems: "center", justifyContent: "center",
-        }}>
-          {busy ? <ActivityIndicator color={C.ink} /> : <Ionicons name="camera" size={20} color={C.ink} />}
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 18, fontWeight: "900", color: C.onInk, letterSpacing: -0.4 }}>{label}</Text>
-          <Text style={{ fontSize: 13, color: C.onInk, opacity: 0.6, marginTop: 2 }}>
-            Photo of the parcel, filed on the order, then shipped
-          </Text>
-        </View>
-        {!busy && <Ionicons name="arrow-forward" size={20} color={C.lime} />}
+      {/*
+        * THE WORDS, AND A LIME GLYPH THAT SITS ON THE INK.
+        *
+        * This was a 40pt lime tile holding a camera, a title, a subtitle explaining what
+        * the press does, and a trailing arrow — five things to say "Confirm shipment". The
+        * subtitle described a sequence nobody reads mid-press, and the filled tile made the
+        * glyph a badge rather than a mark. Lime directly on the ink block is the brand pair
+        * the whole app is built on; a plate behind it only mutes it.
+        */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        {busy
+          ? <ActivityIndicator color={C.lime} />
+          : <Ionicons name="camera" size={22} color={C.lime} />}
+        <Text style={{ fontSize: 22, fontWeight: "900", color: C.onInk, letterSpacing: -0.5 }}>{label}</Text>
       </View>
     </Pressable>
   )

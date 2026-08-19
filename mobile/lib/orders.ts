@@ -282,9 +282,13 @@ export function nextLineStage(
  * button read "Move to Pending this line", which is not a sentence. The verb carries it
  * where there is one; the fallback names the stage ONCE.
  */
-export const stageAction = (to: string) => STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`
+export const stageAction = (to: string) =>
+  STAGE_VERB[to] ? `${STAGE_VERB[to]} Order` : `Move Order to ${STAGE_LABEL[to] ?? to}`
+/** "Start Item", not "Start this line". The card IS the item, so "this line" was a pointer
+ *  to the thing the button already sits on — and "line" is our word for it, not anyone
+ *  else's. Same shape as the order button, one word apart, so the pair reads as a pair. */
 export const stageActionLine = (to: string) =>
-  STAGE_VERB[to] ? `${STAGE_VERB[to]} this line` : `Move this line to ${STAGE_LABEL[to] ?? to}`
+  STAGE_VERB[to] ? `${STAGE_VERB[to]} Item` : `Move Item to ${STAGE_LABEL[to] ?? to}`
 
 /**
  * The word on the button that starts the work, rather than the name of a state. Someone

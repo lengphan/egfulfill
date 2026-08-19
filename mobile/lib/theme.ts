@@ -59,7 +59,35 @@ export const STAGE_TONE: Record<string, { fg: string; bg: string }> = {
   refunded:    { fg: "#d4183d", bg: "#fdeaee" },
 }
 
+/**
+ * THE SAME STAGES, ON THE INK BLOCK.
+ *
+ * STAGE_TONE above is a pale tint carrying saturated text, which is right on a WHITE card
+ * and wrong on the near-black header: there the tint is a near-white blob, the hue drains
+ * out of it, and violet-on-lavender in particular reads as a mistake rather than a status.
+ *
+ * So on ink the stage hue becomes the FILL — the colour is the reading, and it should be
+ * the loud part — and the text is whichever of ink or paper measures higher against it.
+ * MEASURED, not eyeballed (CLAUDE.md §4): cream wins on the dark hues, ink wins on sky,
+ * emerald and amber, and picking by eye would have put cream on all seven.
+ *
+ *   New 4.33 · Pending 5.72 · Working 6.33 · Cancelled 4.78   (cream)
+ *   Approved 4.59 · Shipped 4.31 · On hold 5.43               (ink)
+ */
+export const STAGE_TONE_INK: Record<string, { fg: string; bg: string }> = {
+  "":          { fg: "#F6F4EF", bg: "#64748b" },
+  in_review:   { fg: "#F6F4EF", bg: "#4f46e5" },
+  approved:    { fg: "#141019", bg: "#0284c7" },
+  working:     { fg: "#F6F4EF", bg: "#5b2fe8" },
+  shipped:     { fg: "#141019", bg: "#0f8a5f" },
+  on_hold:     { fg: "#141019", bg: "#c77700" },
+  cancelled:   { fg: "#F6F4EF", bg: "#d4183d" },
+  refunded:    { fg: "#F6F4EF", bg: "#d4183d" },
+}
+
 export const toneOf = (stage: string) => STAGE_TONE[stage] ?? STAGE_TONE[""]
+/** The pill on a dark block. See STAGE_TONE_INK. */
+export const toneOnInk = (stage: string) => STAGE_TONE_INK[stage] ?? STAGE_TONE_INK[""]
 
 /** Card lift. iOS takes the shadow, Android takes elevation; passing both is how one
  *  style object covers the pair without a Platform.select at every call site. */

@@ -3,10 +3,11 @@ import { View, Text, Image, Pressable, ActivityIndicator, Alert, Linking } from 
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, setItemStatus, type OrderItem, type OrderDesign } from "@/lib/api"
 import {
-  designsFor, lineArt, lineTitle, lineFacts, nextLineStage, normalizeStage,
+  designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork,
 } from "@/lib/orders"
 import { C, R, LIFT, toneOf } from "@/lib/theme"
+import { ItemPhotos } from "@/components/item-photos"
 
 /**
  * ONE LINE OF AN ORDER — the unit of work, and the unit this screen is built around.
@@ -77,8 +78,10 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
   onChanged: () => void
 }) {
   const [busy, setBusy] = useState(false)
+  const [zoom, setZoom] = useState(false)
   const mine = designsFor(item, designs)
   const art = lineArt(item, mine)
+  const listing = lineListing(item)
   const stage = normalizeStage(item.factory_status)
   const tone = toneOf(stage)
   const facts = lineFacts(item)
@@ -106,20 +109,39 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
       backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
       padding: 14, marginBottom: 12, ...LIFT,
     }}>
+      <ItemPhotos
+        open={zoom}
+        onClose={() => setZoom(false)}
+        title={lineTitle(item)}
+        art={art}
+        listing={listing}
+      />
       <View style={{ flexDirection: "row", gap: 14 }}>
         {/* THE ARTWORK, not the listing photo — a photo of the finished product tells the
             floor nothing about what to make. */}
-        {art ? (
-          <Image source={{ uri: assetUrl(art) || undefined }}
-            style={{ width: 76, height: 76, borderRadius: R.md, backgroundColor: C.accent }} resizeMode="cover" />
-        ) : (
-          <View style={{
-            width: 76, height: 76, borderRadius: R.md, backgroundColor: C.accent,
-            alignItems: "center", justifyContent: "center",
-          }}>
-            <Ionicons name="image-outline" size={22} color={C.primary} />
-          </View>
-        )}
+        {/* PRESSABLE. 76pt is enough to recognise a design and not enough to check one,
+            and this could not be tapped at all — so the only way to see the artwork full
+            size was to open the file in a browser. It opens both pictures, named: the
+            artwork we print, and the listing photo the buyer saw. It is pressable even
+            with no artwork, because "is there really nothing on this line" is exactly the
+            question a blank tile raises. */}
+        <Pressable
+          onPress={() => setZoom(true)}
+          accessibilityLabel={`See the pictures for ${lineTitle(item)}`}
+          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        >
+          {art ? (
+            <Image source={{ uri: assetUrl(art) || undefined }}
+              style={{ width: 76, height: 76, borderRadius: R.md, backgroundColor: C.accent }} resizeMode="cover" />
+          ) : (
+            <View style={{
+              width: 76, height: 76, borderRadius: R.md, backgroundColor: C.accent,
+              alignItems: "center", justifyContent: "center",
+            }}>
+              <Ionicons name="image-outline" size={22} color={C.primary} />
+            </View>
+          )}
+        </Pressable>
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

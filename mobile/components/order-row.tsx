@@ -140,7 +140,9 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
 
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 8 }}>
           <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} dot />
-          <Chip label={`${units(order)} pc`} fg={C.muted} />
+          {/* "items", matching the order screen. One phrasing across both, and "pc" was
+              abbreviating a word that is barely long. */}
+          <Chip label={`${units(order)} ${units(order) === 1 ? "item" : "items"}`} fg={C.muted} />
           {items.length > 1 && <Chip label={`${items.length} lines`} fg={C.muted} />}
         </View>
 

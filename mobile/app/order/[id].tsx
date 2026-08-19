@@ -11,7 +11,7 @@ import {
   normalizeStage, units, isOverdue, numOf, platformOf, nextStage,
   STAGE_LABEL, stageAction,
 } from "@/lib/orders"
-import { C, R, LIFT, toneOf } from "@/lib/theme"
+import { C, R, LIFT, toneOnInk } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
@@ -147,7 +147,8 @@ export default function OrderDetail() {
   const code = o?.tracking ?? null
   const link = trackingLink(o?.carrier, code)
   const stage = normalizeStage(o?.factory_status)
-  const tone = toneOf(stage)
+  /* The header is the INK block, so the pill takes the on-ink pair. */
+  const tone = toneOnInk(stage)
   const staff = !!me?.role && me.role !== "seller"
   const to = o ? nextStage(o) : null
   const items = o?.items ?? []
@@ -229,38 +230,29 @@ export default function OrderDetail() {
             stage === "working" ? (
               <ConfirmShipment orderId={String(o.id)} role={me?.role} by={me?.name} onDone={refresh} />
             ) : to ? (
+              /*
+               * ONE BUTTON, ONE SENTENCE. It was a 40pt circular icon tile, a title, a
+               * subtitle and a trailing arrow — four elements to say "Start Order", with
+               * two of them arrows pointing at each other. The biggest thing on the screen
+               * should be the words, not the furniture around them.
+               */
               <Pressable
                 onPress={advance}
                 disabled={moving}
                 style={({ pressed }) => ({
-                  flexDirection: "row", alignItems: "center", gap: 12,
-                  marginTop: 8, borderRadius: R.lg, backgroundColor: C.primary,
-                  paddingVertical: 18, paddingHorizontal: 20,
+                  alignItems: "center", justifyContent: "center",
+                  marginTop: 12, borderRadius: R.lg, backgroundColor: C.primary,
+                  paddingVertical: 22, paddingHorizontal: 20,
                   opacity: pressed || moving ? 0.8 : 1,
                 })}
               >
-                <View style={{
-                  width: 40, height: 40, borderRadius: R.md, backgroundColor: C.onPrimary,
-                  alignItems: "center", justifyContent: "center",
-                }}>
-                  {moving
-                    ? <ActivityIndicator color={C.primary} />
-                    : <Ionicons name={to === "working" ? "play" : "arrow-forward"} size={20} color={C.primary} />}
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "900", color: C.onPrimary, letterSpacing: -0.4 }}>
-                    {stageAction(to)}
-                  </Text>
-                  {/* The subtitle says WHAT IT TOUCHES, not the stage again. It read "Moves
-                      the whole order to Pending" under "Move to Pending" — the same three
-                      words twice, so the second line carried nothing. Scope is the thing a
-                      person actually wants confirmed before pressing, because every line
-                      below has a button of its own. */}
-                  <Text style={{ fontSize: 13, color: C.onPrimary, opacity: 0.75, marginTop: 2 }}>
-                    {items.length === 1 ? "The only line on this order" : `All ${items.length} lines`}
-                  </Text>
-                </View>
-                <Ionicons name="arrow-forward" size={20} color={C.onPrimary} />
+                {moving
+                  ? <ActivityIndicator color={C.onPrimary} />
+                  : (
+                    <Text style={{ fontSize: 24, fontWeight: "900", color: C.onPrimary, letterSpacing: -0.6 }}>
+                      {stageAction(to)}
+                    </Text>
+                  )}
               </Pressable>
             ) : null
           )}
@@ -327,8 +319,31 @@ export default function OrderDetail() {
                  also the reason the Confirm-shipment button below would fail — it just
                  didn't say so, and it offered nothing to do about it. */
               <View style={{ gap: 12 }}>
-                <Text style={{ fontSize: 15, color: C.muted }}>Not shipped yet — no tracking number.</Text>
-                {staff && <BuyLabel order={o} onDone={refresh} />}
+                {/* A LABEL WITHOUT A TRACKING NUMBER IS STILL A LABEL. Print lived inside
+                    the `code` branch, so a buy that came back with a PDF and no tracking —
+                    which happens — left the file unreachable and offered to buy a second
+                    one. The PDF's own presence is the condition, not the tracking. */}
+                <Text style={{ fontSize: 15, color: C.muted }}>
+                  {o.tracking_label_url
+                    ? "Label bought — not shipped yet."
+                    : "Not shipped yet — no tracking number."}
+                </Text>
+                {o.tracking_label_url ? (
+                  <Pressable
+                    onPress={printLabel}
+                    disabled={printing}
+                    style={({ pressed }) => ({
+                      height: 46, borderRadius: R.md, flexDirection: "row", gap: 8,
+                      alignItems: "center", justifyContent: "center",
+                      borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
+                    })}
+                  >
+                    {printing ? <ActivityIndicator color={C.ink} /> : <Ionicons name="print" size={16} color={C.ink} />}
+                    <Text style={{ color: C.ink, fontWeight: "800", fontSize: 15 }}>Print label</Text>
+                  </Pressable>
+                ) : staff ? (
+                  <BuyLabel order={o} onDone={refresh} />
+                ) : null}
               </View>
             )}
           </View>
