@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { View, Text, Image, Pressable, Modal, ScrollView } from "react-native"
+import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { assetUrl, type Order, type OrderItem } from "@/lib/api"
+import { assetUrl, type Order } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
 import { F,C, R, LIFT, toneOf } from "@/lib/theme"
 
@@ -16,18 +16,45 @@ import { F,C, R, LIFT, toneOf } from "@/lib/theme"
  * Long-press, because tap already opens the order and long-press on the ROW already starts
  * a selection — the image claims the gesture only over itself, so both survive.
  */
-function ImagePeek({ uri, title, open, onClose }: {
-  uri: string | null; title: string; open: boolean; onClose: () => void
+function ImagePeek({ shots, index, onClose }: {
+  shots: { uri: string; title: string }[]
+  /** null = closed. Otherwise the picture that was tapped, so the viewer opens on it. */
+  index: number | null
+  onClose: () => void
 }) {
+  const { width } = useWindowDimensions()
+  const open = index != null
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.94)", alignItems: "center", justifyContent: "center", padding: 20 }}>
-        {/* contain, not cover: a print file cropped to fill is one you cannot check the
-            edges of — the same rule ItemPhotos follows. */}
-        {uri ? <Image source={{ uri }} style={{ width: "100%", aspectRatio: 1 }} resizeMode="contain" /> : null}
-        <Text numberOfLines={2} style={{ marginTop: 18, fontSize: 14, fontFamily: F.medium, color: C.onInk, textAlign: "center" }}>{title}</Text>
-        <Text style={{ marginTop: 6, fontSize: 12, fontFamily: F.body, color: C.onInk, opacity: 0.55 }}>Tap anywhere to close</Text>
-      </Pressable>
+      <View style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.95)" }}>
+        <Pressable onPress={onClose} style={{ position: "absolute", top: 54, right: 20, zIndex: 2, padding: 6 }} hitSlop={12}>
+          <Ionicons name="close" size={28} color="#fff" />
+        </Pressable>
+        {/* THE WHOLE ORDER, not just the one you tapped. Paged, so it swipes exactly the way
+            the strip in the row does — the gesture you just used still works once you are in
+            here, which is the difference between a viewer and a dead end. */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: (index ?? 0) * width, y: 0 }}
+          style={{ flex: 1 }}
+        >
+          {shots.map((sh, i) => (
+            <Pressable key={i} onPress={onClose} style={{ width, alignItems: "center", justifyContent: "center", padding: 20 }}>
+              {/* contain, not cover: a print file cropped to fill is one you cannot check the
+                  edges of — the same rule ItemPhotos follows. */}
+              <Image source={{ uri: sh.uri }} style={{ width: width - 40, aspectRatio: 1 }} resizeMode="contain" />
+              <Text numberOfLines={2} style={{ marginTop: 18, fontSize: 14, fontFamily: F.medium, color: "#fff", textAlign: "center" }}>{sh.title}</Text>
+              {shots.length > 1 && (
+                <Text style={{ marginTop: 6, fontSize: 12, fontFamily: F.body, color: "#fff", opacity: 0.55 }}>
+                  {i + 1} of {shots.length}
+                </Text>
+              )}
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
     </Modal>
   )
 }
@@ -52,40 +79,6 @@ function ImagePeek({ uri, title, open, onClose }: {
  *  thumbnail, so repeating it here reads as a duplicate rather than as a second item.
  *  Beyond four the strip stops being scannable and starts being a texture, so the rest are
  *  counted instead. */
-function ItemStrip({ items, onPeek }: { items: OrderItem[]; onPeek: (uri: string, title: string) => void }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 7, marginTop: 10, paddingRight: 18 }}
-    >
-      {items.map((it, i) => {
-        const a = assetUrl(it.design_src)
-        const l = assetUrl(it.img_ref || it.img)
-        const u = a || l
-        return (
-          <Pressable
-            key={it.line_id || it.id || i}
-            onLongPress={() => u && onPeek(u, lineTitle(it))}
-            delayLongPress={200}
-          >
-            {u ? (
-              <Image source={{ uri: u }} style={{ width: 54, height: 54, borderRadius: 7, backgroundColor: C.accent }} />
-            ) : (
-              <View style={{
-                width: 54, height: 54, borderRadius: 7, backgroundColor: C.accent,
-                alignItems: "center", justifyContent: "center",
-              }}>
-                <Ionicons name="shirt-outline" size={18} color={C.primary} />
-              </View>
-            )}
-          </Pressable>
-        )
-      })}
-    </ScrollView>
-  )
-}
-
 function Chip({ label, fg, bg, solid }: { label: string; fg: string; bg?: string; solid?: boolean }) {
   /* NOT A PILL ANY MORE.
    *
@@ -125,26 +118,38 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
   const stage = normalizeStage(order.factory_status)
   const tone = toneOf(stage)
   const late = isOverdue(order)
-  /* THE ARTWORK, NOT THE RACK PHOTO.
+  const [peek, setPeek] = useState<number | null>(null)
+
+  /*
+   * EVERY PICTURE IN THE ORDER, in a strip you slide.
    *
-   * This read `img_ref || img || design_src`, which prefers the marketplace LISTING photo
-   * and falls back to the artwork — backwards, and the exact fault lineArt() exists to
-   * prevent. On a seller with one product it made every row show the same stock photo of
-   * aprons on a rail, which is why the queue was impossible to scan and why no amount of
-   * type or spacing was going to fix it. The floor needs to see what it has to MAKE.
+   * The row used to be a 84pt thumbnail on the left with the text beside it, which is a
+   * directory listing: it tells you an order exists. This is the shape a Threads post uses —
+   * who/what in type, then the pictures at a size you can actually judge, then the state.
+   * For a factory queue that is the right trade, because the question being asked of this
+   * screen is "what am I making", and that question is answered by a picture.
    *
-   * When there is no artwork the listing photo is still better than a blank tile — but it
-   * is marked, because "we have not got a file yet" and "here is the file" must never look
-   * the same. */
-  const art = assetUrl(first?.design_src)
-  const listing = assetUrl(first?.img_ref || first?.img)
-  const uri = art || listing
-  const borrowed = !art && !!listing
-  const [peek, setPeek] = useState<{ uri: string; title: string } | null>(null)
-  /* WHAT MAKES THIS ROW DIFFERENT FROM THE ONE ABOVE IT.
-     A seller who sells one product gives every row the same truncated title — six rows all
-     reading "Custom Embroidered Apron with Na…" is a wall, not a list. The variant is the
-     part that actually differs, so it earns a line of its own. */
+   * ARTWORK FIRST, per line. `img_ref`/`img` are the marketplace LISTING photo and
+   * design_src is the buyer's file — reading them the other way round (as this did) makes a
+   * seller with one product show the same rail of aprons on every row, which is what made
+   * the queue unscannable.
+   */
+  const shots = items
+    .map((it) => {
+      const a = assetUrl(it.design_src)
+      const l = assetUrl(it.img_ref || it.img)
+      return (a || l) ? { uri: (a || l) as string, title: lineTitle(it), art: !!a } : null
+    })
+    .filter(Boolean) as { uri: string; title: string; art: boolean }[]
+
+  /* NO ARTWORK IS A FACT THE FLOOR NEEDS, not a badge on a picture.
+   * Every image carried a LISTING tag, and because none of these orders has a file yet the
+   * exception became the rule — a marker on every row marks nothing. It belongs in the state
+   * line instead, where it reads as what it actually means: this cannot be produced yet. */
+  const noArt = shots.length > 0 && !shots.some((s) => s.art)
+
+  /* WHAT MAKES THIS ROW DIFFERENT FROM THE ONE ABOVE IT. A seller with one product gives
+     every row the same truncated title; the variant is the part that differs. */
   const facts = first ? lineFacts(first) : []
 
   return (
@@ -152,101 +157,80 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={220}
-      /* A ROW ON THE PAGE, not a tile floating over it.
-       *
-       * This was a white card on warm paper with a border and a shadow, inset from the
-       * screen margin — so the title sat at one left edge, the card at a second, its padding
-       * at a third and the thumbnail pushed the text to a fourth. Four margins down one
-       * screen is what reads as "no alignment", and white-on-beige is what reads as
-       * stuck-on rather than seamless.
-       *
-       * Now it is paper all the way down: rows separated by a hairline, sharing ONE left
-       * margin with the screen title. Selection tints instead of drawing a second border. */
       style={({ pressed }) => ({
-        flexDirection: "row", gap: 13, paddingVertical: 14, paddingHorizontal: 18,
+        paddingTop: 14, paddingBottom: 14, paddingHorizontal: 18,
         borderBottomWidth: 1, borderBottomColor: C.border,
         backgroundColor: selected ? C.accent : pressed ? C.accent : "transparent",
       })}
     >
-      {/* THE ARTWORK, so a row is recognisable before it is read. The thumbnail route is
-          unauthenticated by design — an <img> cannot carry a bearer header — and guarded by
-          a 122-bit row id instead. */}
-      <Pressable
-        onLongPress={() => uri && setPeek({ uri, title: first ? lineTitle(first) : numOf(order) })}
-        delayLongPress={200}
-        // Tap falls through to the row (open the order); only the long press is claimed.
-        onPress={onPress}
-      >
-        {uri ? (
-          <>
-            <Image source={{ uri }} style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent }} resizeMode="cover" />
-            {borrowed && (
-              <View style={{
-                position: "absolute", right: 4, bottom: 4,
-                paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
-                backgroundColor: "rgba(11,11,12,0.72)",
-              }}>
-                <Text style={{ fontSize: 9, fontFamily: F.semi, color: "#fff", letterSpacing: 0.4 }}>LISTING</Text>
-              </View>
-            )}
-          </>
-        ) : (
-          <View style={{
-            width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent,
-            alignItems: "center", justifyContent: "center",
-          }}>
-            <Ionicons name="shirt-outline" size={26} color={C.primary} />
-          </View>
-        )}
+      {/* WHO — the identifier, small and above, where an identifier belongs. The tick moved
+          here when the thumbnail stopped being the leading element. */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
         {selecting && (
           <View style={{
-            position: "absolute", left: 5, top: 5,
-            width: 21, height: 21, borderRadius: 10.5,
+            width: 19, height: 19, borderRadius: 9.5, marginRight: 1,
             alignItems: "center", justifyContent: "center",
-            backgroundColor: selected ? C.primary : "rgba(255,255,255,0.92)",
-            borderWidth: 1.5, borderColor: selected ? C.primary : "rgba(255,255,255,0.95)",
+            backgroundColor: selected ? C.primary : "transparent",
+            borderWidth: 1.5, borderColor: selected ? C.primary : C.border,
           }}>
-            {selected && <Ionicons name="checkmark" size={13} color={C.onPrimary} />}
+            {selected && <Ionicons name="checkmark" size={12} color={C.onPrimary} />}
           </View>
         )}
-      </Pressable>
-
-      <View style={{ flex: 1, minWidth: 0 }}>
-        {/* The IDENTIFIER, small and above — it is how you find the order, not what the
-            order is. `o.id` is not `o.num`: numOf keeps a marketplace order reading as the
-            number the buyer and the packing slip say. */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.muted, letterSpacing: 0 }} numberOfLines={1}>
-            {numOf(order)}
-          </Text>
-          <Text style={{ fontSize: 12, color: C.muted }}>·</Text>
-          <Text style={{ fontSize: 12, color: C.muted, flex: 1 }} numberOfLines={1}>{platformOf(order)}</Text>
-          {order.rush && <Chip solid label="RUSH" fg="#fff" bg={C.warn} />}
-          {late && <Chip solid label="LATE" fg="#fff" bg={C.alert} />}
-        </View>
-
-        {/* THE PRODUCT — the one thing to read. */}
-        <Text numberOfLines={1} style={{ fontSize: 16, fontFamily: F.medium, color: C.fg, marginTop: 3, letterSpacing: -0.2 }}>
-          {first ? lineTitle(first) : "No lines"}
+        <Text style={{ fontSize: 13, fontFamily: F.medium, color: C.muted }} numberOfLines={1}>
+          {numOf(order)}
         </Text>
-
-        {facts.length > 0 && (
-          <Text numberOfLines={1} style={{ fontSize: 13, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
-            {facts.join("  ·  ")}
-          </Text>
-        )}
-
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 8 }}>
-          <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} />
-          {/* "items", matching the order screen. One phrasing across both, and "pc" was
-              abbreviating a word that is barely long. */}
-          <Chip label={`${units(order)} ${units(order) === 1 ? "item" : "items"}`} fg={C.muted} />
-          {items.length > 1 && <Chip label={`${items.length} lines`} fg={C.muted} />}
-        </View>
-
-        {items.length > 1 && <ItemStrip items={items.slice(1)} onPeek={(u, t) => setPeek({ uri: u, title: t })} />}
+        <Text style={{ fontSize: 12, color: C.muted }}>·</Text>
+        <Text style={{ fontSize: 13, fontFamily: F.body, color: C.muted, flex: 1 }} numberOfLines={1}>
+          {platformOf(order)}
+        </Text>
+        {order.rush && <Chip solid label="RUSH" fg="#fff" bg={C.warn} />}
+        {late && <Chip solid label="LATE" fg="#fff" bg={C.alert} />}
       </View>
-      <ImagePeek uri={peek?.uri ?? null} title={peek?.title ?? ""} open={!!peek} onClose={() => setPeek(null)} />
+
+      {/* WHAT — the one line to read. */}
+      <Text numberOfLines={1} style={{ fontSize: 16, fontFamily: F.medium, color: C.fg, marginTop: 4, letterSpacing: -0.2 }}>
+        {first ? lineTitle(first) : "No lines"}
+      </Text>
+      {facts.length > 0 && (
+        <Text numberOfLines={1} style={{ fontSize: 13.5, fontFamily: F.body, color: C.muted, marginTop: 2 }}>
+          {facts.join("  ·  ")}
+        </Text>
+      )}
+
+      {/* THE PICTURES. Slide for the rest; TAP one to see it full size — tap, not long-press,
+          because on a picture a tap is the obvious gesture and the row already owns
+          long-press for selection. It is a Pressable so the tap does NOT fall through and
+          open the order underneath. */}
+      {shots.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 10, marginHorizontal: -18 }}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 18 }}
+        >
+          {shots.map((sh, i) => (
+            <Pressable key={i} onPress={() => setPeek(i)}>
+              <Image
+                source={{ uri: sh.uri }}
+                style={{
+                  width: shots.length === 1 ? 268 : 152, height: 152,
+                  borderRadius: 10, backgroundColor: C.accent,
+                }}
+                resizeMode="cover"
+              />
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* THE STATE. */}
+      <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
+        <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} />
+        <Chip label={`${units(order)} ${units(order) === 1 ? "item" : "items"}`} fg={C.muted} />
+        {noArt && <Chip label="No artwork" fg={C.muted} />}
+      </View>
+
+      <ImagePeek shots={shots} index={peek} onClose={() => setPeek(null)} />
     </Pressable>
   )
 }

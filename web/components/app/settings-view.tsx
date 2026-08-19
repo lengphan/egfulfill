@@ -3385,7 +3385,25 @@ export function SettingsView() {
           "lg:sticky lg:top-4 lg:mb-0 lg:h-auto lg:flex-col lg:items-stretch lg:gap-0.5 lg:overflow-visible " +
           "lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-2 " +
           // Each trigger becomes a full-width, left-aligned row with its own height.
-          "lg:[&>button]:h-auto lg:[&>button]:w-full lg:[&>button]:flex-none lg:[&>button]:justify-start lg:[&>button]:px-3 lg:[&>button]:py-1.5"
+          "lg:[&>button]:h-auto lg:[&>button]:w-full lg:[&>button]:flex-none lg:[&>button]:justify-start lg:[&>button]:px-3 lg:[&>button]:py-1.5 " +
+          // AND ITS INDICATOR TURNS NINETY DEGREES WITH IT.
+          //
+          // The shared trigger draws the active rule horizontally under the label, which is
+          // right for a strip and wrong for a column: run the full width of a rail and it
+          // reads as a divider between two items rather than as a mark on one. The primitive
+          // cannot know — the same reason the rail is styled here, group-data-vertical never
+          // fires on a list that is a row on a phone and a column on a laptop. So the rule is
+          // re-pointed at exactly the breakpoint the layout flips at: a bar down the leading
+          // edge, which is what marks a selected row.
+          // top/bottom are set EXPLICITLY. `inset-y-*` plus `bottom-auto` (to cancel the strip
+          // rule's bottom-[-5px]) cancels each other: bottom resolves to auto, h-auto then has
+          // nothing to measure against, and the bar renders 2.5px wide by ZERO high. Measured,
+          // not guessed — it was invisible on screen and looked like the style had not applied.
+          "lg:[&>button]:after:inset-x-auto lg:[&>button]:after:top-1 lg:[&>button]:after:bottom-1 " +
+          "lg:[&>button]:after:left-0 lg:[&>button]:after:h-auto lg:[&>button]:after:w-[2.5px] lg:[&>button]:after:rounded-full " +
+          // With a bar on the edge the row can also carry a soft ground, which a full-width
+          // underline could not do without looking like a filled tab again.
+          "lg:[&>button]:data-active:bg-muted/60 lg:[&>button]:rounded-lg"
         }
       >
         <TabsTrigger value="profile"><TabLabel>Profile</TabLabel></TabsTrigger>
