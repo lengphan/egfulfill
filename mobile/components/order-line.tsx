@@ -223,7 +223,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
           disabled={busy}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 10, height: 50, borderRadius: R.md,
+            marginTop: 12, height: 44, borderRadius: 12,
             backgroundColor: to === "working" ? C.primary : C.ink,
             opacity: pressed || busy ? 0.7 : 1,
           })}
@@ -231,7 +231,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
           {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
               second arrow on a card that already had one. */}
           {busy && <ActivityIndicator color={C.onInk} />}
-          <Text style={{ fontSize: 17, fontFamily: F.semi, color: to === "working" ? C.onPrimary : C.onInk, letterSpacing: -0.2 }}>
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: to === "working" ? C.onPrimary : C.onInk, letterSpacing: -0.1 }}>
             {stageActionLine(to)}
           </Text>
         </Pressable>

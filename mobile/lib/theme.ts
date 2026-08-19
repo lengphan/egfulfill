@@ -19,19 +19,20 @@
  * 1px border was.
  */
 export const C = {
-  /** The page. The marketing SURFACE value from CLAUDE.md §4, so the phone and the public
-   *  site stand on the same ground rather than two different warms. */
-  bg: "#FAF8F3",
+  /** The page. Near-white, with just enough warmth left to read as paper rather than as a
+   *  screen — the marketing SURFACE (#FAF8F3) was still too heavy behind a full queue, where
+   *  a warm ground compounds down 800 rows in a way it never does behind a hero. */
+  bg: "#FCFBF8",
   fg: "#0B0B0C",
   muted: "#78736B",
-  border: "#EAE5DB",
+  border: "#ECE7DE",
   /** Still real, but only for surfaces that ARE surfaces: the login panel, the tab bar,
    *  an image well. Never a content card — see the note above. */
   card: "#ffffff",
   accent: "#EEF1FF",
   /** A WELL IN THE PAPER, not a card on it — a slightly deeper tone of the same paper reads
    *  as recessed and needs no line around it. */
-  accentPaper: "#F1EEE7",
+  accentPaper: "#F2EFE8",
   /**
    * PERIWINKLE IS A FILL AND CAN NEVER BE TYPE.
    *
@@ -104,7 +105,7 @@ export const R = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const
  */
 export const SECTION = {
   borderTopWidth: 1,
-  borderTopColor: "#EAE5DB",
+  borderTopColor: "#ECE7DE",
   paddingTop: 20,
   marginTop: 20,
 } as const
@@ -186,19 +187,19 @@ export const HERO_BUTTON = {
   alignItems: "center",
   justifyContent: "center",
   gap: 10,
-  borderRadius: R.lg,
-  paddingVertical: 22,
-  paddingHorizontal: 20,
+  borderRadius: 12,
+  paddingVertical: 15,
+  paddingHorizontal: 18,
 } as const
 
 export const HERO_LABEL = {
-  fontSize: 23,
+  fontSize: 16,
   // A bare fontWeight here rendered the OS face while everything around it was Inter — the
   // exact failure the note on F warns about, missed because the sweep covered app/ and
   // components/ but not the theme that feeds them.
   fontFamily: F.semi,
-  letterSpacing: -0.4,
+  letterSpacing: -0.1,
 } as const
 
-/** The glyph beside a hero label, when there is one. Sized to sit with 24pt type. */
-export const HERO_GLYPH = 24
+/** The glyph beside a hero label, when there is one. Sized to sit with 16pt type. */
+export const HERO_GLYPH = 18

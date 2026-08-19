@@ -106,30 +106,33 @@ export default function Scan() {
       <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
         <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg, marginTop: 8 }}>Scan</Text>
 
-        {/* The mode is the loudest thing here for a reason: everything scanned goes this
-            way until it is changed, and a wrong mode is silent damage to a stock count. */}
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+        {/* THE MODE STILL HAS TO BE UNMISTAKABLE — a wrong one is silent damage to a stock
+            count, and that has not changed. What changed is the instrument: this was two
+            54pt slabs of flat green and red, which is the loudest thing on the screen
+            competing with the camera, the one thing you are actually looking at.
+            The reserved colour survives where it carries furthest — as the word itself, a
+            rule under it, AND the camera frame below, which is tinted from the same `tone`.
+            Three statements of the mode, none of them a coloured square. */}
+        <View style={{ flexDirection: "row", gap: 26, marginTop: 16 }}>
           {(["in", "out"] as Dir[]).map((d) => {
             const on = d === dir
             const c = d === "in" ? "#0a7c42" : C.alert
             return (
-              <Pressable
-                key={d}
-                onPress={() => setDir(d)}
-                style={{
-                  flex: 1, height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center",
-                  flexDirection: "row", gap: 8,
-                  backgroundColor: on ? c : C.accent,
-                }}
-              >
-                <Ionicons
-                  name={d === "in" ? "arrow-down-circle" : "arrow-up-circle"}
-                  size={20}
-                  color={on ? "#ffffff" : C.muted}
-                />
-                <Text style={{ fontSize: 17, fontFamily: F.bold, color: on ? "#ffffff" : C.muted }}>
-                  {d === "in" ? "Stock in" : "Stock out"}
-                </Text>
+              <Pressable key={d} onPress={() => setDir(d)} hitSlop={10} style={{ paddingBottom: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                  <Ionicons
+                    name={d === "in" ? "arrow-down-circle" : "arrow-up-circle"}
+                    size={18}
+                    color={on ? c : C.muted}
+                  />
+                  <Text style={{ fontSize: 16, fontFamily: on ? F.semi : F.body, color: on ? c : C.muted }}>
+                    {d === "in" ? "Stock in" : "Stock out"}
+                  </Text>
+                </View>
+                <View style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: 2,
+                  backgroundColor: on ? c : "transparent",
+                }} />
               </Pressable>
             )
           })}
