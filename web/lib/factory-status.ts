@@ -146,6 +146,36 @@ export function orderStage(items: { factory_status?: string | null }[]): string 
 }
 
 /**
+ * THE ONE ANSWER TO "WHAT STAGE IS THIS ORDER AT".
+ *
+ * There were two, and they disagreed. The production queue read `orderStage(items)` — the
+ * lines only — while the order page read `orders.factory_status` — the row only. Nothing
+ * keeps those two in step: cancelling writes the ORDER row and leaves the lines alone, and
+ * moving a line on the board writes the LINE and leaves the order row alone. So an order
+ * cancelled from its own page went on reading Pending in the queue, and a line pushed to
+ * Working on the board left the page still saying Draft.
+ *
+ * Neither source is wrong; they answer different questions. The order row carries
+ * order-level facts — cancelled, refunded, on hold — which are true of the whole thing and
+ * can never be deduced from a line. The lines carry production, and the least-advanced one
+ * is what "can this ship" means.
+ *
+ * So: AN ORDER-LEVEL EXCEPTION WINS, and everything else comes from the lines. An order is
+ * not half-cancelled, and no arrangement of line stages can make it so.
+ */
+export function resolvedOrderStage(order: {
+  factory_status?: string | null
+  items?: { factory_status?: string | null }[] | null
+} | null | undefined): string {
+  const own = normalizeStage(order?.factory_status)
+  if (EXCEPTIONS.has(own)) return own
+  const items = order?.items ?? []
+  if (items.length) return orderStage(items)
+  // No lines to ask — the row is all there is.
+  return own
+}
+
+/**
  * HOW MANY OF AN ORDER'S LINES ARE UNDER WAY.
  *
  * `orderStage` above answers with the LEAST-ADVANCED line, which is the right answer for

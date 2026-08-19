@@ -51,6 +51,7 @@ import {
   type ShipAddress,
 } from "@/lib/api"
 import { resolveProduct } from "@/lib/variant-resolve"
+import { resolvedOrderStage } from "@/lib/factory-status"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { OrderStageMenu } from "@/components/app/order-stage-menu"
@@ -547,7 +548,11 @@ export default function OrderDetailPage() {
                 * collapsed vocabulary is what the rest of their account speaks.
                 */}
               {isStaff
-                ? <StageBadge status={order.factory_status} />
+                /* The SAME resolver the production queue uses. Reading order.factory_status
+                   alone meant a line moved to Working on the board left this page saying
+                   Draft — the mirror of the cancelled-order case, and as confusing from the
+                   other side. */
+                ? <StageBadge status={resolvedOrderStage(order)} />
                 : <SellerStatusBadge order={order} />}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">

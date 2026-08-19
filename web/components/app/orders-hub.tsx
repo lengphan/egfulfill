@@ -24,7 +24,7 @@ import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 import { useIsNarrow } from "@/lib/use-narrow"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress, resolvedOrderStage } from "@/lib/factory-status"
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
@@ -1740,7 +1740,11 @@ export function OrdersHub() {
           <div className="divide-y divide-border" style={{ minWidth: rowMinPx }}>
             {paged.pageItems.map((o) => {
               const items = o.items ?? []
-              const stage = orderStage(items)
+              // resolvedOrderStage, not orderStage(items): a cancelled, refunded or held
+              // order says so on the ORDER row and never on its lines, so reading the lines
+              // alone left this queue showing Pending for an order the order page was
+              // already calling Cancelled.
+              const stage = resolvedOrderStage(o)
               const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
               const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
               const label = labels[o.id]
