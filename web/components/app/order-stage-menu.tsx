@@ -98,16 +98,28 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
       <DropdownMenuContent align="end" className="w-56">
         {/* WORDS, NOT GLYPHS. These two carried an icon and the two dozen rows below them
             did not, so one menu read as two lists sharing a popup. */}
-        {/* "NEXT STAGE" NAMES THE DESTINATION NOW.
-            It sat directly above a list of every stage by name, so it was a second door to
-            a move already on the menu — and it was the worse door, because it did not say
-            where it went. "Approved" tells you what will happen; "Next stage" makes you
-            work it out, then find the same word two rows below to check. */}
+        {/*
+          * WHERE IT IS, THEN THE ONE PLACE IT GOES.
+          *
+          * The menu opened straight into actions, so you had to already know the current
+          * stage to judge any of them — and the advance row said "Next stage" without
+          * naming which. Stating the stage first makes the row underneath self-evident:
+          * "Working" over "Approved" reads as a step, and needs no verb.
+          *
+          * Every stage is still listed further down for a correction or a move backwards.
+          * This is the one you almost always want, lifted out of that list.
+          */}
+        <DropdownMenuLabel className="text-2xs font-normal text-muted-foreground">
+          Now: {FACTORY_STAGES.find((x) => x.id === stage)?.label
+             ?? EXCEPTION_STAGES.find((x) => x.id === stage)?.label
+             ?? "New"}
+        </DropdownMenuLabel>
         {canAdvance && next && (
-          <DropdownMenuItem onClick={() => setOrderStatus(next)}>
-            Move to {FACTORY_STAGES.find((x) => x.id === next)?.label ?? next}
+          <DropdownMenuItem className="font-medium" onClick={() => setOrderStatus(next)}>
+            {FACTORY_STAGES.find((x) => x.id === next)?.label ?? next}
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
         {/* NEW LABEL ONLY IF THE PAGE ISN'T ALREADY OFFERING IT — see onNewLabel. */}
         {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}>New label</DropdownMenuItem>}
         <DropdownMenuGroup>
