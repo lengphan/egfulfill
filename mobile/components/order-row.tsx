@@ -128,11 +128,11 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
         )}
         {selecting && (
           <View style={{
-            position: "absolute", left: -5, top: -5,
-            width: 22, height: 22, borderRadius: 11,
+            position: "absolute", left: 5, top: 5,
+            width: 21, height: 21, borderRadius: 10.5,
             alignItems: "center", justifyContent: "center",
-            backgroundColor: selected ? C.primary : C.card,
-            borderWidth: 1.5, borderColor: selected ? C.primary : C.border,
+            backgroundColor: selected ? C.primary : "rgba(255,255,255,0.92)",
+            borderWidth: 1.5, borderColor: selected ? C.primary : "rgba(255,255,255,0.95)",
           }}>
             {selected && <Ionicons name="checkmark" size={13} color={C.onPrimary} />}
           </View>

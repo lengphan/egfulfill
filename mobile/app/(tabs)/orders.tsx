@@ -250,7 +250,7 @@ export default function Orders() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 18, paddingTop: 12, paddingBottom: 2, paddingRight: 20 }}
+            contentContainerStyle={{ gap: 16, paddingTop: 14, paddingBottom: 2, paddingRight: 20 }}
           >
             {[null, ...stageChips].map((k) => {
               const on = stage === k
@@ -263,8 +263,8 @@ export default function Orders() {
                   hitSlop={6}
                   style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 5 })}
                 >
-                  <Text style={{ fontSize: 13.5, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{label}</Text>
-                  <Text style={{ fontSize: 12, fontFamily: F.medium, color: on ? C.fg : C.muted, opacity: on ? 1 : 0.7 }}>{n}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{label}</Text>
+                  <Text style={{ fontSize: 11.5, fontFamily: F.medium, color: on ? C.fg : C.muted, opacity: on ? 0.85 : 0.6 }}>{n}</Text>
                 </Pressable>
               )
             })}
@@ -281,7 +281,11 @@ export default function Orders() {
           data={rows}
           keyExtractor={(o) => o.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
-          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + (selecting ? 110 : 24) }}
+          /* NO horizontal padding here. The row owns it (18, the same 18 the title, the
+             search field and the filters use), so content lines up down the whole screen and
+             the hairline runs edge to edge the way a printed rule does. Padding in BOTH
+             places is what left the rows sitting 36 in while the header sat at 18. */
+          contentContainerStyle={{ paddingBottom: insets.bottom + (selecting ? 110 : 24) }}
           ListEmptyComponent={
             /* Says WHICH it is. An empty list that reads the same as a failed one is how a
                broken fetch gets mistaken for a quiet day. */
