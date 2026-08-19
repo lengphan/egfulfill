@@ -72,7 +72,7 @@ const ORDER = FACTORY_STAGES.map((s) => s.id)
 
 // Off-pipeline exception states (set manually, not reached by advancing).
 export const EXCEPTION_STAGES: FactoryStage[] = [
-  { id: "on_hold", label: "On hold", tone: "hold" },
+  { id: "on_hold", label: "Hold", tone: "hold" },
   { id: "cancelled", label: "Cancelled", tone: "closed" },
   { id: "refunded", label: "Refunded", tone: "closed" },
 ]
@@ -273,6 +273,26 @@ export function stageDenialReason(role: string, current: string | null | undefin
   // Refund itself is still admin-gated below (MONEY_STAGES).
   if (at === "shipped" && to !== "shipped" && to !== "refunded") {
     return "This order has shipped — the only change left is a refund."
+  }
+
+  /**
+   * CANCELLED AND REFUNDED ARE THE END — every role, admin included.
+   *
+   * Neither was terminal: a cancelled order could be put ON HOLD, a production state meaning
+   * "this work is paused", on an order where there is no work. And because a hold remembers
+   * where it came from in order to resume, cancel → hold → clear offered "Back to Cancelled" —
+   * a control that undid a stop by returning the order to a stop.
+   *
+   * A cancelled order may still be REFUNDED: the money is a separate fact from the work and
+   * frequently settles later. A refunded one is finished outright.
+   *
+   * Mirrors stageDenial in server/src/routes/orders.js — change both.
+   */
+  if (at === "cancelled" && to !== "cancelled" && to !== "refunded") {
+    return "This order was cancelled — the only change left is a refund."
+  }
+  if (at === "refunded" && to !== "refunded") {
+    return "This order was refunded. That is the end of it."
   }
 
   if (role === "admin") return null

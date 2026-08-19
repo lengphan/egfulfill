@@ -11,7 +11,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -2263,6 +2263,36 @@ export function OrdersHub() {
                                   something no word in a static label can. */}
                               {/* the non-primary pipeline actions */}
                               <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}>{tl("ui", "Open order")}</DropdownMenuItem>
+                              {/**
+                                * REORDER — the only thing left to do with a finished order.
+                                *
+                                * Cancelled and refunded are terminal (see stageDenial): every
+                                * production row below is refused, and the exception rows are
+                                * where it already is. So the menu on a closed order was a list
+                                * of things that cannot happen, and the one thing somebody
+                                * actually wants — the same order again — could only be reached
+                                * by opening it. Reopening THIS one is refused on purpose: it is
+                                * settled and possibly refunded, and chargeForSubmit would see
+                                * the old charge leg and produce it for free. So it makes a new
+                                * draft carrying everything but the money.
+                                */}
+                              {["cancelled", "refunded"].includes(normalizeStage(resolvedOrderStage(o))) && (
+                                <DropdownMenuItem
+                                  disabled={busy === `dup:${o.id}`}
+                                  onClick={async () => {
+                                    setBusy(`dup:${o.id}`)
+                                    try {
+                                      const r = await duplicateOrder(o.id)
+                                      if (r?.error || !r?.id) throw new Error(r?.error || "Couldn't copy this order")
+                                      router.push(`/orders/${encodeURIComponent(r.id)}`)
+                                    } catch (e) {
+                                      setActionErr(e instanceof Error ? e.message : "Couldn't copy this order")
+                                    } finally { setBusy(null) }
+                                  }}
+                                >
+                                  {busy === `dup:${o.id}` ? tl("ui", "Copying…") : tl("ui", "Reorder")}
+                                </DropdownMenuItem>
+                              )}
                               {/* The one-step advance lives HERE now, and only here — it is
                                   never the row's primary. Named with its destination, since
                                   in a list of stages "next" is the only one that doesn't say

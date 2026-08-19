@@ -189,6 +189,27 @@ export function stageDenial(role, current, target, isFactory = false) {
     return 'This order has shipped — the only change left is a refund.';
   }
 
+  /**
+   * CANCELLED AND REFUNDED ARE THE END. Every role, admin included.
+   *
+   * They were not terminal at all: a cancelled order could be put ON HOLD, which is a
+   * production state for work that is going to continue, on an order that is not. Worse, the
+   * hold remembers where it came from so it can be resumed — so cancelling, holding, then
+   * clearing the hold offered "Back to Cancelled", and the board grew a button that undid a
+   * stop by returning the order to a stop.
+   *
+   * A cancelled order may still be REFUNDED, because the money is a separate fact from the
+   * work and often settles later. A refunded one is finished outright.
+   *
+   * Mirrors stageDenialReason in web/lib/factory-status.ts.
+   */
+  if (at === 'cancelled' && to !== 'cancelled' && to !== 'refunded') {
+    return 'This order was cancelled — the only change left is a refund.';
+  }
+  if (at === 'refunded' && to !== 'refunded') {
+    return 'This order was refunded. That is the end of it.';
+  }
+
   if (role === 'admin') return null;
   if (role === 'warehouse') {
     return MONEY_STAGES.has(to) ? 'Cancelling or refunding is an admin decision.' : null;

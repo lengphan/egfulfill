@@ -1418,10 +1418,18 @@ function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => v
     return (
       <span className="flex items-center gap-2">
         {err && <span className="text-xs text-destructive">{err}</span>}
-        <span className="text-xs font-medium text-muted-foreground">Order {fs}</span>
+        {/* NO "Order cancelled" LABEL. The stage badge beside the order number says it, in
+            colour, at the top of the page — this repeated the same word in grey text inside
+            the row of things you can DO, where the only word is a verb.
+
+            REORDER, not "Duplicate". It is the same action and a truer name: nobody
+            duplicates a cancelled order for the sake of having two, they order it again.
+            Reopening this one is refused on purpose — it is settled and possibly refunded,
+            and chargeForSubmit would see the old charge leg and produce it for free — so
+            this makes a NEW draft carrying everything but the money. */}
         <Button size="sm" variant="outline" disabled={busy} onClick={() => void duplicate()}
-          title="Create a new draft with the same items, variants and artwork. This order stays cancelled.">
-          {busy ? "Copying…" : "Duplicate"}
+          title="Start a new draft with the same items, variants and artwork. This order stays as it is.">
+          {busy ? "Copying…" : "Reorder"}
         </Button>
       </span>
     )
