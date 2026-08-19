@@ -11,6 +11,8 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
+import { fetchShipmentLabel } from "@/lib/api"
+import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { StagedLabelRow, UploadLabelRow, useLabelPullBack, AddLabelButton, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
@@ -665,6 +667,68 @@ export function DispatchBoard() {
    * filled in, and nothing on screen explained why.
    */
   const canStampPrinted = role === "admin" || role === "warehouse"
+
+  /**
+   * REPRINT — every selected label in ONE document.
+   *
+   * `openLabels` below opens each label in its own browser tab, so a batch of eight arrives
+   * as eight popups and the blocker stops seven of them. Selecting several and seeing one
+   * label is that, not a lost label.
+   *
+   * So: fetch each stored PDF through our own same-origin route, render them into a single
+   * packet, and print it in a hidden iframe. No popups to block, one print dialog, and the
+   * pages come out in the order they were selected.
+   *
+   * Stamps them printed for the same reason the tab version does — the Printed dots are how
+   * the floor knows a label is already on paper and does not need pulling again.
+   */
+  const [reprinting, setReprinting] = useState(false)
+  const reprintLabels = async () => {
+    const withLabel = chosen.filter((o) => !!o.tracking_label_url)
+    if (!withLabel.length) {
+      setErr("None of the selected orders have a stored label file to reprint.")
+      return
+    }
+    setReprinting(true)
+    const blobs: string[] = []
+    try {
+      const items: { labelBlobUrl: string; order: typeof withLabel[number] }[] = []
+      const unreadable: string[] = []
+      for (const o of withLabel) {
+        try {
+          const url = URL.createObjectURL(await fetchShipmentLabel(String(o.id)))
+          blobs.push(url)
+          items.push({ labelBlobUrl: url, order: o })
+        } catch {
+          unreadable.push(numOf(o))
+        }
+      }
+      if (!items.length) { setErr("Couldn't read any of those label files."); return }
+
+      const { html, skipped } = await packetHtml(items)
+      await printHtmlViaIframe(html)
+
+      const notes: string[] = []
+      if (unreadable.length) notes.push(`${unreadable.length} label file${unreadable.length === 1 ? "" : "s"} couldn't be read (${unreadable.join(", ")}).`)
+      if (skipped.length) notes.push(`${skipped.length} couldn't be rendered (${skipped.join(", ")}).`)
+
+      if (canStampPrinted) {
+        const results = await Promise.allSettled(items.map((i) => markLabelPrinted(String(i.order.id))))
+        const failed = results.filter((r) => r.status === "rejected").length
+        if (failed) notes.push(`${failed} couldn't be marked as printed — they still printed.`)
+      } else {
+        notes.push("Marking them printed is a warehouse/admin step, so the Printed dots won't fill in from here.")
+      }
+      setErr(notes.length ? notes.join(" · ") : null)
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't build the reprint packet.")
+    } finally {
+      // Blob URLs live until revoked; a batch a day would leak the whole PDF set.
+      for (const b of blobs) { try { URL.revokeObjectURL(b) } catch { /* already gone */ } }
+      setReprinting(false)
+    }
+  }
   const openLabels = async () => {
     const urls = chosenWithLabel.map((o) => o.tracking_label_url).filter(Boolean) as string[]
     if (!urls.length) { setErr("None of the selected orders have a stored label file."); return }
@@ -871,6 +935,16 @@ export function DispatchBoard() {
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!chosenWithLabel.length} onClick={openLabels}>
                   <Printer size={14} weight="bold" /> Open labels
+                </DropdownMenuItem>
+                {/* REPRINT sits beside the SCAN form: both produce paper, neither spends
+                    money. Deliberately a separate item from anything that BUYS a label —
+                    one button that both buys and reprints is how a reprint becomes a
+                    second purchase. */}
+                <DropdownMenuItem
+                  disabled={!chosen.some((o) => o.tracking_label_url) || reprinting || busy}
+                  onClick={reprintLabels}
+                >
+                  <Printer size={14} weight="bold" /> Reprint labels
                 </DropdownMenuItem>
                 {canScanOut && (
                   <DropdownMenuItem disabled={!chosen.length || busy} onClick={() => setManifestOpen(true)} title={manifestTooltip(chosen)}>
