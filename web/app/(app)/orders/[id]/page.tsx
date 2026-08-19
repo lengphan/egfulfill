@@ -11,6 +11,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
+import { DesignCharge } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -1262,6 +1263,15 @@ export default function OrderDetailPage() {
                         : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
                     </dd>
                   </div>
+
+                  {/* THE DESIGN CHARGE, WHERE THE MONEY IS. It was inside the design window
+                      — a screen about placing pictures — so the one figure a seller is
+                      billed for design work could only be set by opening a line, and read
+                      nowhere near the total it lands in. Staff only, and the server enforces
+                      that: the person being charged must not be the one setting the charge. */}
+                  {isStaff && !feesGated && (order.items ?? []).length > 0 && (
+                    <DesignCharge orderId={id} items={order.items ?? []} onChanged={reloadAll} />
+                  )}
 
                   {/* The buyer's side, kept visually apart from ours. Two different pots of
                       money on one card is only safe if the reader can never mistake one

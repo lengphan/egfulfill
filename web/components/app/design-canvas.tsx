@@ -13,6 +13,7 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
+import { TIER_LABEL, TIER_WHY, feeFor } from "@/lib/design-fee"
 import { fileToUploadUrl } from "@/lib/chat-upload"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
@@ -703,22 +704,6 @@ const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
  *  picker can't start offering a type the drop handler refuses (or the reverse). */
 const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
 
-/** The three tiers, in the factory's own words. Mirrors the mapping in
- *  server/src/routes/orders.js — tier → fee — so the label and the debit can't disagree. */
-const TIER_LABEL: Record<DesignTier, string> = {
-  standard: "Standard",
-  complex: "Complex",
-  supplied: "Their file",
-}
-const TIER_WHY: Record<DesignTier, string> = {
-  standard: "We cut the machine file from their artwork — ordinary work",
-  complex: "We cut it, but it's intricate. Quotes the seller and waits for them to accept",
-  supplied: "They sent their own machine file — we only check it",
-}
-/** null while settings are still loading, so a price never renders as a confident $0. */
-const feeFor = (t: DesignTier, fees: { standard: number; complex: number; check: number } | null) =>
-  fees ? (t === "standard" ? fees.standard : t === "complex" ? fees.complex : fees.check) : null
-
 
 /**
  * The buyer's uploaded file, as a picture — whatever kind of file it is.
@@ -806,6 +791,18 @@ export function DesignCanvasDialog({
    *  so the two toolbars on this stage are one visual language rather than two. */
   const railBtn = "flex size-9 items-center justify-center rounded-lg text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
   const [tplBusy, setTplBusy] = useState(false)
+  /** null = the box is closed. A string is what is being typed into it. */
+  const [tplName, setTplName] = useState<string | null>(null)
+  /**
+   * THE SUGGESTED NAME, and it is NOT the item's name.
+   *
+   * A marketplace title is a keyword list — "Custom Apron with Embroidered Name, Heavy Duty
+   * Cotton Canvas Apron with Pocket, Adjustable Barista Apron, Personalized Apron, Gift For
+   * Mom" — and offering that as the default made every template share a 120-character name
+   * that says nothing about the placement, which is the only thing a template holds. The
+   * blank and the side do say something, and they fit in a field.
+   */
+  const defaultTplName = [item.blank || item.sku || "Placement", item.color].filter(Boolean).join(" · ")
 
   const faces = useMemo(() => {
     const product = resolveProduct(item, catalog ?? [])
@@ -1292,11 +1289,10 @@ export function DesignCanvasDialog({
   const sentToDesigner = !!boardCard && !hasMachineFile
 
 
-  const [tier, setTier] = useState<DesignTier | null>((item.design_tier as DesignTier | null) ?? null)
-  const [tierBusy, setTierBusy] = useState<DesignTier | null>(null)
-  const [chargeOpen, setChargeOpen] = useState(false)
+  /* The tier STATE went with the picker (design-charge.tsx, in the order's Summary). What
+     is left is `applying`, which belongs to "apply this image to every line" and never had
+     anything to do with the charge. */
   const [applying, setApplying] = useState(false)
-  const quote = item.design_quote_status ?? null
 
   /**
    * THE SUGGESTION IS GONE, deliberately, and this note is what is left of it.
@@ -1531,18 +1527,20 @@ export function DesignCanvasDialog({
    * blank is deliberately NOT stored — the picker refuses to apply one anyway, because this
    * canvas belongs to a line whose garment is already decided.
    */
-  const saveAsTemplate = async () => {
+  const saveAsTemplate = async (name: string) => {
     if (!designUrl) return
-    const name = window.prompt("Name this template", item.name || item.sku || "Placement")
-    if (name === null) return                      // cancelled — not an empty name
     setTplBusy(true); setErr(null)
     try {
       const r = await saveTemplate({
         id: `tpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-        name: name.trim() || "Placement",
+        name: name.trim() || defaultTplName,
+        // The shape LibraryPickerDialog reads back — and it reads the SAME /api/templates
+        // this writes, so a template saved here is in the list the rail's library button
+        // opens, on this order and on every other one.
         layers: { images: [{ src: designUrl, pos }] },
       })
       if (r?.error) throw new Error(r.error)
+      setTplName(null)
       setAttached("Saved as a template — it is in the library for any order.")
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save that template.")
@@ -1882,11 +1880,12 @@ export function DesignCanvasDialog({
                 only way to reuse a placement was to redo it by eye on the next order. */}
             <button
               type="button"
-              onClick={() => void saveAsTemplate()}
+              onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
               disabled={!designUrl || tplBusy}
               title={designUrl ? "Save this artwork and its placement as a template" : "Add artwork first"}
               aria-label="Save as a template"
-              className={railBtn}
+              aria-expanded={tplName !== null}
+              className={railBtn + (tplName !== null ? " bg-primary/10 text-primary" : "")}
             >
               {tplBusy ? <CircleNotch size={18} className="animate-spin" /> : <BookmarkSimple size={18} weight="bold" />}
             </button>
@@ -1914,6 +1913,52 @@ export function DesignCanvasDialog({
               {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
             </button>
           </div>
+
+          {/**
+            * OUR OWN BOX, not the browser's.
+            *
+            * This was window.prompt, which is the one dialog we cannot style, cannot place,
+            * and cannot stop from arriving pre-filled with whatever string it was handed —
+            * so naming a template meant a system alert at the top of the screen, over the
+            * artwork, carrying a 120-character marketplace title. It also blocks the page
+            * outright, which for a control this small is a lot of ceremony to type six
+            * words.
+            *
+            * Beside the rail, so the name is typed next to the button that asked for it and
+            * the garment stays in view. Enter saves, Escape closes — the two keys a
+            * one-field form should answer to.
+            */}
+          {tplName !== null && (
+            <div className="absolute left-14 top-2 z-30 w-56 rounded-xl border border-border bg-card p-2 shadow-lg">
+              <label className="block text-2xs font-medium text-muted-foreground">Save as template</label>
+              <input
+                autoFocus
+                value={tplName}
+                onChange={(e) => setTplName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); void saveAsTemplate(tplName) }
+                  if (e.key === "Escape") { e.preventDefault(); setTplName(null) }
+                }}
+                placeholder={defaultTplName}
+                aria-label="Template name"
+                className="mt-1 h-8 w-full rounded-lg border border-input bg-background px-2 text-xs outline-none focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30"
+              />
+              <div className="mt-1.5 flex items-center justify-end gap-1.5">
+                <button type="button" onClick={() => setTplName(null)}
+                  className="rounded-lg px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent">
+                  Cancel
+                </button>
+                <button type="button" onClick={() => void saveAsTemplate(tplName)} disabled={tplBusy}
+                  className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-2xs font-semibold text-primary-foreground transition-opacity disabled:opacity-60">
+                  {tplBusy && <CircleNotch size={11} className="animate-spin" />}
+                  Save
+                </button>
+              </div>
+              {/* WHERE IT GOES, said once. A template that saves silently to a list you have
+                  not opened is indistinguishable from one that did not save. */}
+              <p className="mt-1 text-2xs text-muted-foreground">Into your library, for any order.</p>
+            </div>
+          )}
           {designUrl && (
             <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-1.5">
               {/* The background BUTTONS moved onto the selection strip (see the stage props
@@ -2279,27 +2324,25 @@ export function DesignCanvasDialog({
               * the title where a glance already goes, rather than by flooding a whole panel
               * with green.
               */}
-            <div className="border-t border-border pt-2.5 first:border-t-0 first:pt-0">
-              {/* THE SAME MARK AS THE STEP BELOW IT. This briefly carried a small dot while
-                  the next step carried a numbered circle that turns into a tick — two ways
-                  of saying "where am I" in one column, eighty pixels apart. Numbered, and
-                  ticked when done, like its neighbour. */}
-              <div className="flex min-w-0 items-center gap-2">
-                {designUrl
-                  ? <CheckCircle size={18} weight="fill" className="shrink-0 text-success" />
-                  : <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">1</span>}
-                <span className="text-sm font-medium">Your design</span>
-                {designUrl && designNo != null && (
-                  <span className="truncate font-mono text-2xs font-medium text-muted-foreground">DSN-{designNo}</span>
-                )}
-              </div>
-              {/* NO BUTTONS HERE. Upload, replace, library and save-as-template are on the
-                  RAIL on the artboard — the same reason background removal moved onto the
-                  artwork. A control in this column described a step in a form; on the stage
-                  it describes the thing under your cursor, and the result lands where you
-                  are already looking. What is left is the one thing the stage cannot say:
-                  whether this line's design is settled, and which DSN it filed as. */}
-            </div>
+            {/**
+              * THE STEPS ARE GONE — "1 · Your design", "2 · Print artwork", and the charge
+              * that sat under them.
+              *
+              * They described a form to fill in, and the artwork does not arrive that way any
+              * more: it is dropped onto the garment, moved with a cursor and saved. A column
+              * of numbered states beside that is a second account of the same thing, written
+              * in the grammar of a wizard — and it was reporting on work already visible on
+              * the stage two hundred pixels to its left.
+              *
+              * WHAT WENT WHERE, so none of it is merely missing:
+              *   · upload / replace / library / template  → the rail on the artboard
+              *   · remove background                      → the selection strip
+              *   · send to the print partner              → the ⋯ menu on the order's item
+              *     row (ItemDesignActions), which is where it also lives for a line nobody
+              *     has opened
+              *   · the design charge                      → the order's Summary, beside the
+              *     total, where every other number about money is, and editable there
+              */}
             {/* 2 — Machine file (the seller's own-file route, now discoverable).
                 EMBROIDERY ONLY. Every part of this step is stitch apparatus: the formats it
                 accepts (.emb/.pes/.dst), the words "ready to stitch", the EMB- id it files
@@ -2419,66 +2462,6 @@ export function DesignCanvasDialog({
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
             </div>
             )}
-            {/* 2, THE OTHER HALF — print methods go to the PARTNER, not our board.
-                Our designers digitise; DTG/DTF is print artwork and Pink Design does it.
-                That split is already recorded on every card (`vendor` — "our designers do
-                embroidery, so DTG/DTF goes out"); this is the button that acts on it.
-                A DTG line used to get an embroidery step it had no use for, and once that
-                was gated off it had no route to a designer at all.
-                Staff only, like its embroidery counterpart: opening a partner task spends
-                money, and the person being charged must not be the one who spends it. */}
-            {!isEmb && isStaff && (
-              /* The amber STAYS as a tint — "you replaced the image and Pink still has the
-                 old one" is a warning about work already sent, and a dot is not enough for
-                 something that costs money to get wrong. Done and to-do lose theirs. */
-              <div className={"border-t border-border pt-2.5 " + (artworkChangedSinceSend
-                ? "rounded-lg border border-amber-300 bg-amber-50/60 p-2.5 dark:border-amber-900/40 dark:bg-amber-950/20"
-                : "")}>
-                <div className="flex items-start gap-2">
-                  {/* SENT LOOKS LIKE DONE, the same way step 1 does. This step reported "On
-                      the board · In progress" whether or not it had actually gone to the
-                      partner, and still offered the send button underneath — so a card
-                      already with Pink was one click from a SECOND task and a second charge,
-                      with nothing on screen to say the first had worked. */}
-                  {artworkChangedSinceSend ? (
-                    // NOT a tick. The step is no longer done: they hold the old file.
-                    <Warning size={20} weight="fill" className="mt-0.5 shrink-0 text-amber-600" />
-                  ) : sentToPartner ? (
-                    <CheckCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-success" />
-                  ) : (
-                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-2xs font-bold text-muted-foreground">2</span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">Print artwork</div>
-                    <div className={"text-2xs " + (artworkChangedSinceSend ? "text-amber-700 dark:text-amber-500" : "truncate text-muted-foreground")}>
-                      {artworkChangedSinceSend
-                        ? `You replaced the image — Pink Design still has the old one${boardCard?.vendor_ref ? ` (ref ${boardCard.vendor_ref})` : ""}. Send it again or tell them, or they'll digitise the wrong artwork.`
-                        : sentToPartner
-                        ? `Sent to Pink Design${boardCard?.vendor_ref ? ` · ref ${boardCard.vendor_ref}` : ""}${boardCard?.lane_label || boardCard?.col ? ` · ${boardCard.lane_label || boardCard.col}` : ""}`
-                        : boardCard
-                          ? `On the board · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
-                          : "Our designers do embroidery — print work goes to Pink Design"}
-                    </div>
-                  </div>
-                </div>
-                {/* No button once it has gone — re-sending is not an undo, it opens a second
-                    task nobody asked for. UNLESS the artwork has changed since: then they
-                    hold a file that is no longer the job, and sending again is the only way
-                    to fix it. Labelled so it's clear that's what it does. */}
-                {(!sentToPartner || artworkChangedSinceSend) && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Button
-                      size="sm"
-                      disabled={!designUrl}
-                      title={designUrl ? undefined : "Add an image first — the partner needs something to work from"}
-                      onClick={() => setPinkOpen(true)}
-                    >
-                      {artworkChangedSinceSend ? "Send the new artwork" : "Send to Pink Design"}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           {/* LAST, because it is a shortcut rather than a decision: "do this line" is the
               question, "and the other nine" is the follow-up.
@@ -2514,148 +2497,36 @@ export function DesignCanvasDialog({
               one setting the charge. Collapsed by default so the seller-shaped window stays
               a design window; the summary line carries the answer, so staff only expand
               when they disagree with it. */}
-          {isStaff && (
-            /* The charge is an OUTCOME of the route above, not a fourth choice — so it is a
-               line you can open, not a panel with a frame of its own. */
-            <div className="border-t border-border">
-              <button
-                type="button"
-                onClick={() => setChargeOpen((v) => !v)}
-                aria-expanded={chargeOpen}
-                className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-2 text-left transition-colors hover:bg-accent"
-              >
-                {/**
-                  * WHAT WE CHARGE, NEVER WHAT WE GUESS.
-                  *
-                  * This line read "Suggested: Standard · $2.00 — not charged yet" on every
-                  * line that had no tier — a number that had been worked out by a rule of
-                  * thumb here, sitting in the place a real figure goes, on the window where
-                  * someone decides what to bill. Read quickly it is indistinguishable from
-                  * the charge, and it is not one: nothing is set and nothing has moved.
-                  *
-                  * A set tier still names its FEE, because that is a figure we configured
-                  * and the person setting it has to see it. Unset says exactly that. The
-                  * amount that is actually owed is read off the order's total, which is the
-                  * one place a number about money should live.
-                  */}
-                <span className="min-w-0">
-                  <span className="block text-xs font-medium">Design charge</span>
-                  <span className="block truncate text-2xs text-muted-foreground">
-                    {tier
-                      ? `${TIER_LABEL[tier]}${feeFor(tier, fees) !== null ? ` · ${usd(feeFor(tier, fees)!)}` : ""}${quote === "pending" ? " · awaiting the seller" : ""}`
-                      : "Not set — nothing charged"}
-                  </span>
-                </span>
-                <CaretDown size={14} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (chargeOpen ? "rotate-180" : "")} />
-              </button>
-
-              {chargeOpen && (
-                <div className="border-t border-border p-3">
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(["standard", "complex", "supplied"] as DesignTier[]).map((id) => {
-                      const isSet = tier === id
-                      /* NO PRE-HIGHLIGHT. A tinted chip in a row of three reads as the one
-                         that is in force, and it was only ever a guess from a rule of thumb
-                         — on the control that decides what a seller is billed. The tiers
-                         carry their configured fees; picking one is a decision, not a
-                         confirmation of ours. */
-                      const fee = feeFor(id, fees)
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          title={TIER_WHY[id]}
-                          disabled={!!tierBusy || quote === "accepted"}
-                          onClick={async () => {
-                            setTierBusy(id); setErr(null)
-                            try {
-                              const r = await setDesignTier(orderId, {
-                                tier: id, line_id: item.line_id, sku: item.line_id ? undefined : item.sku,
-                              })
-                              if (r?.error) throw new Error(r.error)
-                              setTier(id)
-                              setAttached(r.quoted
-                                // Says what has NOT happened. "Marked complex" reads as done,
-                                // and the money has not moved and may never.
-                                ? "Quoted to the seller. Nothing is charged until they accept, and they may decline."
-                                : r.charged?.charged
-                                  ? `Charged ${usd(Number(r.charged.charged))} to the seller.`
-                                  : r.charged?.reason === "already-charged"
-                                    ? "Re-filed. This line was already charged, so nothing moved."
-                                    // OUR OWN SHOP. A factory-owned order's seller_id is a
-                                    // staff account, so charging it moves money from the
-                                    // factory to the factory. That nets to zero, which
-                                    // sounds harmless and isn't: it books revenue nobody
-                                    // earned, so every margin figure reading design-work
-                                    // rows counts our own costs as income.
-                                    : r.charged?.reason === "factory-order"
-                                      ? "Filed. This is our own shop's order, so nothing is charged — the tier is still recorded."
-                                      : r.charged?.reason === "no-fee-set"
-                                        ? "Filed. No fee is set for this tier, so nothing was charged."
-                                        : "Filed.")
-                              onSaved?.()
-                            } catch (e) { setErr((e as Error).message) } finally { setTierBusy(null) }
-                          }}
-                          className={"relative rounded-lg border px-2 py-1.5 text-2xs font-medium transition-colors disabled:opacity-50 " +
-                            (isSet ? "border-primary bg-primary/10 text-primary"
-                              : "border-border text-muted-foreground hover:bg-accent")}
-                        >
-                          {tierBusy === id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : (
-                            <>
-                              <span className="block">{TIER_LABEL[id]}</span>
-                              {/* The number, not just the word — Complex is several times
-                                  Standard, and a charge chosen by someone who can't see the
-                                  amount is a charge made blind. Only once fees load. */}
-                              {fee !== null && (
-                                <span className="block text-2xs font-normal tabular-nums opacity-70">{usd(fee)}</span>
-                              )}
-                            </>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {/* The paragraph that explained the suggestion is gone. It restated what the
-                      chips already show (which tier is suggested, and that nothing is charged
-                      until one is picked) in three lines of prose above the controls it was
-                      describing. */}
-                  {/* The quote's own state, in words. A "complex" chip alone can't tell
-                      waiting-on-the-seller from already-paid from refused. */}
-                  {quote === "pending" && <p className="mt-2 text-2xs text-amber-700">Waiting on the seller to accept — don&apos;t start work yet.</p>}
-                  {quote === "declined" && <p className="mt-2 text-2xs text-rose-700">The seller declined. Cancel the line, or agree something else with them.</p>}
-                  {quote === "accepted" && <p className="mt-2 text-2xs text-emerald-700">Accepted and paid — cleared to digitise. The tier is locked.</p>}
-
-                  {/* The ALTERNATIVE to uploading, not a step after it. Offering both without
-                      saying so is how a line ends up with a finished file AND an open card
-                      nobody closes. */}
-                  {/* NOT on an embroidered line: "Send to Board" is already in the Embroidery
-                      file card above, next to Attach file, where the choice between the two
-                      routes is actually made. Two buttons for one board, worded differently
-                      and thirty lines apart, is how a line gets a finished file AND an open
-                      card nobody closes. */}
-                  {onSendToDesigner && !isEmb && (
-                    <div className="mt-3 border-t border-border pt-3">
-                      <p className="mb-1.5 text-2xs text-muted-foreground">Don&apos;t have the file yet?</p>
-                      {/* SAVE FIRST, then send — and only send if the save actually landed.
-                          This silently did nothing before: the board builds its card from
-                          the SAVED designs map, so artwork dropped here but not yet saved
-                          didn't exist as far as the push was concerned. It hit a guard that
-                          returned without a word, and the designer's board stayed empty
-                          with nothing on screen to say why. */}
-                      <Button size="sm" variant="outline" disabled={!designUrl || saving} onClick={async () => {
-                        if (!(await save(false))) return
-                        onSendToDesigner()
-                      }}>
-                        {saving ? "Saving…" : "Send this line to a designer"}
-                      </Button>
-                      {!designUrl && <p className="mt-1 text-2xs text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {/**
+            * THE CHARGE HAS LEFT THIS WINDOW.
+            *
+            * It is in the order's Summary now, beside the total and editable there
+            * (design-charge.tsx). A tier is a decision about money, and it was sitting on a
+            * screen about placing pictures, reachable only by opening a line — so the number
+            * a seller is billed lived somewhere other than every other number about money.
+            *
+            * What stayed is the ROUTE, because a route is not a charge: this is how a print
+            * line reaches OUR OWN designers, and the ⋯ menu on the order row only offers the
+            * outside partner.
+            */}
+        {onSendToDesigner && !isEmb && (
+          <div className="mt-3 border-t border-border pt-3">
+            <p className="mb-1.5 text-2xs text-muted-foreground">Don&apos;t have the file yet?</p>
+            {/* SAVE FIRST, then send — and only send if the save actually landed.
+                This silently did nothing before: the board builds its card from
+                the SAVED designs map, so artwork dropped here but not yet saved
+                didn't exist as far as the push was concerned. It hit a guard that
+                returned without a word, and the designer's board stayed empty
+                with nothing on screen to say why. */}
+            <Button size="sm" variant="outline" disabled={!designUrl || saving} onClick={async () => {
+              if (!(await save(false))) return
+              onSendToDesigner()
+            }}>
+              {saving ? "Saving…" : "Send this line to a designer"}
+            </Button>
+            {!designUrl && <p className="mt-1 text-2xs text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
+          </div>
+        )}
 
           {/* SELLER view of the same thing the staff picker above decides — a plain-language
               estimate, never the fee controls (they're being charged; they don't set it):
