@@ -135,6 +135,10 @@ function buildBitmapXml({ filename, base64, width, height, designFile }) {
  * it reads natively — verified live for .dst and .pes, and the others are the same class of
  * file the desktop product opens. Anything else is refused WITHOUT a call.
  */
+/** The stored file's extension, upper-cased — "DST", "PES". The UI names what it rendered,
+ *  because a TrueView of the wrong attachment looks exactly like a TrueView of the right one. */
+const fileExt = (name) => (String(name || '').match(/\.([0-9a-z]+)$/i) || [null, ''])[1].toUpperCase() || null;
+
 const STITCH_EXT = /\.(emb|dst|pes|exp|jef|vp3|vip|hus|pcs|xxx|sew|csd|pec|shv|u01|tap|10o|zsk)$/i;
 export const isStitchFile = (name, mime) =>
   STITCH_EXT.test(String(name || '')) || /emb|dst|pes|stitch/i.test(String(mime || ''));
@@ -222,6 +226,13 @@ function ensurePreviews() {
     // ERROR_FILE_SECURITY_INVALID), and without recording that, every click on that card
     // spends another call to be told the same thing.
     .then(() => q('alter table wilcom_previews add column if not exists failed text'))
+    // SIZE IS THE FACT THE FLOOR NEEDS. parseDesignInfo already read width/height/machine
+    // out of every response and threw them away, so a preview could show a design and not
+    // whether it fits the hoop — which is the first thing anyone standing at the machine
+    // asks. Cached with the PNG so it costs no extra call.
+    .then(() => q('alter table wilcom_previews add column if not exists width numeric'))
+    .then(() => q('alter table wilcom_previews add column if not exists height numeric'))
+    .then(() => q('alter table wilcom_previews add column if not exists machine text'))
     .catch((e) => { _pvReady = null; throw e; });
   return _pvReady;
 }
@@ -677,8 +688,16 @@ export function wilcomRoutes(app, requireStaff) {
     await ensurePreviews();
     // Cache key from the file's stored content hash (no bytes needed to check the cache).
     const hash = String(row.content_hash || ('id-' + row.design_id)).slice(0, 32);
-    const cached = (await q(`select png, stitches, colours, failed from wilcom_previews where design_id=$1 and hash=$2`, [row.design_id, hash])).rows[0];
-    if (cached && cached.png) return { ok: true, png: cached.png, stitches: cached.stitches, colours: cached.colours, cached: true };
+    const cached = (await q(`select png, stitches, colours, width, height, machine, failed
+                               from wilcom_previews where design_id=$1 and hash=$2`, [row.design_id, hash])).rows[0];
+    if (cached && cached.png) {
+      return {
+        ok: true, png: cached.png, stitches: cached.stitches, colours: cached.colours,
+        width: cached.width == null ? null : Number(cached.width),
+        height: cached.height == null ? null : Number(cached.height),
+        machine: cached.machine, format: fileExt(row.file_name), cached: true,
+      };
+    }
     // Already tried and refused: same file, same answer, no call.
     if (cached && cached.failed) return { ok: false, unavailable: true, reason: cached.failed, cached: true };
     if (!configured()) return { ok: false, unavailable: true, reason: 'not-configured' };
@@ -724,11 +743,18 @@ export function wilcomRoutes(app, requireStaff) {
       const info = parseDesignInfo(res.body) || {};
       const tv = files.find((f) => isPng(f.filename));
       if (!tv) { reply.code(502); return { ok: false, error: 'EWA returned no preview image.' }; }
-      await q(`insert into wilcom_previews (design_id, hash, png, stitches, colours) values ($1,$2,$3,$4,$5)
+      await q(`insert into wilcom_previews (design_id, hash, png, stitches, colours, width, height, machine)
+               values ($1,$2,$3,$4,$5,$6,$7,$8)
                on conflict (design_id) do update set hash=excluded.hash, png=excluded.png,
-                 stitches=excluded.stitches, colours=excluded.colours, created_at=now()`,
-        [row.design_id, hash, tv.base64, info.stitches ?? null, info.colours ?? null]).catch(() => {});
-      return { ok: true, png: tv.base64, stitches: info.stitches ?? null, colours: info.colours ?? null };
+                 stitches=excluded.stitches, colours=excluded.colours, width=excluded.width,
+                 height=excluded.height, machine=excluded.machine, failed=null, created_at=now()`,
+        [row.design_id, hash, tv.base64, info.stitches ?? null, info.colours ?? null,
+         info.width ?? null, info.height ?? null, info.machine ?? null]).catch(() => {});
+      return {
+        ok: true, png: tv.base64, stitches: info.stitches ?? null, colours: info.colours ?? null,
+        width: info.width ?? null, height: info.height ?? null, machine: info.machine ?? null,
+        format: fileExt(row.file_name),
+      };
     } catch (e) {
       reply.code(502); return { ok: false, error: (e && e.message) || 'Could not reach the Wilcom EWA service' };
     }

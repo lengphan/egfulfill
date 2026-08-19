@@ -297,6 +297,40 @@ export const getOrderDesigns = (id: string) =>
   request<OrderDesign[]>(`/api/orders/${encodeURIComponent(id)}/designs`)
 
 /**
+ * THE STITCH FILE, RENDERED — Wilcom TrueView of what the machine will actually sew.
+ *
+ * This is the right-hand pane of the check: the mockup says what it should look like, this
+ * says what the file will produce. They are different claims and the whole point is seeing
+ * them together before a garment is hooped.
+ *
+ * `unavailable` is a NORMAL outcome, not an error — Wilcom unconfigured, the file not a
+ * stitch format, or EWA refusing a protected .EMB. The caller says which of those it is
+ * rather than showing a broken image, because "cannot be read" and "does not exist" are
+ * different problems on the floor.
+ *
+ * Server-side it is cached by design and content hash, so re-opening an order costs nothing.
+ */
+export type EmbPreview = {
+  ok: boolean
+  /** Base64 PNG, no data: prefix. */
+  png?: string
+  stitches?: number | null
+  colours?: number | null
+  /** Millimetres — the number that answers "does it fit the hoop". */
+  width?: number | null
+  height?: number | null
+  /** The machine the format is native to, as EWA reports it ("Tajima", "Melco"). */
+  machine?: string | null
+  /** Extension of the file that was rendered, e.g. "DST". */
+  format?: string | null
+  unavailable?: boolean
+  reason?: string
+  error?: string
+}
+export const getEmbPreview = (body: { orderId?: string | null; sku?: string | null; designId?: string }) =>
+  request<EmbPreview>("/api/wilcom/design-preview", { method: "POST", body: JSON.stringify(body) })
+
+/**
  * THE LABEL PDF, THROUGH US — the address to hand a printer.
  *
  * NOT `order.tracking_label_url`. That is the carrier's or the aggregator's own CDN and it
