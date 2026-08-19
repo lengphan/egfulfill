@@ -660,14 +660,16 @@ function ProductGroup({
         * The held/available line only appears when something IS held: on a shelf with
         * nothing reserved, "0 held → 40 available" is two numbers restating the one above.
         */}
-      <td className="px-4 py-2">
-        <div className="flex flex-col items-center gap-0.5">
+      {/* The other half of the column's right edge — the group row above is right-aligned
+          too, so a product's figure and its variants' land on the same x. */}
+      <td className="px-4 py-2 text-right">
+        <div className="flex flex-col items-end gap-0.5">
           <Input
             value={String(num(it.in_stock))}
             onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
             inputMode="numeric"
             aria-label={`In stock for ${it.sku}`}
-            className="relative z-[1] h-8 w-16 text-center"
+            className="relative z-[1] h-8 w-16 text-right tabular-nums"
           />
           {num(it.reserved) > 0 && (
             <span
