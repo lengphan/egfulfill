@@ -1669,6 +1669,10 @@ export type POLine = {
    *  single word, so the picture is what confirms the right sku was chosen. Lines without
    *  one (auto-replenished from inventory) resolve it by sku at render time. */
   image?: string | null
+  /** How many of this line have actually arrived. Absent on every line raised before
+   *  receiving existed, which reads as none — the honest default, since nothing was
+   *  recorded either way. `qty - received` is what is still outstanding. */
+  received?: number
 }
 
 // ── Factory-global shared lists (staff-only KV blobs, whole-array replace) ──
@@ -1690,6 +1694,22 @@ export function getPurchaseOrders() {
 }
 export function savePurchaseOrder(po: PurchaseOrder) {
   return api<{ ok?: boolean; num?: string; error?: string }>(`/api/purchase`, { method: "POST", body: JSON.stringify(po) })
+}
+/**
+ * Book a delivery in against a purchase order's own lines.
+ *
+ * WAREHOUSE, not admin — purchasing commits money and is admin-gated; receiving is a floor
+ * job. Crediting the shelf by LINE rather than by typed sku is the point: the mapping from
+ * supplier goods to our variant sku was already made when the PO was raised, so nobody at
+ * the door has to know it. Returns what landed, what is still outstanding, and any line it
+ * could not credit.
+ */
+export function receivePurchaseOrder(num: string, lines: { sku: string; qty: number }[]) {
+  return api<{ ok?: boolean; num?: string; status?: string; error?: string; problems?: string[]
+               received?: { sku: string; qty: number; inStock: number; received: number }[] }>(
+    `/api/purchase/${encodeURIComponent(num)}/receive`,
+    { method: "POST", body: JSON.stringify({ lines }) },
+  )
 }
 export function deletePurchaseOrder(num: string) {
   return api<{ ok?: boolean }>(`/api/purchase/${encodeURIComponent(num)}`, { method: "DELETE" })

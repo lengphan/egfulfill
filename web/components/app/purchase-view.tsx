@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  getInventory, patchInventoryItem, addInventoryItem, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
+  getInventory, patchInventoryItem, addInventoryItem, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder, receivePurchaseOrder,
   getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
   ssOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
 } from "@/lib/api"
@@ -1494,8 +1494,11 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             with three short phrases that already said it. The spinner stays on the one
             button that waits for something, because that is state rather than decoration.
 
-            Receiving is its own job, done at the bench with a scanner — not something you
-            reach through a purchase order. */}
+            Receiving a BOX is its own job, done at the bench with a scanner — that is for
+            goods already carrying our own label, which means consigned stock, where we
+            printed the barcode. A supplier's carton never does, so those are received
+            against the PO line instead (the Receive button on each line), where the mapping
+            to our sku was already made when the order was raised. */}
         <Button size="sm" variant="outline" onClick={() => setScanOpen(true)}>
           Receive a box
         </Button>
