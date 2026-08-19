@@ -33,7 +33,12 @@ const tabsListVariants = cva(
       },
     },
     defaultVariants: {
-      variant: "default",
+      // UNDERLINE, NOT A TRAY. The filled `default` tray put a second rounded box around
+      // every tab bar in the app — chrome that says nothing, on eight surfaces. A rule under
+      // the live tab says the same thing with one line, which is the house pattern now for
+      // tabs AND filter rows. `default` is kept only for a surface that genuinely needs a
+      // segmented control; nothing currently passes it.
+      variant: "line",
     },
   }
 )
@@ -59,11 +64,11 @@ function TabsList({
  *  keeps them from drifting from the tab bars in Settings and Wallet.
  *  `data-active:` styles only apply to the primitive; pass `active` for plain elements. */
 const tabsTriggerVariants = cva(
-  "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-2xl border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start group-data-vertical/tabs:px-3 group-data-vertical/tabs:py-0.5 hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-2xl border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start group-data-vertical/tabs:px-3 group-data-vertical/tabs:py-0.5 hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 after:absolute after:inset-x-0 after:bottom-[-5px] after:h-0.5 after:bg-foreground after:opacity-0 after:transition-opacity group-data-vertical/tabs:after:inset-x-auto group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:h-auto group-data-vertical/tabs:after:w-0.5",
   {
     variants: {
       active: {
-        true: "bg-background text-foreground dark:border-input dark:bg-input/30 dark:text-foreground",
+        true: "text-foreground after:opacity-100 dark:text-foreground",
         false: "",
       },
     },
@@ -77,10 +82,10 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
       data-slot="tabs-trigger"
       className={cn(
         tabsTriggerVariants(),
-        "border-transparent!",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
-        "data-active:bg-background data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground",
-        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+        "border-transparent! bg-transparent",
+        // The SAME active treatment the `active` variant above gives the link bars — written
+        // twice only because one is driven by data-active and the other by a prop.
+        "data-active:bg-transparent data-active:text-foreground data-active:after:opacity-100 dark:data-active:bg-transparent dark:data-active:text-foreground",
         className
       )}
       {...props}
