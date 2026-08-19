@@ -437,9 +437,23 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
                    when coalesce(o.tracking,'') = '' and coalesce(o.voided_tracking,'') <> ''
                         and o.refund_status is null then 'carrier'
               end as restorable,
-              -- price from the order column if stored, else the label-cost ledger row (so
-              -- labels bought before the column existed still show what they cost).
-              coalesce(o.label_cost,
+              -- WHAT THE LABEL COST US, INCLUDING WHAT WAS BILLED LATER.
+              --
+              -- The carrier re-weighs the parcel days after it ships and bills the difference
+              -- as a LABEL_SURCHARGE against the tracking number — $1.65 on a $6.24 label is
+              -- a quarter of it again. That is a real cost of this shipment and it arrived
+              -- after the fact, so the price shown here was the quote at purchase and never
+              -- what we actually paid.
+              --
+              -- Summed over every NEGATIVE label-cost row carrying this order, rather than
+              -- matched on the purchase's own ref: a surcharge files under its own ref (it
+              -- can happen more than once) and would otherwise have nowhere to land. The
+              -- positive rows are refunds and are reported separately below — netting them
+              -- into one figure would make a refunded label look cheap rather than returned.
+              coalesce(
+                (select -sum(w.delta) from wallet_ledger w
+                  where w.type='label-cost' and w.order_id = o.id and w.delta < 0),
+                o.label_cost,
                 (select -sum(w.delta) from wallet_ledger w where w.type='label-cost' and w.ref='label-'||o.id)
               )::float as label_cost,
               -- What came BACK. A void books a positive label-cost row under a 'label-void-'
@@ -447,7 +461,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               -- had no way to reach the screen, which is why a voided label looked exactly
               -- like a live one and its postage looked like money still spent.
               (select sum(w.delta) from wallet_ledger w
-                where w.type='label-cost' and w.ref='label-void-'||o.id)::float as label_refund,
+                where w.type='label-cost' and w.order_id = o.id and w.delta > 0)::float as label_refund,
               o.customer->>'name' as customer, o.address->>'state' as state,
               -- WHERE IT IS GOING, in one line. The window showed the state alone, which is
               -- not enough to tell two parcels for one buyer apart, and it is the first
@@ -668,6 +682,47 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
    * (the same gap the dispatch-cancel fix closed for byeastside). Best-effort on the ledger
    * so a booking blip can't undo a successful carrier refund. Warehouse/admin only (money).
    */
+  /**
+   * A CARRIER SURCHARGE, booked against the shipment it belongs to.
+   *
+   * The carrier re-weighs the parcel after it ships and bills the difference days later —
+   * Shippo files it as LABEL_SURCHARGE against the tracking number, with a line reading
+   * "Shipping Charge Correction: Billed Weight 1.0 lb / Declared 6.0 oz". It arrives on an
+   * invoice, not through any API we call, so nothing here can see it happen.
+   *
+   * IT IS OURS TO BEAR, and that is a decision rather than an oversight: the seller was
+   * quoted a price and the correction is between us and the carrier. So it books as a
+   * FACTORY cost — the same type and the same account as the postage itself — and the
+   * shipment's price becomes what the parcel actually cost us rather than what it was
+   * quoted at.
+   *
+   * Idempotent per (order, tracking, amount): an invoice gets re-read, and the same
+   * correction typed twice must not become two costs. A genuinely second surcharge on the
+   * same parcel differs in amount, or carries its own reference.
+   */
+  app.post('/api/shipments/:id/surcharge', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id || '');
+    const b = req.body || {};
+    const amount = Math.round((Number(b.amount) || 0) * 100) / 100;
+    if (!isFinite(amount) || amount <= 0) { reply.code(400); return { error: 'Enter the amount the carrier billed.' }; }
+    const o = (await q('select id, tracking, voided_tracking from orders where id=$1', [id]).catch(() => ({ rows: [] }))).rows[0];
+    if (!o) { reply.code(404); return { error: 'Order not found' }; }
+    // The TRACKING NUMBER is how the invoice names it, so it goes in the ref and in the
+    // note: reconciling a Shippo statement against our ledger is done on that number.
+    const tn = String(b.tracking || o.tracking || o.voided_tracking || '').trim();
+    const ref = `label-surcharge-${id}-${tn || 'na'}-${amount.toFixed(2)}`;
+    const note = `Carrier surcharge${tn ? ` · ${tn}` : ''}${b.note ? ` · ${String(b.note).slice(0, 120)}` : ''} · order ${id}`;
+    const r = await q(
+      `insert into wallet_ledger (account, delta, type, ref, note, order_id)
+       values ('factory', $1, 'label-cost', $2, $3, $4)
+       on conflict do nothing returning id`,
+      [-amount, ref, note, id]
+    ).catch((e) => { reply.code(500); return { rows: [], error: e.message }; });
+    const already = !r.rows || r.rows.length === 0;
+    audit(req, 'label.surcharge', { entityType: 'order', entityId: id, after: { amount, tracking: tn || null, duplicate: already } });
+    return { ok: true, amount, tracking: tn || null, duplicate: already };
+  });
+
   app.post('/api/shipments/:id/void', { preHandler: requireWarehouse }, async (req, reply) => {
     const id = String(req.params.id);
     /**
