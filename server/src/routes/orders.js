@@ -777,13 +777,25 @@ export function ordersRoutes(app, requireAuth) {
     .then(async () => {
       await q('alter table order_designs drop constraint if exists order_designs_pkey')
         .catch((e) => console.error('[order_designs] could not drop the old primary key:', e.message));
+      /**
+       * THE THREE-COLUMN INDEX IS TRIED, NOT DEMANDED.
+       *
+       * It was created here and then ASSERTED — "order_designs_line_key IS MISSING. Artwork
+       * uploads are broken. Create it by hand." — which was true when it was the ON CONFLICT
+       * target of every artwork save, and stopped being true the moment the per-side index
+       * below superseded it.
+       *
+       * Worse, it can never succeed again. Once any line carries artwork on two sides, front
+       * and back share (order, line, kind), so the unique index it demands is a constraint
+       * the data deliberately violates. The migration below even DROPS it on purpose.
+       *
+       * So the alarm fired on every boot of a healthy server, claiming an outage that was not
+       * happening. An alarm that is always on is an alarm nobody reads — and the log it was
+       * printed into is where a real failure has to be visible. It is a create-if-possible
+       * step now; the loud assertion moved to the index the inserts actually use.
+       */
       await q(`create unique index if not exists order_designs_line_key on order_designs (order_id, (${DESIGN_KEY}), kind)`)
-        .catch((e) => console.error('[order_designs] COULD NOT CREATE order_designs_line_key — design saves will fail with 42P10 until this exists:', e.message));
-      // Assert it, loudly. This index is load-bearing for every artwork write, and the
-      // failure mode is a 500 on a path nobody tests until a seller uses it.
-      const ok = await q("select 1 from pg_indexes where tablename='order_designs' and indexname='order_designs_line_key'")
-        .then((r) => r.rowCount).catch(() => 0);
-      if (!ok) console.error('[order_designs] order_designs_line_key IS MISSING. Artwork uploads are broken. Create it by hand.');
+        .catch(() => { /* superseded by order_designs_line_side_key below — see the note */ });
     })
     /**
      * A SIDE IS PART OF A DESIGN'S IDENTITY.
@@ -814,7 +826,10 @@ export function ordersRoutes(app, requireAuth) {
       const ok = await q("select 1 from pg_indexes where tablename='order_designs' and indexname='order_designs_line_side_key'")
         .then((r) => r.rowCount).catch(() => 0);
       if (!ok) {
-        console.error('[order_designs] order_designs_line_side_key IS MISSING — keeping the old index, because dropping it now would break every artwork save.');
+        // THE one that matters: this is the ON CONFLICT target of every artwork save, so
+        // without it a save raises 42P10 and returns 500. The old index is left in place
+        // deliberately — one side per line is a smaller failure than no artwork at all.
+        console.error('[order_designs] order_designs_line_side_key IS MISSING — ARTWORK SAVES WILL FAIL (42P10). The superseded one-per-line index is kept so saves degrade to front-only rather than stopping.');
         return;
       }
       // Safe: its replacement is in place and covers strictly more.
