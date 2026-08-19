@@ -57,7 +57,21 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
             ? "Not a stitch file — TrueView renders native .emb, and this is a .pes/.dst."
             : r.reason === "not-configured"
               ? "Wilcom isn't connected — an admin can add the keys in Integrations."
-              : r.error || (r.reason ? `Wilcom: ${r.reason}` : "The renderer returned no image."),
+              /**
+               * ERROR_FILE_SECURITY_INVALID, in words.
+               *
+               * Wilcom can lock an .emb to the licence that made it — design security, which
+               * a digitiser applies so their file cannot be opened and re-sold. Ours is a
+               * different licence, so EWA refuses to open it at all. Nothing on our side
+               * fixes that: the file has to come again unlocked, or as stitches we are
+               * allowed to read. Saying "file-security" told a designer a code; this tells
+               * them who to go back to.
+               */
+              : r.reason === "file-security"
+                ? "Locked by Wilcom design security — the digitiser's licence owns it and ours can't open it. Ask them for an unprotected .emb."
+                : r.reason === "ewa-rejected"
+                  ? "Wilcom refused the file without saying why."
+                  : r.error || (r.reason ? `Wilcom: ${r.reason}` : "The renderer returned no image."),
         )
       })
       .catch((e) => setWhy(e instanceof Error ? e.message : "Couldn't reach the renderer."))
