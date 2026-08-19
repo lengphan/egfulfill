@@ -1742,6 +1742,15 @@ export function DesignCanvasDialog({
             underneath the ✕. */}
         <DialogHeader>
           <DialogTitle className="line-clamp-2 pr-10 leading-snug">{item.name || item.sku}</DialogTitle>
+          {/* THE VARIANT, READ-ONLY. What is being printed on is a thing this window has to
+              state and does not need to own: the picker is on the order's item row, and two
+              controls for one fact is how the two disagree. A line of text answers "what am
+              I placing this on" without being a second place to change it. */}
+          {[item.color, item.size, item.print_type].some(Boolean) && (
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+              {[item.blank || item.sku, item.color, item.size, item.print_type].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </DialogHeader>
         {/* TWO COLUMNS from lg up: the garment on the left, every control on the right.
             Stacked, the stage alone ate the window and the steps, thread match and charge all
@@ -1752,7 +1761,17 @@ export function DesignCanvasDialog({
             when it does scroll the garment stays put instead of leaving the screen. Below lg
             it collapses back to the original single stack — two columns in a phone-width
             dialog would make both of them useless. */}
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+        {/**
+          * ONE COLUMN, IMAGE FIRST.
+          *
+          * This was `1fr | 380px` — a fixed rail beside the garment — and the rail is what
+          * kept the stage at min(54vh, 460px): a picture SMALLER than the library dialog
+          * that opens on top of it. With the steps and the charge gone the rail held one
+          * repeated fact (the variant, already on the order row) and a card only embroidery
+          * uses, so it was 380px of column earning almost nothing and costing the one thing
+          * this window is for.
+          */}
+        <div className="flex flex-col gap-5">
         {/* The left column is sized to the stage itself rather than to half the dialog. An
             even 50/50 split gave the controls far more width than their cards use and stranded
             the remainder as dead space beside them; letting the garment take what it needs and
@@ -1812,7 +1831,10 @@ export function DesignCanvasDialog({
           * which genuinely was too small) and it lets the two columns end near each other,
           * which is what stops a dialog reading as half-empty.
           */}
-        <div className="relative w-full max-w-[min(100%,54vh,460px)]">
+        {/* 72vh, not 54: the cap existed to leave room for a column that is no longer
+            there. Still capped rather than free — past ~720px the artwork is being judged at
+            a size no garment is ever seen at. */}
+        <div className="relative mx-auto w-full max-w-[min(100%,72vh,720px)]">
           <DesignStage
             className="w-full" mockup={activeMockup}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -2082,28 +2104,11 @@ export function DesignCanvasDialog({
             it was avoiding only ever appeared on an empty line, and a gap below the last
             control reads as nothing at all; a first step that starts halfway down does not. */}
         <div className="flex flex-col gap-4 lg:min-w-0 lg:self-start">
-        {/**
-          * THE BLANK, PICKED HERE.
-          *
-          * Placing artwork and choosing what it goes ON are one decision, and they were two
-          * screens: you opened this window, found the line had no blank, closed it, picked
-          * the blank in the order table, and opened it again. The mockup behind this rail is
-          * drawn FROM that choice, so the one place it obviously belongs is the one place it
-          * wasn't.
-          *
-          * The real VariantPicker, not a private dropdown — it owns the resolution rules, the
-          * post-submit refusal and the method list, and a second implementation would drift
-          * from the row that shows the same four values (CLAUDE.md §5).
-          */}
-        {catalog && catalog.length > 0 && (
-          <div className="rounded-lg border border-border p-2.5">
-            <div className="mb-1.5 text-sm font-medium">Product</div>
-            {/* dense: the rail is a fixed 380px column, and the picker's four-across layout
-                turns on at the `sm` VIEWPORT — which is true here and wrong here, so Size and
-                Method came out as "S.." and "E...". Two per row fits. */}
-            <VariantPicker dense orderId={orderId} item={item} catalog={catalog} onSaved={() => onSaved?.()} />
-          </div>
-        )}
+        {/* THE VARIANT IS NOT PICKED HERE ANY MORE.
+            It is on the order's item row, four fields wide, and this window repeated the
+            same picker on the same line — two places to change one fact, and the second one
+            reachable only by opening a dialog. What this window needs from it is not a
+            control but a sentence, and that is in the header above. */}
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads.
             `order-last` rather than moving the block: it sits first in the markup for historical
@@ -2470,20 +2475,8 @@ export function DesignCanvasDialog({
               buttons because they are two separate things: the image is what the mockup shows,
               the machine file is what the machine stitches, and an order can legitimately want
               one shared and the other per-item. */}
-          {(designUrl || latestMachine) && !!siblings?.length && (
-            <div className="flex flex-wrap gap-1.5">
-              {designUrl && (
-                <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
-                  {applying ? "Applying…" : `Apply ${sideName} image to all items`}
-                </Button>
-              )}
-              {latestMachine && (
-                <Button variant="outline" size="sm" disabled={fileBusy} onClick={() => void applyFileToAll()}>
-                  {fileBusy ? "Applying…" : "Apply file to all items"}
-                </Button>
-              )}
-            </div>
-          )}
+          {/* THE SHORTCUT MOVED to the action bar at the bottom, with Save — it is an action,
+              and actions belong in one row rather than scattered up a column. */}
           {/* WHERE THIS LINE IS ON THE BOARD. Named lane, not a generic "sent" — "sent to
               design" three days ago and "Approved" are very different answers, and the lane
               is the one the board itself shows. */}
@@ -2574,7 +2567,36 @@ export function DesignCanvasDialog({
                 : "Add your design above, then save."}
             </p>
           )}
-          <div className="flex items-center justify-end gap-2">
+          {/* ONE ACTION BAR. Apply-to-all sat halfway up a column while Save sat at the
+              bottom, so the two things you press at the END of the job were in different
+              places. The shortcut goes LEFT, away from Save: "and the other nine" is a
+              different decision from "keep this", and they should not be neighbours you can
+              hit by accident.
+
+              "Apply All", not "Apply front image to all items" — the button sits under the
+              garment it applies, on the face you are looking at, next to the file it would
+              copy. The sentence was describing its own context back to itself. */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {(designUrl || latestMachine) && !!siblings?.length && (
+              <div className="mr-auto flex flex-wrap gap-1.5">
+                {designUrl && (
+                  <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}
+                    title={`Put this ${sideName} image on every other line of this order`}>
+                    {applying ? "Applying…" : "Apply All"}
+                  </Button>
+                )}
+                {/* The machine file keeps its own word: the image is what the mockup shows
+                    and the file is what the machine stitches, and an order can legitimately
+                    want one shared and the other per item. Two buttons both reading "Apply
+                    All" would be one button with a coin toss. */}
+                {latestMachine && (
+                  <Button variant="outline" size="sm" disabled={fileBusy} onClick={() => void applyFileToAll()}
+                    title="Put this machine file on every other line of this order">
+                    {fileBusy ? "Applying…" : "Apply file to all"}
+                  </Button>
+                )}
+              </div>
+            )}
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             {/* "Save", not "Save design" — it saves the item: every face's artwork at once,
                 and the threads with it. And enabled whenever ANY face carries artwork, not
