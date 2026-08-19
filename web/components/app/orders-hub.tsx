@@ -673,9 +673,8 @@ export function OrdersHub() {
   const startOrder = async (order: OrderRow) => {
     setBusy(`ord:${order.id}`)
     try {
-      for (const it of order.items ?? []) {
-        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "working", it.line_id)
-      }
+      /* One request. The per-line loop this replaced could stop halfway and leave an order
+         that had "started" with some of it still waiting. */
       await updateOrder(order.id, { factoryStatus: "working" })
       setActionErr(null)
     } catch (e) {
@@ -743,7 +742,13 @@ export function OrdersHub() {
       } else if (prev === "on_hold" && to !== "on_hold" && o.meta && "hold_from" in o.meta) {
         const m = { ...o.meta }; delete m.hold_from; metaPatch = m
       }
-      for (const it of o.items ?? []) if (it.sku || it.line_id) { patchItem(o.id, it.sku ?? "", to, it.line_id); await postItemStatus(o.id, it.sku ?? "", to, it.line_id) }
+      /* THE ROWS MOVE OPTIMISTICALLY; THE MOVE ITSELF IS ONE REQUEST.
+         This looped a call PER LINE and then patched the order — so a line that failed
+         halfway left the order half-moved, with no way back and nothing on screen saying
+         which lines had gone. The order PATCH now moves every line server-side, in one
+         statement, under the same gate that authorised the order. patchItem stays: it is
+         what makes the table redraw before the round trip. */
+      for (const it of o.items ?? []) if (it.sku || it.line_id) patchItem(o.id, it.sku ?? "", to, it.line_id)
       await updateOrder(o.id, metaPatch ? { factoryStatus: to, meta: metaPatch } : { factoryStatus: to })
       setActionErr(null)
     } catch (e) {

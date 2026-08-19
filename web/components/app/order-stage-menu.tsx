@@ -4,7 +4,7 @@ import { useState } from "react"
 import { DotsThree } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk, isFactoryOrder } from "@/lib/factory-status"
-import { postItemStatus, updateOrder, type OrderRow } from "@/lib/api"
+import { updateOrder, type OrderRow } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
 /**
@@ -51,7 +51,9 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   const setOrderStatus = async (to: string) => {
     setBusy(true)
     try {
-      for (const it of items) if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", to, it.line_id)
+      /* ONE REQUEST, not one per line. The order PATCH moves every line server-side now,
+         under the same gate that authorised the order — this looped from the browser, so a
+         failure partway left the order half-moved and the menu had no idea which half. */
       await updateOrder(order.id, { factoryStatus: to })
       onChanged()
     } catch (e) {

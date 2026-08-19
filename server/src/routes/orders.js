@@ -1700,6 +1700,33 @@ export function ordersRoutes(app, requireAuth) {
         });
       })().catch(() => {});
     }
+    /**
+     * MOVING THE ORDER MOVES ITS LINES — here, in one request, instead of the browser
+     * looping over them.
+     *
+     * Every client that changed an order's stage fired one item-status call PER LINE and
+     * then PATCHed the order. Two problems, and both are real: a line that failed halfway
+     * left the order half-moved with no way back and nothing on screen to say which lines
+     * went, and the per-line gate and the order gate were evaluated SEPARATELY — the
+     * authority for one move was checked twice, against two different current stages.
+     *
+     * The denial has already run ONCE above, against the order's own stage, which is the
+     * decision the person actually made ("set this order to Working"). The lines follow it.
+     *
+     * NOT a replacement for item-status: production is genuinely per line, and the floor
+     * moves one at a time. This is the order-level act — the one the boards and the order
+     * screen mean — and it is now atomic in the only sense that matters here, a single
+     * statement over every line of the order.
+     */
+    if (body.factoryStatus !== undefined) {
+      const want = String(body.factoryStatus ?? '');
+      const r = await q('update order_items set factory_status=$1 where order_id=$2', [want, req.params.id])
+        .catch((e) => { console.error('[orders] lines did not follow the order stage:', e.message); return null; });
+      if (r) audit(req, 'order.stage_lines', {
+        entityType: 'order', entityId: String(req.params.id),
+        after: { status: want, lines: r.rowCount },
+      });
+    }
     // Accepting the WHOLE order into production holds its blanks too — the same act as the
     // per-line route above, reached from the order screen instead of the board.
     if (normalizeStage(String(body.factoryStatus ?? body.status ?? '')) === 'working') {
