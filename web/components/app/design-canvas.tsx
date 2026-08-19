@@ -1587,6 +1587,30 @@ export function DesignCanvasDialog({
     } finally { setTplBusy(false) }
   }
 
+  /**
+   * ONE INTAKE FOR ONE WINDOW — dropped or browsed, the same rules.
+   *
+   * A STITCH FILE ONLY FITS AN EMBROIDERED LINE. On a DTG or laser line there is no machine
+   * to run it and no check to perform, so filing one there is not a near-miss — it is a fee
+   * raised for a file nothing can use. This refusal used to live only in the drop handler,
+   * so the file picker beside it would happily accept what the drop refused.
+   */
+  const takeFile = (f: File | undefined) => {
+    if (!f) return
+    if (MACHINE_RE.test(f.name)) {
+      if (!isEmb) {
+        setErr(`${f.name} is an embroidery file, and this line is ${item.print_type || "not embroidered"} — there is no machine to run it. Use a PNG or JPG instead.`)
+        return
+      }
+      void attachMachineFile(f); return
+    }
+    if (!/^image\//.test(f.type)) {
+      setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
+      return
+    }
+    readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f.name); setPos(DEFAULT_POS) }, setErr)
+  }
+
   const removeArtwork = async () => {
     if (removing) return   // a second click would open a second confirm over the first
     const saved = !!artAtOpen && !!designUrl
@@ -1768,18 +1792,7 @@ export function DesignCanvasDialog({
             * can use. The seller card has always refused this; this window took the drop and
             * attached it, which is the same mistake with fewer words.
             */
-          if (MACHINE_RE.test(f.name)) {
-            if (!isEmb) {
-              setErr(`${f.name} is an embroidery file, and this line is ${item.print_type || "not embroidered"} — there is no machine to run it. Drop a PNG or JPG instead.`)
-              return
-            }
-            void attachMachineFile(f); return
-          }
-          if (!/^image\//.test(f.type)) {
-            setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
-            return
-          }
-          readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f.name); setPos(DEFAULT_POS) }, setErr)
+          takeFile(f)
         }}
       >
         {/* Dropping anywhere in the window still works — but it no longer outlines the WHOLE
@@ -1951,12 +1964,16 @@ export function DesignCanvasDialog({
             <button
               type="button"
               onClick={() => uploadRef.current?.click()}
-              title={designUrl ? "Replace the artwork" : "Upload artwork"}
-              aria-label={designUrl ? "Replace the artwork" : "Upload artwork"}
+              /* ONE WORD, ALWAYS. "Replace" described the state of the line rather than the
+                 action, so the tool that puts a file on this garment had two names depending
+                 on whether you had already used it. The title names every type it takes —
+                 which is the question actually being asked at the moment of pressing it. */
+              title={`Upload — ${isEmb ? "PNG or JPG, or a machine file (.EMB .PES .DST .EXP .JEF …)" : "PNG or JPG"}`}
+              aria-label="Upload a file"
               className={railBtn}
             >
               <UploadSimple size={18} weight="bold" />
-              <span className={railWord}>{designUrl ? "Replace" : "Upload"}</span>
+              <span className={railWord}>Upload</span>
             </button>
             <button
               type="button"
@@ -2395,8 +2412,13 @@ export function DesignCanvasDialog({
           {/* The artwork input the STAGE opens. An explicit Upload image / Replace button is
               always shown too: the empty stage alone wasn't discoverable, which left people
               staring at a greyed-out Save with no obvious way to add the image. */}
-          <input ref={uploadRef} type="file" accept="image/*" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f?.name ?? null); setPos(DEFAULT_POS) }, setErr); e.target.value = "" }} />
+          {/* IT TAKES A MACHINE FILE TOO. The picker accepted image/* while the DROP handler
+              on the same window took a .pes and filed it — so the same file was accepted by
+              dragging and refused by browsing, from one control. Both routes now run the
+              same intake, which is also where the "a stitch file only fits an embroidered
+              line" refusal lives. */}
+          <input ref={uploadRef} type="file" accept={"image/*," + MACHINE_EXT_LIST} className="hidden"
+            onChange={(e) => { takeFile(e.target.files?.[0]); e.target.value = "" }} />
         <input ref={mockupRef} type="file" accept="image/*" className="hidden"
           onChange={(e) => { void setOwnMockup(e.target.files?.[0]); e.target.value = "" }} />
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
@@ -2516,32 +2538,18 @@ export function DesignCanvasDialog({
                     : ""}
                 </span>
               </div>
+              {/* THE FILE ROWS ARE GONE — "Embroidery file · pant.EMB" over [Replace file]
+                  [Download] [Remove].
+                  ────────────────────────────────────────────────────────────────────────
+                  Attaching one is the rail's Upload now, which takes a PNG, a JPG or a
+                  machine file through one intake, so the window has ONE place a file goes in
+                  rather than a general one on the artboard and a special one buried in a
+                  drawer. Downloading or removing it is the order's Design files panel, which
+                  lists every file on the order with the same two controls on every row —
+                  this was a second, differently-worded copy of that for one file.
+                  What stays here is the ROUTE that is not about a file we already hold: a
+                  designer cutting one from the image. */}
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <Button
-                  variant="outline" size="sm"
-                  disabled={filesLocked}
-                  title={filesLocked ? lockedWhy : undefined}
-                  onClick={() => machineRef.current?.click()}
-                >
-                  {hasMachineFile ? "Replace file" : "Attach file"}
-                </Button>
-                {/* THE SECOND ROUTE TO THE SAME THING, standing beside the first.
-                    ──────────────────────────────────────────────────────────────
-                    There are exactly two ways this line ever gets a stitch file: someone
-                    hands us one, or a designer cuts one from the image. They are
-                    alternatives — the owner's word for it was "either or" — and they were
-                    being shown in two different places, one as a button inside this step
-                    and one as a strip floating below the whole section. Reading the panel
-                    meant discovering that the orphan strip at the bottom answered the
-                    question the step above had just asked.
-
-                    Now they sit side by side, so the choice is visible as a choice, and the
-                    whole panel is two rows that each read "or": the image comes from an
-                    upload OR the library, the stitch file comes from a file OR a designer.
-
-                    Hidden once a file exists (nothing left to cut) or once it is already
-                    with a designer (the subtitle says so) — so this is never a third thing
-                    to weigh, only ever the other half of one decision. */}
                 {isStaff && !hasMachineFile && !boardCard && (
                   <Button
                     size="sm"
@@ -2550,54 +2558,6 @@ export function DesignCanvasDialog({
                     onClick={() => void sendToBoard()}
                   >
                     {sending ? "Sending…" : "Send to Board"}
-                  </Button>
-                )}
-                {/* DOWNLOAD. The file could be attached, named and confirmed here with no way
-                    to actually get it — the only route to the bytes was the readiness chip in
-                    the row behind this dialog, which is not where anyone looks for it.
-                    Routed through downloadDesignFile (/api/design_files/:id) rather than a raw
-                    URL, because that route is where the paywall and the seller/staff checks
-                    live — a direct link would hand out bytes the caller may not have bought. */}
-                {latestMachine && (
-                  <>
-                  <Button variant="outline" size="sm" disabled={dlBusy} onClick={() => void downloadMachine()}>
-                    {dlBusy
-                      ? <><CircleNotch size={13} className="animate-spin" /> Fetching…</>
-                      : <><DownloadSimple size={13} weight="bold" /> Download</>}
-                  </Button>
-                  </>
-                )}
-                              {/* REMOVE. The artwork on the canvas has always had its X; the machine file
-                    had Replace and Download and no way to say "not this one after all". A
-                    wrong .emb had to be overwritten by another file, so a line could never
-                    return to having none — and the readiness chip kept reading as ready.
-                    Deletes the newest file for THIS line only; siblings keep theirs. */}
-                {hasMachineFile && latestMachine && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={fileBusy || filesLocked}
-                    title={filesLocked ? lockedWhy : undefined}
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: `Remove ${latestMachine.name}?`,
-                        body: "This line goes back to having no machine file. Other items on the order keep theirs.",
-                        confirmLabel: "Remove file",
-                        destructive: true,
-                      })
-                      if (!ok) return
-                      setFileBusy(true); setErr(null)
-                      try {
-                        const r = await deleteDesignFile(latestMachine.designId)
-                        if (r && r.error) throw new Error(r.error)
-                        setHasFile(false); setLatestMachine(null); setJustAttachedFile(false)
-                      } catch (e) {
-                        setErr(e instanceof Error ? e.message : "Couldn't remove the file.")
-                      } finally { setFileBusy(false) }
-                    }}
-                  >
-                    Remove
                   </Button>
                 )}
 </div>
