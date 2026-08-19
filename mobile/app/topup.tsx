@@ -83,6 +83,18 @@ export default function TopUp() {
     }
   }, [])
 
+  /** Paid rows from the ledger and unpaid ones from topup_requests, newest first. Two
+   *  sources because they are the same fact at two moments — see the note on the list. */
+  const entries = [
+    ...(history ?? []).map((r) => ({
+      key: `l${r.id}`, usd: Number(r.delta) || 0, at: r.created_at, paid: true,
+      req: undefined as TopupRequest | undefined,
+    })),
+    ...(open_ ?? []).map((r) => ({
+      key: `r${r.id}`, usd: Number(r.amount_usd) || 0, at: r.created_at, paid: false, req: r,
+    })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+
   const usdAmt = Number(amount) || 0
   const minUsd = cfg?.minUsd ?? 0
   // The better rate applies from the tier it belongs to — same walk the web does, so the
@@ -158,6 +170,45 @@ export default function TopUp() {
    * share sheet, where "Save Image" puts it in Photos without us asking for the photo
    * library permission up front.
    */
+  /**
+   * OPEN AN UNPAID REQUEST AGAIN — never mint a second one.
+   *
+   * A VietQR request is a virtual account created for one payment. "Pay it later" therefore
+   * has to mean re-showing THAT code: creating another would leave two live accounts for the
+   * same money, and a transfer against the abandoned one would arrive matching nothing.
+   *
+   * Everything drawn here comes off the stored row, so the code shown is byte-for-byte the
+   * one issued — which is the whole point, since VietQR reconciles against what it issued.
+   */
+  const reopen = useCallback((r: TopupRequest) => {
+    if (!r.qr_code) return
+    if (poll.current) clearInterval(poll.current)
+    setErr(null)
+    setPayment({
+      ok: true,
+      qrCode: r.qr_code,
+      note: r.ref || "",
+      content: r.qr_content || r.ref || "",
+      amount: Number(r.vnd) || 0,
+      amountUsd: Number(r.amount_usd) || 0,
+      name: r.receiver_name || "",
+      bankCode: r.bank_code || "",
+      vaAccount: r.va_account || "",
+    })
+    setPhase("qr")
+    const ref = r.ref || ""
+    /* NOT put back into openRef: that ref drives abandon-on-exit, and a request the seller
+       deliberately came back to must not be withdrawn again for leaving the screen twice. */
+    if (ref) {
+      poll.current = setInterval(async () => {
+        try {
+          const st = await vietqrStatus(ref)
+          if (st.paid) { if (poll.current) clearInterval(poll.current); setPhase("paid") }
+        } catch { /* a dropped poll is not a failed payment */ }
+      }, 4000)
+    }
+  }, [])
+
   const saveQr = useCallback(async () => {
     const ref = qrRef.current
     if (!ref?.toDataURL) { Alert.alert("Nothing to save", "The code hasn't finished drawing yet."); return }
@@ -360,82 +411,73 @@ export default function TopUp() {
                 transfer land?") and anything longer belongs in the wallet's full ledger,
                 which is one screen away. Five rows, amount and date, nothing else. */}
             {/*
-              * AWAITING PAYMENT — the state that had nowhere to appear.
+              * ONE LIST, EACH ROW CARRYING ITS OWN STATUS.
               *
-              * Saving the QR means leaving for a banking app, and coming back to a screen
-              * that shows nothing in flight reads as "my request vanished". These rows are
-              * the proof it did not.
+              * Paid top-ups come from the LEDGER and unpaid requests from topup_requests,
+              * because a ledger row is only written when the money lands — so a payment in
+              * flight has no ledger row at all and used to be invisible here. They are the
+              * same fact at two moments, so they read as one list in one order, and the
+              * status is on the row rather than in a heading above a separate section.
               *
-              * `abandoned` is shown too, and not as a failure: closing the QR only takes the
-              * request out of the ADMIN queue, because an unpaid VietQR is nothing for them
-              * to act on. The virtual account stays live and the reference still settles, so
-              * it is a payment the seller can still make.
+              * An unpaid row is PRESSABLE: it re-opens the code that was issued for it. That
+              * is the reason the QR is stored — "pay it later" has to mean paying THAT
+              * virtual account, and creating a fresh one would leave two live accounts for
+              * the same money.
+              *
+              * Abandoned is not shown as a failure. Closing the QR only takes the request out
+              * of the admin queue; the account stays live and the reference still settles.
               */}
-            {open_ !== null && open_.length > 0 && (
-              <>
-                <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1, marginTop: 28 }}>
-                  AWAITING PAYMENT
-                </Text>
-                <View style={{ marginTop: 8, borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.card }}>
-                  {open_.map((r, i) => (
-                    <View
-                      key={r.id}
-                      style={{
-                        flexDirection: "row", alignItems: "center", gap: 12,
-                        paddingHorizontal: 16, paddingVertical: 14,
-                        borderTopWidth: i ? 1 : 0, borderTopColor: C.border,
-                      }}
-                    >
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={{ fontSize: 16, fontWeight: "800", color: C.fg }}>
-                          {usd0(Number(r.amount_usd) || 0)}
-                          {r.vnd ? <Text style={{ fontSize: 13, fontWeight: "400", color: C.muted }}>{`  ${vnd0(Number(r.vnd))}`}</Text> : null}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                          {r.ref ? `Ref ${r.ref} · ` : ""}
-                          {new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        </Text>
-                      </View>
-                      <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: "#fdf3e3" }}>
-                        <Text style={{ fontSize: 12, fontWeight: "800", color: C.warn }}>Awaiting payment</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-                <Text style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 19 }}>
-                  Pay one of these from your banking app and the balance updates on its own —
-                  the account and reference stay live.
-                </Text>
-              </>
-            )}
-
-            {history !== null && history.length > 0 && (
+            {(entries.length > 0) && (
               <View style={{ marginTop: 36 }}>
                 <Text style={{ fontSize: 12, fontWeight: "800", color: C.muted, letterSpacing: 1 }}>
-                  RECENT TOP-UPS
+                  TOP-UPS
                 </Text>
                 <View style={{ marginTop: 6 }}>
-                  {history.map((r) => (
-                    <View
-                      key={String(r.id)}
-                      style={{
-                        flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12,
-                        paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border,
-                      }}
-                    >
-                      <Text style={{ fontSize: 14, color: C.muted }}>
-                        {new Date(r.created_at).toLocaleDateString()}
-                      </Text>
-                      <Text style={{ fontSize: 15, fontWeight: "800", color: "#0a7c42" }}>
-                        +${(Number(r.delta) || 0).toFixed(2)}
-                      </Text>
-                    </View>
-                  ))}
+                  {entries.map((e) => {
+                    const row = (
+                      <View
+                        style={{
+                          flexDirection: "row", alignItems: "center", gap: 12,
+                          paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border,
+                        }}
+                      >
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ fontSize: 15, fontWeight: "800", color: C.fg }}>
+                            {e.paid ? "+" : ""}{usd0(e.usd)}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                            {new Date(e.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                            {e.req?.ref ? ` · ${e.req.ref}` : ""}
+                          </Text>
+                        </View>
+                        <View style={{
+                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+                          backgroundColor: e.paid ? "#e7f6ef" : "#fdf3e3",
+                        }}>
+                          <Text style={{ fontSize: 12, fontWeight: "800", color: e.paid ? "#0a7c42" : C.warn }}>
+                            {e.paid ? "Paid" : "Awaiting payment"}
+                          </Text>
+                        </View>
+                      </View>
+                    )
+                    return e.req?.qr_code ? (
+                      <Pressable key={e.key} onPress={() => reopen(e.req as TopupRequest)}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                        {row}
+                      </Pressable>
+                    ) : <View key={e.key}>{row}</View>
+                  })}
                 </View>
+                {entries.some((e) => !e.paid) && (
+                  <Text style={{ fontSize: 13, color: C.muted, marginTop: 10, lineHeight: 19 }}>
+                    Tap one awaiting payment to bring its QR back — the account and reference
+                    stay live, so paying it still credits your balance.
+                  </Text>
+                )}
               </View>
             )}
 
-            {history !== null && history.length === 0 && (
+            {history !== null && open_ !== null && entries.length === 0 && (
               <Text style={{ fontSize: 14, color: C.muted, marginTop: 36 }}>
                 No top-ups yet.
               </Text>

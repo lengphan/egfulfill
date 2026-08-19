@@ -25,6 +25,22 @@ export function topupsRoutes(app, requireAuth) {
   q(`alter table topup_requests add column if not exists txn_id text`).catch(() => {});
   q(`alter table topup_requests add column if not exists method text`).catch(() => {});
   q(`alter table topup_requests add column if not exists attachment text`).catch(() => {});
+  /**
+   * THE QR, KEPT, so an unpaid request can be opened again.
+   *
+   * A VietQR request is a virtual account minted for one payment. The row recorded the ref
+   * and the amount and nothing you could actually pay — so a seller who saved the QR, left
+   * for their banking app and came back had a request they could see and no way back to the
+   * code. Creating another would mint a SECOND virtual account for the same money.
+   *
+   * These are our own receiving details, not the payer's: safe on the seller's own row, and
+   * on a staff view where the point is knowing which account was quoted.
+   */
+  q(`alter table topup_requests add column if not exists qr_code text`).catch(() => {});
+  q(`alter table topup_requests add column if not exists qr_content text`).catch(() => {});
+  q(`alter table topup_requests add column if not exists bank_code text`).catch(() => {});
+  q(`alter table topup_requests add column if not exists va_account text`).catch(() => {});
+  q(`alter table topup_requests add column if not exists receiver_name text`).catch(() => {});
 
   // Seller creates a pending top-up (after they've transferred via VietQR).
   app.post('/api/topups', { preHandler: requireAuth }, async (req, reply) => {

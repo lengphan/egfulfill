@@ -396,6 +396,14 @@ export type TopupRequest = {
   ref?: string | null
   status: "pending" | "received" | "rejected" | "abandoned" | string
   created_at: string
+  /* The QR, kept on the row so an unpaid request can be OPENED AGAIN rather than replaced.
+     A VietQR request is a virtual account minted for one payment — creating another mints a
+     second account for the same money, which is how one transfer ends up unmatched. */
+  qr_code?: string | null
+  qr_content?: string | null
+  bank_code?: string | null
+  va_account?: string | null
+  receiver_name?: string | null
 }
 export const getMyTopups = () => request<TopupRequest[]>("/api/topups")
 

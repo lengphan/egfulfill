@@ -412,9 +412,13 @@ export function vietqrRoutes(app, requireAuth) {
       const amountUsd = Math.round((amount / applicable) * 100) / 100;
       try {
         await q(
-          `insert into topup_requests (seller_id, seller_email, amount_usd, vnd, ref, method, status)
-           values ($1,$2,$3,$4,$5,'VietQR','pending')`,
-          [req.user.sub, req.user.email || null, amountUsd, amount, note]
+          `insert into topup_requests
+             (seller_id, seller_email, amount_usd, vnd, ref, method, status,
+              qr_code, qr_content, bank_code, va_account, receiver_name)
+           values ($1,$2,$3,$4,$5,'VietQR','pending',$6,$7,$8,$9,$10)`,
+          [req.user.sub, req.user.email || null, amountUsd, amount, note,
+           gd.qrCode || null, gd.content || note, bankCode || null,
+           gd.vaAccount || account || null, name || null]
         );
       } catch (e) { req.log?.warn?.({ err: String(e) }, 'vietqr pending topup insert failed'); }
       return {
