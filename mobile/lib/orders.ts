@@ -174,7 +174,14 @@ export const shortOrderRef = (id: string) => {
   const m = raw.match(/^FF-.*-([A-Za-z0-9]+)$/)     // FF-ombao6-msyfrdqn-2mfrc → FF-2mfrc
   return m ? `FF-${m[1]}` : raw
 }
-export const numOf = (o: Order) => (o.seq ? `#${o.seq}` : shortOrderRef(String(o.id)))
+/** Mirrors web/lib/order-format.ts numOf — same rule, same shape, so the phone and the
+ *  packing slip never quote an order differently. The hash marks a NUMBER; our own
+ *  FF-… references already read as references and do not take one. */
+export const numOf = (o: Order) => {
+  if (o.seq) return `#${o.seq}`
+  const ref = shortOrderRef(String(o.id))
+  return /^\d+$/.test(ref) ? `#${ref}` : ref
+}
 export const platformOf = (o: Order) => {
   const raw = (String(o.id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
   return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))

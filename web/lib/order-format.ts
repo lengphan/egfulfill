@@ -53,7 +53,23 @@ const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
  *  this order. Takes a bare id, so screens that hold something narrower than an OrderRow
  *  (Shipments holds a parcel, not an order) can read it without a private copy of the regex. */
 export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, "")
-export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : plainNum(String(o.id)))
+/**
+ * THE NUMBER, WITH ONE SHAPE.
+ *
+ * This read `#52` for one of ours and a bare `4149084185` for an Etsy order, side by side
+ * in the same column — two things that are the same KIND of fact wearing two formats, which
+ * makes a list look like it is showing you two different columns. The hash is what says
+ * "this is the order number", and it is as true of a marketplace receipt as of our own
+ * sequence; Etsy prints its own receipts as `#4149084185` too.
+ *
+ * Only for a number. Our own ids are `FF-<tag>-<time>-<rand>` and a hash in front of that
+ * says nothing — it is already unmistakably a reference.
+ */
+export const numOf = (o: OrderRow) => {
+  if (o.seq) return `#${o.seq}`
+  const p = plainNum(String(o.id))
+  return /^\d+$/.test(p) ? `#${p}` : p
+}
 
 /**
  * A readable ref when ALL you hold is the id — no seq, no row to read it from.

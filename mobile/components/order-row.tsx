@@ -103,13 +103,45 @@ function RowMenu({ open, onClose, title, actions }: {
 
   if (!shown) return null
 
+  /* GROUPED. The look actions in one block, the ones that CHANGE the order in another.
+     A single list of five makes five equal-looking decisions out of one that matters and
+     four that don't. */
+  const look = live.filter((a) => !a.strong)
+  const change = live.filter((a) => a.strong)
+
+  const Block = ({ items }: { items: Exclude<Action, null>[] }) => (
+    <View style={{ backgroundColor: C.card, borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
+      {items.map((a, i) => (
+        <Pressable
+          key={a.label}
+          onPress={() => { onClose(); a.run() }}
+          /* 60pt tall. The rows were 15pt of padding around 16pt type and split by
+             hairlines — a small target on a hand that is also holding a garment, and
+             hairlines between touchables read as decoration rather than as edges. A filled
+             block with real height says "press anywhere in here". */
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: 12,
+            paddingHorizontal: 18, height: 60,
+            borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
+            backgroundColor: pressed ? C.accent : "transparent",
+          })}
+        >
+          <Text style={{ flex: 1, fontSize: 16.5, fontFamily: a.strong ? F.semi : F.body, color: C.fg }}>{a.label}</Text>
+          {/* Icon trailing, as Threads has it: the words are what you read down, and a
+              column of glyphs on the left pushes every label away from the edge. */}
+          <Ionicons name={a.icon} size={21} color={a.strong ? C.fg : C.muted} />
+        </Pressable>
+      ))}
+    </View>
+  )
+
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose}>
       {/* Catches the tap OUTSIDE the sheet, and draws nothing. */}
       <Pressable onPress={onClose} style={{ flex: 1, justifyContent: "flex-end" }}>
         <Animated.View
           style={{
-            transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 460] }) }],
+            transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 620] }) }],
           }}
         >
           {/* Stops a tap INSIDE the sheet from reaching the backdrop above. */}
@@ -117,34 +149,21 @@ function RowMenu({ open, onClose, title, actions }: {
             onPress={() => {}}
             style={{
               backgroundColor: C.bg,
-              borderTopLeftRadius: 20, borderTopRightRadius: 20,
-              paddingTop: 10, paddingBottom: 34, paddingHorizontal: 18,
-              // With no scrim behind it the sheet has to carry its own separation from the
-              // page, or its top edge simply dissolves into paper of the same colour.
+              borderTopLeftRadius: 22, borderTopRightRadius: 22,
+              paddingTop: 10, paddingBottom: 40, paddingHorizontal: 14,
+              // With no scrim behind it the sheet carries its own separation, or its top
+              // edge dissolves into paper of exactly the same colour.
               borderTopWidth: 1, borderColor: C.border,
               shadowColor: "#0B0B0C", shadowOpacity: 0.13, shadowRadius: 22,
               shadowOffset: { width: 0, height: -6 }, elevation: 16,
             }}
           >
-            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 12 }} />
-            <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, marginBottom: 4 }}>
+            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 14 }} />
+            <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, paddingHorizontal: 4 }}>
               {title.toUpperCase()}
             </Text>
-            {live.map((a, i) => (
-              <Pressable
-                key={a.label}
-                onPress={() => { onClose(); a.run() }}
-                style={({ pressed }) => ({
-                  flexDirection: "row", alignItems: "center", gap: 12,
-                  paddingVertical: 15,
-                  borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
-                  opacity: pressed ? 0.55 : 1,
-                })}
-              >
-                <Ionicons name={a.icon} size={19} color={a.strong ? C.fg : C.muted} />
-                <Text style={{ fontSize: 16, fontFamily: a.strong ? F.semi : F.body, color: C.fg }}>{a.label}</Text>
-              </Pressable>
-            ))}
+            {change.length > 0 && <Block items={change} />}
+            {look.length > 0 && <Block items={look} />}
           </Pressable>
         </Animated.View>
       </Pressable>
