@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { View, Text, Image, Pressable, Modal } from "react-native"
+import { View, Text, Image, Pressable, Modal, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order, type OrderItem } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
@@ -52,29 +52,37 @@ function ImagePeek({ uri, title, open, onClose }: {
  *  thumbnail, so repeating it here reads as a duplicate rather than as a second item.
  *  Beyond four the strip stops being scannable and starts being a texture, so the rest are
  *  counted instead. */
-function ItemStrip({ items }: { items: OrderItem[] }) {
-  const shown = items.slice(0, 4)
-  const rest = items.length - shown.length
+function ItemStrip({ items, onPeek }: { items: OrderItem[]; onPeek: (uri: string, title: string) => void }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
-      {shown.map((it, i) => {
-        const uri = assetUrl(it.img_ref || it.img || it.design_src)
-        return uri ? (
-          <Image key={it.line_id || it.id || i} source={{ uri }}
-            style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: C.accent }} />
-        ) : (
-          <View key={it.line_id || it.id || i} style={{
-            width: 34, height: 34, borderRadius: 8, backgroundColor: C.accent,
-            alignItems: "center", justifyContent: "center",
-          }}>
-            <Ionicons name="shirt-outline" size={15} color={C.primary} />
-          </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 7, marginTop: 10, paddingRight: 18 }}
+    >
+      {items.map((it, i) => {
+        const a = assetUrl(it.design_src)
+        const l = assetUrl(it.img_ref || it.img)
+        const u = a || l
+        return (
+          <Pressable
+            key={it.line_id || it.id || i}
+            onLongPress={() => u && onPeek(u, lineTitle(it))}
+            delayLongPress={200}
+          >
+            {u ? (
+              <Image source={{ uri: u }} style={{ width: 54, height: 54, borderRadius: 7, backgroundColor: C.accent }} />
+            ) : (
+              <View style={{
+                width: 54, height: 54, borderRadius: 7, backgroundColor: C.accent,
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <Ionicons name="shirt-outline" size={18} color={C.primary} />
+              </View>
+            )}
+          </Pressable>
         )
       })}
-      {rest > 0 && (
-        <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, marginLeft: 2 }}>+{rest}</Text>
-      )}
-    </View>
+    </ScrollView>
   )
 }
 
@@ -117,8 +125,22 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
   const stage = normalizeStage(order.factory_status)
   const tone = toneOf(stage)
   const late = isOverdue(order)
-  const uri = assetUrl(first?.img_ref || first?.img || first?.design_src)
-  const [peek, setPeek] = useState(false)
+  /* THE ARTWORK, NOT THE RACK PHOTO.
+   *
+   * This read `img_ref || img || design_src`, which prefers the marketplace LISTING photo
+   * and falls back to the artwork — backwards, and the exact fault lineArt() exists to
+   * prevent. On a seller with one product it made every row show the same stock photo of
+   * aprons on a rail, which is why the queue was impossible to scan and why no amount of
+   * type or spacing was going to fix it. The floor needs to see what it has to MAKE.
+   *
+   * When there is no artwork the listing photo is still better than a blank tile — but it
+   * is marked, because "we have not got a file yet" and "here is the file" must never look
+   * the same. */
+  const art = assetUrl(first?.design_src)
+  const listing = assetUrl(first?.img_ref || first?.img)
+  const uri = art || listing
+  const borrowed = !art && !!listing
+  const [peek, setPeek] = useState<{ uri: string; title: string } | null>(null)
   /* WHAT MAKES THIS ROW DIFFERENT FROM THE ONE ABOVE IT.
      A seller who sells one product gives every row the same truncated title — six rows all
      reading "Custom Embroidered Apron with Na…" is a wall, not a list. The variant is the
@@ -150,13 +172,24 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
           unauthenticated by design — an <img> cannot carry a bearer header — and guarded by
           a 122-bit row id instead. */}
       <Pressable
-        onLongPress={() => uri && setPeek(true)}
+        onLongPress={() => uri && setPeek({ uri, title: first ? lineTitle(first) : numOf(order) })}
         delayLongPress={200}
         // Tap falls through to the row (open the order); only the long press is claimed.
         onPress={onPress}
       >
         {uri ? (
-          <Image source={{ uri }} style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent }} resizeMode="cover" />
+          <>
+            <Image source={{ uri }} style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent }} resizeMode="cover" />
+            {borrowed && (
+              <View style={{
+                position: "absolute", right: 4, bottom: 4,
+                paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
+                backgroundColor: "rgba(11,11,12,0.72)",
+              }}>
+                <Text style={{ fontSize: 9, fontFamily: F.semi, color: "#fff", letterSpacing: 0.4 }}>LISTING</Text>
+              </View>
+            )}
+          </>
         ) : (
           <View style={{
             width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent,
@@ -211,9 +244,9 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
           {items.length > 1 && <Chip label={`${items.length} lines`} fg={C.muted} />}
         </View>
 
-        {items.length > 1 && <ItemStrip items={items.slice(1)} />}
+        {items.length > 1 && <ItemStrip items={items.slice(1)} onPeek={(u, t) => setPeek({ uri: u, title: t })} />}
       </View>
-      <ImagePeek uri={uri} title={first ? lineTitle(first) : numOf(order)} open={peek} onClose={() => setPeek(false)} />
+      <ImagePeek uri={peek?.uri ?? null} title={peek?.title ?? ""} open={!!peek} onClose={() => setPeek(null)} />
     </Pressable>
   )
 }
