@@ -50,7 +50,7 @@ function FileChip({ d }: { d: OrderDesign }) {
           width: 34, height: 34, borderRadius: 8, backgroundColor: C.ink,
           alignItems: "center", justifyContent: "center",
         }}>
-          <Ionicons name="document-text" size={16} color={C.lime} />
+          <Ionicons name="document-text" size={16} color={C.onInk} />
         </View>
       )}
       <Text style={{ flex: 1, fontSize: 14, fontFamily: F.medium, color: C.fg }} numberOfLines={1}>
@@ -230,8 +230,8 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
         >
           {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
               second arrow on a card that already had one. */}
-          {busy && <ActivityIndicator color={to === "working" ? C.onPrimary : C.lime} />}
-          <Text style={{ fontSize: 18, fontFamily: F.bold, color: to === "working" ? C.onPrimary : C.lime, letterSpacing: -0.2 }}>
+          {busy && <ActivityIndicator color={C.onInk} />}
+          <Text style={{ fontSize: 17, fontFamily: F.semi, color: to === "working" ? C.onPrimary : C.onInk, letterSpacing: -0.2 }}>
             {stageActionLine(to)}
           </Text>
         </Pressable>

@@ -1,8 +1,36 @@
-import { View, Text, Image, Pressable } from "react-native"
+import { useState } from "react"
+import { View, Text, Image, Pressable, Modal } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order, type OrderItem } from "@/lib/api"
-import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, STAGE_LABEL } from "@/lib/orders"
+import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
 import { F,C, R, LIFT, toneOf } from "@/lib/theme"
+
+/**
+ * THE ARTWORK, FULL SIZE, on a long press.
+ *
+ * A 60pt thumbnail is enough to recognise a design and not enough to CHECK one — the same
+ * finding that put ItemPhotos on the detail screen. On the queue the check has to be
+ * reachable without leaving the list, because the question ("is this the right artwork?")
+ * arrives while you are scrolling, not after you have committed to an order.
+ *
+ * Long-press, because tap already opens the order and long-press on the ROW already starts
+ * a selection — the image claims the gesture only over itself, so both survive.
+ */
+function ImagePeek({ uri, title, open, onClose }: {
+  uri: string | null; title: string; open: boolean; onClose: () => void
+}) {
+  return (
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.94)", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        {/* contain, not cover: a print file cropped to fill is one you cannot check the
+            edges of — the same rule ItemPhotos follows. */}
+        {uri ? <Image source={{ uri }} style={{ width: "100%", aspectRatio: 1 }} resizeMode="contain" /> : null}
+        <Text numberOfLines={2} style={{ marginTop: 18, fontSize: 14, fontFamily: F.medium, color: C.onInk, textAlign: "center" }}>{title}</Text>
+        <Text style={{ marginTop: 6, fontSize: 12, fontFamily: F.body, color: C.onInk, opacity: 0.55 }}>Tap anywhere to close</Text>
+      </Pressable>
+    </Modal>
+  )
+}
 
 /**
  * ONE ORDER IN THE LIST.
@@ -90,6 +118,12 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
   const tone = toneOf(stage)
   const late = isOverdue(order)
   const uri = assetUrl(first?.img_ref || first?.img || first?.design_src)
+  const [peek, setPeek] = useState(false)
+  /* WHAT MAKES THIS ROW DIFFERENT FROM THE ONE ABOVE IT.
+     A seller who sells one product gives every row the same truncated title — six rows all
+     reading "Custom Embroidered Apron with Na…" is a wall, not a list. The variant is the
+     part that actually differs, so it earns a line of its own. */
+  const facts = first ? lineFacts(first) : []
 
   return (
     <Pressable
@@ -115,15 +149,20 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
       {/* THE ARTWORK, so a row is recognisable before it is read. The thumbnail route is
           unauthenticated by design — an <img> cannot carry a bearer header — and guarded by
           a 122-bit row id instead. */}
-      <View>
+      <Pressable
+        onLongPress={() => uri && setPeek(true)}
+        delayLongPress={200}
+        // Tap falls through to the row (open the order); only the long press is claimed.
+        onPress={onPress}
+      >
         {uri ? (
-          <Image source={{ uri }} style={{ width: 60, height: 60, borderRadius: 8, backgroundColor: C.accent }} resizeMode="cover" />
+          <Image source={{ uri }} style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent }} resizeMode="cover" />
         ) : (
           <View style={{
-            width: 64, height: 64, borderRadius: R.md, backgroundColor: C.accent,
+            width: 84, height: 84, borderRadius: 8, backgroundColor: C.accent,
             alignItems: "center", justifyContent: "center",
           }}>
-            <Ionicons name="shirt-outline" size={22} color={C.primary} />
+            <Ionicons name="shirt-outline" size={26} color={C.primary} />
           </View>
         )}
         {selecting && (
@@ -137,7 +176,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
             {selected && <Ionicons name="checkmark" size={13} color={C.onPrimary} />}
           </View>
         )}
-      </View>
+      </Pressable>
 
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* The IDENTIFIER, small and above — it is how you find the order, not what the
@@ -158,6 +197,12 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
           {first ? lineTitle(first) : "No lines"}
         </Text>
 
+        {facts.length > 0 && (
+          <Text numberOfLines={1} style={{ fontSize: 13, fontFamily: F.body, color: C.muted, marginTop: 3 }}>
+            {facts.join("  ·  ")}
+          </Text>
+        )}
+
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 8 }}>
           <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} />
           {/* "items", matching the order screen. One phrasing across both, and "pc" was
@@ -168,6 +213,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
 
         {items.length > 1 && <ItemStrip items={items.slice(1)} />}
       </View>
+      <ImagePeek uri={uri} title={first ? lineTitle(first) : numOf(order)} open={peek} onClose={() => setPeek(false)} />
     </Pressable>
   )
 }

@@ -212,7 +212,7 @@ export default function OrderDetail() {
           {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
           <View style={{ backgroundColor: C.ink, borderRadius: R.xl, padding: 22, ...LIFT }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.lime, letterSpacing: 1.4 }}>
+              <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.brand, letterSpacing: 1.4 }}>
                 {platformOf(o).toUpperCase()}
               </Text>
               {o.rush && (

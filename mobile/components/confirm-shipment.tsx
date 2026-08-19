@@ -116,8 +116,8 @@ export function ConfirmShipment({ orderId, role, by, onDone }: {
       {/* Same shape as Start Order — see HERO_BUTTON. These sit within a screen of each
           other and are the same kind of control, so they are the same size. */}
       {busy
-        ? <ActivityIndicator color={C.lime} />
-        : <Ionicons name="camera" size={HERO_GLYPH} color={C.lime} />}
+        ? <ActivityIndicator color={C.onInk} />
+        : <Ionicons name="camera" size={HERO_GLYPH} color={C.onInk} />}
       <Text style={{ ...HERO_LABEL, color: C.onInk }}>{label}</Text>
     </Pressable>
   )

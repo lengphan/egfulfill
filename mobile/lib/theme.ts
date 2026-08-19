@@ -19,33 +19,48 @@
  * 1px border was.
  */
 export const C = {
-  /** The page. Warm, so the white cards on top of it read as objects. */
-  bg: "#F6F4EF",
-  fg: "#141019",
-  muted: "#7a7469",
-  border: "#E6E1D8",
+  /** The page. The marketing SURFACE value from CLAUDE.md §4, so the phone and the public
+   *  site stand on the same ground rather than two different warms. */
+  bg: "#FAF8F3",
+  fg: "#0B0B0C",
+  muted: "#78736B",
+  border: "#EAE5DB",
   /** Still real, but only for surfaces that ARE surfaces: the login panel, the tab bar,
    *  an image well. Never a content card — see the note above. */
   card: "#ffffff",
-  accent: "#F1EEFD",
-  /** A WELL IN THE PAPER, not a card on it. Warm paper with a white field on top was the
-   *  "doesn't look seamless" problem in one control: two near-identical surfaces, one warm
-   *  and one not, held apart by a border. A slightly deeper tone of the SAME paper reads as
-   *  recessed and needs no line around it. */
-  accentPaper: "#EDEAE2",
-  /** --primary: the vivid violet. Filled surfaces and active state. */
-  primary: "#5b2fe8",
-  /** --primary-foreground: the lime that sits ON primary. Not decoration — it is the pair. */
-  onPrimary: "#dcf56b",
-  /** The near-black used for hero blocks. Violet-tinted, never a pure grey — pure grey next
-   *  to a saturated violet reads as a rendering fault rather than a choice. */
-  ink: "#141019",
-  onInk: "#F6F4EF",
-  lime: "#dcf56b",
+  accent: "#EEF1FF",
+  /** A WELL IN THE PAPER, not a card on it — a slightly deeper tone of the same paper reads
+   *  as recessed and needs no line around it. */
+  accentPaper: "#F1EEE7",
+  /**
+   * PERIWINKLE IS A FILL AND CAN NEVER BE TYPE.
+   *
+   * §4 measures it: #A5B7FF is 1.83:1 on paper — a ghost. So the accent is split by JOB,
+   * exactly as the web splits --brand from --primary:
+   *   brand   #A5B7FF  large fills only, and whatever sits on it must be INK (10.13:1)
+   *   primary #4259D6  the deep step — the only one that may carry WORDS (5.45:1)
+   * Getting this backwards is the single easiest way to ship an unreadable screen, and it
+   * is why the app palette's vivid violet is not simply re-tinted here.
+   */
+  primary: "#4259D6",
+  onPrimary: "#FAF8F3",
+  brand: "#A5B7FF",
+  onBrand: "#0B0B0C",
+  /** The near-black of the hero blocks and the primary action. Ink and paper carry this app
+   *  now; the accent is the one note on top, not the thing doing the work. */
+  ink: "#0B0B0C",
+  onInk: "#FAF8F3",
+  /**
+   * RETIRED as a brand colour (2026-08-19). Acid lime on violet is a FLOOR-TOOL pair — built
+   * to be read across a warehouse — and it fought Playfair on every screen. It survives only
+   * as the highlight on the dark action bar, where lime on near-black is a classic
+   * editorial pairing rather than a clash. Never on paper.
+   */
+  lime: "#DCF56B",
   /** Reserved status colours. These carry meaning on the floor; nothing else may use them. */
-  alert: "#d4183d",
-  warn: "#c77700",
-  success: "#0f8a5f",
+  alert: "#C0303F",
+  warn: "#B87503",
+  success: "#0F7A55",
 } as const
 
 /**
@@ -89,7 +104,7 @@ export const R = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const
  */
 export const SECTION = {
   borderTopWidth: 1,
-  borderTopColor: "#E6E1D8",
+  borderTopColor: "#EAE5DB",
   paddingTop: 20,
   marginTop: 20,
 } as const
@@ -177,9 +192,12 @@ export const HERO_BUTTON = {
 } as const
 
 export const HERO_LABEL = {
-  fontSize: 24,
-  fontWeight: "900",
-  letterSpacing: -0.6,
+  fontSize: 23,
+  // A bare fontWeight here rendered the OS face while everything around it was Inter — the
+  // exact failure the note on F warns about, missed because the sweep covered app/ and
+  // components/ but not the theme that feeds them.
+  fontFamily: F.semi,
+  letterSpacing: -0.4,
 } as const
 
 /** The glyph beside a hero label, when there is one. Sized to sit with 24pt type. */
