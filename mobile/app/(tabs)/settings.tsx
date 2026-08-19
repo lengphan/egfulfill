@@ -5,7 +5,7 @@ import { router } from "expo-router"
 import Constants from "expo-constants"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, type User } from "@/lib/api"
-import { F,C } from "@/lib/theme"
+import { TAB_BAR,F,C } from "@/lib/theme"
 
 /**
  * SETTINGS — deliberately short.
@@ -62,7 +62,7 @@ export default function Settings() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 32 }}
+      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 8, paddingBottom: insets.bottom + TAB_BAR.clearance + 8 }}
     >
       <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg }}>Settings</Text>
 

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { SECTION,F,C } from "@/lib/theme"
+import { TAB_BAR,SECTION,F,C } from "@/lib/theme"
 
 /**
  * WALLET — the balance, what moved it, and the way to add more.
@@ -133,7 +133,7 @@ export default function Wallet() {
         data={w?.ledger ?? []}
         keyExtractor={(r) => String(r.id)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + TAB_BAR.clearance }}
         ListEmptyComponent={
           <Text style={{ color: C.muted, fontSize: 14, marginTop: 16 }}>
             {err ? "Couldn't load your history." : "Nothing has moved yet."}

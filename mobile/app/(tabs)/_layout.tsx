@@ -1,6 +1,8 @@
 import { Tabs } from "expo-router"
+import { Platform } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
-import { F,C } from "@/lib/theme"
+import { F,C, TAB_BAR } from "@/lib/theme"
 
 /**
  * The three things worth opening a phone for: what needs doing, a specific order, and the
@@ -8,6 +10,19 @@ import { F,C } from "@/lib/theme"
  * and the point of the phone app is that it is quick.
  */
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets()
+  /*
+   * BOTH PLATFORMS, AND THEY DISAGREE ON EVERY PART OF THIS.
+   *
+   * - shadow* is iOS-only; Android draws depth from `elevation` and ignores the rest.
+   * - Android's elevation shadow behind a TRANSLUCENT fill renders muddy, and on several
+   *   versions it is painted as a rectangle that ignores borderRadius entirely — which is
+   *   exactly the boxy artefact under a rounded bar. So Android takes a near-opaque fill and
+   *   a modest elevation; iOS keeps the softer translucency and a real soft shadow.
+   * - The home indicator (iOS) and the gesture pill (Android) both live where this bar sits,
+   *   so it has to clear the safe-area inset rather than a hard-coded 16.
+   */
+  const bottom = Math.max(insets.bottom, 10)
   return (
     <Tabs
       screenOptions={{
@@ -29,9 +44,16 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
         tabBarStyle: {
           position: "absolute",
-          left: 16, right: 16, bottom: 14,
-          height: 62,
-          borderRadius: 22,
+          // CONDENSED, AND A REAL CAPSULE. At 16pt insets with a 22pt radius this was still
+          // a full-width slab with softened corners — the icons pushed out to the screen
+          // edges, which is what makes a bar read as fixed furniture rather than as
+          // something floating on top of the page. Pulled in so the five glyphs sit as a
+          // GROUP, and rounded to half its height so the shape is a lozenge rather than a
+          // rectangle pretending. This is the one place a fully-round shape is right: it is
+          // not a chip, it is the bar itself.
+          left: 40, right: 40, bottom,
+          height: TAB_BAR.height,
+          borderRadius: TAB_BAR.height / 2,
           /*
            * TRANSLUCENT PAPER, not a panel and not nothing.
            *
@@ -46,18 +68,23 @@ export default function TabsLayout() {
            * blur on purpose: expo-blur is a native module and would need a fresh dev build
            * before anyone could see it.
            */
-          backgroundColor: "rgba(252,251,248,0.94)",
+          backgroundColor: Platform.OS === "android" ? "rgba(252,251,248,0.985)" : "rgba(252,251,248,0.94)",
           borderTopWidth: 0,
           borderWidth: 1,
           borderColor: "rgba(11,11,12,0.06)",
           paddingBottom: 0,
-          shadowColor: "#0B0B0C",
-          shadowOpacity: 0.09,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
+          ...Platform.select({
+            ios: {
+              shadowColor: "#0B0B0C",
+              shadowOpacity: 0.09,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: 8 },
+            },
+            android: { elevation: 4 },
+            default: {},
+          }),
         },
-        tabBarItemStyle: { height: 62, paddingTop: 0 },
+        tabBarItemStyle: { height: TAB_BAR.height, paddingTop: 0 },
       }}
     >
       <Tabs.Screen

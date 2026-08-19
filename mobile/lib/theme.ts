@@ -88,6 +88,14 @@ export const F = {
   bold: "Inter_700Bold",
 } as const
 
+/**
+ * THE FLOATING TAB BAR's own metrics, exported because every scrolling screen has to know
+ * them. The bar is position:absolute, so nothing reserves space for it — a list that pads
+ * only for the safe-area inset hides its own last row behind it, on every tab.
+ * `clearance` is what a scroll container must add BELOW the safe-area inset.
+ */
+export const TAB_BAR = { height: 60, gap: 10, get clearance() { return this.height + this.gap + 14 } } as const
+
 export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const
 
 /** One radius scale. Phones read big radii as "current"; 4px corners read as 2014. */

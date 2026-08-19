@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getOrders, type Order } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage } from "@/lib/orders"
-import { F,C, S } from "@/lib/theme"
+import { TAB_BAR,F,C, S } from "@/lib/theme"
 
 /**
  * TODAY — the same screen as the web shell, rebuilt with native primitives.
@@ -76,7 +76,7 @@ export default function Today() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + S.lg, paddingBottom: insets.bottom + S.xl * 2 }}
+      contentContainerStyle={{ paddingTop: insets.top + S.lg, paddingBottom: insets.bottom + TAB_BAR.clearance + S.lg }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
     >
       <View style={{ paddingHorizontal: S.xl }}>

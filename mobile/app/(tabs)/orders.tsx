@@ -5,7 +5,7 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
-import { F,C, R, LIFT } from "@/lib/theme"
+import { TAB_BAR,F,C, R, LIFT } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 
 /**
@@ -285,7 +285,7 @@ export default function Orders() {
              search field and the filters use), so content lines up down the whole screen and
              the hairline runs edge to edge the way a printed rule does. Padding in BOTH
              places is what left the rows sitting 36 in while the header sat at 18. */
-          contentContainerStyle={{ paddingBottom: insets.bottom + (selecting ? 110 : 24) }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + TAB_BAR.clearance + (selecting ? 86 : 0) }}
           ListEmptyComponent={
             /* Says WHICH it is. An empty list that reads the same as a failed one is how a
                broken fetch gets mistaken for a quiet day. */
@@ -312,7 +312,7 @@ export default function Orders() {
           jump under the thumb at the moment of choosing. */}
       {selecting && (
         <View style={{
-          position: "absolute", left: 14, right: 14, bottom: insets.bottom + 10,
+          position: "absolute", left: 14, right: 14, bottom: insets.bottom + TAB_BAR.clearance - 4,
           flexDirection: "row", alignItems: "center", gap: 12,
           backgroundColor: C.ink, borderRadius: R.lg, padding: 12, ...LIFT,
         }}>

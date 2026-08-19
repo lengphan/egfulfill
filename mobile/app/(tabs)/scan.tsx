@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { Ionicons } from "@expo/vector-icons"
 import { scanInventory, type ScanResult } from "@/lib/api"
-import { F,C } from "@/lib/theme"
+import { TAB_BAR,F,C } from "@/lib/theme"
 
 /**
  * SCAN — stock in and out, from the aisle instead of a station.
@@ -182,7 +182,7 @@ export default function Scan() {
         {busy ? "Recording…" : `Point at a label — everything scanned goes ${inMode ? "IN" : "OUT"}`}
       </Text>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: insets.bottom + 24 }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: insets.bottom + TAB_BAR.clearance }}>
         {log.length === 0 ? (
           <Text style={{ fontSize: 15, color: C.muted }}>Nothing scanned yet.</Text>
         ) : (
