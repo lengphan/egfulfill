@@ -16,6 +16,7 @@ import jwt from 'jsonwebtoken';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { isStaff } from '../auth.js';
+import { notify } from './notifications.js';
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const VQ_USER = process.env.VIETQR_USERNAME || '';   // inbound: VietQR -> us
@@ -166,6 +167,9 @@ export function vietqrRoutes(app, requireAuth) {
                values ($1,$2,'topup',$3,$4,null) on conflict do nothing`,
               [row.seller_id, Number(row.amount_usd) || 0, String(row.id), (row.method ? row.method + ' top-up' : 'VietQR top-up')]
             ).catch(() => {});
+            /* Paid — take the reminder back. A bell still saying "payment waiting" after
+               the balance has gone up is the app arguing with itself. */
+            await q("delete from notifications where type='topup_pending' and entity_id=$1", [String(row.ref || '')]).catch(() => {});
           }
         } else if (cands.length) {
           // Matched a reference but the money doesn't cover it. Deliberately left pending
@@ -207,6 +211,13 @@ export function vietqrRoutes(app, requireAuth) {
       `update topup_requests set status='abandoned'
         where ref=$1 and seller_id=$2 and status='pending'
         returning id`, [ref, req.user.sub]).catch(() => ({ rowCount: 0 }));
+    /* Withdrawn — the reminder goes with it. The virtual account stays live and a late
+       transfer still settles, but the seller has said they are not paying it now, and a
+       bell that keeps asking is the one thing that would make them stop reading the bell. */
+    if (r.rowCount) {
+      await q("delete from notifications where type='topup_pending' and entity_id=$1 and user_id=$2",
+        [ref, req.user.sub]).catch(() => {});
+    }
     return { ok: true, abandoned: r.rowCount || 0 };
   });
 
@@ -421,6 +432,24 @@ export function vietqrRoutes(app, requireAuth) {
            gd.vaAccount || account || null, name || null]
         );
       } catch (e) { req.log?.warn?.({ err: String(e) }, 'vietqr pending topup insert failed'); }
+      /**
+       * TELL THE SELLER IT IS WAITING — because nobody else will.
+       *
+       * A VietQR request confirms itself when the money lands, so staff are shown nothing
+       * until it does: an unpaid one is not their work. That is right, and it leaves the
+       * seller as the only person who can move it — someone who has typically just left
+       * for their banking app and may not come back to the same screen.
+       *
+       * Keyed on the ref so it can be TAKEN BACK: this is cleared when the payment lands
+       * and when the request is abandoned, so the bell reflects what is actually
+       * outstanding rather than accumulating one row per QR anyone ever looked at.
+       */
+      notify({
+        userIds: [req.user.sub], type: 'topup_pending', entityId: note,
+        title: 'Payment waiting',
+        body: `${amountUsd} USD top-up is ready to pay — transfer with reference ${note} and your balance updates on its own.`,
+        href: '/wallet',
+      }).catch(() => {});
       return {
         ok: true,
         amountUsd,                           // credited USD once paid (VND ÷ rate)
