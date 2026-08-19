@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, Truck, Printer, Warning, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, BookmarkSimple } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, Printer, Warning, ArrowSquareOut, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, Check, BookmarkSimple } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -2212,15 +2212,26 @@ export function OrdersHub() {
                               <DotsThree size={18} weight="bold" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52">
+                              {/* WORDS, NOT GLYPHS — the whole menu, not just most of it.
+                                  The top handful of actions carried an icon and everything
+                                  below them (every stage, every flag) did not, so one menu
+                                  read as two lists that happened to share a popup. The icons
+                                  were also the weaker half of each row: a truck, a printer
+                                  and a barcode next to "Create new label", "Reopen label"
+                                  and "Print blank labels" restate the word beside them and
+                                  add a column of colour to a list whose job is to be read
+                                  quickly. Same call as the Download button on the design
+                                  files panel. A spinner is the exception, because it says
+                                  something no word in a static label can. */}
                               {/* the non-primary pipeline actions */}
-                              <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}><ArrowSquareOut size={14} weight="bold" /> {tl("ui", "Open order")}</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}>{tl("ui", "Open order")}</DropdownMenuItem>
                               {/* The one-step advance lives HERE now, and only here — it is
                                   never the row's primary. Named with its destination, since
                                   in a list of stages "next" is the only one that doesn't say
                                   where it goes. */}
                               {canAdvance && next && (
                                 <DropdownMenuItem onClick={() => advanceOrder(o)}>
-                                  <SkipForward size={14} weight="fill" /> {tl("ui", "Move to")} {stageMeta(next)?.label ?? next}
+                                  {tl("ui", "Move to")} {stageMeta(next)?.label ?? next}
                                 </DropdownMenuItem>
                               )}
                               {/* THE ONLY WAY TO BUY A LABEL FROM A ROW, on purpose.
@@ -2232,8 +2243,8 @@ export function OrdersHub() {
                                   Dropped the `primary !== "ship"` guard with it: that was
                                   only there to avoid showing the item twice, and there is
                                   no longer a primary to collide with. */}
-                              {canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> {tl("ui", "Create new label")}</DropdownMenuItem>}
-                              {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> {tl("ui", "Reopen label")}</DropdownMenuItem>}
+                              {canShip && <DropdownMenuItem onClick={() => openFulfill(o)}>{tl("ui", "Create new label")}</DropdownMenuItem>}
+                              {label && <DropdownMenuItem onClick={() => openLabel(label)}>{tl("ui", "Reopen label")}</DropdownMenuItem>}
                               {/* TikTok orders can be shipped on TIKTOK'S label, which lives
                                   only in Seller Center — so it's fetched on demand, not a
                                   file we hold. Shown for any TikTok order rather than gated
@@ -2243,9 +2254,10 @@ export function OrdersHub() {
                                   more use than a hidden menu item. */}
                               {canFetchTiktokLabel(o) && (
                                 <DropdownMenuItem disabled={ttLabel === o.id} onClick={() => openTiktokLabel(o)}>
-                                  {ttLabel === o.id
-                                    ? <CircleNotch size={14} className="animate-spin" />
-                                    : <FileArrowDown size={14} weight="bold" />}
+                                  {/* The SPINNER stays where the glyphs went: it is the one
+                                      mark here that says something the word cannot, which is
+                                      that the fetch is still running. */}
+                                  {ttLabel === o.id && <CircleNotch size={14} className="animate-spin" />}
                                   {ttLabel === o.id ? tl("ui", "Fetching…") : tl("ui", "TikTok label")}
                                 </DropdownMenuItem>
                               )}
@@ -2261,7 +2273,7 @@ export function OrdersHub() {
                                     onClick={() => printable && setBarcodeOrder(o)}
                                     title={printable ? undefined : "Pick a blank on at least one line first — the barcode is the stock code"}
                                   >
-                                    <Barcode size={14} weight="bold" /> {tl("ui", "Print blank labels")}
+                                    {tl("ui", "Print blank labels")}
                                   </DropdownMenuItem>
                                 )
                               })()}

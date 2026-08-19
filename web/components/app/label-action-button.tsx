@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { DownloadSimple, Plus, ArrowCounterClockwise, CaretDown, CircleNotch } from "@phosphor-icons/react"
+import { CaretDown, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { voidLabel, type OrderRow } from "@/lib/api"
@@ -83,7 +83,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
         title="Open the stored label PDF"
         className="inline-flex h-full items-center gap-1.5 rounded-l-lg px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        <DownloadSimple size={14} weight="bold" /> Download label
+        Download label
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -105,9 +105,14 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem onClick={createAnother}><Plus size={14} weight="bold" /> Create another label</DropdownMenuItem>
+          {/* WORDS, NOT GLYPHS — matching the ⋯ menu and the buttons either side of this
+              one. This control sits in a row of plain-text buttons (Create label, Packing
+              slip, Cancel order, Approve), so a truck and a plus here were the only marks in
+              the row and read as decoration on the one action that spends money. The CARET
+              stays: it is not a picture of the action, it is what says there is a menu. */}
+          <DropdownMenuItem onClick={createAnother}>Create another label</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={refund}><ArrowCounterClockwise size={14} weight="bold" /> <span className="text-red-600">Refund label</span></DropdownMenuItem>
+          <DropdownMenuItem onClick={refund}><span className="text-red-600">Refund label</span></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

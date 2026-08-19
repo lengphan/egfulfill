@@ -547,7 +547,11 @@ export default function OrderDetailPage() {
                 order={order}
                 role={role}
                 canFulfill={canFulfill}
-                onNewLabel={() => setLabelOpen(true)}
+                /* NO onNewLabel — deliberately. LabelActionButton is in this same row under
+                   the same condition, so passing it would put the same action on screen
+                   twice under two different names ("Create label" / "New label"). The button
+                   is the one that stays: it also knows when a label already exists and
+                   confirms before buying a second. */
                 onChanged={reloadAll}
                 onError={setActionErr}
               />

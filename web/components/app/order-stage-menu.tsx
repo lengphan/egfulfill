@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { DotsThree, SkipForward, Truck } from "@phosphor-icons/react"
+import { DotsThree } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, canSetStage, stageDenialReason, canWalk, isFactoryOrder } from "@/lib/factory-status"
 import { postItemStatus, updateOrder, type OrderRow } from "@/lib/api"
@@ -22,6 +22,16 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   order: OrderRow
   role: string
   onChanged: () => void
+  /**
+   * PASS THIS ONLY IF THE CALLER IS NOT ALREADY SHOWING A LABEL CONTROL.
+   *
+   * Omitted ⇒ no "New label" row. The order-detail page renders LabelActionButton in the
+   * same button row under the same condition (staff who can fulfil), so the menu was
+   * offering a second door to a window already open two buttons to its left — and the two
+   * did not even agree on the name, one saying "Create label" and the other "New label".
+   * The button is the better of the pair: it also knows when a label already EXISTS, where
+   * this row would cheerfully buy a second one.
+   */
   onNewLabel?: () => void
   canFulfill?: boolean
   onError?: (msg: string) => void
@@ -86,8 +96,11 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
         <DotsThree size={18} weight="bold" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        {canAdvance && <DropdownMenuItem onClick={() => next && setOrderStatus(next)}><SkipForward size={14} weight="fill" /> Next stage</DropdownMenuItem>}
-        {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}><Truck size={14} weight="bold" /> New label</DropdownMenuItem>}
+        {/* WORDS, NOT GLYPHS. These two carried an icon and the two dozen rows below them
+            did not, so one menu read as two lists sharing a popup. */}
+        {canAdvance && <DropdownMenuItem onClick={() => next && setOrderStatus(next)}>Next stage</DropdownMenuItem>}
+        {/* NEW LABEL ONLY IF THE PAGE ISN'T ALREADY OFFERING IT — see onNewLabel. */}
+        {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}>New label</DropdownMenuItem>}
         <DropdownMenuGroup>
           <DropdownMenuLabel>Set all items to</DropdownMenuLabel>
           {prod.map((s) => (
