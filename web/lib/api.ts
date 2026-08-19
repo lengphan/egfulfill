@@ -4118,14 +4118,49 @@ export type OrderCharges = {
 export function getOrderCharges(id: string) {
   return api<OrderCharges>(`/api/orders/${encodeURIComponent(id)}/charges`)
 }
+/**
+ * Charge a later price adjustment against an order — the other direction of the same money.
+ *
+ * Admin and warehouse only, enforced server-side. The reason is REQUIRED: it is written onto
+ * the ledger row and is what the seller reads on their statement. Refusals worth handling by
+ * name: an empty wallet comes back with `shortfall`, which is the number they must top up by.
+ */
+export function chargeOrderFee(
+  id: string,
+  body: { amount: number; note: string; clientId?: string }
+) {
+  return api<OrderCharges & { ok?: boolean; charged?: number; error?: string; shortfall?: number; balance?: number | null }>(
+    `/api/orders/${encodeURIComponent(id)}/fee`,
+    { method: "POST", body: JSON.stringify(body) }
+  )
+}
 /** `full` refunds everything left; `select` names parts to refund whole; `amount` is
  *  either a figure (spent top-down) or a per-part map. `clientId` makes a double-click
- *  idempotent — the server dedupes on it. */
+ *  idempotent — the server dedupes on it.
+ *
+ *  `fee` keeps an amount back: the refund goes out in full and the adjustment is charged
+ *  separately, so the seller's statement carries both with their own reasons rather than one
+ *  netted figure that matches nothing they were told. It can fail on its own (an empty
+ *  wallet) WITHOUT failing the refund — read `fee.error`, never assume both legs landed. */
 export function refundOrder(
   id: string,
-  body: { full?: boolean; select?: string[]; amount?: number | Record<string, number>; note?: string; clientId?: string }
+  body: {
+    full?: boolean; select?: string[]; amount?: number | Record<string, number>
+    note?: string; clientId?: string
+    fee?: { amount: number; note?: string }
+  }
 ) {
-  return api<OrderCharges & { ok?: boolean; refunded?: number; error?: string; balance?: number | null }>(
+  return api<OrderCharges & {
+    ok?: boolean
+    /** Everything this order has EVER refunded. */
+    refunded?: number
+    /** What THIS press sent back, and where it went. `refunded` is the running total and is
+     *  the wrong number to report after a second refund. */
+    refundedNow?: number
+    alloc?: { part: string; amount: number }[]
+    fee?: { charged?: number; error?: string; shortfall?: number } | null
+    error?: string; balance?: number | null
+  }>(
     `/api/orders/${encodeURIComponent(id)}/refund`,
     { method: "POST", body: JSON.stringify(body) }
   )

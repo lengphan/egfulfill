@@ -289,8 +289,20 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
      */
     const costOf = (t) => absNeg(t) - pos(t + '-credit');
     const summary = {
-      revenue: pos('order-charge-in'),      // factory: what sellers paid in
-      paid: absNeg('order-charge-out'),     // seller: what they paid out
+      /**
+       * ORDER-FEE COUNTS AS ORDER MONEY, because that is what it is: a later price
+       * adjustment charged against an order (order_refunds.js), moved by the same
+       * mechanism, and shown to the seller in the same cost breakdown. Folded into these
+       * two rather than given a line of its own so it cannot become the thing the memo
+       * warns about — a type that is NAMED, therefore not flagged as unaccounted, and
+       * rendered nowhere, which is how money goes quiet.
+       *
+       * GROSS, like the charge beside it: refunds are reported separately below rather
+       * than netted off here, and an adjustment is refundable exactly like any other
+       * charge, so netting one and not the other would be the inconsistency.
+       */
+      revenue: pos('order-charge-in') + pos('order-fee-in'),      // factory: what sellers paid in
+      paid: absNeg('order-charge-out') + absNeg('order-fee-out'), // seller: what they paid out
       deposits: pos('topup'),               // top-ups (card / VietQR / transfer)
       // 'refund-in' / 'refund-out', NOT 'order-refund-*'. moveFunds writes `type + '-out'`
       // and `type + '-in'`, so a refund moved with type 'refund' lands as refund-out/in —
@@ -350,7 +362,8 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
      * quietly failing to add up.
      */
     const NAMED = new Set([
-      'order-charge-in', 'order-charge-out', 'topup', 'refund-in', 'refund-out',
+      'order-charge-in', 'order-charge-out', 'order-fee-in', 'order-fee-out',
+      'topup', 'refund-in', 'refund-out',
       'subscription-in', 'withdrawal', 'blanks-cost', 'label-cost', 'design-partner-cost',
       'design-pay-out', 'expedite-cost', 'sample-cost', 'bank-fee',
       'manual-adjust-in', 'manual-adjust-out', 'adjust', 'opening', 'test-cleanup',

@@ -14,6 +14,7 @@ import { q, withLock } from '../db.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
 import { canMoveMoney, resolveSeller, canSurface } from '../auth.js';
+import { notify } from './notifications.js';
 
 // Which part of an order a refund row paid back. Added idempotently at load, like the
 // other late columns in this codebase — schema.sql only runs on a first DB init, so an
@@ -47,6 +48,26 @@ const FILE_TYPES = ['emb-file', 'design-file'];
 const REFUND_TYPE = 'order-refund';
 
 /**
+ * A LATER PRICE ADJUSTMENT — money charged to the seller AFTER the order was billed.
+ *
+ * The loop only ever ran one way: charge on submit, and give some back. But a quote can be
+ * wrong in the other direction too — a heavier parcel than the estimate, a colour added at
+ * the machine, a re-print of one line — and with no way to record that, the money either
+ * never got taken or it got taken as some unrelated ledger entry with no order against it.
+ *
+ * Several per order, so it is matched by PREFIX like the file sales rather than by an exact
+ * ref: `fee-<orderId>-<stamp>`. Each row keeps its own note, which is the reason the seller
+ * reads on their statement, and which is REQUIRED — an unexplained debit is the one thing a
+ * seller will always ask about, and "ask the person who did it" is not an answer a ledger
+ * should give.
+ *
+ * It is an ordinary charge in every other respect: it lands in a part, it counts toward what
+ * the order has charged, and it is REFUNDABLE. A fee added by mistake has to be reversible
+ * by the same panel that added it, or the only fix is a hand-written ledger row.
+ */
+const FEE_TYPE = 'order-fee';
+
+/**
  * The refundable PARTS of an order, in the order a refund should consume them.
  *
  * A marketplace refund isn't one number — it's "give back the shipping", or "refund the
@@ -61,7 +82,10 @@ const REFUND_TYPE = 'order-refund';
  * Order matters: an unallocated amount is consumed top-down, so a partial refund with no
  * parts named takes product cost first and the fees we've already paid out last.
  */
-export const PART_ORDER = ['product', 'shipping', 'expedite', 'express', 'design', 'files'];
+// 'fee' is LAST on purpose. An unallocated partial refund is consumed top-down, and what
+// should go back first is what the seller paid for the goods — not an adjustment that was
+// raised for a cost we have already met.
+export const PART_ORDER = ['product', 'shipping', 'expedite', 'express', 'design', 'files', 'fee'];
 const PART_LABELS = {
   /**
    * BASE COST, because "product cost" already means something else here.
@@ -83,6 +107,10 @@ const PART_LABELS = {
   express: 'Express shipping',
   design: 'Design service',
   files: 'Design files',
+  // Deliberately not 'Fee'. Every one of these carries its own reason on the line, and the
+  // part is the sum of them — "Price adjustment" is what the sum is, where "Fee" invites the
+  // reading that there is one of them.
+  fee: 'Price adjustment',
 };
 
 /**
@@ -120,13 +148,19 @@ export async function orderCharges(orderId) {
   const refs = CHARGE_KINDS.map((k) => k.ref(id));
   const inTypes = CHARGE_KINDS.map((k) => k.type + '-in');
 
-  const [flat, files, refunds] = await Promise.all([
+  const [flat, files, fees, refunds] = await Promise.all([
     q(`select type, ref, delta, note, created_at from wallet_ledger
         where account='factory' and type = any($1) and ref = any($2) order by created_at`,
       [inTypes, refs]),
     q(`select type, ref, delta, note, created_at from wallet_ledger
         where type = any($1) and ref like $2 order by created_at`,
       [FILE_TYPES, id + '|%']),
+    // Prefix, not an exact ref: an order can carry several adjustments, each its own row
+    // with its own reason. Read off the FACTORY's credit leg like every other charge, so
+    // these figures come from the same rows the balance is computed from.
+    q(`select type, ref, delta, note, created_at, created_by from wallet_ledger
+        where account='factory' and type=$1 and ref like $2 order by created_at`,
+      [FEE_TYPE + '-in', `fee-${id}-%`]),
     q(`select ref, delta, note, refund_part, created_at, created_by from wallet_ledger
         where account='factory' and type=$1 and (ref = $2 or ref like $3) order by created_at`,
       [REFUND_TYPE + '-out', id, `refund-${id}-%`]),
@@ -151,6 +185,14 @@ export async function orderCharges(orderId) {
         : kind?.type === 'design-fee' ? 'design' : 'files';
     chargedBy[part] += amt;
     lines.push({ part, label: kind?.label || r.type, amount: amt, note: r.note, at: r.created_at });
+  }
+  // Each adjustment is its OWN line, never a merged total: the reason is the point of the
+  // row, and two adjustments summed into one line lose both of them.
+  for (const r of fees.rows) {
+    const amt = money(r.delta);
+    if (amt <= 0) continue;
+    chargedBy.fee += amt;
+    lines.push({ part: 'fee', label: PART_LABELS.fee, amount: amt, note: r.note, at: r.created_at, by: r.created_by });
   }
   // File sales are recorded as the SELLER's debit (negative), so flip the sign to state
   // them as a charge like every other line.
@@ -300,8 +342,79 @@ export async function refundOrder({ orderId, amount, select, full, note, by, cli
     }
 
     const after = await orderCharges(id);
-    return { ok: true, refunded: plan.total, parts: plan.alloc, ...after,
+    /**
+     * `refundedNow` / `alloc` ARE SEPARATE KEYS, and they have to be.
+     *
+     * This used to read `{ refunded: plan.total, parts: plan.alloc, ...after }` — and the
+     * spread comes last, so `after.refunded` (everything this order has EVER refunded) and
+     * `after.parts` (the order's charge parts) silently overwrote both. The caller asking
+     * "how much did I just send back" was handed the cumulative total, which is right only
+     * for the first refund on an order, and the audit trail recorded the charge parts where
+     * it meant to record the allocation.
+     */
+    return { ok: true, ...after,
+             refundedNow: plan.total, alloc: plan.alloc,
              balance: await balanceOf(row.seller_id).catch(() => null) };
+  });
+}
+
+/**
+ * Charge a later price adjustment to the seller, against this order.
+ *
+ * THE MIRROR OF refundOrder, and held to the same rules, because it is the same money
+ * moving the other way:
+ *
+ *   • ONE LEDGER PAIR, through moveFunds — never a hand-written row. That is what keeps the
+ *     seller's balance a SUM of the ledger rather than a number somebody maintains.
+ *   • IDEMPOTENT on the ref, so a double-click is one charge and a retry after a timeout is
+ *     the same charge, not a second one. `clientId` is the press; separate presses are
+ *     separate refs and genuinely separate money.
+ *   • THE ORDER LOCK, shared with refunds. A fee and a refund arriving together would
+ *     otherwise both read the same charge total, and the refund cap would be computed
+ *     against a state that no longer existed by the time it wrote.
+ *   • A REASON IS REQUIRED. It is written onto the ledger row, which is what the seller
+ *     reads on their statement.
+ *
+ * The overdraft guard in moveFunds is NOT bypassed. A seller whose wallet cannot cover the
+ * adjustment gets a refusal naming the shortfall, and the floor asks them to top up — a
+ * wallet quietly pushed negative by the factory is a different product decision, and not one
+ * to make inside a fee button.
+ */
+export async function chargeOrderFee({ orderId, amount, note, by, clientId }) {
+  const id = String(orderId);
+  const amt = money(amount);
+  if (!isFinite(amt) || amt <= 0) return { error: 'Enter an amount greater than zero.' };
+  const why = String(note || '').trim();
+  if (!why) return { error: 'Say what the adjustment is for — it goes on the seller’s statement.' };
+
+  return withLock(`order-refund:${id}`, async () => {
+    const row = await q('select id, seller_id from orders where id=$1', [id]).then((r) => r.rows[0]);
+    if (!row) return { error: 'Order not found' };
+    if (!row.seller_id) return { error: 'This order has no seller to charge.' };
+
+    const ref = `fee-${id}-${clientId || Date.now().toString(36)}`;
+    try {
+      await moveFunds({ from: row.seller_id, to: 'factory', amount: amt, type: FEE_TYPE,
+                        ref, note: why, by });
+    } catch (e) {
+      // The shortfall is the useful half of this — it is the number they have to top up by.
+      if (e && e.code === 'INSUFFICIENT_FUNDS') {
+        return { error: e.message, shortfall: e.shortfall, balance: e.balance };
+      }
+      throw e;
+    }
+    // Tag both legs with the order, so it appears on the order's own money history and not
+    // only in a flat wallet statement.
+    await q('update wallet_ledger set order_id=$1 where ref=$2', [id, ref]).catch(() => {});
+
+    // TELL THEM. A debit that appears with no warning is the one that becomes a support
+    // thread; the reason is already written, so it costs nothing to send it.
+    notify({ userIds: [row.seller_id], type: 'order-fee',
+             title: `$${amt.toFixed(2)} charged on order ${id}`,
+             body: why, href: `/orders/${encodeURIComponent(id)}`, entityId: id }).catch(() => {});
+
+    const after = await orderCharges(id);
+    return { ok: true, charged: amt, ...after, balance: await balanceOf(row.seller_id).catch(() => null) };
   });
 }
 
@@ -397,7 +510,70 @@ export function orderRefundRoutes(app, requireAuth) {
     audit(req, 'order.refund', {
       entityType: 'order', entityId: String(req.params.id),
       before: { refunded: before.refunded, refundable: before.refundable },
-      after: { refunded: out.refunded, parts: out.parts, note: b.note || null, refundableLeft: out.refundable },
+      // What THIS press moved and where it went — not the order's running totals, which is
+      // what `out.refunded` / `out.parts` are. See the note on refundOrder's return.
+      after: { refunded: out.refundedNow, parts: out.alloc, note: b.note || null, refundableLeft: out.refundable },
+    });
+
+    /**
+     * KEEPING A FEE BACK is a refund AND a charge, never a smaller refund.
+     *
+     * "Send back $53.95 but keep $5" could be recorded as a single $48.95 refund, and it
+     * would net out the same. It would also be the one entry on the seller's statement that
+     * cannot be read: a number that matches neither what they paid nor what they were told
+     * they would get, with the $5 existing nowhere at all. So both legs are written — the
+     * refund they are owed, and the adjustment, with its own reason — and the net is left to
+     * arithmetic, which is what a ledger is for.
+     *
+     * AFTER the refund, deliberately: the refund is the money they are owed, and it must not
+     * be held up by a charge. It also means the funds are there, so the overdraft guard
+     * cannot refuse a fee the refund itself just covered.
+     *
+     * A failed fee leg does NOT fail the refund. It is reported instead — `fee.error` — and
+     * the refund it followed stands, because unwinding a completed money movement to report
+     * a second one is how one honest failure becomes two dishonest rows.
+     */
+    let fee = null;
+    if (b.fee && Number(b.fee.amount) > 0) {
+      fee = await chargeOrderFee({
+        orderId: req.params.id, amount: b.fee.amount,
+        note: b.fee.note || b.note, by: req.user.sub,
+        // Its own key, so the fee and the refund of one press never collide on a ref.
+        clientId: b.clientId ? `${b.clientId}-fee` : undefined,
+      }).catch((e) => ({ error: e instanceof Error ? e.message : 'The fee could not be charged.' }));
+      if (fee.ok) {
+        audit(req, 'order.fee', {
+          entityType: 'order', entityId: String(req.params.id),
+          after: { charged: fee.charged, note: b.fee.note || b.note || null, withRefund: out.refundedNow },
+        });
+      }
+    }
+    // The charge state moved under us, so re-read it rather than returning the pre-fee copy.
+    const state = fee && fee.ok ? await orderCharges(req.params.id) : null;
+    return { ...out, ...(state || {}),
+             fee: fee ? (fee.ok ? { charged: fee.charged } : { error: fee.error, shortfall: fee.shortfall }) : null };
+  });
+
+  /**
+   * A price adjustment on its own — no refund involved.
+   *
+   * Same authority as a refund (canMoveMoney: admin and warehouse), because it is the same
+   * act: moving money between a seller's wallet and the house against a specific order. An
+   * operator may not do it for the same reason they may not refund one.
+   */
+  app.post('/api/orders/:id/fee', { preHandler: requireAuth }, async (req, reply) => {
+    if (!canRefund(req.user)) {
+      reply.code(403);
+      return { error: 'Only admin or warehouse can adjust what an order charges.' };
+    }
+    const b = req.body || {};
+    const out = await chargeOrderFee({
+      orderId: req.params.id, amount: b.amount, note: b.note, by: req.user.sub, clientId: b.clientId,
+    });
+    if (out.error) { reply.code(400); return out; }
+    audit(req, 'order.fee', {
+      entityType: 'order', entityId: String(req.params.id),
+      after: { charged: out.charged, note: String(b.note || '').trim() || null },
     });
     return out;
   });
