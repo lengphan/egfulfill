@@ -1,5 +1,6 @@
 import Constants from "expo-constants"
 import * as SecureStore from "expo-secure-store"
+import { remember } from "@/lib/order-cache"
 
 /**
  * The ONE place the app talks to the server — same rule the web client follows.
@@ -234,8 +235,21 @@ export async function login(email: string, password: string) {
 }
 
 export const getMe = () => request<User>("/api/me")
-export const getOrders = () => request<Order[]>("/api/orders")
-export const getOrder = (id: string) => request<Order>(`/api/orders/${encodeURIComponent(id)}`)
+/**
+ * Both order fetchers REMEMBER what they returned (lib/order-cache.ts), so the detail screen
+ * can paint from memory the instant it slides in instead of showing a spinner for data the
+ * list already had. Done here rather than in the screens so a list added later cannot forget.
+ */
+export const getOrders = async () => {
+  const rows = await request<Order[]>("/api/orders")
+  remember(rows)
+  return rows
+}
+export const getOrder = async (id: string) => {
+  const o = await request<Order>(`/api/orders/${encodeURIComponent(id)}`)
+  remember(o)
+  return o
+}
 export const getWallet = () => request<WalletResponse>("/api/wallet")
 
 /*

@@ -16,6 +16,7 @@ import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
 import { BuyLabel } from "@/components/buy-label"
+import { recall } from "@/lib/order-cache"
 import { printOrderLabel, printWasCancelled } from "@/lib/print-label"
 
 /**
@@ -72,7 +73,11 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function OrderDetail() {
   const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams<{ id: string }>()
-  const [o, setO] = useState<Order | null>(null)
+  /* SEEDED FROM THE LIST, so this screen has content the moment it slides in. The push
+     animation was never the problem — arriving at a blank page and watching it fill was.
+     recall() reads memory only, so it is safe as lazy initial state; the fetch below still
+     runs and still wins. */
+  const [o, setO] = useState<Order | null>(() => recall(id))
   const [err, setErr] = useState<string | null>(null)
   const [designs, setDesigns] = useState<OrderDesign[]>([])
   const [activity, setActivity] = useState<ChatEntry[] | null>(null)
