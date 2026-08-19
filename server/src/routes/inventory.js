@@ -317,11 +317,31 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
       const idx = items.findIndex((it) => String(it?.sku || '').toUpperCase() === sku.toUpperCase());
       if (idx < 0) { problems.push(`${sku} is not on ${num}`); continue; }
 
+      /**
+       * NEVER MORE THAN THE LINE IS OWED.
+       *
+       * A double-press — a slow connection, a second click, a page left open on two screens
+       * — credited the shelf twice, and nothing on screen said so afterwards. Stock is the
+       * one number here nobody re-counts, which is what makes a silent double the worst
+       * failure this route can have.
+       *
+       * The line's own `received` is the ledger: what is outstanding is qty − received, and
+       * a receive is clamped to it. Press twice and the second press books nothing and says
+       * why. It is the same shape as wallet_ledger's idempotency — the record of what has
+       * already happened decides what may happen next, rather than a token that has to be
+       * remembered.
+       */
+      const want = Math.max(0, Math.round(Number(items[idx].qty) || 0));
+      const had = Math.max(0, Math.round(Number(items[idx].received) || 0));
+      const owed = Math.max(0, want - had);
+      if (owed <= 0) { problems.push(`${items[idx].sku} is already fully received on ${num}`); continue; }
+      const take = Math.min(qty, owed);
+
       // The shelf. Same statement the scan gun runs, so the two can never disagree about
       // what receiving means.
       const upd = await q(
         'update inventory set in_stock = coalesce(in_stock,0) + $1, updated_at = now() where sku = $2 returning sku, in_stock',
-        [qty, items[idx].sku]
+        [take, items[idx].sku]
       );
       if (!upd.rows.length) {
         // NOT created blind. An inventory row carries a name, a category and a reorder
@@ -333,14 +353,16 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
 
       // What the LINE has had. Kept on the line rather than derived from scan history:
       // history is per sku, and the same blank can sit on two purchase orders at once.
-      const already = Math.max(0, Math.round(Number(items[idx].received) || 0));
-      items[idx] = { ...items[idx], received: already + qty };
+      items[idx] = { ...items[idx], received: had + take };
 
       await q(
         'insert into scan_history (sku, direction, qty, order_ref, by_id) values ($1,$2,$3,$4,$5)',
-        [items[idx].sku, 'in', qty, num, req.user?.sub || null]
+        [items[idx].sku, 'in', take, num, req.user?.sub || null]
       ).catch(() => {});
-      received.push({ sku: items[idx].sku, qty, inStock: Number(upd.rows[0].in_stock) || 0, received: items[idx].received });
+      // `qty` is what was ASKED for, `take` what was allowed — a short-ship that over-sends
+      // should read as "3 of the 5 you asked for", not silently as 3.
+      received.push({ sku: items[idx].sku, qty: take, asked: qty, inStock: Number(upd.rows[0].in_stock) || 0, received: items[idx].received });
+      if (take < qty) problems.push(`${items[idx].sku}: only ${owed} were still owed, so ${take} went in`);
     }
 
     if (!received.length) {

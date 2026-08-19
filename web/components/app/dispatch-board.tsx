@@ -926,15 +926,26 @@ export function DispatchBoard() {
               <DropdownMenuTrigger className="eg-control">
                 Print <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 p-1">
+              {/**
+                * WORDS, NOT ICONS — the rule the purchase board already follows.
+                *
+                * Five items each carried a glyph and TWO CARRIED THE SAME ONE — a printer, on
+                * Open labels and on Reprint labels — so the mark that had to tell two actions
+                * apart told you nothing, while the rest needed decoding before the word beside
+                * them was read.
+                *
+                * And the menu is called Print, so "Print manifest" says Print twice. What
+                * survives is the noun; the menu supplies the verb.
+                */}
+              <DropdownMenuContent align="start" className="w-44 p-1">
                 <DropdownMenuItem disabled={!chosen.length} onClick={printPackingSlips}>
-                  <Package size={14} weight="bold" /> Print packing slips
+                  Packing slips
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!chosen.length} onClick={printManifest}>
-                  <ListChecks size={14} weight="bold" /> Print manifest
+                  Manifest
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!chosenWithLabel.length} onClick={openLabels}>
-                  <Printer size={14} weight="bold" /> Open labels
+                  Labels
                 </DropdownMenuItem>
                 {/* REPRINT sits beside the SCAN form: both produce paper, neither spends
                     money. Deliberately a separate item from anything that BUYS a label —
@@ -944,11 +955,11 @@ export function DispatchBoard() {
                   disabled={!chosen.some((o) => o.tracking_label_url) || reprinting || busy}
                   onClick={reprintLabels}
                 >
-                  <Printer size={14} weight="bold" /> Reprint labels
+                  Reprint labels
                 </DropdownMenuItem>
                 {canScanOut && (
                   <DropdownMenuItem disabled={!chosen.length || busy} onClick={() => setManifestOpen(true)} title={manifestTooltip(chosen)}>
-                    <Barcode size={14} weight="bold" /> Create SCAN form
+                    SCAN form
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -981,10 +992,10 @@ export function DispatchBoard() {
                   onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)) }}
                   title="Discard the dropped files that haven't been sent anywhere"
                 >
-                  <X size={14} weight="bold" /> Discard dropped files
+                  Discard dropped files
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={(!chosen.length && !uploadsChosen.length) || busy} onClick={pullBack}>
-                  <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
+                  Cancel with byeastside
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
