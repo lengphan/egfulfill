@@ -42,6 +42,7 @@ import {
   uploadChatAttachment,
   type ChatAttachment,
   updateOrder,
+  duplicateOrder,
   type OrderRow,
   type OrderItem,
   type OrderDesign,
@@ -1405,7 +1406,39 @@ function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => v
   const fs = String(order.factory_status || "")
   const started = !["", "new", "draft", "in_review"].includes(fs)
   const done = fs === "cancelled" || fs === "refunded"
-  if (done) return <span className="text-xs font-medium text-muted-foreground">Order {fs}</span>
+  /**
+   * A CLOSED ORDER GETS A WAY FORWARD, not just a label.
+   *
+   * It read "Order cancelled" and stopped there, which is true and useless: the thing
+   * somebody wants next is the same order again. Reopening this one is refused on purpose —
+   * it is settled, it was refunded, and chargeForSubmit would see the old charge leg and
+   * produce it for free — so this makes a NEW draft carrying everything but the money.
+   */
+  if (done) {
+    return (
+      <span className="flex items-center gap-2">
+        {err && <span className="text-xs text-destructive">{err}</span>}
+        <span className="text-xs font-medium text-muted-foreground">Order {fs}</span>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void duplicate()}
+          title="Create a new draft with the same items, variants and artwork. This order stays cancelled.">
+          {busy ? "Copying…" : "Duplicate"}
+        </Button>
+      </span>
+    )
+  }
+
+  const duplicate = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await duplicateOrder(order.id)
+      if (r?.error || !r?.id) throw new Error(r?.error || "Couldn't copy this order")
+      // Straight to the copy. Staying put would leave you looking at the cancelled order
+      // wondering whether anything happened — the new draft IS the result.
+      window.location.href = `/orders/${encodeURIComponent(r.id)}`
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't copy this order")
+    } finally { setBusy(false) }
+  }
 
   const cancel = async () => {
     setBusy(true); setErr(null)

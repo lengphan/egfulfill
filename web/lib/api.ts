@@ -1550,6 +1550,20 @@ export function purchaseDesignFile(designId: string) {
 export function downloadDesignFile(designId: string) {
   return api<{ designId: string; name?: string; mime?: string; data?: string; url?: string }>(`/api/design_files/${encodeURIComponent(designId)}`)
 }
+/**
+ * Copy an order into a fresh DRAFT — lines, variants, customer, address and the artwork on
+ * every line. New id, empty charge ledger, so submitting it charges properly.
+ *
+ * The cancelled original is left exactly as it is. Reopening one would rewrite a settled
+ * record, and there is a trap under it: chargeForSubmit skips when the charge leg is
+ * non-zero, and a refund never subtracts from that leg — so a reopened order would read
+ * "already charged" and be produced for nothing.
+ */
+export function duplicateOrder(id: string) {
+  return api<{ ok?: boolean; id?: string; seq?: number; lines?: number; artwork?: number; error?: string }>(
+    `/api/orders/${encodeURIComponent(id)}/duplicate`, { method: "POST" },
+  )
+}
 /** Remove a file from an order (staff only). The Design readiness tag reverts once it's
  *  gone; the server records it in the order's tag history and broadcasts a refresh. */
 /** Widen a file to the whole order (lineId null) or pin it back to one line. Metadata only

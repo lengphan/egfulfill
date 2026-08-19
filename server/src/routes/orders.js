@@ -2082,6 +2082,98 @@ export function ordersRoutes(app, requireAuth) {
     return { ok: true, lineId };
   });
 
+  /**
+   * DUPLICATE AN ORDER INTO A FRESH DRAFT.
+   *
+   * A cancelled order is settled — it was cancelled, and if it had been charged the seller
+   * was refunded. Reopening it would rewrite that, and there is a money trap underneath:
+   * chargeForSubmit skips when chargedAmount() > 0, and chargedAmount sums only the CHARGE
+   * leg. A refund writes a different type and never subtracts, so a reopened order would
+   * read "already charged" and go to production for nothing.
+   *
+   * So the cancelled order stays cancelled and this makes a NEW one. New id, empty charge
+   * ledger, submit charges properly. It is the same shape purchasing already uses to buy a
+   * past PO's lines again.
+   *
+   * IT CARRIES EVERYTHING BUT THE MONEY: lines, variants, quantities, customer, address and
+   * the artwork on every line — an embroidery order re-uploaded by hand is most of the work
+   * done twice. What it deliberately drops is unit_cost and ship_fee (frozen at the old
+   * order's submit — the new one is priced today) and every charge, refund and status.
+   */
+  app.post('/api/orders/:id/duplicate', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const src = await q('select * from orders where id=$1', [req.params.id]).then((r) => r.rows[0]);
+    if (!src) { reply.code(404); return { error: 'Order not found' }; }
+    // A seller may only duplicate their own; staff may duplicate any they can see.
+    const sel = isStaff(req.user) ? null : await resolveSeller(req.user);
+    if (sel && src.seller_id !== sel.id) { reply.code(403); return { error: 'forbidden' }; }
+
+    const items = await q('select * from order_items where order_id=$1 order by id', [req.params.id]).then((r) => r.rows);
+    if (!items.length) { reply.code(409); return { error: 'This order has no lines to copy.' }; }
+
+    // Same shape the client mints: FF-<tag>-<ms base36>-<rand>. Server-side because the
+    // copy has to be atomic with the lines and the artwork.
+    const newId = 'FF-dup-' + Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex');
+    const seq = await q("select coalesce(max(seq),0) + 1 as n from orders where seller_id=$1 and coalesce(factory_order,false)=false",
+      [src.seller_id]).then((r) => r.rows[0]?.n || 1).catch(() => null);
+
+    /**
+     * SOURCE BECOMES MANUAL. The original may have come from Etsy, and this order did not —
+     * nothing was bought on a marketplace, so claiming it was would put a fake receipt in
+     * the channel reports. Where it came from is recorded in meta instead, which is also
+     * what makes the pair readable afterwards.
+     */
+    const meta = { ...(src.meta && typeof src.meta === 'object' ? src.meta : {}), duplicated_from: String(req.params.id) };
+    delete meta.retail_set;                       // the sale price was the OLD order's claim
+    await q(
+      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status,
+                           total, seq, meta, factory_order, created_by)
+       values ($1,$2,$3,'manual',$4,$5,'new','',0,$6,$7,$8,$9)`,
+      [newId, src.seller_id, src.store || null, src.customer, src.address, seq, JSON.stringify(meta),
+       src.factory_order === true, req.user.sub]
+    );
+
+    // Lines, each with a NEW line_id — the old one addresses the old order's artwork, and
+    // two orders sharing a line id is the collision this codebase has already paid for once.
+    const lineMap = new Map();
+    for (const it of items) {
+      const lineId = `FFL-${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
+      lineMap.set(it.line_id || ('S:' + it.sku), lineId);
+      await q(
+        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant,
+                                  unit_price, design_src, img, blank, design_pos, line_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [newId, it.sku, it.name, it.print_type, it.qty, it.color, it.size, it.variant,
+         it.unit_price, it.design_src, it.img, it.blank, it.design_pos, lineId]
+      );
+    }
+
+    /**
+     * AND THE ARTWORK. Copied by REFERENCE where the bytes are in storage (storage_key) and
+     * by value where they are inline, so a duplicate costs no extra storage for the common
+     * case. Best-effort per row: a design that fails to copy must not lose the order.
+     */
+    let art = 0;
+    const designs = await q('select * from order_designs where order_id=$1', [req.params.id])
+      .then((r) => r.rows).catch(() => []);
+    for (const d of designs) {
+      const to = lineMap.get(d.line_id || ('S:' + d.sku));
+      if (!to) continue;
+      const ok = await q(
+        `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, updated_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+         on conflict do nothing`,
+        [newId, d.sku, to, d.kind, d.side, d.data, d.storage_key, d.name, d.pos, d.art_hash, d.art_phash]
+      ).then(() => true).catch(() => false);
+      if (ok) art++;
+    }
+
+    audit(req, 'order.duplicate', { entityType: 'order', entityId: newId,
+      before: { from: String(req.params.id) }, after: { id: newId, lines: items.length, artwork: art } });
+    egBroadcast({ type: 'orders' });
+    return { ok: true, id: newId, seq, lines: items.length, artwork: art };
+  });
+
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
   // Save one design (data URL) for an order item.
   //
