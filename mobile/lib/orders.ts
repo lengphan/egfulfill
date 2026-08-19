@@ -197,13 +197,34 @@ export const isArtwork = (kind?: string | null) => {
 
 /** The picture to put beside a line: its OWN artwork first, the listing photo only if
  *  there is none. A listing photo tells the floor nothing about what to print. */
+/**
+ * THE ARTWORK, AND ONLY THE ARTWORK.
+ *
+ * This fell through to `img_ref || img`, and those are the marketplace LISTING photo —
+ * etsy.js sets `img` from listingImage() and puts the buyer's upload in `design_src`. So a
+ * line with nothing to print rendered a photo of finished aprons on a rack, immediately
+ * above its own sentence "No artwork on this line yet": two claims on one card, disagreeing.
+ *
+ * orders.js says the same thing about its card thumb, in as many words — "Never the
+ * marketplace listing photo: a designer opening a card needs to see what they're
+ * digitising, and a photo of the finished product tells them nothing about the file." The
+ * fallback contradicted the rule it was written under.
+ *
+ * Returns null when there is no artwork, which is a REAL state — a plain blank has nothing
+ * to print — and the caller must show it as one rather than borrowing a picture.
+ */
 export function lineArt(
-  item: { img?: string | null; img_ref?: string | null; design_src?: string | null },
+  item: { design_src?: string | null },
   designs: { kind?: string | null; data?: string | null; url?: string | null }[],
 ): string | null {
   const art = designs.find((d) => isArtwork(d.kind))
-  return art?.url || art?.data || item.design_src || item.img_ref || item.img || null
+  return art?.url || art?.data || item.design_src || null
 }
+
+/** The marketplace's photo of the finished product. NOT artwork — it is what the buyer saw
+ *  on the listing, which is worth having beside the file but never in place of it. */
+export const lineListing = (item: { img?: string | null; img_ref?: string | null }): string | null =>
+  item.img_ref || item.img || null
 
 /**
  * The line's product name.
