@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock } from "@phosphor-icons/react"
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import type { OrderDesignStatus } from "@/lib/api"
+import { getPinkStatus, type OrderDesignStatus } from "@/lib/api"
 
 type CardState = OrderDesignStatus["bySku"][string]
 
@@ -59,6 +59,42 @@ export function ItemDesignActions({
   const lane = state?.col ? LANE[state.col] : undefined
   const Icon = lane?.icon
 
+  /**
+   * WHY THIS CANNOT BE SENT — decided before the window opens, not inside it.
+   *
+   * Every one of these failed AFTER the dialog was up: it loaded, offered a form, and then
+   * either refused on submit or sent something that could not be worked on. A menu item
+   * that opens a window which cannot succeed is worse than a disabled one, because the
+   * person has already committed to the task by the time it says no.
+   *
+   * Order matters — the first true reason is the one shown, and they are ordered by what
+   * the reader can act on. "Already sent" is about this line and is checked first; "not
+   * configured" is about the whole install and would otherwise mask the line's own problem
+   * on every row at once.
+   */
+  const [pinkOk, setPinkOk] = useState<boolean | null>(null)
+  useEffect(() => {
+    let live = true
+    const t = setTimeout(() => {
+      getPinkStatus().then((s) => { if (live) setPinkOk(!!s.configured) }).catch(() => { if (live) setPinkOk(false) })
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [])
+
+  /* Artwork is what Pink work ON. A line with no stored design and no picture of its own
+     has nothing to send, and the dialog's own message for this asked the person to attach
+     the file they were already looking at. */
+  const hasArtwork = !!(artworkUrl || lineImage)
+  /* An embroidered line goes to Pink to be DIGITISED, so having no machine file is the
+     reason to send it, not a reason to refuse. A print line needs artwork and nothing else.
+     Either way the block below is about what is missing, never about the method. */
+  const blocker =
+    sent ? `Already with ${vendorLabel(state?.vendor)}`
+    : !hasArtwork ? "No artwork on this line yet"
+    : pinkOk === false ? "Design partner isn't set up"
+    : pinkOk === null ? "Checking the design partner…"
+    : null
+
   return (
     <>
       <div className="flex items-center gap-1.5">
@@ -83,9 +119,12 @@ export function ItemDesignActions({
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Design</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={sent}>
+              <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={!!blocker}>
                 <PaperPlaneTilt size={14} />
-                {sent ? `Already with ${vendorLabel(state?.vendor)}` : "Send to design partner"}
+                {/* The blocker IS the label. A greyed "Send to design partner" says it
+                    cannot be pressed and not one word about why, which on a row that looks
+                    identical to the one above it is the most annoying kind of disabled. */}
+                {blocker ?? "Send to design partner"}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
