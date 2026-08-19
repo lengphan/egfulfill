@@ -36,11 +36,12 @@ export default function TopUp() {
    * — a banking app has to read it, often off a second phone held at arm's length — and it
    * was rendering smaller than the button beneath it while a third of the width sat empty.
    *
-   * 20 is the screen padding either side, 16 is the white card's own padding, and 320 is a
-   * ceiling so it does not become the whole page on a tablet.
+   * 20 is the screen padding either side, 16 is the white card's own padding, and 380 is a
+   * ceiling so it does not become the whole page on a tablet — 320 was leaving 38pt unused
+   * on a Pro Max, which is real resolution on the one thing that has to be readable.
    */
   const { width: screenW } = useWindowDimensions()
-  const qrSize = Math.min(320, Math.max(200, screenW - (20 + 16) * 2))
+  const qrSize = Math.min(380, Math.max(200, screenW - (20 + 16) * 2))
   const [cfg, setCfg] = useState<TopupConfig | null>(null)
   const [amount, setAmount] = useState("")
   const [phase, setPhase] = useState<"pick" | "qr" | "paid">("pick")

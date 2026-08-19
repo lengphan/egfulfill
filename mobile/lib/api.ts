@@ -122,6 +122,8 @@ export type Order = {
    *  for a seller (maskBuyerPII), which is why buying a label is a staff action: the fields
    *  a carrier needs are the ones a seller is never sent. */
   address?: ShipAddress | null
+  /** Who the order is for. Masked to a name alone for a seller on a marketplace order. */
+  customer?: { name?: string | null; email?: string | null; masked?: boolean } | null
   /** The carrier's label PDF. STAFF ONLY — the server nulls it for a seller, because the
    *  buyer's full address is printed on it and every masked field above would otherwise be
    *  cosmetic. So a missing value here is a permission, not an error. */

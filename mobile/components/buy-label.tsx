@@ -1,7 +1,8 @@
 import { useState } from "react"
-import { View, Text, Pressable, ActivityIndicator, Alert } from "react-native"
+import { View, Text, Pressable, ActivityIndicator, Alert, TextInput } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { getShippingRates, buyShippingLabel, type Order, type ShippingRate } from "@/lib/api"
+import { getShippingRates, buyShippingLabel, type Order, type ShipAddress, type ShippingRate } from "@/lib/api"
+import { addressLines } from "@/lib/orders"
 import { C, R } from "@/lib/theme"
 
 /**
@@ -32,12 +33,31 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
   const [rates, setRates] = useState<ShippingRate[] | null>(null)
   const [busy, setBusy] = useState<null | "rates" | string>(null)
   const [err, setErr] = useState<string | null>(null)
+  /**
+   * THE ADDRESS IS CHECKED BEFORE IT IS PAID FOR, and it is editable here.
+   *
+   * A label is printed the moment it is bought and a wrong one is money gone plus a parcel
+   * that comes back — and marketplace addresses arrive with real defects: a missing unit
+   * number, a state the seller typed into the city field, a country the API abbreviated.
+   * The one moment anyone will actually read the address is the moment before spending on
+   * it, so that is where it is shown.
+   *
+   * Seeded from the order and held locally: what is typed here goes to the rate call and
+   * the buy, and is NOT written back to the order. Editing a stored buyer address is a
+   * different decision with an audit trail attached; this only decides where this parcel
+   * goes.
+   */
+  const [edit, setEdit] = useState(false)
+  const [form, setFormState] = useState<ShipAddress>(() => ({ ...(order.address ?? {}) }))
+  /* Any edit drops quoted rates: a price fetched for the previous ZIP is not this
+     parcel's price, and leaving it on screen invites buying it. */
+  const setForm = (fn: (f: ShipAddress) => ShipAddress) => { setFormState(fn); setRates(null) }
 
-  const to = order.address ?? null
+  const to: ShipAddress | null = order.address ? form : null
   /* A seller's copy of the order carries a masked address — city and state only — which is
      not enough to buy anything with. Saying so is better than a button that always errors:
      it is a permission, not a failure. */
-  const masked = !!to?.masked
+  const masked = !!order.address?.masked
   const enough = !!to && !masked && !!(to.street1 || to.street) && !!to.zip
 
   const load = async () => {
@@ -88,8 +108,72 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
     )
   }
 
+  const field = (label: string, k: "name" | "street1" | "street2" | "city" | "state" | "zip" | "country") => (
+    <View key={k} style={{ flex: 1, minWidth: 120, gap: 4 }}>
+      <Text style={{ fontSize: 11, fontWeight: "800", color: C.muted, letterSpacing: 0.6 }}>
+        {label.toUpperCase()}
+      </Text>
+      <TextInput
+        value={String(form[k] ?? "")}
+        onChangeText={(t) => setForm((f) => ({ ...f, [k]: t }))}
+        autoCapitalize={k === "state" || k === "country" ? "characters" : "words"}
+        style={{
+          height: 44, borderRadius: R.md, paddingHorizontal: 12,
+          borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
+          color: C.fg, fontSize: 15,
+        }}
+      />
+    </View>
+  )
+
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: 12 }}>
+      {/* DELIVER TO, above the price. Reviewed, then paid for — never the other way. */}
+      <View style={{
+        borderRadius: R.md, borderWidth: 1, borderColor: C.border,
+        backgroundColor: C.card, padding: 14, gap: 10,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ flex: 1, fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 1 }}>
+            DELIVER TO
+          </Text>
+          <Pressable onPress={() => setEdit((v) => !v)} hitSlop={8}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: C.primary }}>
+              {edit ? "Done" : "Edit"}
+            </Text>
+          </Pressable>
+        </View>
+
+        {edit ? (
+          <View style={{ gap: 10 }}>
+            {field("Name", "name")}
+            {field("Street", "street1")}
+            {field("Apt / unit", "street2")}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {field("City", "city")}
+              {field("State", "state")}
+            </View>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {field("ZIP", "zip")}
+              {field("Country", "country")}
+            </View>
+            {/* Rates were quoted for the OLD address, so they cannot stand. Dropping them
+                is safer than leaving a price on screen that a new ZIP may have changed. */}
+            <Text style={{ fontSize: 12, color: C.muted }}>
+              Changing this re-quotes the rates.
+            </Text>
+          </View>
+        ) : (
+          <View>
+            {addressLines(form).map((l, i) => (
+              <Text key={i} style={{ fontSize: 15, color: i === 0 ? C.fg : C.muted, fontWeight: i === 0 ? "700" : "400" }}>
+                {l}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
       {rates === null ? (
         <Pressable
           onPress={load}
@@ -100,9 +184,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
             opacity: pressed || busy === "rates" ? 0.8 : 1,
           })}
         >
-          {busy === "rates"
-            ? <ActivityIndicator color={C.onPrimary} />
-            : <Ionicons name="pricetags-outline" size={18} color={C.onPrimary} />}
+          {busy === "rates" && <ActivityIndicator color={C.onPrimary} />}
           <Text style={{ fontSize: 16, fontWeight: "800", color: C.onPrimary }}>
             {busy === "rates" ? "Getting rates…" : "Buy shipping label"}
           </Text>

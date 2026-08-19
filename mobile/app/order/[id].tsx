@@ -8,7 +8,7 @@ import {
   type Order, type OrderDesign, type ChatEntry, type User,
 } from "@/lib/api"
 import {
-  normalizeStage, units, isOverdue, numOf, platformOf, nextStage,
+  normalizeStage, units, isOverdue, numOf, platformOf, nextStage, addressLines,
   STAGE_LABEL, stageAction,
 } from "@/lib/orders"
 import { C, R, LIFT, toneOnInk } from "@/lib/theme"
@@ -265,6 +265,57 @@ export default function OrderDetail() {
               whose only possible outcome was an error, printed under a heading for a
               concept the floor does not have. */}
 
+          {/*
+            * WHO IT IS FOR, AND WHERE IT GOES.
+            *
+            * The screen said what to make and never once said who for. Anyone packing is
+            * about to write this on a box, and it is also the thing a label is bought
+            * against — so it belongs on the order, not only inside the buy flow.
+            *
+            * A null address on a marketplace order is Etsy's app-tier PII gate and NOT our
+            * bug, so it says so rather than rendering an empty card that reads as a failed
+            * fetch. A seller sees a masked version (city and state), which is a permission.
+            */}
+          <Section title="DELIVER TO" />
+          <View style={{
+            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
+            padding: 18, ...LIFT,
+          }}>
+            {addressLines(o.address).length > 0 ? (
+              <>
+                {addressLines(o.address).map((l, i) => (
+                  <Text
+                    key={i}
+                    selectable
+                    style={{
+                      fontSize: i === 0 ? 17 : 15,
+                      fontWeight: i === 0 ? "800" : "400",
+                      color: i === 0 ? C.fg : C.muted,
+                      letterSpacing: i === 0 ? -0.3 : 0,
+                    }}
+                  >
+                    {l}
+                  </Text>
+                ))}
+                {o.address?.masked && (
+                  <Text style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
+                    Only staff can see the full address.
+                  </Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: C.fg }}>
+                  {o.customer?.name || "No name on this order"}
+                </Text>
+                <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
+                  No delivery address yet. On an Etsy order this is their app-tier privacy
+                  gate, not a sync failure.
+                </Text>
+              </>
+            )}
+          </View>
+
           {/* ── TRACKING ───────────────────────────────────────────────────────── */}
           <Section title="SHIPPING" />
           <View style={{
@@ -288,7 +339,6 @@ export default function OrderDetail() {
                         backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
                       })}
                     >
-                      <Ionicons name="navigate" size={16} color={C.onPrimary} />
                       <Text style={{ color: C.onPrimary, fontWeight: "800", fontSize: 15 }}>Track</Text>
                     </Pressable>
                   )}
@@ -304,7 +354,7 @@ export default function OrderDetail() {
                         borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
                       })}
                     >
-                      {printing ? <ActivityIndicator color={C.ink} /> : <Ionicons name="print" size={16} color={C.ink} />}
+                      {printing && <ActivityIndicator color={C.ink} />}
                       <Text style={{ color: C.ink, fontWeight: "800", fontSize: 15 }}>Print label</Text>
                     </Pressable>
                   ) : null}
@@ -338,7 +388,7 @@ export default function OrderDetail() {
                       borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
                     })}
                   >
-                    {printing ? <ActivityIndicator color={C.ink} /> : <Ionicons name="print" size={16} color={C.ink} />}
+                    {printing && <ActivityIndicator color={C.ink} />}
                     <Text style={{ color: C.ink, fontWeight: "800", fontSize: 15 }}>Print label</Text>
                   </Pressable>
                 ) : staff ? (

@@ -301,3 +301,27 @@ export const stageActionLine = (to: string) =>
 export const STAGE_VERB: Record<string, string> = {
   approved: "Approve", working: "Start", shipped: "Ship",
 }
+
+
+/**
+ * THE DELIVERY ADDRESS AS LINES, in the order an envelope is read.
+ *
+ * Returned as an array rather than a joined string because a phone renders it as an
+ * address block, and joining with commas here would force the caller to split it again.
+ * Empty array means nothing usable — which is a real state on an Etsy order, where the
+ * buyer's address is withheld behind Etsy's app-tier PII gate and is NOT our bug.
+ */
+export function addressLines(a?: {
+  name?: string | null; street1?: string | null; street?: string | null; street2?: string | null
+  city?: string | null; state?: string | null; zip?: string | null; country?: string | null
+} | null): string[] {
+  if (!a) return []
+  const cityLine = [a.city, a.state].filter(Boolean).join(", ")
+  return [
+    a.name,
+    a.street1 || a.street,
+    a.street2,
+    [cityLine, a.zip].filter(Boolean).join(" "),
+    a.country,
+  ].map((v) => String(v ?? "").trim()).filter(Boolean)
+}

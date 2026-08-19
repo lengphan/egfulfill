@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native"
+import { View, Text, Pressable, ActivityIndicator, ScrollView, useWindowDimensions } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { Ionicons } from "@expo/vector-icons"
@@ -27,6 +27,10 @@ type Entry = { at: number; code: string; dir: Dir; ok: boolean; message: string 
 
 export default function Scan() {
   const insets = useSafeAreaInsets()
+  /* 20 is the margin either side. Capped so it does not eat a tablet, floored so a small
+     phone still frames a code rather than a slot. */
+  const { width: screenW } = useWindowDimensions()
+  const camSize = Math.min(420, Math.max(260, screenW - 40))
   const [perm, requestPerm] = useCameraPermissions()
   const [dir, setDir] = useState<Dir>("in")
   const [busy, setBusy] = useState(false)
@@ -132,7 +136,23 @@ export default function Scan() {
         </View>
       </View>
 
-      <View style={{ marginHorizontal: 20, borderRadius: 20, overflow: "hidden", height: 260, backgroundColor: "#000" }}>
+      {/*
+        * THE VIEWFINDER IS SIZED FOR WHAT IT READS.
+        *
+        * It was a fixed 260pt letterbox with a 190×130 landscape reticle — the shape of a
+        * 1D barcode, from when that was the only thing on a label. The codes people point
+        * this at are QR now (a 25-character SKU as Code-128 is unreadable off a screen,
+        * which is why the web shows a QR), and a QR is SQUARE: framing it inside a wide,
+        * short box means holding the phone further back, which is exactly when a camera
+        * stops resolving the modules.
+        *
+        * Square, and as wide as the screen allows. More pixels across the code is the
+        * whole game — a decoder needs roughly two camera pixels per module.
+        */}
+      <View style={{
+        marginHorizontal: 20, borderRadius: 20, overflow: "hidden",
+        height: camSize, backgroundColor: "#000",
+      }}>
         <CameraView
           style={{ flex: 1 }}
           facing="back"
@@ -149,7 +169,9 @@ export default function Scan() {
             alignItems: "center", justifyContent: "center",
           }}
         >
-          <View style={{ width: 190, height: 130, borderWidth: 3, borderColor: tone, borderRadius: 14 }} />
+          {/* Square, because the code is. 68% leaves the quiet zone inside the frame —
+              a QR held edge-to-edge with the reticle loses the margin decoders need. */}
+          <View style={{ width: camSize * 0.68, height: camSize * 0.68, borderWidth: 3, borderColor: tone, borderRadius: 18 }} />
         </View>
       </View>
 

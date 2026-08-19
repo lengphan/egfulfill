@@ -211,9 +211,9 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
             opacity: pressed || busy ? 0.7 : 1,
           })}
         >
-          {busy
-            ? <ActivityIndicator color={to === "working" ? C.onPrimary : C.lime} />
-            : <Ionicons name={to === "working" ? "play" : "arrow-forward"} size={16} color={to === "working" ? C.onPrimary : C.lime} />}
+          {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
+              second arrow on a card that already had one. */}
+          {busy && <ActivityIndicator color={to === "working" ? C.onPrimary : C.lime} />}
           <Text style={{ fontSize: 15, fontWeight: "800", color: to === "working" ? C.onPrimary : C.lime }}>
             {stageActionLine(to)}
           </Text>
