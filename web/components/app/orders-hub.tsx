@@ -25,7 +25,7 @@ import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrd
 import { useIsNarrow } from "@/lib/use-narrow"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress } from "@/lib/factory-status"
-import { setInternalNote } from "@/lib/api"
+import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
@@ -357,34 +357,6 @@ function ageOf(iso: string | null | undefined): string {
  * The seed is a prop, and the field is keyed by order id at the call site, so switching
  * rows shows that row's note rather than the last one's.
  */
-function InternalNote({ orderId, value }: { orderId: string; value: string }) {
-  const [text, setText] = useState(value)
-  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle")
-  const save = async () => {
-    if (text === value && state !== "error") return
-    setState("saving")
-    try { await setInternalNote(orderId, text); setState("saved") }
-    catch { setState("error") }
-  }
-  return (
-    <div>
-      <div className="mb-0.5 flex items-center gap-2">
-        <span className="eg-label text-muted-foreground">Factory note</span>
-        <span className="text-2xs text-muted-foreground">
-          {state === "saving" ? "saving…" : state === "saved" ? "saved" : state === "error" ? "couldn't save" : "staff only"}
-        </span>
-      </div>
-      <textarea
-        value={text}
-        onChange={(e) => { setText(e.target.value); if (state !== "idle") setState("idle") }}
-        onBlur={save}
-        rows={2}
-        placeholder="e.g. re-hooping, waiting on navy thread…"
-        className="w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-relaxed"
-      />
-    </div>
-  )
-}
 
 export function OrdersHub() {
   const router = useRouter()

@@ -52,6 +52,8 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { OrderStageMenu } from "@/components/app/order-stage-menu"
 import { LabelActionButton } from "@/components/app/label-action-button"
+import { InternalNote } from "@/components/app/internal-note"
+import { printPackingSlips } from "@/lib/packing-slip"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
 import { OrderedVariant } from "@/components/app/ordered-variant"
@@ -525,6 +527,18 @@ export default function OrderDetailPage() {
                 onError={setActionErr}
               />
             )}
+            {/* PACKING SLIP FOR THIS ORDER. It existed only as a bulk action on the list,
+                so the screen where one order is actually worked could not print its own —
+                you had to go back, find it, tick it, and print from there. */}
+            {isStaff && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { const msg = printPackingSlips([order]); if (msg) setActionErr(msg) }}
+              >
+                Packing slip
+              </Button>
+            )}
             <CancelOrderButton order={order} onDone={reload} />
             <SubmitOrderButton order={order} quote={quote} onDone={reload} incomplete={orderNeedsSetup(order.items, catalog)} />
             {isStaff && <ApproveOrderButton order={order} catalog={catalog} onDone={reloadAll} onError={setActionErr} />}
@@ -815,6 +829,19 @@ export default function OrderDetailPage() {
 
           {/* The RECORD, distinct from the conversation below it. */}
           <OrderHistory orderId={String(id)} items={items} />
+
+          {/* THE FACTORY NOTE, above the activity thread and deliberately separate from it.
+              One field, overwritten, staff-only: "the thing to know about this order".
+              The thread below is the sequence of events. Conflating them is how a note
+              becomes forty messages nobody reads, or a note nobody can find. */}
+          {isStaff && (
+            <SectionCard title="Factory note" bodyClassName="p-5">
+              <InternalNote
+                orderId={order.id}
+                value={(order as { internal_note?: string | null }).internal_note ?? ""}
+              />
+            </SectionCard>
+          )}
 
           <SectionCard title="Order activity">
             <div className="flex flex-col">
