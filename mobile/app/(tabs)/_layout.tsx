@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router"
-import { Platform } from "react-native"
+import { Platform, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { F,C, TAB_BAR } from "@/lib/theme"
@@ -28,7 +28,11 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: C.fg,
-        tabBarInactiveTintColor: C.muted,
+        /* HARDER TO SPOT because the inactive tint was C.muted — a warm grey drawn to sit
+           quietly under body copy, which is the opposite of what a control needs. A tab you
+           cannot find is not restraint. Ink at 55% keeps the live one clearly ahead while
+           leaving the rest legible at arm's length. */
+        tabBarInactiveTintColor: "rgba(11,11,12,0.55)",
         /*
          * A FLOATING BAR, ICONS ONLY.
          *
@@ -95,42 +99,65 @@ export default function TabsLayout() {
           paddingBottom: 0,
           paddingVertical: 0,
         },
-        tabBarIconStyle: { marginTop: 0, marginBottom: 0 },
+        /* The icon slot is given the bar's FULL height and centres its own content, so the
+           glyph no longer floats against space the (hidden) label used to occupy — that is
+           what made every icon sit high in the capsule. */
+        tabBarIconStyle: { flex: 1, marginTop: 0, marginBottom: 0, justifyContent: "center" },
       }}
     >
       <Tabs.Screen
         name="today"
         options={{
           title: "Today",
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "today" : "today-outline"} size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name={focused ? "today" : "today-outline"} size={27} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="orders"
         options={{
           title: "Orders",
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "cube" : "cube-outline"} size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name={focused ? "cube" : "cube-outline"} size={27} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="scan"
         options={{
           title: "Scan",
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "scan" : "scan-outline"} size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name={focused ? "scan" : "scan-outline"} size={27} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="wallet"
         options={{
           title: "Wallet",
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "wallet" : "wallet-outline"} size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name={focused ? "wallet" : "wallet-outline"} size={27} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "settings" : "settings-outline"} size={26} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name={focused ? "settings" : "settings-outline"} size={27} color={color} />
+            </View>
+          ),
         }}
       />
     </Tabs>
