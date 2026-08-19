@@ -98,7 +98,16 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
       <DropdownMenuContent align="end" className="w-56">
         {/* WORDS, NOT GLYPHS. These two carried an icon and the two dozen rows below them
             did not, so one menu read as two lists sharing a popup. */}
-        {canAdvance && <DropdownMenuItem onClick={() => next && setOrderStatus(next)}>Next stage</DropdownMenuItem>}
+        {/* "NEXT STAGE" NAMES THE DESTINATION NOW.
+            It sat directly above a list of every stage by name, so it was a second door to
+            a move already on the menu — and it was the worse door, because it did not say
+            where it went. "Approved" tells you what will happen; "Next stage" makes you
+            work it out, then find the same word two rows below to check. */}
+        {canAdvance && next && (
+          <DropdownMenuItem onClick={() => setOrderStatus(next)}>
+            Move to {FACTORY_STAGES.find((x) => x.id === next)?.label ?? next}
+          </DropdownMenuItem>
+        )}
         {/* NEW LABEL ONLY IF THE PAGE ISN'T ALREADY OFFERING IT — see onNewLabel. */}
         {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}>New label</DropdownMenuItem>}
         <DropdownMenuGroup>
