@@ -6,7 +6,7 @@ import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork,
 } from "@/lib/orders"
-import { C, R, LIFT, toneOf } from "@/lib/theme"
+import { C, R, LIFT } from "@/lib/theme"
 import { ItemPhotos } from "@/components/item-photos"
 
 /**
@@ -83,7 +83,6 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
   const art = lineArt(item, mine)
   const listing = lineListing(item)
   const stage = normalizeStage(item.factory_status)
-  const tone = toneOf(stage)
   const facts = lineFacts(item)
   const to = nextLineStage(item, order)
   // A line with no print method is an undecorated blank. It needs no artwork, so it must
@@ -148,11 +147,11 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
             <Text style={{ fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 1 }}>
               {String(index + 1).padStart(2, "0")}
             </Text>
-            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.pill, backgroundColor: tone.bg }}>
-              <Text style={{ fontSize: 10, fontWeight: "900", color: tone.fg, letterSpacing: 0.6 }}>
-                {(STAGE_LABEL[stage] ?? stage).toUpperCase()}
-              </Text>
-            </View>
+            {/* THE STATUS PILL IS GONE FROM THE LINE. 10pt letters on a pale tint, inside a
+                card that already carries a button saying what happens next — it was the
+                smallest thing on the card and the hardest to read, and on the common case
+                (every line at the same stage) it repeated the order's own badge N times.
+                Where a line has no action left, the state is said in words below instead. */}
             {Number(item.qty ?? 1) > 1 && (
               <Text style={{ fontSize: 12, fontWeight: "800", color: C.fg }}>×{Number(item.qty)}</Text>
             )}
@@ -200,13 +199,13 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
         )}
       </View>
 
-      {canWork && to && (
+      {canWork && to ? (
         <Pressable
           onPress={move}
           disabled={busy}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 10, height: 46, borderRadius: R.md,
+            marginTop: 10, height: 50, borderRadius: R.md,
             backgroundColor: to === "working" ? C.primary : C.ink,
             opacity: pressed || busy ? 0.7 : 1,
           })}
@@ -214,11 +213,18 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
           {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
               second arrow on a card that already had one. */}
           {busy && <ActivityIndicator color={to === "working" ? C.onPrimary : C.lime} />}
-          <Text style={{ fontSize: 15, fontWeight: "800", color: to === "working" ? C.onPrimary : C.lime }}>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: to === "working" ? C.onPrimary : C.lime, letterSpacing: -0.2 }}>
             {stageActionLine(to)}
           </Text>
         </Pressable>
-      )}
+      ) : stage ? (
+        /* NO BUTTON MEANS THE LINE IS SOMEWHERE, and it still has to say where. A card that
+           simply stops looks like one whose control failed to render — and this is the case
+           the pill above used to cover. In words, full size, rather than 10pt on a tint. */
+        <Text style={{ marginTop: 10, fontSize: 15, fontWeight: "700", color: C.muted, textAlign: "center" }}>
+          {STAGE_LABEL[stage] ?? stage}
+        </Text>
+      ) : null}
     </View>
   )
 }

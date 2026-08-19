@@ -255,8 +255,21 @@ export function nextLineStage(
   const at = normalizeStage(it.factory_status)
   if (EXCEPTIONS.includes(at)) return null
   if (isFactoryOrder(order) && (at === "" || at === "in_review")) return "working"
+  /**
+   * A LINE NEVER GOES TO PENDING — for any order, not just the factory's.
+   *
+   * Pending means the SELLER submitted and we took their money. That is one fact about one
+   * order; it is not a thing that happens to a sleeve. Every untouched line on a seller
+   * order was offering "Move Item to Pending", so a five-line order showed the button five
+   * times and pressing one claimed a payment event per garment.
+   *
+   * The order-level ladder still carries it (that button is the order's), and the server is
+   * still the one that decides. This is only about what a LINE can be asked to do: making,
+   * which starts at Approved.
+   */
   const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
-  const next = PIPELINE[i + 1] ?? null
+  let next = PIPELINE[i + 1] ?? null
+  if (next === "in_review") next = "approved"
   /**
    * A LINE IS NEVER SHIPPED ON ITS OWN — the parcel is the order.
    *

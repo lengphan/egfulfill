@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native"
+import { View, Text, TextInput, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
-import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
+import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
 import { C, R, LIFT } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 
@@ -25,6 +25,9 @@ import { OrderRow } from "@/components/order-row"
  * in the pipeline.
  */
 const FILTERS = ["Open", "Late", "All"] as const
+/** The stage chips, in pipeline order — the ladder read left to right, exceptions last,
+ *  so the row is the floor's own sequence rather than whatever order the data arrived in. */
+const STAGE_ORDER = ["", "in_review", "approved", "working", "shipped", "on_hold", "cancelled", "refunded"] as const
 type Filter = (typeof FILTERS)[number]
 
 export default function Orders() {
@@ -33,6 +36,8 @@ export default function Orders() {
   const [err, setErr] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<Filter>("Open")
+  /** null = every stage. A chosen stage narrows the lens above it. */
+  const [stage, setStage] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [me, setMe] = useState<User | null>(null)
   const [picked, setPicked] = useState<string[]>([])
@@ -57,8 +62,30 @@ export default function Orders() {
     All: all.length,
   }), [all])
 
+  /**
+   * WHICH STAGE — the filter that was missing entirely.
+   *
+   * Open / Late / All is a lens on urgency, not on status: there was no way to ask "show me
+   * what is waiting to be approved" or "show me today's shipped", which is most of what
+   * anyone opens a queue for. It NARROWS the lens rather than replacing it, so Open + Working
+   * means the working orders that are still open, which is what picking both plainly implies.
+   *
+   * Only stages that are actually present get a chip. A row of eight, six of them reading
+   * zero, is a filter that mostly advertises what the floor is not doing.
+   */
+  const stageCounts = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const o of all) { const k = normalizeStage(o.factory_status); m[k] = (m[k] ?? 0) + 1 }
+    return m
+  }, [all])
+  const stageChips = useMemo(
+    () => STAGE_ORDER.filter((k) => (stageCounts[k] ?? 0) > 0),
+    [stageCounts],
+  )
+
   const rows = useMemo(() => {
-    const byFilter = filter === "All" ? all : filter === "Late" ? all.filter(isOverdue) : all.filter(isOpen)
+    const byLens = filter === "All" ? all : filter === "Late" ? all.filter(isOverdue) : all.filter(isOpen)
+    const byFilter = stage === null ? byLens : byLens.filter((o) => normalizeStage(o.factory_status) === stage)
     const q = search.trim().toLowerCase()
     if (!q) return byFilter
     // id AND num AND the product: a marketplace order's id (`etsy-abc`) is not the number
@@ -71,7 +98,7 @@ export default function Orders() {
       || (o.items ?? []).some((it) => lineTitle(it).toLowerCase().includes(q)
         || String(it.sku ?? "").toLowerCase().includes(q)
         || String(it.blank ?? "").toLowerCase().includes(q)))
-  }, [all, filter, search])
+  }, [all, filter, stage, search])
 
   const staff = !!me?.role && me.role !== "seller"
   const chosen = useMemo(() => rows.filter((o) => picked.includes(o.id)), [rows, picked])
@@ -202,6 +229,39 @@ export default function Orders() {
             )
           })}
         </View>
+        {/* WHICH STAGE. Only the ones present — a row of eight with six reading zero is a
+            filter advertising what the floor is not doing. Scrolls, because the ladder is
+            longer than a phone and squeezing eight into a segmented control makes every one
+            of them unreadable. */}
+        {stageChips.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingVertical: 10, paddingRight: 20 }}
+          >
+            {[null, ...stageChips].map((k) => {
+              const on = stage === k
+              const label = k === null ? "Any stage" : (STAGE_LABEL[k] ?? k)
+              const n = k === null ? all.length : (stageCounts[k] ?? 0)
+              return (
+                <Pressable
+                  key={k ?? "__any"}
+                  onPress={() => setStage(k)}
+                  style={({ pressed }) => ({
+                    flexDirection: "row", alignItems: "center", gap: 6,
+                    paddingHorizontal: 14, height: 34, borderRadius: R.pill,
+                    backgroundColor: on ? C.ink : C.card,
+                    borderWidth: 1, borderColor: on ? C.ink : C.border,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ fontSize: 13.5, fontWeight: "800", color: on ? C.onInk : C.fg }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: "900", color: on ? C.lime : C.muted }}>{n}</Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        )}
       </View>
 
       {orders === null && !err ? (

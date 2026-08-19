@@ -50,7 +50,7 @@ function ItemStrip({ items }: { items: OrderItem[] }) {
   )
 }
 
-function Chip({ label, fg, bg, dot }: { label: string; fg: string; bg?: string; dot?: boolean }) {
+function Chip({ label, fg, bg }: { label: string; fg: string; bg?: string }) {
   return (
     <View style={{
       flexDirection: "row", alignItems: "center", gap: 5,
@@ -58,7 +58,9 @@ function Chip({ label, fg, bg, dot }: { label: string; fg: string; bg?: string; 
       backgroundColor: bg ?? "transparent",
       borderWidth: bg ? 0 : 1, borderColor: C.border,
     }}>
-      {dot && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: fg }} />}
+      {/* NO DOT. The chip is already the colour the dot was — a 6pt disc of the same
+          hue beside its own coloured word is the value stated twice, and at that size it
+          reads as a rendering speck rather than a mark. */}
       <Text style={{ fontSize: 11.5, fontWeight: "800", color: fg, letterSpacing: 0.2 }}>{label}</Text>
     </View>
   )
@@ -139,7 +141,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
         </Text>
 
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 8 }}>
-          <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} dot />
+          <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} />
           {/* "items", matching the order screen. One phrasing across both, and "pc" was
               abbreviating a word that is barely long. */}
           <Chip label={`${units(order)} ${units(order) === 1 ? "item" : "items"}`} fg={C.muted} />
