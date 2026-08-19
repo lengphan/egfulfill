@@ -169,19 +169,38 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
   url: string; src?: string; name?: string; badge?: string; title?: string; onPlace: () => void; onDelete?: () => void
 }) {
+  /**
+   * THE SIZE, MEASURED FROM THE PICTURE ITSELF.
+   *
+   * There was no way to tell a 4500px file from a 400px one before placing it — you found
+   * out from the quality meter after it was on the garment, which is the wrong end of the
+   * job. The image is being decoded to draw the thumbnail anyway, so onLoad already knows.
+   * No fetch, no extra request.
+   */
+  const [dim, setDim] = useState<{ w: number; h: number } | null>(null)
+  /** Under 1200px on its long edge is soft on anything bigger than a pocket print, which is
+   *  worth saying HERE — the cheapest moment to pick a different file is before placing it. */
+  const small = dim != null && Math.max(dim.w, dim.h) > 0 && Math.max(dim.w, dim.h) < 1200
   return (
     <div className="group/thumb relative">
       <button
-        type="button" onClick={onPlace} title={title || [badge, name].filter(Boolean).join(" · ") || "Place on the design"}
+        type="button" onClick={onPlace} title={[title || [badge, name].filter(Boolean).join(" · "), dim ? `${dim.w} × ${dim.h} px` : null].filter(Boolean).join(" · ") || "Place on the design"}
         className="block w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src ?? url} alt={name || ""} className="aspect-square w-full object-cover" />
-        {badge && (
-          <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium text-muted-foreground">
-            {badge}
-          </span>
-        )}
+        <img
+          src={src ?? url} alt={name || ""}
+          onLoad={(e) => setDim({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+          className="aspect-square w-full object-cover"
+        />
+        {/* THE PIXELS, not a truncated id. This caption used to read "4148231…" — the order
+            reference cut off mid-number, which identifies nothing and is on the tooltip
+            anyway. What you actually need before dropping a file on a garment is how big it
+            is. Amber when it is too small to print large. */}
+        <span className={"block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium tabular-nums " +
+          (small ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+          {dim ? `${dim.w}×${dim.h}` : badge || "…"}
+        </span>
       </button>
       {onDelete && (
         <button
@@ -784,7 +803,10 @@ export function DesignMaker() {
           ))}
         </nav>
 
-        <aside className="hidden w-60 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
+        {/* WIDER, so a thumbnail is a picture rather than a stamp. Three tracks in 240px
+            gave each image about 68px — too small to tell two of a seller's logos apart,
+            which is the entire job of this panel. Two tracks in 288px is ~130px each. */}
+        <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
           {tool === "blank" && (
             <div className="space-y-2">
               <div className="text-sm font-semibold">Blank</div>
@@ -825,7 +847,7 @@ export function DesignMaker() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-2 gap-2">
                       {sellerImages.slice(0, RAIL_LIMIT).map((im) => <ImageThumb key={im.id} url={im.url} name={im.name} onPlace={() => placeImage(im.url)} onDelete={() => removeImage(im.id)} />)}
                     </div>
                   </>
@@ -844,7 +866,7 @@ export function DesignMaker() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-2 gap-2">
                       {orderUploads.slice(0, RAIL_LIMIT).map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={shortRef(im.orderRef)} title={[im.orderRef, im.name].filter(Boolean).join(" · ")} onPlace={() => placeImage(im.url)} />)}
                     </div>
                   </>

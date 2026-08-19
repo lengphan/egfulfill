@@ -12,7 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
-import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
+import { storageEnabled, putObject, fromDataUrl, getObject } from '../storage.js';
 
 // seller_images is created idempotently at route load, like the other late-added tables.
 let _ready = null;
@@ -26,20 +26,71 @@ function ensure() {
       created_at timestamptz not null default now()
     )`)
     .then(() => q(`create index if not exists seller_images_seller on seller_images (seller_id, created_at desc)`))
+    // The storage KEY. `url` was all we kept, and it is whatever putObject returned —
+    // which prefers a CDN host that was never connected, on a private bucket. Nothing
+    // could ever load it. The key is what fetches bytes.
+    .then(() => q(`alter table seller_images add column if not exists obj_key text`))
     .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
 
+/**
+ * Where an image is actually readable from — our own origin, never the bucket.
+ *
+ * NO EXTENSION ON THE PATH. It carried one at first and the route simply never matched:
+ * `/:id/art` wants the literal segment `art`, and `art.png` is a different string, so every
+ * thumbnail 404'd exactly as it had before. The Content-Type header says what the bytes
+ * are, which is what /api/design_cards/art relies on too.
+ */
+const artPath = (id) => `/api/design/images/${encodeURIComponent(id)}/art`;
+
 export function designImagesRoutes(app, requireAuth) {
+  /**
+   * THE BYTES, SAME-ORIGIN.
+   *
+   * UNAUTHENTICATED BY DESIGN, exactly like /api/templates/art/:hash and
+   * /api/design_cards/art: an <img> cannot carry a Bearer header. The id is
+   * `IMG-` + 8 random bytes, so the path is unguessable — knowing it means already having
+   * been handed it by an authenticated list.
+   *
+   * It also makes the image CANVAS-READABLE, which the CDN url never was: the design maker
+   * composes artwork onto a canvas and exports it, and a cross-origin picture taints that
+   * canvas so the export throws (CLAUDE.md §5).
+   */
+  app.get('/api/design/images/:id/art', async (req, reply) => {
+    await ensure();
+    const raw = String(req.params.id || '');
+    const id = raw.replace(/\.[a-z0-9]+$/i, '');
+    if (!/^IMG-[0-9a-f]{16}$/i.test(id)) { reply.code(404); return { error: 'not found' }; }
+    const row = await q('select obj_key, url from seller_images where id = $1', [id]).then((r) => r.rows[0]);
+    if (!row) { reply.code(404); return { error: 'not found' }; }
+    // Rows written before obj_key existed keep only the url; the key is its path, which is
+    // recoverable because we control how it was built (seller-images/<seller>/<id><ext>).
+    let key = row.obj_key;
+    if (!key) {
+      const m = String(row.url || '').match(/seller-images\/[^?#]+/);
+      key = m ? m[0] : null;
+    }
+    if (!key) { reply.code(404); return { error: 'not found' }; }
+    const obj = await getObject(key).catch(() => null);
+    if (!obj || !obj.body) { reply.code(404); return { error: 'not found' }; }
+    // Content-addressed enough to cache hard: an IMG- id is never reassigned.
+    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+    reply.header('Content-Type', obj.contentType || 'image/png');
+    return reply.send(obj.body);
+  });
+
   // ── Your uploads: list ───────────────────────────────────────────────────────
   app.get('/api/design/images', { preHandler: requireAuth }, async (req) => {
     await ensure();
     const r = await q(
-      `select id, url, name, created_at from seller_images
+      `select id, url, obj_key, name, created_at from seller_images
         where seller_id=$1 order by created_at desc limit 200`, [req.user.sub]);
     return {
       images: r.rows.map((x) => ({
-        id: x.id, url: x.url, name: x.name || '',
+        // SAME-ORIGIN, always. See artPath — the stored url points at a CDN host that was
+        // never connected, so handing it to an <img> drew a broken picture every time.
+        id: x.id, url: artPath(x.id), name: x.name || '',
         ts: x.created_at ? new Date(x.created_at).getTime() : 0,
       })),
     };
@@ -62,9 +113,14 @@ export function designImagesRoutes(app, requireAuth) {
       const ext = '.' + sub.replace('+xml', '').replace(/[^a-z0-9]/gi, '') || '.png';
       const key = `seller-images/${req.user.sub}/${id}${ext}`;
       const url = await putObject(key, parsed.buffer, parsed.mime || 'image/png', 'public-read');
-      await q(`insert into seller_images (id, seller_id, url, name) values ($1,$2,$3,$4)`,
-        [id, req.user.sub, url, String(b.name || '').slice(0, 120)]);
-      return { ok: true, image: { id, url, name: String(b.name || '') } };
+      // THE KEY, kept alongside the url. `url` is whatever putObject returned, and putObject
+      // prefers SPACES_CDN — https://cdn.egful.store, a host that has never been connected —
+      // on a bucket that is private anyway. So the url has never been loadable in an <img>,
+      // which is why every upload rendered as a broken thumbnail. The key is what we can
+      // actually fetch bytes with.
+      await q(`insert into seller_images (id, seller_id, url, obj_key, name) values ($1,$2,$3,$4,$5)`,
+        [id, req.user.sub, url, key, String(b.name || '').slice(0, 120)]);
+      return { ok: true, image: { id, url: artPath(id), name: String(b.name || '') } };
     } catch (e) {
       req.log?.warn?.({ err: String(e) }, 'seller image upload failed');
       reply.code(500); return { error: e.message || 'Upload failed' };
