@@ -184,11 +184,11 @@ export function RateCalculatorView() {
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">From ZIP</span>
-              <Input value={fromZip} onChange={(e) => setFromZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="90638" className="h-9 font-mono" />
+              <Input value={fromZip} onChange={(e) => setFromZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="90638" className="h-9 tabular-nums" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">To ZIP</span>
-              <Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="10118" className="h-9 font-mono" />
+              <Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="10118" className="h-9 tabular-nums" />
             </label>
           </div>
 
@@ -212,11 +212,11 @@ export function RateCalculatorView() {
           <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">lb</span>
-              <Input value={lb} onChange={(e) => setLb(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
+              <Input value={lb} onChange={(e) => setLb(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 tabular-nums" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">oz</span>
-              <Input value={oz} onChange={(e) => setOz(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
+              <Input value={oz} onChange={(e) => setOz(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 tabular-nums" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Common</span>
@@ -262,7 +262,7 @@ export function RateCalculatorView() {
               {([["L", len, setLen], ["W", wid, setWid], ["H", hei, setHei]] as const).map(([k, v, set]) => (
                 <label key={k} className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">{k} in</span>
-                  <Input value={v} onChange={(e) => set(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 font-mono" />
+                  <Input value={v} onChange={(e) => set(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 tabular-nums" />
                 </label>
               ))}
             </div>
@@ -278,7 +278,7 @@ export function RateCalculatorView() {
             The arithmetic and nothing else. The prose that used to sit around it
             explained the rule three times over; the numbers say it once. */}
         <SectionCard title="How it's billed" bodyClassName="space-y-2 p-4 text-xs">
-          <div className="rounded-lg bg-muted/40 p-2 text-center font-mono text-2xs">
+          <div className="rounded-lg bg-muted/40 p-2 text-center tabular-nums text-2xs">
             {dims.l} × {dims.w} × {dims.h} = <strong>{cuIn.toLocaleString()}</strong> cu in
           </div>
           <dl className="space-y-1">
@@ -320,7 +320,7 @@ export function RateCalculatorView() {
             <div className="divide-y divide-border">
               {rates.map((r, i) => (
                   <div key={r.token || i} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
-                    <span className={"w-16 shrink-0 font-mono tabular-nums " + (i === 0 ? "font-semibold text-success" : "")}>{usd(r.amount)}</span>
+                    <span className={"w-16 shrink-0 tabular-nums tabular-nums " + (i === 0 ? "font-semibold text-success" : "")}>{usd(r.amount)}</span>
                     <span className="min-w-0 flex-1 truncate">
                       <span className="font-medium">{r.carrier}</span>
                       <span className="text-muted-foreground"> · {r.service}</span>

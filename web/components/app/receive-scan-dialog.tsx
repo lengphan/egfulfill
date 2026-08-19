@@ -121,7 +121,7 @@ export function ReceiveScanDialog({
               // A scanner types the code then sends Enter, so this is the whole interaction.
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup() } }}
               placeholder="Scan or type — e.g. 42592959.0011"
-              className="h-10 font-mono"
+              className="h-10 tabular-nums"
               disabled={busy || saving}
             />
             {/* Phone camera, for a bench without a handheld scanner. */}
@@ -160,9 +160,9 @@ export function ReceiveScanDialog({
                 <span className="inline-flex items-center gap-1 font-medium">
                   <Package size={13} weight="fill" /> Box {box.boxNumber}{box.boxCount ? ` of ${box.boxCount}` : ""}
                 </span>
-                <span className="text-muted-foreground">Order <span className="font-mono text-foreground">{box.orderNumber}</span></span>
-                <span className="text-muted-foreground">Invoice <span className="font-mono text-foreground">{box.invoiceNumber}</span></span>
-                {box.poNumber && <span className="text-muted-foreground">PO <span className="font-mono text-foreground">{box.poNumber}</span></span>}
+                <span className="text-muted-foreground">Order <span className="tabular-nums text-foreground">{box.orderNumber}</span></span>
+                <span className="text-muted-foreground">Invoice <span className="tabular-nums text-foreground">{box.invoiceNumber}</span></span>
+                {box.poNumber && <span className="text-muted-foreground">PO <span className="tabular-nums text-foreground">{box.poNumber}</span></span>}
                 {box.warehouse && <span className="text-muted-foreground">from {box.warehouse}</span>}
                 {box.tracking && <span className="text-muted-foreground">{box.carrier} <span className="tabular-nums text-foreground">{box.tracking}</span></span>}
               </div>
@@ -186,7 +186,7 @@ export function ReceiveScanDialog({
                       <div className="truncate font-medium">{l.title || l.sku}</div>
                       <div className="truncate text-xs text-muted-foreground">
                         {[l.brand, l.style, l.color, l.size].filter(Boolean).join(" · ")}
-                        <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
+                        <span className="ml-1.5 tabular-nums opacity-70">{l.sku}</span>
                       </div>
                     </div>
                     {l.ordered > l.qty ? (

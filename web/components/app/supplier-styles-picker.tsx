@@ -187,7 +187,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
                         <div className="min-w-0">
                           <div className="max-w-[22rem] truncate font-medium">{st.name || st.ref}</div>
                           <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-                            <span className="font-mono">{st.ref}</span>
+                            <span className="tabular-nums">{st.ref}</span>
                             {st.brand && <span>{st.brand}</span>}
                             {/* No "published" pill — the tick at the head of this row already
                                 says it, and this tab sits beside Our products, which no longer

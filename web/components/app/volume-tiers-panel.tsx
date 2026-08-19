@@ -286,7 +286,7 @@ export function VolumeTiersPanel() {
                         }}
                         className={"cursor-pointer border-t border-border transition-colors hover:bg-accent " + (open ? "bg-accent" : "")}
                       >
-                        <td className="py-1.5 pr-3 font-mono text-2xs">{s.sellerId.slice(0, 8)}…</td>
+                        <td className="py-1.5 pr-3 tabular-nums text-2xs">{s.sellerId.slice(0, 8)}…</td>
                         <td className="py-1.5 pr-3 text-right tabular-nums">{s.orders}</td>
                         <td className="py-1.5 pr-3 text-right tabular-nums">{s.units.toLocaleString()}</td>
                         <td className="py-1.5 text-right tabular-nums">
@@ -309,7 +309,7 @@ export function VolumeTiersPanel() {
           {preview && (
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
               <div className="mb-3 eg-label text-muted-foreground">
-                Seller&apos;s view · <span className="font-mono normal-case">{preview.slice(0, 8)}…</span>
+                Seller&apos;s view · <span className="tabular-nums normal-case">{preview.slice(0, 8)}…</span>
               </div>
               {previewData
                 ? <VolumeRail data={previewData} />

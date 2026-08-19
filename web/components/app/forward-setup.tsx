@@ -130,7 +130,7 @@ export function ForwardSetup() {
             <div>
               <div className="mb-1.5 text-sm font-medium">1. Your forwarding address</div>
               <div className="flex flex-wrap items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-sm">
+                <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-muted/50 px-3 py-2 tabular-nums text-sm">
                   {address}
                 </code>
                 <button

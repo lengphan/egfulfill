@@ -107,7 +107,7 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
                   <Package size={16} weight="duotone" className="shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-semibold">{orderNum(o)}</span>
+                      <span className="tabular-nums text-sm font-semibold">{orderNum(o)}</span>
                       <span className="truncate text-sm">{o.customer?.name || "—"}</span>
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">

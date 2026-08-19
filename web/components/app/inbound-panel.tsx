@@ -146,7 +146,7 @@ export function InboundPanel() {
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{po.supplier || "Unassigned supplier"}</span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        <span className="font-mono">{po.num}</span>
+                        <span className="tabular-nums">{po.num}</span>
                         {" · "}{lines.length} sku{lines.length === 1 ? "" : "s"}{" · "}{units} unit{units === 1 ? "" : "s"}
                         {when(po.created_at) ? ` · placed ${when(po.created_at)}` : ""}
                       </span>
@@ -169,7 +169,7 @@ export function InboundPanel() {
                         <ProductThumb src={l.image ?? ""} alt={l.name || l.sku} className="size-10 shrink-0" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate">{l.name || l.sku}</span>
-                          <span className="block truncate font-mono text-2xs text-muted-foreground">{l.sku}{l.variant ? ` · ${l.variant}` : ""}</span>
+                          <span className="block truncate tabular-nums text-2xs text-muted-foreground">{l.sku}{l.variant ? ` · ${l.variant}` : ""}</span>
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground">ordered {l.qty}</span>
                         {/* What actually turned up. Blank means "as ordered" rather than

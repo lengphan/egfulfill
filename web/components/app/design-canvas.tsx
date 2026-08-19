@@ -67,7 +67,7 @@ function ThreadSelect({ value, options, onChange }: {
       <DropdownMenuTrigger className="flex h-8 w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
         <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: current.hex }} />
         <span className="truncate font-medium">{current.name}</span>
-        <span className="shrink-0 font-mono text-2xs text-muted-foreground">{current.code}</span>
+        <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">{current.code}</span>
         <CaretDown size={11} weight="bold" className="ml-auto shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 min-w-56 overflow-y-auto">
@@ -78,7 +78,7 @@ function ThreadSelect({ value, options, onChange }: {
             {i === 0 && (
               <span className="shrink-0 rounded bg-muted px-1 py-px text-2xs font-medium text-muted-foreground">best match</span>
             )}
-            <span className="ml-auto shrink-0 font-mono text-2xs text-muted-foreground">{o.code}</span>
+            <span className="ml-auto shrink-0 tabular-nums text-2xs text-muted-foreground">{o.code}</span>
             {o.code === value && <Check size={12} weight="bold" className="shrink-0 text-primary" />}
           </DropdownMenuItem>
         ))}
@@ -658,7 +658,7 @@ export function DesignStage({
           />
           <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-2xs font-medium text-background">
             <span className="size-2.5 rounded-full border border-white/40" style={{ background: loupe.hex }} />
-            <span className="font-mono">{loupe.hex}</span>
+            <span className="tabular-nums">{loupe.hex}</span>
           </div>
         </div>
       )}
@@ -2393,7 +2393,7 @@ export function DesignCanvasDialog({
                   exactly, in mono, where a trailing space (this one has one) is visible
                   rather than invisibly trimmed by the eye. */}
               {item.personalization && (
-                <div className="mt-0.5 line-clamp-2 whitespace-pre-wrap break-words font-mono text-xs text-foreground">
+                <div className="mt-0.5 line-clamp-2 whitespace-pre-wrap break-words tabular-nums text-xs text-foreground">
                   {decodeEntities(item.personalization)}
                 </div>
               )}

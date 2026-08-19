@@ -391,7 +391,7 @@ export function ProductsCatalog() {
                           that don't are exactly the ones you need to find, and a row reading
                           "—" tells you nothing about which blank it is. sellerSafe strips
                           supplierSku, so a seller sees "—" here, never a supplier's code. */}
-                      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.sku || p.supplierSku || "—"}</div>
+                      <div className="mt-0.5 truncate tabular-nums text-xs text-muted-foreground">{p.sku || p.supplierSku || "—"}</div>
                     </div>
                     <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
                   </div>

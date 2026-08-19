@@ -23,7 +23,7 @@ function Field({ label, hint, value, onChange, mono }: {
   return (
     <label className="block">
       {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
-      <Input value={value} onChange={(e) => onChange(e.target.value)} className={mono ? "font-mono" : ""} />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} className={mono ? "tabular-nums" : ""} />
       {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
   )

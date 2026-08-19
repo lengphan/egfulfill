@@ -159,7 +159,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                     <div className="flex flex-wrap items-center gap-2 px-4 py-3">
                       <button onClick={() => toggle(o.tradeId)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                         <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
-                        <span className="font-mono text-sm font-medium">{o.tradeId}</span>
+                        <span className="tabular-nums text-sm font-medium">{o.tradeId}</span>
                         <span className="truncate text-sm text-muted-foreground">
                           {when(o.createdAt)}
                           {/* Only once it's known. Before the detail call we have no total

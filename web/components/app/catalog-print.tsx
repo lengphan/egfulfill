@@ -609,7 +609,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     {/* The sku and the brand are NOT editable. One is how a buyer orders the
                         thing and the other is whose garment it is — a document where those
                         can be retyped is a document that can quote a style nobody can supply. */}
-                    <span className="font-mono">{st.sku}</span>
+                    <span className="tabular-nums">{st.sku}</span>
                     {st.brand && <span>· {st.brand}</span>}
                     {editing && st.edited && (
                       <button
@@ -876,7 +876,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         <span key={c.name + c.sku}
                               className="rounded border border-neutral-200 px-2 py-1 text-[10px] leading-tight text-neutral-700">
                           {c.name}
-                          {c.sku && <span className="ml-1.5 font-mono text-[9px] text-neutral-400">{c.sku}</span>}
+                          {c.sku && <span className="ml-1.5 tabular-nums text-[9px] text-neutral-400">{c.sku}</span>}
                         </span>
                       ))}
                     </div>
@@ -997,7 +997,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                          item silently missing from a quote. */
                       <tr key={`${st.ref}-${st.sku}-${ri}`} className={ri % 2 ? "" : "bg-neutral-50"}>
                         <td className="max-w-[90mm] truncate py-2 pr-3 font-medium">{st.name}</td>
-                        <td className="py-2 pr-3 font-mono text-[11px] text-neutral-500">{st.sku}</td>
+                        <td className="py-2 pr-3 tabular-nums text-[11px] text-neutral-500">{st.sku}</td>
                         {/* A DASH, NEVER A ZERO. An unpriced style on a price list that
                             printed $0.00 would be quoting a wholesale buyer a free garment,
                             and it is the one mistake here nobody could walk back. */}

@@ -167,7 +167,7 @@ function DesignLab() {
                       <button
                         onClick={() => { navigator.clipboard?.writeText(`IMG-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
                         title="Copy this image's reference"
-                        className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 font-mono text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                        className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
                         {copied === String(d.id) ? "Copied ✓" : `IMG-${d.id}`}
                       </button>

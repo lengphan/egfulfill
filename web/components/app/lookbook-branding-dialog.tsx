@@ -138,7 +138,7 @@ export function LookbookBrandingDialog({
                 aria-label="Lookbook accent colour"
                 className="h-9 w-12 cursor-pointer rounded-md border border-input bg-transparent p-1"
               />
-              <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#6633FF" className="h-9 flex-1 font-mono" />
+              <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#6633FF" className="h-9 flex-1 tabular-nums" />
             </div>
             {/* Stated rather than discovered at the printer: the covers reverse cream type out
                 of this colour, so a light value makes the title vanish. */}

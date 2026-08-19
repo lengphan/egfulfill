@@ -163,7 +163,7 @@ export function SampleOrderDialog({
           )}
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Supplier&apos;s order number</span>
-            <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="ALI-88213-7" className="h-9 font-mono" />
+            <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="ALI-88213-7" className="h-9 tabular-nums" />
           </label>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
@@ -253,7 +253,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
               {items.map((s) => (
                 <tr key={s.id} className="border-t border-border">
                   <td className="px-4 py-2">
-                    <div className="font-mono text-xs">{s.orderNo || "—"}</div>
+                    <div className="tabular-nums text-xs">{s.orderNo || "—"}</div>
                     {(chatUrl(s.sellerEid) || orderUrl(s.tradeId)) && (
                       <div className="mt-1 flex items-center gap-2 text-xs">
                         {chatUrl(s.sellerEid) && (

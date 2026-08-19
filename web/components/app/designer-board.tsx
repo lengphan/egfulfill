@@ -827,7 +827,7 @@ export function DesignerBoard() {
                               a card with no order says "No order" rather than going blank, and the
                               file count shows even at 0. Method/product sits between them when set. */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-2xs text-muted-foreground">
-                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
+                            <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
                               {/* shortOrderRef, not slice(0,14). Truncating at a character
                                   count cut `etsy-4149084185` to `etsy-414908418` — a number
                                   with its last digit removed, which still LOOKS like an
@@ -851,7 +851,7 @@ export function DesignerBoard() {
                               once actually credited, " · partner" for an outsourced card, else the
                               plain rate. */}
                           <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5 text-xs text-muted-foreground">
-                            <span className="shrink-0 font-mono">DSN-{c.id}</span>
+                            <span className="shrink-0 tabular-nums">DSN-{c.id}</span>
                             {/* EMB-check cards carry no payout (factory check, not designer
                                 work), so the footer figure is suppressed for them. */}
                             {!isDesigner && !isEmbCard(c) && (() => {
@@ -926,7 +926,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
       {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-2xs font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
-  { id: "order", label: "Order", cell: (c) => <span title={c.order_id ? String(c.order_id) : undefined} className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? shortOrderRef(String(c.order_id)) : "—"}</span> },
+  { id: "order", label: "Order", cell: (c) => <span title={c.order_id ? String(c.order_id) : undefined} className="whitespace-nowrap tabular-nums text-xs text-muted-foreground">{c.order_id ? shortOrderRef(String(c.order_id)) : "—"}</span> },
   { id: "customer", label: "Customer", cell: (c) => <span className="text-muted-foreground">{c.customer ? String(c.customer) : "—"}</span> },
   { id: "product", label: "Product", cell: (c) => <div className="max-w-[220px] truncate text-muted-foreground">{c.product || c.type || "—"}</div> },
   { id: "method", label: "Method", cell: (c) => <span className="text-muted-foreground">{c.type ? String(c.type) : (isEmbCard(c) ? "Embroidery" : "—")}</span> },
@@ -1269,7 +1269,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           <span>{card.product || card.type || "No product / type set"}</span>
           <span aria-hidden>·</span>
           {card.order_id
-            ? <span>Order <span className="font-mono text-foreground" title={String(card.order_id)}>{shortOrderRef(String(card.order_id))}</span></span>
+            ? <span>Order <span className="tabular-nums text-foreground" title={String(card.order_id)}>{shortOrderRef(String(card.order_id))}</span></span>
             : <span>Not attached to an order yet</span>}
           {card.customer && <><span aria-hidden>·</span><span>{String(card.customer)}</span></>}
           {card.claimed_by && <><span aria-hidden>·</span><span>Claimed by {String(card.claimed_by)}</span></>}
@@ -1357,13 +1357,13 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {card.vendor_task_id && (
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
                   <div className="eg-label text-muted-foreground">Task ID</div>
-                  <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
+                  <div className="select-all tabular-nums text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
                 </div>
               )}
               {card.vendor_ref && (
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
                   <div className="eg-label text-muted-foreground">Ref ID</div>
-                  <div className="select-all font-mono text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
+                  <div className="select-all tabular-nums text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
                 </div>
               )}
             </div>

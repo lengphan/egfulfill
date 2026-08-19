@@ -77,7 +77,7 @@ export function AddTracking({ orderId, onSaved }: { orderId: string; onSaved: ()
           onKeyDown={(e) => { if (e.key === "Enter") void save() }}
           placeholder="Tracking number"
           aria-label="Tracking number"
-          className="h-8 min-w-[12rem] flex-1 font-mono text-xs"
+          className="h-8 min-w-[12rem] flex-1 tabular-nums text-xs"
           autoFocus
         />
         <Button onClick={() => void save()} disabled={busy || !num.trim()}>

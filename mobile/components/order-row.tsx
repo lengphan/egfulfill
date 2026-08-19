@@ -50,18 +50,29 @@ function ItemStrip({ items }: { items: OrderItem[] }) {
   )
 }
 
-function Chip({ label, fg, bg }: { label: string; fg: string; bg?: string }) {
+function Chip({ label, fg, bg, solid }: { label: string; fg: string; bg?: string; solid?: boolean }) {
+  /* NOT A PILL ANY MORE.
+   *
+   * Every row carried two of these and the filter rows carried eight more, so a screen
+   * opened with ~20 lozenges on it and the eye had nowhere to land. The reserved stage
+   * colour is the information; the capsule around it never was. A 6pt dot in that exact
+   * colour beside plain type says the same thing and stops competing with the product name,
+   * which is the one line anyone is actually reading.
+   *
+   * RUSH and LATE keep a fill, because they are the two states that SHOULD interrupt. That
+   * is the whole point of reserving a shape: it means something when almost nothing has it.
+   */
+  if (solid) {
+    return (
+      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, backgroundColor: bg }}>
+        <Text style={{ fontSize: 10.5, fontFamily: F.bold, color: fg, letterSpacing: 0.6 }}>{label}</Text>
+      </View>
+    )
+  }
   return (
-    <View style={{
-      flexDirection: "row", alignItems: "center", gap: 5,
-      paddingHorizontal: 9, paddingVertical: 4, borderRadius: R.pill,
-      backgroundColor: bg ?? "transparent",
-      borderWidth: bg ? 0 : 1, borderColor: C.border,
-    }}>
-      {/* NO DOT. The chip is already the colour the dot was — a 6pt disc of the same
-          hue beside its own coloured word is the value stated twice, and at that size it
-          reads as a rendering speck rather than a mark. */}
-      <Text style={{ fontSize: 11.5, fontFamily: F.bold, color: fg, letterSpacing: 0.2 }}>{label}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+      {bg ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: fg }} /> : null}
+      <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: bg ? C.fg : C.muted }}>{label}</Text>
     </View>
   )
 }
@@ -85,13 +96,20 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={220}
+      /* A ROW ON THE PAGE, not a tile floating over it.
+       *
+       * This was a white card on warm paper with a border and a shadow, inset from the
+       * screen margin — so the title sat at one left edge, the card at a second, its padding
+       * at a third and the thumbnail pushed the text to a fourth. Four margins down one
+       * screen is what reads as "no alignment", and white-on-beige is what reads as
+       * stuck-on rather than seamless.
+       *
+       * Now it is paper all the way down: rows separated by a hairline, sharing ONE left
+       * margin with the screen title. Selection tints instead of drawing a second border. */
       style={({ pressed }) => ({
-        flexDirection: "row", gap: 13, padding: 13, marginBottom: 10,
-        backgroundColor: C.card, borderRadius: R.lg,
-        borderWidth: selected ? 2 : 1,
-        borderColor: selected ? C.primary : C.border,
-        opacity: pressed ? 0.75 : 1,
-        ...LIFT,
+        flexDirection: "row", gap: 13, paddingVertical: 14, paddingHorizontal: 18,
+        borderBottomWidth: 1, borderBottomColor: C.border,
+        backgroundColor: selected ? C.accent : pressed ? C.accent : "transparent",
       })}
     >
       {/* THE ARTWORK, so a row is recognisable before it is read. The thumbnail route is
@@ -99,7 +117,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
           a 122-bit row id instead. */}
       <View>
         {uri ? (
-          <Image source={{ uri }} style={{ width: 64, height: 64, borderRadius: R.md, backgroundColor: C.accent }} resizeMode="cover" />
+          <Image source={{ uri }} style={{ width: 60, height: 60, borderRadius: 8, backgroundColor: C.accent }} resizeMode="cover" />
         ) : (
           <View style={{
             width: 64, height: 64, borderRadius: R.md, backgroundColor: C.accent,
@@ -126,17 +144,17 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress }: {
             order is. `o.id` is not `o.num`: numOf keeps a marketplace order reading as the
             number the buyer and the packing slip say. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 0.3 }} numberOfLines={1}>
+          <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.muted, letterSpacing: 0 }} numberOfLines={1}>
             {numOf(order)}
           </Text>
           <Text style={{ fontSize: 12, color: C.muted }}>·</Text>
           <Text style={{ fontSize: 12, color: C.muted, flex: 1 }} numberOfLines={1}>{platformOf(order)}</Text>
-          {order.rush && <Chip label="RUSH" fg="#fff" bg={C.warn} />}
-          {late && <Chip label="LATE" fg="#fff" bg={C.alert} />}
+          {order.rush && <Chip solid label="RUSH" fg="#fff" bg={C.warn} />}
+          {late && <Chip solid label="LATE" fg="#fff" bg={C.alert} />}
         </View>
 
         {/* THE PRODUCT — the one thing to read. */}
-        <Text numberOfLines={1} style={{ fontSize: 17, fontFamily: F.bold, color: C.fg, marginTop: 3, letterSpacing: -0.3 }}>
+        <Text numberOfLines={1} style={{ fontSize: 16, fontFamily: F.medium, color: C.fg, marginTop: 3, letterSpacing: -0.2 }}>
           {first ? lineTitle(first) : "No lines"}
         </Text>
 

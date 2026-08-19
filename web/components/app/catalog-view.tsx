@@ -326,7 +326,7 @@ export function CatalogView() {
                                 price cell beside it — three readings of two facts, on the
                                 screen where the facts are already the columns. */}
                             <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-                              <span className="font-mono">{p.sku || id}</span>
+                              <span className="tabular-nums">{p.sku || id}</span>
                             </div>
                             {/* Colourways as their own supplier photos where we have them.
                                 Capped at eight with a count — a 40-colour style would

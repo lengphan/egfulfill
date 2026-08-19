@@ -57,7 +57,7 @@ const cellClass = (id: OrderColId) => {
 }
 function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderDesign>, catalog?: CatalogProduct[]): React.ReactNode {
   switch (id) {
-    case "order": return <span className="font-mono text-xs font-medium">{numOf(o)}</span>
+    case "order": return <span className="tabular-nums text-xs font-medium">{numOf(o)}</span>
     case "store": return <span className="text-muted-foreground">{storeOf(o)}</span>
     case "customer": return <span className="font-medium">{customerOf(o)}</span>
     case "items": return (

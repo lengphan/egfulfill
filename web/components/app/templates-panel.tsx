@@ -152,7 +152,7 @@ export function TemplatesPanel() {
                   <button
                     onClick={() => { navigator.clipboard?.writeText(ref).catch(() => {}); setCopied(t.id); setTimeout(() => setCopied(null), 1400) }}
                     title="Copy this template's reference"
-                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {copied === t.id ? "Copied" : ref}
                   </button>

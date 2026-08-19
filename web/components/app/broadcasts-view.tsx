@@ -175,7 +175,7 @@ function EmailBrandingCard() {
             <div className="flex items-center gap-2">
               <input type="color" value={b.accent} onChange={(e) => patch({ accent: e.target.value })}
                 className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-1" aria-label="Accent colour" />
-              <Input value={b.accent} onChange={(e) => patch({ accent: e.target.value })} className="h-9 font-mono" placeholder="#604cfa" />
+              <Input value={b.accent} onChange={(e) => patch({ accent: e.target.value })} className="h-9 tabular-nums" placeholder="#604cfa" />
             </div>
           </div>
           <div>
@@ -795,7 +795,7 @@ export function BroadcastsView() {
                 {!!cCount?.invalid?.length && (
                   <p className="mt-1.5 text-2xs leading-snug text-amber-700 dark:text-amber-400">
                     {cCount.invalid.length} address{cCount.invalid.length === 1 ? "" : "es"} can&apos;t be delivered to and will fail:{" "}
-                    <span className="font-mono">{cCount.invalid.map((x) => x.email || "(blank)").join(", ")}</span>.
+                    <span className="tabular-nums">{cCount.invalid.map((x) => x.email || "(blank)").join(", ")}</span>.
                   </p>
                 )}
                 <p className="mt-1.5 text-2xs text-muted-foreground">
@@ -857,7 +857,7 @@ export function BroadcastsView() {
                  this is where the raw text belongs — you came here to look for it. */
               <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
                 <div className="font-medium">{viewing.failed_count.toLocaleString("en-US")} didn&apos;t get it</div>
-                <div className="mt-0.5 font-mono opacity-90">{viewing.last_error}</div>
+                <div className="mt-0.5 tabular-nums opacity-90">{viewing.last_error}</div>
               </div>
             )}
             {/* WHERE IT LANDED, address by address. The counts above answer "how many"; this
@@ -883,7 +883,7 @@ export function BroadcastsView() {
                           {/* The reason sits under the address it belongs to — a failure list
                               that doesn't say why is just a shorter list. */}
                           {d.status === "failed" && d.error && (
-                            <span className="mt-0.5 block font-mono text-2xs leading-snug text-red-700 dark:text-red-300">{d.error}</span>
+                            <span className="mt-0.5 block tabular-nums text-2xs leading-snug text-red-700 dark:text-red-300">{d.error}</span>
                           )}
                         </span>
                         {d.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">added</span>}
@@ -963,7 +963,7 @@ export function BroadcastsView() {
               {sendsEmail && !!count.invalid?.length && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
                   {count.invalid.length} address{count.invalid.length === 1 ? "" : "es"} can&apos;t be delivered to and will fail:{" "}
-                  <span className="font-mono">{count.invalid.map((x) => x.email || "(blank)").join(", ")}</span>. Fix the seller record, or remove them below.
+                  <span className="tabular-nums">{count.invalid.map((x) => x.email || "(blank)").join(", ")}</span>. Fix the seller record, or remove them below.
                 </div>
               )}
 

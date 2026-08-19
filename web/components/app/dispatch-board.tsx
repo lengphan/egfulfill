@@ -887,7 +887,7 @@ export function DispatchBoard() {
                 className="eg-tap inline-flex items-center gap-1 rounded-lg border border-amber-400 bg-white px-2 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50"
                 title={`Force-clear ${numOf(o)}'s byeastside link`}
               >
-                <span className="font-mono">{numOf(o)}</span> · Force-clear
+                <span className="tabular-nums">{numOf(o)}</span> · Force-clear
               </button>
             ))}
             {stuck.length > 1 && (
@@ -1209,7 +1209,7 @@ export function DispatchBoard() {
                     <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
                       <DispStatus k={d.key} label={d.label} />
-                      <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
+                      <span className="truncate tabular-nums text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
                       <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
                       {(() => {
@@ -1328,7 +1328,7 @@ export function DispatchBoard() {
                     type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)}
                     className="size-4 shrink-0 accent-primary" aria-label={`Select ${numOf(o)}`}
                   />
-                  <span className="truncate font-mono text-sm font-semibold">{numOf(o)}</span>
+                  <span className="truncate tabular-nums text-sm font-semibold">{numOf(o)}</span>
                   <span className="truncate text-sm">{customerOf(o)}</span>
                   <span className="truncate text-xs text-muted-foreground" title={o.store || undefined}>
                     {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}

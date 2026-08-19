@@ -517,7 +517,7 @@ export function BoldProduct({ product, shipping }: {
                   {guides.map((g, i) => (
                     <div key={g.label} className="mb-8 break-inside-avoid">
                       <dt className="flex items-baseline gap-2.5">
-                        <span className="font-mono text-xs font-bold tabular-nums" style={{ color: ACID }}>
+                        <span className="tabular-nums text-xs font-bold tabular-nums" style={{ color: ACID }}>
                           {String(i + 1).padStart(2, "0")}
                         </span>
                         <span className="text-base font-black tracking-tight" style={{ color: ACCENT_INK }}>{g.label}</span>

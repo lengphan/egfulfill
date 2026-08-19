@@ -88,7 +88,7 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
       {saved && !editing ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-            <span className="font-mono">{maskNumber(saved.card_number)}</span>
+            <span className="tabular-nums">{maskNumber(saved.card_number)}</span>
             <span className="text-muted-foreground">{saved.name}</span>
             <span className={expired ? "font-medium text-destructive" : "text-muted-foreground"}>
               {expired ? `expired ${saved.exp_date}` : saved.exp_date}
@@ -123,19 +123,19 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
               // transposed digit hides.
               onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 19).replace(/(.{4})/g, "$1 ").trim())}
               inputMode="numeric" autoComplete="cc-number" name="cardnumber"
-              className="h-9 font-mono" placeholder="4111 1111 1111 1111" />
+              className="h-9 tabular-nums" placeholder="4111 1111 1111 1111" />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
               <span className="text-sm font-medium">Expiry</span>
               <Input value={exp} onChange={(e) => setExp(formatExpiry(e.target.value))}
                      placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp"
-                     className="h-9 font-mono" />
+                     className="h-9 tabular-nums" />
             </label>
             <label className="block space-y-1">
               <span className="text-sm font-medium">CVV</span>
               <Input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                     inputMode="numeric" autoComplete="cc-csc" name="cvc" className="h-9 font-mono" />
+                     inputMode="numeric" autoComplete="cc-csc" name="cvc" className="h-9 tabular-nums" />
             </label>
           </div>
 

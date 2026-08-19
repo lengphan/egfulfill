@@ -486,7 +486,7 @@ export function ShipmentDetailDialog({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2">
                           <span className="truncate text-sm font-medium">{c.customer || "No name on the order"}</span>
-                          <span className="font-mono text-2xs text-muted-foreground">{c.id}</span>
+                          <span className="tabular-nums text-2xs text-muted-foreground">{c.id}</span>
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
                           {/* The import date earns its place: two orders for one buyer are

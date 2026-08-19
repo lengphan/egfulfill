@@ -116,7 +116,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
             ) : picked ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
-                  <span className="font-mono text-xs">{numOf(picked)}</span>
+                  <span className="tabular-nums text-xs">{numOf(picked)}</span>
                   <span className="truncate text-muted-foreground">{picked.customer?.name ?? "—"}</span>
                   <Button size="sm" variant="ghost" className="ml-auto"
                     onClick={() => { setPicked(null); setLine(null) }}>Change</Button>
@@ -138,7 +138,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                           >
                             <span className="min-w-0 flex-1 truncate">{it.name ?? it.sku ?? "Line"}</span>
                             <span className="shrink-0 text-xs text-muted-foreground">{variantOf(it)}</span>
-                            <span className="shrink-0 font-mono text-2xs text-muted-foreground">{it.sku}</span>
+                            <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">{it.sku}</span>
                           </button>
                         )
                       })}
@@ -155,7 +155,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                 {matches.map((o) => (
                   <button key={o.id} onClick={() => setPicked(o)}
                     className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent">
-                    <span className="shrink-0 font-mono text-xs">{numOf(o)}</span>
+                    <span className="shrink-0 tabular-nums text-xs">{numOf(o)}</span>
                     <span className="min-w-0 flex-1 truncate text-muted-foreground">{o.customer?.name ?? "—"}</span>
                     <span className="shrink-0 text-2xs text-muted-foreground">{(o.items ?? []).length} lines</span>
                   </button>

@@ -513,7 +513,7 @@ export function StaffDashboard() {
               <div className="divide-y divide-border">
                 {recent.map((o) => (
                   <div key={o.id} className="flex items-center gap-3 px-5 py-3">
-                    <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
+                    <span className="tabular-nums text-sm font-semibold">{numOf(o)}</span>
                     <StageBadge status={orderStage(o.items ?? [])} />
                     <span className="truncate text-sm text-muted-foreground">{o.customer?.name || "—"}</span>
                     <span className="ml-auto shrink-0 text-xs text-muted-foreground">{o.store || o.source || "manual"} · {fmtDate(o.created_at)}</span>

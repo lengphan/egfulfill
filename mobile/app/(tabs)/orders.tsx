@@ -176,14 +176,17 @@ export default function Orders() {
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 18, paddingBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 34, fontFamily: F.bold, color: C.fg, marginTop: 6, letterSpacing: -1.2 }}>Orders</Text>
+          {/* The one DISPLAY moment on the screen. Playfair is a high-contrast serif — it
+              earns its place at 34pt and would be mud at 13, which is why nothing else here
+              uses it. */}
+          <Text style={{ fontSize: 32, fontFamily: F.display, color: C.fg, marginTop: 6, letterSpacing: -0.6 }}>Orders</Text>
           {staff && orders !== null && (
             <Pressable
               onPress={() => (selecting ? clearSelection() : setSelecting(true))}
               hitSlop={10}
-              style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: selecting ? C.ink : C.accent }}
+              style={{ paddingVertical: 6, paddingHorizontal: 4 }}
             >
-              <Text style={{ fontSize: 13, fontFamily: F.bold, color: selecting ? C.lime : C.primary }}>
+              <Text style={{ fontSize: 14.5, fontFamily: F.semi, color: C.primary }}>
                 {selecting ? "Done" : "Select"}
               </Text>
             </Pressable>
@@ -192,8 +195,8 @@ export default function Orders() {
 
         <View style={{
           flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12,
-          height: 46, borderRadius: R.md, paddingHorizontal: 12,
-          backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+          height: 44, borderRadius: 10, paddingHorizontal: 12,
+          backgroundColor: C.accentPaper, borderWidth: 0,
         }}>
           <Ionicons name="search" size={17} color={C.muted} />
           <TextInput
@@ -212,47 +215,42 @@ export default function Orders() {
           )}
         </View>
 
-        {/* THE FILTER, as a segmented control that carries its own numbers. A chip that says
-            "Late" tells you a filter exists; one that says "Late 3" is already the answer,
-            and most of the time nobody needs to press it at all. */}
-        <View style={{
-          flexDirection: "row", marginTop: 12, padding: 4, gap: 4,
-          borderRadius: R.pill, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-        }}>
+        {/* THE FILTER, AS A RULE UNDER A WORD — the same pattern the web tab bars use.
+            It was a segmented control: a pill tray, holding a filled pill, on a screen that
+            already had two pills on every row. The number is the useful half and it survives
+            intact ("Late 3" is already the answer, and most of the time nobody needs to
+            press anything); the capsule around it never said a thing. */}
+        <View style={{ flexDirection: "row", marginTop: 14, gap: 22 }}>
           {FILTERS.map((f) => {
             const on = f === filter
             const n = counts[f]
             const hot = f === "Late" && n > 0
             return (
-              <Pressable
-                key={f}
-                onPress={() => setFilter(f)}
-                style={{
-                  flex: 1, height: 36, borderRadius: R.pill, gap: 6,
-                  flexDirection: "row", alignItems: "center", justifyContent: "center",
-                  backgroundColor: on ? C.ink : "transparent",
-                }}
-              >
-                <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: on ? C.onInk : C.muted }}>{f}</Text>
-                <Text style={{
-                  fontSize: 12, fontFamily: F.bold,
-                  color: on ? C.lime : hot ? C.alert : C.muted,
-                }}>
-                  {orders === null ? "" : n}
-                </Text>
+              <Pressable key={f} onPress={() => setFilter(f)} hitSlop={8} style={{ paddingBottom: 7 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 15, fontFamily: on ? F.semi : F.medium, color: on ? C.fg : C.muted }}>{f}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: F.medium, color: hot ? C.alert : C.muted }}>
+                    {orders === null ? "" : n}
+                  </Text>
+                </View>
+                {/* The rule, and only under the live one. */}
+                <View style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: 1.5,
+                  backgroundColor: on ? C.fg : "transparent",
+                }} />
               </Pressable>
             )
           })}
         </View>
         {/* WHICH STAGE. Only the ones present — a row of eight with six reading zero is a
             filter advertising what the floor is not doing. Scrolls, because the ladder is
-            longer than a phone and squeezing eight into a segmented control makes every one
-            of them unreadable. */}
+            longer than a phone. Plain words now: eight pills below three pills was the
+            "pills on pills" the queue opened with. */}
         {stageChips.length > 1 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingVertical: 10, paddingRight: 20 }}
+            contentContainerStyle={{ gap: 18, paddingTop: 12, paddingBottom: 2, paddingRight: 20 }}
           >
             {[null, ...stageChips].map((k) => {
               const on = stage === k
@@ -262,16 +260,11 @@ export default function Orders() {
                 <Pressable
                   key={k ?? "__any"}
                   onPress={() => setStage(k)}
-                  style={({ pressed }) => ({
-                    flexDirection: "row", alignItems: "center", gap: 6,
-                    paddingHorizontal: 14, height: 34, borderRadius: R.pill,
-                    backgroundColor: on ? C.ink : C.card,
-                    borderWidth: 1, borderColor: on ? C.ink : C.border,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
+                  hitSlop={6}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 5 })}
                 >
-                  <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: on ? C.onInk : C.fg }}>{label}</Text>
-                  <Text style={{ fontSize: 12, fontFamily: F.bold, color: on ? C.lime : C.muted }}>{n}</Text>
+                  <Text style={{ fontSize: 13.5, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontFamily: F.medium, color: on ? C.fg : C.muted, opacity: on ? 1 : 0.7 }}>{n}</Text>
                 </Pressable>
               )
             })}

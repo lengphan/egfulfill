@@ -70,7 +70,7 @@ function Slider({ label, hint, unit, value, min, max, step, onChange }: {
     <label className="block">
       <span className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">
+        <span className="tabular-nums text-xs tabular-nums text-muted-foreground">
           {step < 0.01 ? value.toFixed(3) : step < 1 ? value.toFixed(2) : Math.round(value)}{unit}
         </span>
       </span>
@@ -184,7 +184,7 @@ export function MotionEditor({ value, onChange }: {
                 <option value="custom">Custom — {curveKey(preset.ease)}</option>
               )}
             </select>
-            <span className="mt-1 block font-mono text-2xs text-muted-foreground">
+            <span className="mt-1 block tabular-nums text-2xs text-muted-foreground">
               cubic-bezier({preset.ease.join(", ")})
             </span>
           </label>
@@ -247,7 +247,7 @@ export function MotionEditor({ value, onChange }: {
 
           <p className="mt-5 text-2xs leading-snug text-black/45">
             The last element lands at{" "}
-            <span className="font-mono">
+            <span className="tabular-nums">
               {(preset.delay + 8 * preset.stagger + preset.duration).toFixed(2)}s
             </span>
             . Past about 1.5s a section reads as slow to arrive rather than considered.

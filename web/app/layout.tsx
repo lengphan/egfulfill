@@ -40,7 +40,7 @@ const playfair = Playfair_Display({
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--tabular-nums",
 })
 
 export const metadata: Metadata = {

@@ -120,7 +120,7 @@ function SourceTags({ line }: { line: POLine }) {
         // id stays in the title for anyone who needs to match it against the database.
         const label = s.num || shortOrderRef(s.order)
         return (
-          <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground"
+          <span key={i} className="rounded bg-muted px-1.5 py-0.5 tabular-nums text-2xs text-muted-foreground"
                 title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
             {label} ×{s.qty}
           </span>
@@ -1399,7 +1399,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         wide is a miss waiting to happen. */}
                     <button onClick={() => toggle(po.num)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={isOpen}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
-                      <span className="font-mono text-sm font-medium">{po.num}</span>
+                      <span className="tabular-nums text-sm font-medium">{po.num}</span>
                       <span className="truncate text-sm text-muted-foreground">
                         {supKey(po.supplier)} · {poTotal(po)} units · {unpriced(po) ? "unpriced" : usd(poMoney(po))}
                         {poDate(po) ? " · " + poDate(po) : ""}
@@ -1495,7 +1495,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border py-2.5 text-xs">
                           <span className="text-muted-foreground">
                             Supplier order{" "}
-                            <span className="font-mono text-foreground">{supplierOrderNo(po) ?? "—"}</span>
+                            <span className="tabular-nums text-foreground">{supplierOrderNo(po) ?? "—"}</span>
                           </span>
                           {/* S&S know their own tracking, so ask them rather than making
                               someone copy it across. Manual entry stays for suppliers with
@@ -1513,7 +1513,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                                 defaultValue={trackingOf(po)}
                                 onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
                                 placeholder="paste carrier number"
-                                className="h-7 w-48 font-mono text-xs"
+                                className="h-7 w-48 tabular-nums text-xs"
                               />
                             </label>
                           )}
@@ -1585,7 +1585,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                             <div className="truncate font-medium">{l.name || l.sku}</div>
                             <div className="truncate text-xs text-muted-foreground">
                               {l.variant || l.sku}
-                              <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
+                              <span className="ml-1.5 tabular-nums opacity-70">{l.sku}</span>
                             </div>
                             <SourceTags line={l} />
                           </div>
@@ -1862,7 +1862,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
                         <div className="truncate text-xs text-muted-foreground">
                           {l.variant || supByS[l.sku]?.variant || l.sku}
-                          <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
+                          <span className="ml-1.5 tabular-nums opacity-70">{l.sku}</span>
                         </div>
                         <SourceTags line={l} />
                         {/* ONE CLICK TO THE PAGE IT IS BOUGHT ON. A hand-ordered line used

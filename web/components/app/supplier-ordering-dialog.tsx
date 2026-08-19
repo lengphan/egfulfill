@@ -450,13 +450,13 @@ function KeyRow({ label, shown, isAdmin, editing, value, busy, onEdit, onChange,
       {editing ? (
         <>
           <Input value={value} onChange={(e) => onChange(e.target.value)} disabled={busy}
-                 placeholder="paste the new value" autoFocus className="h-7 flex-1 font-mono text-xs" />
+                 placeholder="paste the new value" autoFocus className="h-7 flex-1 tabular-nums text-xs" />
           <Button size="sm" className="h-7" onClick={onSave} disabled={busy || !value.trim()}>Save</Button>
           <button onClick={onCancel} disabled={busy} className="text-muted-foreground hover:text-foreground">Cancel</button>
         </>
       ) : (
         <>
-          <span className="flex-1 truncate font-mono">{shown ?? "not set"}</span>
+          <span className="flex-1 truncate tabular-nums">{shown ?? "not set"}</span>
           {isAdmin && (
             <button onClick={onEdit} className="font-medium text-primary hover:underline">
               {shown ? "Change" : "Set"}

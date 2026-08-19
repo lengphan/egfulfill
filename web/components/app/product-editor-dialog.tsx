@@ -1023,12 +1023,12 @@ export function ProductEditorDialog({
                   <span className="text-sm text-muted-foreground">Our SKU</span>
                   {/* The placeholder is the number this product would ACTUALLY get, not a
                       hardcoded example — "EG-1005" over an empty field reads as filled. */}
-                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? "EG-1005"} className="h-9 font-mono" />
+                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? "EG-1005"} className="h-9 tabular-nums" />
                   <span className="text-2xs text-muted-foreground">Stock is held against this, and the seller sees it on their listing.</span>
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-muted-foreground">Supplier SKU</span>
-                  <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 font-mono" />
+                  <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 tabular-nums" />
                   <span className="text-2xs text-muted-foreground">Never shown to sellers or published anywhere.</span>
                 </label>
               </div>
@@ -1378,7 +1378,7 @@ export function ProductEditorDialog({
                       <div className="ml-12 mr-8 rounded-lg border border-border bg-muted/20 p-2">
                         <div className="mb-1 flex items-center justify-between text-2xs text-muted-foreground">
                           <span>Stock · {s}</span>
-                          <span className="font-mono">{variantSku(ourSku, s, colors[0])}</span>
+                          <span className="tabular-nums">{variantSku(ourSku, s, colors[0])}</span>
                         </div>
                         {/* WRAPPED PAIRS, not a grid. A grid across the whole table width
                             put hundreds of pixels between a colour and the box it belongs

@@ -183,7 +183,7 @@ export function LibraryPickerDialog({
                   </div>
                   <div className="flex items-center gap-1.5 p-2">
                     <span className="min-w-0 flex-1 truncate text-xs font-medium">{t.name || "Untitled template"}</span>
-                    {t.seq != null && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">TPL-{t.seq}</span>}
+                    {t.seq != null && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 tabular-nums text-2xs text-muted-foreground">TPL-{t.seq}</span>}
                   </div>
                 </button>
               ))}

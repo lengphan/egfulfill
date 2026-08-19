@@ -205,7 +205,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
               <Detail label="Description" value={payment.content || payment.note} mono missing="Description not returned" />
               {payment.content && payment.note && payment.content !== payment.note && (
                 <p className="mt-2 text-2xs text-muted-foreground">
-                  Send the description exactly as shown. Our reference <span className="font-mono">{payment.note}</span>{" "}sits inside it — that&apos;s what matches the payment to your wallet.
+                  Send the description exactly as shown. Our reference <span className="tabular-nums">{payment.note}</span>{" "}sits inside it — that&apos;s what matches the payment to your wallet.
                 </p>
               )}
             </dl>
@@ -295,7 +295,7 @@ function Detail({ label, value, mono, missing }: { label: string; value?: string
   return (
     <div className="flex items-start justify-between gap-3 py-1">
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-      <dd className={"min-w-0 break-all text-right text-xs font-medium " + (ok ? (mono ? "font-mono" : "") : "text-amber-600")}>
+      <dd className={"min-w-0 break-all text-right text-xs font-medium " + (ok ? (mono ? "tabular-nums" : "") : "text-amber-600")}>
         {ok ? value : missing}
       </dd>
     </div>
@@ -406,7 +406,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
         <div className="rounded-xl border border-border bg-muted/40 p-3">
           <div className="text-xs text-muted-foreground">Send your {provider.key} payment to</div>
           <div className="mt-1 flex items-center justify-between gap-2">
-            <code className="truncate font-mono text-sm font-semibold">{provider.to}</code>
+            <code className="truncate tabular-nums text-sm font-semibold">{provider.to}</code>
             <Button
               size="sm"
               variant="outline"

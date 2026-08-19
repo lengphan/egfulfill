@@ -450,7 +450,7 @@ function ApiKeysPanel() {
             <Check size={15} weight="bold" /> Copy your new key now — it won&apos;t be shown again.
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg border border-emerald-200 bg-white px-3 py-2 font-mono text-sm">
+            <code className="flex-1 truncate rounded-lg border border-emerald-200 bg-white px-3 py-2 tabular-nums text-sm">
               {fresh.key}
             </code>
             <Button size="sm" variant="outline" onClick={copy}>
@@ -499,7 +499,7 @@ function ApiKeysPanel() {
                   <Badge variant="secondary" className="text-2xs uppercase">{k.mode}</Badge>
                   {k.revoked_at && <span className="text-2xs font-medium text-red-600">revoked</span>}
                 </div>
-                <div className="mt-0.5 font-mono text-xs text-muted-foreground">
+                <div className="mt-0.5 tabular-nums text-xs text-muted-foreground">
                   {/* prefix••••last4 — the SAME shape the API Explorer shows, so a key can be
                       matched by its first + last chars. Older keys (no stored last4) show prefix-only. */}
                   {k.last4 ? `${k.prefix.replace(/…$/, "")}••••••••${k.last4}` : k.prefix} · created {fmtDate(k.created_at)} · last used {fmtDate(k.last_used_at)}
@@ -1687,7 +1687,7 @@ function PlatformPanel() {
                   <Input
                     value={t.code}
                     onChange={(e) => setThreads((p) => p.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)))}
-                    className="h-7 font-mono text-xs"
+                    className="h-7 tabular-nums text-xs"
                     placeholder="1801"
                   />
                   <Input
@@ -1722,7 +1722,7 @@ function PlatformPanel() {
             value={newThread.code}
             onChange={(e) => setNewThread((p) => ({ ...p, code: e.target.value }))}
             placeholder="Code"
-            className="h-9 w-28 font-mono"
+            className="h-9 w-28 tabular-nums"
           />
           <Input
             value={newThread.name}

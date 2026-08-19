@@ -206,7 +206,7 @@ export default function ProductDetailPage() {
               )}
             </div>
             <h1 className="mt-2 font-title text-3xl font-semibold tracking-tight">{product.name ?? "Untitled"}</h1>
-            <div className="mt-1 font-mono text-sm text-muted-foreground">{product.sku ?? "—"}</div>
+            <div className="mt-1 tabular-nums text-sm text-muted-foreground">{product.sku ?? "—"}</div>
           </div>
 
           {/* THE NUMBER, THEN WHAT SHIPPING ADDS TO IT.

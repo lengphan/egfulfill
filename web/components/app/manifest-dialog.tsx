@@ -100,7 +100,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
               <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{m.count} {m.count === 1 ? "label" : "labels"}</div>
-                  <div className="truncate font-mono text-2xs text-muted-foreground">{m.id}</div>
+                  <div className="truncate tabular-nums text-2xs text-muted-foreground">{m.id}</div>
                 </div>
                 {m.pdf ? (
                   <Button size="sm" variant="outline"
@@ -157,7 +157,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                     </div>
                     {skipped.map((s) => (
                       <div key={s.id} className="text-2xs text-amber-800">
-                        <span className="font-mono">{s.num}</span> — {s.reason}
+                        <span className="tabular-nums">{s.num}</span> — {s.reason}
                       </div>
                     ))}
                   </div>

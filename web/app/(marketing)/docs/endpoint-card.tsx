@@ -100,10 +100,10 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
     <div className="rounded-lg border border-border p-4 transition-colors hover:border-primary/30">
       <div className="flex flex-wrap items-center gap-2">
         <span className={
-          "rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold " +
+          "rounded px-1.5 py-0.5 tabular-nums text-[11px] font-semibold " +
           (e.method === "GET" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")
         }>{e.method}</span>
-        <code className="font-mono text-sm">{e.path}</code>
+        <code className="tabular-nums text-sm">{e.path}</code>
         <span className="ml-auto text-sm font-medium">{e.title}</span>
       </div>
 

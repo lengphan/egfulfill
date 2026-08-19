@@ -156,7 +156,7 @@ function BrowseTab() {
                 </div>
                 <div className="p-2.5">
                   <div className="truncate text-sm font-medium">{it.name}</div>
-                  {it.ref && <div className="truncate font-mono text-2xs text-muted-foreground">{it.ref}</div>}
+                  {it.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{it.ref}</div>}
                 </div>
               </button>
             ))}
@@ -293,7 +293,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{item.name}</div>
-            {item.ref && <div className="truncate font-mono text-2xs text-muted-foreground">{item.ref}</div>}
+            {item.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{item.ref}</div>}
           </div>
           <button onClick={onClose} className="ml-auto grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent"><X size={16} /></button>
         </div>
@@ -472,7 +472,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                                 <span className="size-5 shrink-0 rounded border border-border" style={{ background: m.hex }} />
                                 <span className="min-w-0 flex-1 truncate">
                                   <span className="font-medium">{m.name}</span>
-                                  <span className="ml-1.5 font-mono text-2xs text-muted-foreground">{m.code}</span>
+                                  <span className="ml-1.5 tabular-nums text-2xs text-muted-foreground">{m.code}</span>
                                 </span>
                               </>
                             ) : (
@@ -908,7 +908,7 @@ function CreateTab() {
                 <span className="size-6 shrink-0 rounded-md border border-border" style={{ background: color }} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{selCone?.name ?? "Custom colour"}</span>
-                  <span className="block font-mono text-2xs text-muted-foreground">{selCone?.code ?? color}</span>
+                  <span className="block tabular-nums text-2xs text-muted-foreground">{selCone?.code ?? color}</span>
                 </span>
               </button>
               {showPalette && (
@@ -1186,7 +1186,7 @@ function HistoryTab() {
                   <td className="px-4 py-2.5 text-muted-foreground">{g.order_ref || (g.source === "maker" ? "Maker" : "—")}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.stitches != null ? g.stitches.toLocaleString() : "—"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.colours ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{(g.formats ?? []).join(" · ") || "—"}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-xs text-muted-foreground">{(g.formats ?? []).join(" · ") || "—"}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{fmtDate(g.created_at)}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-3">

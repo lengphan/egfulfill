@@ -121,7 +121,7 @@ export default function DocsPage() {
               <tbody>
                 {SCOPES.map((s) => (
                   <tr key={s.name} className="border-b border-border/60 align-top">
-                    <td className="py-2 pr-4 font-mono text-xs">{s.name}</td>
+                    <td className="py-2 pr-4 tabular-nums text-xs">{s.name}</td>
                     <td className="py-2 text-muted-foreground">{s.allows}</td>
                   </tr>
                 ))}
@@ -145,7 +145,7 @@ export default function DocsPage() {
                 {LIMITS.map((l) => (
                   <tr key={l.scope} className="border-b border-border/60">
                     <td className="py-2">{l.scope}</td>
-                    <td className="py-2 font-mono text-xs">{l.limit}</td>
+                    <td className="py-2 tabular-nums text-xs">{l.limit}</td>
                   </tr>
                 ))}
               </tbody>
@@ -214,7 +214,7 @@ export default function DocsPage() {
               <tbody>
                 {EVENTS.map((e) => (
                   <tr key={e.name} className="border-b border-border/60 align-top">
-                    <td className="py-2 pr-4 font-mono text-xs">{e.name}</td>
+                    <td className="py-2 pr-4 tabular-nums text-xs">{e.name}</td>
                     <td className="py-2 text-muted-foreground">{e.when}</td>
                   </tr>
                 ))}

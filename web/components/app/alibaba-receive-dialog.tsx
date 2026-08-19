@@ -185,7 +185,7 @@ export function AlibabaReceiveDialog({
             <Package size={18} weight="fill" /> Bring {order.tradeId} into stock
           </DialogTitle>
           <DialogDescription>
-            Creates purchase order <span className="font-mono font-medium">{poNum}</span>
+            Creates purchase order <span className="tabular-nums font-medium">{poNum}</span>
             {/* Supplier names end in a full stop far more often than not ("… Co., Ltd."),
                 so the sentence is separated rather than joined — otherwise "Ltd.. Receive". */}
             {order.sellerName ? ` against ${order.sellerName}` : ""}
@@ -243,7 +243,7 @@ export function AlibabaReceiveDialog({
                     </td>
                     <td className="py-2 pr-3">
                       <Input value={l.sku} onChange={(e) => set(i, { sku: e.target.value })}
-                             className={"h-8 w-44 font-mono text-xs " + (dupSkus.has(l.sku.trim()) ? "border-amber-500" : "")} />
+                             className={"h-8 w-44 tabular-nums text-xs " + (dupSkus.has(l.sku.trim()) ? "border-amber-500" : "")} />
                       {/* Two lines on one sku merge into a single stock movement. That is
                           sometimes right — the same blank in one colour ordered twice — and
                           sometimes a mistake, and only the person importing knows which. */}

@@ -210,7 +210,7 @@ export function DashboardView() {
                   {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), t("dash.openOrder", { num: numOf(o) }))}
                   className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
-                  <TableCell className="truncate font-mono text-xs font-semibold">{numOf(o)}</TableCell>
+                  <TableCell className="truncate tabular-nums text-xs font-semibold">{numOf(o)}</TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
                   <TableCell className="truncate text-muted-foreground">{itemsLabel(o, t("dash.item"))}</TableCell>
                   <TableCell><SellerStatusBadge order={o} /></TableCell>

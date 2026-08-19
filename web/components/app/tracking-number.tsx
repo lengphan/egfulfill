@@ -43,7 +43,7 @@ export function TrackingNumber({ carrier, tracking }: { carrier?: string | null;
         type="button"
         onClick={copy}
         title={copied ? "Copied" : "Copy this tracking number"}
-        className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 font-mono text-xs tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 tabular-nums text-xs tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <span className="select-all">{tracking}</span>
         {copied

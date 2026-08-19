@@ -253,7 +253,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
             placeholder="Scan or type a SKU…  (try SKU x5 for qty)"
             spellCheck={false}
             autoComplete="off"
-            className={"h-16 text-center font-mono text-lg transition-colors " + (flash === "ok" ? "border-emerald-500 bg-emerald-50" : flash === "err" ? "border-red-500 bg-red-50" : "")}
+            className={"h-16 text-center tabular-nums text-lg transition-colors " + (flash === "ok" ? "border-emerald-500 bg-emerald-50" : flash === "err" ? "border-red-500 bg-red-50" : "")}
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{busy ? <span className="inline-flex items-center gap-1"><CircleNotch size={12} className="animate-spin" /> saving…</span> : "Ready — the input stays focused for the gun."}</span>
@@ -278,7 +278,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className={"truncate text-sm font-medium " + (e.ok ? "" : "text-destructive")}>{e.label}</div>
-                  <div className="truncate font-mono text-xs text-muted-foreground">{e.sub}</div>
+                  <div className="truncate tabular-nums text-xs text-muted-foreground">{e.sub}</div>
                 </div>
                 {e.ok && e.scanId && (
                   <Button size="sm" variant="ghost" onClick={() => undo(e)} title="Undo this scan" className="shrink-0 text-muted-foreground hover:text-destructive">
@@ -326,7 +326,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   {log[0].ok ? <CheckCircle size={15} weight="fill" /> : <Warning size={15} weight="fill" />} {log[0].label}
                 </div>
-                <div className="mt-0.5 font-mono text-xs opacity-90">{log[0].sub}</div>
+                <div className="mt-0.5 tabular-nums text-xs opacity-90">{log[0].sub}</div>
               </div>
             )}
           </div>

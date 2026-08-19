@@ -91,7 +91,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
    * times.
    */
   const parts: React.ReactNode[] = []
-  if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="font-mono">{sku}</span></span>)
+  if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="tabular-nums">{sku}</span></span>)
   // The blank stands in where there is no listing sku — a manual line — and sits beside it
   // where there is one, because they are different codes for different things.
   /**
@@ -110,7 +110,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
   if (blankSku || blank) parts.push(
     <span key="b" title={blank || undefined}>
       <span className="font-medium text-foreground/70">Blank SKU:</span>{" "}
-      <span className="font-mono">{blankSku || blank}</span>
+      <span className="tabular-nums">{blankSku || blank}</span>
     </span>
   )
   // ALWAYS PRESENT, including x1. An absent count and a count of one must never look the

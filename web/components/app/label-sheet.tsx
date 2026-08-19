@@ -161,7 +161,7 @@ export function LabelSheet({
             <div className="max-h-44 space-y-1 overflow-auto pr-1">
               {labels.map((l) => (
                 <label key={l.sku} className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-2xs" title={l.sku}>{l.sku}</span>
+                  <span className="min-w-0 flex-1 truncate tabular-nums text-2xs" title={l.sku}>{l.sku}</span>
                   <input
                     value={String(copiesOf(l))}
                     onChange={(e) => setPer((m) => ({ ...m, [l.sku]: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) }))}
@@ -254,7 +254,7 @@ export function LabelSheet({
                   // No code at all: the number becomes the label, at a size someone reads
                   // across a shelf rather than the 8px caption it is under a barcode.
                   <div className="flex w-full flex-1 items-center justify-center">
-                    <span className="w-full break-all px-1 text-center font-mono text-[13px] font-semibold leading-tight tracking-tight">{l.sku}</span>
+                    <span className="w-full break-all px-1 text-center tabular-nums text-[13px] font-semibold leading-tight tracking-tight">{l.sku}</span>
                   </div>
                 ) : codeType === "qr" ? (
                   // Square, and centred in whatever slice the sticker allows. A QR has no
@@ -276,7 +276,7 @@ export function LabelSheet({
                     stamped inside the svg and scales down with it, so on a 2×1 the code
                     was legible and the number underneath was clipped mid-digit. */}
                 {oneUp && content === "both" && (
-                  <div className="w-full truncate font-mono text-[8px] leading-none tracking-tight">{l.sku}</div>
+                  <div className="w-full truncate tabular-nums text-[8px] leading-none tracking-tight">{l.sku}</div>
                 )}
               </div>
             ))}

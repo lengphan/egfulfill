@@ -633,7 +633,7 @@ function ProductGroup({
             seventeen variants a column of data grew seventeen tiny marks and every sku
             looked pressable for a reason nobody could guess. The code is a named item in
             the row menu now — "Barcode" says what it is, which a 13px glyph never did. */}
-        <span className="block w-[15rem] max-w-full break-all font-mono text-xs font-medium">
+        <span className="block w-[15rem] max-w-full break-all tabular-nums text-xs font-medium">
           {it.sku}
         </span>
         {/* VISIBILITY SPEAKS UP ONLY WHEN IT IS NOT THE DEFAULT.
@@ -720,7 +720,7 @@ function ProductGroup({
               <DotsThree size={18} weight="bold" />
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64 space-y-3 p-3">
-              <div className="truncate font-mono text-2xs text-muted-foreground">{it.sku}</div>
+              <div className="truncate tabular-nums text-2xs text-muted-foreground">{it.sku}</div>
               <label className="flex items-center justify-between gap-3">
                 <span className="text-xs font-medium">Reorder at</span>
                 <Input
@@ -822,7 +822,7 @@ function ProductGroup({
         <td className="px-4 py-2 text-xs text-muted-foreground">
           {/* NOT one of the variants' skus. Printing the first would read as the product's
               own code and get scanned as one. */}
-          <span className="font-mono">{group.rows.length} SKUs</span>
+          <span className="tabular-nums">{group.rows.length} SKUs</span>
           {/* VISIBILITY ONLY WHEN IT IS NOT THE DEFAULT, and only when the variants agree.
               Showing the first row's setting as if it were the product's is how a public
               sku hides behind a "Factory only" label — so disagreement says so instead. */}
@@ -945,7 +945,7 @@ function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
   return (
     <p className="text-2xs text-muted-foreground">
       {rows.length} variant{rows.length === 1 ? "" : "s"}{" "}not on this grid — the sku doesn&apos;t match the
-      product&apos;s sizes and colours: <span className="font-mono">{rows.map((r) => r.sku).join(", ")}</span>
+      product&apos;s sizes and colours: <span className="tabular-nums">{rows.map((r) => r.sku).join(", ")}</span>
     </p>
   )
 }
@@ -1142,7 +1142,7 @@ function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void
                   better than a phone camera does. */}
               <Barcode value={sku} height={70} width={2} fontSize={0} displayValue={false} fit />
             </div>
-            <p className="text-center font-mono text-sm text-white/70">{sku}</p>
+            <p className="text-center tabular-nums text-sm text-white/70">{sku}</p>
             <p className="text-center text-xs text-white/50">
               Phone camera: use the square code. Handheld gun: either. Hold 15–25cm away and
               turn screen brightness up if it won&apos;t read.
@@ -1182,7 +1182,7 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
           <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> Scan history</DialogTitle>
         </DialogHeader>
         <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
-          <span className="font-mono text-xs font-medium">{sku}</span>
+          <span className="tabular-nums text-xs font-medium">{sku}</span>
           {rows && rows.length > 0 && <span className="text-xs text-muted-foreground">Net <b className={net >= 0 ? "text-success" : "text-red-600"}>{net >= 0 ? "+" : ""}{net}</b> over {rows.length} scan{rows.length === 1 ? "" : "s"}</span>}
         </div>
         {rows === null ? (
@@ -1201,7 +1201,7 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">{r.by_name || "Unknown user"}</div>
-                  {r.order_ref && <div className="truncate font-mono text-xs text-muted-foreground">order {r.order_ref}</div>}
+                  {r.order_ref && <div className="truncate tabular-nums text-xs text-muted-foreground">order {r.order_ref}</div>}
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground">{when(r.created_at)}</span>
               </div>
@@ -1396,7 +1396,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                         <Thumb src={imageFor(p, null)} name={p.name ?? "?"} size={34} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{p.name || "Untitled"}</span>
-                          <span className="block truncate font-mono text-xs text-muted-foreground">{p.sku}</span>
+                          <span className="block truncate tabular-nums text-xs text-muted-foreground">{p.sku}</span>
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground">{productColors(p).length || 1} × {productSizes(p).length || 1}</span>
                       </button>
@@ -1409,7 +1409,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                     <Thumb src={imageFor(picked, null)} name={picked.name ?? "?"} size={44} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{picked.name}</div>
-                      <div className="truncate font-mono text-xs text-muted-foreground">{picked.sku}</div>
+                      <div className="truncate tabular-nums text-xs text-muted-foreground">{picked.sku}</div>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => { setPickedId(null); setChosen(new Set()) }}>Change</Button>
                   </div>
@@ -1481,7 +1481,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
             </>
           ) : (
             <>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">SKU</span><Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="G2000-BLK-L" className="h-9 font-mono" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">SKU</span><Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="G2000-BLK-L" className="h-9 tabular-nums" /></label>
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gildan Ultra Cotton Tee" className="h-9" /></label>
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Variant</span><Input value={variant} onChange={(e) => setVariant(e.target.value)} placeholder="Black · L" className="h-9" /></label>
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Supplier</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&S Activewear / Otto Cap" className="h-9" /></label>

@@ -816,7 +816,7 @@ export function DesignMaker() {
                   <div className="font-medium text-foreground">{product.name}</div>
                   {/* Never the supplier — see CLAUDE.md 2.9. The seller sees what they are
                       buying from US, not who we buy it from. */}
-                  {product.sku && <div className="font-mono text-2xs">{product.sku}</div>}
+                  {product.sku && <div className="tabular-nums text-2xs">{product.sku}</div>}
                 </div>
               )}
             </div>

@@ -97,7 +97,7 @@ export function ThreadBreakdown({
                     <span className="truncate text-sm font-medium">{r.thread.name}</span>
                     {/* Selectable: a code gets typed into a machine or read down a phone, and a
                         span you cannot select is one somebody transcribes by eye. */}
-                    <span className="shrink-0 select-all font-mono text-2xs text-muted-foreground">{r.thread.code}</span>
+                    <span className="shrink-0 select-all tabular-nums text-2xs text-muted-foreground">{r.thread.code}</span>
                   </div>
                   {/* Artwork colour AND cone colour: they are not the same, and a
                       digitiser needs to see how far the match had to travel. */}
@@ -107,9 +107,9 @@ export function ThreadBreakdown({
                     </div>
                   )}
                   <div className="mt-0.5 flex items-center gap-1.5 text-2xs text-muted-foreground">
-                    <span className="font-mono">{r.srcHex}</span>
+                    <span className="tabular-nums">{r.srcHex}</span>
                     <span>→</span>
-                    <span className="font-mono">{r.thread.hex.toUpperCase()}</span>
+                    <span className="tabular-nums">{r.thread.hex.toUpperCase()}</span>
                     <span className="ml-auto font-medium text-foreground">{r.pct}%</span>
                   </div>
                 </div>

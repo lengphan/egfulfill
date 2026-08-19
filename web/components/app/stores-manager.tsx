@@ -479,7 +479,7 @@ export function StoresManager() {
                     {isAdmin && openScopes.has(c.shop_id) && c.scopes && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {c.scopes.split(/[\s,]+/).filter(Boolean).map((s) => (
-                          <span key={s} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">{s}</span>
+                          <span key={s} className="rounded-md bg-muted px-1.5 py-0.5 tabular-nums text-2xs text-muted-foreground">{s}</span>
                         ))}
                       </div>
                     )}
@@ -571,7 +571,7 @@ export function StoresManager() {
               <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
                 login. If your shop is {tiktokRegion === "us" ? "not US" : "US"} and it can&apos;t find your account, the
-                server&apos;s <code className="font-mono">TIKTOK_REGION</code> is set to the wrong region.
+                server&apos;s <code className="tabular-nums">TIKTOK_REGION</code> is set to the wrong region.
               </div>
             )}
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on

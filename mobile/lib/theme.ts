@@ -20,6 +20,11 @@ export const C = {
   border: "#E6E1D8",
   card: "#ffffff",
   accent: "#F1EEFD",
+  /** A WELL IN THE PAPER, not a card on it. Warm paper with a white field on top was the
+   *  "doesn't look seamless" problem in one control: two near-identical surfaces, one warm
+   *  and one not, held apart by a border. A slightly deeper tone of the SAME paper reads as
+   *  recessed and needs no line around it. */
+  accentPaper: "#EDEAE2",
   /** --primary: the vivid violet. Filled surfaces and active state. */
   primary: "#5b2fe8",
   /** --primary-foreground: the lime that sits ON primary. Not decoration — it is the pair. */

@@ -536,7 +536,7 @@ export function ImportOrdersDialog({
                   onChange={(e) => setPaste(e.target.value)}
                   rows={6}
                   placeholder={"Paste rows copied from a spreadsheet (tab or comma separated), including the header row."}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 tabular-nums text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>Preview rows</Button>
               </TabsContent>
@@ -674,7 +674,7 @@ export function ImportOrdersDialog({
                     readOnly
                     onFocus={(e) => e.currentTarget.select()}
                     value={copyFallback}
-                    className="mt-2 h-16 w-full resize-none rounded-md border border-border bg-background p-2 font-mono text-2xs text-foreground"
+                    className="mt-2 h-16 w-full resize-none rounded-md border border-border bg-background p-2 tabular-nums text-2xs text-foreground"
                   />
                 )}
               </div>
@@ -723,8 +723,8 @@ export function ImportOrdersDialog({
                         : <>
                             {templateOutcome.applied} of {templateOutcome.typed} {templateOutcome.typed === 1 ? "line" : "lines"} will take
                             their blank and artwork from a saved template.
-                            {templateOutcome.unmatched.length > 0 && <> No template matches <span className="font-mono">{templateOutcome.unmatched.join(", ")}</span> — check the number on the template card.</>}
-                            {templateOutcome.ambiguous.length > 0 && <> More than one template is called <span className="font-mono">{templateOutcome.ambiguous.join(", ")}</span>, so those lines were left alone — use the TPL- number instead.</>}
+                            {templateOutcome.unmatched.length > 0 && <> No template matches <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span> — check the number on the template card.</>}
+                            {templateOutcome.ambiguous.length > 0 && <> More than one template is called <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span>, so those lines were left alone — use the TPL- number instead.</>}
                           </>}
                     </span>
                   </div>
@@ -746,7 +746,7 @@ export function ImportOrdersDialog({
                           <td className="px-3 py-1.5 text-muted-foreground">{r._rowNum}</td>
                           {/* "assigned" rather than an em-dash: the row isn't missing
                               something, it's getting a platform number instead. */}
-                          <td className="px-3 py-1.5 font-mono text-xs">
+                          <td className="px-3 py-1.5 tabular-nums text-xs">
                             {r.order_number || <span className="not-italic text-muted-foreground">assigned</span>}
                           </td>
                           <td className="max-w-[140px] truncate px-3 py-1.5">{r.ship_name || "—"}</td>

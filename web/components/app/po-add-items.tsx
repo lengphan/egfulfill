@@ -154,7 +154,7 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle, qty, onQt
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {meta.map((m) => (
               <span key={m.k} className="text-2xs text-muted-foreground">
-                {m.k} <span className="font-mono text-foreground/70">{m.v}</span>
+                {m.k} <span className="tabular-nums text-foreground/70">{m.v}</span>
               </span>
             ))}
           </span>
@@ -553,8 +553,8 @@ export function POAddItems({
             </div>
             <p className="mt-1 text-amber-800 dark:text-amber-300">
               {unmapped.product
-                ? <>We stock <span className="font-medium">{unmapped.product}</span>, but nothing records that its{unmapped.variant ? ` ${unmapped.variant}` : " variant"} is <span className="font-mono">{unmapped.supplierSku}</span> at this supplier. Open that product and add the supplier code to this variant, then add it here again.</>
-                : <>Add it to Products first — with <span className="font-mono">{unmapped.supplierSku}</span> recorded as the supplier code for this variant — so what arrives can be booked onto the right shelf.</>}
+                ? <>We stock <span className="font-medium">{unmapped.product}</span>, but nothing records that its{unmapped.variant ? ` ${unmapped.variant}` : " variant"} is <span className="tabular-nums">{unmapped.supplierSku}</span> at this supplier. Open that product and add the supplier code to this variant, then add it here again.</>
+                : <>Add it to Products first — with <span className="tabular-nums">{unmapped.supplierSku}</span> recorded as the supplier code for this variant — so what arrives can be booked onto the right shelf.</>}
             </p>
             <button type="button" onClick={() => setUnmapped(null)}
               className="mt-1.5 font-medium text-amber-900 underline underline-offset-2 dark:text-amber-200">

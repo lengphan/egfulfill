@@ -178,7 +178,7 @@ export function ConsignmentPanel() {
               <div key={s.id} className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-semibold">{s.id}</span>
+                    <span className="tabular-nums text-sm font-semibold">{s.id}</span>
                     <span className={"rounded-full px-2 py-0.5 eg-label " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
                       {s.status.replace(/_/g, " ")}
                     </span>
@@ -242,7 +242,7 @@ export function ConsignmentPanel() {
                 <Package size={16} weight="duotone" className="shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{r.name || r.seller_sku || "Item"}</div>
-                  <div className="truncate font-mono text-2xs text-muted-foreground">{r.internal_sku}</div>
+                  <div className="truncate tabular-nums text-2xs text-muted-foreground">{r.internal_sku}</div>
                 </div>
                 <span className="text-xs text-muted-foreground">{r.seller_name}</span>
                 <span className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs font-medium">
@@ -360,7 +360,7 @@ export function ConsignmentPanel() {
               const pct = b.capacity > 0 ? Math.min(100, Math.round((b.used / b.capacity) * 100)) : 0
               return (
                 <div key={b.code} className="w-32 rounded-lg border border-border p-2">
-                  <div className="font-mono text-xs font-semibold">{b.code}</div>
+                  <div className="tabular-nums text-xs font-semibold">{b.code}</div>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div className={"h-full " + (pct > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${pct}%` }} />
                   </div>

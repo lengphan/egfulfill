@@ -251,7 +251,7 @@ export function VariantStrip({
           key={c.key}
           className={cn(
             "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-medium",
-            c.mono && "font-mono",
+            c.mono && "tabular-nums",
             "border-border bg-muted/50 text-foreground/80"
           )}
         >

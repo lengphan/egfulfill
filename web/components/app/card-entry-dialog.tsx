@@ -140,7 +140,7 @@ export function CardEntryDialog({
               // Grouped as you type — a 16-digit run is unreadable, and unreadable is
               // where a transposed digit hides.
               onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 19).replace(/(.{4})/g, "$1 ").trim())}
-              inputMode="numeric" autoComplete="cc-number" name="cardnumber" className="h-9 font-mono"
+              inputMode="numeric" autoComplete="cc-number" name="cardnumber" className="h-9 tabular-nums"
               placeholder="4111 1111 1111 1111"
             />
           </label>
@@ -148,12 +148,12 @@ export function CardEntryDialog({
             <label className="block space-y-1">
               <span className="text-sm font-medium">Expiry</span>
               <Input value={exp} onChange={(e) => setExp(formatExpiry(e.target.value))}
-                     placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp" className="h-9 font-mono" />
+                     placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp" className="h-9 tabular-nums" />
             </label>
             <label className="block space-y-1">
               <span className="text-sm font-medium">CVV</span>
               <Input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                     inputMode="numeric" autoComplete="cc-csc" name="cvc" className="h-9 font-mono" />
+                     inputMode="numeric" autoComplete="cc-csc" name="cvc" className="h-9 tabular-nums" />
             </label>
           </div>
 

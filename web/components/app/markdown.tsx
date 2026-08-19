@@ -21,7 +21,7 @@ function inline(text: string, keyBase: string): ReactNode[] {
     if (p.startsWith("**") && p.endsWith("**") && p.length > 4) {
       out.push(<strong key={k} className="font-semibold">{p.slice(2, -2)}</strong>)
     } else if (p.startsWith("`") && p.endsWith("`") && p.length > 2) {
-      out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{p.slice(1, -1)}</code>)
+      out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 tabular-nums text-[0.85em]">{p.slice(1, -1)}</code>)
     } else {
       out.push(<Fragment key={k}>{p}</Fragment>)
     }
