@@ -896,30 +896,127 @@ function ProductGroup({
  * neither is one cell. Anything whose sku doesn't land in the grid is listed underneath as
  * a plain row, because a variant this cannot place must not vanish.
  */
+/**
+ * A ZERO IS A FACT, NOT AN ALARM. Every cell filled red turned a product we simply don't
+ * stock into a page of warnings — seventeen filled pills reading as seventeen problems.
+ * The number carries the colour and the border marks it; the fill is gone.
+ */
+function cellTone(it: InventoryItem, lowAt: (x: InventoryItem) => number) {
+  const stock = Number(it.in_stock) || 0
+  if (stock <= 0) return "border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300"
+  if (stock <= lowAt(it)) return "border-amber-200 text-amber-800 dark:border-amber-900/40 dark:text-amber-300"
+  return "border-border"
+}
+
+/** The variants a grid could not place — named, never dropped. */
+function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
+  return (
+    <p className="text-2xs text-muted-foreground">
+      {rows.length} variant{rows.length === 1 ? "" : "s"}{" "}not on this grid — the sku doesn&apos;t match the
+      product&apos;s sizes and colours: <span className="font-mono">{rows.map((r) => r.sku).join(", ")}</span>
+    </p>
+  )
+}
+
 function StockMatrix({ group, edit, lowAt }: {
   group: { product: CatalogProduct | null; rows: InventoryItem[] }
   edit: (sku: string, field: "in_stock", value: number) => void
   lowAt: (it: InventoryItem) => number
 }) {
   const p = group.product
-  const bySkuKey = new Map(group.rows.map((r) => [String(r.sku).toUpperCase(), r]))
-  const sizes = productSizes(p).slice().sort(bySize)
-  const colors = productColors(p)
-  // Nothing to lay out on two axes — the caller falls back to rows.
-  if (!p || (!sizes.length && !colors.length)) return null
+  if (!p) return null
 
-  const cellFor = (color: string, size: string) => {
-    const sku = variantSku(p.sku, size || null, color || null)
-    return sku ? bySkuKey.get(String(sku).toUpperCase()) ?? null : null
+  /**
+   * THE AXES COME FROM THE SHELF, NOT THE CATALOGUE.
+   *
+   * Built the other way round first, and both failure modes showed up on real data at once.
+   * A product declaring 40 colours and 9 sizes produced 360 input boxes for a shelf holding
+   * a handful of skus; and most inventory skus here are SIZE ONLY — `EG-1006-L`, no colour
+   * — so a colour axis matched nothing and every cell rendered as an empty dot beneath a
+   * product that plainly had stock.
+   *
+   * So each row is asked what it IS: try the sku against size+colour, then size alone, then
+   * colour alone. Only the sizes and colours that actually appear become axes, which makes
+   * the grid exactly as big as the shelf and never bigger.
+   */
+  const declaredSizes = productSizes(p)
+  const declaredColors = productColors(p)
+  const norm = (v: string) => String(v || "").trim().toUpperCase()
+
+  const placed = new Map<string, { size: string; color: string; it: InventoryItem }>()
+  for (const it of group.rows) {
+    const sku = norm(it.sku)
+    let hit: { size: string; color: string } | null = null
+    for (const z of declaredSizes) {
+      for (const c of declaredColors) {
+        if (norm(variantSku(p.sku, z, c) || "") === sku) { hit = { size: z, color: c }; break }
+      }
+      if (hit) break
+      if (norm(variantSku(p.sku, z, null) || "") === sku) { hit = { size: z, color: "" }; break }
+    }
+    if (!hit) {
+      for (const c of declaredColors) {
+        if (norm(variantSku(p.sku, null, c) || "") === sku) { hit = { size: "", color: c }; break }
+      }
+    }
+    if (hit) placed.set(sku, { ...hit, it })
   }
-  const placed = new Set<string>()
-  const rowsOf = colors.length ? colors : [""]
-  const colsOf = sizes.length ? sizes : [""]
-  for (const c of rowsOf) for (const z of colsOf) {
-    const it = cellFor(c, z)
-    if (it) placed.add(String(it.sku).toUpperCase())
+  if (!placed.size) return null                       // nothing resolves — the list is honest
+
+  const sizes = [...new Set([...placed.values()].map((x) => x.size).filter(Boolean))].sort(bySize)
+  const colors = [...new Set([...placed.values()].map((x) => x.color).filter(Boolean))]
+  const leftover = group.rows.filter((r) => !placed.has(norm(r.sku)))
+  const at = (size: string, color: string) =>
+    [...placed.values()].find((x) => x.size === size && x.color === color)?.it ?? null
+
+  const cell = (it: InventoryItem | null, key: string) =>
+    it ? (
+      <Input
+        key={key}
+        value={String(Number(it.in_stock) || 0)}
+        onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+        inputMode="numeric"
+        aria-label={`In stock for ${it.sku}`}
+        title={`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`}
+        className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
+      />
+    ) : <span key={key} className="inline-block w-12 text-center text-muted-foreground/30">·</span>
+
+  /**
+   * ONE AXIS IS NOT A MATRIX. A cap has one size and seventeen colours; a table of that is
+   * a column seventeen rows tall — the pile of rows this was built to replace. With one
+   * axis the honest layout is a wrapped set, so seventeen colours are three short lines.
+   */
+  /**
+   * AN AXIS WITH ONE VALUE IS NOT AN AXIS. A cap's sku carries both a size and a colour —
+   * `…-ADJUSTABLE-RED` — so two axes resolve and the table renders twelve rows one column
+   * wide, which is the pile of rows this exists to replace wearing a header. What matters
+   * is which axis VARIES, not how many were found.
+   */
+  if (sizes.length <= 1 || colors.length <= 1) {
+    const oneSize = sizes[0] ?? ""
+    const oneColor = colors[0] ?? ""
+    const axis = sizes.length > 1
+      ? sizes.map((z) => ({ label: z, it: at(z, oneColor) }))
+      : colors.length > 1
+        ? colors.map((c) => ({ label: prettyColorName(c), it: at(oneSize, c) }))
+        // Neither varies: one cell, labelled by whatever it is.
+        : [{ label: [oneSize, oneColor ? prettyColorName(oneColor) : ""].filter(Boolean).join(" · ") || "Stock",
+             it: at(oneSize, oneColor) }]
+    return (
+      <div className="space-y-2 px-4 py-3">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {axis.map(({ label, it }) => (
+            <span key={label} className="flex items-center gap-1.5 text-xs">
+              <span className="whitespace-nowrap text-muted-foreground">{label}</span>
+              {cell(it, label)}
+            </span>
+          ))}
+        </div>
+        {leftover.length > 0 && <LeftoverNote rows={leftover} />}
+      </div>
+    )
   }
-  const leftover = group.rows.filter((r) => !placed.has(String(r.sku).toUpperCase()))
 
   return (
     <div className="space-y-2 px-4 py-3">
@@ -927,51 +1024,21 @@ function StockMatrix({ group, edit, lowAt }: {
         <table className="text-xs">
           <thead>
             <tr className="text-muted-foreground">
-              <th className="px-2 py-1 text-left font-medium">{colors.length ? "Colour" : ""}</th>
-              {colsOf.map((z) => (
-                <th key={z || "one"} className="min-w-14 px-2 py-1 text-center font-medium">{z || "One size"}</th>
-              ))}
+              <th className="px-2 py-1 text-left font-medium">Colour</th>
+              {sizes.map((z) => <th key={z} className="min-w-14 px-2 py-1 text-center font-medium">{z}</th>)}
             </tr>
           </thead>
           <tbody>
-            {rowsOf.map((c) => (
-              <tr key={c || "one"} className="border-t border-border">
-                <td className="whitespace-nowrap px-2 py-1 font-medium">{c ? prettyColorName(c) : "—"}</td>
-                {colsOf.map((z) => {
-                  const it = cellFor(c, z)
-                  // A CELL THAT DOESN'T EXIST IS NOT A ZERO. No inventory row means this
-                  // variant was never set up; printing 0 would say the shelf is empty, which
-                  // is a different and actionable claim.
-                  if (!it) return <td key={z || "one"} className="px-2 py-1 text-center text-muted-foreground/40">·</td>
-                  const stock = Number(it.in_stock) || 0
-                  const reserved = Number(it.reserved) || 0
-                  const tone = stock <= 0 ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
-                    : stock <= lowAt(it) ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
-                    : "border-border"
-                  return (
-                    <td key={z || "one"} className="px-1 py-1 text-center">
-                      <Input
-                        value={String(stock)}
-                        onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                        inputMode="numeric"
-                        aria-label={`In stock for ${it.sku}`}
-                        title={`${it.sku} · ${stock} on the shelf${reserved > 0 ? ` · ${reserved} held · ${stock - reserved} free` : ""}`}
-                        className={"h-7 w-14 text-center tabular-nums " + tone}
-                      />
-                    </td>
-                  )
-                })}
+            {colors.map((c) => (
+              <tr key={c} className="border-t border-border">
+                <td className="whitespace-nowrap px-2 py-1 font-medium">{prettyColorName(c)}</td>
+                {sizes.map((z) => <td key={z} className="px-1 py-1 text-center">{cell(at(z, c), c + z)}</td>)}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {leftover.length > 0 && (
-        <p className="text-2xs text-muted-foreground">
-          {leftover.length} variant{leftover.length === 1 ? "" : "s"} not on this grid — their sku doesn&apos;t match
-          the product&apos;s sizes and colours: <span className="font-mono">{leftover.map((r) => r.sku).join(", ")}</span>
-        </p>
-      )}
+      {leftover.length > 0 && <LeftoverNote rows={leftover} />}
     </div>
   )
 }
