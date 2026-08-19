@@ -105,8 +105,11 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
 
   return (
     <View style={{
-      backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-      padding: 14, marginBottom: 12, ...LIFT,
+      /* A LINE ON THE PAGE. Each line was its own bordered, shadowed card inside the
+         order's own card — a box in a box, and the reason nothing on this screen shared a
+         left edge. A rule between lines separates them just as clearly. */
+      borderTopWidth: 1, borderTopColor: C.border,
+      paddingTop: 16, paddingBottom: 16,
     }}>
       <ItemPhotos
         open={zoom}
@@ -172,21 +175,27 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
             </Text>
           ) : null}
 
-          {/* THE VARIANT CHIPS, READABLE. They were 12pt on a hairline border with no fill —
-              the lightest marks on the card, carrying the three facts someone picking a
-              garment actually needs. Filled, larger, and the print method is separated from
-              the colour and size because it is a different KIND of fact: those two describe
-              the blank, the method describes the work. */}
+          {/* THE VARIANT FACTS, still readable — and no longer chips.
+              These carry the three things someone picking a garment needs, so they were
+              made bigger and filled to stop being the lightest marks on the card. That was
+              the right instinct and the wrong instrument: filled blocks are how the screen
+              ended up as pills inside pills. Plain type at a readable size does it, and the
+              PRINT METHOD keeps its distinction by weight and ink rather than a box — it is
+              a different kind of fact (those two describe the blank, this describes the
+              work), which is what the separator is there to say. */}
           {facts.length > 0 && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 8 }}>
               {facts.map((f, i) => {
                 const method = i === facts.length - 1 && !!String(item.print_type || "").trim()
                 return (
-                  <View key={f} style={{
-                    paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.pill,
-                    backgroundColor: method ? C.ink : C.accent,
-                  }}>
-                    <Text style={{ fontSize: 13, fontFamily: F.bold, color: method ? C.lime : C.fg }}>{f}</Text>
+                  <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                    {i > 0 && <Text style={{ fontSize: 13, color: C.muted, opacity: 0.6 }}>·</Text>}
+                    <Text style={{
+                      fontSize: 13.5,
+                      fontFamily: method ? F.semi : F.medium,
+                      color: method ? C.primary : C.fg,
+                      letterSpacing: method ? 0.3 : 0,
+                    }}>{f}</Text>
                   </View>
                 )
               })}

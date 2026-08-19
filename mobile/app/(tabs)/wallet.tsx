@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { F,C } from "@/lib/theme"
+import { SECTION,F,C } from "@/lib/theme"
 
 /**
  * WALLET — the balance, what moved it, and the way to add more.
@@ -82,23 +82,17 @@ export default function Wallet() {
           * their way to add more.
           */}
         {noWallet ? (
-          <View style={{
-            marginTop: 16, borderRadius: 20, padding: 22,
-            backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-          }}>
-            <Text style={{ fontSize: 17, fontFamily: F.bold, color: C.fg }}>No wallet on this account</Text>
+          <View style={{ ...SECTION }}>
+            <Text style={{ fontSize: 17, fontFamily: F.semi, color: C.fg }}>No wallet on this account</Text>
             <Text style={{ fontSize: 14, color: C.muted, marginTop: 6, lineHeight: 20 }}>
               Wallets belong to sellers — orders are charged to theirs. What the factory
               spends on postage, blanks and design lives in Finance on the web.
             </Text>
           </View>
         ) : (
-        <View style={{
-          marginTop: 16, borderRadius: 20, padding: 22,
-          backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-        }}>
+        <View style={{ ...SECTION }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.bold, letterSpacing: 1 }}>BALANCE</Text>
+            <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>BALANCE</Text>
             {w?.low && (
               <View style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: "center", backgroundColor: "#fff4e5" }}>
                 <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.warn }}>

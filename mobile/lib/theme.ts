@@ -68,6 +68,24 @@ export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const
 
 /** One radius scale. Phones read big radii as "current"; 4px corners read as 2014. */
 export const R = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const
+/**
+ * A SECTION ON THE PAGE, and the only way to divide one.
+ *
+ * The detail screen stacked six white cards on warm paper, each with its own border, its own
+ * shadow and its own padding — six boxes, six inner margins, nothing sharing an edge. That
+ * reads as tiles, and on a warm ground the white also reads as stuck on.
+ *
+ * A rule and space do the same job with nothing drawn around anything, and every section
+ * that uses this shares one left margin with the screen title. Import it; a card typed
+ * inline in a screen is how the six got there.
+ */
+export const SECTION = {
+  borderTopWidth: 1,
+  borderTopColor: "#E6E1D8",
+  paddingTop: 20,
+  marginTop: 20,
+} as const
+
 
 /**
  * STAGE COLOUR — the reserved vocabulary from CLAUDE.md §4, and only it.

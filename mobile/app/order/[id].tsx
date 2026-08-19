@@ -11,7 +11,7 @@ import {
   normalizeStage, units, isOverdue, numOf, platformOf, nextStage, addressLines,
   STAGE_LABEL, stageAction,
 } from "@/lib/orders"
-import { F,C, R, LIFT, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
+import { F,C, R, LIFT, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
@@ -284,8 +284,7 @@ export default function OrderDetail() {
                  and is charged, and only then does this become Pending for the floor to
                  approve. Saying so beats an empty space where a control usually sits. */
               <View style={{
-                marginTop: 12, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-                backgroundColor: C.card, padding: 16,
+                ...SECTION,
               }}>
                 <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
                   Waiting on the seller
@@ -318,8 +317,7 @@ export default function OrderDetail() {
             */}
           <Section title="DELIVER TO" />
           <View style={{
-            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-            padding: 18, ...LIFT,
+            ...SECTION,
           }}>
             {addressLines(o.address).length > 0 ? (
               <>
@@ -359,8 +357,7 @@ export default function OrderDetail() {
           {/* ── TRACKING ───────────────────────────────────────────────────────── */}
           <Section title="SHIPPING" />
           <View style={{
-            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-            padding: 18, ...LIFT,
+            ...SECTION,
           }}>
             {code ? (
               <>
@@ -461,8 +458,7 @@ export default function OrderDetail() {
 
           <Section title="DETAILS" />
           <View style={{
-            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-            paddingHorizontal: 16, paddingBottom: 2, ...LIFT,
+            ...SECTION, paddingBottom: 2,
           }}>
             {o.status ? <Row label="Status" value={String(o.status)} /> : null}
             {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
@@ -473,8 +469,7 @@ export default function OrderDetail() {
 
           <Section title="ACTIVITY" />
           <View style={{
-            backgroundColor: C.card, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
-            paddingHorizontal: 16, paddingVertical: 4, ...LIFT,
+            ...SECTION, paddingBottom: 4,
           }}>
             {activity === null
               ? <ActivityIndicator style={{ marginVertical: 16 }} color={C.primary} />
