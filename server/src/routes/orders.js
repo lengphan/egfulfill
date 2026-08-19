@@ -432,7 +432,31 @@ async function chargedAmount(orderId) {
 // expected refusal (short balance, unpriceable line), so the caller can pass the
 // message straight to the seller.
 async function chargeForSubmit(orderId, sellerId, by, hideMoney = false) {
-  if (await chargedAmount(orderId) > 0) return { ok: true, already: true };
+  /**
+   * ALREADY PAID, OR PAID AND GIVEN BACK? THEY ARE NOT THE SAME ANSWER.
+   *
+   * This asked chargedAmount() — the sum of the CHARGE leg alone. A refund writes its own
+   * type and never subtracts from that leg, so an order charged $50 and refunded $50 still
+   * read "charged" and this returned ok without moving a cent.
+   *
+   * Reachable, and it produces goods for free. An admin may set any stage, so: charge →
+   * full refund → back to Draft → submit. The seller has their money, the floor has the
+   * order, and nothing bills. Re-charging is not the fix either — moveFunds is idempotent
+   * on (ref, type) and the ref is the order id, so a second charge on the same order is
+   * deduped and silently moves nothing, which lands in exactly the same place.
+   *
+   * So a retry still passes (charged, nothing refunded → net > 0 → already), and an order
+   * whose money has been handed back is REFUSED with the way forward: Duplicate makes a new
+   * order with a new id, an empty ledger, and therefore a real charge.
+   */
+  const state = await orderCharges(orderId).catch(() => null);
+  const charged = state ? Number(state.charged) || 0 : await chargedAmount(orderId);
+  const net = state ? Number(state.refundable) || 0 : charged;
+  if (charged > 0 && net > 0) return { ok: true, already: true };
+  if (charged > 0 && net <= 0) {
+    return { error: 'This order was charged and then refunded in full, so it cannot be submitted again. Duplicate it instead — the copy is charged properly.',
+             refundedInFull: true, charged };
+  }
   const quote = await quoteOrder(orderId);
   if (quote.unpriced.length) {
     // No catalog match = no cost. Charging 0 would fulfil it free, forever, silently.

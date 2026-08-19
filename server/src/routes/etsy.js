@@ -809,10 +809,30 @@ export async function shopListings(conn) {
  * ship. Bound to the order's OWNER shop with NO fallback: a wrong push emails the wrong
  * buyer, and repeated bogus fulfilments are how Etsy flags an account. Throws on any problem.
  */
+/**
+ * WHICH MARKETPLACE RECEIPT THIS ORDER FULFILS.
+ *
+ * Normally the order id says so — `etsy-4149102814` IS the receipt. A DUPLICATE has an id
+ * of its own (a copy of a marketplace order is not that order), so the link would be lost
+ * and tracking would have to be pasted into the channel by hand — on the one order where a
+ * buyer is already waiting and the clock is the marketplace's.
+ *
+ * `meta.duplicated_from` carries it. Only a value that is itself a receipt of THIS platform
+ * is accepted: a duplicate of a manual order fulfils nothing on a marketplace, and guessing
+ * would push tracking at a receipt that has nothing to do with it.
+ */
+function receiptIdOf(order, platform) {
+  const direct = String((order && order.id) || '').match(new RegExp('^' + platform + '-(.+)$', 'i'));
+  if (direct) return direct[1];
+  const meta = order && order.meta && typeof order.meta === 'object' ? order.meta : {};
+  const from = String(meta.duplicated_from || '');
+  const copied = from.match(new RegExp('^' + platform + '-(.+)$', 'i'));
+  return copied ? copied[1] : null;
+}
+
 export async function etsyPushTracking(order, tracking_code, carrier_name) {
-  const m = String((order && order.id) || '').match(/^etsy-(.+)$/i);
-  if (!m) throw new Error('Not an Etsy order');
-  const receiptId = m[1];
+  const receiptId = receiptIdOf(order, 'etsy');
+  if (!receiptId) throw new Error('Not an Etsy order');
   const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
   const conn = conns.find((c) => order && String(c.connected_by) === String(order.seller_id))
     || conns.find((c) => order && c.shop_name && c.shop_name === order.store)
