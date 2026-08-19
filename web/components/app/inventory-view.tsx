@@ -20,6 +20,7 @@ import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { variantSku, variantLabel, productSizes, productColors } from "@/lib/variant-sku"
 import { prettyColorName } from "@/lib/color-name"
+import { bySize } from "@/lib/size-order"
 import { PageTitle } from "@/components/app/page-title"
 import { TabLabel } from "@/components/app/tab-label"
 
@@ -783,6 +784,10 @@ function ProductGroup({
   const out = group.rows.filter(isOut).length
   const low = group.rows.filter(isLow).length
 
+  /** Two axes to lay out, and a catalogue product to take them from. Anything else keeps
+   *  the rows it always had — see StockMatrix. */
+  const matrixable = !!group.product && (productSizes(group.product).length > 0 || productColors(group.product).length > 0)
+
   return (
     <>
       <tr className={"border-t border-border " + (selected ? "bg-primary/[0.04]" : "")}>
@@ -849,8 +854,125 @@ function ProductGroup({
         </td>
         <td className="px-4 py-2" />
       </tr>
-      {open && group.rows.map((it) => row(it, true))}
+      {/* THE GRID WHEN IT CAN BE ONE, the list when it cannot.
+          StockMatrix returns null for anything it can't lay out on two axes — no catalogue
+          product, or a product with neither sizes nor colours — and those fall through to
+          the rows they always had. Nothing is hidden either way: a variant the grid can't
+          place is named underneath it. */}
+      {open && (matrixable ? (
+        <tr className="border-t border-border">
+          {/* The group row above has four cells; the grid spans all of them so it reads as
+              this product's own panel rather than as another row in the table. */}
+          <td colSpan={4} className="bg-muted/20 p-0">
+            <StockMatrix
+              group={group}
+              edit={(sku, _f, v) => edit(sku, "in_stock", v)}
+              lowAt={(it) => Number(it.reorder_at ?? 25)}
+            />
+          </td>
+        </tr>
+      ) : group.rows.map((it) => row(it, true)))}
     </>
+  )
+}
+
+/**
+ * A PRODUCT'S STOCK AS A GRID — colours down, sizes across.
+ *
+ * Stock is held per variant, and a variant has TWO axes. A list flattens them into one, so
+ * a tee in five colours and eight sizes became forty rows that you had to read and add up
+ * to answer either question anyone actually asks: "do we stock this" (the whole grid) and
+ * "can I make Navy in L" (one cell). Grouping helped the first and left the second buried
+ * under a caret.
+ *
+ * Every apparel system settles here for the same reason. Forty numbers in a 5×8 grid are
+ * read at a glance, and a hole in the shelf is a coloured cell rather than a row you have
+ * to find.
+ *
+ * IT STAYS EDITABLE. Losing inline editing was the real cost of a grid and there is no need
+ * to pay it — a cell is an input, exactly as the list's count was.
+ *
+ * Degenerates on purpose: a cap has one size, so it is a column of colours; a product with
+ * neither is one cell. Anything whose sku doesn't land in the grid is listed underneath as
+ * a plain row, because a variant this cannot place must not vanish.
+ */
+function StockMatrix({ group, edit, lowAt }: {
+  group: { product: CatalogProduct | null; rows: InventoryItem[] }
+  edit: (sku: string, field: "in_stock", value: number) => void
+  lowAt: (it: InventoryItem) => number
+}) {
+  const p = group.product
+  const bySkuKey = new Map(group.rows.map((r) => [String(r.sku).toUpperCase(), r]))
+  const sizes = productSizes(p).slice().sort(bySize)
+  const colors = productColors(p)
+  // Nothing to lay out on two axes — the caller falls back to rows.
+  if (!p || (!sizes.length && !colors.length)) return null
+
+  const cellFor = (color: string, size: string) => {
+    const sku = variantSku(p.sku, size || null, color || null)
+    return sku ? bySkuKey.get(String(sku).toUpperCase()) ?? null : null
+  }
+  const placed = new Set<string>()
+  const rowsOf = colors.length ? colors : [""]
+  const colsOf = sizes.length ? sizes : [""]
+  for (const c of rowsOf) for (const z of colsOf) {
+    const it = cellFor(c, z)
+    if (it) placed.add(String(it.sku).toUpperCase())
+  }
+  const leftover = group.rows.filter((r) => !placed.has(String(r.sku).toUpperCase()))
+
+  return (
+    <div className="space-y-2 px-4 py-3">
+      <div className="overflow-x-auto">
+        <table className="text-xs">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="px-2 py-1 text-left font-medium">{colors.length ? "Colour" : ""}</th>
+              {colsOf.map((z) => (
+                <th key={z || "one"} className="min-w-14 px-2 py-1 text-center font-medium">{z || "One size"}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rowsOf.map((c) => (
+              <tr key={c || "one"} className="border-t border-border">
+                <td className="whitespace-nowrap px-2 py-1 font-medium">{c ? prettyColorName(c) : "—"}</td>
+                {colsOf.map((z) => {
+                  const it = cellFor(c, z)
+                  // A CELL THAT DOESN'T EXIST IS NOT A ZERO. No inventory row means this
+                  // variant was never set up; printing 0 would say the shelf is empty, which
+                  // is a different and actionable claim.
+                  if (!it) return <td key={z || "one"} className="px-2 py-1 text-center text-muted-foreground/40">·</td>
+                  const stock = Number(it.in_stock) || 0
+                  const reserved = Number(it.reserved) || 0
+                  const tone = stock <= 0 ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
+                    : stock <= lowAt(it) ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
+                    : "border-border"
+                  return (
+                    <td key={z || "one"} className="px-1 py-1 text-center">
+                      <Input
+                        value={String(stock)}
+                        onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                        inputMode="numeric"
+                        aria-label={`In stock for ${it.sku}`}
+                        title={`${it.sku} · ${stock} on the shelf${reserved > 0 ? ` · ${reserved} held · ${stock - reserved} free` : ""}`}
+                        className={"h-7 w-14 text-center tabular-nums " + tone}
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {leftover.length > 0 && (
+        <p className="text-2xs text-muted-foreground">
+          {leftover.length} variant{leftover.length === 1 ? "" : "s"} not on this grid — their sku doesn&apos;t match
+          the product&apos;s sizes and colours: <span className="font-mono">{leftover.map((r) => r.sku).join(", ")}</span>
+        </p>
+      )}
+    </div>
   )
 }
 
