@@ -10,7 +10,13 @@ import type { Order } from "./api"
  * a real order. CLAUDE.md records three files that already grew private copies of these.
  */
 
-const DONE = new Set(["shipped", "cancelled", "refunded"])
+/*
+ * OPEN means the same thing here as on the boards: not shipped, and not parked in an
+ * exception. This counted only shipped/cancelled/refunded as finished, so an ON HOLD order
+ * stayed "open" on the phone while the web had already set it aside — the same floor,
+ * counted two ways. web/lib/order-filter.ts: `!isException(stage) && stage !== "shipped"`.
+ */
+const CLOSED = new Set(["shipped", "cancelled", "refunded", "on_hold"])
 
 /*
  * MIRRORS normalizeStage() and PIPELINE in server/src/routes/orders.js. Change both.
@@ -74,7 +80,7 @@ export function nextStage(o: Order): string | null {
   return next ?? null
 }
 
-export const isOpen = (o: Order) => !DONE.has(normalizeStage(o.factory_status))
+export const isOpen = (o: Order) => !CLOSED.has(normalizeStage(o.factory_status))
 
 /**
  * Mirrors isOverdue() in web/lib/order-filter.ts: the ship-by date decides when Etsy gave us
@@ -82,6 +88,14 @@ export const isOpen = (o: Order) => !DONE.has(normalizeStage(o.factory_status))
  * late and lets a genuinely late one through.
  */
 export function isOverdue(o: Order, fallbackDays = 10): boolean {
+  /*
+   * A CLOSED ORDER IS NEVER LATE — the check web/lib/order-filter.ts makes first, and this
+   * did not. Shipped, cancelled and refunded orders kept counting against their ship-by
+   * date forever, so the phone's "Late" tally rose every day and included work that was
+   * finished. Today happened to filter to open orders before counting and looked right;
+   * the Orders list did not, so the two disagreed about the same floor.
+   */
+  if (!isOpen(o)) return false
   if (o.ship_by) return new Date(o.ship_by).getTime() < Date.now()
   if (!o.created_at) return false
   const days = (Date.now() - new Date(o.created_at).getTime()) / 86_400_000
