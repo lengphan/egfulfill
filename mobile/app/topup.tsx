@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from "react-native"
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, useWindowDimensions } from "react-native"
 import * as FileSystem from "expo-file-system/legacy"
 import * as Sharing from "expo-sharing"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -29,6 +29,18 @@ const vnd0 = (n: number) => `${Math.round(n).toLocaleString()} ₫`
 
 export default function TopUp() {
   const insets = useSafeAreaInsets()
+  /**
+   * THE QR IS AS BIG AS THE PHONE ALLOWS.
+   *
+   * It was pinned at 220pt on every device. This is the one thing on the screen with a job
+   * — a banking app has to read it, often off a second phone held at arm's length — and it
+   * was rendering smaller than the button beneath it while a third of the width sat empty.
+   *
+   * 20 is the screen padding either side, 16 is the white card's own padding, and 320 is a
+   * ceiling so it does not become the whole page on a tablet.
+   */
+  const { width: screenW } = useWindowDimensions()
+  const qrSize = Math.min(320, Math.max(200, screenW - (20 + 16) * 2))
   const [cfg, setCfg] = useState<TopupConfig | null>(null)
   const [amount, setAmount] = useState("")
   const [phase, setPhase] = useState<"pick" | "qr" | "paid">("pick")
@@ -74,7 +86,18 @@ export default function TopUp() {
     return r
   })()
   const vndAmt = rate > 0 ? Math.round(usdAmt * rate) : 0
-  const presets = [...(cfg?.smallPresets ?? []), ...(cfg?.bulkPresets ?? [])]
+  /**
+   * ONE LADDER, IN ORDER, WITH NOTHING REPEATED.
+   *
+   * These are two admin-set lists concatenated, and $2,000 is in both — so the row rendered
+   * it twice, React was handed two children keyed `2000`, and the chips read 200 · 500 ·
+   * 1,000 · 2,000 · 3,000 · 2,000 · 5,000, which is a jumbled ladder as well as a console
+   * error. Deduped by value (which also makes `key={p}` sound again) and sorted, because
+   * the amount a preset carries IS its order — the split into small and bulk is about the
+   * volume rate, not about how the buttons are read.
+   */
+  const presets = Array.from(new Set([...(cfg?.smallPresets ?? []), ...(cfg?.bulkPresets ?? [])]))
+    .sort((a, b) => a - b)
 
   const start = useCallback(async () => {
     if (usdAmt <= 0) { setErr("Enter an amount."); return }
@@ -187,7 +210,7 @@ export default function TopUp() {
           <View style={{ alignItems: "center", marginTop: 20 }}>
             <View style={{ padding: 16, borderRadius: 20, backgroundColor: "#ffffff", borderWidth: 1, borderColor: C.border }}>
               {payment.qrCode
-                ? <QRCode value={payment.qrCode} size={220} getRef={(c) => { qrRef.current = c }} />
+                ? <QRCode value={payment.qrCode} size={qrSize} getRef={(c) => { qrRef.current = c }} />
                 : <Text style={{ color: C.muted }}>No scannable code</Text>}
             </View>
 
@@ -240,17 +263,39 @@ export default function TopUp() {
               AMOUNT (USD)
             </Text>
 
-            <TextInput
-              value={amount}
-              onChangeText={(t) => { setAmount(t.replace(/[^0-9.]/g, "")); setErr(null) }}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={C.muted}
-              style={{
-                marginTop: 10, height: 64, borderRadius: 16, paddingHorizontal: 18,
-                backgroundColor: C.accent, color: C.fg, fontSize: 30, fontWeight: "800",
-              }}
-            />
+            {/*
+              * WHAT YOU TYPE AND WHAT YOU SEND, IN ONE BOX.
+              *
+              * The dong figure sat under the preset chips — four rows of buttons away from
+              * the number it converts — so the two never read as the same fact, and the
+              * line had to name itself ("You'll transfer …") to explain what it was about.
+              * In the corner of the field it needs no sentence: it is plainly this amount,
+              * in the currency the transfer actually happens in.
+              *
+              * The rate stays below on its own, because it explains the conversion rather
+              * than being part of it.
+              */}
+            <View style={{
+              marginTop: 10, borderRadius: 16, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
+              backgroundColor: C.accent,
+            }}>
+              <TextInput
+                value={amount}
+                onChangeText={(t) => { setAmount(t.replace(/[^0-9.]/g, "")); setErr(null) }}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={C.muted}
+                style={{ height: 52, padding: 0, color: C.fg, fontSize: 30, fontWeight: "800" }}
+              />
+              {/* Only once there is an amount to convert. "≈ 0 ₫" under a blank field is a
+                  sum nobody asked for. */}
+              <Text style={{
+                height: 16, textAlign: "right", fontSize: 12, fontWeight: "600",
+                color: usdAmt > 0 && rate > 0 ? C.muted : "transparent",
+              }}>
+                {usdAmt > 0 && rate > 0 ? `≈ ${vnd0(vndAmt)}` : "·"}
+              </Text>
+            </View>
 
             {presets.length > 0 && (
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
@@ -276,7 +321,7 @@ export default function TopUp() {
             {cfg && (
               <Text style={{ fontSize: 14, color: C.muted, marginTop: 18 }}>
                 {usdAmt > 0 && rate > 0
-                  ? `You'll transfer ${vnd0(vndAmt)} · ${Math.round(rate).toLocaleString()} ₫ per $1`
+                  ? `${Math.round(rate).toLocaleString()} ₫ per $1`
                   : `Minimum ${usd0(minUsd)}`}
               </Text>
             )}
