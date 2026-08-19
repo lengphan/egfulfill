@@ -367,7 +367,20 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       // under a heading that no longer describes them.
       .then((rows) => {
         const all = rows ?? []
-        setPending(all.filter((r) => r.status === "pending"))
+        /**
+         * ABANDONED IS STILL OUTSTANDING — and it was being dropped on the floor.
+         *
+         * Closing the QR window marks a VietQR request `abandoned` so it leaves the ADMIN
+         * queue, which is right: an unpaid one is nothing for staff to act on. But this
+         * filtered for `pending` alone, so the moment a seller saved the QR and left for
+         * their banking app — which is what closes the window — their request disappeared
+         * from here too. No ledger row (the money hasn't landed) and no pending row either:
+         * a payment they were about to make, invisible on the page about their money.
+         *
+         * The virtual account is still live and the reference still settles, so it is not
+         * rubbish. It is the one thing on this page they can still act on.
+         */
+        setPending(all.filter((r) => r.status === "pending" || r.status === "abandoned"))
         setRejected(all.filter((r) => r.status === "rejected"))
       })
       .catch(() => setPending([]))
@@ -567,15 +580,21 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         </div>
         {pending.length > 0 && (
           <div className="border-b border-border px-4 py-3">
-            <div className="mb-2 eg-label text-muted-foreground">Awaiting confirmation</div>
+            {/* Not "Awaiting confirmation": a VietQR request confirms ITSELF when the money
+                arrives, so nobody is waiting to approve it — the seller is waiting to pay
+                it. Only a manual transfer waits on a human. */}
+            <div className="mb-2 eg-label text-muted-foreground">Not in your balance yet</div>
             <div className="space-y-1.5">
               {pending.map((p) => {
                 const rejected = p.status === "rejected"
+                /* VietQR self-confirms, so an unpaid one is the SELLER's move, not an
+                   admin's. A manual transfer really does wait on someone reading a receipt. */
+                const selfServe = p.status === "abandoned" || String(p.method || "").toLowerCase() === "vietqr"
                 return (
                   <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className={rejected ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}>
-                        {rejected ? "Rejected" : "Pending"}
+                        {rejected ? "Rejected" : selfServe ? "Awaiting payment" : "Awaiting confirmation"}
                       </Badge>
                       <span className="text-muted-foreground">
                         {p.method || "Top-up"}{p.ref ? ` · ${p.ref}` : ""} · {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}

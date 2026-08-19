@@ -440,7 +440,9 @@ export type TopupRequest = {
    *  and anything built against the API. Read alongside `method`, never instead of it. */
   methods?: string[] | null
   ref?: string | null
-  status: "pending" | "received" | "rejected"
+  /** `abandoned` = the seller closed the QR window. It leaves the ADMIN queue but stays
+   *  the seller's to pay: the virtual account is live and the reference still settles. */
+  status: "pending" | "received" | "rejected" | "abandoned"
   txn_id?: string | null
   created_at: string
 }

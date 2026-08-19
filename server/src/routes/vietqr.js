@@ -448,8 +448,30 @@ export function vietqrRoutes(app, requireAuth) {
         userIds: [req.user.sub], type: 'topup_pending', entityId: note,
         title: 'Payment waiting',
         body: `${amountUsd} USD top-up is ready to pay — transfer with reference ${note} and your balance updates on its own.`,
+        // /wallet, because that is where the thing can be ACTED on: the request shows there
+        // as Awaiting payment and its QR can be re-opened. A bell that only announces is
+        // half a message.
         href: '/wallet',
       }).catch(() => {});
+      /**
+       * AND A LINE IN THEIR OWN CHANNEL, so there is a conversation rather than a toast.
+       *
+       * NOT the announce channel, despite it being the obvious-sounding home: `announce` is
+       * one global room — orders.js gates it "admin → all sellers, everyone reads" — so a
+       * per-seller payment posted there would show every seller somebody else's money.
+       * `support-<sellerId>` is that seller's own private thread with us, it already holds
+       * their history, and it is where they would reply if they had a question about it.
+       *
+       * A system message: it is from EGFUL, not from a person, and nobody should be able to
+       * mistake it for someone typing. Fire-and-forget like the bell — a missing line in a
+       * chat must never fail the payment it describes.
+       */
+      q(`insert into order_messages (order_id, sender_id, sender_role, body, meta)
+         values ($1, null, 'system', $2, $3)`,
+        [`support-${req.user.sub}`,
+         `Top-up of $${amountUsd} is waiting to be paid. Transfer with reference ${note} and your balance updates on its own — the account stays live, so you can pay it whenever you're ready. You'll find it under Wallet, where the QR can be opened again.`,
+         JSON.stringify({ by: 'EGFUL', system: true, topup_ref: note })]
+      ).catch(() => {});
       return {
         ok: true,
         amountUsd,                           // credited USD once paid (VND ÷ rate)
