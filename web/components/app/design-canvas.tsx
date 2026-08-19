@@ -90,11 +90,14 @@ function ThreadSelect({ value, options, onChange }: {
 // Reusable place/size/rotate surface — used by the order customizer, the studio, and the
 // full maker. Renders a mockup + a draggable image layer + optional draggable text layers.
 export function DesignStage({
-  mockup, designUrl = "", pos = DEFAULT_POS, setPos, onRemove, onCopy, copyLabel, className,
+  mockup, mockupFill, designUrl = "", pos = DEFAULT_POS, setPos, onRemove, onCopy, copyLabel, className,
   texts, updateText, images, updateImage, onEraseBg, eraseBusy, onUndoErase, selected, onSelect, picking, onPickColor,
   printZone, emptyHint,
 }: {
   mockup?: string
+  /** True when `mockup` is the SELLER'S own photo rather than our catalogue blank — see the
+   *  note on the <img>. It changes how the picture is fitted, not which picture it is. */
+  mockupFill?: boolean
   /** The single artwork. Optional because a caller driving `images` has no single one —
    *  requiring it forced a placeholder that the stage would then draw beneath the stack. */
   designUrl?: string
@@ -519,11 +522,26 @@ export function DesignStage({
     // and the print zone keep a stable frame to measure against.
     <div ref={stageRef} onPointerDown={() => select(null)} style={{ containerType: "size" }} className={"relative aspect-square select-none " + (className ?? "w-full")}>
 
+      {/**
+        * OURS IS CONTAINED; THEIRS FILLS.
+        *
+        * A catalogue blank is a product shot on white — it wants the 5% margin and the
+        * drop shadow, or it sits edge to edge like a scan. A seller's OWN photograph is a
+        * BACKDROP: they uploaded it to be the background, and containing it inside a 5%
+        * inset left our white showing round the outside, which is the opposite of
+        * replacing the background and is what "it doesn't replace the full background"
+        * means.
+        *
+        * object-cover crops rather than letterboxes, which is the right trade for a
+        * backdrop: the artwork is positioned as a PERCENTAGE of the stage, so a
+        * letterboxed photo would put the placement somewhere other than where it looks.
+        */}
       {mockup ? (
         // p-[6%] lets the garment fill more of the bed than a raw object-contain, which
         // left wide dead margins around a portrait mockup.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain p-[5%] drop-shadow-[0_10px_28px_rgba(0,0,0,0.16)]" />
+        <img src={mockup} alt="" className={"pointer-events-none absolute inset-0 size-full " +
+          (mockupFill ? "object-cover" : "object-contain p-[5%] drop-shadow-[0_10px_28px_rgba(0,0,0,0.16)]")} />
       ) : (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
           <ImageIcon size={38} weight="duotone" className="opacity-40" />
@@ -1709,7 +1727,7 @@ export function DesignCanvasDialog({
            under the stage than a DTG one, and it should scroll INSIDE the window rather than
            pushing the action bar off the screen. Plain block comment: this is an attribute
            list, where a JSX-style comment is a syntax error. */
-        className="max-h-[92vh] overflow-y-auto sm:max-w-lg lg:max-w-[min(94vw,620px)]"
+        className="max-h-[92vh] overflow-y-auto sm:max-w-lg lg:max-w-[min(94vw,720px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -1866,9 +1884,9 @@ export function DesignCanvasDialog({
           * the width follows from it. Bigger than it looks: the stage is the whole width of
           * the dialog now, where it used to share it with a 380px column.
           */}
-        <div className="relative mx-auto w-full max-w-[min(100%,44vh,460px)]">
+        <div className="relative mx-auto w-full max-w-[min(100%,52vh,520px)]">
           <DesignStage
-            className="w-full" mockup={activeMockup}
+            className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
             pos={pos} setPos={setPos}
             onRemove={() => void removeArtwork()}

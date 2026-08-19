@@ -102,7 +102,12 @@ export function LibraryPickerDialog({
       {/* WIDER, so the cards can be. At 2xl a four-column grid gave each design about
           150px — a thumbnail you squint at to tell two designs apart, which defeats a
           picker whose entire job is recognising one. */}
-      <DialogContent className="sm:max-w-4xl">
+      {/* NARROWER THAN WHAT OPENS IT. This was max-w-4xl — 896px — and it opens ON TOP of
+          the designer, which is 720px. A child picker wider than its parent reads as the
+          bigger, more important window, and it was showing two thumbnails in it. Matched to
+          the designer so the pair reads as one tool: pick a design, land back on the
+          garment, same footprint. */}
+      <DialogContent className="sm:max-w-[min(94vw,720px)]">
         <DialogHeader><DialogTitle>Choose from your library</DialogTitle></DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
