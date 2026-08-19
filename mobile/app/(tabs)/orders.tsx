@@ -24,7 +24,9 @@ import { OrderRow } from "@/components/order-row"
  * moves them all — each to ITS OWN next stage, since a selection is rarely all at one point
  * in the pipeline.
  */
-const FILTERS = ["Open", "Late", "All"] as const
+/* The urgency lenses. They head the single filter row; the stages follow them. */
+const LENSES = ["Open", "Late", "All"] as const
+const FILTERS = LENSES
 /** The stage chips, in pipeline order — the ladder read left to right, exceptions last,
  *  so the row is the floor's own sequence rather than whatever order the data arrived in. */
 const STAGE_ORDER = ["", "in_review", "approved", "working", "shipped", "on_hold", "cancelled", "refunded"] as const
@@ -231,61 +233,76 @@ export default function Orders() {
           )}
         </View>
 
-        {/* THE FILTER, AS A RULE UNDER A WORD — the same pattern the web tab bars use.
-            It was a segmented control: a pill tray, holding a filled pill, on a screen that
-            already had two pills on every row. The number is the useful half and it survives
-            intact ("Late 3" is already the answer, and most of the time nobody needs to
-            press anything); the capsule around it never said a thing. */}
-        <View style={{ flexDirection: "row", marginTop: 14, gap: 22 }}>
-          {FILTERS.map((f) => {
-            const on = f === filter
+        {/*
+          * ONE ROW OF FILTERS, not two.
+          *
+          * There were two: an urgency LENS (Open/Late/All) above a STAGE row, and they
+          * combined — Open + Working was a real and useful question. But two tab bars
+          * stacked read as two competing controls, and on a phone the second one was mostly
+          * scrolled past. Collapsed into a single mutually-exclusive list: the three lenses
+          * first, then the stages that actually have something in them.
+          *
+          * THE TRADE, stated plainly: you can no longer ask "open AND working" in one go —
+          * picking a stage now shows every order at that stage. In exchange the control is
+          * one thing you read once. If the combination turns out to matter on the floor, the
+          * answer is a second axis somewhere deliberate, not a second tab bar.
+          */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 20, paddingTop: 14, paddingBottom: 2, paddingRight: 20 }}
+        >
+          {LENSES.map((f) => {
+            const on = stage === null && filter === f
             const n = counts[f]
             const hot = f === "Late" && n > 0
             return (
-              <Pressable key={f} onPress={() => setFilter(f)} hitSlop={8} style={{ paddingBottom: 7 }}>
+              <Pressable
+                key={f}
+                onPress={() => { setFilter(f); setStage(null) }}
+                hitSlop={8}
+                style={{ paddingBottom: 7 }}
+              >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 15, fontFamily: on ? F.semi : F.medium, color: on ? C.fg : C.muted }}>{f}</Text>
-                  <Text style={{ fontSize: 13, fontFamily: F.medium, color: hot ? C.alert : C.muted }}>
+                  <Text style={{ fontSize: 15.5, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{f}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: F.medium, color: hot ? C.alert : C.muted, opacity: on ? 1 : 0.75 }}>
                     {orders === null ? "" : n}
                   </Text>
                 </View>
-                {/* The rule, and only under the live one. */}
                 <View style={{
-                  position: "absolute", left: 0, right: 0, bottom: 0, height: 1.5,
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: 2,
                   backgroundColor: on ? C.fg : "transparent",
                 }} />
               </Pressable>
             )
           })}
-        </View>
-        {/* WHICH STAGE. Only the ones present — a row of eight with six reading zero is a
-            filter advertising what the floor is not doing. Scrolls, because the ladder is
-            longer than a phone. Plain words now: eight pills below three pills was the
-            "pills on pills" the queue opened with. */}
-        {stageChips.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 16, paddingTop: 14, paddingBottom: 2, paddingRight: 20 }}
-          >
-            {[null, ...stageChips].map((k) => {
-              const on = stage === k
-              const label = k === null ? "All" : (STAGE_LABEL[k] ?? k)
-              const n = k === null ? all.length : (stageCounts[k] ?? 0)
-              return (
-                <Pressable
-                  key={k ?? "__any"}
-                  onPress={() => setStage(k)}
-                  hitSlop={6}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 5 })}
-                >
-                  <Text style={{ fontSize: 13, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{label}</Text>
-                  <Text style={{ fontSize: 11.5, fontFamily: F.medium, color: on ? C.fg : C.muted, opacity: on ? 0.85 : 0.6 }}>{n}</Text>
-                </Pressable>
-              )
-            })}
-          </ScrollView>
-        )}
+
+          {stageChips.map((k) => {
+            const on = stage === k
+            const label = STAGE_LABEL[k] ?? k
+            const n = stageCounts[k] ?? 0
+            return (
+              <Pressable
+                key={k}
+                /* A stage shows every order AT that stage — it replaces the lens rather than
+                   narrowing it, which is what makes one row honest: whatever is underlined
+                   is the whole question being asked. */
+                onPress={() => { setStage(k); setFilter("All") }}
+                hitSlop={8}
+                style={{ paddingBottom: 7 }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 15.5, fontFamily: on ? F.semi : F.body, color: on ? C.fg : C.muted }}>{label}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: F.medium, color: C.muted, opacity: on ? 1 : 0.75 }}>{n}</Text>
+                </View>
+                <View style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: 2,
+                  backgroundColor: on ? C.fg : "transparent",
+                }} />
+              </Pressable>
+            )
+          })}
+        </ScrollView>
       </View>
 
       {orders === null && !err ? (
