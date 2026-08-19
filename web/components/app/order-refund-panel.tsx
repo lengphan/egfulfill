@@ -204,9 +204,12 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
                 SELECTION rather than from which button was pressed — refunding every part
                 at its full amount IS the whole order, and letting the server take its own
                 "everything" path avoids the two disagreeing over a rounding penny. */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* FULL WIDTH, not a small button adrift on the left. It is the only action on
+                the panel, it sits under a full-width reason field, and it is the one that
+                moves money — so it gets the width and the target size to match. */}
+            <div className="flex">
               <Button
-                size="sm"
+                className="w-full justify-center"
                 onClick={() => send(isEverything ? "full" : "selected")}
                 disabled={busy || !selected.length}
               >
