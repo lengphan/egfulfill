@@ -666,6 +666,25 @@ export function ordersRoutes(app, requireAuth) {
    * the quote flow, where the seller sees the number and accepts it. A tier that silently
    * billed on write would make 'complex' a charge nobody agreed to.
    */
+  /**
+   * THE SELLER'S OWN MOCKUP — a BACKDROP, never the print file.
+   *
+   * Sellers mostly already have product photography, and placing artwork on OUR blank photo
+   * means the picture they list with and the picture the floor works from are two different
+   * images of the same job. This is the one they supply, per line and per side:
+   * `{"front": "/api/support/asset/…", "back": "…"}`.
+   *
+   * ON order_items, AND THAT IS THE POINT. It would fit as neatly in order_designs — until
+   * you read missingArtwork(), which gates SHIPPING on "does this sku have an order_designs
+   * row" and does not care what kind. A mockup filed there would satisfy the artwork check
+   * for a decorated line, and an order with a nice photo and no print file would sail
+   * through the one gate that exists to stop exactly that. A different table cannot be
+   * mistaken for artwork by any query that has not been written yet.
+   *
+   * A URL, not the bytes. GET /api/orders returns every item, and a base64 photo per line
+   * would put megabytes back into the list the img_ref split took them out of.
+   */
+  q('alter table order_items add column if not exists mockups jsonb').catch(() => {});
   q('alter table order_items add column if not exists design_tier text').catch(() => {});
   q('alter table order_items add column if not exists design_tier_at timestamptz').catch(() => {});
   q('alter table order_items add column if not exists design_tier_by text').catch(() => {});
@@ -1888,6 +1907,53 @@ export function ordersRoutes(app, requireAuth) {
   // staff may set them (canSeeOrder), but ONLY before the price is locked: once the
   // seller has submitted (and been charged), the frozen cost must not silently drift
   // from the variants it was based on.
+  /**
+   * Set (or clear) the seller's own mockup for one side of one line.
+   *
+   * canSeeOrder, like item-setup: this is the seller's own photograph of their own product,
+   * so the owner sets it and staff working the line can too. It is NOT gated on the price
+   * being unlocked the way variants are — a backdrop changes nothing that was quoted.
+   *
+   * IT IS NOT ARTWORK, and nothing here treats it as any. The ship gate reads order_designs;
+   * this writes order_items.mockups. A line with a beautiful mockup and no print file is
+   * still a line with no print file, and still cannot ship.
+   *
+   * `url` null clears the side and falls the stage back to our catalogue photo. Only a
+   * SAME-ORIGIN path is accepted: the client uploads through /api/support/attachment and
+   * hands back what that returns, so nothing here fetches or stores a remote address that
+   * could rot, redirect, or point at a supplier's CDN (§2.9).
+   */
+  app.post('/api/orders/:id/item-mockup', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const b = req.body || {};
+    const lineId = b.line_id ? String(b.line_id) : null;
+    const sku = b.sku != null ? String(b.sku) : null;
+    if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
+    const side = String(b.side || 'front').toLowerCase().trim() || 'front';
+    const raw = b.url == null || b.url === '' ? null : String(b.url);
+    if (raw && !/^\/api\//.test(raw)) {
+      reply.code(400);
+      return { error: 'A mockup has to be an uploaded image on this site, not a link to one elsewhere.' };
+    }
+    const key = lineId ? 'line_id' : 'sku';
+    const val = lineId || sku;
+    // Merge, never replace: the sides are independent, and writing the whole object would
+    // drop the front the moment somebody set a back.
+    const r = await q(
+      `update order_items
+          set mockups = case when $1::text is null
+                             then coalesce(mockups, '{}'::jsonb) - $2::text
+                             else coalesce(mockups, '{}'::jsonb) || jsonb_build_object($2::text, $1::text) end
+        where order_id=$3 and ${key}=$4
+        returning mockups`,
+      [raw, side, req.params.id, val]
+    );
+    if (!r.rows[0]) { reply.code(404); return { error: 'item not found' }; }
+    audit(req, raw ? 'item.mockup' : 'item.mockup_cleared',
+      { entityType: 'order', entityId: String(req.params.id), after: { line: lineId || sku, side } });
+    return { ok: true, mockups: r.rows[0].mockups || {} };
+  });
+
   app.post('/api/orders/:id/item-setup', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const b = req.body || {};

@@ -1863,6 +1863,10 @@ export type OrderItem = {
   unit_cost?: number | string | null
   print_type?: string
   factory_status?: string | null
+  /** The seller's OWN mockup per side — `{front, back}`, same-origin paths. A backdrop for
+   *  placement, never the print file: a line with one of these and no artwork is still a
+   *  line with no artwork, and the ship gate says so. */
+  mockups?: Record<string, string> | null
 }
 export type OrderRow = {
   id: string
@@ -2429,6 +2433,20 @@ export function getOrderDesigns(id: string) {
 }
 /** Attach artwork to a LINE. Pass `line_id` — without it the design keys on sku alone
  *  and two lines of the same sku overwrite each other. */
+/**
+ * The seller's own product photo, as the BACKDROP for one side of one line.
+ *
+ * A mockup is not artwork and never satisfies the print-file requirement — the ship gate
+ * reads order_designs and this writes order_items.mockups, deliberately a different place
+ * so no future query can confuse the two. `url` must be a same-origin path from our own
+ * upload route; null clears the side and falls back to the catalogue photo.
+ */
+export function setItemMockup(orderId: string, body: { line_id?: string | null; sku?: string | null; side?: string; url: string | null }) {
+  return api<{ ok?: boolean; mockups?: Record<string, string>; error?: string }>(
+    `/api/orders/${encodeURIComponent(orderId)}/item-mockup`,
+    { method: "POST", body: JSON.stringify(body) },
+  )
+}
 export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
   /** `design_no`/`design_id` come back from the save: the number minted for these exact
    *  bytes, or the existing one if this artwork has been seen before (server/design-id.js). */

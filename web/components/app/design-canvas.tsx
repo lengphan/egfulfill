@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple } from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple, ImageSquare } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,10 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, saveTemplate, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
+import { fileToUploadUrl } from "@/lib/chat-upload"
 import { perceptualHash } from "@/lib/phash"
 import { decodeEntities, usd } from "@/lib/order-format"
 import { useArtworkSrc } from "@/lib/pdf-preview"
@@ -812,7 +813,24 @@ export function DesignCanvasDialog({
     return f.length ? f : (item.img ? [{ side: "front", url: item.img }] : [])
   }, [item, catalog])
   const [side, setSide] = useState(0)
-  const activeMockup = faces[side]?.url || item.img || ""
+  /**
+   * WHOSE PHOTO THE STAGE DRAWS.
+   *
+   * The seller's own comes first when they have set one for this side: most of them already
+   * have product photography, and placing artwork on OUR blank photo means the picture they
+   * list with and the picture the floor works from are two different images of one job.
+   * Ours is the fallback, and clearing theirs returns to it.
+   *
+   * A BACKDROP ONLY. Nothing below reads this as artwork — `designUrl` is still what gets
+   * placed, saved and printed, and a line with a mockup and no design is still a line with
+   * no design, on this screen and at the ship gate alike.
+   */
+  const [ownMockups, setOwnMockups] = useState<Record<string, string>>(
+    (item.mockups as Record<string, string> | null | undefined) ?? {})
+  const sideKey = (faces[side]?.side || "front").toLowerCase()
+  const activeMockup = ownMockups[sideKey] || faces[side]?.url || item.img || ""
+  const [mockBusy, setMockBusy] = useState(false)
+
   const sideName = (faces[side]?.side || "front").toLowerCase()
 
   /**
@@ -1062,6 +1080,9 @@ export function DesignCanvasDialog({
   const machineRef = useRef<HTMLInputElement | null>(null)
   /** The artwork picker, driven by the stage overlay rather than by a button of its own. */
   const uploadRef = useRef<HTMLInputElement | null>(null)
+  /** Separate from the artwork input on purpose: two files, two meanings, and one picker
+   *  that changed meaning by mode would be the exact confusion this control has to avoid. */
+  const mockupRef = useRef<HTMLInputElement | null>(null)
 
   /**
    * Whether the VIEWER is factory staff.
@@ -1466,6 +1487,38 @@ export function DesignCanvasDialog({
    * delete, so that case stays local and instant.
    */
   const [removing, setRemoving] = useState(false)
+  /** Upload a photo and hang it behind THIS side. Same downsize-then-store path the chat
+   *  composer uses, so one place decides what we accept and what gets re-encoded. */
+  const setOwnMockup = async (file: File | undefined) => {
+    if (!file) return
+    setMockBusy(true); setErr(null)
+    try {
+      const up = await uploadChatAttachment(await fileToUploadUrl(file), file.name)
+      if (up.error || !up.url) throw new Error(up.error || "Upload failed")
+      const r = await setItemMockup(orderId, { line_id: item.line_id, sku: item.line_id ? undefined : item.sku, side: sideKey, url: up.url })
+      if (r.error) throw new Error(r.error)
+      // FUNCTIONAL UPDATE, not a read of the state it is writing. Closing over `ownMockups`
+      // here made this function depend on a value it also sets, which is both a stale-read
+      // hazard across an await and enough to stop the compiler preserving the memoization
+      // of every callback in the component.
+      setOwnMockups((m) => r.mockups ?? { ...m, [sideKey]: up.url as string })
+      setAttached("Your photo is the backdrop for this side. It is not the print file — the design still is.")
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't use that photo as the mockup.")
+    } finally { setMockBusy(false) }
+  }
+
+  const clearOwnMockup = async () => {
+    setMockBusy(true); setErr(null)
+    try {
+      const r = await setItemMockup(orderId, { line_id: item.line_id, sku: item.line_id ? undefined : item.sku, side: sideKey, url: null })
+      if (r.error) throw new Error(r.error)
+      setOwnMockups(r.mockups ?? {})
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't put our photo back.")
+    } finally { setMockBusy(false) }
+  }
+
   /**
    * SAVE THIS PLACEMENT AS A TEMPLATE — the missing half of the library.
    *
@@ -1837,6 +1890,29 @@ export function DesignCanvasDialog({
             >
               {tplBusy ? <CircleNotch size={18} className="animate-spin" /> : <BookmarkSimple size={18} weight="bold" />}
             </button>
+            {/**
+              * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the title says
+              * in as many words because it is the one thing about this control that can be
+              * misread. Most sellers already have product photography; placing on our blank
+              * photo means the picture they list with and the picture the floor works from
+              * are two different images of one job.
+              *
+              * It does NOT replace the print file. The design is still what is placed, saved
+              * and printed, and a line with a photo and no design cannot ship — the gate
+              * reads order_designs, and this is stored somewhere else on purpose.
+              */}
+            <button
+              type="button"
+              onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
+              disabled={mockBusy}
+              title={ownMockups[sideKey]
+                ? "Put our product photo back"
+                : "Use your own product photo as the backdrop — the design file is still needed"}
+              aria-label={ownMockups[sideKey] ? "Use our product photo" : "Use my own product photo"}
+              className={railBtn + (ownMockups[sideKey] ? " bg-primary/10 text-primary" : "")}
+            >
+              {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
+            </button>
           </div>
           {designUrl && (
             <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center gap-1.5">
@@ -2159,6 +2235,8 @@ export function DesignCanvasDialog({
               staring at a greyed-out Save with no obvious way to add the image. */}
           <input ref={uploadRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f?.name ?? null); setPos(DEFAULT_POS) }, setErr); e.target.value = "" }} />
+        <input ref={mockupRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { void setOwnMockup(e.target.files?.[0]); e.target.value = "" }} />
           <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
 
