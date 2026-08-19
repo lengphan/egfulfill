@@ -7,6 +7,7 @@ import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
 import { AlibabaBrowse } from "@/components/app/alibaba-browse"
 import { Button } from "@/components/ui/button"
+import { FilterMenu } from "@/components/app/filter-menu"
 import { Input } from "@/components/ui/input"
 import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpydeckSaves,
          SOURCING_STAGES, type SourcingRow, type SourcingStage, type SavedListing } from "@/lib/api"
@@ -335,18 +336,22 @@ export function SourcingView() {
           </Button>
         </div>
 
+        {/* ONE FILTER CONTROL, not a row of solid pills.
+            The pills were the same rounded shape as the stage BADGES in the table below,
+            so a control and a read-only label looked identical — and being filled with the
+            accent, they read as actions sitting beside the real ones above. */}
         {rows.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
-            <button onClick={() => setStageFilter("")}
-                    className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (stageFilter === "" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
-              All {rows.length}
-            </button>
-            {SOURCING_STAGES.map((st) => (
-              <button key={st.id} onClick={() => setStageFilter(stageFilter === st.id ? "" : st.id)} title={st.hint}
-                      className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (stageFilter === st.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
-                {st.label} {stageCounts[st.id] ?? 0}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+            <FilterMenu
+              label="Stage"
+              anyLabel={`All stages (${rows.length})`}
+              value={stageFilter}
+              options={SOURCING_STAGES.map((st) => ({
+                value: st.id,
+                label: `${st.label} (${stageCounts[st.id] ?? 0})`,
+              }))}
+              onPick={(v) => setStageFilter(v as "" | SourcingStage)}
+            />
           </div>
         )}
 
