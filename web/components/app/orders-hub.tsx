@@ -1750,6 +1750,9 @@ export function OrdersHub() {
               // alone left this queue showing Pending for an order the order page was
               // already calling Cancelled.
               const stage = resolvedOrderStage(o)
+              /** Cancelled and refunded are terminal — nothing on this row can move. Named
+               *  once so the menu and the per-item control agree about it. */
+              const closed = ["cancelled", "refunded"].includes(normalizeStage(stage))
               const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
               const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
               const label = labels[o.id]
@@ -2281,7 +2284,7 @@ export function OrdersHub() {
                                 * the old charge leg and produce it for free. So it makes a new
                                 * draft carrying everything but the money.
                                 */}
-                              {["cancelled", "refunded"].includes(normalizeStage(resolvedOrderStage(o))) && (
+                              {closed && (
                                 <DropdownMenuItem
                                   disabled={busy === `dup:${o.id}`}
                                   onClick={async () => {
@@ -2298,7 +2301,19 @@ export function OrdersHub() {
                                   {busy === `dup:${o.id}` ? tl("ui", "Copying…") : tl("ui", "Reorder")}
                                 </DropdownMenuItem>
                               )}
-                              {/* The one-step advance lives HERE now, and only here — it is
+                              {/**
+                              * A FINISHED ORDER OFFERS TWO THINGS, and this is the whole
+                              * list: open it to read, or order it again.
+                              *
+                              * Everything below was already refused — stageDenial makes
+                              * cancelled and refunded terminal — so the menu was a column of
+                              * greyed rows a person still had to read past to find the one
+                              * item that worked. Disabled is for "you may not"; this is
+                              * "there is nothing here", and the honest shape for that is an
+                              * absence, not a grey list.
+                              */}
+                            {!closed && (<>
+                            {/* The one-step advance lives HERE now, and only here — it is
                                   never the row's primary. Named with its destination, since
                                   in a list of stages "next" is the only one that doesn't say
                                   where it goes. */}
@@ -2434,7 +2449,8 @@ export function OrdersHub() {
                                   </DropdownMenuGroup>
                                 </>
                               )}
-                            </DropdownMenuContent>
+                                                        </>)}
+</DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                       )
@@ -2829,6 +2845,15 @@ export function OrdersHub() {
                             const here = normalizeStage(it.factory_status)
                             const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
                               .filter((s) => !isMoneyStage(s.id) || s.id === here)
+                            /**
+                             * A CLOSED ORDER HAS NO PER-LINE MOVES. Cancelled and refunded
+                             * are terminal for the order, so a line-level control offering
+                             * stages is a promise nothing can keep — and worse than useless
+                             * here, because item-status writes the LINE and never the order,
+                             * so using it would leave the two saying different things again.
+                             * The stage is a label on these rows.
+                             */
+                            if (closed) return <StageBadge status={it.factory_status} />
                             if (!opts.length) return <StageBadge status={it.factory_status} />
                             if (!prod.length) return (
                               <>
