@@ -3039,7 +3039,10 @@ export function wilcomDigitize(body: { image: string; filename?: string; name?: 
 }
 /** TrueView PNG for an already-uploaded .emb, by order+sku (or design id). `unavailable`
  *  (Wilcom off / not a native .emb) is a normal outcome — the caller keeps its placeholder. */
-export type EmbPreviewResult = { ok: boolean; png?: string; stitches?: number | null; colours?: number | null; unavailable?: boolean; error?: string }
+/** `reason` is a CODE, not a sentence — 'not-stitch-file', 'not-configured', or whatever EWA
+ *  said when a render failed (stored and replayed from cache). The caller turns it into
+ *  words; the server keeps it quotable. `error` is used for the outright failures instead. */
+export type EmbPreviewResult = { ok: boolean; png?: string; stitches?: number | null; colours?: number | null; unavailable?: boolean; reason?: string; cached?: boolean; error?: string }
 export function getEmbPreview(body: { orderId?: string | null; sku?: string | null; designId?: string }) {
   return api<EmbPreviewResult>(`/api/wilcom/design-preview`, { method: "POST", body: JSON.stringify(body) })
 }

@@ -28,13 +28,39 @@ import { PageTitle } from "@/components/app/page-title"
 function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: string | null; orderId?: string | null; sku?: string | null; cached?: boolean; children: ReactNode }) {
   const [png, setPng] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /**
+   * WHY IT DIDN'T WORK, said on the card.
+   *
+   * Every failure was swallowed — `if (r.ok && r.png)` with an empty catch — so a refusal
+   * was indistinguishable from a click that never registered: the label went "Rendering…",
+   * came back to "Show stitches", and nothing else happened. Pressing it again does the
+   * same thing, which is what makes it maddening rather than merely broken.
+   *
+   * The reasons are real and each needs a different person to act: Wilcom not configured
+   * (an admin), the file not being a native .emb (whoever attached a .pes or .dst — EWA
+   * renders TrueView from .emb only), or the render failing outright. The server says which;
+   * this used to throw that away.
+   */
+  const [why, setWhy] = useState<string | null>(null)
   const fetchPng = useCallback(() => {
     if (!designId && !orderId) return
-    setBusy(true)
+    setBusy(true); setWhy(null)
     // design_id is the reliable key (the file's order_id can be null); order+sku is a fallback.
     getEmbPreview(designId ? { designId } : { orderId, sku })
-      .then((r) => { if (r.ok && r.png) setPng(r.png) })
-      .catch(() => {})
+      .then((r) => {
+        if (r.ok && r.png) { setPng(r.png); return }
+        /* THE REASON IS A CODE, and each one needs a different person to act — so it is
+           turned into the sentence that says who. Anything unrecognised is quoted verbatim
+           rather than flattened: it came from EWA, and their words beat our paraphrase. */
+        setWhy(
+          r.reason === "not-stitch-file"
+            ? "Not a stitch file — TrueView renders native .emb, and this is a .pes/.dst."
+            : r.reason === "not-configured"
+              ? "Wilcom isn't connected — an admin can add the keys in Integrations."
+              : r.error || (r.reason ? `Wilcom: ${r.reason}` : "The renderer returned no image."),
+        )
+      })
+      .catch((e) => setWhy(e instanceof Error ? e.message : "Couldn't reach the renderer."))
       .finally(() => setBusy(false))
   }, [designId, orderId, sku])
   // ONLY WHEN IT IS FREE. A rendered preview is cached server-side, so fetching it costs
@@ -71,7 +97,15 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
           }}
           className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
         >
-          {busy ? "Rendering…" : "Show stitches"}
+          {busy ? "Rendering…" : why ? "Couldn't render" : "Show stitches"}
+        </span>
+      )}
+      {/* The reason, under the button that failed. Truncated to one line on the card — the
+          full sentence is in the title, because a card is not the place to read a stack of
+          apparatus. */}
+      {why && !busy && (
+        <span title={why} className="pointer-events-none absolute inset-x-2 bottom-9 truncate rounded bg-background/90 px-1.5 py-0.5 text-center text-2xs text-amber-700 backdrop-blur dark:text-amber-500">
+          {why}
         </span>
       )}
     </div>
