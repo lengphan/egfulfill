@@ -31,6 +31,25 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
   const labelUrl = order.tracking_label_url || ""
   const hasLabel = !!labelUrl
 
+  /*
+   * BUYING A SECOND LABEL COSTS AGAIN, and nothing on the way there said so — "Create
+   * another label" opened the same window as "Create label" and bought a second one at
+   * full price. The first stays valid too, so the parcel now has two live labels and the
+   * carrier will bill for both.
+   *
+   * A confirm rather than a disabled item: a second label is a real need (a reprint on
+   * damaged stock, a changed address), it just must not happen by accident.
+   */
+  const createAnother = async () => {
+    const ok = await confirm({
+      title: "This order already has a label",
+      body: `A label was already bought for this order${order.tracking ? ` (${order.tracking})` : ""}. Creating another buys a SECOND label and charges again — the first stays valid unless you refund it.`,
+      confirmLabel: "Buy another label",
+      cancelLabel: "Cancel",
+    })
+    if (ok) onOpenLabel()
+  }
+
   const refund = async () => {
     const ok = await confirm({
       title: "Refund this label?",
@@ -75,7 +94,18 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
           {busy ? <CircleNotch size={14} className="animate-spin" /> : <CaretDown size={12} weight="bold" />}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onClick={onOpenLabel}><Plus size={14} weight="bold" /> Create another label</DropdownMenuItem>
+          {/* The tracking number, where the label decisions are. It is further down the
+              page as well, but "which label am I about to replace" is answered here. */}
+          {order.tracking && (
+            <>
+              <div className="px-2 py-1.5">
+                <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Tracking</div>
+                <div className="truncate font-mono text-xs">{order.tracking}</div>
+              </div>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <DropdownMenuItem onClick={createAnother}><Plus size={14} weight="bold" /> Create another label</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={refund}><ArrowCounterClockwise size={14} weight="bold" /> <span className="text-red-600">Refund label</span></DropdownMenuItem>
         </DropdownMenuContent>
