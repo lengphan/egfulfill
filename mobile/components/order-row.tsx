@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions } from "react-native"
+import { useState, useRef, useEffect } from "react"
+import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions, Animated, Easing } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
@@ -74,34 +74,79 @@ function RowMenu({ open, onClose, title, actions }: {
   open: boolean; onClose: () => void; title: string; actions: Action[]
 }) {
   const live = actions.filter(Boolean) as Exclude<Action, null>[]
+  /*
+   * SLID BY HAND, not by Modal's animationType.
+   *
+   * `animationType="slide"` has one fixed speed and no way to soften it, and it arrived too
+   * fast to read as a panel rising — it read as a jump. An Animated value gives a duration
+   * and an easing curve, and it has to stay mounted through the way OUT as well, which is
+   * what `shown` is for: unmounting on `open` going false would cut the exit animation off
+   * at frame one.
+   *
+   * NO SCRIM. Threads puts nothing behind its sheet, and the reason it works is that the
+   * sheet is opaque and lands against the page rather than over a dimmed copy of it.
+   * Dimming also implies modality this menu does not have — every action here is a small
+   * one, and none of them stops you carrying on down the queue.
+   */
+  const slide = useRef(new Animated.Value(1)).current
+  const [shown, setShown] = useState(open)
+
+  useEffect(() => {
+    if (open) setShown(true)
+    Animated.timing(slide, {
+      toValue: open ? 0 : 1,
+      duration: open ? 340 : 220,   // slower in, quicker out — an exit that lingers reads as lag
+      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => { if (finished && !open) setShown(false) })
+  }, [open, slide])
+
+  if (!shown) return null
+
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.4)", justifyContent: "flex-end" }}>
-        {/* Stops a tap INSIDE the sheet from closing it via the backdrop above. */}
-        <Pressable onPress={() => {}} style={{
-          backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-          paddingTop: 10, paddingBottom: 34, paddingHorizontal: 18,
-        }}>
-          <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 12 }} />
-          <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, marginBottom: 4 }}>
-            {title.toUpperCase()}
-          </Text>
-          {live.map((a, i) => (
-            <Pressable
-              key={a.label}
-              onPress={() => { onClose(); a.run() }}
-              style={({ pressed }) => ({
-                flexDirection: "row", alignItems: "center", gap: 12,
-                paddingVertical: 15,
-                borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
-                opacity: pressed ? 0.55 : 1,
-              })}
-            >
-              <Ionicons name={a.icon} size={19} color={a.strong ? C.fg : C.muted} />
-              <Text style={{ fontSize: 16, fontFamily: a.strong ? F.semi : F.body, color: C.fg }}>{a.label}</Text>
-            </Pressable>
-          ))}
-        </Pressable>
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      {/* Catches the tap OUTSIDE the sheet, and draws nothing. */}
+      <Pressable onPress={onClose} style={{ flex: 1, justifyContent: "flex-end" }}>
+        <Animated.View
+          style={{
+            transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 460] }) }],
+          }}
+        >
+          {/* Stops a tap INSIDE the sheet from reaching the backdrop above. */}
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: C.bg,
+              borderTopLeftRadius: 20, borderTopRightRadius: 20,
+              paddingTop: 10, paddingBottom: 34, paddingHorizontal: 18,
+              // With no scrim behind it the sheet has to carry its own separation from the
+              // page, or its top edge simply dissolves into paper of the same colour.
+              borderTopWidth: 1, borderColor: C.border,
+              shadowColor: "#0B0B0C", shadowOpacity: 0.13, shadowRadius: 22,
+              shadowOffset: { width: 0, height: -6 }, elevation: 16,
+            }}
+          >
+            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 12 }} />
+            <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, marginBottom: 4 }}>
+              {title.toUpperCase()}
+            </Text>
+            {live.map((a, i) => (
+              <Pressable
+                key={a.label}
+                onPress={() => { onClose(); a.run() }}
+                style={({ pressed }) => ({
+                  flexDirection: "row", alignItems: "center", gap: 12,
+                  paddingVertical: 15,
+                  borderTopWidth: i === 0 ? 0 : 1, borderTopColor: C.border,
+                  opacity: pressed ? 0.55 : 1,
+                })}
+              >
+                <Ionicons name={a.icon} size={19} color={a.strong ? C.fg : C.muted} />
+                <Text style={{ fontSize: 16, fontFamily: a.strong ? F.semi : F.body, color: C.fg }}>{a.label}</Text>
+              </Pressable>
+            ))}
+          </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   )
