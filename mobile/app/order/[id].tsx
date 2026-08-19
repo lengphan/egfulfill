@@ -152,6 +152,17 @@ export default function OrderDetail() {
   const to = o ? nextStage(o) : null
   const items = o?.items ?? []
   const late = o ? isOverdue(o) : false
+  /**
+   * HOW BIG THIS ORDER IS, in the words anyone would use.
+   *
+   * It read "1 line · 1 pc" in the header and "1 · 1 pc" beside ITEMS — two numbers that
+   * are the same number on most orders, one of them unlabelled, and "pc" abbreviating a
+   * word that was already short. Lines and pieces only differ when a line carries a
+   * quantity, and the count that answers "how much is in the box" is the pieces: two
+   * lines of one and one line of two are both two things to make.
+   */
+  const itemCount = o ? units(o) : 0
+  const sizeText = `${itemCount} ${itemCount === 1 ? "item" : "items"}`
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
@@ -204,7 +215,7 @@ export default function OrderDetail() {
                 </Text>
               </View>
               <Text style={{ fontSize: 13, color: C.onInk, opacity: 0.65 }}>
-                {items.length} {items.length === 1 ? "line" : "lines"} · {units(o)} pc
+                {sizeText}
                 {o.total != null ? ` · $${(Number(o.total) || 0).toFixed(2)}` : ""}
               </Text>
             </View>
@@ -320,7 +331,7 @@ export default function OrderDetail() {
           {/* ── THE LINES ──────────────────────────────────────────────────────────
               Each with its own artwork, its own files and its own button. This is the
               screen's centre of gravity: an order is not a piece count. */}
-          <Section title="ITEMS" right={`${items.length} · ${units(o)} pc`} />
+          <Section title="ITEMS" right={sizeText} />
           {items.length === 0 ? (
             <Text style={{ fontSize: 15, color: C.muted, paddingVertical: 12 }}>This order has no lines on it.</Text>
           ) : (
