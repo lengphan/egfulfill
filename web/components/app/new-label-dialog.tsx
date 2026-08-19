@@ -54,7 +54,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
     return () => clearTimeout(t)
   }, [])
 
-  const [basis, setBasis] = useState<string | null>(null)
+  const [basis, setBasis] = useState<{ text: string; tone: "warn" | "info" } | null>(null)
   const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
   // Add-ons the carrier prices into the rate: signature on delivery, declared insurance.
   const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
@@ -248,7 +248,10 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       .then((r) => {
         if (!alive) return
         const g = parcelFromOrder(order.items, r)
-        if (!g) return
+        /* NO EARLY RETURN when nothing is known. That left the stock mailer on screen with
+           no note at all — the one state that costs money, presented as if it had been
+           checked. The guess stands; what changes is that it now says it is one. */
+        if (!g) { setBasis(parcelBasisNote(null, order.items?.length ?? 0)); return }
         setPkg((p) => ({
           lb: Math.floor(g.weightOz / 16) || 0,
           oz: g.weightOz ? Math.round(g.weightOz % 16) : p.oz,
@@ -258,7 +261,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
           width: g.width || p.width,
           height: g.height || p.height,
         }))
-        setBasis(parcelBasisNote(g))
+        setBasis(parcelBasisNote(g, order.items?.length ?? 0))
         invalidateRates()
       })
       .catch(() => { /* no catalog — the stock mailer stands */ })
@@ -511,10 +514,15 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 </div>
               )}
 
+              {/* AN ASSUMPTION LOOKS DIFFERENT FROM A MEASUREMENT. Both used to be the same
+                  grey line, on the control that spends the money. */}
               {basis && (
-                <p className="flex items-start gap-1.5 text-2xs text-muted-foreground">
-                  <Package size={12} weight="fill" className="mt-0.5 shrink-0" />
-                  {basis}
+                <p className={"flex items-start gap-1.5 text-2xs " +
+                  (basis.tone === "warn" ? "font-medium text-amber-700 dark:text-amber-500" : "text-muted-foreground")}>
+                  {basis.tone === "warn"
+                    ? <Warning size={12} weight="fill" className="mt-0.5 shrink-0" />
+                    : <Package size={12} weight="fill" className="mt-0.5 shrink-0" />}
+                  {basis.text}
                 </p>
               )}
 

@@ -279,6 +279,16 @@ const SANMAR_CSV_FIELDS = {
   status:       ['productstatus', 'status'],
   keywords:     ['keywords'],
   piecePrice:   ['pieceprice', 'myprice'],
+  /**
+   * THE PIECE WEIGHT, from the FILE — which is the catalog's real source (the SOAP path is
+   * for live inventory and pricing only; see the note at the top of this module).
+   *
+   * It is what postage is quoted against, and nothing here read it: a garment went out
+   * declared at the stock 8oz and USPS weighed it at a pound, then billed the difference
+   * days later, per parcel. Several spellings because SanMar's SDL header is not stable
+   * across dumps and this is cheaper than finding out on a re-sync.
+   */
+  pieceWeight:  ['pieceweight', 'weight', 'unitweight', 'productweight'],
   casePrice:    ['caseprice'],
   msrp:         ['msrp', 'piecepricemsrp'],
   qty:          ['qty', 'quantity', 'totalqty', 'inventory', 'totalinventory'],
@@ -351,6 +361,7 @@ function rowToVariant(r, idx) {
     color, catalogColor: cell('catalogColor'), size, sizeIndex: cell('sizeIndex'),
     inventoryKey: cell('inventoryKey'), status: cell('status'), keywords: cell('keywords'),
     piecePrice: num(cell('piecePrice')), casePrice: num(cell('casePrice')), msrp: num(cell('msrp')),
+    pieceWeight: num(cell('pieceWeight')),
     qty: idx.qty != null ? (parseInt(cell('qty').replace(/[^0-9-]/g, ''), 10) || 0) : null,
     image: absolutizeImg(cell('image')), cardImage: absolutizeImg(cell('cardImage')),
     swatch: absolutizeImg(cell('swatch')),
@@ -458,6 +469,19 @@ function makeStyleAggregator() {
       s.variants.push({
         c: v.color || null, s: v.size || null, i: v.sizeIndex || null,
         k: v.inventoryKey || null, u: v.uniqueKey, p: v.piecePrice,
+        /**
+         * `w` — THE PIECE WEIGHT, IN THE FOLD.
+         *
+         * It was parsed out of the feed and then dropped here, so the one number that
+         * decides what postage costs existed for a moment and was discarded. A garment
+         * declared at the stock 8oz and weighed by USPS at a pound is billed the
+         * difference days later, per parcel, forever — the correction on the invoice that
+         * started this read $1.65 on a $6.24 label.
+         *
+         * One letter, like its neighbours: this is 4,081 rows of jsonb and the keys are
+         * repeated 161,304 times.
+         */
+        w: v.pieceWeight ?? null,
       });
     },
     styles() {

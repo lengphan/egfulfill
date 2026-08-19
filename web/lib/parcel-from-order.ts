@@ -63,11 +63,34 @@ export function parcelFromOrder(items: OrderItem[] | undefined, catalog: Catalog
   return { weightOz, length, width, height, known, unknown }
 }
 
-/** One sentence saying where the numbers came from, or null when there is nothing to say. */
-export function parcelBasisNote(g: ParcelGuess | null): string | null {
-  if (!g) return null
-  if (g.unknown > 0) {
-    return `From ${g.known} of ${g.known + g.unknown} items — the rest have no size recorded, so check this before buying.`
+/**
+ * WHERE THE NUMBERS CAME FROM — and it must speak loudest when it knows least.
+ *
+ * It returned NULL when nothing was known, which is precisely the case worth a sentence:
+ * parcelFromOrder gives up when no line has a weight, the dialog keeps its stock mailer, and
+ * a figure nobody measured is bought as though somebody had. That is what a carrier
+ * correction is made of — USPS weighs the parcel days later and bills the band it actually
+ * fell in ($1.65 on a $6.24 label, on one we declared at 6 oz and they weighed at a pound).
+ *
+ * `tone` is for the caller to paint with, because "assumed" and "measured" must not look
+ * alike on a control that spends money.
+ */
+export function parcelBasisNote(g: ParcelGuess | null, itemCount = 0): { text: string; tone: "warn" | "info" } | null {
+  if (!g) {
+    if (!itemCount) return null
+    return {
+      tone: "warn",
+      text: "No weight is recorded for anything on this order, so this is the stock mailer rather than a measurement. Weigh it, or set the weight on the product — the carrier re-weighs it later and bills the difference.",
+    }
   }
-  return `From the ${g.known === 1 ? "product" : `${g.known} products`} in this order. Adjust if the pack differs.`
+  if (g.unknown > 0) {
+    return {
+      tone: "warn",
+      text: `From ${g.known} of ${g.known + g.unknown} items — the rest have no size recorded, so this is under-declared. Check it before buying.`,
+    }
+  }
+  return {
+    tone: "info",
+    text: `From the ${g.known === 1 ? "product" : `${g.known} products`} in this order. Adjust if the pack differs.`,
+  }
 }
