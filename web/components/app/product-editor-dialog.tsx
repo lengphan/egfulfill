@@ -182,7 +182,7 @@ const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
 /** `blank` is what a seller pays for this size UNDECORATED. It rides in the size row
  *  rather than behind a variant picker of its own: a blank is the same garment in the same
  *  size with nothing done to it, so it is a column here, not a second dimension. */
-type Tier = { price: string; shipping: string; cost: string; blank: string }
+type Tier = { price: string; shipping: string; cost: string; blank: string; weightOz: string }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
   const out: Record<string, Tier> = {}
   if (!Array.isArray(v)) return out
@@ -193,6 +193,7 @@ function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
       shipping: t.shipping != null && isFinite(Number(t.shipping)) ? String(Number(t.shipping)) : "",
       cost: t.cost != null && isFinite(Number(t.cost)) ? String(Number(t.cost)) : "",
       blank: t.blank != null && isFinite(Number(t.blank)) ? String(Number(t.blank)) : "",
+      weightOz: t.weightOz != null && isFinite(Number(t.weightOz)) ? String(Number(t.weightOz)) : "",
     }
   }
   return out
@@ -223,6 +224,12 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
       cost: hasCost ? cost : null,
       shipping: ship != null && isFinite(ship) && ship >= 0 ? ship : null,
       blank: blk != null && isFinite(blk) && blk > 0 ? blk : null,
+      /* Null when unset, never 0 — a zero-ounce garment would be quoted as free postage and
+         corrected by the carrier on every parcel. Unset means "use the product weight". */
+      weightOz: (() => {
+        const w = t.weightOz.trim() === "" ? null : Number(t.weightOz)
+        return w != null && isFinite(w) && w > 0 ? w : null
+      })(),
     })
   }
   return out.length ? out : undefined
@@ -1197,8 +1204,16 @@ export function ProductEditorDialog({
                     the only place in this form asking for a second dimension, to answer a
                     question ("how many 3XL?") this row is already asking. Held per SIZE now,
                     so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_1fr_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span title="What this size costs undecorated — charged when a line carries no print method">Blank ($)</span><span>Shipping ($)</span><span>Stock</span><span className="text-right">Margin</span><span />
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
+                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span title="What this size costs undecorated — charged when a line carries no print method">Blank ($)</span><span>Shipping ($)</span>
+                  {/* WEIGHT IS PER SIZE, which is the whole reason it is a column here. A 3XL
+                      crewneck runs several ounces over an S, and postage is priced in bands
+                      (4 / 8 / 12 / 15.999oz, then 1lb), so one size can sit a band above
+                      another. One product-level figure has to be the heaviest — over-declaring
+                      every small one — or an average, which under-declares the big ones and is
+                      corrected by the carrier later at about $1.65 a parcel. */}
+                  <span title="What one of this size weighs, in ounces. Postage is quoted against it; the carrier re-weighs the parcel and bills the difference.">Weight (oz)</span>
+                  <span>Stock</span><span className="text-right">Margin</span><span />
                 </div>
                 <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => {
@@ -1207,10 +1222,10 @@ export function ProductEditorDialog({
                     // What pricing will actually charge if Base cost is left blank.
                     const derived = t?.cost?.trim() && isFinite(costN) && costN > 0 ? (costN + markup).toFixed(2) : ""
                     const patch = (k: keyof Tier, v: string) =>
-                      setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "", blank: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
+                      setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "", blank: "", weightOz: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
                     return (
                     <Fragment key={s}>
-                    <div className="grid grid-cols-[3rem_1fr_1fr_1fr_1fr_5rem_4.5rem_1.5rem] items-center gap-2">
+                    <div className="grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
                         value={t?.cost ?? ""}
@@ -1254,6 +1269,16 @@ export function ProductEditorDialog({
                         placeholder={shipping.trim() !== "" ? Number(shipping).toFixed(2) : (bandFee != null ? Number(bandFee).toFixed(2) : "—")}
                         title={shipping.trim() !== "" ? "Using the product-level shipping fee above" : (bandFee != null ? "Platform default for this weight band" : undefined)}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
+                      />
+                      <Input
+                        value={t?.weightOz ?? ""}
+                        onChange={(e) => patch("weightOz", e.target.value)}
+                        /* The product-level weight is the fallback, shown as the placeholder
+                           so the number in force is visible without saving — the same rule
+                           Base cost and Shipping follow in this row. */
+                        placeholder={weightOz.trim() !== "" ? String(Number(weightOz)) : "—"}
+                        title="What one of this size weighs, in ounces — what postage is quoted against"
+                        className="h-8 text-xs" inputMode="decimal" aria-label={`Weight in ounces for size ${s}`}
                       />
                       {/* STOCK FOR THIS SIZE — a total, opened per colourway.
                           ─────────────────────────────────────────────────────

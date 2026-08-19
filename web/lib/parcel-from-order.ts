@@ -48,7 +48,23 @@ export function parcelFromOrder(items: OrderItem[] | undefined, catalog: Catalog
   for (const it of items) {
     const qty = Math.max(1, Number(it.qty) || 1)
     const p = resolveProduct(it, catalog)
-    const w = num(p?.weightOz), l = num(p?.boxL), bw = num(p?.boxW), h = num(p?.boxH)
+    /**
+     * THE SIZE'S OWN WEIGHT WINS.
+     *
+     * A 3XL crewneck runs several ounces over an S, and USPS prices in bands (4 / 8 / 12 /
+     * 15.999oz, then 1lb), so two sizes of one product can sit a band apart. The
+     * product-level figure is the fallback for a size nobody has weighed — not a substitute
+     * for one that has been.
+     *
+     * Matched case-insensitively on the size string, because a line carries what the
+     * marketplace sent ("L", "l", "Large") and the tier carries what we typed.
+     */
+    const sizeKey = String(it.size ?? "").trim().toLowerCase()
+    const tier = sizeKey
+      ? (p?.sizePrices ?? []).find((t) => String(t?.size ?? "").trim().toLowerCase() === sizeKey)
+      : undefined
+    const w = num(tier?.weightOz) || num(p?.weightOz)
+    const l = num(p?.boxL), bw = num(p?.boxW), h = num(p?.boxH)
     // A product with a weight but no box still helps — weight is the half that usually
     // decides the rate on a soft pack, so it is counted rather than discarded.
     if (!w && !l && !bw && !h) { unknown += 1; continue }

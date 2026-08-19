@@ -48,6 +48,10 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   /** "Custom size…" is a MODE, not a size: it keeps the boxes open even if the numbers
    *  land back on a stock size, so choosing it doesn't snap the label to a mailer. */
   const [customSize, setCustomSize] = useState(false)
+  /** The empty packaging's weight, in ounces. Kept apart from `pkg.oz` so the contents and
+   *  the container stay separately editable — re-picking a size replaces one and not the
+   *  other, and a person who weighs the full parcel can leave this at 0. */
+  const [tareOz, setTareOz] = useState(0)
   const [sizes, setSizes] = useState<ParcelSize[]>(STOCK_SIZES)
   useEffect(() => {
     const t = setTimeout(() => setSizes([...STOCK_SIZES, ...customSizes()]), 0)
@@ -55,7 +59,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   }, [])
 
   const [basis, setBasis] = useState<{ text: string; tone: "warn" | "info" } | null>(null)
-  const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
+  /* CONTENTS + CONTAINER. The box's own weight was never in this sum, so every boxed parcel
+     was declared light by 8–12oz — a full price band on Ground Advantage. */
+  const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0) + (Number(tareOz) || 0)
   // Add-ons the carrier prices into the rate: signature on delivery, declared insurance.
   const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
   const [busy, setBusy] = useState(false)
@@ -473,6 +479,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                     if (!hit) { setCustomSize(true); return }
                     setCustomSize(false)
                     setPkg({ ...pkg, length: hit.length, width: hit.width, height: hit.height })
+                    /* The box brings its own weight back with it — that is the point of
+                       saving it as a size rather than as three numbers. */
+                    setTareOz(Number(hit.tareOz) > 0 ? Number(hit.tareOz) : 0)
                     invalidateRates()
                   }}
                   className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
@@ -500,12 +509,26 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => { setPkg({ ...pkg, length: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                   <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                   <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  {/* THE EMPTY PACKAGING'S OWN WEIGHT.
+                      ────────────────────────────────
+                      A poly mailer is a fraction of an ounce and rounds to nothing. A rigid
+                      box does not: a 12 × 12 × 6 carton is 8–12oz empty, which on Ground
+                      Advantage is a whole price band before anything goes in it. A parcel
+                      costed from its CONTENTS alone is therefore under-declared by the
+                      weight of the thing carrying them — every time, and the carrier bills
+                      the difference days later.
+                      Asked here rather than beside the stock mailers, because this is the
+                      row where somebody is describing a box. */}
+                  <label className="flex w-20 flex-col gap-1">
+                    <span className="text-2xs text-muted-foreground" title="What the empty box or mailer weighs — added to the contents">Box oz</span>
+                    <Input type="number" min={0} value={tareOz} onChange={(e) => { setTareOz(Math.max(0, Number(e.target.value) || 0)); invalidateRates() }} className="h-9" />
+                  </label>
                   {/* Only offered when the dimensions are genuinely new — a button that saves
                       a size you already have does nothing and says nothing. */}
                   {!sizes.some((z) => sizeKey(z) === sizeKey(pkg)) && pkg.length > 0 && pkg.width > 0 && (
                     <button
                       type="button"
-                      onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height })])}
+                      onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height, tareOz: tareOz > 0 ? tareOz : undefined })])}
                       className="pb-2 text-xs font-medium text-primary hover:underline"
                     >
                       Save {sizeLabel(pkg)} as a size

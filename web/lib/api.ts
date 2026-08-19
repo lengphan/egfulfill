@@ -891,7 +891,20 @@ export type CatalogProduct = {
   /** `blank` is what this size costs UNDECORATED — charged when an order line carries no
    *  print method. Null when we don't sell this one as a blank, which leaves the printed
    *  base cost in charge; it is never 0, because 0 would mean giving the garment away. */
-  sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null; blank?: number | null }[]
+  /**
+   * `weightOz` — WHAT THIS SIZE WEIGHS, and why it is per SIZE rather than per product.
+   *
+   * A 3XL crewneck is not the same parcel as a S: the difference runs to several ounces,
+   * and postage is priced in bands (4oz, 8oz, 12oz, 15.999oz, then 1lb on USPS Ground
+   * Advantage), so one size can sit a whole band above another. A single product-level
+   * figure has to be either the heaviest — over-declaring every small one — or an average,
+   * which under-declares the big ones and gets corrected by the carrier days later at
+   * roughly $1.65 a parcel.
+   *
+   * It rides in the size row for the same reason `blank` does: it is the same garment in
+   * the same size, so it is a column here rather than a second dimension.
+   */
+  sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null; blank?: number | null; weightOz?: number | null }[]
   /**
    * OUR variant sku → the SUPPLIER's code for that same variant ("EG-CAP-ORN-ADJ" →
    * "B49795660"). Per variant, because a supplier's catalogue is keyed by colour AND size

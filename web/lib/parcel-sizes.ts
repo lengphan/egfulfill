@@ -16,7 +16,20 @@ import { getUser } from "@/lib/auth"
  * something the person packing reaches for, not a policy the business sets — and getting it
  * wrong costs one dropdown, not money.
  */
-export type ParcelSize = { label: string; length: number; width: number; height: number }
+/**
+ * `tareOz` — WHAT THE EMPTY PACKAGING WEIGHS.
+ *
+ * A poly mailer is a fraction of an ounce and nobody would miss it; a rigid box is not. A
+ * 12 × 12 × 6 carton runs 8–12oz empty, which on USPS Ground Advantage is a whole price
+ * band on its own — so a parcel costed from its CONTENTS alone is under-declared by the
+ * weight of the thing carrying them, every time, and the carrier bills the difference days
+ * later.
+ *
+ * Optional, because the stock mailers genuinely round to nothing and asking for a number
+ * that is always 0.4 is a field people learn to skip. It is the boxes that need it, which
+ * is where the prompt appears.
+ */
+export type ParcelSize = { label: string; length: number; width: number; height: number; tareOz?: number }
 
 /** Stock sizes. Ordered smallest first — the pick is usually "the smallest it fits in". */
 export const STOCK_SIZES: ParcelSize[] = [
@@ -37,7 +50,8 @@ export function customSizes(): ParcelSize[] {
   try {
     const raw = localStorage.getItem(storeKey())
     const list = raw ? (JSON.parse(raw) as ParcelSize[]) : []
-    return Array.isArray(list) ? list.filter((s) => s && s.length > 0 && s.width > 0 && s.height > 0) : []
+    return Array.isArray(list) ? list.filter((s) => s && s.length > 0 && s.width > 0 && s.height > 0)
+      .map((s) => ({ ...s, tareOz: Number(s.tareOz) > 0 ? Number(s.tareOz) : undefined })) : []
   } catch {
     return []
   }
