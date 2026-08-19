@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X, DownloadSimple } from "@phosphor-icons/react"
+import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
@@ -201,10 +201,14 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-foreground/70" title="Which face this artwork is on">
             {r.side}
           </span>
-          {/* DOWNLOAD, matching the machine-file row. Placed artwork is already same-origin
-              (it renders on the mockup), so the link fetches the bytes it is showing rather
-              than routing through the paywalled deliverable endpoint — this is the seller's
-              own artwork on their own order, not a file we cut. */}
+          {/* DOWNLOAD, matching the machine-file row — WORD ALONE, and for the same reason
+              it is a word there: the glyph says nothing "Download" doesn't, and it made this
+              button visibly heavier than the one a row below it. That change was made on the
+              machine-file row only, so for a while the same action wore two faces in one
+              list. Placed artwork is already same-origin (it renders on the mockup), so the
+              link fetches the bytes it is showing rather than routing through the paywalled
+              deliverable endpoint — this is the seller's own artwork on their own order, not
+              a file we cut. */}
           {/**
             * THE ACTIONS, VISIBLE AND IN THE SAME PLACE ON EVERY ROW.
             *
@@ -225,7 +229,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
               a.href = r.src; a.download = r.name || "artwork"; a.click()
             }}
           >
-            <DownloadSimple size={13} weight="bold" /> Download
+            Download
           </Button>
           {onRemove && (
             <Button
@@ -985,13 +989,15 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             * a non-staff caller may only re-scope a file on their OWN order, so this control
             * is safe to give to every role that can already see the row.
             */}
-          {/* SIZED TO ITS NEIGHBOURS. This sat at text-2xs beside a text-sm file name and a
-              text-sm Download button, at the same height as the button — so the row had two
-              controls the same size holding type two steps apart, which is what made it
-              read as uneven rather than as a pair. */}
+          {/* SIZED TO ITS NEIGHBOURS — text-xs, which is what Download and Remove are.
+              It went to text-2xs, then to text-sm to match a Download button that was text-sm
+              at the time; that button has since come down to text-xs and this stayed, so the
+              pair drifted apart again in the other direction. It is the same size as the
+              staging list's copy of this field for the same reason. The file NAME above is
+              text-sm and stays there: a name is content, these are controls. */}
           {items.length > 0 && (
             <VariantField
-              label="Goes on" compact clearable={false} className="w-32 shrink-0 text-sm"
+              label="Goes on" compact clearable={false} className="w-32 shrink-0 text-xs"
               value={labelFor(f.kind === "image", f.lineId || ALL)}
               options={optionsFor(f.kind === "image")}
               onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
