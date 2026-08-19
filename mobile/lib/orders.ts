@@ -87,6 +87,21 @@ export function nextStage(o: Order): string | null {
    * legacy row already sitting at in_review had no way forward.
    */
   if (isFactoryOrder(o) && (at === "" || at === "in_review")) return "working"
+  /**
+   * THE FACTORY DOES NOT HAVE A PENDING STAGE, so it is never offered one.
+   *
+   * The flow is the seller's: they submit, the wallet is charged, and the order becomes
+   * Pending. Only then does the factory approve it. So an order sitting at Draft on a
+   * SELLER's account is one they have not submitted and not paid for — there is nothing
+   * for the floor to do with it, and the button offering "Move Order to Pending" was
+   * asking a staff member to assert a payment that never happened.
+   *
+   * Null rather than skipping ahead to Approved: the server counts '' → approved as a
+   * skip on a seller order (SELLER_LINE keeps in_review between them) and would refuse it
+   * — so jumping the stage here would only trade a wrong button for a broken one. The
+   * screen says who the next move belongs to instead.
+   */
+  if (!isFactoryOrder(o) && at === "") return null
   const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
   const next = PIPELINE[i + 1]
   return next ?? null

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { View, Text, TextInput, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import { router, useLocalSearchParams } from "expo-router"
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
@@ -60,7 +60,10 @@ export default function Orders() {
     try { setOrders(await getOrders()); setErr(null) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load orders.") }
   }, [])
-  useEffect(() => { load() }, [load])
+  /* The queue is the screen people leave and come back to most — after moving an order,
+     after buying a label, after the designer. Arriving at a list that still shows the
+     state you just changed is the one thing a queue must not do. */
+  useFocusEffect(useCallback(() => { load() }, [load]))
   useEffect(() => { getMe().then(setMe).catch(() => setMe(null)) }, [])
 
   const onRefresh = useCallback(async () => {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, type WalletResponse, type LedgerRow } from "@/lib/api"
-import { router } from "expo-router"
+import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { C } from "@/lib/theme"
 
@@ -28,7 +28,19 @@ export default function Wallet() {
     try { setW(await getWallet()); setErr(null) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load your wallet.") }
   }, [])
-  useEffect(() => { load() }, [load])
+  /**
+   * REFETCH WHEN THE SCREEN COMES BACK.
+   *
+   * These tabs loaded once on mount and never again, so returning from an action showed
+   * the numbers from before it: submit an order, come back to Wallet, and the balance is
+   * the old one until you pull to refresh. A tab bar makes that constant — you leave and
+   * return to these screens dozens of times an hour, and every arrival was stale.
+   *
+   * useFocusEffect, not an interval: the trigger is arriving at the screen, which is
+   * exactly when a person is about to read it. Polling would fetch while nobody is
+   * looking and still be stale at the moment they arrive.
+   */
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true); await load(); setRefreshing(false)

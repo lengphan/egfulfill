@@ -257,6 +257,21 @@ export default function OrderDetail() {
                   {stageAction(to)}
                 </Text>
               </Pressable>
+            ) : stage === "" ? (
+              /* NOT A MISSING BUTTON — a move that is not ours to make. The seller submits
+                 and is charged, and only then does this become Pending for the floor to
+                 approve. Saying so beats an empty space where a control usually sits. */
+              <View style={{
+                marginTop: 12, borderRadius: R.lg, borderWidth: 1, borderColor: C.border,
+                backgroundColor: C.card, padding: 16,
+              }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: C.fg }}>
+                  Waiting on the seller
+                </Text>
+                <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
+                  Nothing to approve until they submit and pay for it.
+                </Text>
+              </View>
             ) : null
           )}
 
