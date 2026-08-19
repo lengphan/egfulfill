@@ -235,7 +235,22 @@ export function nextLineStage(
   if (EXCEPTIONS.includes(at)) return null
   if (isFactoryOrder(order) && (at === "" || at === "in_review")) return "working"
   const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
-  return PIPELINE[i + 1] ?? null
+  const next = PIPELINE[i + 1] ?? null
+  /**
+   * A LINE IS NEVER SHIPPED ON ITS OWN — the parcel is the order.
+   *
+   * The line ladder was the order ladder, so a line sitting at Working offered "Ship this
+   * line", and pressing it on a three-line order claimed one item had gone while two sat
+   * on the bench. There is one parcel, one label and one tracking number for the whole
+   * order, so there is one shipping event, and it belongs to the order.
+   *
+   * Making is per line and stops at Working, which is the real boundary: after that the
+   * work is packing, and packing is not something you do to one item of three. Confirm
+   * shipment on the order is the step that follows, and the server independently refuses
+   * a ship it cannot back (no label, or a decorated line with no artwork) — this only
+   * stops the phone OFFERING a move that would be wrong.
+   */
+  return next === "shipped" ? null : next
 }
 
 /**
