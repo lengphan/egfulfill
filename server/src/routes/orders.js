@@ -2002,10 +2002,31 @@ export function ordersRoutes(app, requireAuth) {
     const sku = b.sku != null ? String(b.sku) : null;
     if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
     const side = String(b.side || 'front').toLowerCase().trim() || 'front';
-    const raw = b.url == null || b.url === '' ? null : String(b.url);
-    if (raw && !/^\/api\//.test(raw)) {
-      reply.code(400);
-      return { error: 'A mockup has to be an uploaded image on this site, not a link to one elsewhere.' };
+    /**
+     * SAME-ORIGIN, AND STORED AS A PATH.
+     *
+     * This accepted only a value already starting with /api/ — and the upload route it is
+     * fed from returns an ABSOLUTE url (`${attachBase()}/api/support/asset/…`). So every
+     * save was refused with a 400 the moment it left the browser, and the backdrop never
+     * changed: the whole feature was dead on arrival and looked like a rendering fault.
+     *
+     * The PATH is what gets stored, absolute or not. It is what the rest of the app already
+     * does with an asset (assetUrl adds the origin back), it survives the host moving — this
+     * VPS has moved once already — and it is the part worth checking anyway. An address on
+     * somebody else's domain is still refused: a stored remote url can rot, redirect, or name
+     * a supplier's CDN (§2.9), none of which we would find out about.
+     */
+    let raw = b.url == null || b.url === '' ? null : String(b.url);
+    if (raw) {
+      let path = raw;
+      if (/^https?:\/\//i.test(raw)) {
+        try { path = new URL(raw).pathname; } catch { path = ''; }
+      }
+      if (!/^\/api\/(support\/asset|design_cards\/art|order_designs\/art|order_items)\//.test(path)) {
+        reply.code(400);
+        return { error: 'A mockup has to be an image uploaded here, not a link to one elsewhere.' };
+      }
+      raw = path;
     }
     const key = lineId ? 'line_id' : 'sku';
     const val = lineId || sku;

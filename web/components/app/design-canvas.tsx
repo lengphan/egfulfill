@@ -1944,7 +1944,10 @@ export function DesignCanvasDialog({
             * the selection strip floats above the artwork, the sides sit under the stage,
             * and artwork lands centred — so the rail costs no view of what is being made.
             */}
-          <div className="absolute left-2 top-2 flex flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
+          {/* MIDDLE-LEFT, not top-left. Pinned to the top it sat level with the garment's
+              collar and the eye had to travel up to reach it; centred, it is where the
+              cursor already is when it is on the artwork. */}
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
             <button
               type="button"
               onClick={() => uploadRef.current?.click()}
@@ -2086,23 +2089,10 @@ export function DesignCanvasDialog({
               {bg.msg && (
                 <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">{bg.msg}</span>
               )}
-              {/* ON THE ARTWORK, like the background tools — it changes what the stage
-                  draws, so it belongs where the stage is, not in the file card across the
-                  window. */}
-              {latestMachine && (
-                <button
-                  type="button"
-                  onClick={() => void toggleStitch()}
-                  disabled={stitchState === "loading" || stitchState === "none"}
-                  title={stitchState === "none" ? "EWA can't read this file" : "Show the stitches instead of the image"}
-                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-accent disabled:opacity-60"
-                >
-                  {stitchState === "loading" ? <CircleNotch size={12} className="animate-spin" /> : <Eyedropper size={12} weight="bold" />}
-                  {stitchState === "loading" ? "Rendering…"
-                    : stitchState === "none" ? "No stitch preview"
-                      : showStitch ? "Show image" : "Show stitches"}
-                </button>
-              )}
+              {/* THE STITCH TOGGLE MOVED into the Embroidery drawer. It is stitch
+                  apparatus — it only exists when there is a machine file — and it was
+                  sitting on the garment next to the side pills, where the two read as one
+                  confused row of chips that did unrelated things. */}
             </div>
           )}
           {!designUrl && (
@@ -2493,6 +2483,31 @@ export function DesignCanvasDialog({
                 <span className="shrink-0 text-sm font-medium">
                   Embroidery file{!isStaff && <span className="font-normal text-muted-foreground"> (optional)</span>}
                 </span>
+                {/**
+                  * SHOW STITCHES — and NOTHING when there are none to show.
+                  *
+                  * This was a chip on the garment reading "No stitch preview", disabled,
+                  * beside the side pills — so the row under the stage held a dead control
+                  * saying what the product could NOT do, next to four live ones that change
+                  * which face you are looking at. A disabled button that names an absent
+                  * feature is worse than no button: it is read as something broken.
+                  *
+                  * It renders only when a file exists AND EWA could read it. When it cannot,
+                  * there is simply nothing here — the file card above already says the file
+                  * is attached, which is the fact that matters.
+                  */}
+                {latestMachine && stitchState !== "none" && (
+                  <button
+                    type="button"
+                    onClick={() => void toggleStitch()}
+                    disabled={stitchState === "loading"}
+                    title="Show the stitches instead of the image"
+                    className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-2xs font-medium transition-colors hover:bg-accent disabled:opacity-60"
+                  >
+                    {stitchState === "loading" ? <CircleNotch size={12} className="animate-spin" /> : <Eyedropper size={12} weight="bold" />}
+                    {stitchState === "loading" ? "Rendering…" : showStitch ? "Show image" : "Show stitches"}
+                  </button>
+                )}
                 <span className="truncate text-2xs text-muted-foreground" title={latestMachine?.name || attached || undefined}>
                   {hasMachineFile ? (latestMachine?.name || attached || "Added")
                     : boardCard ? (isStaff
@@ -2587,6 +2602,15 @@ export function DesignCanvasDialog({
                 )}
 </div>
               {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
+              {/* BESIDE THE FILE IT COPIES. This was in the action bar next to "Apply All",
+                  two buttons inches apart doing different things to different objects, in
+                  the row read last before Save. Only when there IS another line to copy to. */}
+              {latestMachine && !!siblings?.length && (
+                <Button variant="outline" size="sm" className="mt-2" disabled={fileBusy} onClick={() => void applyFileToAll()}
+                  title="Put this machine file on every other line of this order">
+                  {fileBusy ? "Applying…" : "Apply file to all lines"}
+                </Button>
+              )}
             </div>
             )}
           </div>
@@ -2691,16 +2715,11 @@ export function DesignCanvasDialog({
                     {applying ? "Applying…" : "Apply All"}
                   </Button>
                 )}
-                {/* The machine file keeps its own word: the image is what the mockup shows
-                    and the file is what the machine stitches, and an order can legitimately
-                    want one shared and the other per item. Two buttons both reading "Apply
-                    All" would be one button with a coin toss. */}
-                {latestMachine && (
-                  <Button variant="outline" size="sm" disabled={fileBusy} onClick={() => void applyFileToAll()}
-                    title="Put this machine file on every other line of this order">
-                    {fileBusy ? "Applying…" : "Apply file to all"}
-                  </Button>
-                )}
+                {/* THE FILE'S COPY-TO-ALL MOVED into the Embroidery drawer, beside the file
+                    it copies. Two buttons here, "Apply All" and "Apply file to all", sat
+                    inches apart doing different things to different objects — and the row
+                    they sat in was already the last thing read before Save. One Apply in the
+                    bar; the machine file's version is with the machine file. */}
               </div>
             )}
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
