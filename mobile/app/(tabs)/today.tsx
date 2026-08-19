@@ -83,29 +83,38 @@ export default function Today() {
         <Text style={{ fontSize: 13, color: C.muted }}>
           {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </Text>
-        <Text style={{ marginTop: 2, fontSize: 32, fontFamily: F.bold, letterSpacing: -0.8, color: C.fg }}>Today</Text>
+        <Text style={{ marginTop: 2, fontSize: 30, fontFamily: F.display, letterSpacing: -0.5, color: C.fg }}>Today</Text>
       </View>
 
       {/* The one number, and it is a door. */}
       <View style={{ paddingHorizontal: S.xl, marginTop: S.lg }}>
-        <View style={{ borderRadius: 20, backgroundColor: C.primary, padding: S.xl }}>
-          <Text style={{ color: C.onPrimary, opacity: 0.85, fontSize: 11, fontFamily: F.semi, letterSpacing: 1 }}>
+        {/* THE ONE NUMBER, and it is a door.
+            It was a filled violet slab carrying a 52pt figure — the loudest thing in the app,
+            and loudest of all on the morning it reads ZERO, which is the morning that should
+            feel calm. The number is still the biggest thing on the screen; it just sits on
+            the page in ink like everything else, and only takes ALERT's colour when there is
+            genuinely something overdue. Colour means something here or it means nothing. */}
+        <View>
+          <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>
             NEEDS YOU NOW
           </Text>
-          <Text style={{ color: C.onPrimary, fontSize: 52, fontFamily: F.bold, marginTop: 6 }}>
+          <Text style={{
+            color: needsYou > 0 ? C.alert : C.fg,
+            fontSize: 60, fontFamily: F.display, marginTop: 2, letterSpacing: -1.5,
+          }}>
             {orders === null ? "—" : needsYou}
           </Text>
-          <Text style={{ color: C.onPrimary, opacity: 0.75, fontSize: 12, marginTop: 4 }}>
+          <Text style={{ color: C.muted, fontSize: 13.5, fontFamily: F.body, marginTop: 2 }}>
             {orders === null ? "Loading…" : needsYou === 0 ? "Nothing overdue or rushed" : "overdue and rush"}
           </Text>
         </View>
       </View>
 
-      <Text style={{ paddingHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm, fontSize: 11, fontFamily: F.semi, letterSpacing: 1, color: C.muted }}>
+      <Text style={{ paddingHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4, color: C.muted }}>
         WHAT NEEDS DOING
       </Text>
-      <View style={{ marginHorizontal: S.xl, borderRadius: 20, borderWidth: 1, borderColor: C.border, overflow: "hidden" }}>
-        {jobs.map((j, i) => (
+      <View style={{ marginHorizontal: S.xl, borderTopWidth: 1, borderTopColor: C.border }}>
+        {jobs.map((j) => (
           <Pressable
             key={j.key}
             onPress={() => router.push({ pathname: "/(tabs)/orders", params: j.to })}
@@ -115,16 +124,16 @@ export default function Today() {
             /* Press feedback on touch-DOWN, which is the tell people read as "native". */
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: S.md,
-              paddingHorizontal: S.lg, paddingVertical: 14,
-              borderTopWidth: i ? 1 : 0, borderTopColor: C.border,
-              backgroundColor: pressed ? C.accent : C.card,
+              paddingVertical: 15,
+              borderBottomWidth: 1, borderBottomColor: C.border,
+              backgroundColor: pressed ? C.accent : "transparent",
             })}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: TONE[j.tone] }} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>{j.label}</Text>
             </View>
-            <Text style={{ fontSize: 18, fontFamily: F.bold, color: TONE[j.tone] }}>
+            <Text style={{ fontSize: 17, fontFamily: F.semi, color: j.count === 0 ? C.muted : TONE[j.tone] }}>
               {orders === null ? "—" : j.count}
             </Text>
           </Pressable>

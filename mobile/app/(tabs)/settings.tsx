@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { View, Text, ScrollView, Pressable, Alert, Linking } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import Constants from "expo-constants"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, type User } from "@/lib/api"
+import { useFocusEffect } from "expo-router"
 import { TAB_BAR,F,C } from "@/lib/theme"
 
 /**
@@ -43,7 +44,13 @@ export default function Settings() {
     try { setMe(await getMe()); setErr(null) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load your account.") }
   }, [])
-  useEffect(() => { load() }, [load])
+  /* RELOAD WHEN YOU COME BACK TO IT, not once and never again.
+   *
+   * This ran on mount only — and a tab screen mounts once and then stays mounted for the
+   * life of the app, so a name or a role changed anywhere else (the web, an admin promoting
+   * you) never appeared here. It read as "settings don't update", and it was: nothing was
+   * ever asked for again. The wallet already reloads on focus for the same reason. */
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   const signOut = () => {
     // Confirmed, because on a phone this is one mis-tap away from the tab bar and signing
@@ -64,9 +71,9 @@ export default function Settings() {
       style={{ flex: 1, backgroundColor: C.bg }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 8, paddingBottom: insets.bottom + TAB_BAR.clearance + 8 }}
     >
-      <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg }}>Settings</Text>
+      <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg, letterSpacing: -0.5 }}>Settings</Text>
 
-      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 28 }}>ACCOUNT</Text>
+      <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>ACCOUNT</Text>
       <View style={{ marginTop: 8 }}>
         {err
           ? <Text style={{ color: C.alert, fontSize: 15, paddingVertical: 14 }}>{err}</Text>
@@ -92,7 +99,7 @@ export default function Settings() {
           )}
       </View>
 
-      <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 28 }}>APP</Text>
+      <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>APP</Text>
       <View style={{ marginTop: 8 }}>
         <Line label="Version" value={version} />
       </View>
