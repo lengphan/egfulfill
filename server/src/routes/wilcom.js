@@ -130,6 +130,15 @@ function buildBitmapXml({ filename, base64, width, height, designFile }) {
 // including it as a file reference made EWA report "Call to EmbServer_GenerateDesign failed"
 // (it had no design to render). We therefore pass just the .emb in <files> plus
 // <trueview_options> and let designTrueview return the PNG in <files>.
+/**
+ * Formats designTrueview will render. `.emb` is Wilcom's own; the rest are stitch formats
+ * it reads natively — verified live for .dst and .pes, and the others are the same class of
+ * file the desktop product opens. Anything else is refused WITHOUT a call.
+ */
+const STITCH_EXT = /\.(emb|dst|pes|exp|jef|vp3|vip|hus|pcs|xxx|sew|csd|pec|shv|u01|tap|10o|zsk)$/i;
+export const isStitchFile = (name, mime) =>
+  STITCH_EXT.test(String(name || '')) || /emb|dst|pes|stitch/i.test(String(mime || ''));
+
 function buildDesignTrueviewXml({ filename, base64 }) {
   return '<xml>'
     + `<trueview_options dpi="120"/>`
@@ -649,9 +658,21 @@ export function wilcomRoutes(app, requireStaff) {
       }
     }
     if (!row) { reply.code(404); return { ok: false, error: 'No machine file for that design.' }; }
-    // designTrueview reads Wilcom-native .emb; skip anything else rather than guessing.
-    if (!/\.emb$/i.test(row.file_name || '') && !/emb/i.test(row.mime || '')) {
-      return { ok: false, unavailable: true, reason: 'not-emb' };
+    // WHICH FILES TRUEVIEW CAN ACTUALLY RENDER.
+    //
+    // This was `.emb` only, on the stated reasoning of not guessing — and the guess was
+    // wrong in the expensive direction: it refused exactly the formats sellers send. Tested
+    // against the live EWA with real files, both render at full fidelity:
+    //   .DST -> HTTP 200, 27,705 stitches, 5 colours, 154.2 x 114.8 mm, machine "Tajima"
+    //   .PES -> HTTP 200, 27,711 stitches, 5 colours, 154.2 x 114.8 mm, machine "Melco"
+    // Wilcom reads stitch formats the same way EmbroideryStudio does, so the allow-list is
+    // the set of formats the desktop product opens.
+    //
+    // An ALLOW-LIST, not a deny-list: an unknown extension costs a 90-second EWA call and a
+    // cached failure row, so a new upload type should be added deliberately rather than
+    // discovered by everyone's board hanging on it.
+    if (!isStitchFile(row.file_name, row.mime)) {
+      return { ok: false, unavailable: true, reason: 'not-stitch-file' };
     }
     await ensurePreviews();
     // Cache key from the file's stored content hash (no bytes needed to check the cache).
