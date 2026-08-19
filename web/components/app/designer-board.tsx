@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
+import { shortOrderRef } from "@/lib/order-format"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
@@ -793,7 +794,13 @@ export function DesignerBoard() {
                               file count shows even at 0. Method/product sits between them when set. */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-2xs text-muted-foreground">
                             <span className="rounded bg-muted px-1.5 py-0.5 font-mono" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
-                              {c.order_id ? String(c.order_id).slice(0, 14) : "No order"}
+                              {/* shortOrderRef, not slice(0,14). Truncating at a character
+                                  count cut `etsy-4149084185` to `etsy-414908418` — a number
+                                  with its last digit removed, which still LOOKS like an
+                                  order number and matches nothing. The shared formatter
+                                  takes the routing prefix off a marketplace id and shortens
+                                  one of ours to the segment that distinguishes it. */}
+                              {c.order_id ? shortOrderRef(String(c.order_id)) : "No order"}
                             </span>
                             {(c.product || c.type) && (
                               <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
@@ -885,7 +892,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
       {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-2xs font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
-  { id: "order", label: "Order", cell: (c) => <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</span> },
+  { id: "order", label: "Order", cell: (c) => <span title={c.order_id ? String(c.order_id) : undefined} className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? shortOrderRef(String(c.order_id)) : "—"}</span> },
   { id: "customer", label: "Customer", cell: (c) => <span className="text-muted-foreground">{c.customer ? String(c.customer) : "—"}</span> },
   { id: "product", label: "Product", cell: (c) => <div className="max-w-[220px] truncate text-muted-foreground">{c.product || c.type || "—"}</div> },
   { id: "method", label: "Method", cell: (c) => <span className="text-muted-foreground">{c.type ? String(c.type) : (isEmbCard(c) ? "Embroidery" : "—")}</span> },
@@ -1228,7 +1235,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           <span>{card.product || card.type || "No product / type set"}</span>
           <span aria-hidden>·</span>
           {card.order_id
-            ? <span>Order <span className="font-mono text-foreground">{String(card.order_id)}</span></span>
+            ? <span>Order <span className="font-mono text-foreground" title={String(card.order_id)}>{shortOrderRef(String(card.order_id))}</span></span>
             : <span>Not attached to an order yet</span>}
           {card.customer && <><span aria-hidden>·</span><span>{String(card.customer)}</span></>}
           {card.claimed_by && <><span aria-hidden>·</span><span>Claimed by {String(card.claimed_by)}</span></>}
