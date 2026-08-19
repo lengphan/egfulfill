@@ -5,6 +5,7 @@ import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { TAB_BAR,SECTION,F,C } from "@/lib/theme"
+import { TopupApprovals } from "@/components/topup-approvals"
 
 /**
  * WALLET — the balance, what moved it, and the way to add more.
@@ -63,7 +64,7 @@ export default function Wallet() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 20 }}>
-        <Text style={{ fontSize: 32, fontFamily: F.bold, color: C.fg, marginTop: 8 }}>Wallet</Text>
+        <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg, marginTop: 8, letterSpacing: -0.5 }}>{noWallet ? "Top-ups" : "Wallet"}</Text>
 
         {/* A BALANCE IS READ OFTEN, so it is a quiet card rather than a coloured block —
             and "low" is a chip, not a repaint. Turning the whole panel red made a working
@@ -81,15 +82,13 @@ export default function Wallet() {
           * has genuinely spent down to nothing must still see their zero, their history and
           * their way to add more.
           */}
-        {noWallet ? (
-          <View style={{ ...SECTION }}>
-            <Text style={{ fontSize: 17, fontFamily: F.semi, color: C.fg }}>No wallet on this account</Text>
-            <Text style={{ fontSize: 14, color: C.muted, marginTop: 6, lineHeight: 20 }}>
-              Wallets belong to sellers — orders are charged to theirs. What the factory
-              spends on postage, blanks and design lives in Finance on the web.
-            </Text>
-          </View>
-        ) : (
+        {/* AND WHAT STAFF GET INSTEAD.
+            "No wallet on this account" was true and it was the whole screen — a tab that
+            exists to tell you it has nothing for you. The work that genuinely belongs on
+            this tab is the queue of sellers waiting to be told their money landed, which is
+            the one job where standing at a desk is the only thing between a seller and
+            being able to trade. Staff see approvals here; sellers see their own wallet. */}
+        {noWallet ? null : (
         <View style={{ ...SECTION }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>BALANCE</Text>
@@ -124,11 +123,14 @@ export default function Wallet() {
 
         {err && <Text style={{ color: C.alert, fontSize: 14, marginTop: 16 }}>{err}</Text>}
 
-        <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.muted, letterSpacing: 1, marginTop: 24 }}>
-          RECENT
-        </Text>
+        {!noWallet && (
+          <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 24 }}>
+            RECENT
+          </Text>
+        )}
       </View>
 
+      {noWallet ? <TopupApprovals bottomInset={insets.bottom} /> : (
       <FlatList
         data={w?.ledger ?? []}
         keyExtractor={(r) => String(r.id)}
@@ -161,6 +163,7 @@ export default function Wallet() {
           )
         }}
       />
+      )}
     </View>
   )
 }

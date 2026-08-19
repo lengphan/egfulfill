@@ -311,6 +311,49 @@ export const getOrderDesigns = (id: string) =>
   request<OrderDesign[]>(`/api/orders/${encodeURIComponent(id)}/designs`)
 
 /**
+ * TOP-UPS — a seller says they have sent money; staff confirm it actually arrived.
+ *
+ * Staff get everyone's, newest first; a seller gets only their own. The statuses are
+ * `pending` (waiting on a human), `received` (confirmed — the wallet is credited at that
+ * moment, append-only and idempotent on the top-up id, so confirming twice cannot
+ * double-credit), `rejected` (money never came) and `abandoned` (an unpaid window aged out).
+ */
+export type Topup = {
+  id: string
+  seller_id?: string | null
+  seller_name?: string | null
+  seller_email?: string | null
+  amount_usd?: number | string | null
+  amount_vnd?: number | string | null
+  method?: string | null
+  status?: "pending" | "received" | "rejected" | "abandoned" | string
+  note?: string | null
+  ref?: string | null
+  created_at?: string
+  confirmed_at?: string | null
+}
+export const getTopups = (status?: string) =>
+  request<Topup[]>(`/api/topups${status ? `?status=${encodeURIComponent(status)}` : ""}`)
+
+/**
+ * CONFIRM — the money arrived. This CREDITS THE SELLER, so it is the single most
+ * consequential button in the phone app.
+ *
+ * `fee` is the transfer cost, and it is optional because it is only knowable now, by the
+ * person looking at what actually landed — the corridor, the bank and the day's FX decide
+ * it. It books as its OWN debit rather than being netted off, because crediting $980 for a
+ * $1,000 transfer shows the seller a number they cannot reconcile against what they sent.
+ */
+export const confirmTopup = (id: string, fee?: number) =>
+  request<Topup>(`/api/topups/${encodeURIComponent(id)}/confirm`, {
+    method: "POST", body: JSON.stringify(fee && fee > 0 ? { fee } : {}),
+  })
+
+/** REJECT — the money never came. No credit, and the seller's wallet shows it as rejected. */
+export const rejectTopup = (id: string) =>
+  request<Topup>(`/api/topups/${encodeURIComponent(id)}/reject`, { method: "POST" })
+
+/**
  * THE STITCH FILE, RENDERED — Wilcom TrueView of what the machine will actually sew.
  *
  * This is the right-hand pane of the check: the mockup says what it should look like, this
