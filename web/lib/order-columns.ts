@@ -131,7 +131,13 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // wants opening anyway.
   units:    { id: "units",    label: "Items",    grid: "3rem", align: "right" },
   tracking: { id: "tracking", label: "Tracking", grid: "12rem" },
-  store:    { id: "store",    label: "Store",    grid: "7rem" },
+  // SHOP · MARKETPLACE · SELLER, stacked two-deep — the three facts that say whose order
+  // this is and where it came from. It used to carry the date on its second line, which the
+  // Age column two tracks over already answers; the date is still in the cell's tooltip.
+  // 9rem, not 7: a shop name and a seller name are both real names, and at 7rem both
+  // truncated to a syllable. Every rem here comes off the flexible columns (see the note at
+  // the top of this block), so it is deliberately 2 and not 4.
+  store:    { id: "store",    label: "Store",    grid: "9rem" },
   // CAPPED, not flexible. As the only 1fr track it swallowed every spare pixel, so a board
   // with room ended up with a very wide Customer column holding "Philipp Bumb" and a lot of
   // white space, while the List chips next to it stayed cramped. A name needs about 11rem;

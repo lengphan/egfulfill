@@ -1075,7 +1075,10 @@ export function OrdersHub() {
    * second place for "what does Status mean", and those drift.
    */
   const narrow = useIsNarrow()
-  const NARROW_COLS: FactoryColId[] = ["order", "status", "age", "units"]
+  // Store rides along on a phone. It is the one column that says whose order a row is, and
+  // a stacked cell costs a narrow card almost nothing — it is already a label/value list, so
+  // the second line lands under the first either way.
+  const NARROW_COLS: FactoryColId[] = ["order", "status", "age", "units", "store"]
   const rowCols = useMemo(
     () => (narrow ? visibleData.filter((id) => NARROW_COLS.includes(id)) : visibleData),
     // NARROW_COLS is a module-level constant in spirit; listing it would only churn the memo.
@@ -1848,12 +1851,39 @@ export function OrdersHub() {
                     )}
                   </div>
                 ),
-                store: (
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{o.store || platformOf(o)}</div>
-                    <div className="truncate text-xs text-muted-foreground">{platformOf(o)} · {fmtDate(o.created_at)}</div>
-                  </div>
-                ),
+                /**
+                 * WHOSE ORDER THIS IS, in one column, two lines.
+                 *
+                 * Shop on top, then marketplace and seller under it. Three facts, and on a
+                 * board that mixes every seller's work they are three different questions:
+                 * which storefront it was bought from, which marketplace that storefront is
+                 * on, and which of our sellers the row belongs to. The shop name alone does
+                 * not answer the last one — one seller can run three shops, and two sellers
+                 * can both call a shop "Home".
+                 *
+                 * The date that used to sit on the second line is gone: Age, two tracks over,
+                 * is the same fact in the form the floor actually reads it, and it was the
+                 * cheaper of the two to give up. It stays in the tooltip.
+                 *
+                 * A FACTORY order says so rather than naming the staff account that keyed it
+                 * in — "who is this for" is the question, and the answer is us.
+                 */
+                store: (() => {
+                  const platform = platformOf(o)
+                  const seller = o.factory_order ? "In-house" : (o.seller_name || "").trim()
+                  return (
+                    <div className="min-w-0" title={[o.store || platform, seller && `Seller: ${seller}`, o.created_at && fmtDate(o.created_at)].filter(Boolean).join(" · ")}>
+                      <div className="truncate text-sm font-medium">{o.store || platform}</div>
+                      {/* One line, two facts, in the order you narrow by: the marketplace
+                          first because it is a handful of known values, the seller after
+                          because it is the long one — so what truncates is the name, and the
+                          name is the part the tooltip and the opened order both repeat. */}
+                      <div className="truncate text-xs text-muted-foreground">
+                        {platform}{seller ? ` · ${seller}` : ""}
+                      </div>
+                    </div>
+                  )
+                })(),
                 customer: <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>,
                 /* THE PICTURES ARE THE CELL. The name beside them was truncated to
                    "Cust…" in the width this column gets — a word that identifies nothing —

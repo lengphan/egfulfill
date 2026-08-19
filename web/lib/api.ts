@@ -1872,6 +1872,11 @@ export type OrderRow = {
   /** Who uploaded it — resolved server-side ONLY when it's the shop owner or one of their
    *  own team members (else null). Never a factory account. Used for the seller's history. */
   created_by_name?: string | null
+  /** WHOSE ORDER IT IS — the seller account that owns the row, name or email. STAFF LISTS
+   *  ONLY: the seller's own query never selects it, because a seller reading their own
+   *  orders would only ever see themselves. Distinct from created_by_name (who uploaded it)
+   *  and from `store` (which storefront it came from — one seller can run three). */
+  seller_name?: string | null
   tracking?: string | null
   /**
    * THE MARKETPLACE'S OWN SHIP-BY DATE — a promise, not an inference.

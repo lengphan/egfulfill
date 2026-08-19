@@ -1154,8 +1154,14 @@ export function ordersRoutes(app, requireAuth) {
       // A seller order sits at factory_status 'new'/'draft' while the seller is still
       // managing it; Push moves it to 'in_review'. So until Push it stays OFF the
       // factory boards (seller-managed). factory_order rows show regardless of status.
+      // WHOSE ORDER THIS IS. The staff boards render every seller's work in one queue and
+      // had no way to say which seller a row belonged to — the shop name answers "which
+      // storefront", which is not the same question once one seller runs three shops or two
+      // sellers both call a shop "Home". Staff branch only: a seller reading their own list
+      // would only ever see themselves.
+      const sellerName = `(select coalesce(nullif(su.name,''), su.email) from users su where su.id = o.seller_id) as seller_name`;
       const r = await q(
-        `select o.*, ${machineFile}, ${designBoard}, ${agg} from orders o ${join}
+        `select o.*, ${machineFile}, ${designBoard}, ${sellerName}, ${agg} from orders o ${join}
          -- A LABEL IS NOT AN ORDER. Buying a standalone label (re-ship, sample, someone
          -- else's parcel) mints an FF-* row purely so the label has somewhere to live —
          -- it has no lines, nothing to make, and nothing to dispatch, but it was landing
