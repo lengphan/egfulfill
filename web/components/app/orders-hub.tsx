@@ -1865,12 +1865,12 @@ export function OrdersHub() {
                  * is the same fact in the form the floor actually reads it, and it was the
                  * cheaper of the two to give up. It stays in the tooltip.
                  *
-                 * A FACTORY order says so rather than naming the staff account that keyed it
-                 * in — "who is this for" is the question, and the answer is us.
+                 * A FACTORY order reads "EG" rather than naming the staff account that
+                 * keyed it in — "who is this for" is the question, and the answer is us.
                  */
                 store: (() => {
                   const platform = platformOf(o)
-                  const seller = o.factory_order ? "In-house" : (o.seller_name || "").trim()
+                  const seller = o.factory_order ? "EG" : (o.seller_name || "").trim()
                   return (
                     <div className="min-w-0" title={[o.store || platform, seller && `Seller: ${seller}`, o.created_at && fmtDate(o.created_at)].filter(Boolean).join(" · ")}>
                       <div className="truncate text-sm font-medium">{o.store || platform}</div>

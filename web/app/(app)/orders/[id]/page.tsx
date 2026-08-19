@@ -1054,6 +1054,33 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
               )}
+              {/*
+                * WHERE IT CAME FROM, under who it is going to.
+                *
+                * The page named the buyer and nothing else: which shop sold it, on which
+                * marketplace, for which of our sellers were all absent from the one screen
+                * where an order is actually worked — you had to go back to the queue and
+                * find the row. Same three facts the board's Store column carries, so the two
+                * screens can't tell different stories.
+                *
+                * In the Customer card rather than a card of its own, because it answers the
+                * same question one step further out: this order's parties. Separated by the
+                * rule and labelled, so the shop can never be misread as the buyer.
+                *
+                * The seller line is STAFF ONLY — the server strips seller_name for a seller,
+                * who would only ever be reading their own name back.
+                */}
+              <div className="border-t border-border pt-3">
+                <div className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">Sold through</div>
+                <div className="mt-1 font-medium">{order.store || platformOf(order)}</div>
+                <div className="text-muted-foreground">
+                  {platformOf(order)}
+                  {(() => {
+                    const seller = order.factory_order ? "EG" : (order.seller_name || "").trim()
+                    return seller ? ` · ${seller}` : ""
+                  })()}
+                </div>
+              </div>
             </div>
           </SectionCard>
 

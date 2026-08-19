@@ -109,16 +109,23 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
           * Every stage is still listed further down for a correction or a move backwards.
           * This is the one you almost always want, lifted out of that list.
           */}
-        <DropdownMenuLabel className="text-2xs font-normal text-muted-foreground">
-          Now: {FACTORY_STAGES.find((x) => x.id === stage)?.label
-             ?? EXCEPTION_STAGES.find((x) => x.id === stage)?.label
-             ?? "New"}
-        </DropdownMenuLabel>
-        {canAdvance && next && (
-          <DropdownMenuItem className="font-medium" onClick={() => setOrderStatus(next)}>
-            {FACTORY_STAGES.find((x) => x.id === next)?.label ?? next}
-          </DropdownMenuItem>
-        )}
+        {/* INSIDE A GROUP, and not optionally: DropdownMenuLabel is Base UI's
+            Menu.GroupLabel, which throws when it has no Menu.Group above it. Rendered bare
+            it took the whole popup down with it, so the ⋯ button opened onto nothing and
+            read as a dead control — the two labels further down were already wrapped, which
+            is why only this one, added last, broke it. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-2xs font-normal text-muted-foreground">
+            Now: {FACTORY_STAGES.find((x) => x.id === stage)?.label
+               ?? EXCEPTION_STAGES.find((x) => x.id === stage)?.label
+               ?? "New"}
+          </DropdownMenuLabel>
+          {canAdvance && next && (
+            <DropdownMenuItem className="font-medium" onClick={() => setOrderStatus(next)}>
+              {FACTORY_STAGES.find((x) => x.id === next)?.label ?? next}
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {/* NEW LABEL ONLY IF THE PAGE ISN'T ALREADY OFFERING IT — see onNewLabel. */}
         {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}>New label</DropdownMenuItem>}

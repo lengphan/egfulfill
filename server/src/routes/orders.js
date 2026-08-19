@@ -937,7 +937,9 @@ export function ordersRoutes(app, requireAuth) {
    */
   function stripStaffOnly(row) {
     if (!row) return row;
-    const { internal_note, ...rest } = row;   // eslint-disable-line no-unused-vars
+    // seller_name goes too: it is only ever the reader's own name, and shipping a field
+    // that names an account is not something to do by accident on a seller-facing route.
+    const { internal_note, seller_name, ...rest } = row;   // eslint-disable-line no-unused-vars
     return rest;
   }
 
@@ -976,8 +978,12 @@ export function ordersRoutes(app, requireAuth) {
              select 1 from jsonb_array_elements(coalesce(po.items,'[]'::jsonb)) it,
                           jsonb_array_elements(coalesce(it->'sources','[]'::jsonb)) src
               where src->>'order' = o.id)) as blanks_ordered`;
+    // WHOSE ORDER THIS IS — see the list route. Selected for everyone and removed again for
+    // sellers by stripStaffOnly, rather than branching the query: one statement, and the
+    // redaction sits in the one function that already owns "what a seller may not read".
+    const sellerName = `(select coalesce(nullif(su.name,''), su.email) from users su where su.id = o.seller_id) as seller_name`;
     const r = await q(
-      `select o.*, ${placedPO}, ${agg} from orders o left join order_items i on i.order_id = o.id
+      `select o.*, ${placedPO}, ${sellerName}, ${agg} from orders o left join order_items i on i.order_id = o.id
         where o.id = $1 group by o.id`, [req.params.id]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Order not found' }; }
