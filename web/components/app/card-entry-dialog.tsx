@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CreditCard, Warning, Lock } from "@phosphor-icons/react"
+import { CreditCard, Warning } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
@@ -164,25 +164,12 @@ export function CardEntryDialog({
             </div>
           )}
 
-          {/* The way out of this window. Ticked, the card goes to the same browser store
-              Order settings › Payment writes, and placement reads it from there. */}
-          <label className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-xs">
+          <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-                   className="mt-0.5 size-3.5 accent-[var(--primary)]" />
-            <span>
-              <strong className="text-foreground">Save in this browser</strong> so Otto orders stop
-              asking. Change or remove it any time at <strong>Order settings › Payment</strong>.
-            </span>
+                   className="size-3.5 accent-[var(--primary)]" />
+            Save card for future payments
           </label>
 
-          {/* Said plainly, because "will this be saved" is the reasonable question and the
-              honest answer is short. */}
-          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-            <Lock size={13} weight="fill" className="mt-0.5 shrink-0" />
-            {remember
-              ? "Kept in this browser only — never on EGFUL's server, never written to the purchase order, and stripped from anything the supplier sends back."
-              : "Sent with this order only. Not saved here, not written to the purchase order, and stripped from anything the supplier sends back — so the next Otto order will ask again."}
-          </p>
         </div>
 
         <DialogFooter>
