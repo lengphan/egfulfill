@@ -47,8 +47,12 @@
       ]
     ],
     "extra": {
-      "apiBase": "https://api.egful.store"
+      "apiBase": "https://api.egful.store",
+      "eas": {
+        "projectId": "46ae7f79-bb5e-493d-87bf-50ed01faf7ff"
+      }
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "owner": "lengphans-team"
   }
 }
