@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { View, Text, Image, Pressable, ActivityIndicator, Alert, Linking } from "react-native"
+import { View, Text, Image, Pressable, ActivityIndicator, Alert, Linking, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, setItemStatus, type OrderItem, type OrderDesign } from "@/lib/api"
 import {
@@ -7,7 +7,7 @@ import {
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork,
 } from "@/lib/orders"
 import { F,C, R, LIFT } from "@/lib/theme"
-import { ItemPhotos } from "@/components/item-photos"
+import { ImagePeek } from "@/components/order-row"
 
 /**
  * ONE LINE OF AN ORDER — the unit of work, and the unit this screen is built around.
@@ -78,7 +78,6 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
   onChanged: () => void
 }) {
   const [busy, setBusy] = useState(false)
-  const [zoom, setZoom] = useState(false)
   const mine = designsFor(item, designs)
   const art = lineArt(item, mine)
   const listing = lineListing(item)
@@ -103,6 +102,32 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
     } finally { setBusy(false) }
   }
 
+  const [peek, setPeek] = useState<number | null>(null)
+
+  /*
+   * EVERY PICTURE ON THIS LINE, captioned, in the order someone would look at them.
+   *
+   * The artwork per SIDE first — a front and a back are two different jobs on one garment,
+   * and this strip is the only place they can be seen next to each other. The listing photo
+   * last and NAMED, because it is what the buyer saw and not what we make; the two being
+   * indistinguishable is the exact fault lineArt() exists to prevent.
+   *
+   * Anything with no picture to show (a .pes has nothing to look at) is not dropped — it
+   * falls through to `docs` and stays a named row, because a stitch file that is silently
+   * absent is a file that reaches the machine missing.
+   */
+  const pics = mine
+    .filter((d) => isArtwork(d.kind) && (d.url || d.data))
+    .map((d) => ({
+      uri: assetUrl(d.url || d.data) as string,
+      caption: [d.side ? String(d.side) : "Front", KIND_LABEL[String(d.kind || "raster").toLowerCase()] ?? "Artwork"]
+        .filter(Boolean).join(" · "),
+      title: lineTitle(item),
+    }))
+  if (!pics.length && art) pics.push({ uri: assetUrl(art) as string, caption: "Artwork", title: lineTitle(item) })
+  if (listing) pics.push({ uri: assetUrl(listing) as string, caption: "Listing photo — what the buyer saw", title: lineTitle(item) })
+  const docs = mine.filter((d) => !isArtwork(d.kind))
+
   return (
     <View style={{
       /* A LINE ON THE PAGE. Each line was its own bordered, shadowed card inside the
@@ -111,111 +136,111 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
       borderTopWidth: 1, borderTopColor: C.border,
       paddingTop: 16, paddingBottom: 16,
     }}>
-      <ItemPhotos
-        open={zoom}
-        onClose={() => setZoom(false)}
-        title={lineTitle(item)}
-        art={art}
-        listing={listing}
-      />
-      <View style={{ flexDirection: "row", gap: 14 }}>
-        {/* THE ARTWORK, not the listing photo — a photo of the finished product tells the
-            floor nothing about what to make. */}
-        {/* PRESSABLE. 76pt is enough to recognise a design and not enough to check one,
-            and this could not be tapped at all — so the only way to see the artwork full
-            size was to open the file in a browser. It opens both pictures, named: the
-            artwork we print, and the listing photo the buyer saw. It is pressable even
-            with no artwork, because "is there really nothing on this line" is exactly the
-            question a blank tile raises. */}
-        <Pressable
-          onPress={() => setZoom(true)}
-          accessibilityLabel={`See the pictures for ${lineTitle(item)}`}
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-        >
-          {art ? (
-            <Image source={{ uri: assetUrl(art) || undefined }}
-              style={{ width: 76, height: 76, borderRadius: R.md, backgroundColor: C.accent }} resizeMode="cover" />
-          ) : (
-            <View style={{
-              width: 76, height: 76, borderRadius: R.md, backgroundColor: C.accent,
-              alignItems: "center", justifyContent: "center",
-            }}>
-              <Ionicons name="image-outline" size={22} color={C.primary} />
-            </View>
-          )}
-        </Pressable>
-
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 1 }}>
-              {String(index + 1).padStart(2, "0")}
-            </Text>
-            {/* THE STATUS PILL IS GONE FROM THE LINE. 10pt letters on a pale tint, inside a
-                card that already carries a button saying what happens next — it was the
-                smallest thing on the card and the hardest to read, and on the common case
-                (every line at the same stage) it repeated the order's own badge N times.
-                Where a line has no action left, the state is said in words below instead. */}
-            {Number(item.qty ?? 1) > 1 && (
-              <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.fg }}>×{Number(item.qty)}</Text>
-            )}
-          </View>
-
-          <Text numberOfLines={2} style={{ fontSize: 17, fontFamily: F.bold, color: C.fg, marginTop: 5, letterSpacing: -0.3 }}>
-            {lineTitle(item)}
-          </Text>
-
-          {/* THE BLANK COMES BEFORE THE VARIANTS, because it is what they are variants OF.
-              It was last — under the colour and size that describe it — so the card read
-              "Black, Adjustable, DTG… of what?" and answered on the line after. The
-              marketplace title above is a keyword list on an Etsy order and names nothing
-              the floor picks; the blank is the garment, and it is the second thing read. */}
-          {item.blank ? (
-            <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: F.semi, color: C.fg, marginTop: 6 }}>
-              {item.blank}
-            </Text>
-          ) : null}
-
-          {/* THE VARIANT FACTS, still readable — and no longer chips.
-              These carry the three things someone picking a garment needs, so they were
-              made bigger and filled to stop being the lightest marks on the card. That was
-              the right instinct and the wrong instrument: filled blocks are how the screen
-              ended up as pills inside pills. Plain type at a readable size does it, and the
-              PRINT METHOD keeps its distinction by weight and ink rather than a box — it is
-              a different kind of fact (those two describe the blank, this describes the
-              work), which is what the separator is there to say. */}
-          {facts.length > 0 && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 8 }}>
-              {facts.map((f, i) => {
-                const method = i === facts.length - 1 && !!String(item.print_type || "").trim()
-                return (
-                  <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-                    {i > 0 && <Text style={{ fontSize: 13, color: C.muted, opacity: 0.6 }}>·</Text>}
-                    <Text style={{
-                      fontSize: 13.5,
-                      fontFamily: method ? F.semi : F.medium,
-                      color: method ? C.primary : C.fg,
-                      letterSpacing: method ? 0.3 : 0,
-                    }}>{f}</Text>
-                  </View>
-                )
-              })}
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* ── THIS LINE'S FILES ───────────────────────────────────────────────────── */}
-      <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 8 }}>
-        {mine.length > 0 ? (
-          mine.map((d, i) => <FileChip key={`${d.kind}-${d.side}-${i}`} d={d} />)
-        ) : (
-          /* Says WHICH it is: nothing to print versus nothing uploaded. An empty list that
-             reads the same either way is how a missing file reaches the machine. */
-          <Text style={{ fontSize: 13, color: needsArt ? C.warn : C.muted, paddingVertical: 8, paddingHorizontal: 10 }}>
-            {needsArt ? "No artwork on this line yet." : "No file needed — plain blank."}
-          </Text>
+      <ImagePeek shots={pics} index={peek} onClose={() => setPeek(null)} />
+      {/* TITLE → WHAT IT IS → THE PICTURES, in that order.
+       *
+       * The line used to lead with a 76pt thumbnail beside the text, and then list its files
+       * as separate rows underneath — so ONE line showed two pictures (artwork and listing)
+       * through a modal, plus a list of file names, and none of it told you what was
+       * actually going on the garment. Reading order is the fix: what it is in type, then
+       * every image belonging to this line laid out sideways, at a size worth looking at.
+       *
+       * Per SIDE matters here in a way it never did on the queue — a front and a back are
+       * two different jobs on one garment, and the strip is the only place they can be seen
+       * next to each other. Each picture is captioned with its side and what kind of file it
+       * is, because "front artwork" and "the photo the buyer saw" must never be mistaken for
+       * one another. */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Text style={{ fontSize: 11, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2 }}>
+          {String(index + 1).padStart(2, "0")}
+        </Text>
+        {Number(item.qty ?? 1) > 1 && (
+          <Text style={{ fontSize: 12.5, fontFamily: F.semi, color: C.fg }}>×{Number(item.qty)}</Text>
         )}
       </View>
+
+      <Text numberOfLines={2} style={{ fontSize: 16.5, fontFamily: F.medium, color: C.fg, marginTop: 5, letterSpacing: -0.2 }}>
+        {lineTitle(item)}
+      </Text>
+
+      {/* THE BLANK COMES BEFORE THE VARIANTS, because it is what they are variants OF. The
+          marketplace title above is a keyword list on an Etsy order and names nothing the
+          floor picks; the blank is the garment. */}
+      {item.blank ? (
+        <Text numberOfLines={1} style={{ fontSize: 14.5, fontFamily: F.semi, color: C.fg, marginTop: 6 }}>
+          {item.blank}
+        </Text>
+      ) : null}
+
+      {facts.length > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 5 }}>
+          {facts.map((f, i) => {
+            const method = i === facts.length - 1 && !!String(item.print_type || "").trim()
+            return (
+              <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                {i > 0 && <Text style={{ fontSize: 13, color: C.muted, opacity: 0.6 }}>·</Text>}
+                <Text style={{
+                  fontSize: 13.5,
+                  fontFamily: method ? F.semi : F.medium,
+                  color: method ? C.primary : C.fg,
+                  letterSpacing: method ? 0.3 : 0,
+                }}>{f}</Text>
+              </View>
+            )
+          })}
+        </View>
+      )}
+
+      {/* THE SKU, LAST AND QUIET. It is how a person looks something up, not what the thing
+          is — and it carries a print-method suffix the blank does not, so it is deliberately
+          not the same string as the line above. */}
+      {item.sku ? (
+        <Text numberOfLines={1} style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, marginTop: 4 }}>
+          {item.sku}
+        </Text>
+      ) : null}
+
+      {/* EVERY PICTURE ON THIS LINE, sideways. */}
+      {pics.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 12 }}
+          contentContainerStyle={{ gap: 10, paddingRight: 18 }}
+        >
+          {pics.map((pc, i) => (
+            <Pressable key={i} onPress={() => setPeek(i)} style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}>
+              <Image
+                source={{ uri: pc.uri }}
+                style={{
+                  width: pics.length === 1 ? 200 : 168,
+                  height: pics.length === 1 ? 200 : 168,
+                  borderRadius: 10, backgroundColor: C.accent,
+                }}
+                resizeMode="cover"
+              />
+              <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: F.medium, color: C.muted, marginTop: 6, maxWidth: 168 }}>
+                {pc.caption}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : (
+        /* Says WHICH it is: nothing to print versus nothing uploaded. An empty list that
+           reads the same either way is how a missing file reaches the machine. */
+        <Text style={{ fontSize: 13.5, fontFamily: F.body, color: needsArt ? C.warn : C.muted, marginTop: 12 }}>
+          {needsArt ? "No artwork on this line yet." : "No file needed — plain blank."}
+        </Text>
+      )}
+
+      {/* Files with nothing to show as a picture — a .pes has nothing to look at — stay as
+          named rows, so a stitch file is never silently absent just because it cannot be
+          previewed. */}
+      {docs.length > 0 && (
+        <View style={{ marginTop: 10 }}>
+          {docs.map((d, i) => <FileChip key={`${d.kind}-${d.side}-${i}`} d={d} />)}
+        </View>
+      )}
 
       {canWork && to ? (
         <Pressable

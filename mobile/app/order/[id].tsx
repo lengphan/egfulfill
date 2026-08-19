@@ -15,7 +15,6 @@ import { F,C, R, LIFT, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH }
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
-import { BuyLabel } from "@/components/buy-label"
 import { recall } from "@/lib/order-cache"
 import { printOrderLabel, printWasCancelled } from "@/lib/print-label"
 
@@ -428,9 +427,13 @@ export default function OrderDetail() {
                     {printing && <ActivityIndicator color={C.ink} />}
                     <Text style={{ color: C.ink, fontFamily: F.bold, fontSize: 15 }}>Print label</Text>
                   </Pressable>
-                ) : staff ? (
-                  <BuyLabel order={o} onDone={refresh} />
                 ) : null}
+                {/* BUYING A LABEL IS NOT A PHONE JOB, and it was the biggest panel on this
+                    screen — a rate table, a parcel form and a purchase, all on a 390pt
+                    surface, for a decision that wants an address checked against a screen
+                    and a scale beside it. It buys real postage with real money. Shipping on
+                    the web is where that belongs; the phone shows what HAPPENED — the
+                    tracking number, and the label, to print. */}
               </View>
             )}
           </View>

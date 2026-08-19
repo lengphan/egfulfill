@@ -16,7 +16,7 @@ import { F,C, R, LIFT, toneOf } from "@/lib/theme"
  * Long-press, because tap already opens the order and long-press on the ROW already starts
  * a selection — the image claims the gesture only over itself, so both survive.
  */
-function ImagePeek({ shots, index, onClose }: {
+export function ImagePeek({ shots, index, onClose }: {
   shots: { uri: string; title: string }[]
   /** null = closed. Otherwise the picture that was tapped, so the viewer opens on it. */
   index: number | null
