@@ -1686,7 +1686,12 @@ export function DesignCanvasDialog({
          * whole thing scrolled sideways. The track is minmax(0,1fr) now, so the stage gives
          * way and this only has to say how wide the window may get.
          */
-        className="sm:max-w-2xl lg:max-w-[min(96vw,940px)]"
+        /* A ceiling AND its own scrollbar — belt and braces. The sizes above are meant to fit
+           without either, but an embroidered line carrying threads and a machine file has more
+           under the stage than a DTG one, and it should scroll INSIDE the window rather than
+           pushing the action bar off the screen. Plain block comment: this is an attribute
+           list, where a JSX-style comment is a syntax error. */
+        className="max-h-[92vh] overflow-y-auto sm:max-w-2xl lg:max-w-[min(96vw,940px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -1831,10 +1836,19 @@ export function DesignCanvasDialog({
           * which genuinely was too small) and it lets the two columns end near each other,
           * which is what stops a dialog reading as half-empty.
           */}
-        {/* 72vh, not 54: the cap existed to leave room for a column that is no longer
-            there. Still capped rather than free — past ~720px the artwork is being judged at
-            a size no garment is ever seen at. */}
-        <div className="relative mx-auto w-full max-w-[min(100%,72vh,720px)]">
+        {/**
+          * SIZED SO THE WINDOW NEVER SCROLLS.
+          *
+          * The cap was a WIDTH, and a garment mockup is portrait — so 72vh wide made the
+          * picture about 72vh tall, and with a header, the sides, the cards and an action bar
+          * under it the dialog ran off the bottom of the screen. Save was below the fold. A
+          * window you have to scroll to save in is worse than a smaller picture, every time.
+          *
+          * 44vh is the height that leaves room for everything else at a laptop's 800px, and
+          * the width follows from it. Bigger than it looks: the stage is the whole width of
+          * the dialog now, where it used to share it with a 380px column.
+          */}
+        <div className="relative mx-auto w-full max-w-[min(100%,44vh,460px)]">
           <DesignStage
             className="w-full" mockup={activeMockup}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -2103,7 +2117,12 @@ export function DesignCanvasDialog({
             no longer lined up with the top of the image it was talking about. The dead band
             it was avoiding only ever appeared on an empty line, and a gap below the last
             control reads as nothing at all; a first step that starts halfway down does not. */}
-        <div className="flex flex-col gap-4 lg:min-w-0 lg:self-start">
+        {/* w-full, and NO self-start. This was the right-hand column of a grid, where
+            `self-start` meant "don't stretch to the tallest row". The parent is a flex
+            COLUMN now, so self-start became a CROSS-axis rule — it shrank every one of these
+            blocks to its own content width and pinned them to the left edge, beside the
+            garment instead of under it. */}
+        <div className="mx-auto flex w-full max-w-[min(100%,560px)] flex-col gap-4">
         {/* THE VARIANT IS NOT PICKED HERE ANY MORE.
             It is on the order's item row, four fields wide, and this window repeated the
             same picker on the same line — two places to change one fact, and the second one
