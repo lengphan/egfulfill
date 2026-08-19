@@ -2318,8 +2318,7 @@ export function OrdersHub() {
                                       a bare label throws "MenuGroupContext is missing" as
                                       the popup mounts, which killed the whole menu. */}
                                   <DropdownMenuGroup>
-                                    <DropdownMenuLabel>{tl("ui", "Set all items to")}</DropdownMenuLabel>
-                                    {prod.map((s) => (
+                                          {prod.map((s) => (
                                       <DropdownMenuItem
                                         key={s.id || "new"}
                                         disabled={(!!s.deny && !s.walk) || normalizeStage(stage) === s.id}
@@ -2344,8 +2343,7 @@ export function OrdersHub() {
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuGroup>
-                                    <DropdownMenuLabel>{tl("ui", "Flag / hold")}</DropdownMenuLabel>
-                                    {/* RUSH sits above the hold states because it is the
+                                          {/* RUSH sits above the hold states because it is the
                                         opposite action and the most reachable one: the person
                                         who notices a job is urgent is usually mid-task, and a
                                         flag two menus deep is a flag nobody sets. */}
