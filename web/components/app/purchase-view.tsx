@@ -529,7 +529,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           ...po,
           num: numFor,
           supplier: g.supplier ?? po.supplier ?? null,
-          items: g.lines,
+          // Priced as they go out — see freezeLines.
+          items: freezeLines(g.lines),
           status: placedOk && g.api ? "placed" : placedOk ? "placed" : "draft",
           meta: { ...(po.meta || {}), response: resp, placedAt, api: g.api, splitFrom: parts.length > 1 ? po.num : undefined },
         })
@@ -877,6 +878,25 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       : { unit: 0, from: "none" as const }
   }, [supByS])
 
+  /**
+   * FREEZE WHAT THE LINES COST, at the moment of placing.
+   *
+   * A placed PO is a record of a purchase, and what a past order cost is a fact — it must
+   * not be re-estimated from a catalogue that has since been re-synced, and it must not
+   * read as free because the line was drafted without a price. So the figure the cart was
+   * showing is written ONTO the line as it is placed, marked `priceSource: "catalog"` so it
+   * is never mistaken for a supplier confirmation.
+   *
+   * Only where there is something to freeze: a line with its own price keeps it untouched,
+   * and a line with no price anywhere stays unpriced rather than being stamped 0 — an
+   * invented zero would read as free, permanently, on a document nobody revisits.
+   */
+  const freezeLines = useCallback(<T extends { sku: string; price?: number | null }>(lines: T[]) =>
+    lines.map((l) => {
+      const { unit, from } = unitPrice(l)
+      return from === "catalog" && unit > 0 ? { ...l, price: unit, priceSource: "catalog" as const } : l
+    }), [unitPrice])
+
   const toOrderGroups = useMemo(() => {
     const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
     for (const l of saved) {
@@ -1036,7 +1056,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         // The PO record is created HERE, at the moment of placing — never before. That
         // document existing beforehand is exactly what "draft PO" was.
         await savePurchaseOrder({
-          num: poNum, supplier: g.supplier ?? null, items: g.lines, status: ok ? "placed" : "draft",
+          // Priced as they go out — see freezeLines.
+          num: poNum, supplier: g.supplier ?? null, items: freezeLines(g.lines), status: ok ? "placed" : "draft",
           meta: { response: resp, placedAt: new Date().toISOString(), api: g.api },
         }).catch(() => {})
         if (ok) g.lines.forEach((l) => placedKeys.add(lineKey(l)))
@@ -1495,7 +1516,17 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           {/* A single line can be re-ordered on its own — restocking one
                               short blank shouldn't drag the whole past PO along with it. */}
                           <span className="text-muted-foreground">×{num(l.qty)}</span>
-                          <span className="w-20 text-right tabular-nums text-muted-foreground">
+                          {/* THE RECORDED PRICE, and only that. A placed PO is not re-costed
+                              from today's catalogue — what it cost is a fact. The title says
+                              when the figure was our own catalogue snapshot rather than a
+                              price the supplier confirmed, because the invoice can differ
+                              and the two must not read as the same claim. */}
+                          <span
+                            className="w-20 text-right tabular-nums text-muted-foreground"
+                            title={num(l.price)
+                              ? `${usd(num(l.price))} each${l.priceSource === "catalog" ? " — our catalogue price when this was placed, not a supplier confirmation" : ""}`
+                              : "No price was recorded on this line"}
+                          >
                             {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
                           </span>
                           <button onClick={() => reorder(po, l)} className="text-muted-foreground hover:text-foreground" title="Reorder just this line">

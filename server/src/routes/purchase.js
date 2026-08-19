@@ -195,13 +195,34 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
     // price at all, had a known cost sitting one column away from a query it was already
     // running. Reading it here costs nothing and is what stops a cart of real goods
     // totalling nothing.
-    const [ss, otto, inv] = await Promise.all([
+    const [ss, otto, sanmar, inv] = await Promise.all([
       softQ('ss supplier lookup', 'select sku, image, color, size, price from ss_products where sku = any($1)', [skus]),
       softQ('otto supplier lookup', 'select sku, image, color, size, price from otto_products where sku = any($1)', [skus]),
+      /**
+       * SANMAR IS A DIFFERENT SHAPE, which is why it was missing from this and its lines
+       * showed no price at all.
+       *
+       * The other two are one row per sku. SanMar is stored one row per STYLE with the
+       * per-variant fields folded into `variants` jsonb (4,081 rows instead of 161,304 —
+       * see sanmar.js), so its skus only exist inside that array. The keys are compact:
+       * `k` is the inventoryKey, `u` the uniqueKey, `p` the piece price, and a variant's
+       * sku is `k || u`, exactly as the catalogue route builds it.
+       *
+       * The expansion is a scan of 4,081 rows rather than an index hit. That is the price
+       * of the fold, it is bounded and small, and this runs once per cart — worth stating
+       * so nobody is surprised to find no index behind it.
+       */
+      softQ('sanmar supplier lookup', `
+        select coalesce(v->>'k', v->>'u') as sku,
+               nullif(v->>'p','')::numeric  as price,
+               v->>'c' as color, v->>'s' as size
+          from sanmar_styles s, jsonb_array_elements(coalesce(s.variants, '[]'::jsonb)) v
+         where coalesce(v->>'k', v->>'u') = any($1)`, [skus]),
       softQ('inventory supplier lookup', 'select sku, supplier from inventory where sku = any($1)', [skus]),
     ]);
     const ssRow = new Map(ss.rows.map((r) => [String(r.sku), r]));
     const ottoRow = new Map(otto.rows.map((r) => [String(r.sku), r]));
+    const sanRow = new Map(sanmar.rows.map((r) => [String(r.sku), r]));
     const ssSet = new Set(ssRow.keys());
     const ottoSet = new Set(ottoRow.keys());
     const invSup = new Map(inv.rows.map((r) => [String(r.sku), r.supplier || null]));
@@ -224,7 +245,7 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
 
     const bySku = {};
     for (const sku of skus) {
-      const r = ssRow.get(sku) || ottoRow.get(sku) || null;
+      const r = ssRow.get(sku) || ottoRow.get(sku) || sanRow.get(sku) || null;
       const variant = r ? [r.color, r.size].filter(Boolean).join(' / ') || null : null;
       const image = proxied(r ? r.image : null);
       // The LAST SYNCED catalogue price, and it is labelled as that rather than as a quote:
@@ -234,6 +255,20 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
       if (ssSet.has(sku)) { bySku[sku] = { api: 'ss', supplier: 'S&S Activewear', source: 'catalog', image, variant, price }; continue; }
       if (ottoSet.has(sku)) { bySku[sku] = { api: 'otto', supplier: 'Otto Cap', source: 'catalog', image, variant, price }; continue; }
       const name = invSup.get(sku) || null;
+      /**
+       * SanMar gets a PRICE and a NAME, and deliberately no `api`.
+       *
+       * `api` is what sends an order down a supplier's ordering path, and there are only
+       * two of those (ss, otto). SanMar's submitPO is gated off and unvalidated, so
+       * claiming an api here would route a real purchase into a path that does not exist.
+       * A SanMar line is ordered by hand — it just no longer has to be COSTED by hand.
+       */
+      if (sanRow.has(sku)) {
+        const sr = sanRow.get(sku);
+        bySku[sku] = { api: apiFromName(name), supplier: name || 'SanMar', source: 'catalog',
+                       image: null, variant, price: sr.price != null && isFinite(Number(sr.price)) ? Number(sr.price) : null };
+        continue;
+      }
       bySku[sku] = { api: apiFromName(name), supplier: name, source: name ? 'inventory' : 'unknown', image: null, variant: null, price: null };
     }
     return { bySku };

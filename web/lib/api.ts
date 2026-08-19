@@ -1683,6 +1683,17 @@ export type POLine = {
    *  receiving existed, which reads as none — the honest default, since nothing was
    *  recorded either way. `qty - received` is what is still outstanding. */
   received?: number
+  /**
+   * WHERE `price` CAME FROM, on a line that was placed without one of its own.
+   *
+   * "catalog" means the figure was the supplier catalogue's last synced price at the
+   * MOMENT OF PLACING, frozen onto the line so a past order keeps a real total. It is our
+   * best knowledge at that moment, not a supplier confirmation — the invoice can still
+   * differ — and it is marked so the two are never read as the same claim.
+   *
+   * Absent means the price is whatever was put on the line (browsed, or typed).
+   */
+  priceSource?: "catalog"
 }
 
 // ── Factory-global shared lists (staff-only KV blobs, whole-array replace) ──
