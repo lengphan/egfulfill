@@ -98,3 +98,34 @@ export const LIFT = {
   shadowOffset: { width: 0, height: 6 },
   elevation: 2,
 } as const
+
+
+/**
+ * THE ONE BIG ACTION at the top of an order.
+ *
+ * Two components render it — the stage advance ("Start Order", "Approve Order") and
+ * Confirm shipment — and they are the same control wearing different words and a different
+ * fill. Typed separately they had already drifted a step apart: 22pt padding against 18,
+ * 24pt type against 22, which on two buttons that sit within a screen of each other reads
+ * as one of them being slightly wrong rather than as two sizes.
+ *
+ * So the shape is here and the callers bring only the colour and the word.
+ */
+export const HERO_BUTTON = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  borderRadius: R.lg,
+  paddingVertical: 22,
+  paddingHorizontal: 20,
+} as const
+
+export const HERO_LABEL = {
+  fontSize: 24,
+  fontWeight: "900",
+  letterSpacing: -0.6,
+} as const
+
+/** The glyph beside a hero label, when there is one. Sized to sit with 24pt type. */
+export const HERO_GLYPH = 24

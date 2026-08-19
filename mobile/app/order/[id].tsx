@@ -11,7 +11,7 @@ import {
   normalizeStage, units, isOverdue, numOf, platformOf, nextStage, addressLines,
   STAGE_LABEL, stageAction,
 } from "@/lib/orders"
-import { C, R, LIFT, toneOnInk } from "@/lib/theme"
+import { C, R, LIFT, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
@@ -240,19 +240,22 @@ export default function OrderDetail() {
                 onPress={advance}
                 disabled={moving}
                 style={({ pressed }) => ({
-                  alignItems: "center", justifyContent: "center",
-                  marginTop: 12, borderRadius: R.lg, backgroundColor: C.primary,
-                  paddingVertical: 22, paddingHorizontal: 20,
+                  ...HERO_BUTTON,
+                  marginTop: 12, backgroundColor: C.primary,
                   opacity: pressed || moving ? 0.8 : 1,
                 })}
               >
+                {/* THE PLAY MARK, and only on Start. It is the one glyph here that is not a
+                    picture of the word next to it — starting has a universal mark and
+                    "Approve" does not, which is why the arrow came off that one. */}
                 {moving
                   ? <ActivityIndicator color={C.onPrimary} />
-                  : (
-                    <Text style={{ fontSize: 24, fontWeight: "900", color: C.onPrimary, letterSpacing: -0.6 }}>
-                      {stageAction(to)}
-                    </Text>
-                  )}
+                  : to === "working"
+                    ? <Ionicons name="play" size={HERO_GLYPH} color={C.onPrimary} />
+                    : null}
+                <Text style={{ ...HERO_LABEL, color: C.onPrimary }}>
+                  {stageAction(to)}
+                </Text>
               </Pressable>
             ) : null
           )}

@@ -3,7 +3,7 @@ import { View, Text, Pressable, Alert, ActivityIndicator } from "react-native"
 import * as ImagePicker from "expo-image-picker"
 import { Ionicons } from "@expo/vector-icons"
 import { uploadAttachment, postOrderMessage, setOrderStage } from "@/lib/api"
-import { C, R } from "@/lib/theme"
+import { C, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 
 /**
  * CONFIRM SHIPMENT — the last step, and ONE press.
@@ -99,8 +99,8 @@ export function ConfirmShipment({ orderId, role, by, onDone }: {
       onPress={start}
       disabled={!!busy}
       style={({ pressed }) => ({
-        marginTop: 8, borderRadius: R.lg, backgroundColor: C.ink,
-        paddingVertical: 18, paddingHorizontal: 20,
+        ...HERO_BUTTON,
+        marginTop: 8, backgroundColor: C.ink,
         opacity: pressed || busy ? 0.8 : 1,
       })}
     >
@@ -113,12 +113,12 @@ export function ConfirmShipment({ orderId, role, by, onDone }: {
         * glyph a badge rather than a mark. Lime directly on the ink block is the brand pair
         * the whole app is built on; a plate behind it only mutes it.
         */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 }}>
-        {busy
-          ? <ActivityIndicator color={C.lime} />
-          : <Ionicons name="camera" size={22} color={C.lime} />}
-        <Text style={{ fontSize: 22, fontWeight: "900", color: C.onInk, letterSpacing: -0.5 }}>{label}</Text>
-      </View>
+      {/* Same shape as Start Order — see HERO_BUTTON. These sit within a screen of each
+          other and are the same kind of control, so they are the same size. */}
+      {busy
+        ? <ActivityIndicator color={C.lime} />
+        : <Ionicons name="camera" size={HERO_GLYPH} color={C.lime} />}
+      <Text style={{ ...HERO_LABEL, color: C.onInk }}>{label}</Text>
     </Pressable>
   )
 }
