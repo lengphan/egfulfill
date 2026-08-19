@@ -12,11 +12,10 @@ import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialo
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { useBackgroundRemoval } from "@/lib/remove-background"
-import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
+import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { designFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
-import { DesignLabTabs } from "@/components/app/design-lab-tabs"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
 // when the product has no imagery of its own — that outline exists precisely so a new
@@ -269,8 +268,6 @@ export function DesignMaker() {
   // Fall back to the single mockup when a product defines no per-side images, so a blank
   // without them behaves exactly as before rather than losing its picture.
   const faceUrl = faces.find((f) => f.side === side)?.url || (side === "front" ? typeMockupOf(product) : "")
-  const [paW, setPaW] = useState(String(BASE_PRINT_IN.w))
-  const [paH, setPaH] = useState(String(BASE_PRINT_IN.h))
   const [dragOver, setDragOver] = useState(false)
   // Built when Publish opens: the composed design becomes the primary photo and the
   // blank already picked here carries over, so the dialog opens ready rather than blank.
@@ -333,8 +330,20 @@ export function DesignMaker() {
    * Read off the WORST layer on this side, not an average: one soft layer prints soft
    * whatever the rest of the stack does.
    */
-  const areaIn = { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h }
-  const zone = printZoneOf(product, side, areaIn)
+  /**
+   * THE PRINT AREA IS THE GARMENT'S, NOT THIS WINDOW'S.
+   *
+   * It was two typed fields here, which meant the number every DPI check divided by was
+   * whatever the last person to open the designer had left in them — per session, not per
+   * product, so the same cap could measure 12×16 one day and 4×2.5 the next. Worse, typing
+   * a size also RESCALED the dashed box, so a seller could quietly redraw the printable
+   * area of a garment the factory had already set up.
+   *
+   * Read-only here, set by staff per product and side (product editor → Print area). The
+   * zone is taken as the product defines it — no scaling by anything typed in this window.
+   */
+  const areaIn = printSizeOf(product, side)
+  const zone = printZoneOf(product, side)
   const natural = useNaturalSizes(images.map((im) => im.src))
   const dpiOf = (im: ImageLayer) => layerDpi(natural.get(im.src)?.w ?? 0, im.pos.w, zone.w, areaIn.w)
   const measured = images.map(dpiOf).filter((d): d is number => d != null)
@@ -516,8 +525,10 @@ export function DesignMaker() {
       setStacks({ front })
     }
     if (l.pos) setPos(l.pos)
-    if (d.printArea?.w) setPaW(String(d.printArea.w))
-    if (d.printArea?.h) setPaH(String(d.printArea.h))
+    // The template's stored printArea is NOT applied. It is a record of what the blank
+    // measured when the template was saved; the size now comes from whichever product this
+    // is opened on, so restoring the old number would print the new garment to the old
+    // garment's measurements.
     const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
     if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
   }
@@ -616,7 +627,9 @@ export function DesignMaker() {
         id: templateId.current,
         name: name.trim() || "Untitled template",
         composite: composed,
-        data: { blank: product?.name ?? null, blankSku: product?.sku ?? null, printArea: { w: Number(paW), h: Number(paH) } },
+        // The size the product declares for this side, not a number typed in this window —
+        // reopening a template must not carry a stale measurement onto a different garment.
+        data: { blank: product?.name ?? null, blankSku: product?.sku ?? null, printArea: { w: areaIn.w, h: areaIn.h } },
         // EVERY SIDE, plus the old flat fields describing the FRONT.
         // `sides` is the truth now — a template of a two-sided design that saved only the
         // face you happened to be looking at is a template of half a design. The flat
@@ -719,8 +732,11 @@ export function DesignMaker() {
         * the editor.
         */}
       <header className="flex shrink-0 items-center gap-2">
-        {/* THE WAY OUT, FIRST IN THE ROW. This surface covers the sidebar and the top bar,
-            so without its own exit the only way back is the browser's. */}
+        {/* THE WAY OUT, and the only navigation in here.
+            The Library/Templates/Design toggle used to sit beside it — three tabs inside a
+            full-screen editor, two of which throw away whatever is on the canvas. A toggle
+            belongs on the page you toggle between, not inside one of them; Back is how you
+            leave, and the Design Lab is what you land on. */}
         <Button
           variant="ghost" size="sm" className="-ml-1 shrink-0"
           onClick={() => router.push("/design?tab=library")}
@@ -728,7 +744,6 @@ export function DesignMaker() {
         >
           <ArrowLeft size={15} weight="bold" /> Back
         </Button>
-        <DesignLabTabs className="hidden shrink-0 md:flex" />
         {/* The name, as a title rather than a form field: transparent until you touch it.
             It was an Input at the bottom of a panel, which made naming a design feel like
             filling something in rather than titling your work. */}
@@ -953,11 +968,11 @@ export function DesignMaker() {
             */}
           <div className="space-y-2">
             <div className="text-sm font-semibold">Print area</div>
-            <div className="flex items-center gap-1.5">
-              <Input value={paW} onChange={(e) => setPaW(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area width in inches" />
-              <span className="text-xs text-muted-foreground">×</span>
-              <Input value={paH} onChange={(e) => setPaH(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area height in inches" />
-              <span className="text-xs text-muted-foreground">in</span>
+            <div className="flex items-baseline gap-1.5 text-sm tabular-nums">
+              <span className="font-medium">{areaIn.w}&quot; × {areaIn.h}&quot;</span>
+              <span className="text-2xs text-muted-foreground">
+                {product ? "set on this product" : "standard size"}
+              </span>
             </div>
             <div className="flex items-baseline justify-between text-2xs text-muted-foreground">
               <span className="tabular-nums">{Math.round(areaIn.w * 300)} × {Math.round(areaIn.h * 300)} px</span>

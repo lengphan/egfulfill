@@ -955,10 +955,20 @@ export type CatalogProduct = {
   mockup?: string
   sideMockups?: Record<string, string>
   side_mockups?: Record<string, string>
-  /** The dashed print area per side, 0–100% of the mockup. Read by lib/print-zone.ts;
-   *  absent means "use the garment-type fallback". Set in the product editor. */
-  printAreas?: Record<string, { x: number; y: number; w: number; h: number }>
-  print_areas?: Record<string, { x: number; y: number; w: number; h: number }>
+  /**
+   * The dashed print area per side. `x/y/w/h` are 0–100% of the mockup — where the
+   * rectangle sits. `wIn/hIn` are what it MEASURES, in inches.
+   *
+   * Both are needed and neither implies the other: the percentages place the box on the
+   * picture, the inches say how big the real thing is, and a photo has no scale of its own.
+   * The inches are what a DPI check has to divide by, so without them the designer was
+   * asking whoever opened it to type a number nobody had recorded.
+   *
+   * Absent ⇒ the garment-type fallback in lib/print-zone.ts, and the 12×16 base size.
+   * Set by staff in the product editor, never in the designer.
+   */
+  printAreas?: Record<string, { x: number; y: number; w: number; h: number; wIn?: number; hIn?: number }>
+  print_areas?: Record<string, { x: number; y: number; w: number; h: number; wIn?: number; hIn?: number }>
   // Explicit per-variant SKUs ([{sku,color,size}] | string[]) — how a marketplace
   // listing's SKU resolves back to this product. Matched by pricing.js + the variant picker.
   variantSkus?: (string | { sku?: string; SKU?: string; color?: string; size?: string })[]

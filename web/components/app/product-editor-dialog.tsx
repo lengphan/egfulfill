@@ -18,7 +18,10 @@ import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
 import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
 import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
-import { printZoneOf, type PrintZone } from "@/lib/print-zone"
+import { printZoneOf, BASE_PRINT_IN, type PrintZone } from "@/lib/print-zone"
+
+/** The stored shape: where the box sits (percentages) AND what it measures (inches). */
+type PrintArea = PrintZone & { wIn?: number; hIn?: number }
 
 const clampPct = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
@@ -34,8 +37,8 @@ const clampPct = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo
  */
 function PrintAreaEditor({ src, zone, onChange, onReset }: {
   src: string
-  zone: PrintZone
-  onChange: (z: PrintZone) => void
+  zone: PrintArea
+  onChange: (z: PrintArea) => void
   onReset: () => void
 }) {
   const box = useRef<HTMLDivElement | null>(null)
@@ -62,6 +65,25 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
     window.addEventListener("pointermove", move)
     window.addEventListener("pointerup", up)
   }
+  /** Inches accept a decimal and may be EMPTY — empty means "not measured", which is a
+   *  different claim from zero and falls back to the 12x16 base rather than to nothing. */
+  const inches = (k: "wIn" | "hIn", label: string) => (
+    <label className="flex items-center gap-1 text-xs text-muted-foreground">
+      {label}
+      <Input
+        value={zone[k] == null ? "" : String(zone[k])}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/[^0-9.]/g, "")
+          const v = raw === "" ? undefined : Number(raw)
+          onChange({ ...zone, [k]: v != null && Number.isFinite(v) && v > 0 ? v : undefined })
+        }}
+        className="h-7 w-16 text-xs"
+        inputMode="decimal"
+        aria-label={`Print area ${label} in inches`}
+        placeholder="—"
+      />
+    </label>
+  )
   const num = (k: keyof PrintZone, label: string) => (
     <label className="flex items-center gap-1 text-xs text-muted-foreground">
       {label}
@@ -111,6 +133,26 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
           production. Values are percentages of the photo.
         </p>
         <div className="flex flex-wrap gap-2">{num("x", "X")}{num("y", "Y")}{num("w", "W")}{num("h", "H")}</div>
+        {/**
+          * AND WHAT IT MEASURES. The box above says WHERE the print sits on the photo; this
+          * says how big it really is, and a photo has no scale of its own to tell you.
+          *
+          * It used to be typed in the designer, per session — so the number every DPI check
+          * divided by was whatever the last person left in the field, and the same cap could
+          * be 12×16 one day and 4×2.5 the next. It belongs to the garment, and setting it is
+          * a factory job, which is why it is here and read-only there.
+          */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          <span className="text-xs font-medium">Real size</span>
+          {inches("wIn", "W")}
+          <span className="text-xs text-muted-foreground">×</span>
+          {inches("hIn", "H")}
+          <span className="text-xs text-muted-foreground">inches</span>
+        </div>
+        <p className="max-w-xs text-2xs text-muted-foreground">
+          Left empty this side is treated as {BASE_PRINT_IN.w}&quot; × {BASE_PRINT_IN.h}&quot;, which is what the
+          fallback outlines were drawn for — right for a shirt front, wrong for a cap.
+        </p>
         <Button type="button" variant="outline" size="sm" onClick={onReset}>Reset to the type default</Button>
       </div>
     </div>
@@ -270,7 +312,7 @@ export function ProductEditorDialog({
   const [sideMockups, setSideMockups] = useState<Record<string, string>>({})
   /** The dashed print area per side, 0–100% of the mockup. Empty = follow the garment-type
    *  fallback in print-zone.ts, which is what every product did before this could be set. */
-  const [printAreas, setPrintAreas] = useState<Record<string, PrintZone>>({})
+  const [printAreas, setPrintAreas] = useState<Record<string, PrintArea>>({})
   /** Which side's area is open in the editor below the tiles. */
   const [areaSide, setAreaSide] = useState<string | null>(null)
   useEffect(() => {
@@ -457,7 +499,7 @@ export function ProductEditorDialog({
         setImgColor(tags)
       }
       setSideMockups({ ...((p?.side_mockups ?? p?.sideMockups ?? {}) as Record<string, string>) })
-      setPrintAreas({ ...((p?.printAreas ?? p?.print_areas ?? {}) as Record<string, PrintZone>) })
+      setPrintAreas({ ...((p?.printAreas ?? p?.print_areas ?? {}) as Record<string, PrintArea>) })
       setAreaSide(null)
       setStatus(p?.status ?? "Active")
       setFeatured(p?.featured === true)

@@ -3,6 +3,27 @@ import type { CatalogProduct } from "@/lib/api"
 /** Printable rectangle, as 0–100 percentages of the mockup image. */
 export type PrintZone = { x: number; y: number; w: number; h: number }
 
+/** What a side's print area MEASURES, in inches. Set per product+side by staff; the base
+ *  is what the zone table was drawn for and what a product without one is assumed to be. */
+export type PrintSize = { w: number; h: number }
+
+/**
+ * The print size for a product + side, in inches.
+ *
+ * ONE PLACE TO ASK. The designer used to hold this as two typed fields, so the number a
+ * DPI check divided by was whatever the last person opened the window and left there —
+ * and it was per-session, not per-product, so the same cap measured 12×16 one day and
+ * 4×2.5 the next. It belongs to the garment.
+ */
+export function printSizeOf(p: CatalogProduct | null, side = "front"): PrintSize {
+  const a = (p as { printAreas?: Record<string, { wIn?: number; hIn?: number }> } | null)?.printAreas?.[side]
+  const w = Number(a?.wIn), h = Number(a?.hIn)
+  return {
+    w: Number.isFinite(w) && w > 0 ? w : BASE_PRINT_IN.w,
+    h: Number.isFinite(h) && h > 0 ? h : BASE_PRINT_IN.h,
+  }
+}
+
 // Ported verbatim from design-maker.html's PRODUCT_ZONES (0–1 fractions there). The
 // fallback printable area per garment type, used when a product carries no
 // operator-defined printAreas.
