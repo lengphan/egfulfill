@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple, ImageSquare } from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -807,7 +807,17 @@ export function DesignCanvasDialog({
   // can't be resolved (e.g. an unmatched marketplace SKU).
   /** One size for every mark on the rail — the same 36px target the selection strip uses,
    *  so the two toolbars on this stage are one visual language rather than two. */
-  const railBtn = "flex size-9 items-center justify-center rounded-lg text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+  /**
+   * EVERY TOOL SAYS WHAT IT IS.
+   *
+   * The rail was four glyphs in a column — an arrow, a folder, a bookmark and a picture —
+   * and between them they name four things you can do to artwork, none of which a person
+   * can tell apart at 18px. A tooltip does not help: it appears after you have already
+   * guessed and hovered, which is the thing being got wrong. Icon over a word, both small,
+   * so the rail is still a rail and not a menu.
+   */
+  const railBtn = "flex w-14 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+  const railWord = "text-[10px] font-medium leading-none"
   const [tplBusy, setTplBusy] = useState(false)
   /** null = the box is closed. A string is what is being typed into it. */
   const [tplName, setTplName] = useState<string | null>(null)
@@ -1884,7 +1894,13 @@ export function DesignCanvasDialog({
           * the width follows from it. Bigger than it looks: the stage is the whole width of
           * the dialog now, where it used to share it with a 380px column.
           */}
-        <div className="relative mx-auto w-full max-w-[min(100%,52vh,520px)]">
+        {/* NO FIXED PIXEL CAP. It was 520px inside a 720px window, so the garment stopped
+            short of the title above it and the action bar below — a picture floating in a
+            box, when the picture IS the window. It takes the full content width now, and the
+            only limit left is a HEIGHT one, because the stage is square and this dialog must
+            never scroll: 62vh is what still leaves room for the header, the embroidery line
+            and the action bar on a laptop's 800px. On a taller screen it simply fills. */}
+        <div className="relative mx-auto w-full max-w-[min(100%,62vh)]">
           <DesignStage
             className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -1937,6 +1953,7 @@ export function DesignCanvasDialog({
               className={railBtn}
             >
               <UploadSimple size={18} weight="bold" />
+              <span className={railWord}>{designUrl ? "Replace" : "Upload"}</span>
             </button>
             <button
               type="button"
@@ -1946,6 +1963,7 @@ export function DesignCanvasDialog({
               className={railBtn}
             >
               <FolderOpen size={18} weight="bold" />
+              <span className={railWord}>Library</span>
             </button>
             {/* SAVE THIS PLACEMENT AS A TEMPLATE. The library could always hand a template
                 back — artwork AND where it sits — and nothing here could put one in, so the
@@ -1960,6 +1978,7 @@ export function DesignCanvasDialog({
               className={railBtn + (tplName !== null ? " bg-primary/10 text-primary" : "")}
             >
               {tplBusy ? <CircleNotch size={18} className="animate-spin" /> : <BookmarkSimple size={18} weight="bold" />}
+              <span className={railWord}>Template</span>
             </button>
             {/**
               * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the title says
@@ -1983,7 +2002,35 @@ export function DesignCanvasDialog({
               className={railBtn + (ownMockups[sideKey] ? " bg-primary/10 text-primary" : "")}
             >
               {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
+              <span className={railWord}>{ownMockups[sideKey] ? "Our photo" : "Mockup"}</span>
             </button>
+            {/**
+              * SEND, on the rail with the rest.
+              *
+              * It was three rows under the stage — a question ("Don't have the file yet?"), a
+              * button, and a line explaining why the button was disabled — for one action,
+              * on a window being cut down to the picture. It is a thing you DO to this
+              * line's artwork, which is what the rail is.
+              *
+              * SAVE FIRST, then send, and only if the save landed. The board builds its card
+              * from the SAVED designs map, so artwork dropped here and not yet saved does
+              * not exist as far as the push is concerned — it used to hit a guard that
+              * returned without a word, leaving the designer's board empty and nothing on
+              * screen to say why.
+              */}
+            {onSendToDesigner && !isEmb && (
+              <button
+                type="button"
+                onClick={async () => { if (await save(false)) onSendToDesigner() }}
+                disabled={!designUrl || saving}
+                title={designUrl ? "Save this line and put it on the designers' board" : "Needs artwork first — there is nothing to digitise"}
+                aria-label="Send this line to a designer"
+                className={railBtn}
+              >
+                {saving ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneTilt size={18} weight="bold" />}
+                <span className={railWord}>Send</span>
+              </button>
+            )}
           </div>
 
           {/**
@@ -2577,24 +2624,8 @@ export function DesignCanvasDialog({
             * line reaches OUR OWN designers, and the ⋯ menu on the order row only offers the
             * outside partner.
             */}
-        {onSendToDesigner && !isEmb && (
-          <div className="mt-3 border-t border-border pt-3">
-            <p className="mb-1.5 text-2xs text-muted-foreground">Don&apos;t have the file yet?</p>
-            {/* SAVE FIRST, then send — and only send if the save actually landed.
-                This silently did nothing before: the board builds its card from
-                the SAVED designs map, so artwork dropped here but not yet saved
-                didn't exist as far as the push was concerned. It hit a guard that
-                returned without a word, and the designer's board stayed empty
-                with nothing on screen to say why. */}
-            <Button size="sm" variant="outline" disabled={!designUrl || saving} onClick={async () => {
-              if (!(await save(false))) return
-              onSendToDesigner()
-            }}>
-              {saving ? "Saving…" : "Send this line to a designer"}
-            </Button>
-            {!designUrl && <p className="mt-1 text-2xs text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
-          </div>
-        )}
+        {/* The three rows that were here — a question, a button and a note explaining why
+            the button was disabled — are one tool on the rail now. See "SEND, on the rail". */}
 
           {/* SELLER view of the same thing the staff picker above decides — a plain-language
               estimate, never the fee controls (they're being charged; they don't set it):
