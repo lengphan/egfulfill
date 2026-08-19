@@ -227,7 +227,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       const r = await setFactorySettings({ ss_payment_profile: pickCard })
       if (r.error) { setMsg({ ok: false, text: r.error }); return }
       setPickerOpen(false)
-      setMsg({ ok: true, text: "Payment updated — place the order again to retry with the new card." })
+      // THE STRIP GOES, it doesn't turn green. It described a decline that is no longer the
+      // state, and the "place the order again" it would have said was already said by the
+      // dialog you just used. Leaving a banner behind makes a finished repair look like it
+      // still needs reading. `declineFix` goes with it so the Change payment shortcut it
+      // powers doesn't outlive the failure that raised it.
+      setMsg(null); setDeclineFix(null)
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't update the payment." })
     } finally { setPickSaving(false) }
@@ -2032,7 +2037,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         onOpenChange={setNeedCard}
         amount={toOrderGroups.filter((g) => g.api === "otto").reduce((s2, g) => s2 + g.total, 0)}
         // Straight on to placing with the card in hand. It exists only for this call.
-        onSubmit={(c) => { setNeedCard(false); void placeAllGroups(c) }}
+        // Clear the failure banner on the way through: placeAllGroups does it too, but only
+        // after a round trip for the ship-from settings, so the strip that sent you here
+        // would sit there through the retry it was asking for.
+        onSubmit={(c) => { setNeedCard(false); setMsg(null); setDeclineFix(null); void placeAllGroups(c) }}
       />
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
