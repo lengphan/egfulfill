@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, setItemStatus, type OrderItem, type OrderDesign } from "@/lib/api"
 import {
   designsFor, lineArt, lineTitle, lineFacts, nextLineStage, normalizeStage,
-  STAGE_LABEL, STAGE_VERB, KIND_LABEL, isArtwork,
+  STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork,
 } from "@/lib/orders"
 import { C, R, LIFT, toneOf } from "@/lib/theme"
 
@@ -61,8 +61,12 @@ function FileChip({ d }: { d: OrderDesign }) {
   )
 }
 
-export function OrderLine({ orderId, item, index, designs, canWork, onChanged }: {
+export function OrderLine({ orderId, order, item, index, designs, canWork, onChanged }: {
   orderId: string
+  /** The order this line belongs to — needed ONLY for `factory_order`, which decides
+   *  whether `in_review` ("Pending") is on this line's ladder at all. A line cannot tell
+   *  on its own; see nextLineStage. */
+  order?: { factory_order?: boolean | null } | null
   item: OrderItem
   index: number
   /** EVERY design on the order. The line picks its own out — see designsFor. */
@@ -78,7 +82,7 @@ export function OrderLine({ orderId, item, index, designs, canWork, onChanged }:
   const stage = normalizeStage(item.factory_status)
   const tone = toneOf(stage)
   const facts = lineFacts(item)
-  const to = nextLineStage(item)
+  const to = nextLineStage(item, order)
   // A line with no print method is an undecorated blank. It needs no artwork, so it must
   // not be flagged as missing one — that would deadlock every plain-garment order.
   const needsArt = !!String(item.print_type || "").trim() && !mine.some((d) => isArtwork(d.kind))
@@ -189,7 +193,7 @@ export function OrderLine({ orderId, item, index, designs, canWork, onChanged }:
             ? <ActivityIndicator color={to === "working" ? C.onPrimary : C.lime} />
             : <Ionicons name={to === "working" ? "play" : "arrow-forward"} size={16} color={to === "working" ? C.onPrimary : C.lime} />}
           <Text style={{ fontSize: 15, fontWeight: "800", color: to === "working" ? C.onPrimary : C.lime }}>
-            {STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`} this line
+            {stageActionLine(to)}
           </Text>
         </Pressable>
       )}

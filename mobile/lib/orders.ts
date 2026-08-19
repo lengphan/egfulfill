@@ -75,6 +75,18 @@ export const stageLabel = (o: Order) => STAGE_LABEL[normalizeStage(o.factory_sta
 export function nextStage(o: Order): string | null {
   const at = normalizeStage(o.factory_status)
   if (EXCEPTIONS.includes(at)) return null
+  /*
+   * `in_review` IS NOT ON A FACTORY ORDER'S LINE — the phone was the only surface that
+   * did not know this.
+   *
+   * The server keeps TWO lines (FACTORY_LINE in orders.js) and the web mirrors it with
+   * nextStage(current, isFactory). "Pending" means the seller submitted and we took their
+   * money; a factory-owned order has no seller, is never charged and approves itself, so
+   * the stage cannot describe anything true about it. This file had one line, so the phone
+   * offered "Move to Pending" on an order that can never legitimately be there — and a
+   * legacy row already sitting at in_review had no way forward.
+   */
+  if (isFactoryOrder(o) && (at === "" || at === "in_review")) return "working"
   const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
   const next = PIPELINE[i + 1]
   return next ?? null
@@ -208,13 +220,35 @@ export const lineTitle = (it: { name?: string | null; blank?: string | null; sku
 export const lineFacts = (it: { color?: string | null; size?: string | null; print_type?: string | null }) =>
   [it.color, it.size, it.print_type].map((v) => (v ? String(v).trim() : "")).filter(Boolean)
 
-/** Where this LINE goes next. Same pipeline as the order — the floor moves lines. */
-export function nextLineStage(it: { factory_status?: string | null }): string | null {
+/** The factory's OWN order rather than a seller's. Mirrors isFactoryOrder in
+ *  web/lib/factory-status.ts, which reads the same column. */
+export const isFactoryOrder = (o?: { factory_order?: boolean | null } | null) => !!o?.factory_order
+
+/** Where this LINE goes next. Same pipeline as the order — the floor moves lines — and
+ *  the same two-line rule, so `order` has to be passed: a line cannot tell on its own
+ *  whether the order it belongs to is the factory's. */
+export function nextLineStage(
+  it: { factory_status?: string | null },
+  order?: { factory_order?: boolean | null } | null,
+): string | null {
   const at = normalizeStage(it.factory_status)
   if (EXCEPTIONS.includes(at)) return null
+  if (isFactoryOrder(order) && (at === "" || at === "in_review")) return "working"
   const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
   return PIPELINE[i + 1] ?? null
 }
+
+/**
+ * THE BUTTON'S WORDS, in one place, because there are two buttons.
+ *
+ * They were built inline at both call sites and repeated the stage twice over: the order
+ * button read "Move to Pending" above "Moves the whole order to Pending", and the line
+ * button read "Move to Pending this line", which is not a sentence. The verb carries it
+ * where there is one; the fallback names the stage ONCE.
+ */
+export const stageAction = (to: string) => STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`
+export const stageActionLine = (to: string) =>
+  STAGE_VERB[to] ? `${STAGE_VERB[to]} this line` : `Move this line to ${STAGE_LABEL[to] ?? to}`
 
 /**
  * The word on the button that starts the work, rather than the name of a state. Someone

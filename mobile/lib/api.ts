@@ -101,6 +101,10 @@ export type Order = {
   num?: string | null
   seq?: number | null
   factory_status?: string | null
+  /** The FACTORY's own order, not a seller's. Decides which stage line applies: `in_review`
+   *  ("Pending") means a seller submitted and was charged, so it is not a position a
+   *  factory order can occupy. See nextStage in lib/orders.ts. */
+  factory_order?: boolean | null
   rush?: boolean
   created_at?: string | null
   ship_by?: string | null

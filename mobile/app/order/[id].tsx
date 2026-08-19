@@ -9,7 +9,7 @@ import {
 } from "@/lib/api"
 import {
   normalizeStage, units, isOverdue, numOf, platformOf, plainNum, nextStage,
-  STAGE_LABEL, STAGE_VERB,
+  STAGE_LABEL, stageAction,
 } from "@/lib/orders"
 import { C, R, LIFT, toneOf } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
@@ -238,10 +238,15 @@ export default function OrderDetail() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontSize: 18, fontWeight: "900", color: C.onPrimary, letterSpacing: -0.4 }}>
-                    {STAGE_VERB[to] ?? `Move to ${STAGE_LABEL[to] ?? to}`}
+                    {stageAction(to)}
                   </Text>
+                  {/* The subtitle says WHAT IT TOUCHES, not the stage again. It read "Moves
+                      the whole order to Pending" under "Move to Pending" — the same three
+                      words twice, so the second line carried nothing. Scope is the thing a
+                      person actually wants confirmed before pressing, because every line
+                      below has a button of its own. */}
                   <Text style={{ fontSize: 13, color: C.onPrimary, opacity: 0.75, marginTop: 2 }}>
-                    Moves the whole order to {STAGE_LABEL[to] ?? to}
+                    {items.length === 1 ? "The only line on this order" : `All ${items.length} lines`}
                   </Text>
                 </View>
                 <Ionicons name="arrow-forward" size={20} color={C.onPrimary} />
@@ -323,6 +328,7 @@ export default function OrderDetail() {
               <OrderLine
                 key={it.line_id || it.id || `${it.sku}-${i}`}
                 orderId={String(o.id)}
+                order={o}
                 item={it}
                 index={i}
                 designs={designs}
