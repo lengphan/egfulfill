@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown } from "@phosphor-icons/react"
+import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown, ImageSquare } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -393,12 +393,13 @@ export function ListingPhotoStudio({
                 the final dimensions before the content exists is what every image-generation
                 UI does, and what Cumulative Layout Shift is a measure of. ── */}
           <div className="grid gap-4 p-4 lg:grid-cols-2">
-            {/* THEIRS */}
+            {/* THEIRS — NO LABEL ROW.
+                "Theirs" over a photograph of somebody else's product, beside "Ours" over an
+                empty frame, is a caption telling you what the two things obviously are. The
+                count went with it: the ticks on the thumbs below say which are in use, and
+                say it where the choice is actually made. Every generation UI worth copying
+                leaves this strip silent — the frames carry the meaning. */}
             <section className="min-w-0 space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="eg-label text-muted-foreground">Theirs</h3>
-                <span className="text-2xs text-muted-foreground">{picked.length} of {references.length} used as reference</span>
-              </div>
               {/* ONE TREE, ALWAYS. A hero at the same size as Ours, with the rest as a strip
                   underneath. There is no second layout to switch to, so there is nothing to
                   remount and nothing to tween. */}
@@ -433,26 +434,45 @@ export function ListingPhotoStudio({
                 on its own, so the heading leaked past the collapsed edge and rendered as "OU"
                 beside the reference grid. */}
             <section className="min-w-0 space-y-2 overflow-hidden">
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="eg-label text-muted-foreground">Ours</h3>
-                {hero && <span className="text-2xs tabular-nums text-muted-foreground">{hero.size} · {hero.aspectRatio}</span>}
-              </div>
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted/40">
-                {busy ? (
-                  <span className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
-                    <CircleNotch size={22} className="animate-spin" />
-                    Rendering {count > 1 ? `${count} photos` : "a photo"}…
-                  </span>
-                ) : hero ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={hero.url} alt="" className="size-full object-contain" />
+              {/* THE WELL IS THE EMPTY STATE, not a paragraph inside it.
+                  It held three lines explaining that nothing had been rendered and what to
+                  press — under a button labelled Generate, beside the picture it would be
+                  made from. That is instructions for a control already in view, and it is
+                  what every image tool leaves out: Midjourney, Firefly and the rest give the
+                  waiting slot a tinted frame and a shimmer, never prose.
+
+                  So: the house periwinkle, at the strength CLAUDE.md §4 reserves for a large
+                  FILL, with one quiet glyph so the frame reads as "a picture goes here"
+                  rather than as something that failed. The distinction the honesty rule
+                  actually cares about is empty-versus-broken, and a deliberate tint carries
+                  that where grey does not. */}
+              <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg">
+                {hero && !busy ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={hero.url} alt="" className="size-full bg-muted/40 object-contain" />
+                    {/* The size rode in a header row that is gone. On the picture is where it
+                        belonged anyway — it describes THIS render, not the column. */}
+                    <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-2xs tabular-nums text-white">
+                      {hero.size} · {hero.aspectRatio}
+                    </span>
+                  </>
                 ) : (
-                  /* An empty state that says what will fill it. "Nothing here" and "this is
-                     broken" must never look the same. */
-                  <span className="max-w-[16rem] px-4 text-center text-xs leading-relaxed text-muted-foreground">
-                    Nothing rendered yet. Write the prompt below and press Generate — what comes
-                    back appears here for you to look at before it goes anywhere.
-                  </span>
+                  <div className="absolute inset-0 bg-brand/20">
+                    {/* A SHEEN WHILE IT WORKS, and stillness while it waits — the difference
+                        between the two states without a word or a spinner. Off under
+                        prefers-reduced-motion, where the tint alone still says which frame
+                        this is. */}
+                    {busy && (
+                      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-transparent via-white/45 to-transparent motion-reduce:animate-none" />
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {/* The violet itself, not --brand-foreground. That token is the LIME half of the
+                          action pair — it is a label colour for a solid violet fill, and at
+                          1.19:1 on a near-white tint it would be invisible. */}
+                      <ImageSquare size={30} weight="light" className="text-primary/40" />
+                    </div>
+                  </div>
                 )}
               </div>
               {/* The decision, on the big version — which is the point of showing it big. */}
