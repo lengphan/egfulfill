@@ -4,6 +4,7 @@
 
 import { q, softQ } from '../db.js';
 import { recordCost, recordCredit } from '../costs.js';
+import { recordStockMove, STOCK_REASONS } from '../stock.js';
 
 let _ready = null;
 function ensure() {
@@ -568,6 +569,11 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
     for (const l of lines) {
       await q('update inventory set in_stock = greatest(0, coalesce(in_stock,0) - $2) where sku=$1', [l.sku, l.qty])
         .catch(() => {});
+      await recordStockMove({
+        sku: l.sku, delta: -Math.abs(Number(l.qty) || 0), reason: STOCK_REASONS.supplierReturn,
+        ref: num, by: req.user && req.user.sub,
+        note: `Returned to ${po.supplier || 'the supplier'}${b.rma ? ` · RMA ${String(b.rma).slice(0, 40)}` : ''}`,
+      });
     }
 
     await q('update purchase_orders set meta=$2 where num=$1',

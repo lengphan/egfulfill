@@ -15,7 +15,7 @@ import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, resolveSuppliers, getCatalogProducts, getPurchaseOrders, type CatalogProduct, type InventoryItem, type OrderItem, type ScanRow, type SkuVisibility } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getStockMovements, resolveSuppliers, getCatalogProducts, getPurchaseOrders, type CatalogProduct, type InventoryItem, type OrderItem, type StockHistory, type SkuVisibility } from "@/lib/api"
 import { getFactoryList, saveFactoryList, type SavedPOLine } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -1220,58 +1220,111 @@ function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void
   )
 }
 
-// Every stock movement for one SKU — who scanned it, which way, and when. This is
-// how an admin audits a count that looks wrong without digging through the DB.
+/**
+ * ONE SKU'S STOCK HISTORY — why the number is what it is.
+ *
+ * This said "every stock movement" and showed only SCANS, which was most of the reason a
+ * count that looked wrong could not be explained: a purchase order arriving, an order going
+ * into production, goods sent back to a supplier and someone typing a number into the grid
+ * all changed the shelf and left no trace anywhere. They are all movements now, from one
+ * append-only journal (server/src/stock.js), and the scans are simply four of its reasons.
+ *
+ * The journal total is stated next to the shelf's own number ON PURPOSE. They should match;
+ * where they don't, the row is older than the ledger, and saying which is more useful than
+ * a screen that implies the history is complete when it starts mid-story.
+ */
+const MOVE_WORD: Record<string, string> = {
+  "order-consume": "Into production",
+  "order-restore": "Back out of production",
+  "po-receipt": "Received from supplier",
+  "supplier-return": "Returned to supplier",
+  "scan-in": "Scanned in",
+  "scan-out": "Scanned out",
+  "scan-undo": "Scan reversed",
+  "count-set": "Counted by hand",
+}
+
 function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () => void }) {
-  const [rows, setRows] = useState<ScanRow[] | null>(null)
+  const [data, setData] = useState<StockHistory | null>(null)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let live = true
     const id = setTimeout(() => {
-      if (!sku) { setRows(null); return }
-      getScanHistory(sku, 100).then((r) => { if (live) setRows(r ?? []) }).catch(() => { if (live) setRows([]) })
+      if (!sku) { setData(null); setFailed(false); return }
+      getStockMovements(sku, 100)
+        .then((r) => { if (live) { setData(r ?? null); setFailed(!r) } })
+        .catch(() => { if (live) { setData(null); setFailed(true) } })
     }, 0)
     return () => { live = false; clearTimeout(id) }
   }, [sku])
 
-  const net = (rows ?? []).reduce((n, r) => n + (r.direction === "in" ? r.qty : -r.qty), 0)
+  const rows = data?.movements ?? null
   const when = (s?: string) => {
     if (!s) return "—"
     const d = new Date(s)
     return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
   }
+  // The shelf and its journal, and the gap between them named rather than hidden.
+  const gap = data && data.inStock != null ? data.inStock - data.journal : 0
 
   return (
     <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> Scan history</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> Stock history</DialogTitle>
         </DialogHeader>
         <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
           <span className="tabular-nums text-xs font-medium">{sku}</span>
-          {rows && rows.length > 0 && <span className="text-xs text-muted-foreground">Net <b className={net >= 0 ? "text-success" : "text-red-600"}>{net >= 0 ? "+" : ""}{net}</b> over {rows.length} scan{rows.length === 1 ? "" : "s"}</span>}
+          {data && (
+            <span className="text-xs text-muted-foreground">
+              On the shelf <b className="tabular-nums text-foreground">{data.inStock ?? "—"}</b>
+              {" · "}journal <b className="tabular-nums text-foreground">{data.journal}</b>
+            </span>
+          )}
         </div>
-        {rows === null ? (
+        {/* A DIFFERENCE IS A FACT, NOT AN ERROR — every row that existed before this journal
+            did starts with one, and it is exactly the size of whatever was on the shelf that
+            day. Said plainly so nobody chases it as a bug. */}
+        {data && gap !== 0 && (
+          <p className="text-2xs text-muted-foreground">
+            {gap > 0 ? gap : -gap} {gap > 0 ? "more" : "fewer"} on the shelf than this history accounts for
+            — anything counted before movements were recorded isn&apos;t in it.
+          </p>
+        )}
+        {failed ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Couldn&apos;t read this SKU&apos;s history.</div>
+        ) : rows === null ? (
           <div className="flex justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
         ) : rows.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">No scans recorded for this SKU yet.</div>
+          <div className="py-10 text-center text-sm text-muted-foreground">Nothing has moved this SKU yet.</div>
         ) : (
           <div className="max-h-80 divide-y divide-border overflow-auto">
-            {rows.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 py-2">
-                <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (r.direction === "in" ? "bg-emerald-100 text-success" : "bg-amber-100 text-amber-700")}>
-                  {r.direction === "in" ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
-                </span>
-                <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (r.direction === "in" ? "text-success" : "text-red-600")}>
-                  {r.direction === "in" ? "+" : "−"}{r.qty}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{r.by_name || "Unknown user"}</div>
-                  {r.order_ref && <div className="truncate tabular-nums text-xs text-muted-foreground">order {r.order_ref}</div>}
+            {rows.map((r) => {
+              const up = r.delta > 0
+              return (
+                <div key={r.id} className="flex items-center gap-3 py-2">
+                  <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (up ? "bg-emerald-100 text-success" : "bg-amber-100 text-amber-700")}>
+                    {up ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
+                  </span>
+                  <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (up ? "text-success" : "text-red-600")}>
+                    {up ? "+" : "−"}{Math.abs(r.delta)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{MOVE_WORD[r.reason] ?? r.reason}</div>
+                    {(r.orderId || r.ref || r.note) && (
+                      <div className="truncate text-xs text-muted-foreground">
+                        {r.orderId ? <span className="tabular-nums">order {r.orderId}</span>
+                          : r.ref ? <span className="tabular-nums">{r.ref}</span> : null}
+                        {(r.orderId || r.ref) && r.note ? " · " : null}
+                        {r.note}
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">{when(r.at)}</span>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">{when(r.created_at)}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </DialogContent>

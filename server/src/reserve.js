@@ -22,6 +22,7 @@
 //     them off the shelf is what lowers in_stock — the hold must not survive it or the same
 //     garment is subtracted twice. Cancelled: the work will never happen.
 import { q } from './db.js';
+import { recordStockMove, STOCK_REASONS } from './stock.js';
 import { catalogIndex } from './pricing.js';
 import { stockKeysFor, stockKeyOf } from './replenish.js';
 
@@ -211,6 +212,13 @@ async function applyConsumption(orderId, want) {
     } else {
       await q('delete from stock_consumption where order_id=$1 and sku=$2', [orderId, sku]).catch(() => {});
     }
+    // The journal. `delta` here is how much MORE this order is taking, so the shelf moved
+    // by -delta — a restore (delta < 0) is a positive movement, which is exactly right.
+    await recordStockMove({
+      sku, delta: -delta, orderId, ref: orderId,
+      reason: delta > 0 ? STOCK_REASONS.consume : STOCK_REASONS.restore,
+      note: delta > 0 ? 'Into production' : 'Back out of production',
+    });
     (delta > 0 ? took : gave).push({ sku, qty: Math.abs(delta) });
   }
   return { took, gave, skipped };

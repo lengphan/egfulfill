@@ -15,6 +15,7 @@ import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
 import { canMoveMoney, resolveSeller, canSurface } from '../auth.js';
 import { notify } from './notifications.js';
+import { notifyChannelStillOpen } from './orders.js';
 
 // Which part of an order a refund row paid back. Added idempotently at load, like the
 // other late columns in this codebase — schema.sql only runs on a first DB init, so an
@@ -505,6 +506,10 @@ export function orderRefundRoutes(app, requireAuth) {
       clientId: b.clientId,
     });
     if (out.error) { reply.code(400); return out; }
+    // OUR side is settled; the buyer's is not, and cannot be from here. See the note on
+    // notifyChannelStillOpen — the seller's own transaction with their buyer is theirs to
+    // reverse, and until this it was never said.
+    await notifyChannelStillOpen(req.params.id, 'refunded');
     // Money moving back to a seller is exactly the kind of act that needs a name against
     // it later — who, how much, which parts, and what it left behind.
     audit(req, 'order.refund', {

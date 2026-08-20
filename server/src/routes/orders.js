@@ -541,6 +541,56 @@ async function refundForCancel(orderId, sellerId, by) {
 const fmtMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 
 /**
+ * WHICH MARKETPLACE AN ORDER BELONGS TO — its own id, or the one it is a copy of.
+ *
+ * One rule, because two things ask: the tracking push, and the notice telling a seller
+ * their channel still shows the order as open. If those two ever disagreed, we would push
+ * tracking to a shop we had just told the seller we could not reach.
+ */
+const CHANNEL_NAME = { etsy: 'Etsy', shopify: 'Shopify', tiktok: 'TikTok Shop' };
+function marketplaceChannelOf(order) {
+  const of = (v) => (/^etsy-/i.test(v) ? 'etsy' : /^shopify-/i.test(v) ? 'shopify' : /^tiktok-/i.test(v) ? 'tiktok' : null);
+  const id = String((order && order.id) || '');
+  const meta = order && order.meta && typeof order.meta === 'object' ? order.meta : {};
+  return of(id) || of(String(meta.duplicated_from || ''));
+}
+
+/**
+ * WE SETTLED OUR SIDE. THEIRS IS STILL OPEN — say so, to the person who has to close it.
+ *
+ * Cancelling or refunding here moves money in the seller's EGFULFILL wallet: it reverses
+ * what they paid US to make the thing. The buyer paid the MARKETPLACE, and that money is
+ * the seller's own transaction with them — we have no access to it and could not touch it
+ * if we wanted to. There is no outbound cancel or refund to any channel in this codebase,
+ * deliberately.
+ *
+ * So the order sits open on Etsy with nobody working it, and the shop takes the
+ * late-shipment hit — which is the kind of thing that puts a seller's account at risk (§2.6).
+ * That gap was silent. It isn't now.
+ *
+ * Sent whoever pressed the button, INCLUDING the seller themselves: someone cancelling
+ * their own order here has no particular reason to know that their channel didn't hear it.
+ * Only for a marketplace order — a manual one has no channel to close.
+ */
+export async function notifyChannelStillOpen(orderId, what) {
+  try {
+    const o = (await q('select id, seller_id, meta from orders where id=$1', [orderId])).rows[0];
+    if (!o || !o.seller_id) return;
+    const channel = marketplaceChannelOf(o);
+    if (!channel) return;
+    const name = CHANNEL_NAME[channel] || channel;
+    notify({
+      userIds: [String(o.seller_id)],
+      type: 'order-channel-open',
+      title: `${name} still shows this order as open`,
+      body: `Order ${orderId} was ${what} here and your wallet has been settled. We can't cancel or refund a buyer's order on your behalf — that part is yours to do on ${name}, and leaving it open counts against your shop.`,
+      href: `/orders/${orderId}`,
+      entityId: String(orderId),
+    });
+  } catch (e) { /* a missed bell must never break the cancel */ }
+}
+
+/**
  * Push a shipped order's tracking to its marketplace so the buyer's shop marks it shipped
  * (and, for Etsy, emails the buyer). Routes by the order's id prefix.
  *
@@ -565,9 +615,7 @@ async function pushMarketplaceTracking(order, tracking, carrier) {
    * dropped as 'not-applicable' before the resolver saw it, and tracking had to be pasted
    * into the channel by hand on precisely the orders where someone is waiting.
    */
-  const from = (order && order.meta && typeof order.meta === 'object' && order.meta.duplicated_from) || '';
-  const channelOf = (v) => (/^etsy-/i.test(v) ? 'etsy' : /^shopify-/i.test(v) ? 'shopify' : /^tiktok-/i.test(v) ? 'tiktok' : null);
-  const channel = channelOf(id) || channelOf(String(from));
+  const channel = marketplaceChannelOf(order);
   if (!channel || !tracking) return { skipped: 'not-applicable' };
   if (process.env.MARKETPLACE_FULFILL_LIVE !== '1') return { channel, dryRun: true, wouldSend: { tracking, carrier } };
   try {
@@ -1695,6 +1743,7 @@ export function ordersRoutes(app, requireAuth) {
       if (want === 'cancelled' && !started) {
         const back = await refundForCancel(req.params.id, sel.id, req.user.sub);
         _refunded = back.refunded || 0;
+        await notifyChannelStillOpen(req.params.id, 'cancelled');
       }
     }
     /**
@@ -1765,6 +1814,7 @@ export function ordersRoutes(app, requireAuth) {
         if (row && row.seller_id && !startedNow) {
           await refundForCancel(req.params.id, row.seller_id, req.user.sub).catch(() => {});
         }
+        await notifyChannelStillOpen(req.params.id, 'cancelled');
       }
     }
     if (sets.length) {

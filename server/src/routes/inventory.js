@@ -2,6 +2,7 @@
 // (DB-shaped rows) on every change; we upsert all and drop any SKUs no longer
 // present, so the table mirrors the client. Empty body never wipes (safety).
 import { q } from '../db.js';
+import { recordStockMove, stockMovementsFor, stockJournalSum, STOCK_REASONS } from '../stock.js';
 // Receiving against a PO writes an audit entry and nudges both boards, the same way every
 // other stock-moving route in this file's neighbourhood does.
 import { audit } from '../audit.js';
@@ -202,12 +203,26 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
       vals.push(v); sets.push(f + '=$' + vals.length);
     }
     if (!sets.length) { reply.code(400); return { error: 'No updatable fields supplied' }; }
+    // What the shelf said BEFORE, so a typed count lands in the journal as a delta. Read
+    // only when in_stock is actually being written — every other field is free.
+    const settingStock = b.in_stock !== undefined;
+    const wasStock = settingStock
+      ? await q('select in_stock from inventory where sku=$1', [sku])
+          .then((x) => Number(x.rows[0]?.in_stock) || 0).catch(() => 0)
+      : 0;
     vals.push(sku);
     const r = await q(
       'update inventory set ' + sets.join(', ') + ', updated_at = now() where sku = $' + vals.length + ' returning *',
       vals
     );
     if (!r.rows.length) { reply.code(404); return { error: 'Unknown SKU: ' + sku }; }
+    if (settingStock) {
+      await recordStockMove({
+        sku, delta: (Number(r.rows[0].in_stock) || 0) - wasStock,
+        reason: STOCK_REASONS.set, by: req.user && req.user.sub,
+        note: `Set to ${Number(r.rows[0].in_stock) || 0} (was ${wasStock})`,
+      });
+    }
     return { ok: true, item: r.rows[0] };
   });
 
@@ -260,6 +275,13 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
       'update inventory set in_stock = coalesce(in_stock,0) + $1, updated_at = now() where sku = $2 returning *',
       [delta, sku]
     );
+    if (upd.rows.length) {
+      await recordStockMove({
+        sku, delta, by: req.user && req.user.sub,
+        reason: direction === 'out' ? STOCK_REASONS.scanOut : STOCK_REASONS.scanIn,
+        note: b.note ? String(b.note).slice(0, 200) : null,
+      });
+    }
 
     // Not ours? It may be CONSIGNED stock — the barcodes printed at receiving carry an
     // internal SKU (EG-…) that lives in consignment_lines, not inventory. Without this a
@@ -356,6 +378,13 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
         'update inventory set in_stock = coalesce(in_stock,0) + $1, updated_at = now() where sku = $2 returning sku, in_stock',
         [eaches, items[idx].sku]
       );
+      if (upd.rows.length) {
+        await recordStockMove({
+          sku: items[idx].sku, delta: eaches, reason: STOCK_REASONS.receive,
+          ref: b.po ? String(b.po) : null, by: req.user && req.user.sub,
+          note: pack > 1 ? `${take} × pack of ${pack}` : null,
+        });
+      }
       if (!upd.rows.length) {
         // NOT created blind. An inventory row carries a name, a category and a reorder
         // point that belong to the product, and inventing one here would put a bare sku on
@@ -438,6 +467,12 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
       'update inventory set in_stock = coalesce(in_stock,0) + $1, updated_at = now() where sku = $2 returning *',
       [reverse, s.sku]
     );
+    // The scan row is deleted so the scan drawer stays a list of what was really scanned.
+    // The LEDGER keeps both halves — an undo is a movement, not an unhappening.
+    await recordStockMove({
+      sku: s.sku, delta: reverse, reason: STOCK_REASONS.scanUndo, ref: id,
+      by: req.user && req.user.sub, note: `Reversed a ${s.direction} scan of ${s.qty}`,
+    });
     return { ok: true, item: upd.rows[0] || null };
   });
 
@@ -465,6 +500,16 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
     const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
     if (!rows.length) { reply.code(400); return { error: 'rows required' }; }
     let written = 0;
+    // Every sku's current count, in ONE query rather than one per row — this is the grid's
+    // save, so it can carry a whole product's variants at once.
+    const keys = rows.map((r) => String((r && r.sku) || '').trim()).filter(Boolean);
+    const wasBy = new Map(
+      keys.length
+        ? (await q('select upper(sku) as sku, in_stock from inventory where upper(sku) = any($1)',
+            [keys.map((k) => k.toUpperCase())]).catch(() => ({ rows: [] }))).rows
+            .map((x) => [String(x.sku), Number(x.in_stock) || 0])
+        : []
+    );
     for (const r of rows) {
       const sku = String(r && r.sku != null ? r.sku : '').trim();
       if (!sku) continue;
@@ -481,9 +526,43 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
            updated_at = now()`,
         [sku, r.name || null, r.variant || null, n]
       );
+      const was = wasBy.has(sku.toUpperCase()) ? wasBy.get(sku.toUpperCase()) : 0;
+      await recordStockMove({
+        sku, delta: n - was, reason: STOCK_REASONS.set, by: req.user && req.user.sub,
+        note: `Set to ${n} (was ${was})`,
+      });
       written++;
     }
     return { ok: true, written };
+  });
+
+  /**
+   * ONE SKU'S HISTORY — why the number is what it is.
+   *
+   * Staff-readable (not warehouse-only): an operator asking "where did those twelve go" is
+   * the ordinary case this exists for, and it is a read.
+   *
+   * `journal` vs `inStock` is reported rather than reconciled. They can legitimately differ
+   * for a row that existed before this ledger did, and saying so is more useful than a
+   * screen that quietly implies the history is complete when it starts mid-story.
+   */
+  app.get('/api/inventory/:sku/movements', { preHandler: requireStaff }, async (req) => {
+    const sku = String(req.params.sku || '');
+    const [rows, journal, row] = await Promise.all([
+      stockMovementsFor(sku, Number(req.query?.limit) || 100),
+      stockJournalSum(sku),
+      q('select in_stock from inventory where upper(sku)=upper($1)', [sku])
+        .then((r) => r.rows[0] || null).catch(() => null),
+    ]);
+    return {
+      sku,
+      inStock: row ? Number(row.in_stock) || 0 : null,
+      journal,
+      movements: rows.map((m) => ({
+        id: String(m.id), delta: Number(m.delta) || 0, reason: m.reason,
+        ref: m.ref || null, orderId: m.order_id || null, note: m.note || null, at: m.at,
+      })),
+    };
   });
 
   app.delete('/api/inventory/:sku', { preHandler: requireWarehouse }, async (req) => {

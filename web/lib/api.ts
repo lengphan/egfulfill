@@ -1668,6 +1668,30 @@ export type ScanRow = { id: string; sku: string; direction: "in" | "out"; qty: n
 export function scanInventory(body: { sku: string; direction: "in" | "out"; qty?: number; order_ref?: string | null }) {
   return api<{ ok: boolean; item: InventoryItem; scan: ScanRow }>(`/api/inventory/scan`, { method: "POST", body: JSON.stringify(body) })
 }
+/**
+ * ONE SKU'S STOCK HISTORY — the journal behind its count.
+ *
+ * `in_stock` used to be a running number with nothing behind it, so a count that looked
+ * wrong could not be explained. Every write to it now lands a movement, and this reads
+ * them. `journal` is the sum of those deltas: it SHOULD equal `inStock`, and where it
+ * doesn't the row predates the ledger — which the screen says rather than papering over.
+ */
+export type StockMovement = {
+  id: string
+  delta: number
+  /** One of the STOCK_REASONS ids — see server/src/stock.js. */
+  reason: string
+  ref: string | null
+  orderId: string | null
+  note: string | null
+  at: string
+}
+export type StockHistory = { sku: string; inStock: number | null; journal: number; movements: StockMovement[] }
+
+export function getStockMovements(sku: string, limit = 100) {
+  return api<StockHistory>(`/api/inventory/${encodeURIComponent(sku)}/movements?limit=${limit}`)
+}
+
 export function getScanHistory(sku?: string, limit = 100) {
   const qs = new URLSearchParams()
   if (sku) qs.set("sku", sku)
