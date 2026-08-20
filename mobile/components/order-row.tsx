@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions, Animated, Easing } from "react-native"
+import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions, Animated, Easing, PanResponder } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
@@ -22,13 +22,112 @@ export function ImagePeek({ shots, index, onClose }: {
   index: number | null
   onClose: () => void
 }) {
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
   const open = index != null
   const pager = useRef<ScrollView | null>(null)
+
+  /**
+   * IT OPENS AND CLOSES LIKE A PHOTO VIEWER, not like a screen appearing.
+   *
+   * This was `Modal animationType="fade"`, which cross-fades the ENTIRE surface — a black
+   * rectangle materialising over the list, with the photograph arriving inside it already
+   * at full size. Nothing moves, so nothing connects the thumbnail you touched to the
+   * picture you get, and a fade over a full-screen dark layer is the one transition a phone
+   * cannot do cheaply. That is what reads as heavy.
+   *
+   * Three things replace it, which together are what Threads is doing:
+   *
+   *  1. THE BACKDROP FADES AND THE PICTURE GROWS. `enter` springs 0 → 1; the ground takes
+   *     it as opacity and the photo takes it as scale from 0.92. The image arriving under
+   *     its own momentum is what makes it feel attached to the tap.
+   *  2. DRAG TO DISMISS. The photo follows your finger one-to-one, the ground thins as you
+   *     pull, and the picture shrinks slightly with distance — so letting go is obviously
+   *     going to put it back where it came from. Short pull springs home; past the
+   *     threshold, or a fast flick, it leaves.
+   *  3. IT ANIMATES OUT. Closing used to unmount instantly.
+   *
+   * All of it on the NATIVE DRIVER — only transform and opacity are touched, never layout,
+   * so the whole gesture runs off the JS thread and does not stutter while the list behind
+   * it is still settling.
+   *
+   * Core Animated + PanResponder deliberately: reanimated and gesture-handler are native
+   * modules, and adding one would mean a new dev build before anybody could see this. This
+   * ships over the air.
+   */
+  const enter = useRef(new Animated.Value(0)).current
+  const drag = useRef(new Animated.Value(0)).current
+  const closing = useRef(false)
+
+  useEffect(() => {
+    if (!open) return
+    closing.current = false
+    drag.setValue(0)
+    enter.setValue(0)
+    Animated.spring(enter, { toValue: 1, useNativeDriver: true, damping: 22, stiffness: 260, mass: 0.9 }).start()
+  }, [open, enter, drag])
+
+  /** Leave along the direction of travel, then unmount. Guarded so a flick that also lands
+   *  a tap cannot fire two closes and animate twice. */
+  const dismiss = (velocity = 0, toward = 1) => {
+    if (closing.current) return
+    closing.current = true
+    Animated.parallel([
+      Animated.timing(drag, { toValue: toward * height, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(enter, { toValue: 0, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start(() => onClose())
+    void velocity
+  }
+
+  const pan = useRef(
+    PanResponder.create({
+      /* Claimed only for a clearly VERTICAL drag. The pager underneath owns horizontal, and
+         taking every touch here would kill swiping between a line's photos — the gesture the
+         strip you came from already uses. */
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx) * 1.6,
+      onPanResponderMove: (_e, g) => drag.setValue(g.dy),
+      onPanResponderRelease: (_e, g) => {
+        const far = Math.abs(g.dy) > 110
+        const fast = Math.abs(g.vy) > 0.75
+        if (far || fast) dismiss(g.vy, g.dy >= 0 ? 1 : -1)
+        else Animated.spring(drag, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 300 }).start()
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(drag, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 300 }).start()
+      },
+    }),
+  ).current
+
+  /* The ground thins with the pull as well as with the entrance, so the list behind shows
+     through the further you drag — that is the feedback that says "let go and this ends". */
+  const pullFade = drag.interpolate({
+    inputRange: [-height, -160, 0, 160, height],
+    outputRange: [0.2, 0.72, 1, 0.72, 0.2],
+    extrapolate: "clamp",
+  })
+  const shrink = drag.interpolate({
+    inputRange: [-height, 0, height],
+    outputRange: [0.86, 1, 0.86],
+    extrapolate: "clamp",
+  })
+  const grow = enter.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] })
+
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.95)" }}>
-        <Pressable onPress={onClose} style={{ position: "absolute", top: 54, right: 20, zIndex: 2, padding: 6 }} hitSlop={12}>
+    /* `none` — the entrance is ours. Modal's own fade on top of it was the double
+       animation that made opening feel like two separate events. */
+    <Modal visible={open} transparent animationType="none" onRequestClose={() => dismiss()}>
+      <Animated.View
+        style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.95)", opacity: Animated.multiply(enter, pullFade) }}
+      />
+      <Animated.View
+        {...pan.panHandlers}
+        style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          opacity: enter,
+          transform: [{ translateY: drag }, { scale: Animated.multiply(grow, shrink) }],
+        }}
+      >
+        <Pressable onPress={() => dismiss()} style={{ position: "absolute", top: 54, right: 20, zIndex: 2, padding: 6 }} hitSlop={12}>
           <Ionicons name="close" size={28} color="#fff" />
         </Pressable>
         {/* THE WHOLE ORDER, not just the one you tapped. Paged, so it swipes exactly the way
@@ -36,9 +135,9 @@ export function ImagePeek({ shots, index, onClose }: {
             here, which is the difference between a viewer and a dead end. */}
         {/* JUMPED INTO PLACE, NOT SCROLLED INTO IT.
             `contentOffset` is applied after the list has laid out at zero, so opening on the
-            second or third picture played a visible slide across the ones before it — on top
-            of the modal's own fade, which is what read as slow and glitchy. Scrolling on
-            layout with `animated: false` puts it there before the first frame anybody sees.
+            second or third picture played a visible slide across the ones before it.
+            Scrolling on layout with `animated: false` puts it there before the first frame
+            anybody sees.
 
             `removeClippedSubviews` keeps the off-screen pages from decoding a full-width
             copy of every photo on the line at once, which is the other half of the delay. */}
@@ -52,15 +151,13 @@ export function ImagePeek({ shots, index, onClose }: {
           style={{ flex: 1 }}
         >
           {shots.map((sh, i) => (
-            <Pressable key={i} onPress={onClose} style={{ width, alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <Pressable key={i} onPress={() => dismiss()} style={{ width, alignItems: "center", justifyContent: "center", padding: 20 }}>
               {/* contain, not cover: a print file cropped to fill is one you cannot check the
                   edges of — the same rule ItemPhotos follows. */}
               <Image source={{ uri: sh.uri }} style={{ width: width - 40, aspectRatio: 1 }} resizeMode="contain" />
-              {/* NO TITLE. A marketplace product name is a keyword list — "Custom Apron with
-                  Embroidered Name, Heavy Duty Cotton Canvas Apron with Pocket, Adjustable
-                  Barista Ap…" — and it was set under the photograph in white, two lines and
-                  still truncated, on the one screen whose entire job is to show the picture
-                  larger. The line it belongs to is the one you tapped from, an inch away. */}
+              {/* NO TITLE. A marketplace product name is a keyword list, set under the
+                  photograph in white and still truncated, on the one screen whose entire job
+                  is to show the picture larger. The line it belongs to is an inch away. */}
               {shots.length > 1 && (
                 <Text style={{ marginTop: 6, fontSize: 12, fontFamily: F.body, color: "#fff", opacity: 0.55 }}>
                   {i + 1} of {shots.length}
@@ -69,7 +166,7 @@ export function ImagePeek({ shots, index, onClose }: {
             </Pressable>
           ))}
         </ScrollView>
-      </View>
+      </Animated.View>
     </Modal>
   )
 }
