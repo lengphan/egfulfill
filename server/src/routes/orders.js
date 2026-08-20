@@ -75,7 +75,10 @@ function notifyOrderEvent(orderId, event, extra) {
 const PIPELINE = ['in_review', 'approved', 'working', 'shipped'];
 // Flagged + Backorder were retired; normalizeStage collapses any legacy value onto on_hold.
 const EXCEPTIONS = ['on_hold', 'cancelled', 'refunded'];
-function normalizeStage(s) {
+// EXPORTED so tools/check-order-rules.mjs can EXECUTE it against web/shared/order-rules.ts
+// rather than compare the two by eye. Nothing else imports it; the export is the seam the
+// drift guard needs, and reading a rule is what let three divergences through before.
+export function normalizeStage(s) {
   const v = String(s || '').toLowerCase().trim();
   if (['new', 'draft', 'none', 'pending'].includes(v)) return '';
   if (PIPELINE.includes(v) || EXCEPTIONS.includes(v)) return v;
@@ -151,8 +154,13 @@ const lineFor = (isFactory) => (isFactory ? FACTORY_LINE : SELLER_LINE);
 const posOf = (s, isFactory = false) => lineFor(isFactory).indexOf(normalizeStage(s));
 // Human names, so a refusal can say which stages would be skipped rather than printing
 // the internal ids at someone.
+// COMPLETE, because the fallback below is `STAGE_LABEL[s] || s` — a missing entry does not
+// fail, it prints the raw id. 'approved' was inserted into PIPELINE and never added here, so
+// every refused skip past it read "That would skip Pending, approved." to whoever tried.
+// Found by tools/check-order-rules.mjs, which runs this against web/shared/order-rules.ts.
 const STAGE_LABEL = {
-  '': 'Draft', in_review: 'Pending', working: 'Working', shipped: 'Shipped',
+  '': 'Draft', in_review: 'Pending', approved: 'Approved', working: 'Working',
+  shipped: 'Shipped', on_hold: 'On hold', cancelled: 'Cancelled', refunded: 'Refunded',
 };
 
 /**

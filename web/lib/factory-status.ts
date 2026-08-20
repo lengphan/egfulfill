@@ -19,6 +19,31 @@
 // exactly one mention in the whole codebase — this line. Two of the dead entries were also
 // near-identical ambers (qc 700, hold 800) for unrelated meanings, which is the kind of
 // thing that only stays harmless while it stays unreachable.
+import {
+  normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage,
+  isMoneyStage, lineFor, posOf,
+} from "@/shared/order-rules"
+
+/**
+ * THE LADDER AND THE ROLE GATE LIVE IN shared/order-rules.ts.
+ *
+ * This file was the canonical copy and mobile/lib/orders.ts was a hand-kept port of it. Both
+ * now import the same module, so there is one definition of what a stage is and who may set
+ * it, and the phone cannot quietly permit something the boards forbid.
+ *
+ * What stays HERE is presentation: the tone each stage carries on a board, and the
+ * order-level readings (orderStage, lineProgress) that are about a list of items rather than
+ * about the ladder itself.
+ *
+ * stageDenial() in server/src/routes/orders.js is still a separate implementation, on
+ * purpose — it is the one that ENFORCES. tools/stage-gate-diff.mjs executes both over the
+ * whole role x stage matrix and fails if they ever disagree.
+ */
+export {
+  normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage,
+  isMoneyStage,
+}
+
 export type FactoryTone = "new" | "review" | "neutral" | "prod" | "shipped" | "hold" | "closed"
 export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 
@@ -84,60 +109,9 @@ const EXCEPTIONS = new Set(EXCEPTION_STAGES.map((s) => s.id))
 // factory approval. Confusing them is how a paid order gets treated as untouched.
 export const ALL_STATUSES: FactoryStage[] = [{ id: "", label: "Draft", tone: "new" }, ...FACTORY_STAGES, ...EXCEPTION_STAGES]
 
-// Collapse the many raw factory_status values onto a canonical id. "" = not started.
-export function normalizeStage(s?: string | null): string {
-  const v = String(s || "").toLowerCase().trim()
-  if (v === "new" || v === "draft" || v === "none" || v === "pending") return ""
-  if (ORDER.includes(v) || EXCEPTIONS.has(v)) return v
-  // Every retired id folds onto "working" — they all meant "accepted and being made",
-  // whatever paperwork step they were named after. 'awaiting_scan' joins them: an order
-  // carrying it was accepted into production, which is what "working" says, and where its
-  // label has got to is read from label_scanned_at as it always was.
-  if (["ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled",
-       "awaiting_scan", "awaiting-scan",
-       "scanned", "printing", "qc", "production", "in_production", "in-prod", "prepress",
-       "packing", "packed", "ready", "finished"].includes(v)) return "working"
-  if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
-  // Flagged + Backorder were retired — collapse them and their aliases onto On hold, the one
-  // remaining stop, so an existing order at either keeps a valid, actionable stage.
-  if (["flagged", "escalated", "action", "backorder", "replacement"].includes(v)) return "on_hold"
-  return "" // unknown → treat as new
-}
-
 export function stageMeta(id: string): FactoryStage | null {
   return ALL_STATUSES.find((s) => s.id === id) ?? null
 }
-export function isException(id?: string | null): boolean {
-  return EXCEPTIONS.has(normalizeStage(id))
-}
-
-/**
- * The next linear stage to advance an item to (null once shipped or in an exception).
- *
- * IT WALKS THIS ORDER'S OWN LINE, which is the only way it can stay correct when a stage is
- * added. It used to hard-code `isFactory && !v -> "working"`, written when FACTORY_LINE was
- * ['', 'working', 'shipped'] and that really was one step. Inserting `approved` into
- * PIPELINE made FACTORY_LINE ['', 'approved', 'working', 'shipped'] and turned the same hop
- * into a SKIP — so the Start button on the factory's own Draft orders targeted a stage the
- * server refuses for every role, admin included ("That would skip Approved"). The floor's
- * own orders could not be started from either front-end.
- *
- * Deriving the answer from lineFor() means the next stage after a future insertion is
- * whatever the line says it is, with nothing to remember to update.
- *
- * A legacy factory row sitting AT in_review is OFF this order's line (posOf = -1). It
- * rejoins at Approved — the first real step of making, and the stage the warehouse starts
- * from — rather than jumping to Working, which the warehouse may no longer set from there.
- */
-export function nextStage(current?: string | null, isFactory?: boolean): string | null {
-  const v = normalizeStage(current)
-  if (EXCEPTIONS.has(v)) return null
-  const line = lineFor(isFactory)
-  const i = line.indexOf(v)
-  if (i < 0) return "approved"
-  return i < line.length - 1 ? line[i + 1] : null
-}
-
 // An order's overall stage from its items: any exception wins; else the least-advanced
 // line. Empty items → "".
 export function orderStage(items: { factory_status?: string | null }[]): string {
@@ -220,186 +194,6 @@ export function lineProgress(items: { factory_status?: string | null }[]): { tot
 /* Approved is IN the operator zone — confirming the blank is the operator's job, and the
    stage exists to record that they did it. Working is NOT: starting production is the
    warehouse's call, tested explicitly above so the refusal can say why. */
-const OP_ZONE = new Set(["", "in_review", "approved"])
-const OP_STOPS = new Set(["on_hold"])
-const MONEY_STAGES = new Set(["cancelled", "refunded"])
-
-// The linear order, '' (Received) first, for adjacency. Exceptions are deliberately absent:
-// a stop is not a position on this line, which is why it can be entered from anywhere and
-// never counts as a skip. MIRRORS `LINE`/`skipsPipeline` in server/src/routes/orders.js.
-//
-// TWO LINES, BECAUSE "Pending" IS A SELLER STAGE AND NOT A STEP OF MAKING ANYTHING.
-//
-// in_review means: the seller submitted, we charged them, and we haven't accepted the job
-// yet. A factory-owned order has no seller and is never charged, so the stage can say
-// nothing true about one — it was only ever passed through to satisfy the one-step rule,
-// and any that stopped there sat in the seller queue looking like work someone was waiting
-// on us for. For those orders the stage is simply not on the line, so Draft → Working
-// is one move. The skip rule is untouched otherwise: it exists so nobody can assert
-// physical work that didn't happen, and in_review isn't work.
-const SELLER_LINE = ["", ...FACTORY_STAGES.map((s) => s.id)]
-const FACTORY_LINE = SELLER_LINE.filter((s) => s !== "in_review")
-const lineFor = (isFactory?: boolean) => (isFactory ? FACTORY_LINE : SELLER_LINE)
-// -1 for anything off this order's line — a stop, or a legacy in_review row on a factory
-// order. Off-line is not a position, so it is never a skip in either direction, which is
-// what lets those existing rows be moved straight on.
-const posOf = (s: string | null | undefined, isFactory?: boolean) => lineFor(isFactory).indexOf(normalizeStage(s))
-
-/**
- * Is this the factory's own order rather than a seller's?
- *
- * One reading of one server-derived column (orders.factory_order, derived from the owner's
- * role), so every caller asks the same question the same way. An order the client hasn't
- * been told about defaults to false — the stricter line.
- */
-export const isFactoryOrder = (o?: { factory_order?: boolean | null } | null) => !!o?.factory_order
-const LABEL_OF = (id: string) => (id === "" ? "Draft" : FACTORY_STAGES.find((s) => s.id === id)?.label ?? id)
-
-/**
- * WHY a move is refused, or null if it's allowed.
- *
- * Mirrors `stageDenial` in server/src/routes/orders.js — the server is what enforces this;
- * this exists so the UI can grey an option and say why, instead of silently dropping it
- * from the menu and leaving the rule unlearnable.
- *
- * `isFactory` — the factory's own order rather than a seller's (see isFactoryOrder). It
- * chooses which line the adjacency rules read; omitting it holds the caller to the
- * stricter, seller-shaped one.
- */
-export function stageDenialReason(role: string, current: string | null | undefined, target: string, isFactory?: boolean): string | null {
-  const at = normalizeStage(current)
-  const to = normalizeStage(target)
-
-  // Skipping is denied for EVERYONE, admin included — it isn't a permission, it's what the
-  // pipeline means. Nobody has the authority to make an order have been printed when it
-  // wasn't. Backwards is not a skip: it claims LESS has happened, which is always safe.
-  const ai = posOf(at, isFactory), ti = posOf(to, isFactory)
-  if (ai >= 0 && ti >= 0 && ti > ai + 1) {
-    return `That would skip ${lineFor(isFactory).slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
-  }
-
-  // A shipped order is done — the only change left is a Refund. Un-shipping would claim the
-  // buyer's tracking reversed (it can't), and it's too late to cancel. Applies to EVERY role;
-  // Refund itself is still admin-gated below (MONEY_STAGES).
-  if (at === "shipped" && to !== "shipped" && to !== "refunded") {
-    return "This order has shipped — the only change left is a refund."
-  }
-
-  /**
-   * CANCELLED AND REFUNDED ARE THE END — every role, admin included.
-   *
-   * Neither was terminal: a cancelled order could be put ON HOLD, a production state meaning
-   * "this work is paused", on an order where there is no work. And because a hold remembers
-   * where it came from in order to resume, cancel → hold → clear offered "Back to Cancelled" —
-   * a control that undid a stop by returning the order to a stop.
-   *
-   * A cancelled order may still be REFUNDED: the money is a separate fact from the work and
-   * frequently settles later. A refunded one is finished outright.
-   *
-   * Mirrors stageDenial in server/src/routes/orders.js — change both.
-   */
-  if (at === "cancelled" && to !== "cancelled" && to !== "refunded") {
-    return "This order was cancelled — the only change left is a refund."
-  }
-  if (at === "refunded" && to !== "refunded") {
-    return "This order was refunded. That is the end of it."
-  }
-
-  /**
-   * A PAID ORDER CANNOT BE DRAFT. Every role, admin included.
-   *
-   * Draft is not a stage — it is a statement about money: nobody submitted this and nobody
-   * was charged. An order sitting at Draft with a charge against it is a contradiction the
-   * rest of the system then acts on: the seller's Submit unlocks (their zone is '', new,
-   * draft, in_review), the order reads untouched and editable, and the money stays taken.
-   * It was the operator's rule alone, so the two roles most likely to be tidying a board
-   * were the two who could create it.
-   *
-   * Nothing is lost. A mis-click steps back one stage inside production, a pause is On
-   * hold, and an order that should not be made is Cancelled — which refunds. Only the WORD
-   * Draft is refused, because it is the one of the four that says something untrue.
-   *
-   * Never for a factory order: nothing was charged, so "this has been paid for" would be
-   * false about the floor's own work.
-   *
-   * Mirrors stageDenial in server/src/routes/orders.js — change both.
-   */
-  if (!isFactory && (to === "" || to === "new" || to === "draft") && posOf(at, isFactory) > posOf("", isFactory)) {
-    return "This order has been paid for, so it cannot go back to Draft. Step it back one stage, put it on hold, or cancel it to refund."
-  }
-
-  if (role === "admin") return null
-  if (role === "warehouse") {
-    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision."
-    /**
-     * PRODUCTION STARTS FROM APPROVED, and only from there.
-     *
-     * Approved means an operator has confirmed the blank on every line — the whole reason
-     * the stage exists. Starting from Pending would be the warehouse making that judgement
-     * itself, on an order whose variants may still be unset, which is the case Approved was
-     * added to catch. Admin is past this check already and may skip.
-     */
-    /* Coming off a HOLD is not starting production — it is putting the order back where the
-       stop found it, which may well be Working. Gating that on Approved would strand every
-       held order that was already being made. */
-    if (to === "working" && at !== "approved" && at !== "on_hold") {
-      return "Start it from Approved — an operator confirms the blank first."
-    }
-    return null
-  }
-  if (role === "operator") {
-    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
-    if (OP_STOPS.has(to)) return null                       // andon cord: any stage
-    /**
-     * AND THE CORD LETS GO. Raising a stop is an operator's right from any stage; releasing
-     * it has to be the same right, or the andon cord is a trap — the one who pulled it
-     * cannot undo a false alarm, and has to find a warehouse to say "never mind".
-     *
-     * Coming off hold is not starting production: it is putting the order back where it was
-     * before the stop, which is why it is allowed even to Working, which an operator may not
-     * otherwise set. Money stages are still refused above.
-     */
-    if (at === "on_hold") return null
-    // Tested on the DESTINATION, not the origin. As `at === "in_review"` it blocked only
-    // the direct hop, and OP_ZONE also holds the next stage along — so the same move went
-    // through in two clicks via Working. Anything past Received has been PAID for.
-    // The justification is the CHARGE, so it can't apply to a factory order — nothing was
-    // taken, and saying "this order has been paid for" about the floor's own order would
-    // be untrue. Custody is still covered by the OP_ZONE tests below.
-    // (Sending a paid order back to Draft is refused for every role above — this was the
-    // only copy of that rule, which is how warehouse and admin kept the hole.)
-    /**
-     * AN OPERATOR APPROVES; THE WAREHOUSE STARTS.
-     *
-     * The operator's job on this line is the BLANK — confirming it is theirs, and Approved
-     * is where that judgement is recorded. Committing the order to production is the
-     * warehouse's call, and it is a different decision made by whoever is going to make the
-     * thing. So Working is out of reach here even though Approved is not: the handover is
-     * the point of having two stages rather than one.
-     */
-    if (to === "working") return "Approving is yours — the warehouse starts production from there."
-    if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
-    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Approved."
-    return null
-  }
-  return "Your role cannot change production status."
-}
-
-export function canSetStage(role: string, current: string | null | undefined, target: string, isFactory?: boolean): boolean {
-  return stageDenialReason(role, current, target, isFactory) === null
-}
-
-/**
- * Cancelled and Refunded — the two stages that MOVE MONEY.
- *
- * Exported because they are order-level moves, not line-level ones, and a control that
- * offers them per line cannot keep that promise: the refund is worked out by the order's
- * PATCH (refundForCancel in server/src/routes/orders.js), while a per-line write only sets
- * order_items.factory_status. Setting one line to Cancelled therefore reverses nothing,
- * charges nothing back, and — because orderStage() lets any exception win — makes the WHOLE
- * order read Cancelled. Same set the role gate uses, so the two can't drift apart.
- */
-export const isMoneyStage = (id?: string | null): boolean => MONEY_STAGES.has(normalizeStage(id))
 
 /**
  * The stages to WRITE, in order, to get from here to there one step at a time.

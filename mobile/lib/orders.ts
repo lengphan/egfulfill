@@ -1,212 +1,56 @@
 import type { Order } from "./api"
+import {
+  PIPELINE, STAGE_LABEL, normalizeStage, isOpenStage, isException,
+  nextStage as nextStageOn, stageDenialReason, canSetStage, isFactoryOrder,
+  isOverdueBy, DEFAULT_OVERDUE_DAYS, plainNum, platformFromId, unitsOfItems,
+} from "@shared/order-rules"
 
 /**
- * THE RULES, and they must never disagree with the web.
+ * THE RULES — NOT A COPY OF THEM ANY MORE.
  *
- * Ported from web/lib/factory-status.ts and web/lib/order-filter.ts rather than reinvented.
- * For the spike they are duplicated here so the app can run standalone; the moment this
- * stops being a spike they move to a package both surfaces import, because a second copy of
- * "what does Working mean" is exactly how one screen starts telling a different story about
- * a real order. CLAUDE.md records three files that already grew private copies of these.
- */
-
-/*
- * OPEN means the same thing here as on the boards: not shipped, and not parked in an
- * exception. This counted only shipped/cancelled/refunded as finished, so an ON HOLD order
- * stayed "open" on the phone while the web had already set it aside — the same floor,
- * counted two ways. web/lib/order-filter.ts: `!isException(stage) && stage !== "shipped"`.
- */
-const CLOSED = new Set(["shipped", "cancelled", "refunded", "on_hold"])
-
-/*
- * MIRRORS normalizeStage() and PIPELINE in server/src/routes/orders.js. Change both.
+ * This file used to port web/lib/factory-status.ts rule for rule, with a comment promising
+ * the two would move into a package "the moment this stops being a spike". They have. The
+ * ladder, the stage vocabulary and the role gate now live once, in shared/order-rules.ts,
+ * and both front-ends import that file — metro.config.js watches it, so it hot-reloads here
+ * like any local module.
  *
- * This had DRIFTED: it folded `awaiting_scan` onto "packed" and passed every other unknown
- * value straight through, while the server folds the whole retired vocabulary onto
- * "working" and returns "" for anything it does not know. So the phone could name a stage
- * the server has never heard of — harmless while it only displayed them, and not harmless
- * now that it can ASK for one.
- */
-export const PIPELINE = ["in_review", "approved", "working", "shipped"] as const
-const EXCEPTIONS = ["on_hold", "cancelled", "refunded"]
-const RETIRED_WORKING = [
-  "ready_print", "in_queue", "queued", "prescan", "printed", "label", "labelled", "labeled",
-  "awaiting_scan", "awaiting-scan", "scanned", "printing", "qc", "production", "in_production",
-  "in-prod", "prepress", "packing", "packed", "ready", "finished",
-]
-
-export function normalizeStage(s?: string | null): string {
-  const v = String(s ?? "").trim().toLowerCase()
-  if (["new", "draft", "none", "pending", ""].includes(v)) return ""
-  if ((PIPELINE as readonly string[]).includes(v) || EXCEPTIONS.includes(v)) return v
-  if (RETIRED_WORKING.includes(v)) return "working"
-  if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
-  if (["flagged", "escalated", "action", "backorder", "replacement"].includes(v)) return "on_hold"
-  return ""
-}
-
-/*
- * The FACTORY's own words for a stage — the exact labels in web/lib/factory-status.ts.
+ * They are re-exported under the names this app already used, so every screen's import is
+ * unchanged and there is exactly one definition behind them.
  *
- * These are not the seller's words: a seller sees collapsed stages, where approved and
- * working both read "In Process", because which internal step it is on is not their
- * business. The floor needs to know which. Two vocabularies on purpose — the mistake is
- * mixing them, or inventing a third here, which "In production" and "In review" were.
+ * What is still duplicated on purpose: stageDenial() in server/src/routes/orders.js. That is
+ * the one that ENFORCES; this one exists so a control can be greyed with its reason instead
+ * of being pressed and failing. tools/stage-gate-diff.mjs executes both over the whole
+ * role × stage matrix and fails if they ever answer differently.
  */
-export const STAGE_LABEL: Record<string, string> = {
-  "": "New", in_review: "Pending", approved: "Approved", working: "Working",
-  shipped: "Shipped", on_hold: "On hold", cancelled: "Cancelled", refunded: "Refunded",
+export {
+  PIPELINE, STAGE_LABEL, normalizeStage, isException, stageDenialReason, canSetStage,
+  isFactoryOrder, plainNum,
 }
 /** The stage as a person reads it. Raw ids ("working", "in_review") were being printed
  *  straight onto rows, which is why the phone and the boards disagreed on wording. */
 export const stageLabel = (o: Order) => STAGE_LABEL[normalizeStage(o.factory_status)] ?? ""
 
-/* ── THE LADDER, AND WHO MAY CLIMB IT ─────────────────────────────────────────
+/* ── THE LADDER ───────────────────────────────────────────────
  *
- * THE WEB IS CANONICAL. Everything from here to the end of this section is a port of
- * web/lib/factory-status.ts, rule for rule, because the phone is an extension of the web
- * app and not a second opinion about it. Its job is to make the same move FASTER — never
- * to permit something the web forbids, and never to withhold something the web offers.
+ * SELLER_LINE / FACTORY_LINE / lineFor / posOf and the whole role gate moved to
+ * shared/order-rules.ts. The phone is an extension of the web app, not a second opinion
+ * about it — which is now structural rather than a promise in a comment.
  *
- * Two mobile-only rules used to live here and both were the second kind. A line was never
- * offered "Pending" (it was remapped to Approved, which the server then refused as a skip,
- * so the button could not succeed at all), and a Draft order on a seller's account offered
- * nothing at all. Each was argued for in a comment and each quietly made the phone worse at
- * the one thing it is for.
- */
-
-/**
- * TWO LINES, because "Pending" is a SELLER stage and not a step of making anything.
- * Mirrors SELLER_LINE / FACTORY_LINE in web/lib/factory-status.ts and orders.js.
- */
-const SELLER_LINE = ["", ...PIPELINE]
-const FACTORY_LINE = SELLER_LINE.filter((s) => s !== "in_review")
-const lineFor = (isFactory?: boolean) => (isFactory ? FACTORY_LINE : SELLER_LINE)
-/** -1 for anything off this order's line — a stop, or a legacy in_review row on a factory
- *  order. Off-line is not a position, so it is never a skip in either direction. */
-const posOf = (s: string | null | undefined, isFactory?: boolean) =>
-  lineFor(isFactory).indexOf(normalizeStage(s))
-
-/**
- * The ONE stage this may move to next, or null at the end of the line.
- *
- * IT WALKS THE LINE rather than hard-coding hops, which is the only way it stays correct
- * when a stage is added. The old code said `isFactory && at === "" -> "working"`, written
- * when FACTORY_LINE was ['', 'working', 'shipped'] and that was genuinely one step.
- * Inserting `approved` into PIPELINE made it a SKIP, and the server refuses a skip for
- * every role including admin — so Start Order on the factory's own Draft orders was a
- * button that could not work for anybody.
- */
-function nextOnLine(current?: string | null, isFactory?: boolean): string | null {
-  const at = normalizeStage(current)
-  if (EXCEPTIONS.includes(at)) return null
-  const line = lineFor(isFactory)
-  const i = line.indexOf(at)
-  // Off-line: a legacy in_review row on a factory order. It rejoins at Approved — the first
-  // real step of making, and the stage the warehouse starts from.
-  if (i < 0) return "approved"
-  return i < line.length - 1 ? line[i + 1] : null
-}
+ * The wrappers below stay because the screens pass an Order, not (stage, isFactory). */
 
 export function nextStage(o: Order): string | null {
-  return nextOnLine(o.factory_status, isFactoryOrder(o))
+  return nextStageOn(o.factory_status, isFactoryOrder(o))
 }
 
-const OP_ZONE = new Set(["", "in_review", "approved"])
-const OP_STOPS = new Set(["on_hold"])
-const MONEY_STAGES = new Set(["cancelled", "refunded"])
-const LABEL_OF = (id: string) => (id === "" ? "Draft" : STAGE_LABEL[id] ?? id)
+export const isOpen = (o: Order) => isOpenStage(normalizeStage(o.factory_status))
 
-/**
- * WHY a move is refused, or null if it's allowed.
- *
- * A PORT OF stageDenialReason IN web/lib/factory-status.ts — change both, and change
- * stageDenial in server/src/routes/orders.js with them. The server is what enforces this;
- * this exists so the phone can grey a control and say why, instead of sending a request it
- * already knows will come back 403.
- *
- * The phone had NO copy of this at all. It gated on "is this person staff", which is true
- * of designers too, so every staff role saw every button and learned the rules by pressing
- * things and reading Alerts. That is slow on a factory floor, and on Confirm shipment it
- * was worse than slow: an operator can never set `shipped`, so the sequence was photograph
- * the parcel → upload it → post it to the order → get refused, every single time.
- */
-export function stageDenialReason(
-  role: string, current: string | null | undefined, target: string, isFactory?: boolean,
-): string | null {
-  const at = normalizeStage(current)
-  const to = normalizeStage(target)
+/** Late against the PROMISE where there is one, and only then against age. Delegates to
+ *  shared/order-rules.ts — this was a hand-kept copy that had drifted twice (it counted
+ *  closed orders as late forever, so the phone's Late tally climbed over finished work). */
+export const isOverdue = (o: Order, fallbackDays = DEFAULT_OVERDUE_DAYS) =>
+  isOverdueBy(o, fallbackDays)
 
-  // Skipping is denied for EVERYONE, admin included. Not a permission — it is what the
-  // pipeline means. Backwards is not a skip: it claims LESS has happened, which is safe.
-  const ai = posOf(at, isFactory), ti = posOf(to, isFactory)
-  if (ai >= 0 && ti >= 0 && ti > ai + 1) {
-    return `That would skip ${lineFor(isFactory).slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
-  }
-  if (at === "shipped" && to !== "shipped" && to !== "refunded") {
-    return "This order has shipped — the only change left is a refund."
-  }
-  if (at === "cancelled" && to !== "cancelled" && to !== "refunded") {
-    return "This order was cancelled — the only change left is a refund."
-  }
-  if (at === "refunded" && to !== "refunded") {
-    return "This order was refunded. That is the end of it."
-  }
-  // A PAID ORDER CANNOT BE DRAFT — every role. Draft is a statement about money: nobody
-  // submitted this and nobody was charged. Never for a factory order; nothing was charged.
-  if (!isFactory && (to === "" || to === "new" || to === "draft") && posOf(at, isFactory) > posOf("", isFactory)) {
-    return "This order has been paid for, so it cannot go back to Draft. Step it back one stage, put it on hold, or cancel it to refund."
-  }
-
-  if (role === "admin") return null
-  if (role === "warehouse") {
-    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision."
-    // Production starts from Approved — an operator confirms the blank first. Coming off a
-    // HOLD is not starting production, so it is exempt.
-    if (to === "working" && at !== "approved" && at !== "on_hold") {
-      return "Start it from Approved — an operator confirms the blank first."
-    }
-    return null
-  }
-  if (role === "operator") {
-    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
-    if (OP_STOPS.has(to)) return null                       // andon cord: any stage
-    if (at === "on_hold") return null                       // and the cord lets go
-    // An operator APPROVES; the warehouse STARTS. The handover is the point of two stages.
-    if (to === "working") return "Approving is yours — the warehouse starts production from there."
-    if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
-    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Approved."
-    return null
-  }
-  return "Your role cannot change production status."       // designer, and anything new
-}
-
-export const canSetStage = (role: string, current: string | null | undefined, target: string, isFactory?: boolean) =>
-  stageDenialReason(role, current, target, isFactory) === null
-
-export const isOpen = (o: Order) => !CLOSED.has(normalizeStage(o.factory_status))
-
-/**
- * Mirrors isOverdue() in web/lib/order-filter.ts: the ship-by date decides when Etsy gave us
- * one, and age is only the fallback. Judging every order by age alone calls a young order
- * late and lets a genuinely late one through.
- */
-export function isOverdue(o: Order, fallbackDays = 10): boolean {
-  /*
-   * A CLOSED ORDER IS NEVER LATE — the check web/lib/order-filter.ts makes first, and this
-   * did not. Shipped, cancelled and refunded orders kept counting against their ship-by
-   * date forever, so the phone's "Late" tally rose every day and included work that was
-   * finished. Today happened to filter to open orders before counting and looked right;
-   * the Orders list did not, so the two disagreed about the same floor.
-   */
-  if (!isOpen(o)) return false
-  if (o.ship_by) return new Date(o.ship_by).getTime() < Date.now()
-  if (!o.created_at) return false
-  const days = (Date.now() - new Date(o.created_at).getTime()) / 86_400_000
-  return days > fallbackDays
-}
-
-export const units = (o: Order) => (o.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
+export const units = (o: Order) => unitsOfItems(o.items)
 
 export function ageLabel(o: Order): string {
   if (!o.created_at) return "—"
@@ -223,17 +67,9 @@ export function ageLabel(o: Order): string {
  *
  * The platform belongs on the row's second line, not welded to the front of the number.
  *
- * DUPLICATED, and it should not be: this file already mirrors the stage vocabulary in
- * server/src/routes/orders.js, and this makes a third copy of rules the web also holds.
- * The fix is a shared package both apps import; until then, changing either side means
- * changing both.
+ * The prefix table and plainNum() live in shared/order-rules.ts now — this was the third
+ * copy of them, and the comment that used to sit here said so and asked for exactly this.
  */
-const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
-const PLATFORM_NAMES: Record<string, string> = {
-  etsy: "Etsy", shopify: "Shopify", tiktok: "TikTok", amazon: "Amazon",
-  ebay: "eBay", woo: "WooCommerce", walmart: "Walmart", manual: "Manual",
-}
-export const plainNum = (id: string) => String(id ?? "").replace(SOURCE_PREFIX, "")
 /**
  * A READABLE REF WHEN THERE IS NO SEQ — ported from web/lib/order-format.ts, not invented.
  *
@@ -259,10 +95,7 @@ export const numOf = (o: Order) => {
   const ref = shortOrderRef(String(o.id))
   return /^\d+$/.test(ref) ? `#${ref}` : ref
 }
-export const platformOf = (o: Order) => {
-  const raw = (String(o.id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
-  return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
-}
+export const platformOf = (o: Order) => platformFromId(String(o.id ?? ""))
 
 /* ── LINES ────────────────────────────────────────────────────────────────────
  * A line is the unit of work. The order is the unit of shipping. Everything below keeps
@@ -357,10 +190,6 @@ export const lineTitle = (it: { name?: string | null; blank?: string | null; sku
 export const lineFacts = (it: { color?: string | null; size?: string | null; print_type?: string | null }) =>
   [it.color, it.size, it.print_type].map((v) => (v ? String(v).trim() : "")).filter(Boolean)
 
-/** The factory's OWN order rather than a seller's. Mirrors isFactoryOrder in
- *  web/lib/factory-status.ts, which reads the same column. */
-export const isFactoryOrder = (o?: { factory_order?: boolean | null } | null) => !!o?.factory_order
-
 /**
  * Where this LINE goes next — the SAME ladder as the order.
  *
@@ -386,7 +215,7 @@ export function nextLineStage(
   it: { factory_status?: string | null },
   order?: { factory_order?: boolean | null } | null,
 ): string | null {
-  return nextOnLine(it.factory_status, isFactoryOrder(order))
+  return nextStageOn(it.factory_status, isFactoryOrder(order))
 }
 
 /**
