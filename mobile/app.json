@@ -9,7 +9,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "store.egful.app",
-      "icon": "./assets/icon.png"
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "store.egful.app",
