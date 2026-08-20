@@ -44,6 +44,27 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
   // same precedence artwork uses. `sheet` is set by kindOf server-side.
   const sheet = filesForLine(files, item).find((f) => f.kind === "sheet")
 
+  /**
+   * IS THERE ANYTHING TO SEW? Asked HERE, from files the page already holds, instead of by
+   * asking the renderer and rendering its refusal.
+   *
+   * A line with no machine file drew a full-size empty square reading "No machine file for
+   * that design." — the 404 from /api/wilcom/design-preview. On an order of plain DTG items
+   * that is a 144px hole beside every line, holding space for a thing that does not exist
+   * and never will on that line. An absence does not need a frame.
+   *
+   * The predicate MIRRORS THE LOOKUP in server/src/routes/wilcom.js: the line's own .emb,
+   * else ANY .emb on the order — checking only this line would hide a tile the renderer
+   * would in fact have answered, which is the opposite mistake and the more expensive one.
+   *
+   * `files === undefined` means they have not arrived yet, which is not the same as "none":
+   * nothing is drawn until it is known, so the tile appears WITH a file rather than as a
+   * box that might later fill.
+   */
+  const hasMachineFile = (files ?? []).some(
+    (f) => f.kind === "emb" || /\.emb$/i.test(String(f.name || "")),
+  )
+
   useEffect(() => () => { if (objectUrl.current) URL.revokeObjectURL(objectUrl.current) }, [])
 
   // A worksheet costs nothing, so it loads itself. Keyed on the design id: a line whose file
@@ -129,6 +150,12 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
       </div>
     )
   }
+
+  // NOTHING TO SHOW AND NOTHING TO OFFER. No worksheet, no stitch file, and no render in
+  // hand — so there is no tile. The reason states below are kept for the case that matters:
+  // a file that EXISTS and could not be read, which sends someone to the digitiser rather
+  // than to the designer, and must still say so.
+  if (!hasMachineFile && !why && !busy) return null
 
   return (
     <div className={`${frame} grid place-items-center p-2 text-center`} style={style}>
