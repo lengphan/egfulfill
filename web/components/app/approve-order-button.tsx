@@ -69,10 +69,16 @@ export function ApproveOrderButton({
     setBusy(true)
     onError?.("")
     try {
-      // One hop either way — Pending → Working for a seller's order, Draft → Working for
-      // the factory's own. Move each line, then the order.
+      /**
+       * THE LINES GO WHERE THE ORDER GOES. This wrote "working" for every line whatever the
+       * button said, which was left behind when Approve and Start became two stages: an
+       * operator pressing Approve sent every LINE to Working — a stage that role may not set
+       * — and then the ORDER to Approved, so the two disagreed and the line writes were
+       * refused one by one. It also made the shelf flicker, since the order reaching Working
+       * takes its blanks and the correction at Approved puts them straight back.
+       */
       for (const it of order.items ?? []) {
-        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", "working", it.line_id)
+        if (it.sku || it.line_id) await postItemStatus(order.id, it.sku ?? "", target, it.line_id)
       }
       /**
        * APPROVE MEANS APPROVED, and Start means Working — they are two stages now.
