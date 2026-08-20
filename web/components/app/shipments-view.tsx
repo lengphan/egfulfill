@@ -448,7 +448,11 @@ export function ShipmentsView() {
                         row already says refunded twice over — the crossed-out tracking above
                         and the crossed-out price here. A third statement of it is noise, and
                         the totals live in the tile where they can be read at a glance. */}
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs tabular-nums">
+                    {/* At the table's own size, not a step under it. Postage is the number
+                        this column exists for, and text-xs made it smaller than the customer
+                        name beside it — so the one figure being scanned was the quietest
+                        thing in the row. */}
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums">
                       {s.price != null ? (
                         <span className={(s.refunded ?? 0) > 0 ? "text-muted-foreground line-through decoration-destructive/70" : ""}>
                           ${s.price.toFixed(2)}

@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Warning } from "@phosphor-icons/react"
+import { ArrowRight, ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
@@ -23,12 +23,15 @@ import { plainNum, platformFromId } from "@/lib/order-format"
 const when = (s: string | null | undefined) =>
   s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : null
 
+// THE STATUS NAME, AND NOTHING ELSE. These were sentences ("Not collected by the
+// carrier yet") sitting above the carrier's own raw detail line and a timestamp, so
+// one fact was said three ways down the right-hand column. A status is a word.
 const DELIVERY_WORD: Record<string, string> = {
-  awaiting_pickup: "Not collected by the carrier yet",
+  awaiting_pickup: "Preshipment",
   in_transit: "In transit",
   delivered: "Delivered",
-  returned: "Coming back to us",
-  failed: "The carrier could not deliver it",
+  returned: "Returned",
+  failed: "Delivery failed",
 }
 
 const VIA_WORD: Record<string, string> = {
@@ -422,18 +425,15 @@ export function ShipmentDetailDialog({
 
           {/* TWO STATUSES, ONE EACH SIDE OF THE DOOR — and they used to be four rows.
               "Carrier says", "Detail", "Last checked" and "Pre-scan" are all one question
-              asked twice: what does the carrier know, and what did WE do. So the carrier's
-              word, their sentence and when we last asked collapse into one row, and the
-              scan becomes the dispatch side of the pair. The parcel's own history reads
-              down the column instead of being spread across labels. */}
+              asked twice: what does the carrier know, and what did WE do. So the carrier
+              gets ONE row carrying ONE word, and the scan becomes the dispatch side of the
+              pair. Their raw sentence and the time we last asked are gone: neither changes
+              what anyone does next, and stacked under the status they read as three
+              separate facts when there is only one. */}
           <div>
             <Row label="Carrier status">
               {s.delivery
-                ? <>
-                    <span>{DELIVERY_WORD[s.delivery] ?? s.delivery}</span>
-                    {s.deliveryDetail && <span className="block text-xs text-muted-foreground">{s.deliveryDetail}</span>}
-                    {s.deliveryCheckedAt && <span className="block text-2xs text-muted-foreground">asked {when(s.deliveryCheckedAt)}</span>}
-                  </>
+                ? <span>{DELIVERY_WORD[s.delivery] ?? s.delivery}</span>
                 : <span className="text-muted-foreground">Not asked yet</span>}
             </Row>
             <Row label="Dispatch status">
@@ -586,17 +586,36 @@ export function ShipmentDetailDialog({
                 Wrong order?
               </Button>
             )}
-            {/* The carrier's own copy still has a use — checking ours against theirs. */}
+            {/* The carrier's own copy still has a use — checking ours against theirs.
+                Called what it does: it opens the label. "Carrier's copy" described where the
+                PDF is hosted, which is our bookkeeping, not the reader's question. */}
             {s.labelUrl && (
               <a href={s.labelUrl} target="_blank" rel="noopener noreferrer"
                  className={buttonVariants({ variant: "ghost", size: "sm" })}>
                 <ArrowSquareOut size={13} />
-                Carrier&apos;s copy
+                Open Label
               </a>
             )}
 
-            {s.labelUrl && (
+            {(s.labelUrl || !isLoose) && (
               <div className="ms-auto flex items-center gap-2">
+                {/* THE WAY OUT OF THE WINDOW. This shows one parcel in full, and the question
+                    it most often raises — what is actually in the box, who packed it, what
+                    the buyer was told — is answered on the order, which took a close, a scan
+                    of a second list and a search by number to reach. The parcel already knows
+                    its order: for anything that is not `sh_*`, the shipment id IS the order
+                    id. So it is one click, and it is absent for a loose label because there
+                    is nothing to open — that case is handled by Attach, above. */}
+                {!isLoose && (
+                  <a
+                    href={`/orders/${encodeURIComponent(s.id)}`}
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                    title="Open the full order this parcel belongs to"
+                  >
+                    Open order
+                    <ArrowRight size={13} />
+                  </a>
+                )}
                 {/* The same blob the frame is showing — so what you save is provably what you
                     just looked at, and it needs no second authenticated request. */}
                 <a
