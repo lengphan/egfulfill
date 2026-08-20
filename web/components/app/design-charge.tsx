@@ -1,135 +1,151 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch } from "@phosphor-icons/react"
-import { getDesignFees, setDesignTier, type DesignTier, type OrderItem } from "@/lib/api"
-import { TIER_LABEL, TIER_WHY, feeFor, type DesignFees } from "@/lib/design-fee"
+import { CircleNotch, PencilSimple, Check, X } from "@phosphor-icons/react"
+import { getDesignFees, setDesignTier, type DesignFees, type DesignTier, type OrderDesignFee } from "@/lib/api"
 
-const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
-const TIERS: DesignTier[] = ["standard", "complex", "supplied"]
+const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 
 /**
- * THE DESIGN CHARGE, BESIDE THE TOTAL — set here, read here.
+ * THE AMOUNT CELL OF A DESIGN-FEE ROW, and nothing else.
  *
- * It used to live inside the design window, which put the one number a seller is billed on
- * a screen about placing pictures, and buried it behind opening a line. Money belongs with
- * money: this sits in the order's Summary, under what the order costs, so the charge and
- * the total it lands in are read in one glance and changed in one place.
+ * This file used to export a whole panel: three buttons per line — Standard / Complex /
+ * Their file, each with a price — sitting under the total. That was a classification control
+ * wearing the clothes of a charge. It also duplicated a row that already existed a few lines
+ * above it in the same card, where the design fee is listed beside Shipping and the volume
+ * discount like every other cost on the order.
  *
- * STAFF ONLY, and the server agrees — the person being charged must not be the one setting
- * the charge. It renders per LINE because that is what a tier is: two lines of one order
- * can legitimately be one supplied file and one we cut from scratch.
+ * So the panel is gone and this is what replaced it: the `<dd>` of that existing row, with a
+ * pencil on it. The row keeps its label and the items it covers; only the figure gained an
+ * editor.
  *
- * NOTHING IS PRE-SELECTED. There was a suggestion once, worked out from a rule of thumb and
- * shown as a tinted chip with a fee beside it; nothing was ever debited by it, and it still
- * sat where a real charge goes. Picking a tier is a decision, not a confirmation of ours.
+ * WHY THERE IS A SUGGESTION AT ALL. The old panel deliberately pre-selected nothing —
+ * "picking a tier is a decision, not a confirmation of ours". The tier still is a decision,
+ * and staff can still change it. But the server already KNOWS which fee applies in the
+ * ordinary case: `tierOf()` in routes/orders.js reads an attached machine file as `supplied`
+ * (the seller sent their own file, so we only check it) and artwork as `standard` (we digitise
+ * it), and an explicit staff classification still overrules the inference. Showing a blank
+ * where the files already answer the question is not neutrality, it is withholding.
+ *
+ * WHAT EDITING MEANS. A fee list cannot know that one particular file took twenty minutes to
+ * clean up. Typing a figure overrides the list price for that job; clearing the box returns it
+ * to the list price. The server charges — and quotes — whatever this resolves to, so the
+ * number on screen is the number billed.
+ *
+ * STAFF ONLY, and the server agrees: the person being charged must not set the charge.
  */
-export function DesignCharge({ orderId, items, onChanged }: {
+export function DesignFeeAmount({ orderId, fee, onChanged }: {
   orderId: string
-  items: OrderItem[]
+  fee: OrderDesignFee
   onChanged?: () => void
 }) {
-  const [fees, setFees] = useState<DesignFees | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
-  /** The tier as this panel currently believes it, keyed by line — so a chip reflects the
-   *  press immediately rather than waiting for the order to be re-read. */
-  const [local, setLocal] = useState<Record<string, DesignTier>>({})
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+  const [list, setList] = useState<DesignFees | null>(null)
 
   useEffect(() => {
+    if (!editing || list) return
     // Deferred: a straight setState in an effect body cascades a render, which this
-    // codebase's lint rule rejects.
-    const t = setTimeout(() => { getDesignFees().then(setFees).catch(() => setFees(null)) }, 0)
+    // codebase's lint rule rejects. Fetched on the first EDIT, not on mount — the list price
+    // is only needed by someone about to depart from it.
+    const t = setTimeout(() => { getDesignFees().then(setList).catch(() => setList(null)) }, 0)
     return () => clearTimeout(t)
-  }, [])
+  }, [editing, list])
 
-  const keyOf = useCallback((it: OrderItem) => String(it.line_id || it.sku || ""), [])
+  /** The tier's own list price, for the hint under the box. */
+  const listed = list
+    ? (fee.tier === "supplied" ? list.check : fee.tier === "complex" ? list.complex : list.standard)
+    : null
 
-  const apply = async (it: OrderItem, id: DesignTier) => {
-    const k = keyOf(it)
-    setBusy(k + id); setErr(null); setNote(null)
+  const save = async (amount: number | null) => {
+    setBusy(true); setErr(null)
     try {
-      const r = await setDesignTier(orderId, { tier: id, line_id: it.line_id, sku: it.line_id ? undefined : it.sku })
+      const r = await setDesignTier(orderId, {
+        // The tier travels with the price because the row IS a tier — the server needs to
+        // know which kind of work is being priced, and a fee with no classification is a
+        // number with no reason.
+        tier: fee.tier as DesignTier,
+        amount,
+        line_id: fee.line_id || undefined,
+        sku: fee.line_id ? undefined : (fee.sku || undefined),
+      })
       if (r?.error) throw new Error(r.error)
-      setLocal((m) => ({ ...m, [k]: id }))
-      // The SERVER's own account of what happened — quoted, charged, already charged, our
-      // own shop, or no fee configured. Each is a different fact and only it knows which.
-      setNote(r.quoted
-        ? "Quoted to the seller. Nothing is charged until they accept, and they may decline."
-        : r.charged?.charged
-          ? `Charged ${usd(Number(r.charged.charged))} to the seller.`
-          : r.charged?.reason === "already-charged"
-            ? "Re-filed. This line was already charged, so nothing moved."
-            : r.charged?.reason === "factory-order"
-              ? "Filed. This is our own shop's order, so nothing is charged."
-              : r.charged?.reason === "no-fee-set"
-                ? "Filed. No fee is set for this tier, so nothing was charged."
-                : "Filed.")
+      setEditing(false)
       onChanged?.()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't set that charge.")
-    } finally { setBusy(null) }
+      setErr(e instanceof Error ? e.message : "Couldn't set that amount.")
+    } finally { setBusy(false) }
   }
 
-  if (!items.length) return null
+  const commit = useCallback(() => {
+    const t = draft.trim()
+    // An empty box CLEARS the override rather than charging zero — "I didn't mean to change
+    // it" and "this job is free" are different instructions and must not share a gesture.
+    void save(t === "" ? null : Number(t))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft])
+
+  // Charged is settled: the seller has paid this, and editing it afterwards would rewrite a
+  // record rather than price a job.
+  const locked = fee.status === "charged"
+
+  if (editing) {
+    return (
+      <dd className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="flex items-center gap-1">
+          <span className="text-muted-foreground">$</span>
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.replace(/[^0-9.]/g, ""))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit()
+              if (e.key === "Escape") setEditing(false)
+            }}
+            inputMode="decimal"
+            aria-label={`${fee.label} amount`}
+            className="h-7 w-20 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+          />
+          <button type="button" aria-label="Save this amount" title="Save — this is what gets charged"
+            disabled={busy} onClick={commit}
+            className="rounded p-1 text-primary hover:bg-accent disabled:opacity-50">
+            {busy ? <CircleNotch size={13} className="animate-spin" /> : <Check size={13} weight="bold" />}
+          </button>
+          <button type="button" aria-label="Cancel" onClick={() => setEditing(false)}
+            className="rounded p-1 text-muted-foreground hover:bg-accent">
+            <X size={13} weight="bold" />
+          </button>
+        </span>
+        {/* The baseline it is departing from, so an override is made against a known number
+            rather than from memory. Only while editing — it is noise the rest of the time. */}
+        {listed != null && <span className="text-2xs font-normal text-muted-foreground">list {usd(listed)} · empty = list price</span>}
+        {err && <span className="text-2xs font-normal text-destructive">{err}</span>}
+      </dd>
+    )
+  }
 
   return (
-    <div className="border-t border-border pt-3">
-      <div className="mb-2 text-xs font-medium text-muted-foreground">Design charge</div>
-      <div className="space-y-2.5">
-        {items.map((it) => {
-          const k = keyOf(it)
-          const tier = local[k] ?? ((it.design_tier as DesignTier | null) ?? null)
-          const quote = it.design_quote_status ?? null
-          return (
-            <div key={k || it.sku || it.name}>
-              {/* The LINE, only when there is more than one — on a single-line order naming
-                  it repeats the item card directly above. */}
-              {items.length > 1 && (
-                <div className="mb-1 truncate text-2xs text-muted-foreground">{it.name || it.sku || "Line"}</div>
-              )}
-              <div className="grid grid-cols-3 gap-1.5">
-                {TIERS.map((id) => {
-                  const fee = feeFor(id, fees)
-                  const set = tier === id
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      title={TIER_WHY[id]}
-                      /* Accepted is LOCKED: the seller has paid against that tier, and
-                         changing it afterwards would move a settled record. */
-                      disabled={!!busy || quote === "accepted"}
-                      onClick={() => void apply(it, id)}
-                      className={"rounded-lg border px-2 py-1.5 text-2xs font-medium transition-colors disabled:opacity-50 " +
-                        (set ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent")}
-                    >
-                      {busy === k + id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : (
-                        <>
-                          <span className="block">{TIER_LABEL[id]}</span>
-                          {/* The number, not just the word — Complex is several times
-                              Standard, and a charge set by someone who cannot see the amount
-                              is a charge made blind. Only once the fees have loaded. */}
-                          {fee !== null && <span className="block text-2xs font-normal tabular-nums opacity-70">{usd(fee)}</span>}
-                        </>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-              {/* The quote's own state, in words. A "complex" chip alone cannot tell
-                  waiting-on-the-seller from already-paid from refused. */}
-              {quote === "pending" && <p className="mt-1 text-2xs text-amber-700">Waiting on the seller to accept — don&apos;t start work yet.</p>}
-              {quote === "declined" && <p className="mt-1 text-2xs text-rose-700">The seller declined. Cancel the line, or agree something else with them.</p>}
-              {quote === "accepted" && <p className="mt-1 text-2xs text-emerald-700">Accepted and paid — the tier is locked.</p>}
-              {!tier && <p className="mt-1 text-2xs text-muted-foreground">Not set — nothing charged.</p>}
-            </div>
-          )
-        })}
-      </div>
-      {note && <p className="mt-2 text-2xs text-muted-foreground">{note}</p>}
-      {err && <p className="mt-2 text-2xs text-destructive">{err}</p>}
-    </div>
+    <dd className="flex shrink-0 items-center gap-1.5 tabular-nums">
+      {/* To Be Determined is a real answer, not a missing one: a complex fee is quoted, and
+          no figure exists until somebody names one — which typing here does. */}
+      {fee.amount == null
+        ? <span className="italic text-muted-foreground">To Be Determined</span>
+        : usd(fee.amount)}
+      {/* Said only when true. An unusual figure beside a familiar label otherwise reads as a
+          pricing bug rather than as a decision somebody made. */}
+      {fee.overridden && <span className="text-2xs font-normal text-muted-foreground">edited</span>}
+      <button
+        type="button"
+        disabled={locked}
+        title={locked ? "Already charged — this is settled" : "Change what this costs"}
+        aria-label={`Edit ${fee.label}`}
+        onClick={() => { setEditing(true); setDraft(fee.amount == null ? "" : String(fee.amount)) }}
+        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+      >
+        <PencilSimple size={12} weight="bold" />
+      </button>
+    </dd>
   )
 }

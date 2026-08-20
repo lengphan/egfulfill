@@ -1729,7 +1729,10 @@ export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; tr
  *  returns `rate` as a bare id string on the bought transaction, so it has to survive the
  *  round trip from quote to buy or the label records none — and a label with no carrier
  *  account can never go on a USPS SCAN form (manifests.js:119). */
-export type ShippingRate = { token: string; provider: string; carrier: string; service: string; amount: number; currency?: string; days?: number | null; carrierAccount?: string }
+/** `eta` is a readable SPAN ("2–5 days") because USPS never commits to an integer; `days`
+ *  stays the aggregator's number. `test` marks a quote from USPS's TEM host, where a bought
+ *  label is a free sample and not postage. */
+export type ShippingRate = { token: string; provider: string; carrier: string; service: string; amount: number; currency?: string; days?: number | null; eta?: string; test?: boolean; carrierAccount?: string }
 export function getShippingRates(body: { to: ShipAddress; from?: ShipAddress; parcel: { weightOz?: number; length?: number; width?: number; height?: number }; extra?: { signature?: boolean; insurance?: number } }) {
   return api<{ rates: ShippingRate[]; errors?: string[]; error?: string }>(`/api/shipping/rates`, { method: "POST", body: JSON.stringify(body) })
 }
@@ -2306,6 +2309,8 @@ export type OrderDesignFee = {
   label: string
   /** null = quoted, under review ("To Be Determined") — shown, never hidden. */
   amount: number | null
+  /** Staff typed this figure instead of taking the tier's list price. */
+  overridden?: boolean
   status: "charged" | "estimated" | "tbd"
   /** Every line this ONE fee covers. Both fees pay for work done once — a file is checked
    *  once however many items carry it, a picture is digitised once — so lines sharing a
@@ -2891,7 +2896,15 @@ export function assignDesignCard(id: string, body: { orderId: string; sku: strin
  * IS the decision — there is no second party to ask.
  */
 export type DesignTier = "standard" | "complex" | "supplied"
-export function setDesignTier(orderId: string, body: { tier: DesignTier; line_id?: string; sku?: string }) {
+/**
+ * Classify a line's design work, and optionally price it.
+ *
+ * `amount` is OPTIONAL and `null` is meaningful: omit it and any stored override is left
+ * alone (a plain tier change must not wipe a price somebody typed), pass null to clear it
+ * back to the tier's list price, pass a number to override. The server charges — and quotes
+ * — whatever this resolves to, so the figure on screen is the figure billed.
+ */
+export function setDesignTier(orderId: string, body: { tier: DesignTier; amount?: number | null; line_id?: string; sku?: string }) {
   return api<{ ok?: boolean; tier?: string; quoted?: boolean
                charged?: { charged: number; reason?: string } | null; error?: string }>(
     `/api/orders/${encodeURIComponent(orderId)}/design-tier`,
@@ -3234,7 +3247,11 @@ export function googleLogin(credential: string) {
 /** `restartRequired`: the module using this key snapshots process.env at import, so saving
  *  it does not reach that code until the API restarts. Everything else is live on the next
  *  request. The masked preview updates either way — which is why this flag exists. */
-export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; masked?: string | null; editable?: boolean; restartRequired?: boolean }
+/** `kind` says what the field IS, so the panel stops rendering every setting as a masked
+ *  password. Only `secret` is masked; `value` is populated for the others and a real
+ *  credential never leaves the server in the clear. */
+export type SecretKind = "secret" | "text" | "toggle" | "choice"
+export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; masked?: string | null; editable?: boolean; restartRequired?: boolean; kind?: SecretKind; value?: string; options?: { value: string; label: string }[] }
 export function getAdminSecrets() {
   return api<{ secrets: SecretMeta[] }>(`/api/admin/secrets`)
 }

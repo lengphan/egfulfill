@@ -935,6 +935,10 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table order_items add column if not exists design_tier text').catch(() => {});
   q('alter table order_items add column if not exists design_tier_at timestamptz').catch(() => {});
   q('alter table order_items add column if not exists design_tier_by text').catch(() => {});
+  /* What staff typed INSTEAD of the tier's list price. Null = use the list price, which is
+     the normal case; a number here is a deliberate override of one job's fee and is what
+     both the estimate and the charge then use. Numeric, not integer — fees are dollars. */
+  q('alter table order_items add column if not exists design_fee_override numeric').catch(() => {});
   /**
    * The complex-work quote, and its FROZEN prices.
    *
@@ -2701,12 +2705,24 @@ export function ordersRoutes(app, requireAuth) {
    * losing that record because a wallet call failed would leave the line uncategorised with
    * no sign anything went wrong.
    */
-  async function chargeDesign(req, orderId, lineId, sku, tier, fees) {
-    const amount = tier === 'supplied'
+  async function chargeDesign(req, orderId, lineId, sku, tier, fees, override) {
+    /*
+     * AN OVERRIDE IS THE PRICE, when there is one.
+     *
+     * The tier still says what KIND of work this was — that is a fact about the job and it
+     * stays true — but the amount is a judgement, and a fee list cannot know that this
+     * particular file took twenty minutes to clean up. Staff type a number; that number is
+     * what is charged, not the list price for its class.
+     *
+     * Zero is a legitimate override (waive the fee) and must not fall through to the list
+     * price, which is why this tests for null rather than for truthiness.
+     */
+    const listed = tier === 'supplied'
       ? Number(fees.check_fee) || 0
       : tier === 'complex'
         ? Number(fees.design_fee_complex) || 0
         : Number(fees.design_fee_standard) || 0;
+    const amount = (override != null && isFinite(Number(override))) ? Number(override) : listed;
     if (!(amount > 0)) return { charged: 0, reason: 'no-fee-set' };
     const key = lineId ? 'line_id' : 'sku';
     const row = await q(
@@ -2826,6 +2842,7 @@ export function ordersRoutes(app, requireAuth) {
   async function designLines(orderId) {
     return q(
       `select i.line_id, i.sku, i.name, i.print_type, i.design_tier, i.design_quote_status, i.design_charged_at,
+              i.design_fee_override,
               (select coalesce(f.content_hash, f.design_id) from design_file_data f
                  where f.order_id = i.order_id
                    and (f.line_id = i.line_id
@@ -2906,6 +2923,19 @@ export function ordersRoutes(app, requireAuth) {
         // Fixed only once accepted or charged; otherwise under review → To Be Determined.
         amount = (g.charged || g.quote === 'accepted') ? CPX : null;
       } else { label = 'Design fee'; amount = STD; }
+      /*
+       * AN OVERRIDE WINS THE NUMBER — because the charge obeys it, and an estimate that
+       * disagrees with what will actually be billed is worse than no estimate.
+       *
+       * Any line in the group carrying one sets it (they are one job, so one price). It also
+       * settles a COMPLEX row: a quoted fee is To Be Determined precisely because nobody has
+       * named a figure yet, and typing one is naming it.
+       *
+       * `!= null` rather than truthy — a deliberate zero is a waived fee, not an absent one.
+       */
+      const ov = g.lines.map((l) => l.design_fee_override).find((v) => v != null && v !== '');
+      const overridden = ov != null && isFinite(Number(ov));
+      if (overridden) amount = Number(ov);
       const status = g.charged ? 'charged' : (amount == null ? 'tbd' : 'estimated');
       if (amount != null) total += amount;
       // The rest of the group is NAMED rather than silently folded in: "ab11 +2 items"
@@ -2915,6 +2945,9 @@ export function ordersRoutes(app, requireAuth) {
       items.push({
         line_id: first.line_id || null, sku: first.sku || null, name,
         tier: g.tier, label, amount, status,
+        /** Staff typed this figure rather than taking the tier's list price — the row says
+         *  so, so an unusual number is not mistaken for a pricing bug. */
+        overridden,
         // Every line this one fee covers, so a caller can mark them all rather than
         // guessing which line the row stands for.
         lines: g.lines.map((l) => ({ line_id: l.line_id || null, sku: l.sku || null })),
@@ -2941,21 +2974,48 @@ export function ordersRoutes(app, requireAuth) {
     if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
     const key = lineId ? 'line_id' : 'sku';
     const fees = await readAll().catch(() => ({}));
+    /*
+     * AN OPTIONAL AMOUNT, and `null` is a real value here.
+     *
+     * Omitting `amount` leaves whatever override is stored alone — that is what a plain tier
+     * change does, and it must not silently wipe a price somebody typed. Sending null CLEARS
+     * the override and returns the line to the list price. Sending a number sets it.
+     *
+     * Bounded and finite: an unbounded number on a billing field is a typo away from a
+     * five-figure charge, and NaN would sail through a `> 0` test as false and quietly bill
+     * the list price instead of the one on screen.
+     */
+    const hasAmount = Object.prototype.hasOwnProperty.call(b, 'amount');
+    let override;
+    if (hasAmount) {
+      if (b.amount === null || b.amount === '') override = null;
+      else {
+        const n = Number(b.amount);
+        if (!isFinite(n) || n < 0 || n > 100000) { reply.code(400); return { error: 'amount must be a number between 0 and 100000, or null to clear it.' }; }
+        override = n;
+      }
+    }
     // COMPLEX opens a quote and charges nothing. The other two are charged here, because
     // setting them IS the decision — there is no second party to ask.
     const quoted = tier === 'complex';
+    // The quote is what the SELLER will be asked to accept, so an override has to move it
+    // too — quoting the list price and then charging a different number is the one outcome
+    // this must never produce.
+    const quoteMake = quoted ? (override != null ? override : Number(fees.design_fee_complex) || 0) : null;
     const r = await q(
       `update order_items set design_tier=$3, design_tier_at=now(), design_tier_by=$4,
               design_quote_status = $5,
-              design_quote_make = $6, design_quote_download = $7, design_quote_at = $8
+              design_quote_make = $6, design_quote_download = $7, design_quote_at = $8,
+              design_fee_override = case when $9::boolean then $10::numeric else design_fee_override end
         where order_id=$1 and ${key}=$2`,
       [String(req.params.id), lineId || sku, tier, String((req.user && req.user.sub) || ''),
        quoted ? 'pending' : null,
-       quoted ? Number(fees.design_fee_complex) || 0 : null,
+       quoteMake,
        quoted ? Number(fees.emb_price_complex) || 0 : null,
-       quoted ? new Date().toISOString() : null]);
+       quoted ? new Date().toISOString() : null,
+       hasAmount, override ?? null]);
     if (!r.rowCount) { reply.code(404); return { error: 'No such line on this order.' }; }
-    audit(req, 'design.tier', { entityType: 'order', entityId: String(req.params.id), after: { tier, line_id: lineId, sku } });
+    audit(req, 'design.tier', { entityType: 'order', entityId: String(req.params.id), after: { tier, line_id: lineId, sku, ...(hasAmount ? { amount: override } : {}) } });
 
     let charged = null;
     if (quoted) {
@@ -2970,7 +3030,10 @@ export function ordersRoutes(app, requireAuth) {
         }).catch(() => {});
       }
     } else {
-      charged = await chargeDesign(req, String(req.params.id), lineId, sku, tier, fees);
+      const stored = hasAmount ? override : await q(
+        `select design_fee_override from order_items where order_id=$1 and ${key}=$2 limit 1`,
+        [String(req.params.id), lineId || sku]).then((x) => (x.rows[0] ? x.rows[0].design_fee_override : null)).catch(() => null);
+      charged = await chargeDesign(req, String(req.params.id), lineId, sku, tier, fees, stored);
     }
     egBroadcast({ type: 'orders' });
     return { ok: true, tier, lines: r.rowCount, quoted, charged };

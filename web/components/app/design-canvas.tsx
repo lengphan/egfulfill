@@ -1153,6 +1153,8 @@ export function DesignCanvasDialog({
    * in so a file filed moments ago in this window counts without a refetch.
    */
   const [hasFile, setHasFile] = useState(false)
+  /** Every file on this line, whatever kind — what the rail badge counts. */
+  const [lineFiles, setLineFiles] = useState<{ kind: string; name: string }[]>([])
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
   const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
@@ -1318,13 +1320,23 @@ export function DesignCanvasDialog({
           // order. That is the bug: nothing was being "applied to all", the lines were never
           // distinguishable. Line beats order-wide; order-wide still shows when the line has
           // nothing of its own.
-          const mine = filesForLine(rows ?? [], { line_id: item.line_id, sku: item.sku })
-            .filter((f) => f.kind === "emb" || f.kind === "pes")
+          const forLine = filesForLine(rows ?? [], { line_id: item.line_id, sku: item.sku })
+          /*
+           * KEEP THE WHOLE LINE'S LIST, not just the machine files.
+           *
+           * The fee tier only cares whether a MACHINE file exists, which is why this used to
+           * narrow immediately. But "what has the seller actually sent us" is a different
+           * question with a different answer — a line can carry two reference photos and no
+           * machine file — and nothing on this screen could answer it once the summary strip
+           * came off. The rail badge answers it; the tier still reads `hasFile`.
+           */
+          setLineFiles(forLine.map((f) => ({ kind: String(f.kind || ""), name: f.name || "" })))
+          const mine = forLine.filter((f) => f.kind === "emb" || f.kind === "pes")
           setHasFile(mine.length > 0)
           const newest = mine.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0]
           setLatestMachine(newest ? { designId: newest.designId, name: newest.name || "Machine file" } : null)
         })
-        .catch(() => { setHasFile(false); setLatestMachine(null) })
+        .catch(() => { setHasFile(false); setLatestMachine(null); setLineFiles([]) })
     }, 0)
     return () => clearTimeout(t)
   }, [open, orderId, item.sku, item.line_id])

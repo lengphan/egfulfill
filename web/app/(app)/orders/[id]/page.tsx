@@ -11,7 +11,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
-import { DesignCharge } from "@/components/app/design-charge"
+import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -1227,7 +1227,13 @@ export default function OrderDetailPage() {
                           return <span className="opacity-70"> · Item{covered.length > 1 ? "s" : ""} {covered.join(", ")}</span>
                         })()}
                       </dt>
-                      <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>
+                      {/* STAFF PRICE IT HERE, on the row that already reports it — the
+                          three-button tier panel that used to sit under the total was a
+                          second, differently-shaped copy of this same fee. A seller reads
+                          the figure and cannot change it; the server enforces that. */}
+                      {isStaff
+                        ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
+                        : <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>}
                     </div>
                   ))}
                   <div className="flex justify-between border-t border-border pt-2 font-semibold">
@@ -1272,14 +1278,6 @@ export default function OrderDetailPage() {
                     </dd>
                   </div>
 
-                  {/* THE DESIGN CHARGE, WHERE THE MONEY IS. It was inside the design window
-                      — a screen about placing pictures — so the one figure a seller is
-                      billed for design work could only be set by opening a line, and read
-                      nowhere near the total it lands in. Staff only, and the server enforces
-                      that: the person being charged must not be the one setting the charge. */}
-                  {isStaff && !feesGated && (order.items ?? []).length > 0 && (
-                    <DesignCharge orderId={id} items={order.items ?? []} onChanged={reloadAll} />
-                  )}
 
                   {/* The buyer's side, kept visually apart from ours. Two different pots of
                       money on one card is only safe if the reader can never mistake one
