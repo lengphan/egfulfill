@@ -73,19 +73,25 @@ const money = (n: number) => `$${n.toFixed(2)}`
  * Module scope, not nested in the dialog: a component defined during render is a new type
  * every pass, so React remounts every tile on each keystroke (react-hooks/static-components).
  */
-function RefTile({ src, i, big = false, picked, current, onShow, onToggle }: {
-  src: string; i: number; big?: boolean; picked: boolean; current: boolean
+function RefTile({ src, i, picked, current, onShow, onToggle }: {
+  src: string; i: number; picked: boolean; current: boolean
   onShow: () => void; onToggle: () => void
 }) {
   return (
-    <div className={"relative transition-[width,height] duration-500 ease-out motion-reduce:transition-none " + (big ? "aspect-square w-full" : "size-14")}>
+    /* One size. `big` existed to tween a tile between the grid layout and the strip layout,
+       and there is only one layout now — see the note on the panel grid. */
+    <div className="relative size-14">
       <button
         type="button"
         onClick={onShow}
         aria-label={`Show reference photo ${i + 1}`}
         aria-current={current}
-        className={"size-full overflow-hidden rounded-md border outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/60 " +
-          (current && !big ? "border-primary ring-1 ring-primary" : "border-border") +
+        /* A ring marks the one being shown; nothing outlines the rest. A border on every
+           thumbnail is a line around a picture that already has an edge, and it made the
+           strip read as a row of empty slots. Unpicked stays dimmed, which is the state
+           that actually changes what gets generated. */
+        className={"size-full overflow-hidden rounded-md outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/60 " +
+          (current ? "ring-2 ring-primary" : "") +
           (picked ? "" : " opacity-35")}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -99,10 +105,10 @@ function RefTile({ src, i, big = false, picked, current, onShow, onToggle }: {
         title={picked ? "Using this one — click to drop it" : "Not used — click to add it"}
         /* Same two states as the grid on the publish page: one ring, filled or not. */
         className={"absolute -right-1 -top-1 grid place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
-          (big ? "size-5" : "size-4") + " " +
+          "size-4 " +
           (picked ? "border-white bg-white text-slate-900" : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
       >
-        <Check size={big ? 11 : 9} weight="bold" />
+        <Check size={9} weight="bold" />
       </button>
     </div>
   )
@@ -162,7 +168,6 @@ export function ListingPhotoStudio({
   const pickedSet = new Set(picked)
   /** Is there a right-hand side yet? A render, or one on its way — the spinner needs the pane
    *  open, or the panel would jump sideways the instant the picture arrived. */
-  const showOurs = cands.length > 0 || busy
   const spec = cfg?.models.find((m) => m.id === model) || null
   // A size one variant offers may not exist on another (Lite has no 4K), so switching models
   // can strand an impossible pick — fall through the variant's own default.
@@ -354,68 +359,71 @@ export function ListingPhotoStudio({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92dvh] w-auto max-w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,74rem)]">
-        {/* The subtitle describes the layout ACTUALLY on screen. Before a render there is no
-            right-hand side, so promising one was describing a pane that wasn't there. */}
+        {/* No subtitle. It changed text halfway through the job, which put a second moving
+            part in the header of a window whose whole problem was things moving. The two
+            column headings below already say which side is which. */}
         <DialogTitle className="border-b border-border px-4 py-3 text-sm font-semibold">
-          Make our own photo
-          <span className="ml-2 font-normal text-muted-foreground">
-            {showOurs
-              ? "theirs on the left, ours on the right — nothing joins the listing until you press Use"
-              : "pick which of their photos to work from, write the prompt, then generate"}
-          </span>
+          Generate Images
         </DialogTitle>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* ── ONE PANE, THEN TWO.
-                Before anything is rendered there is nothing to compare against, and a big
-                empty box captioned "nothing here yet" is the worst half of a split screen —
-                it takes the same space as the picture it isn't showing. So the references get
-                the full width as a grid, and the right half opens only when there is
-                something to put in it.
+          {/* ── THE SPACE IS RESERVED. NOTHING GROWS INTO IT. ──────────────────
+                This used to open the right-hand pane only once there was something to put in
+                it, animating grid-template-columns from `1fr 0fr` to `1fr 1fr` over 500ms.
+                Four things then moved at once, and two of them fought:
 
-                The transition is a grid-track animation, which needs BOTH states to have the
-                same number of tracks — 1fr 0fr → 1fr 1fr interpolates; 1fr → 1fr 1fr does
-                not. The collapsed pane keeps min-w-0 and overflow-hidden so its contents fold
-                away rather than forcing the track open. Off under prefers-reduced-motion,
-                where the layout simply changes. ── */}
-          <div className={"grid gap-4 p-4 transition-[grid-template-columns,gap] duration-500 ease-out motion-reduce:transition-none " +
-            (showOurs ? "lg:grid-cols-[1fr_1fr]" : "gap-0 lg:grid-cols-[1fr_0fr]")}>
+                  • the reference grid was `auto-fill minmax(9rem,1fr)`, so as the pane
+                    narrowed the COLUMN COUNT stepped 5 → 4 → 3 → 2 and every tile jumped
+                    position at each step. That was the visible chaos.
+                  • the left pane swapped content trees (grid of big tiles → hero + strip).
+                    A ternary between two different element types remounts the subtree, so
+                    the tiles blinked instead of gliding — the opposite of what the comment
+                    on RefTile promised.
+
+                And below `lg` there were no column tracks at all, so it was a vertical
+                stack: "Ours" arrived below the fold while the left pane rearranged itself.
+                You watched the thing you were looking at reshuffle while the new thing
+                appeared somewhere you couldn't see.
+
+                So the geometry is now FIXED. Both panes are their final size from the moment
+                the window opens, and the right one holds its empty state until a render
+                lands in it. Only opacity changes. This is the ordinary answer — reserving
+                the final dimensions before the content exists is what every image-generation
+                UI does, and what Cumulative Layout Shift is a measure of. ── */}
+          <div className="grid gap-4 p-4 lg:grid-cols-2">
             {/* THEIRS */}
             <section className="min-w-0 space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="eg-label text-muted-foreground">Theirs</h3>
                 <span className="text-2xs text-muted-foreground">{picked.length} of {references.length} used as reference</span>
               </div>
-              {/* BEFORE: the whole set, as a grid across the full width — that is what there
-                  is to look at, so it gets the room. AFTER: one big one with the rest as
-                  thumbs, because now the thing worth the space is the comparison.
+              {/* ONE TREE, ALWAYS. A hero at the same size as Ours, with the rest as a strip
+                  underneath. There is no second layout to switch to, so there is nothing to
+                  remount and nothing to tween. */}
+              {/* NO BORDER ON EITHER FRAME, and the same treatment on both.
+                  Theirs was dashed and Ours was solid — two different line styles, side by
+                  side, for two things that are the same kind of thing. Dashed reads as
+                  provisional or broken, so the reference permanently looked like a slot
+                  that had failed to fill.
 
-                  The tiles animate their own size rather than being two different trees, so
-                  the pictures glide from grid to strip instead of blinking between layouts. */}
-              {!showOurs ? (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
+                  A picture is its own edge. The frame only has to say WHERE the picture
+                  goes while there isn't one, and a filled well does that without drawing a
+                  line around something that already has a boundary. This is the outlined-box
+                  count CLAUDE.md §4 is about — the app carried 490 of them, and two of them
+                  were here disagreeing with each other. */}
+              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted/40">
+                {references[heroRef] ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={references[heroRef]} alt="" className="size-full object-contain" />
+                ) : <span className="text-xs text-muted-foreground">No reference photo</span>}
+              </div>
+              {references.length > 1 && (
+                <div className="flex flex-wrap gap-1.5">
                   {references.map((src, i) => (
-                    <RefTile key={i} src={src} i={i} big picked={pickedSet.has(i)} current={heroRef === i}
+                    <RefTile key={i} src={src} i={i} picked={pickedSet.has(i)} current={heroRef === i}
                       onShow={() => setHeroRef(i)} onToggle={() => toggleRef(i)} />
                   ))}
                 </div>
-              ) : (
-                <>
-                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30">
-                    {references[heroRef] ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={references[heroRef]} alt="" className="size-full object-contain" />
-                    ) : <span className="text-xs text-muted-foreground">No reference photo</span>}
-                  </div>
-                  {references.length > 1 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {references.map((src, i) => (
-                        <RefTile key={i} src={src} i={i} picked={pickedSet.has(i)} current={heroRef === i}
-                          onShow={() => setHeroRef(i)} onToggle={() => toggleRef(i)} />
-                      ))}
-                    </div>
-                  )}
-                </>
               )}
             </section>
 
@@ -427,7 +435,7 @@ export function ListingPhotoStudio({
                 <h3 className="eg-label text-muted-foreground">Ours</h3>
                 {hero && <span className="text-2xs tabular-nums text-muted-foreground">{hero.size} · {hero.aspectRatio}</span>}
               </div>
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
+              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted/40">
                 {busy ? (
                   <span className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
                     <CircleNotch size={22} className="animate-spin" />

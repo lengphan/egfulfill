@@ -1972,25 +1972,36 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   <span className="eg-label text-muted-foreground">When it&apos;s created</span>
                   <div className="grid gap-1 sm:grid-cols-2">
                     {[
-                      { live: false, label: "Save as draft", hint: "You review and activate it in the shop." },
-                      { live: true, label: "Publish live", hint: "It goes on sale as soon as it's created." },
+                      { live: false, label: "Save as draft" },
+                      { live: true, label: "Publish live" },
                     ].map((o) => (
                       <label
                         key={o.label}
-                        className={"flex cursor-pointer items-start gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors " +
-                          (goLive === o.live ? "border-primary/60 bg-primary/5" : "border-border hover:bg-muted/60")}
+                        /* ONLY THE CHOSEN ONE IS DRAWN.
+                           Both cards carried a border, so the unpicked one was outlined in
+                           `--border` — a warm taupe from the base palette — sitting directly
+                           beside a periwinkle-tinted card. Two lines in two unrelated hues,
+                           a centimetre apart, which is what reads as muddy: the eye sees a
+                           colour decision where none was made.
+                           A ring rather than a border on the selected one, so the two states
+                           are the same size and nothing shifts by a pixel when you switch. */
+                        /* THE PANEL IS THE CONTROL. No dot, no sentence under it — the two
+                           labels already say the whole difference, and a radio beside a
+                           tinted panel states the same fact twice.
+                           The input stays, visually hidden: it is what makes this a real
+                           radio group for the keyboard and a screen reader, and the ring
+                           follows its focus so tabbing is still visible. */
+                        className={"flex cursor-pointer items-center justify-center rounded-lg px-2.5 py-2.5 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring " +
+                          (goLive === o.live ? "bg-primary/5 ring-1 ring-primary/60" : "hover:bg-muted/60")}
                       >
                         <input
                           type="radio"
                           name="publish-state"
                           checked={goLive === o.live}
                           onChange={() => { setResult(null); setGoLive(o.live) }}
-                          className="mt-0.5 size-3.5 accent-[var(--primary)]"
+                          className="sr-only"
                         />
-                        <span className="min-w-0">
-                          <span className={"block font-medium " + (goLive === o.live ? "text-primary" : "")}>{o.label}</span>
-                          <span className="block text-2xs text-muted-foreground">{o.hint}</span>
-                        </span>
+                        <span className={"font-medium " + (goLive === o.live ? "text-primary" : "text-foreground")}>{o.label}</span>
                       </label>
                     ))}
                   </div>
