@@ -3867,7 +3867,7 @@ export function ordersRoutes(app, requireAuth) {
     // way to a seller. Doing it in SQL, not in the client, is the point: this is the
     // only read path, and a seller must never receive the row at all.
     const r = await q(
-      `select id, sender_role, body, attachment, meta, client_id, created_at
+      `select id, sender_id, sender_role, body, attachment, meta, client_id, created_at
          from order_messages where order_id=$1
            and ($2::text is null or meta->>'order_ref' = $2)
            and ($3::boolean or not coalesce((meta->>'internal')::boolean, false))
@@ -3875,8 +3875,27 @@ export function ordersRoutes(app, requireAuth) {
     // Reconstruct the client entry shape so getOrderChat round-trips unchanged.
     return r.rows.map((m) => {
       const meta = m.meta || {};
+      /**
+       * WHICH SIDE THE BUBBLE GOES ON — answered by IDENTITY, from the column that already
+       * records it.
+       *
+       * The client had to guess. It fell back to `by === myName`, a display-name string
+       * comparison, because this route never sent the flag it was written to prefer. Any
+       * drift between the name stored on the account and the name attached when the message
+       * was posted — a rename, a message sent from the phone, a session whose user has no
+       * name and reads "You" — makes every comparison false and pushes the ENTIRE thread
+       * to the left, sender and recipient alike, which is not a state a chat can be in.
+       *
+       * `sender_id` has been on the row since schema.sql and is written by all three insert
+       * paths; it simply was not selected. So this is right retroactively, for messages
+       * already in the table, and it cannot be fooled by two people sharing a first name.
+       *
+       * The assistant has no sender_id, so it is never "mine" — which is what the seller
+       * and the factory both need, since an AI reply is not either of them.
+       */
       const e = { id: m.client_id || m.id, by: meta.by || (m.sender_role || 'Unknown'),
         role: m.sender_role || 'seller', text: m.body || '',
+        me: !!m.sender_id && String(m.sender_id) === String((req.user && req.user.sub) || ''),
         ts: meta.ts || (m.created_at ? new Date(m.created_at).getTime() : 0), system: !!meta.system };
       if (m.attachment) e.attachment = m.attachment;
       if (meta.internal) e.internal = true;
