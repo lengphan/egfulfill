@@ -262,16 +262,27 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
    * For a factory queue that is the right trade, because the question being asked of this
    * screen is "what am I making", and that question is answered by a picture.
    *
-   * ARTWORK FIRST, per line. `img_ref`/`img` are the marketplace LISTING photo and
-   * design_src is the buyer's file — reading them the other way round (as this did) makes a
-   * seller with one product show the same rail of aprons on every row, which is what made
-   * the queue unscannable.
+   * THE LISTING PHOTO, ALWAYS — the product as the buyer bought it.
+   *
+   * This showed the ARTWORK first and fell back to the listing photo. The argument was that
+   * a seller with one product gives every row the same rail of aprons, so the file is what
+   * distinguishes them. On a queue that is the wrong trade: a bare design on white says
+   * almost nothing about WHICH job this is, while the product shot is the thing anyone
+   * recognises at a glance — and a print file out of context reads as a different order
+   * from the product it belongs to.
+   *
+   * The artwork has not gone anywhere. It is on the LINE inside the order, beside the
+   * listing photo and captioned per side, which is where someone is actually about to make
+   * it (order-line.tsx). This row is for finding the order; that screen is for doing it.
+   *
+   * `art` still reports whether a file EXISTS, independent of which picture is shown, so
+   * the "no artwork yet" state below stays true.
    */
   const shots = items
     .map((it) => {
       const a = assetUrl(it.design_src)
       const l = assetUrl(it.img_ref || it.img)
-      return (a || l) ? { uri: (a || l) as string, title: lineTitle(it), art: !!a } : null
+      return (l || a) ? { uri: (l || a) as string, title: lineTitle(it), art: !!a } : null
     })
     .filter(Boolean) as { uri: string; title: string; art: boolean }[]
 

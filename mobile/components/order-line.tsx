@@ -135,7 +135,14 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
    * falls through to `docs` and stays a named row, because a stitch file that is silently
    * absent is a file that reaches the machine missing.
    */
-  const pics = mine
+  /* THE PRODUCT FIRST, THEN THE FILE. The strip led with the artwork, so the first thing
+     on a line was a design on white — recognisable only once you already knew the order.
+     The listing photo is what the buyer bought and what anyone identifies the job by, so it
+     leads; the artwork follows, captioned per side, because THIS is the screen where it
+     gets made and a front and a back are two different jobs on one garment. */
+  const pics: { uri: string; caption: string; title: string }[] = []
+  if (listing) pics.push({ uri: assetUrl(listing) as string, caption: "Listing photo — what the buyer saw", title: lineTitle(item) })
+  const artPics = mine
     .filter((d) => isArtwork(d.kind) && (d.url || d.data))
     .map((d) => ({
       uri: assetUrl(d.url || d.data) as string,
@@ -143,8 +150,8 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
         .filter(Boolean).join(" · "),
       title: lineTitle(item),
     }))
-  if (!pics.length && art) pics.push({ uri: assetUrl(art) as string, caption: "Artwork", title: lineTitle(item) })
-  if (listing) pics.push({ uri: assetUrl(listing) as string, caption: "Listing photo — what the buyer saw", title: lineTitle(item) })
+  if (artPics.length) pics.push(...artPics)
+  else if (art) pics.push({ uri: assetUrl(art) as string, caption: "Artwork", title: lineTitle(item) })
   const docs = mine.filter((d) => !isArtwork(d.kind))
   /**
    * IS THERE ANYTHING TO RENDER STITCHES FROM?
