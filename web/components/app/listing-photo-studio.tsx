@@ -1,12 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Sparkle, Warning, Check, X } from "@phosphor-icons/react"
+import { CircleNotch, Sparkle, Warning, Check, X, Eraser } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, type DeskImageConfig, type ListingRender, type AiQuote } from "@/lib/api"
 import { promptWarning } from "@/lib/image-gen"
+import { removeBackground } from "@/lib/remove-background"
+import { canvasReadableSrc } from "@/lib/thread-match"
 
 /**
  * THE LISTING PHOTO STUDIO — their shot on the left, ours on the right.
@@ -310,6 +312,33 @@ export function ListingPhotoStudio({
     }
   }
 
+  /*
+   * CUT THE BACKGROUND OUT — in the browser, on the render we already have.
+   *
+   * The model cannot give us transparency (JPEG has no alpha, see lib/image-gen.ts), so the
+   * only honest way to a PNG is to lift the backdrop off afterwards. That is the same flood
+   * the design maker uses, on the same terms: no model, no API, no credit — which is why it
+   * can sit on a button rather than behind a price.
+   *
+   * It replaces the candidate IN PLACE. The result is a data: URL, so whatever this is used
+   * for next carries the cut-out rather than a link back to the opaque original — the same
+   * rule the design maker follows for exactly the same reason.
+   */
+  const [cutting, setCutting] = useState<string | null>(null)
+  const [cutErr, setCutErr] = useState<string | null>(null)
+  const cutOut = async (r: ListingRender) => {
+    setCutting(r.url); setCutErr(null)
+    try {
+      const out = await removeBackground(r.url.startsWith("data:") ? r.url : canvasReadableSrc(r.url), 12)
+      if ("error" in out) { setCutErr(out.error); return }
+      setCands((p) => p.map((x) => (x.url === r.url ? { ...x, url: out.url, cutOut: true } : x)))
+    } catch (e) {
+      setCutErr(e instanceof Error ? e.message : "That didn't work.")
+    } finally {
+      setCutting(null)
+    }
+  }
+
   const drop = (url: string) => {
     setCands((p) => {
       const n = p.filter((x) => x.url !== url)
@@ -418,13 +447,26 @@ export function ListingPhotoStudio({
               </div>
               {/* The decision, on the big version — which is the point of showing it big. */}
               {hero && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" onClick={() => use(hero)}>Use this photo</Button>
-                  <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => drop(hero.url)}>
-                    <X size={13} weight="bold" /> Discard
-                  </Button>
-                  {cands.length > 1 && <span className="text-2xs text-muted-foreground">{heroGen + 1} of {cands.length}</span>}
-                </div>
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => use(hero)}>Use this photo</Button>
+                    {/* Free, so it says so — every other button in this panel spends money. */}
+                    <Button size="sm" variant="outline" onClick={() => cutOut(hero)} disabled={cutting === hero.url || hero.cutOut}
+                      title={hero.cutOut ? "Background already removed" : "Lift the backdrop off and keep it as a PNG — done in your browser, no charge"}>
+                      {cutting === hero.url ? <CircleNotch size={13} className="animate-spin" /> : <Eraser size={13} weight="bold" />}
+                      {hero.cutOut ? "Background removed" : cutting === hero.url ? "Removing…" : "Remove background"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => drop(hero.url)}>
+                      <X size={13} weight="bold" /> Discard
+                    </Button>
+                    {cands.length > 1 && <span className="text-2xs text-muted-foreground">{heroGen + 1} of {cands.length}</span>}
+                  </div>
+                  {cutErr && (
+                    <div className="flex items-start gap-1.5 text-2xs text-destructive">
+                      <Warning size={12} className="mt-0.5 shrink-0" /><span>{cutErr}</span>
+                    </div>
+                  )}
+                </>
               )}
               {cands.length > 1 && (
                 <div className="flex flex-wrap gap-1.5">

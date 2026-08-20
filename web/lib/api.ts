@@ -3385,6 +3385,9 @@ export type ListingRender = {
   usd?: number
   /** What the caller actually paid, and whether it came out of the free monthly allowance. */
   charged: number; free?: boolean
+  /** Set once the backdrop has been lifted off in the browser — the url is then a
+   *  transparent PNG data URL rather than the stored JPEG. Client-side only. */
+  cutOut?: boolean
 }
 /**
  * Render 1–4 CANDIDATES. Nothing lands in the listing — the caller shows them and a press
