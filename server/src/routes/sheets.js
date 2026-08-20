@@ -567,16 +567,19 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
   app.get('/api/sheets/config', async (req) => {
     const sa = loadSA();
     const templateUrl = await readTemplateUrl();
+    // Keep the master current, without anyone pressing anything — see autoFormat. Not
+    // awaited: handing someone a copy link must not wait on Google, and a refresh that
+    // fails leaves the old fingerprint so the next read tries again.
+    autoFormat().catch(() => {});
     return {
       enabled: !!(API_KEY || sa),
       templateUrl,
       copyUrl: toCopyUrl(templateUrl),
       canCreate: !!sa,
       shareWith: req.user && sa && sa.client_email ? sa.client_email : undefined,
-      // Only an admin is shown the template affordances, so only an admin is told anything
-      // about them. `isTemplateAdmin` survives configuration — the sheet still needs
-      // re-formatting whenever a column or a dropdown list changes — where `needsTemplate`
-      // is just "there is no master yet".
+      // `isTemplateAdmin` used to mean "show the Apply button" and now means only "may set
+      // the master link" — the formatting looks after itself, so there is nothing left to
+      // press. The endpoint stays for diagnosis; the affordance is gone.
       isTemplateAdmin: req.user && req.user.role === 'admin' ? true : undefined,
       needsTemplate: req.user && req.user.role === 'admin' ? !toCopyUrl(templateUrl) : undefined,
     };
@@ -596,43 +599,76 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
    * service account with no Drive. Editing a file someone else owns needs only that the
    * sheet is shared with us as Editor — hence the 403 message names the address.
    */
-  app.post('/api/sheets/template/format', { preHandler: requireAdmin }, async (req, reply) => {
+  /**
+   * THE MASTER KEEPS ITSELF UP TO DATE.
+   *
+   * This was a button an admin had to know existed and remember to press — on a sheet whose
+   * contents go stale on their own, every time a product is added or a colourway changes.
+   * A template that is only correct when somebody remembers to make it correct is the same
+   * failure as the frozen arrays it replaced, one step further from where you would look.
+   *
+   * FINGERPRINTED, not scheduled. The lists are hashed with the column headers; the hash of
+   * what was last written to Google is kept in settings. Reading the sheets config compares
+   * the two, which is a string compare against a query we already run — and calls Google
+   * only when the catalogue has ACTUALLY moved. So: no timer, no polling, no button, and
+   * one batchUpdate per real change rather than one per dialog open.
+   *
+   * Fire-and-forget, guarded against re-entry. Nothing about handing someone a copy link
+   * should wait on Google, and a failed refresh must leave the old fingerprint in place so
+   * the next read tries again rather than recording a write that never happened.
+   */
+  const FP_KEY = 'sheets_template_fingerprint';
+  let _fmtRunning = false;
+
+  async function formatMaster() {
     const url = await readTemplateUrl();
     const id = extractId(url);
-    if (!id) { reply.code(400); return { error: 'No master template is set yet — save its link first.' }; }
-    let token;
-    try { token = await getServiceToken(); }
-    catch (e) { reply.code(502); return { error: 'Service account auth failed: ' + String(e.message || e) }; }
-    const A = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-    const sa = loadSA();
-    const shareHint = sa && sa.client_email
-      ? ` Share the sheet with ${sa.client_email} as Editor — we can only format a sheet we can write to.`
-      : '';
+    if (!id) return { error: 'no-master' };
+    const token = await getServiceToken();
+    return applyTemplateTo(id, token);
+  }
 
-    // The first tab is the one we format; its real sheetId is needed for every range.
+  /** The lists + headers, as one stable string. Any change to either is a new fingerprint. */
+  function fingerprint(tpl, lists) {
+    const P = (lists && lists.products) || [];
+    return crypto.createHash('sha1').update(JSON.stringify([
+      tpl.columns,
+      P.map((p) => [p.name, p.colors, p.sizes, p.methods]),
+    ])).digest('hex');
+  }
+
+  async function autoFormat() {
+    if (_fmtRunning) return;
+    _fmtRunning = true;
+    try {
+      const lists = await catalogLists();
+      const tpl = buildTemplate('', lists);
+      const fp = fingerprint(tpl, lists);
+      const seen = await q('select value from settings where key=$1', [FP_KEY])
+        .then((r) => (r.rows[0] ? String(r.rows[0].value).replace(/^"|"$/g, '') : '')).catch(() => '');
+      if (seen === fp) return;
+      if (!loadSA()) return;                    // nothing to write with — stay quiet
+      const out = await formatMaster().catch((e) => ({ error: String(e && e.message) }));
+      if (out && out.ok) {
+        await q(`insert into settings (key, value, updated_at) values ($1, $2::jsonb, now())
+                 on conflict (key) do update set value = excluded.value, updated_at = now()`,
+          [FP_KEY, JSON.stringify(fp)]).catch(() => {});
+      }
+    } catch (e) { /* a stale template must never break the dialog */ }
+    finally { _fmtRunning = false; }
+  }
+
+  /** Write our template into an EXISTING spreadsheet. Shared by the admin route and the
+   *  automatic refresh, so the two can never format a sheet differently. */
+  async function applyTemplateTo(id, token) {
+    const A = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
     const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties(title,sheetId),namedRanges(namedRangeId,name)`, { headers: A });
     const meta = await metaR.json().catch(() => ({}));
-    if (!metaR.ok) {
-      reply.code(metaR.status === 403 ? 403 : 502);
-      const msg = (meta.error && meta.error.message) || metaR.status;
-      return { error: `Google says: ${msg}.${metaR.status === 403 ? shareHint : ''}` };
-    }
+    if (!metaR.ok) return { error: (meta.error && meta.error.message) || ('HTTP ' + metaR.status), status: metaR.status };
+
     const sheets = meta.sheets || [];
     const first = (sheets[0] || {}).properties || {};
     const gid = first.sheetId || 0;
-
-    /**
-     * THE LISTS TAB, ON A MASTER THAT PREDATES IT.
-     *
-     * The dependent dropdowns read a hidden Lists tab, and every master created before
-     * today has none — so formatting has to be able to ADD it, not only rewrite it. Its id
-     * is picked from what is already there rather than assumed: 1 is what a freshly created
-     * template gets, but this file was made by hand and its second tab could be anything.
-     *
-     * The named ranges are dropped and re-added on every format. A name can only exist
-     * once, so keeping them would 400 the second time this button is pressed — and they
-     * have to move anyway, because the catalogue behind them has changed.
-     */
     const existing = sheets.find((x) => (x.properties || {}).title === 'Lists');
     const used = new Set(sheets.map((x) => (x.properties || {}).sheetId).filter((n) => n != null));
     let listsGid = existing ? existing.properties.sheetId : 1;
@@ -644,8 +680,6 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     const tpl = buildTemplate('', await catalogLists());
     const rowData = tpl.createBody.sheets[0].data[0].rowData;
     const body = { requests: [
-      // Header rows rewritten as well as formatted, so an existing master picks up a column
-      // rename — or the tilde coming off "Order Number" — without being rebuilt by hand.
       { updateCells: { rows: rowData.slice(0, 2), fields: 'userEnteredValue,userEnteredFormat', start: { sheetId: gid, rowIndex: 0, columnIndex: 0 } } },
       { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 2 } }, fields: 'gridProperties.frozenRowCount' } },
       ...tpl.requests(gid, { listsGid, createLists: !existing, dropNamedRanges }),
@@ -653,17 +687,32 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     const upR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`, { method: 'POST', headers: A, body: JSON.stringify(body) });
     if (!upR.ok) {
       const d = await upR.json().catch(() => ({}));
-      reply.code(upR.status === 403 ? 403 : 502);
-      const msg = (d.error && d.error.message) || upR.status;
-      return { error: `Google says: ${msg}.${upR.status === 403 ? shareHint : ''}` };
+      return { error: (d.error && d.error.message) || ('HTTP ' + upR.status), status: upR.status };
     }
     return {
       ok: true, tab: first.title || 'Sheet1',
       dropdowns: T_COLUMNS.filter((c) => c.opts).map((c) => c.h),
-      // A refresh that quietly rebuilt the lists from an empty catalogue would look
-      // identical to one that worked, so the count comes back.
       products: tpl.products, listsTab: existing ? 'refreshed' : 'created', truncated: tpl.truncated,
     };
+  }
+
+  app.post('/api/sheets/template/format', { preHandler: requireAdmin }, async (req, reply) => {
+    const url = await readTemplateUrl();
+    const id = extractId(url);
+    if (!id) { reply.code(400); return { error: 'No master template is set yet — save its link first.' }; }
+    let token;
+    try { token = await getServiceToken(); }
+    catch (e) { reply.code(502); return { error: 'Service account auth failed: ' + String(e.message || e) }; }
+    const sa = loadSA();
+    const shareHint = sa && sa.client_email
+      ? ` Share the sheet with ${sa.client_email} as Editor — we can only format a sheet we can write to.`
+      : '';
+    const out = await applyTemplateTo(id, token);
+    if (out.error) {
+      reply.code(out.status === 403 ? 403 : 502);
+      return { error: `Google says: ${out.error}.${out.status === 403 ? shareHint : ''}` };
+    }
+    return out;
   });
 
   // Admin sets the master template link, from the same dialog a seller uses. Accepts any

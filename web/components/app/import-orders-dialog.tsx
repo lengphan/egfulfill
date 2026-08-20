@@ -25,7 +25,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, formatSheetTemplate, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
@@ -194,8 +194,6 @@ export function ImportOrdersDialog({
   // been configured yet. Server-supplied: the master lives in a setting, not in the bundle.
   const [copyUrl, setCopyUrl] = useState("")
   const [needsTemplate, setNeedsTemplate] = useState(false)
-  const [isTemplateAdmin, setIsTemplateAdmin] = useState(false)
-  const [formatting, setFormatting] = useState(false)
   const [tplInput, setTplInput] = useState("")
   const [tplSaving, setTplSaving] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -210,9 +208,9 @@ export function ImportOrdersDialog({
     return getSheetsConfig()
       .then((c) => {
         setSheetsEnabled(!!c.enabled)
-        setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
+        setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate)
       })
-      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false); setConfigErr(true) })
+      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setConfigErr(true) })
   }, [])
 
   useEffect(() => {
@@ -657,39 +655,13 @@ export function ImportOrdersDialog({
                       is the screen where its absence is felt, and the master has to be made by
                       a real Google account — our service account gets 403 PERMISSION_DENIED
                       creating a spreadsheet, since it has no Drive of its own. */}
-                  {/* ADMIN, master configured: re-apply our formatting to it.
-                      Google's .xlsx conversion does not carry data validation across, so a
-                      master made that way has the right columns and NO dropdowns. This
-                      writes them (and the bands, widths and header rows) straight into the
-                      sheet via the Sheets API — a batchUpdate on an existing file, which the
-                      service account CAN do; only creating a file is refused. It is also how
-                      the master picks up a column rename without being rebuilt. */}
-                  {isTemplateAdmin && copyUrl && (
-                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 p-3">
-                      <span className="eg-label text-muted-foreground">Admin</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={formatting}
-                        onClick={async () => {
-                          setFormatting(true); setError(null); setNotice(null)
-                          try {
-                            const r = await formatSheetTemplate()
-                            setNotice(`Master template formatted — dropdowns written on ${(r.dropdowns || []).join(", ") || "the option columns"}. New copies get them; copies already made don't.`)
-                          } catch (e) {
-                            setError(e instanceof Error && e.message ? e.message : "Couldn't format the master template.")
-                          } finally { setFormatting(false) }
-                        }}
-                      >
-                        {formatting ? <><CircleNotch size={13} className="animate-spin" /> Formatting…</> : "Apply colours + dropdowns to master"}
-                      </Button>
-                      <a href={copyUrl.replace(/\/copy$/, "/edit")} target="_blank" rel="noopener noreferrer" className="text-2xs text-primary hover:underline">
-                        Open master
-                      </a>
-                    </div>
-                  )}
-
-                  {needsTemplate && (
+                  {/* THE APPLY BUTTON IS GONE, and so is the row of state around it.
+                      The master keeps itself current: the server fingerprints the catalogue
+                      and the column list, and re-formats the sheet when that changes — see
+                      autoFormat in server/src/routes/sheets.js. A control that has to be
+                      remembered, on a thing that goes stale by itself, is the same failure
+                      as the frozen lists it was pressed to fix. */}
+{needsTemplate && (
                     <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
                       <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Admin · one-time setup</div>
                       <ol className="list-inside list-decimal space-y-0.5 text-2xs text-amber-800/90 dark:text-amber-300/90">
