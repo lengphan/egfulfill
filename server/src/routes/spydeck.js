@@ -438,12 +438,35 @@ export function spydeckRoutes(app, requireAuth) {
        * The batch endpoint answers by id and carries both fields we need. One read-only GET
        * on the app key, for one listing, on a click — not a per-card cost.
        */
+      const pickImgs = (row) => (row && Array.isArray(row.images) ? row.images : [])
+        .map((im) => im && (im.url_fullxfull || im.url_570xN || im.url_300x300))
+        .filter(Boolean);
+
       const b = await etsyPublicGet(`/listings/batch?listing_ids=${encodeURIComponent(id)}&includes=Images`);
-      const row = (b.ok && b.data && Array.isArray(b.data.results)) ? b.data.results[0] : null;
+      let row = (b.ok && b.data && Array.isArray(b.data.results)) ? b.data.results[0] : null;
+
+      /**
+       * A SECOND DOOR, because the batch endpoint is the one that drops Images.
+       *
+       * searchListings already knows this about /listings/batch — it retries with a
+       * narrower `includes` there for exactly this reason, and the comment on that retry
+       * says the failure is silent and cost weeks. Here there was no retry at all: batch
+       * answering without an `images` array left this returning the pool's cover, or
+       * nothing, and the publish page showed ONE photo for a listing with eight while
+       * looking exactly like a competitor who had posted one.
+       *
+       * /listings/{id} is a different endpoint with a different include path. One extra
+       * read-only GET, only when the first answer came back short, on a click.
+       */
+      if (!pickImgs(row).length) {
+        const one = await etsyPublicGet(`/listings/${encodeURIComponent(id)}?includes=Images`);
+        const alt = one.ok ? (one.data && (one.data.listing_id ? one.data : (Array.isArray(one.data.results) ? one.data.results[0] : null))) : null;
+        if (pickImgs(alt).length) row = alt;
+        else if (!row && alt) row = alt;
+        if (!one.ok) console.warn(`[spydeck] listings/${id} includes=Images -> ${one.status}`);
+      }
       if (row) {
-        const images = (row.images || [])
-          .map((im) => im && (im.url_fullxfull || im.url_570xN || im.url_300x300))
-          .filter(Boolean);
+        const images = pickImgs(row);
         return {
           listing_id: row.listing_id,
           description: row.description || (hit && hit.description) || '',
