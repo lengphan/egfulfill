@@ -51,6 +51,16 @@ export default function Wallet() {
   /* Staff ROLE plus an empty ledger. Not a zero balance: a seller who has spent down to
      nothing must still see their zero, their history and their way to add more. */
   const staff = !!me?.role && me.role !== "seller"
+  /**
+   * WHO MAY CONFIRM MONEY ARRIVED — admin and warehouse, exactly as the web has it
+   * (`canReview` in web/components/app/wallet-dashboard.tsx). They share the factory
+   * wallet; an operator or a designer does not.
+   *
+   * This said "any staff", which is what the SERVER allows (topups.js gates on isStaff) —
+   * but the web is canonical, and the phone offering an operator a queue of bank transfers
+   * to confirm is the phone inventing a permission the boards don't grant.
+   */
+  const canReview = me?.role === "admin" || me?.role === "warehouse"
   const noWallet = staff && !!w && (w.ledger ?? []).length === 0 && Number(w.balance ?? 0) === 0
 
   if (w === null && !err) {
@@ -64,7 +74,7 @@ export default function Wallet() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 20 }}>
-        <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg, marginTop: 8, letterSpacing: -0.5 }}>{noWallet ? "Top-ups" : "Wallet"}</Text>
+        <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg, marginTop: 8, letterSpacing: -0.5 }}>{noWallet && canReview ? "Top-ups" : "Wallet"}</Text>
 
         {/* A BALANCE IS READ OFTEN, so it is a quiet card rather than a coloured block —
             and "low" is a chip, not a repaint. Turning the whole panel red made a working
@@ -130,7 +140,17 @@ export default function Wallet() {
         )}
       </View>
 
-      {noWallet ? <TopupApprovals bottomInset={insets.bottom} /> : (
+      {noWallet && canReview ? <TopupApprovals bottomInset={insets.bottom} /> : noWallet ? (
+        /* Staff with no seller wallet AND no business confirming transfers. Says which of
+           the two it is rather than showing an empty ledger, which reads as a failed load. */
+        <View style={{ paddingHorizontal: 20, paddingTop: 4 }}>
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>No wallet on this account</Text>
+          <Text style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 20 }}>
+            Only a seller account carries a balance. Confirming a seller&apos;s top-up is
+            admin or warehouse.
+          </Text>
+        </View>
+      ) : (
       <FlatList
         data={w?.ledger ?? []}
         keyExtractor={(r) => String(r.id)}

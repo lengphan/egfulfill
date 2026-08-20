@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, ScrollView, useWindowDimensions } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { Ionicons } from "@expo/vector-icons"
-import { scanInventory, type ScanResult } from "@/lib/api"
+import { scanInventory, getMe, type ScanResult, type User } from "@/lib/api"
 import { TAB_BAR,F,C } from "@/lib/theme"
 
 /**
@@ -32,6 +32,17 @@ export default function Scan() {
   const { width: screenW } = useWindowDimensions()
   const camSize = Math.min(420, Math.max(260, screenW - 40))
   const [perm, requestPerm] = useCameraPermissions()
+  /**
+   * WHOSE TAB THIS IS.
+   *
+   * POST /api/inventory/scan is `requireWarehouse` — admin and warehouse, nobody else. The
+   * screen had no idea: it showed the camera to every signed-in account including SELLERS,
+   * asked them for camera permission, and only after a code was in frame came back
+   * "Warehouse or admin only". Asking a seller for their camera to run a request they can
+   * never make is the worst version of a gate that is checked too late.
+   */
+  const [me, setMe] = useState<User | null>(null)
+  useEffect(() => { getMe().then(setMe).catch(() => setMe(null)) }, [])
   const [dir, setDir] = useState<Dir>("in")
   const [busy, setBusy] = useState(false)
   const [log, setLog] = useState<Entry[]>([])
@@ -69,6 +80,23 @@ export default function Scan() {
       setBusy(false)
     }
   }, [dir])
+
+  /* Asked BEFORE the camera permission, so the wrong role is never prompted for a camera.
+     null = still loading; only a definite answer refuses. */
+  const mayScan = !me || me.role === "admin" || me.role === "warehouse"
+  if (me && !mayScan) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 40, paddingHorizontal: 24 }}>
+        <Text style={{ fontSize: 28, fontFamily: F.bold, color: C.fg }}>Scan stock</Text>
+        {/* NEVER HIDE, EXPLAIN — the web's rule. It names the roles rather than saying
+            "not allowed", so the answer to "who do I ask" is on the screen. */}
+        <Text style={{ fontSize: 16, color: C.muted, marginTop: 10, lineHeight: 22 }}>
+          Moving stock on and off the shelf is the warehouse's to record. Only a warehouse
+          or admin account can scan.
+        </Text>
+      </View>
+    )
+  }
 
   if (!perm) {
     return (
