@@ -1410,8 +1410,14 @@ function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => v
 
   // Mirrors the SERVER rule: in_review is still cancellable (submitted + charged,
   // but the floor hasn't started). Past that it's a refund request.
+  //
+  // AND ONCE ACCEPTED, ALWAYS ACCEPTED. Reading the stage alone made this window
+  // re-openable: stepping an order back from Approved to Pending — the ordinary undo of a
+  // mis-click — handed the seller a full refund on work the floor had already taken on.
+  // `approved_at` is stamped once and never cleared, so an internal correction stays
+  // internal. See the column's note in server/src/routes/orders.js.
   const fs = String(order.factory_status || "")
-  const started = !["", "new", "draft", "in_review"].includes(fs)
+  const started = !["", "new", "draft", "in_review"].includes(fs) || !!order.approved_at
   const done = fs === "cancelled" || fs === "refunded"
   /**
    * A CLOSED ORDER GETS A WAY FORWARD, not just a label.

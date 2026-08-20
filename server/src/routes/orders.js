@@ -646,6 +646,17 @@ export async function fulfillMarketplace(orderId, { test = false } = {}) {
  * Best-effort by contract: a status change must never fail because a shelf number could not
  * be adjusted. Every verb inside is idempotent per order, so re-entering a stage settles.
  */
+/**
+ * Stamp the acceptance, once. Approved is the stage that means it, but working and shipped
+ * both imply it — an order that reached either was accepted, whatever route it took — and
+ * every row written before this column existed passed through none of them under this name.
+ * coalesce, so the FIRST acceptance is the one on record.
+ */
+async function markApproved(orderId, stage) {
+  if (!['approved', 'working', 'shipped'].includes(normalizeStage(stage))) return;
+  await q('update orders set approved_at = coalesce(approved_at, now()) where id=$1', [orderId]).catch(() => {});
+}
+
 async function applyStockForStage(orderId, stage) {
   const at = normalizeStage(stage);
   try {
@@ -674,6 +685,22 @@ export function ordersRoutes(app, requireAuth) {
   // When we successfully pushed tracking to the marketplace (Etsy receipt shipped + buyer
   // email). Stamped once so a re-save can't re-email the buyer; a DRY RUN never stamps it.
   q('alter table orders add column if not exists marketplace_fulfilled_at timestamptz').catch(() => {});
+  /**
+   * WHEN THE FACTORY ACCEPTED THIS JOB — stamped once, and never cleared.
+   *
+   * The seller's cancel window was read off the CURRENT stage: at in_review they may
+   * cancel for a full refund, past it they may not. That made the window re-openable —
+   * stepping an order back from Approved to Pending, which is the ordinary undo of a
+   * mis-click, silently handed the seller a full refund on work the floor had already
+   * accepted and may have bought blanks for.
+   *
+   * Approval is a fact about US, not a position on a line: once we have said we will make
+   * this, we have said it. So the window closes on this stamp instead, and an internal
+   * correction stays internal. It does not trap anyone — an order that genuinely should
+   * not be made is cancelled by the factory, which refunds properly and is recorded as our
+   * decision rather than appearing as the seller's.
+   */
+  q('alter table orders add column if not exists approved_at timestamptz').catch(() => {});
   /**
    * THE MARKETPLACE'S OWN SHIP-BY DATE — a promise, not an inference.
    *
@@ -1612,7 +1639,7 @@ export function ordersRoutes(app, requireAuth) {
     // and only while nobody has picked it up yet.
     let _charged = 0, _refunded = 0;   // reported back so the UI can show the wallet moving
     if (sel) {
-      const cur = (await q('select factory_status from orders where id=$1 and seller_id=$2', [req.params.id, sel.id])).rows[0];
+      const cur = (await q('select factory_status, approved_at from orders where id=$1 and seller_id=$2', [req.params.id, sel.id])).rows[0];
       if (!cur) { reply.code(404); return { error: 'Order not found' }; }
       const fs = String(cur.factory_status || '');
       // The seller's own zone. 'in_review' is theirs too: they've submitted (and been
@@ -1620,7 +1647,11 @@ export function ordersRoutes(app, requireAuth) {
       // fully refundable. Once it's working or beyond, the floor owns it and the only
       // route back is a refund REQUEST the factory approves.
       const SELLER_ZONE = ['', 'new', 'draft', 'in_review'];
-      const started = !SELLER_ZONE.includes(fs);
+      // ONCE ACCEPTED, ALWAYS ACCEPTED. The stage alone made this window re-openable by an
+      // ordinary undo on the board — see approved_at. Both tests still have to pass, so an
+      // order that has never been approved and is sitting at Pending is cancellable exactly
+      // as it always was.
+      const started = !SELLER_ZONE.includes(fs) || !!cur.approved_at;
       if (body.tracking !== undefined || body.carrier !== undefined) {
         reply.code(403); return { error: 'Tracking is set by the factory.' };
       }
@@ -1834,7 +1865,9 @@ export function ordersRoutes(app, requireAuth) {
     // This was `if working: reserve`, which is why nothing was ever given back when an
     // order moved the other way.
     if (body.factoryStatus !== undefined || body.status !== undefined) {
-      await applyStockForStage(req.params.id, String(body.factoryStatus ?? body.status ?? ''));
+      const want = String(body.factoryStatus ?? body.status ?? '');
+      await markApproved(req.params.id, want);
+      await applyStockForStage(req.params.id, want);
     }
     egBroadcast({ type: 'orders' });
     if (_charged || _refunded) egBroadcast({ type: 'wallet' });
@@ -2068,7 +2101,13 @@ export function ordersRoutes(app, requireAuth) {
         `select 1 from order_items where order_id=$1 and coalesce(factory_status,'') <> $2 limit 1`,
         [req.params.id, status]
       ).catch(() => ({ rowCount: 1 }));
-      if (!behind.rowCount) reserved = await applyStockForStage(req.params.id, want);
+      // Both are ORDER-level facts, so both wait for the whole order to arrive: one line of
+      // five reaching Approved is not the factory accepting the job, and must not close the
+      // seller's cancel window or take the other lines' blanks off the shelf.
+      if (!behind.rowCount) {
+        await markApproved(req.params.id, want);
+        reserved = await applyStockForStage(req.params.id, want);
+      }
       if (want === 'working') replenish = await autoReplenish(req.params.id).catch(() => null);
     }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above

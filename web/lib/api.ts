@@ -1994,6 +1994,10 @@ export type OrderRow = {
   manifest_id?: string | null
   /** The CARRIER's status, separate from factory_status. Ours ends at 'shipped'; this is
    *  what happens to the parcel afterwards. */
+  /** When the factory accepted the job — stamped once at Approved (or the first stage past
+   *  it) and never cleared. The seller's cancel window closes on THIS, not on the current
+   *  stage, so stepping an order back on the board can't re-open it. */
+  approved_at?: string | null
   delivery_status?: string | null
   delivery_detail?: string | null
   delivery_checked_at?: string | null
