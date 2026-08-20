@@ -6,7 +6,9 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo start --ios",
-    "android": "expo start --android"
+    "android": "expo start --android",
+    "tunnel": "expo start --tunnel",
+    "tunnel:clear": "expo start --tunnel --clear"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
