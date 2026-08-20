@@ -210,8 +210,39 @@ type View = {
   rows: Row[]
 }
 
-const usd = (n: number, signed = false) =>
-  `${signed ? (n < 0 ? "−" : "+") : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+/**
+ * MONEY AT TWO PLACES — EXCEPT WHEN TWO PLACES IS ZERO.
+ *
+ * Every figure on this page is money, and money reads at two decimals. But the ledger now
+ * carries sub-cent rows: one AI prompt read from two reference photos costs about $0.003,
+ * and rounding that to "$0.00" is the same failure the numeric(12,2) column had — the
+ * amount is there, and the screen says there is nothing.
+ *
+ * THE RULE IS HOW MUCH ROUNDING COSTS, not a fixed threshold. If two places lose more than
+ * a tenth of the value, the value is shown at the precision it has; otherwise it reads as
+ * money. That is self-adjusting in a way a cut-off is not:
+ *
+ *   $24.50   exact at two places          -> $24.50
+ *   $0.134   two places lose 3%           -> $0.13
+ *   $0.0127  two places lose 21%          -> $0.0127
+ *   $0.0032  two places lose ALL of it    -> $0.0032
+ *
+ * A fixed "under half a cent" threshold got the last two wrong in opposite directions —
+ * it showed $0.0032 and then quietly turned $0.0127 into a penny, which is the same
+ * disappearing act the numeric(12,2) column was doing, just smaller.
+ *
+ * Zero itself stays "$0.00": a row that genuinely moved nothing should not be dressed up as
+ * $0.0000, which reads like a measurement rather than an absence.
+ */
+const usd = (n: number, signed = false) => {
+  const v = Math.abs(n)
+  const lost = Math.abs(v - Math.round(v * 100) / 100)
+  const fine = v > 0 && lost > v * 0.1
+  return `${signed ? (n < 0 ? "−" : "+") : ""}$${v.toLocaleString("en-US", {
+    minimumFractionDigits: fine ? 4 : 2,
+    maximumFractionDigits: fine ? 4 : 2,
+  })}`
+}
 const pct = (num: number, den: number) => (den > 0 ? `${Math.round((num / den) * 100)}%` : "—")
 
 // Demo fallback — shown when there's no session / API (keeps the page populated in standalone dev).
