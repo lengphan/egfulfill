@@ -273,6 +273,8 @@ export function buildTemplate(title, lists = null) {
   const P = lists && Array.isArray(lists.products) ? lists.products : [];
   const hasLists = P.length > 0;
   const AXES = [['colors', 'PC'], ['sizes', 'PS'], ['methods', 'PM']];
+  // How many rows get a per-row dependent rule — see the note where they are emitted.
+  const DEP_ROWS = 200;
   const BANDS = bands();
   // Row 0 = merged band banner, row 1 = column headers, row 2 = the deletable sample.
   const bannerRow = { values: T_COLUMNS.map((c, i) => {
@@ -370,26 +372,39 @@ export function buildTemplate(title, lists = null) {
       // its fixed one. Both are skipped when there is no catalogue to build lists from,
       // rather than offering a dropdown that would resolve to nothing.
       /**
-       * NO DOLLAR ON THE PRODUCT CELL, and this is the whole of why it did not work.
+       * ONE RULE PER ROW, because Google will not keep a relative reference.
        *
-       * A validation formula is read relative to the TOP-LEFT cell of the range it is set
-       * on, and shifts down with each row — but only for a RELATIVE reference. Sent as
-       * `$K3`, Google normalised it to `Orders!$K$3`: every row in the column then asked
-       * about row 3's product, row 3 is the empty first data row, MATCH returned #N/A, and
-       * all three dropdowns rendered as an empty list with a pencil on it.
+       * A dependent dropdown has to ask about the product on ITS OWN row. Sent as `$K3` the
+       * API stored `Orders!$K$3`; sent as `K3` — no dollars at all — it stored `Orders!$K$3`
+       * again. Data-validation formulas written through the API are absolutised, full stop,
+       * so a rule set over K3:K500 asks every one of those rows what is on row 3. Row 3 is
+       * the empty sample row, MATCH returns #N/A, and all three columns render as an empty
+       * list with a pencil on it. Which is exactly what it looked like.
        *
-       * `K3` shifts. The column cannot drift — each rule is set on one column — so nothing
-       * is lost by making it relative in both axes.
+       * The UI's own version of this trick works because the UI writes the rule per cell.
+       * So does this now: one request per row, each naming its own row, which Google then
+       * absolutises to the row it was already about.
+       *
+       * DEP_ROWS is what that costs — three requests per row, in one batchUpdate. 200 rows
+       * is 600, which Google takes without complaint; 500 would be 1,500 and is a payload
+       * worth not finding the limit of. A sheet with more than 200 lines on it is past what
+       * anyone hand-fills anyway, and the row still accepts a typed value: none of these
+       * rules is strict.
        */
-      const depRule = c.dep && hasLists
-        ? { condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue:
-              `=INDIRECT("${AXES.find(([a]) => a === c.dep)[1]}_" & MATCH(${colLetter(prodIdx)}3, Lists!$A$2:$A, 0))` }] } }
-        : null;
-      if (depRule) {
-        out.push({ setDataValidation: {
-          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
-          rule: { ...depRule, showCustomUi: true, strict: false },
-        } });
+      if (c.dep && hasLists) {
+        const prefix = AXES.find(([a]) => a === c.dep)[1];
+        for (let r = 0; r < DEP_ROWS; r++) {
+          const row = 3 + r;                       // sheet row (1-based); data starts at 3
+          out.push({ setDataValidation: {
+            range: { sheetId: gid, startRowIndex: row - 1, endRowIndex: row, startColumnIndex: i, endColumnIndex: i + 1 },
+            rule: {
+              condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue:
+                `=INDIRECT("${prefix}_" & MATCH(${colLetter(prodIdx)}${row}, Lists!$A$2:$A, 0))` }] },
+              showCustomUi: true,
+              strict: false,
+            },
+          } });
+        }
       } else if (c.opts === 'products' && hasLists) {
         out.push({ setDataValidation: {
           range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
