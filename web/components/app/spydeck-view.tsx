@@ -879,17 +879,27 @@ export function SpyDeckView() {
     const detail = makeDetail && makeDetail.forId === String(l.listing_id) && makeDetail.status === "done"
       ? makeDetail : null
     /*
-     * WAIT FOR THE PHOTOS BEFORE LEAVING.
+     * WAIT FOR THE PHOTOS BEFORE LEAVING — and wait on DONE, not on "not loading".
      *
-     * This used to navigate on the same tick the fetch STARTED, so the draft was stashed with
-     * `detail` still null and the competitor's photos — the entire input to the photo studio —
-     * arrived at a page that had already been left. A publish page is a navigation, not a
-     * dialog: there is no second chance to fill the prefill in afterwards.
+     * The previous guard bailed only when a `loading` record for this listing already
+     * existed, and it could never see one. Both effects key off `makeListing` and both defer
+     * with setTimeout(0): the fetch effect is declared first, so its timeout is queued first,
+     * but THIS effect's timeout is queued in the same pass — before any state has changed.
+     * By the time the fetch effect's callback runs and sets `loading`, the navigation
+     * timeout is already sitting in the macrotask queue, and React's re-render (which is
+     * what would have cleaned it up) is scheduled behind it. So the cleanup never got the
+     * chance to fire, the guard read a closure where `makeDetail` was still null, and the
+     * draft was stashed with `detail` null — falling through to the grid card's single cover
+     * photo for a listing with eight.
      *
-     * Bounded by the fetch itself, which always resolves to `done` even on failure, so this
-     * cannot wait forever on a dead endpoint.
+     * Waiting for `status === "done"` cannot lose that race: there is nothing to cancel,
+     * because nothing is queued until the answer exists. The effect re-runs when
+     * `makeDetail` changes and proceeds exactly once.
+     *
+     * Bounded by the fetch itself, which resolves to `done` even on failure, so this cannot
+     * wait forever on a dead endpoint — a failure still navigates, just with the cover.
      */
-    if (makeDetail?.forId === String(l.listing_id) && makeDetail.status === "loading") return
+    if (!(makeDetail?.forId === String(l.listing_id) && makeDetail.status === "done")) return
     const id = setTimeout(() => {
       const draftId = stashPublishDraft({
         prefill: {

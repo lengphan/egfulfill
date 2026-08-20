@@ -159,8 +159,20 @@
        this is the one surface whose job is judging artwork colour. */
     --studio-bed: oklch(0.982 0.002 255);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.888 0.013 91);
-    --input: oklch(0.928 0.015 91);
+    /* HAIRLINES ARE NEUTRAL, because every surface they sit on is.
+       These were oklch(… 0.013 91) and oklch(… 0.015 91) — hue 91 is yellow, so every line
+       in the light theme carried a warm olive cast. That was the only warm element in the
+       system: --background, --card and --foreground are all chroma 0, and --primary is
+       hue 283.5, violet. 91 against 283 is 192 degrees apart, near enough complementary, so
+       a taupe rule a centimetre from a periwinkle control read as a colour decision nobody
+       made — which is what "muddy" is.
+       Chroma 0 makes the line agree with the surface instead of arguing with it, and the
+       lightness comes UP a step so a 1px rule reads as a hairline rather than a soft grey
+       band. Contrast is the thing that makes a line look thin; the width was never the
+       problem. Dark mode is left alone — its border shares hue 285 with its own surface,
+       which is the same rule, already satisfied. */
+    --border: oklch(0.905 0 0);
+    --input: oklch(0.932 0 0);
     --ring: oklch(0.5305 0.2723 283.5);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
