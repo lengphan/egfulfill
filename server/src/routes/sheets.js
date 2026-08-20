@@ -300,8 +300,33 @@ export function buildTemplate(title, lists = null) {
 
   const createBody = { properties: { title }, sheets: sheetsSpec };
 
-  const requests = (gid) => {
+  /**
+   * `opts` exists for the FORMAT route, which rewrites a master that already exists.
+   *
+   *   listsGid   — the Lists tab's real sheetId. On create it is 1, because createBody
+   *                asks for that id; on an existing file it is whatever is there.
+   *   createLists — the master predates this and has no Lists tab, so add it here.
+   *   dropNamedRanges — a named range cannot be added twice, so the old PC_/PS_/PM_ ones
+   *                have to go first or the second format 400s with "already exists".
+   */
+  const requests = (gid, opts = {}) => {
+    const listsGid = opts.listsGid == null ? 1 : opts.listsGid;
     const out = [];
+    if (hasLists && opts.createLists) {
+      out.push({ addSheet: { properties: {
+        sheetId: listsGid, title: 'Lists', hidden: true,
+        gridProperties: { columnCount: Math.max(listCols.length, 4), rowCount: Math.max(listRowCount, 100) },
+      } } });
+    }
+    // The lists themselves, rewritten every time — this is the whole point of formatting an
+    // existing master: yesterday's catalogue is replaced by today's in place.
+    if (hasLists) {
+      out.push({ updateCells: {
+        rows: listRows, fields: 'userEnteredValue',
+        start: { sheetId: listsGid, rowIndex: 0, columnIndex: 0 },
+      } });
+    }
+    for (const id of opts.dropNamedRanges || []) out.push({ deleteNamedRange: { namedRangeId: id } });
     for (const b of BANDS) {
       if (b.count > 1) out.push({ mergeCells: { mergeType: 'MERGE_ALL', range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: b.start, endColumnIndex: b.start + b.count } } });
     }
@@ -357,7 +382,7 @@ export function buildTemplate(title, lists = null) {
           const col = 1 + i * 3 + a;
           out.push({ addNamedRange: { namedRange: {
             name: `${prefix}_${i + 1}`,
-            range: { sheetId: 1, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: col, endColumnIndex: col + 1 },
+            range: { sheetId: listsGid, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: col, endColumnIndex: col + 1 },
           } } });
         });
       }
@@ -557,15 +582,36 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
       : '';
 
     // The first tab is the one we format; its real sheetId is needed for every range.
-    const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties(title,sheetId)`, { headers: A });
+    const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties(title,sheetId),namedRanges(namedRangeId,name)`, { headers: A });
     const meta = await metaR.json().catch(() => ({}));
     if (!metaR.ok) {
       reply.code(metaR.status === 403 ? 403 : 502);
       const msg = (meta.error && meta.error.message) || metaR.status;
       return { error: `Google says: ${msg}.${metaR.status === 403 ? shareHint : ''}` };
     }
-    const first = ((meta.sheets || [])[0] || {}).properties || {};
+    const sheets = meta.sheets || [];
+    const first = (sheets[0] || {}).properties || {};
     const gid = first.sheetId || 0;
+
+    /**
+     * THE LISTS TAB, ON A MASTER THAT PREDATES IT.
+     *
+     * The dependent dropdowns read a hidden Lists tab, and every master created before
+     * today has none — so formatting has to be able to ADD it, not only rewrite it. Its id
+     * is picked from what is already there rather than assumed: 1 is what a freshly created
+     * template gets, but this file was made by hand and its second tab could be anything.
+     *
+     * The named ranges are dropped and re-added on every format. A name can only exist
+     * once, so keeping them would 400 the second time this button is pressed — and they
+     * have to move anyway, because the catalogue behind them has changed.
+     */
+    const existing = sheets.find((x) => (x.properties || {}).title === 'Lists');
+    const used = new Set(sheets.map((x) => (x.properties || {}).sheetId).filter((n) => n != null));
+    let listsGid = existing ? existing.properties.sheetId : 1;
+    while (!existing && used.has(listsGid)) listsGid++;
+    const dropNamedRanges = (meta.namedRanges || [])
+      .filter((r) => /^(PC|PS|PM)_\d+$/.test(String(r.name || '')))
+      .map((r) => r.namedRangeId).filter(Boolean);
 
     const tpl = buildTemplate('', await catalogLists());
     const rowData = tpl.createBody.sheets[0].data[0].rowData;
@@ -574,7 +620,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
       // rename — or the tilde coming off "Order Number" — without being rebuilt by hand.
       { updateCells: { rows: rowData.slice(0, 2), fields: 'userEnteredValue,userEnteredFormat', start: { sheetId: gid, rowIndex: 0, columnIndex: 0 } } },
       { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 2 } }, fields: 'gridProperties.frozenRowCount' } },
-      ...tpl.requests(gid),
+      ...tpl.requests(gid, { listsGid, createLists: !existing, dropNamedRanges }),
     ] };
     const upR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`, { method: 'POST', headers: A, body: JSON.stringify(body) });
     if (!upR.ok) {
@@ -583,7 +629,13 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
       const msg = (d.error && d.error.message) || upR.status;
       return { error: `Google says: ${msg}.${upR.status === 403 ? shareHint : ''}` };
     }
-    return { ok: true, tab: first.title || 'Sheet1', dropdowns: T_COLUMNS.filter((c) => c.opts).map((c) => c.h) };
+    return {
+      ok: true, tab: first.title || 'Sheet1',
+      dropdowns: T_COLUMNS.filter((c) => c.opts).map((c) => c.h),
+      // A refresh that quietly rebuilt the lists from an empty catalogue would look
+      // identical to one that worked, so the count comes back.
+      products: tpl.products, listsTab: existing ? 'refreshed' : 'created', truncated: tpl.truncated,
+    };
   });
 
   // Admin sets the master template link, from the same dialog a seller uses. Accepts any
