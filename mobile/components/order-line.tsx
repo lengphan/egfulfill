@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { View, Text, Image, Pressable, ActivityIndicator, Alert, Linking, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { assetUrl, setItemStatus, type OrderItem, type OrderDesign } from "@/lib/api"
+import { assetUrl, setItemStatus, getEmbPreview, type OrderItem, type OrderDesign } from "@/lib/api"
 import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork, stageDenialReason, isFactoryOrder,
@@ -134,6 +134,48 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
   if (listing) pics.push({ uri: assetUrl(listing) as string, caption: "Listing photo — what the buyer saw", title: lineTitle(item) })
   const docs = mine.filter((d) => !isArtwork(d.kind))
 
+  /**
+   * WHAT THE MACHINE WILL SEW — the last tile in the strip, and the reason the strip is
+   * worth scrolling on the floor.
+   *
+   * Every picture above is a claim about how it should LOOK: the artwork we were sent, the
+   * photo the buyer saw. None of them is a claim about the stitch file, and the stitch file
+   * is the thing being run. A design that reads right in the artwork and wrong in the
+   * stitches is exactly what nobody catches while holding the garment.
+   *
+   * A BUTTON, not an automatic fetch. The render is cached server-side by content hash, so
+   * it costs one Wilcom call per file ever — but the first one is slow and metered, and a
+   * queue screen scrolling past twenty lines must not fire twenty of them. Staff only: the
+   * route is requireStaff, and a seller is looking at their product, not our check.
+   *
+   * (The web prefers a worksheet PDF over this when the digitiser sent one. Mobile does not
+   * read design_files at all yet, so here it is the render or nothing — said plainly rather
+   * than implied.)
+   */
+  const [stitch, setStitch] = useState<string | null>(null)
+  const [stitchBusy, setStitchBusy] = useState(false)
+  const [stitchWhy, setStitchWhy] = useState<string | null>(null)
+  const renderStitch = async () => {
+    setStitchBusy(true); setStitchWhy(null)
+    try {
+      const r = await getEmbPreview({ orderId, sku: item.sku ?? null })
+      if (r.ok && r.png) { setStitch(`data:image/png;base64,${r.png}`); return }
+      // Each refusal needs a different person to act, so it names which — the same
+      // sentences the web shows, because one floor reading two explanations of one refusal
+      // learns to trust neither.
+      setStitchWhy(
+        r.reason === "not-stitch-file" ? "No stitch file on this line yet."
+          : r.reason === "not-configured" ? "Wilcom isn't connected."
+            : r.reason === "file-security" ? "Locked by the digitiser's licence."
+              : r.reason === "ewa-rejected" ? "Wilcom refused the file."
+                : r.error || "No image came back.",
+      )
+    } catch (e) {
+      setStitchWhy(e instanceof Error ? e.message : "Couldn't reach the renderer.")
+    } finally { setStitchBusy(false) }
+  }
+  if (stitch) pics.push({ uri: stitch, caption: "Stitch view — what the machine sews", title: lineTitle(item) })
+
   return (
     <View style={{
       /* A LINE ON THE PAGE. Each line was its own bordered, shadowed card inside the
@@ -207,7 +249,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
       ) : null}
 
       {/* EVERY PICTURE ON THIS LINE, sideways. */}
-      {pics.length > 0 ? (
+      {pics.length > 0 || canWork ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -230,6 +272,40 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
               </Text>
             </Pressable>
           ))}
+          {/* THE STITCH TILE, same size as the pictures beside it — it belongs to the same
+              row of things you look at, not to a controls area underneath. It disappears the
+              moment it renders, because the render then IS one of the pictures. */}
+          {canWork && !stitch && (
+            <Pressable
+              disabled={stitchBusy || !!stitchWhy}
+              onPress={renderStitch}
+              style={({ pressed }) => ({
+                width: 168, height: 168, borderRadius: 10,
+                // The image well the pictures beside it sit on, not white — a white tile among
+                // warm wells is the stuck-on look the theme note warns about.
+                borderWidth: 1, borderColor: C.border, backgroundColor: C.accent,
+                alignItems: "center", justifyContent: "center", paddingHorizontal: 14,
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              {stitchBusy ? (
+                <ActivityIndicator color={C.primary} />
+              ) : stitchWhy ? (
+                <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted, textAlign: "center" }}>{stitchWhy}</Text>
+              ) : (
+                <>
+                  <Ionicons name="git-network-outline" size={22} color={C.muted} />
+                  <Text style={{ fontSize: 13.5, fontFamily: F.semi, color: C.fg, marginTop: 8 }}>Stitch view</Text>
+                  {/* Said out loud: the first render is slow and metered and every one after
+                      is free, which is the difference between "this is broken" and "of
+                      course, it is rendering". */}
+                  <Text style={{ fontSize: 11.5, fontFamily: F.body, color: C.muted, marginTop: 3, textAlign: "center" }}>
+                    renders once
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          )}
         </ScrollView>
       ) : (
         /* Says WHICH it is: nothing to print versus nothing uploaded. An empty list that
