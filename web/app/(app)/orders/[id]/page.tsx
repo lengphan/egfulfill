@@ -15,6 +15,7 @@ import { DesignCharge } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StageBadge } from "@/components/app/stage-badge"
+import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { OrderHistory } from "@/components/app/order-history"
@@ -556,6 +557,10 @@ export default function OrderDetailPage() {
                    other side. */
                 ? <StageBadge status={resolvedOrderStage(order)} />
                 : <SellerStatusBadge order={order} />}
+              {/* And beside it, for staff only, the carrier's own word about the parcel —
+                  a second status from a party we don't control, which changes nothing here
+                  by design. See lib/delivery-status.ts. */}
+              {isStaff && <DeliveryBadge order={order} onRefreshed={reloadAll} />}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
               {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}

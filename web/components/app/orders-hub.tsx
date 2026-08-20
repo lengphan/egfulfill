@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
+import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
@@ -1775,6 +1776,14 @@ export function OrdersHub() {
                   return (
                     <span className="flex min-w-0 flex-col items-start gap-1 justify-self-start">
                       <StageBadge status={stage} />
+                      {/* THE SECOND STATUS, and only for the factory. The stage above is
+                          what WE did; this is what the carrier says about the same parcel,
+                          adopted verbatim and touching nothing. It is what makes an order
+                          that reads Draft and arrived at the buyer last week legible: it
+                          was made somewhere else, and the row can finally say so instead of
+                          looking like a mistake. Hidden without a tracking number, because
+                          then there is no parcel to have a status. */}
+                      {isStaff && <DeliveryBadge order={o} onRefreshed={load} />}
                       {p.mixed && (
                         <span className="flex items-center gap-1.5" title={`${p.started} of ${p.total} lines started — this order shows the least-advanced one`}>
                           <span className="block h-1 w-10 overflow-hidden rounded-full bg-muted">

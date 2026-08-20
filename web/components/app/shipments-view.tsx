@@ -6,6 +6,7 @@ import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
+import { deliveryWord, DELIVERY_TEXT_TONE } from "@/lib/delivery-status"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,13 +54,9 @@ const shipOrigin = (s: ShipmentRow) => (isLoose(s) ? "Label with no order" : pla
    The colour stays ON THE TEXT, because these hues are the floor's reserved vocabulary
    (amber waiting, emerald done, rose wrong) and dropping them would cost real meaning —
    what goes is the box. */
-const DELIVERY: Record<string, { label: string; cls: string }> = {
-  awaiting_pickup: { label: "Not collected", cls: "text-amber-700 dark:text-amber-400" },
-  in_transit: { label: "In transit", cls: "text-blue-700 dark:text-blue-400" },
-  delivered: { label: "Delivered", cls: "text-emerald-700 dark:text-emerald-400" },
-  returned: { label: "Returning", cls: "text-rose-700 dark:text-rose-400" },
-  failed: { label: "Failed", cls: "text-rose-700 dark:text-rose-400" },
-}
+const DELIVERY: Record<string, { label: string; cls: string }> = Object.fromEntries(
+  Object.keys(DELIVERY_TEXT_TONE).map((k) => [k, { label: deliveryWord(k) as string, cls: DELIVERY_TEXT_TONE[k] }]),
+)
 
 const when = (s: string | null) =>
   s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null

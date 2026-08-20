@@ -6,6 +6,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { useEffect, useRef, useState } from "react"
 import { fetchShipmentLabel, detachOrderLabel, restoreOrderLabel, getShipmentCandidates, attachShipmentToOrder, type ShipmentRow, type ShipmentCandidate } from "@/lib/api"
 import { plainNum, platformFromId } from "@/lib/order-format"
+import { deliveryWord } from "@/lib/delivery-status"
 
 /**
  * ONE PARCEL, IN FULL — so the table doesn't have to be.
@@ -22,17 +23,6 @@ import { plainNum, platformFromId } from "@/lib/order-format"
 
 const when = (s: string | null | undefined) =>
   s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : null
-
-// THE STATUS NAME, AND NOTHING ELSE. These were sentences ("Not collected by the
-// carrier yet") sitting above the carrier's own raw detail line and a timestamp, so
-// one fact was said three ways down the right-hand column. A status is a word.
-const DELIVERY_WORD: Record<string, string> = {
-  awaiting_pickup: "Preshipment",
-  in_transit: "In transit",
-  delivered: "Delivered",
-  returned: "Returned",
-  failed: "Delivery failed",
-}
 
 const VIA_WORD: Record<string, string> = {
   "in-house": "Scanned here",
@@ -433,7 +423,7 @@ export function ShipmentDetailDialog({
           <div>
             <Row label="Carrier status">
               {s.delivery
-                ? <span>{DELIVERY_WORD[s.delivery] ?? s.delivery}</span>
+                ? <span>{deliveryWord(s.delivery)}</span>
                 : <span className="text-muted-foreground">Not asked yet</span>}
             </Row>
             <Row label="Dispatch status">
