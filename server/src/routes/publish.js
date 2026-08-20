@@ -107,6 +107,8 @@ export function publishRoutes(app, requireAuth) {
         system,
         messages: [{ role: 'user', content: `TITLE:\n${title || '(none)'}\n\nDESCRIPTION:\n${description || '(none)'}` }],
         maxTokens: 1200,
+        costRef: `airewrite-${crypto.randomBytes(8).toString('hex')}`,
+        costNote: 'Listing copy rewrite',
       });
       // The model was told to return only JSON; a fenced block or a stray sentence around it
       // is the common failure and is cheap to survive, so pull the outermost object out

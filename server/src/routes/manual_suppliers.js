@@ -6,6 +6,7 @@
 //
 // PRICE IS FETCHED FROM STRUCTURED DATA ONLY. See fetchPrice below for why scraping the
 // visible HTML is not offered.
+import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { audit } from '../audit.js';
 import { aiComplete } from './support_ai.js';
@@ -478,7 +479,10 @@ Rules:
 
     let text;
     try {
-      text = await aiComplete({ system: SUGGEST_SYSTEM, messages: [{ role: 'user', content }], maxTokens: 700 });
+      text = await aiComplete({
+        system: SUGGEST_SYSTEM, messages: [{ role: 'user', content }], maxTokens: 700,
+        costRef: `aisupplier-${crypto.randomBytes(8).toString('hex')}`, costNote: 'Supplier suggestion',
+      });
     } catch (e) {
       reply.code(e && e.status === 503 ? 503 : 502);
       return { error: (e && e.message) || 'Could not reach the AI service.' };

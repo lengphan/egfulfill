@@ -2,6 +2,7 @@
 // Server-authoritative so saves follow the seller across devices. The whole listing
 // is stored as jsonb so the Saved view renders without re-hitting Etsy. Table is
 // created idempotently at route-load (same pattern as order_designs / wallet_ledger).
+import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { searchListings, connectionFor, shopListings, etsyPublicGet, mapListing } from './etsy.js';
 import { aiComplete } from './support_ai.js';
@@ -619,6 +620,8 @@ export function spydeckRoutes(app, requireAuth) {
     try {
       advice = await aiComplete({
         maxTokens: 900,
+        costRef: `aiadvice-${crypto.randomBytes(8).toString('hex')}`,
+        costNote: 'SpyDeck shop advice',
         system: [
           'You are an Etsy shop consultant for print-on-demand sellers.',
           'You are given COMPUTED statistics about one shop. Never invent numbers — cite only what you are given.',

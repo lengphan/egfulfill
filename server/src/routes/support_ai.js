@@ -531,7 +531,18 @@ async function generateReply(key, model, sellerId, messages, isStaffOwn = false)
   const ctx = await accountContext(sellerId);
   const system = SYSTEM + (isStaffOwn ? STAFF_EXTRA : '') + '\n\nACCOUNT DATA (for this seller only):\n' + ctx;
   const body = JSON.stringify({ model, max_tokens: 600, system, messages });
-  return postAnthropic(key, body);
+  /*
+   * The reply a seller (or a staffer in their own workspace) gets back. Booked like every
+   * other call now: it is the highest-VOLUME text path we have, so leaving it out meant the
+   * AI cost line understated by exactly the part that runs all day.
+   *
+   * One ref per reply — there is no natural id to dedupe on here and a reply is not retried,
+   * so a fresh one is correct rather than lazy.
+   */
+  return postAnthropic(key, body, (usage) => {
+    const usd = textCallUsd(model, usage);
+    if (usd > 0) recordGenerationCost(`aireply-${crypto.randomBytes(8).toString('hex')}`, usd, 'Assistant reply').catch(() => {});
+  });
 }
 
 // Workbench = the user's PRIVATE personal assistant (desk-<uid>). Only they can read it, so
@@ -863,7 +874,10 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       : '\n\n(No saved notes yet.)');
     let text = '';
     try {
-      text = stripEmoji(await postAnthropic(key, JSON.stringify({ model, max_tokens: 700, system, messages })));
+      text = stripEmoji(await postAnthropic(key, JSON.stringify({ model, max_tokens: 700, system, messages }), (usage) => {
+        const usd = textCallUsd(model, usage);
+        if (usd > 0) recordGenerationCost(`aidesk-${crypto.randomBytes(8).toString('hex')}`, usd, 'Workbench reply').catch(() => {});
+      }));
     } catch (e) {
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'desk-ai request failed');
       return { ok: false, error: e.message || 'AI service unavailable' };

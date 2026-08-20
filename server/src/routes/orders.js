@@ -104,10 +104,22 @@ function normalizeStage(s) {
 //     nor rewinds; it parks the item for warehouse/admin.
 //   • cancelled/refunded are money calls (admin). The operator puts it on hold; whoever
 //     has the authority resolves.
-// An operator may accept work INTO production; they still cannot claim it left. The zone
-// used to end at 'awaiting_scan' — with that stage gone, 'working' is the same boundary
-// under the name that survived, and 'shipped' is still theirs to not touch.
-const OP_ZONE = new Set(['', 'in_review', 'working']);   // normalized
+// An operator may accept work INTO production; they still cannot claim it left.
+//
+// THE ZONE ENDS AT APPROVED, NOT AT WORKING. It said 'working' because it was written
+// before Approved existed, and inserting a stage into PIPELINE silently moved the boundary
+// without anyone changing this line: the operator kept the stage one PAST the one that is
+// actually theirs, and lost the one the new stage was added FOR. So an operator pressing
+// Approve — the control the web offers them as their own job — got a 403 whose text still
+// named 'Awaiting scan', a stage retired two refactors ago.
+//
+// Confirming the blank on every line IS the operator's job, and Approved is where that
+// judgement is recorded. Committing the order to production is the WAREHOUSE's call, made
+// by whoever is going to make the thing. That handover is the whole reason there are two
+// stages rather than one, so Working is out of reach here even though Approved is not.
+//
+// MIRRORS OP_ZONE in web/lib/factory-status.ts — the web is canonical; change both.
+const OP_ZONE = new Set(['', 'in_review', 'approved']);   // normalized
 const OP_STOPS = new Set(['on_hold']);
 const MONEY_STAGES = new Set(['cancelled', 'refunded']);
 
@@ -234,7 +246,25 @@ export function stageDenial(role, current, target, isFactory = false) {
 
   if (role === 'admin') return null;
   if (role === 'warehouse') {
-    return MONEY_STAGES.has(to) ? 'Cancelling or refunding is an admin decision.' : null;
+    if (MONEY_STAGES.has(to)) return 'Cancelling or refunding is an admin decision.';
+    /**
+     * PRODUCTION STARTS FROM APPROVED, and only from there.
+     *
+     * Approved means an operator has confirmed the blank on every line — the whole reason
+     * the stage exists. Starting from Pending would be the warehouse making that judgement
+     * itself, on an order whose variants may still be unset, which is the case Approved was
+     * added to catch.
+     *
+     * Coming off a HOLD is not starting production — it is putting the order back where the
+     * stop found it, which may well be Working. Gating that on Approved would strand every
+     * held order that was already being made.
+     *
+     * MIRRORS stageDenialReason in web/lib/factory-status.ts — change both.
+     */
+    if (to === 'working' && at !== 'approved' && at !== 'on_hold') {
+      return 'Start it from Approved — an operator confirms the blank first.';
+    }
+    return null;
   }
   if (role === 'operator') {
     if (MONEY_STAGES.has(to)) return 'Cancelling or refunding is an admin decision — put the order on hold instead.';
@@ -243,9 +273,26 @@ export function stageDenial(role, current, target, isFactory = false) {
     // handing the decision over. (An operator who mis-flags needs warehouse/admin to
     // resume it. Accepted: factory_status is one field, so a stop overwrites the stage
     // it interrupted and there's nothing to resume TO without a human deciding.)
-    if (EXCEPTIONS.includes(at)) return 'This item is stopped — warehouse or admin decides what happens next.';
+    /**
+     * AND THE CORD LETS GO. Raising a stop is an operator's right from any stage; releasing
+     * it has to be the same right, or the andon cord is a trap — the one who pulled it
+     * cannot undo a false alarm, and has to go and find a warehouse to say "never mind".
+     *
+     * Coming off hold is not starting production: it is putting the order back where it was
+     * before the stop, which is why it is allowed even to Working, which an operator may not
+     * otherwise set. Money stages are still refused above, and cancelled/refunded are
+     * already terminal for every role further up, so this only ever releases on_hold.
+     *
+     * MIRRORS stageDenialReason in web/lib/factory-status.ts — the web is canonical.
+     */
+    if (at === 'on_hold') return null;
+    /**
+     * AN OPERATOR APPROVES; THE WAREHOUSE STARTS. See OP_ZONE above — tested explicitly so
+     * the refusal can say whose call it is rather than "that's out of your zone".
+     */
+    if (to === 'working') return 'Approving is yours — the warehouse starts production from there.';
     if (!OP_ZONE.has(at)) return 'The warehouse has this item — only warehouse or admin can change its status now.';
-    if (!OP_ZONE.has(to)) return 'Operators can move an item as far as Awaiting scan.';
+    if (!OP_ZONE.has(to)) return 'Operators can move an item as far as Approved.';
     // Reverting OUT of in_review un-does a submission the seller was CHARGED for. The
     // charge is idempotent so nothing double-bills, but the order goes back to looking
     // untouched while the money stays taken — and the seller sees it as editable again.
@@ -3276,6 +3323,8 @@ export function ordersRoutes(app, requireAuth) {
 
       const facts = JSON.stringify({ order: o, items }).slice(0, 12000);
       const text = await aiComplete({
+        costRef: `aibrief-${crypto.randomBytes(8).toString('hex')}`,
+        costNote: 'Order brief',
         system:
           'You brief print-on-demand factory staff on one order so they can answer the seller. ' +
           'Reply with 4-7 terse markdown bullets, no preamble and no closing line. Cover: where the order ' +
