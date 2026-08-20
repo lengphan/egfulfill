@@ -13,6 +13,8 @@
 
 import crypto from 'crypto';
 import { q } from '../db.js';
+import { productSizes, productColors } from '../variant-sku.js';
+import { methodCode } from '../print-route.js';
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY || '';
 const TEMPLATE_URL = process.env.SHEETS_TEMPLATE_URL || '';
@@ -185,17 +187,43 @@ export async function catalogLists() {
     const d = r.data && typeof r.data === 'object' ? r.data : {};
     const name = String(d.name || r.sku || '').trim();
     if (!name) continue;
-    // `methods` is a list on some products and a joined `method` string on others — read
-    // both or a product that has one loses half its options (CLAUDE.md §5).
+    /**
+     * THE PRINT METHOD IS A SENTENCE IN THE DATABASE, AND A CODE IN AN ORDER.
+     *
+     * Production stores it as prose — "DTG printing / Embroidery" is what 27 real products
+     * carry — while an order line, the pricing surcharge and the sku suffix all speak in
+     * codes (DTG, EMB, DTF, APL, LSR, SCR, SUB, VNL). Splitting the sentence and offering
+     * the fragments put "DTG printing" and "Embroidery" in the dropdown: words that read
+     * right to a person and are not what the importer normalises against.
+     *
+     * So each fragment goes through methodCode() — the same normaliser pricing.js and the
+     * design router use, because three places disagreeing about what "DTF" means is how a
+     * job gets priced one way and routed another. Then filtered to the methods we actually
+     * sell, so the sheet can never offer a technique the factory does not do.
+     */
     const methods = clean([
       ...(Array.isArray(d.methods) ? d.methods : []),
-      ...String(d.method || '').split(/[,/|]/),
-    ]);
+      ...String(d.method || '').split(/[,/|+&]|\band\b/i),
+    ]).map((m) => methodCode(m)).filter((m) => T_OPTS.methods.includes(m));
+    /**
+     * COLOURS ARE THE KEYS OF `colorImages`, NOT A `colors` FIELD.
+     *
+     * There is no `colors` column in a catalogue product and never was — checked against
+     * production: 27 products, every one carrying `colorImages`, `sizes` and `method`, not
+     * one carrying `colors`. Reading a field that does not exist gave every product an
+     * empty colour list, which is why the sheet showed no colours and fell back to the old
+     * fixed Print Type list.
+     *
+     * So it goes through the SAME helpers the app uses — productColors falls back to
+     * `mainColor` when there are no keys, and deliberately does not union in sizePrices or
+     * anything else, because a leftover price tier would offer a variant the product does
+     * not sell. CLAUDE.md §5: import, don't re-implement.
+     */
     products.push({
       name,
       sku: String(r.sku || '').trim(),
-      colors: clean(d.colors || d.colours),
-      sizes: clean(d.sizes),
+      colors: clean(productColors(d)),
+      sizes: clean(productSizes(d)),
       methods,
     });
     if (products.length >= LIST_CAP) break;
