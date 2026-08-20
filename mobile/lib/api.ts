@@ -104,6 +104,10 @@ export type OrderDesign = {
    *  a data URL through for rows that predate storage. Both go straight into an <Image>. */
   data?: string | null
   url?: string | null
+  /** `D-XXXXXXXX` — the artwork's content hash, short enough to read aloud. The SAME picture
+   *  carries the same id on every order it appears on, which is what makes "have we cut this
+   *  one before" answerable. Null on rows that predate hashing. */
+  design_id?: string | null
 }
 
 /** Absolute URL for a path the API returned relative (thumbnails). Bare `img` values are

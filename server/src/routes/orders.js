@@ -3248,8 +3248,20 @@ export function ordersRoutes(app, requireAuth) {
     // (an <img src> takes a URL or a data-URL either way).
     return r.rows.map((row) => {
       const url = designUrlOf(row);
+      /*
+       * A SHORT ID THE FLOOR CAN READ OUT AND SEARCH BY.
+       *
+       * art_hash is the artwork's content hash, so the SAME picture carries the same id on
+       * every order it appears on — which is the question the factory actually asks ("have we
+       * cut this one before?"). Truncated to eight characters because it is read aloud and
+       * typed into a search box; the full hash is a wall of hex nobody transcribes.
+       *
+       * Prefixed `D-` so it can never be mistaken for an order number or a SKU when it turns
+       * up in a search field alongside both.
+       */
+      const designId = row.art_hash ? `D-${String(row.art_hash).slice(0, 8).toUpperCase()}` : null;
       // line_id is what a caller should key on; sku stays for rows that predate it.
-      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name, pos: row.pos, data: url || row.data, url };
+      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId };
     });
   });
 

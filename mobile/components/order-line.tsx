@@ -53,10 +53,23 @@ function FileChip({ d }: { d: OrderDesign }) {
           <Ionicons name="document-text" size={16} color={C.onInk} />
         </View>
       )}
-      <Text style={{ flex: 1, fontSize: 14, fontFamily: F.medium, color: C.fg }} numberOfLines={1}>
-        {kind}{side ? ` · ${side}` : ""}
-        {d.name ? <Text style={{ fontFamily: F.body, color: C.muted }}>{`  ${d.name}`}</Text> : null}
-      </Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontFamily: F.medium, color: C.fg }} numberOfLines={1}>
+          {kind}{side ? ` · ${side}` : ""}
+          {d.name ? <Text style={{ fontFamily: F.body, color: C.muted }}>{`  ${d.name}`}</Text> : null}
+        </Text>
+        {/* THE DESIGN ID, so the floor can look this artwork up.
+            A file name is whatever the seller called it — "final_v3 (1).pes" — and says
+            nothing about whether we have sewn it before. The id is the artwork's own hash,
+            so the same picture carries it on every order it turns up on, and it is short
+            enough to read off a phone and type into a search box. Selectable, because being
+            able to copy it is most of the point. */}
+        {d.design_id ? (
+          <Text selectable style={{ fontSize: 12, fontFamily: F.body, color: C.muted, marginTop: 2 }}>
+            {d.design_id}
+          </Text>
+        ) : null}
+      </View>
       {openable && <Ionicons name="open-outline" size={16} color={C.muted} />}
     </Pressable>
   )
@@ -133,6 +146,20 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
   if (!pics.length && art) pics.push({ uri: assetUrl(art) as string, caption: "Artwork", title: lineTitle(item) })
   if (listing) pics.push({ uri: assetUrl(listing) as string, caption: "Listing photo — what the buyer saw", title: lineTitle(item) })
   const docs = mine.filter((d) => !isArtwork(d.kind))
+  /**
+   * IS THERE ANYTHING TO RENDER STITCHES FROM?
+   *
+   * The tile used to be offered on every embroidery line, and only told you there was no
+   * stitch file AFTER you pressed it — so on the many orders that carry no machine file it
+   * was a 168px square of nothing, sitting in the strip beside the one real photograph and
+   * taking the same room as it. A control that can only fail is worse than no control: it
+   * reads as a feature that is broken rather than one that does not apply here.
+   *
+   * `docs` is already the non-picture files on this line, which is exactly where a .emb/.pes
+   * lands — it has nothing to show as an image, so it never reaches `pics`.
+   */
+  const hasStitchFile = docs.some((d) => /^(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i.test(String(d.kind || ""))
+    || /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i.test(String(d.name || "")))
 
   /**
    * WHAT THE MACHINE WILL SEW — the last tile in the strip, and the reason the strip is
@@ -249,7 +276,10 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
       ) : null}
 
       {/* EVERY PICTURE ON THIS LINE, sideways. */}
-      {pics.length > 0 || canWork ? (
+      {/* The strip exists for PICTURES. `canWork` used to open it on its own so the stitch
+          tile had somewhere to live; with the tile now conditional on a file actually being
+          there, an empty strip would be a scroller holding nothing. */}
+      {pics.length > 0 || (canWork && hasStitchFile) ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -275,7 +305,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
           {/* THE STITCH TILE, same size as the pictures beside it — it belongs to the same
               row of things you look at, not to a controls area underneath. It disappears the
               moment it renders, because the render then IS one of the pictures. */}
-          {canWork && !stitch && (
+          {canWork && !stitch && hasStitchFile && (
             <Pressable
               disabled={stitchBusy || !!stitchWhy}
               onPress={renderStitch}

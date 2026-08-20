@@ -24,6 +24,7 @@ export function ImagePeek({ shots, index, onClose }: {
 }) {
   const { width } = useWindowDimensions()
   const open = index != null
+  const pager = useRef<ScrollView | null>(null)
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: "rgba(11,11,12,0.95)" }}>
@@ -33,11 +34,21 @@ export function ImagePeek({ shots, index, onClose }: {
         {/* THE WHOLE ORDER, not just the one you tapped. Paged, so it swipes exactly the way
             the strip in the row does — the gesture you just used still works once you are in
             here, which is the difference between a viewer and a dead end. */}
+        {/* JUMPED INTO PLACE, NOT SCROLLED INTO IT.
+            `contentOffset` is applied after the list has laid out at zero, so opening on the
+            second or third picture played a visible slide across the ones before it — on top
+            of the modal's own fade, which is what read as slow and glitchy. Scrolling on
+            layout with `animated: false` puts it there before the first frame anybody sees.
+
+            `removeClippedSubviews` keeps the off-screen pages from decoding a full-width
+            copy of every photo on the line at once, which is the other half of the delay. */}
         <ScrollView
+          ref={pager}
           horizontal
           pagingEnabled
+          removeClippedSubviews
           showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: (index ?? 0) * width, y: 0 }}
+          onLayout={() => pager.current?.scrollTo({ x: (index ?? 0) * width, animated: false })}
           style={{ flex: 1 }}
         >
           {shots.map((sh, i) => (
@@ -45,7 +56,11 @@ export function ImagePeek({ shots, index, onClose }: {
               {/* contain, not cover: a print file cropped to fill is one you cannot check the
                   edges of — the same rule ItemPhotos follows. */}
               <Image source={{ uri: sh.uri }} style={{ width: width - 40, aspectRatio: 1 }} resizeMode="contain" />
-              <Text numberOfLines={2} style={{ marginTop: 18, fontSize: 14, fontFamily: F.medium, color: "#fff", textAlign: "center" }}>{sh.title}</Text>
+              {/* NO TITLE. A marketplace product name is a keyword list — "Custom Apron with
+                  Embroidered Name, Heavy Duty Cotton Canvas Apron with Pocket, Adjustable
+                  Barista Ap…" — and it was set under the photograph in white, two lines and
+                  still truncated, on the one screen whose entire job is to show the picture
+                  larger. The line it belongs to is the one you tapped from, an inch away. */}
               {shots.length > 1 && (
                 <Text style={{ marginTop: 6, fontSize: 12, fontFamily: F.body, color: "#fff", opacity: 0.55 }}>
                   {i + 1} of {shots.length}

@@ -105,16 +105,34 @@ export default function Orders() {
     const byFilter = stage === null ? byLens : byLens.filter((o) => normalizeStage(o.factory_status) === stage)
     const q = search.trim().toLowerCase()
     if (!q) return byFilter
-    // id AND num AND the product: a marketplace order's id (`etsy-abc`) is not the number
-    // anyone reads (`#4099…`), and on the floor an order is just as often looked up by what
-    // is in it as by its number.
+    /*
+     * EVERYTHING THAT NAMES AN ORDER, not just its number.
+     *
+     * A marketplace order's id (`etsy-abc`) is not the number anyone reads (`#4099…`), and on
+     * the floor an order is just as often looked up by what is IN it. But the searches people
+     * actually run are just as often a PERSON — a buyer chasing their parcel, a seller asking
+     * about theirs — or a tracking number read off a label. Those all identify one order and
+     * none of them matched, so the box came back "Nothing matches" for a name that is printed
+     * on the screen behind it.
+     *
+     * `seller_name` is staff-only and the server strips it for a seller, so this simply finds
+     * nothing extra for them rather than needing a role check here.
+     */
+    const has = (v: unknown) => String(v ?? "").toLowerCase().includes(q)
     return byFilter.filter((o) =>
       plainNum(String(o.id)).toLowerCase().includes(q)
       || String(o.seq ?? "").includes(q)
-      || String(o.id).toLowerCase().includes(q)
+      || has(o.id)
+      // Who it is for, and who it is from.
+      || has(o.customer?.name) || has(o.customer?.email)
+      || has((o as { seller_name?: string | null }).seller_name)
+      || has((o as { seller_email?: string | null }).seller_email)
+      // The name on the parcel, which is not always the account name.
+      || has(o.address?.name) || has(o.address?.city)
+      // A tracking number read off a label or pasted from a buyer's message.
+      || has(o.tracking)
       || (o.items ?? []).some((it) => lineTitle(it).toLowerCase().includes(q)
-        || String(it.sku ?? "").toLowerCase().includes(q)
-        || String(it.blank ?? "").toLowerCase().includes(q)))
+        || has(it.sku) || has(it.blank)))
   }, [all, filter, stage, search])
 
   const role = me?.role ?? ""
@@ -232,7 +250,7 @@ export default function Orders() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Order number, product or SKU"
+            placeholder="Order, product, SKU, buyer, seller or tracking"
             placeholderTextColor={C.muted}
             autoCapitalize="none"
             autoCorrect={false}

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, Alert, RefreshControl, ScrollView, TextInput } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
 import { getTopups, confirmTopup, rejectTopup, type Topup } from "@/lib/api"
-import { F, C, SECTION, TAB_BAR } from "@/lib/theme"
+import { F, C, SECTION, TAB_BAR, methodLabel } from "@/lib/theme"
 
 /**
  * TOP-UPS, APPROVED FROM THE FLOOR.
@@ -89,12 +88,15 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
         <Text style={{ fontSize: 20, fontFamily: F.semi, color: C.fg, letterSpacing: -0.3 }}>{MONEY(t.amount_usd)}</Text>
         <Text style={{ fontSize: 13, fontFamily: F.body, color: C.muted, flex: 1 }} numberOfLines={1}>
-          {t.method || "Transfer"}
+          {methodLabel(t.method)}
         </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: TONE[String(t.status)] ?? C.muted }} />
-          <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: C.fg }}>{WORD[String(t.status)] ?? t.status}</Text>
-        </View>
+        {/* THE WORD, COLOURED — not a dot beside a word. Two marks for one fact, and the dot
+            was the half that cannot be read: it needs the word to mean anything, while the
+            word never needed it. Colour moves onto the lettering, which is where the status
+            chips elsewhere in this app already put it. */}
+        <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: TONE[String(t.status)] ?? C.fg }}>
+          {WORD[String(t.status)] ?? t.status}
+        </Text>
       </View>
 
       <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, marginTop: 4 }}>{who}</Text>
@@ -190,22 +192,20 @@ export function TopupApprovals({ bottomInset }: { bottomInset: number }) {
         <Text style={{ fontSize: 14, fontFamily: F.body, color: C.alert, marginTop: 16 }}>{err}</Text>
       ) : (
         <>
+          {/* NO EMPTY STATE, AND NO EMPTY HEADING.
+              "Nothing waiting — every top-up has been answered" was a sentence, a tick and a
+              whole section reporting an absence, at the top of a screen whose actual content
+              (the answered ones) then started below the fold. A queue with nothing in it is
+              self-evident when the list below it is full of settled rows; the heading only
+              earns its space when there is something under it. */}
+          {waiting.length > 0 && (
           <View style={{ ...SECTION, marginTop: 8 }}>
             <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4 }}>
               WAITING ON YOU
             </Text>
-            {waiting.length === 0 ? (
-              /* An empty queue and a broken one must never look the same. */
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
-                <Ionicons name="checkmark-circle-outline" size={18} color={C.success} />
-                <Text style={{ fontSize: 15, fontFamily: F.body, color: C.muted }}>
-                  Nothing waiting — every top-up has been answered.
-                </Text>
-              </View>
-            ) : (
-              waiting.map((t) => <Row key={String(t.id)} t={t} onDone={load} />)
-            )}
+            {waiting.map((t) => <Row key={String(t.id)} t={t} onDone={load} />)}
           </View>
+          )}
 
           {settled.length > 0 && (
             <View style={{ ...SECTION }}>

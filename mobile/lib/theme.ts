@@ -211,3 +211,24 @@ export const HERO_LABEL = {
 
 /** The glyph beside a hero label, when there is one. Sized to sit with 16pt type. */
 export const HERO_GLYPH = 18
+
+/**
+ * WHAT A PAYMENT METHOD IS CALLED ON SCREEN.
+ *
+ * The stored value is the RAIL — `vietqr` — because that is what issues the virtual account,
+ * what the poll reconciles against, and what the ledger is keyed on. None of that may change:
+ * renaming the data would break the match between a payment and the row it settles.
+ *
+ * But nobody transferring money recognises "VietQR". They see BIDV on their banking app and
+ * on their statement, so BIDV is what the screen says. A display map, never a migration.
+ */
+const METHOD_LABEL: Record<string, string> = {
+  vietqr: "BIDV",
+  VietQR: "BIDV",
+  VIETQR: "BIDV",
+}
+export function methodLabel(m?: string | null): string {
+  const raw = String(m ?? "").trim()
+  if (!raw) return "Transfer"
+  return METHOD_LABEL[raw] ?? METHOD_LABEL[raw.toLowerCase()] ?? raw
+}
