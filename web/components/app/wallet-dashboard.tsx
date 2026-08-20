@@ -237,10 +237,24 @@ type View = {
 const usd = (n: number, signed = false) => {
   const v = Math.abs(n)
   const lost = Math.abs(v - Math.round(v * 100) / 100)
-  const fine = v > 0 && lost > v * 0.1
+  /*
+   * AND MONEY THAT MOVED NEVER READS AS ZERO.
+   *
+   * Four places is enough for everything this ledger books today, but "enough today" is how
+   * the numeric(12,2) column got written in the first place. A cost of $0.00003 would render
+   * "$0.0000" at four — a real amount displayed as nothing, which is the whole failure this
+   * function exists to stop, just further down the scale.
+   *
+   * So the places are chosen from the VALUE: enough to carry two significant digits, capped
+   * at six because that is the column's own scale and nothing finer can be stored anyway.
+   */
+  let places = 2
+  if (v > 0 && lost > v * 0.1) {
+    places = Math.min(6, Math.max(4, Math.ceil(-Math.log10(v)) + 1))
+  }
   return `${signed ? (n < 0 ? "−" : "+") : ""}$${v.toLocaleString("en-US", {
-    minimumFractionDigits: fine ? 4 : 2,
-    maximumFractionDigits: fine ? 4 : 2,
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
   })}`
 }
 const pct = (num: number, den: number) => (den > 0 ? `${Math.round((num / den) * 100)}%` : "—")
