@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
-import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB } from "@/lib/orders"
+import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB, canSetStage, isFactoryOrder } from "@/lib/orders"
 import { TAB_BAR,F,C, R, LIFT } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 
@@ -117,11 +117,23 @@ export default function Orders() {
         || String(it.blank ?? "").toLowerCase().includes(q)))
   }, [all, filter, stage, search])
 
-  const staff = !!me?.role && me.role !== "seller"
+  const role = me?.role ?? ""
+  const staff = !!role && role !== "seller"
+  /**
+   * CAN *THIS PERSON* MOVE *THIS ORDER* — the stage AND the role, asked together.
+   *
+   * It asked only whether a next stage existed, so an operator selecting twelve approved
+   * orders got "Start 12" and twelve refusals in a row: the batch walks them one at a time,
+   * and every one of them was a move only the warehouse may make. Same gate as the web.
+   */
+  const canMove = useCallback((o: Order) => {
+    const to = nextStage(o)
+    return !!to && canSetStage(role, o.factory_status, to, isFactoryOrder(o))
+  }, [role])
   const chosen = useMemo(() => rows.filter((o) => picked.includes(o.id)), [rows, picked])
-  // Only the ones that can actually move. A selection of shipped orders must not offer a
-  // button that would be refused for every one of them.
-  const movable = useMemo(() => chosen.filter((o) => nextStage(o)), [chosen])
+  // Only the ones that can actually move. A selection of shipped orders — or of orders this
+  // role may not advance — must not offer a button that would be refused for every one.
+  const movable = useMemo(() => chosen.filter(canMove), [chosen, canMove])
 
   const toggle = useCallback((id: string) => {
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -336,9 +348,9 @@ export default function Orders() {
               // entering a mode and then having to press the same row again is the step
               // everyone forgets to design and everyone notices.
               onLongPress={() => { if (staff) { setSelecting(true); toggle(item.id) } }}
-              onAdvance={staff && nextStage(item) ? () => advanceOne(item) : undefined}
+              onAdvance={staff && canMove(item) ? () => advanceOne(item) : undefined}
               advanceLabel={
-                staff && nextStage(item)
+                staff && canMove(item)
                   ? (STAGE_VERB[nextStage(item) as string] ?? `Move to ${STAGE_LABEL[nextStage(item) as string]}`)
                   : null
               }

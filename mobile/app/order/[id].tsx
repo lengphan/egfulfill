@@ -9,7 +9,7 @@ import {
 } from "@/lib/api"
 import {
   normalizeStage, units, isOverdue, numOf, platformOf, nextStage, addressLines,
-  STAGE_LABEL, stageAction,
+  STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder,
 } from "@/lib/orders"
 import { F,C, R, LIFT, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
@@ -170,8 +170,24 @@ export default function OrderDetail() {
   const stage = normalizeStage(o?.factory_status)
   /* The header is the INK block, so the pill takes the on-ink pair. */
   const tone = toneOnInk(stage)
-  const staff = !!me?.role && me.role !== "seller"
+  const role = me?.role ?? ""
+  const staff = !!role && role !== "seller"
   const to = o ? nextStage(o) : null
+  /**
+   * WHETHER THIS PERSON MAY MAKE THIS MOVE — asked before the button is drawn, not after
+   * it is pressed.
+   *
+   * The screen used to gate on `staff` alone, which is true of designers too, so every
+   * staff role saw every control and found out the rules from an Alert. Same rules as the
+   * web (stageDenialReason is a port of it), so a control that is dead here is dead there.
+   */
+  const isFactory = isFactoryOrder(o)
+  const denial = o && to ? stageDenialReason(role, stage, to, isFactory) : null
+  /* Asked SEPARATELY, because Confirm shipment is not the next rung on the ladder — it is a
+     camera, an upload and a post to the order's activity BEFORE the stage write. An
+     operator can never set `shipped`, so leaving this ungated meant photographing a parcel
+     and uploading it every time only to be refused at the last step. */
+  const shipDenial = o ? stageDenialReason(role, stage, "shipped", isFactory) : null
   const items = o?.items ?? []
   const late = o ? isOverdue(o) : false
   /**
@@ -249,7 +265,24 @@ export default function OrderDetail() {
               ends in a shipment, and a shipped order has nothing to press at all. */}
           {staff && (
             stage === "working" ? (
-              <ConfirmShipment orderId={String(o.id)} role={me?.role} by={me?.name ?? undefined} onDone={refresh} />
+              shipDenial ? (
+                <View style={{ ...SECTION }}>
+                  <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Not yours to ship</Text>
+                  <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{shipDenial}</Text>
+                </View>
+              ) : (
+                <ConfirmShipment orderId={String(o.id)} role={me?.role} by={me?.name ?? undefined} onDone={refresh} />
+              )
+            ) : to && denial ? (
+              /* NEVER HIDE, EXPLAIN — the web's rule, and the reason the phone can be
+                 learned from. A control that silently vanishes leaves the rule unlearnable;
+                 the stage and whose call it is are both named. */
+              <View style={{ ...SECTION }}>
+                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
+                  {stageAction(to)}
+                </Text>
+                <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>{denial}</Text>
+              </View>
             ) : to ? (
               /*
                * ONE BUTTON, ONE SENTENCE. It was a 40pt circular icon tile, a title, a
@@ -278,20 +311,6 @@ export default function OrderDetail() {
                   {stageAction(to)}
                 </Text>
               </Pressable>
-            ) : stage === "" ? (
-              /* NOT A MISSING BUTTON — a move that is not ours to make. The seller submits
-                 and is charged, and only then does this become Pending for the floor to
-                 approve. Saying so beats an empty space where a control usually sits. */
-              <View style={{
-                ...SECTION,
-              }}>
-                <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>
-                  Waiting on the seller
-                </Text>
-                <Text style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
-                  Nothing to approve until they submit and pay for it.
-                </Text>
-              </View>
             ) : null
           )}
 
@@ -454,6 +473,7 @@ export default function OrderDetail() {
                 index={i}
                 designs={designs}
                 canWork={staff}
+                role={role}
                 onChanged={refresh}
               />
             ))

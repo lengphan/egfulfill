@@ -114,18 +114,28 @@ export function isException(id?: string | null): boolean {
 /**
  * The next linear stage to advance an item to (null once shipped or in an exception).
  *
- * `isFactory` matters at exactly one point, and it's the first: a factory order leaves
- * Draft for Working, because Pending is a seller stage it can never occupy. A legacy
- * factory row sitting AT in_review also advances to Working, which is how those get out.
- * See FACTORY_LINE below.
+ * IT WALKS THIS ORDER'S OWN LINE, which is the only way it can stay correct when a stage is
+ * added. It used to hard-code `isFactory && !v -> "working"`, written when FACTORY_LINE was
+ * ['', 'working', 'shipped'] and that really was one step. Inserting `approved` into
+ * PIPELINE made FACTORY_LINE ['', 'approved', 'working', 'shipped'] and turned the same hop
+ * into a SKIP — so the Start button on the factory's own Draft orders targeted a stage the
+ * server refuses for every role, admin included ("That would skip Approved"). The floor's
+ * own orders could not be started from either front-end.
+ *
+ * Deriving the answer from lineFor() means the next stage after a future insertion is
+ * whatever the line says it is, with nothing to remember to update.
+ *
+ * A legacy factory row sitting AT in_review is OFF this order's line (posOf = -1). It
+ * rejoins at Approved — the first real step of making, and the stage the warehouse starts
+ * from — rather than jumping to Working, which the warehouse may no longer set from there.
  */
 export function nextStage(current?: string | null, isFactory?: boolean): string | null {
   const v = normalizeStage(current)
   if (EXCEPTIONS.has(v)) return null
-  if (isFactory && (!v || v === "in_review")) return "working"
-  if (!v) return "in_review"
-  const i = ORDER.indexOf(v)
-  return i >= 0 && i < ORDER.length - 1 ? ORDER[i + 1] : null
+  const line = lineFor(isFactory)
+  const i = line.indexOf(v)
+  if (i < 0) return "approved"
+  return i < line.length - 1 ? line[i + 1] : null
 }
 
 // An order's overall stage from its items: any exception wins; else the least-advanced

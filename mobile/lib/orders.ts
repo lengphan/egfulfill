@@ -61,51 +61,128 @@ export const STAGE_LABEL: Record<string, string> = {
  *  straight onto rows, which is why the phone and the boards disagreed on wording. */
 export const stageLabel = (o: Order) => STAGE_LABEL[normalizeStage(o.factory_status)] ?? ""
 
-/**
- * The ONE stage this order may move to next, or null at the end of the line.
+/* ── THE LADDER, AND WHO MAY CLIMB IT ─────────────────────────────────────────
  *
- * One step, never a jump: the server refuses a skip for everyone including admin — it is
- * not a permission but what the pipeline means, since nobody can make an order have been
- * printed when it wasn't. Offering only the next step means the phone never asks for
- * something that will be refused.
+ * THE WEB IS CANONICAL. Everything from here to the end of this section is a port of
+ * web/lib/factory-status.ts, rule for rule, because the phone is an extension of the web
+ * app and not a second opinion about it. Its job is to make the same move FASTER — never
+ * to permit something the web forbids, and never to withhold something the web offers.
  *
- * Exceptions (on hold, cancelled, refunded) have no next step here. Clearing a hold is a
- * decision with a reason attached, and that belongs on a screen with room for one.
+ * Two mobile-only rules used to live here and both were the second kind. A line was never
+ * offered "Pending" (it was remapped to Approved, which the server then refused as a skip,
+ * so the button could not succeed at all), and a Draft order on a seller's account offered
+ * nothing at all. Each was argued for in a comment and each quietly made the phone worse at
+ * the one thing it is for.
  */
-export function nextStage(o: Order): string | null {
-  const at = normalizeStage(o.factory_status)
+
+/**
+ * TWO LINES, because "Pending" is a SELLER stage and not a step of making anything.
+ * Mirrors SELLER_LINE / FACTORY_LINE in web/lib/factory-status.ts and orders.js.
+ */
+const SELLER_LINE = ["", ...PIPELINE]
+const FACTORY_LINE = SELLER_LINE.filter((s) => s !== "in_review")
+const lineFor = (isFactory?: boolean) => (isFactory ? FACTORY_LINE : SELLER_LINE)
+/** -1 for anything off this order's line — a stop, or a legacy in_review row on a factory
+ *  order. Off-line is not a position, so it is never a skip in either direction. */
+const posOf = (s: string | null | undefined, isFactory?: boolean) =>
+  lineFor(isFactory).indexOf(normalizeStage(s))
+
+/**
+ * The ONE stage this may move to next, or null at the end of the line.
+ *
+ * IT WALKS THE LINE rather than hard-coding hops, which is the only way it stays correct
+ * when a stage is added. The old code said `isFactory && at === "" -> "working"`, written
+ * when FACTORY_LINE was ['', 'working', 'shipped'] and that was genuinely one step.
+ * Inserting `approved` into PIPELINE made it a SKIP, and the server refuses a skip for
+ * every role including admin — so Start Order on the factory's own Draft orders was a
+ * button that could not work for anybody.
+ */
+function nextOnLine(current?: string | null, isFactory?: boolean): string | null {
+  const at = normalizeStage(current)
   if (EXCEPTIONS.includes(at)) return null
-  /*
-   * `in_review` IS NOT ON A FACTORY ORDER'S LINE — the phone was the only surface that
-   * did not know this.
-   *
-   * The server keeps TWO lines (FACTORY_LINE in orders.js) and the web mirrors it with
-   * nextStage(current, isFactory). "Pending" means the seller submitted and we took their
-   * money; a factory-owned order has no seller, is never charged and approves itself, so
-   * the stage cannot describe anything true about it. This file had one line, so the phone
-   * offered "Move to Pending" on an order that can never legitimately be there — and a
-   * legacy row already sitting at in_review had no way forward.
-   */
-  if (isFactoryOrder(o) && (at === "" || at === "in_review")) return "working"
-  /**
-   * THE FACTORY DOES NOT HAVE A PENDING STAGE, so it is never offered one.
-   *
-   * The flow is the seller's: they submit, the wallet is charged, and the order becomes
-   * Pending. Only then does the factory approve it. So an order sitting at Draft on a
-   * SELLER's account is one they have not submitted and not paid for — there is nothing
-   * for the floor to do with it, and the button offering "Move Order to Pending" was
-   * asking a staff member to assert a payment that never happened.
-   *
-   * Null rather than skipping ahead to Approved: the server counts '' → approved as a
-   * skip on a seller order (SELLER_LINE keeps in_review between them) and would refuse it
-   * — so jumping the stage here would only trade a wrong button for a broken one. The
-   * screen says who the next move belongs to instead.
-   */
-  if (!isFactoryOrder(o) && at === "") return null
-  const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
-  const next = PIPELINE[i + 1]
-  return next ?? null
+  const line = lineFor(isFactory)
+  const i = line.indexOf(at)
+  // Off-line: a legacy in_review row on a factory order. It rejoins at Approved — the first
+  // real step of making, and the stage the warehouse starts from.
+  if (i < 0) return "approved"
+  return i < line.length - 1 ? line[i + 1] : null
 }
+
+export function nextStage(o: Order): string | null {
+  return nextOnLine(o.factory_status, isFactoryOrder(o))
+}
+
+const OP_ZONE = new Set(["", "in_review", "approved"])
+const OP_STOPS = new Set(["on_hold"])
+const MONEY_STAGES = new Set(["cancelled", "refunded"])
+const LABEL_OF = (id: string) => (id === "" ? "Draft" : STAGE_LABEL[id] ?? id)
+
+/**
+ * WHY a move is refused, or null if it's allowed.
+ *
+ * A PORT OF stageDenialReason IN web/lib/factory-status.ts — change both, and change
+ * stageDenial in server/src/routes/orders.js with them. The server is what enforces this;
+ * this exists so the phone can grey a control and say why, instead of sending a request it
+ * already knows will come back 403.
+ *
+ * The phone had NO copy of this at all. It gated on "is this person staff", which is true
+ * of designers too, so every staff role saw every button and learned the rules by pressing
+ * things and reading Alerts. That is slow on a factory floor, and on Confirm shipment it
+ * was worse than slow: an operator can never set `shipped`, so the sequence was photograph
+ * the parcel → upload it → post it to the order → get refused, every single time.
+ */
+export function stageDenialReason(
+  role: string, current: string | null | undefined, target: string, isFactory?: boolean,
+): string | null {
+  const at = normalizeStage(current)
+  const to = normalizeStage(target)
+
+  // Skipping is denied for EVERYONE, admin included. Not a permission — it is what the
+  // pipeline means. Backwards is not a skip: it claims LESS has happened, which is safe.
+  const ai = posOf(at, isFactory), ti = posOf(to, isFactory)
+  if (ai >= 0 && ti >= 0 && ti > ai + 1) {
+    return `That would skip ${lineFor(isFactory).slice(ai + 1, ti).map(LABEL_OF).join(", ")}. Move it one stage at a time.`
+  }
+  if (at === "shipped" && to !== "shipped" && to !== "refunded") {
+    return "This order has shipped — the only change left is a refund."
+  }
+  if (at === "cancelled" && to !== "cancelled" && to !== "refunded") {
+    return "This order was cancelled — the only change left is a refund."
+  }
+  if (at === "refunded" && to !== "refunded") {
+    return "This order was refunded. That is the end of it."
+  }
+  // A PAID ORDER CANNOT BE DRAFT — every role. Draft is a statement about money: nobody
+  // submitted this and nobody was charged. Never for a factory order; nothing was charged.
+  if (!isFactory && (to === "" || to === "new" || to === "draft") && posOf(at, isFactory) > posOf("", isFactory)) {
+    return "This order has been paid for, so it cannot go back to Draft. Step it back one stage, put it on hold, or cancel it to refund."
+  }
+
+  if (role === "admin") return null
+  if (role === "warehouse") {
+    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision."
+    // Production starts from Approved — an operator confirms the blank first. Coming off a
+    // HOLD is not starting production, so it is exempt.
+    if (to === "working" && at !== "approved" && at !== "on_hold") {
+      return "Start it from Approved — an operator confirms the blank first."
+    }
+    return null
+  }
+  if (role === "operator") {
+    if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision — put the order on hold instead."
+    if (OP_STOPS.has(to)) return null                       // andon cord: any stage
+    if (at === "on_hold") return null                       // and the cord lets go
+    // An operator APPROVES; the warehouse STARTS. The handover is the point of two stages.
+    if (to === "working") return "Approving is yours — the warehouse starts production from there."
+    if (!OP_ZONE.has(at)) return "The warehouse has this item — only warehouse or admin can change its status now."
+    if (!OP_ZONE.has(to)) return "Operators can move an item as far as Approved."
+    return null
+  }
+  return "Your role cannot change production status."       // designer, and anything new
+}
+
+export const canSetStage = (role: string, current: string | null | undefined, target: string, isFactory?: boolean) =>
+  stageDenialReason(role, current, target, isFactory) === null
 
 export const isOpen = (o: Order) => !CLOSED.has(normalizeStage(o.factory_status))
 
@@ -284,46 +361,32 @@ export const lineFacts = (it: { color?: string | null; size?: string | null; pri
  *  web/lib/factory-status.ts, which reads the same column. */
 export const isFactoryOrder = (o?: { factory_order?: boolean | null } | null) => !!o?.factory_order
 
-/** Where this LINE goes next. Same pipeline as the order — the floor moves lines — and
- *  the same two-line rule, so `order` has to be passed: a line cannot tell on its own
- *  whether the order it belongs to is the factory's. */
+/**
+ * Where this LINE goes next — the SAME ladder as the order.
+ *
+ * The floor moves lines, so a line climbs the line its order is on, and `order` has to be
+ * passed because a line cannot tell on its own whether the order it belongs to is the
+ * factory's.
+ *
+ * IT NO LONGER HAS RULES OF ITS OWN. It carried two, both of which made the phone refuse
+ * work the web hands out:
+ *
+ *  • "a line never goes to Pending" — it remapped in_review to approved, which on a seller
+ *    order steps over Pending and is exactly what the server calls a skip. So every
+ *    untouched line on a seller order showed "Approve Item", and pressing it returned
+ *    "That would skip Pending" for admin, warehouse and operator alike. A button nobody
+ *    could ever succeed with.
+ *
+ *  • "a line is never shipped on its own" — the web's per-line control offers Shipped, and
+ *    the server backs it with shipBlockers (a label must exist, and every decorated line
+ *    must have artwork). Withholding it here meant the one surface someone uses while
+ *    standing over the parcel was the one that could not record it.
+ */
 export function nextLineStage(
   it: { factory_status?: string | null },
   order?: { factory_order?: boolean | null } | null,
 ): string | null {
-  const at = normalizeStage(it.factory_status)
-  if (EXCEPTIONS.includes(at)) return null
-  if (isFactoryOrder(order) && (at === "" || at === "in_review")) return "working"
-  /**
-   * A LINE NEVER GOES TO PENDING — for any order, not just the factory's.
-   *
-   * Pending means the SELLER submitted and we took their money. That is one fact about one
-   * order; it is not a thing that happens to a sleeve. Every untouched line on a seller
-   * order was offering "Move Item to Pending", so a five-line order showed the button five
-   * times and pressing one claimed a payment event per garment.
-   *
-   * The order-level ladder still carries it (that button is the order's), and the server is
-   * still the one that decides. This is only about what a LINE can be asked to do: making,
-   * which starts at Approved.
-   */
-  const i = at === "" ? -1 : PIPELINE.indexOf(at as (typeof PIPELINE)[number])
-  let next = PIPELINE[i + 1] ?? null
-  if (next === "in_review") next = "approved"
-  /**
-   * A LINE IS NEVER SHIPPED ON ITS OWN — the parcel is the order.
-   *
-   * The line ladder was the order ladder, so a line sitting at Working offered "Ship this
-   * line", and pressing it on a three-line order claimed one item had gone while two sat
-   * on the bench. There is one parcel, one label and one tracking number for the whole
-   * order, so there is one shipping event, and it belongs to the order.
-   *
-   * Making is per line and stops at Working, which is the real boundary: after that the
-   * work is packing, and packing is not something you do to one item of three. Confirm
-   * shipment on the order is the step that follows, and the server independently refuses
-   * a ship it cannot back (no label, or a decorated line with no artwork) — this only
-   * stops the phone OFFERING a move that would be wrong.
-   */
-  return next === "shipped" ? null : next
+  return nextOnLine(it.factory_status, isFactoryOrder(order))
 }
 
 /**

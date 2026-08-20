@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, setItemStatus, type OrderItem, type OrderDesign } from "@/lib/api"
 import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
-  STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork,
+  STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork, stageDenialReason, isFactoryOrder,
 } from "@/lib/orders"
 import { F,C, R, LIFT } from "@/lib/theme"
 import { ImagePeek } from "@/components/order-row"
@@ -62,7 +62,7 @@ function FileChip({ d }: { d: OrderDesign }) {
   )
 }
 
-export function OrderLine({ orderId, order, item, index, designs, canWork, onChanged }: {
+export function OrderLine({ orderId, order, item, index, designs, canWork, role, onChanged }: {
   orderId: string
   /** The order this line belongs to — needed ONLY for `factory_order`, which decides
    *  whether `in_review` ("Pending") is on this line's ladder at all. A line cannot tell
@@ -75,6 +75,9 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
   /** Staff only. The server refuses a seller outright; a button that always errors is
    *  worse than no button. */
   canWork: boolean
+  /** WHICH staff. `canWork` only asks "not a seller", which is true of designers too — the
+   *  role decides whether this particular move is theirs. Same gate as the web. */
+  role?: string
   onChanged: () => void
 }) {
   const [busy, setBusy] = useState(false)
@@ -84,6 +87,9 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
   const stage = normalizeStage(item.factory_status)
   const facts = lineFacts(item)
   const to = nextLineStage(item, order)
+  /* Same rules as the web (a port of stageDenialReason), so a line control that is dead on
+     the phone is dead on the board too — and the reason is the same sentence. */
+  const denial = to ? stageDenialReason(role ?? "", stage, to, isFactoryOrder(order)) : null
   // A line with no print method is an undecorated blank. It needs no artwork, so it must
   // not be flagged as missing one — that would deadlock every plain-garment order.
   const needsArt = !!String(item.print_type || "").trim() && !mine.some((d) => isArtwork(d.kind))
@@ -242,7 +248,13 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, onCha
         </View>
       )}
 
-      {canWork && to ? (
+      {canWork && to && denial ? (
+        /* NEVER HIDE, EXPLAIN. The move is named and so is whose call it is, rather than
+           the card simply stopping — which reads as a control that failed to render. */
+        <Text style={{ marginTop: 12, fontSize: 13.5, fontFamily: F.body, color: C.muted, textAlign: "center" }}>
+          {denial}
+        </Text>
+      ) : canWork && to ? (
         <Pressable
           onPress={move}
           disabled={busy}
