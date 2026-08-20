@@ -21,7 +21,7 @@ import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { variantSku, variantLabel, productSizes, productColors } from "@/lib/variant-sku"
 import { prettyColorName } from "@/lib/color-name"
-import { bySize } from "@/lib/size-order"
+import { bySize, isOneSize } from "@/lib/size-order"
 import { PageTitle } from "@/components/app/page-title"
 import { TabLabel } from "@/components/app/tab-label"
 
@@ -497,7 +497,11 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                       */}
                     <th className="px-4 py-2.5 whitespace-nowrap">Item</th>
                     <th className="px-4 py-2.5 whitespace-nowrap">SKU</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap text-center">Stock</th>
+                    {/* RIGHT, like the figures under it. The header was centred over a
+                        column of right-aligned numbers, so the word sat to the left of the
+                        digits it names — which is the whole of "the Stock column looks
+                        crooked". A number column is read up its right edge. */}
+                    <th className="px-4 py-2.5 whitespace-nowrap text-right">Stock</th>
                     <th className="px-4 py-2.5 whitespace-nowrap">Status</th>
                     <th className="sticky right-0 z-10 bg-card px-4 py-2.5 whitespace-nowrap" />
                   </tr>
@@ -582,12 +586,17 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
       <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
     </span>
   ) : (
+    /* NOT THE FIRST LETTER. Half these names begin with a digit — "47 Brand Trawler Cap"
+       drew a big "4" in the picture column, which reads as a COUNT sitting where a photo
+       should be, and looks like a sync that went wrong rather than a product with no image.
+       A glyph can only mean "no picture". */
     <span
-      className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-sm font-semibold text-muted-foreground"
+      className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-muted-foreground/50"
       style={{ width: size, height: size }}
+      title={name ? `No picture for ${name}` : "No picture"}
       aria-hidden
     >
-      {(name || "?").trim().charAt(0).toUpperCase()}
+      <Package size={Math.round(size / 2.6)} weight="light" />
     </span>
   )
 }
@@ -638,6 +647,9 @@ function ProductGroup({
    * background (an element only gets one). Selected beats indented explicitly — both
    * classes used to be emitted at once and which won was left to stylesheet order.
    */
+  // Second press arms the removal — see the note on the ⋯ menu below.
+  const [killing, setKilling] = useState(false)
+
   const tintOf = (it: InventoryItem, indented: boolean) =>
     sel.has(it.sku) ? "bg-primary/[0.04]" : indented ? "bg-muted/30" : ""
   const stickyTint = (it: InventoryItem, indented: boolean) =>
@@ -870,10 +882,6 @@ function ProductGroup({
   const out = group.rows.filter(isOut).length
   const low = group.rows.filter(isLow).length
 
-  /** Two axes to lay out, and a catalogue product to take them from. Anything else keeps
-   *  the rows it always had — see StockMatrix. */
-  const matrixable = !!group.product && (productSizes(group.product).length > 0 || productColors(group.product).length > 0)
-
   return (
     <>
       <tr className={"border-t border-border " + (selected ? "bg-primary/[0.04]" : "")}>
@@ -954,31 +962,59 @@ function ProductGroup({
             )
               : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
         </td>
-        {/* THE GRID HAS NO ROW MENU, so this is where a multi-variant product reaches its
-            own history: the cells are number inputs, and the ⋯ that carries "Stock history"
-            only exists on a variant ROW. Without it the journal was unreachable for exactly
-            the products that move the most. One button, in the column the variant rows put
-            their menu in, so the affordance is in the same place either way. */}
+        {/* THE PRODUCT ROW GETS THE SAME ⋯, in the same column.
+            A multi-variant product opens into a GRID of number inputs — no variant rows, so
+            no row menu, so no history and NO BIN: there was literally no way to remove a
+            product whose skus happened to form a matrix, which is most of them. The menu is
+            here, at the product level, holding the two things that are about the product
+            rather than about one sku. */}
         <td className="px-4 py-2">
           <div className="flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
-              title={`Stock history for all ${group.rows.length} variants of ${group.name}`}
-              aria-label={`Stock history for ${group.name}`}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-            >
-              <ClockCounterClockwise size={15} />
-            </button>
+            <Popover>
+              <PopoverTrigger
+                aria-label={`Actions for ${group.name}`}
+                title="Stock history, remove"
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                <DotsThree size={18} weight="bold" />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-60 space-y-2 p-3">
+                <div className="truncate text-2xs text-muted-foreground">{group.rows.length} variants</div>
+                <button
+                  type="button"
+                  onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
+                  className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <ClockCounterClockwise size={14} /> Stock history
+                </button>
+                {/* TWO PRESSES, because one press removes every variant. The count is in the
+                    confirm rather than in a dialog — the number IS the warning. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!killing) { setKilling(true); return }
+                    group.rows.forEach((r) => remove(r.sku))
+                    setKilling(false)
+                  }}
+                  className={"flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-xs transition-colors hover:bg-accent "
+                    + (killing ? "font-medium text-red-600" : "text-muted-foreground hover:text-red-600")}
+                >
+                  <Trash size={14} /> {killing ? `Remove all ${group.rows.length}?` : "Remove"}
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         </td>
       </tr>
-      {/* THE GRID WHEN IT CAN BE ONE, the list when it cannot.
-          StockMatrix returns null for anything it can't lay out on two axes — no catalogue
-          product, or a product with neither sizes nor colours — and those fall through to
-          the rows they always had. Nothing is hidden either way: a variant the grid can't
-          place is named underneath it. */}
-      {open && (matrixable ? (
+      {/* ONE PANEL FOR EVERY PRODUCT.
+          This used to branch: a product whose skus decomposed into sizes and colours opened
+          into a grid, and everything else opened into the table's own variant ROWS. So the
+          same click gave two completely different things depending on whether a sku string
+          happened to parse — different left edges, different type, numbers at a different x
+          down the page. StockMatrix handles all of them now and falls back to a one-column
+          table of the same shape (PlainStock) rather than to rows. A variant it still can't
+          place is named underneath, as before. */}
+      {open && (
         <tr className="border-t border-border">
           {/* THE PANEL STARTS WHERE THE PICTURE DOES.
               It was one cell spanning all seven columns with its own px-4, so the grid began
@@ -997,7 +1033,7 @@ function ProductGroup({
             />
           </td>
         </tr>
-      ) : group.rows.map((it) => row(it, true)))}
+      )}
     </>
   )
 }
@@ -1044,13 +1080,63 @@ function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
   )
 }
 
+/**
+ * THE SAME PANEL WHEN THERE ARE NO AXES TO BUILD — a product with no catalogue entry, or
+ * one whose skus don't decompose into a size and a colour.
+ *
+ * These used to fall back to the table's own variant ROWS, which meant a product opened
+ * into one of two completely different things depending on whether its skus happened to
+ * parse. One column instead of six is a smaller table; it is still a table, under the same
+ * header, with its numbers at the same x as every other product's.
+ */
+function PlainStock({ rows, edit, lowAt }: {
+  rows: InventoryItem[]
+  edit: (sku: string, field: "in_stock", value: number) => void
+  lowAt: (it: InventoryItem) => number
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-muted-foreground">
+            <th className="w-px whitespace-nowrap px-2 py-1 text-left font-medium">Variant</th>
+            <th className="min-w-14 px-2 py-1 text-center font-medium">Stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((it) => (
+            <tr key={it.sku} className="border-t border-border">
+              <td className="w-px whitespace-nowrap px-2 py-1 font-medium">
+                <span className="tabular-nums">{it.sku}</span>
+                {it.variant && <span className="ms-2 font-normal text-muted-foreground">{it.variant}</span>}
+              </td>
+              <td className="px-1 py-1 text-center">
+                <Input
+                  value={String(Number(it.in_stock) || 0)}
+                  onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                  inputMode="numeric"
+                  aria-label={`In stock for ${it.sku}`}
+                  title={`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`}
+                  className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function StockMatrix({ group, edit, lowAt }: {
   group: { product: CatalogProduct | null; rows: InventoryItem[] }
   edit: (sku: string, field: "in_stock", value: number) => void
   lowAt: (it: InventoryItem) => number
 }) {
   const p = group.product
-  if (!p) return null
+  // No catalogue product = no declared sizes or colours to build axes from. Same panel,
+  // one column. See PlainStock.
+  if (!p) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} />
 
   /**
    * THE AXES COME FROM THE SHELF, NOT THE CATALOGUE.
@@ -1087,7 +1173,9 @@ function StockMatrix({ group, edit, lowAt }: {
     }
     if (hit) placed.set(sku, { ...hit, it })
   }
-  if (!placed.size) return null                       // nothing resolves — the list is honest
+  // Nothing resolves — the skus don't decompose against this product's sizes and colours.
+  // Still a table, still under a header; the list stays honest by naming each sku.
+  if (!placed.size) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} />
 
   /**
    * WHAT IS ON THE SHELF, NOT WHAT THE CATALOGUE COULD HOLD.
@@ -1121,44 +1209,35 @@ function StockMatrix({ group, edit, lowAt }: {
     ) : <span key={key} className="inline-block w-12 text-center text-muted-foreground/30">·</span>
 
   /**
-   * ONE AXIS IS NOT A MATRIX. A cap has one size and seventeen colours; a table of that is
-   * a column seventeen rows tall — the pile of rows this was built to replace. With one
-   * axis the honest layout is a wrapped set, so seventeen colours are three short lines.
+   * ONE TABLE, ALWAYS — even when an axis has a single value.
+   *
+   * A one-axis product used to get a different layout: a wrapped auto-fill grid of
+   * label-and-box pairs. It was defensible on its own (seventeen colours in three short
+   * lines rather than a column seventeen rows tall) and wrong on the page, because the
+   * page holds both kinds one under the other. Two shapes for the same fact means the
+   * colour names sit at one x in this product and another x in the next, and the numbers
+   * never line up down the screen — which is exactly what "they don't look evened out" is.
+   *
+   * So a colour with one size gets a row with one cell, and it lands under the same header
+   * as every other product's. A column that is boring is still a column.
    */
+  // An axis with no values still needs one slot, or there is nothing to draw the cell in.
+  const sizeCols = sizes.length ? sizes : [""]
+  const colorRows = colors.length ? colors : [""]
+  const hasColorAxis = colors.length > 0
   /**
-   * AN AXIS WITH ONE VALUE IS NOT AN AXIS. A cap's sku carries both a size and a colour —
-   * `…-ADJUSTABLE-RED` — so two axes resolve and the table renders twelve rows one column
-   * wide, which is the pile of rows this exists to replace wearing a header. What matters
-   * is which axis VARIES, not how many were found.
+   * WHAT A SIZELESS COLUMN IS CALLED — and the suppliers already answered this.
+   *
+   * Caps and duffels record it as `OS`, `OSFA`, `OSFM` or `One Size` depending on whose
+   * feed it came from (sanmar.js ranks all four; Otto's are `OS`; the import sheet offers
+   * "One Size"). Four spellings of one thing would put four different headers across the
+   * page for the same column, so they normalise here — isOneSize is the same test the
+   * catalogue's size-range label uses, so the grid and the product card agree.
+   *
+   * A real single size keeps its own name: a cap sku carrying `ADJUSTABLE` is not
+   * one-size-fits-all, it is a size called Adjustable, and saying so is more useful.
    */
-  if (sizes.length <= 1 || colors.length <= 1) {
-    const oneSize = sizes[0] ?? ""
-    const oneColor = colors[0] ?? ""
-    const axis = sizes.length > 1
-      ? sizes.map((z) => ({ label: z, it: at(z, oneColor) }))
-      : colors.length > 1
-        ? colors.map((c) => ({ label: prettyColorName(c), it: at(oneSize, c) }))
-        // Neither varies: one cell, labelled by whatever it is.
-        : [{ label: [oneSize, oneColor ? prettyColorName(oneColor) : ""].filter(Boolean).join(" · ") || "Stock",
-             it: at(oneSize, oneColor) }]
-    return (
-      <div className="space-y-2">
-        {/* COLUMNS, NOT A WRAP. Ragged chips put every label at a different x, so seventeen
-            of them are seventeen things to find rather than a list to read down. A fixed
-            grid lines the names up and the numbers up, which is the whole reason a table
-            beats a sentence. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-6 gap-y-1.5">
-          {axis.map(({ label, it }) => (
-            <span key={label} className="flex items-center justify-between gap-2 text-xs">
-              <span className="truncate text-muted-foreground">{label}</span>
-              {cell(it, label)}
-            </span>
-          ))}
-        </div>
-        {leftover.length > 0 && <LeftoverNote rows={leftover} />}
-      </div>
-    )
-  }
+  const sizeHeader = (z: string) => (!z || isOneSize(z) ? "One size" : z)
 
   return (
     <div className="space-y-2">
@@ -1173,17 +1252,26 @@ function StockMatrix({ group, edit, lowAt }: {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-muted-foreground">
-              <th className="px-2 py-1 text-left font-medium">Colour</th>
-              {sizes.map((z) => <th key={z} className="min-w-14 px-2 py-1 text-center font-medium">{z}</th>)}
+              {/* "Colour" only when there IS one. A product whose skus carry sizes and no
+                  colour was heading its own name column "Colour" and printing a size under
+                  it. */}
+              <th className="w-px whitespace-nowrap px-2 py-1 text-left font-medium">{hasColorAxis ? "Colour" : "Variant"}</th>
+              {sizeCols.map((z) => (
+                <th key={z || "one"} className="min-w-14 px-2 py-1 text-center font-medium">{sizeHeader(z)}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {colors.map((c) => (
-              <tr key={c} className="border-t border-border">
-                {/* The colour column takes only what the longest name needs; the width
-                    freed goes to the numbers, which are what the row is for. */}
-                <td className="w-px whitespace-nowrap px-2 py-1 font-medium">{prettyColorName(c)}</td>
-                {sizes.map((z) => <td key={z} className="px-1 py-1 text-center">{cell(at(z, c), c + z)}</td>)}
+            {colorRows.map((c) => (
+              <tr key={c || "one"} className="border-t border-border">
+                {/* The label column takes only what the longest name needs; the width freed
+                    goes to the numbers, which are what the row is for. */}
+                <td className="w-px whitespace-nowrap px-2 py-1 font-medium">
+                  {c ? prettyColorName(c) : (p.name || group.rows[0]?.name || "Stock")}
+                </td>
+                {sizeCols.map((z) => (
+                  <td key={(c || "one") + (z || "one")} className="px-1 py-1 text-center">{cell(at(z, c), c + z)}</td>
+                ))}
               </tr>
             ))}
           </tbody>
