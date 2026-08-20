@@ -68,7 +68,13 @@ export const recogniserLang = (locale: string | undefined) => RECOGNISER_LANG[St
  * which is what lets the same hook serve a chat composer that appends at the caret and a
  * prompt box that appends at the end.
  */
-export function useDictation({ lang, onText }: { lang: string; onText: (chunk: string) => void }) {
+export function useDictation({ lang, onText, onInterim }: {
+  lang: string
+  onText: (chunk: string) => void
+  /** Words heard but not yet settled, fired as they change. The caller decides where they
+   *  go; nothing here draws them. */
+  onInterim?: (text: string) => void
+}) {
   const [supported, setSupported] = useState(false)
   const [listening, setListening] = useState(false)
   const [interim, setInterim] = useState("")
@@ -94,8 +100,9 @@ export function useDictation({ lang, onText }: { lang: string; onText: (chunk: s
      forbids the render-phase assignment, and the recogniser only reads these from its own
      callbacks, which always run after commit. */
   const onTextRef = useRef(onText)
+  const onInterimRef = useRef(onInterim)
   const langRef = useRef(lang)
-  useEffect(() => { onTextRef.current = onText; langRef.current = lang })
+  useEffect(() => { onTextRef.current = onText; onInterimRef.current = onInterim; langRef.current = lang })
 
   /* Deferred with setTimeout(fn, 0) — the pattern used across the app pages, because
      `react-hooks/set-state-in-effect` rejects a synchronous setState in an effect body.
@@ -141,6 +148,9 @@ export function useDictation({ lang, onText }: { lang: string; onText: (chunk: s
           else live += text
         }
         setInterim(live)
+        // From the recogniser's own callback, not an effect — this is an event, and the
+        // caller writes it straight into whatever field it owns.
+        onInterimRef.current?.(live)
       }
 
       r.onerror = (e) => {

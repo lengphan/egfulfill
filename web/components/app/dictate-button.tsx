@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import { Microphone } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { useLocale } from "@/lib/i18n"
@@ -28,38 +29,52 @@ export function DictateButton({
   label?: string
 }) {
   const { locale } = useLocale()
-  const { supported, listening, interim, error, toggle } = useDictation({
+  /**
+   * IT TYPES INTO THE BOX, WORD BY WORD.
+   *
+   * The words being heard used to float in a bubble above the microphone, which made two
+   * places to look: the transcript appeared over here, then jumped over there once it
+   * settled. Now the live words go straight into the field, so there is one place the text
+   * ever is and you watch it arrive where it will stay.
+   *
+   * `baseRef` is what has actually been SETTLED. Every interim update rewrites the field as
+   * base + the current guess, so a revised guess replaces the last one instead of stacking;
+   * a final chunk moves it into the base and the next phrase builds from there. Without
+   * that anchor the recogniser's own corrections would each append, and speaking one
+   * sentence would leave four half-versions of it in the box.
+   */
+  const baseRef = useRef(value)
+  const join = (a: string, b: string) => (a && !/\s$/.test(a) ? `${a} ${b}` : `${a}${b}`)
+
+  const { supported, listening, error, toggle } = useDictation({
     // The recogniser follows the app's own language switcher. Dictating Vietnamese into an
     // English recogniser does not error — it returns confident nonsense, which is worse.
     lang: recogniserLang(locale),
+    onInterim: (live) => { if (live) onChange(join(baseRef.current, live)) },
     onText: (chunk) => {
-      const base = value
-      // Join with a space unless the box is empty or already ends in whitespace, so
-      // successive phrases read as a sentence rather than runtogetherlikethis.
-      onChange(base && !/\s$/.test(base) ? `${base} ${chunk}` : `${base}${chunk}`)
+      baseRef.current = join(baseRef.current, chunk)
+      onChange(baseRef.current)
     },
   })
+
+  /* Starting anchors on whatever is in the box right now, so dictation continues a
+     half-typed sentence. Stopping drops any unsettled guess rather than leaving it behind
+     as though it had been heard properly. */
+  const onToggle = () => {
+    if (listening) onChange(baseRef.current)
+    else baseRef.current = value
+    toggle()
+  }
 
   if (!supported) return null
 
   return (
-    <span className="relative inline-flex">
-      {/* WHAT IT THINKS IT IS HEARING, while it is still hearing it.
-          A pulsing icon says "running"; it does not say "running and picking up YOU". The
-          interim string is the only thing that distinguishes a working microphone from a
-          muted one, and it costs a line. It floats so a growing phrase cannot reflow the
-          toolbar it sits in. */}
-      {listening && interim ? (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 max-w-56 -translate-x-1/2 truncate rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground shadow-sm">
-          {interim}
-        </span>
-      ) : null}
     <Button
       type="button"
       variant="ghost"
       size="icon"
       className={className ?? "size-9 shrink-0"}
-      onClick={toggle}
+      onClick={onToggle}
       disabled={disabled}
       aria-label={listening ? "Stop dictating" : label}
       aria-pressed={listening}
@@ -75,6 +90,5 @@ export function DictateButton({
         className={listening ? "animate-pulse text-primary" : error ? "text-muted-foreground" : undefined}
       />
     </Button>
-    </span>
   )
 }
