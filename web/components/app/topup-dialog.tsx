@@ -175,7 +175,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
       <div className="flex flex-col items-center gap-4 py-2">
         {qrImg ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={qrImg} alt="VietQR payment code" className="size-56 rounded-xl border border-border" />
+          <img src={qrImg} alt="BIDV payment code" className="size-56 rounded-xl border border-border" />
         ) : (
           <div className="flex size-56 items-center justify-center rounded-xl border border-border"><CircleNotch size={28} className="animate-spin text-muted-foreground" /></div>
         )}

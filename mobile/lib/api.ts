@@ -541,3 +541,33 @@ export const uploadAttachment = (dataUrl: string, name: string) =>
     method: "POST",
     body: JSON.stringify({ dataUrl, name }),
   })
+
+/* ── CHAT — people talking to people ──────────────────────────────────────────
+ *
+ * TWO ROOMS, and the server already knows both (canSeeThread in routes/orders.js):
+ *
+ *   staff-general      the internal room. Any non-seller, designers included.
+ *   support-<sellerId> one seller's conversation with EGFULFILL. A seller sees only
+ *                      their own; staff see all of them as an inbox.
+ *
+ * NO AI ON THIS PLATFORM. The assistant, the Workbench and image generation stay on the
+ * web — they are desk features that cost money per press, and a phone in a factory is not
+ * where you want either. So there is no reply-draft call, no generate button and no
+ * `desk-` channel here; this is people talking to people, and the same `order_messages`
+ * table carries it.
+ */
+export type SupportThread = {
+  order_id: string
+  seller_id?: string | null
+  seller_name?: string | null
+  last?: string | null
+  last_at?: number | null
+  n?: number
+  /** Incoming since our last HUMAN reply — the badge. An answered thread reports 0, which is
+   *  what makes it mean "needs you" rather than "is long". */
+  unanswered?: number
+  escalated?: boolean
+}
+/** Staff only — every seller conversation, newest first. A seller gets a 403 and should
+ *  simply open their own `support-<id>` instead. */
+export const getSupportThreads = () => request<SupportThread[]>(`/api/support/threads`)

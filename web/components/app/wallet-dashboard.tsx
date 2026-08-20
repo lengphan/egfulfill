@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { labelRail } from "@/lib/payment-method"
 import { Plus, DownloadSimple } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
 import { PayoutDialog } from "@/components/app/payout-dialog"
@@ -128,11 +129,11 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
                 <div className="font-semibold tabular-nums">{usd2(Number(p.amount_usd) || 0)} <span className="text-sm font-normal text-muted-foreground">· {p.seller_name || p.seller_email || "seller"}</span></div>
                 <div className="text-xs text-muted-foreground">{fmtDT2(p.created_at)}</div>
                 <div className="mt-1 space-y-0.5 rounded-lg bg-muted/50 px-2.5 py-2 text-xs">
-                  <div className="font-medium capitalize">{(m.type || "payout").replace("vietqr", "VietQR")}{m.account_name ? ` · ${m.account_name}` : ""}</div>
+                  <div className="font-medium capitalize">{labelRail(m.type || "payout")}{m.account_name ? ` · ${m.account_name}` : ""}</div>
                   {(m.account_id || m.account_number) && <div className="text-muted-foreground">{m.account_id || m.account_number}{m.bank_name ? ` · ${m.bank_name}` : ""}</div>}
                   {m.note && <div className="text-muted-foreground">{m.note}</div>}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {m.qr && <img src={m.qr} alt="Seller VietQR" className="mt-1.5 size-24 rounded border border-border object-contain" />}
+                  {m.qr && <img src={m.qr} alt="Seller bank QR" className="mt-1.5 size-24 rounded border border-border object-contain" />}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -629,7 +630,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                 )
               })}
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">Pending top-ups credit your balance once confirmed (VietQR auto-confirms on payment; manual transfers are reviewed by our team).</div>
+            <div className="mt-2 text-xs text-muted-foreground">Pending top-ups credit your balance once confirmed (BIDV auto-confirms on payment; manual transfers are reviewed by our team).</div>
           </div>
         )}
         <Table>

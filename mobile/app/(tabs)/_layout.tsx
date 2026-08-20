@@ -3,6 +3,7 @@ import { Platform, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { F,C, TAB_BAR } from "@/lib/theme"
+import { ChatBubble } from "@/components/chat-bubble"
 
 /**
  * The three things worth opening a phone for: what needs doing, a specific order, and the
@@ -23,7 +24,12 @@ export default function TabsLayout() {
    *   so it has to clear the safe-area inset rather than a hard-coded 16.
    */
   const bottom = Math.max(insets.bottom, 10)
+  /* THE BUBBLE IS A SIBLING OF THE TABS, not a sixth tab.
+     The bar holds places you GO; a conversation is something that interrupts you, which
+     wants a control that floats over the page and carries a count rather than a slot in a
+     row of five. A Fragment so it lands over whichever screen is showing. */
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -161,5 +167,7 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    <ChatBubble />
+    </>
   )
 }

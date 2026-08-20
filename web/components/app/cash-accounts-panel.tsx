@@ -18,7 +18,9 @@ const SUGGESTED = [
   { id: "pingpong", name: "PingPong", kind: "rail" },
   { id: "lianlian", name: "LianLian", kind: "rail" },
   { id: "paypal", name: "PayPal", kind: "rail" },
-  { id: "vietqr", name: "VietQR", kind: "rail" },
+  /* The id stays `vietqr` — it keys the ledger and the reconciliation. Only the name a
+     person reads changes; see lib/payment-method.ts. */
+  { id: "vietqr", name: "BIDV", kind: "rail" },
 ]
 
 /**
