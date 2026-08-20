@@ -25,7 +25,9 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, formatSheetTemplate, getTemplates, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, formatSheetTemplate, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
+import { productSizes, productColors } from "@/lib/variant-sku"
+import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
 
@@ -81,10 +83,67 @@ async function downloadXlsxTemplate() {
   // Google Sheet makes. Excel caps an inline list at 255 characters; every list here is well
   // under (US states, the longest, is ~152).
   const DATA_ROWS = 500
-  Object.entries(COLUMN_OPTIONS).forEach(([key, values]) => {
+
+  /**
+   * THE LIVE LISTS, ON A HIDDEN TAB — because an inline list cannot hold them.
+   *
+   * Excel caps an inline dropdown at 255 characters. Twenty-seven product names blow past
+   * that on their own, so the catalogue cannot be written the way the fixed lists are: it
+   * goes on a hidden sheet and the validation points at the range, which has no such cap.
+   *
+   * Read from the catalogue at DOWNLOAD time, not from a constant — the whole complaint
+   * that started this was a template offering sizes a product doesn't come in and never
+   * showing a blank added since the arrays were last edited.
+   *
+   * NOT DEPENDENT, and that is the honest difference from the Google copy. Excel can do it
+   * (defined names plus INDIRECT) but ExcelJS's own xlsx is then rewritten by whatever
+   * opens it, and Google's importer drops data validation on conversion entirely — see the
+   * note on the format route. So the file gets every colour, size and method the catalogue
+   * actually offers, and the Sheets master gets the per-product narrowing.
+   */
+  const live: Record<string, string[]> = {}
+  try {
+    const cat = await getCatalogProducts()
+    const names = [...new Set((cat ?? []).map((p) => String(p.name || "").trim()).filter(Boolean))].sort()
+    const colors = [...new Set((cat ?? []).flatMap((p) => productColors(p)))].sort()
+    const sizes = [...new Set((cat ?? []).flatMap((p) => productSizes(p)))]
+    const methods = [...new Set(normalizeMethods((cat ?? []).flatMap((p) => [p.method, ...(p.methods ?? [])]))
+      .map((m) => m.key.toUpperCase()))]
+    if (names.length) live.blank = names
+    if (colors.length) live.item_color = colors
+    if (sizes.length) live.item_size = sizes
+    if (methods.length) live.print_type = methods
+  } catch { /* no catalogue → the fixed lists below, exactly as before */ }
+
+  const listCols = Object.entries(live)
+  if (listCols.length) {
+    const lists = wb.addWorksheet("Lists", { state: "veryHidden" })
+    listCols.forEach(([key, values], i) => {
+      lists.getCell(1, i + 1).value = key
+      values.forEach((v, r) => { lists.getCell(r + 2, i + 1).value = v })
+    })
+  }
+
+  // A live list wins over the fixed one for the same column — same precedence the Sheets
+  // template uses, so the two never offer different things.
+  Object.entries({ ...COLUMN_OPTIONS, ...live }).forEach(([key, values]) => {
     const idx = CSV_COLUMNS.findIndex((c) => c.key === key)
     if (idx < 0) return
     const letter = ws.getColumn(idx + 1).letter
+    const liveAt = listCols.findIndex(([k]) => k === key)
+    if (liveAt >= 0) {
+      const col = String.fromCharCode(65 + liveAt)      // Lists has at most four columns
+      const validations = (ws as unknown as {
+        dataValidations: { add: (range: string, rule: Record<string, unknown>) => void }
+      }).dataValidations
+      validations.add(`${letter}3:${letter}${DATA_ROWS}`, {
+        type: "list",
+        allowBlank: true,
+        formulae: [`Lists!$${col}$2:$${col}$${values.length + 1}`],
+        showErrorMessage: false,
+      })
+      return
+    }
     // The RANGE api, via a narrow cast — ExcelJS ships it but leaves it off the Worksheet
     // type. It is worth the cast: assigning per cell instead (the typed path) makes ExcelJS
     // emit the same rule twice under split, wrong ranges (C3:C500 *and* C10:C500) and a
