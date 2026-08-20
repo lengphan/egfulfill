@@ -264,18 +264,22 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
               <StatBox label="Colours" value={String(colors.length)} />
               <StatBox label="Sizes" value={String(sizes.length)} />
             </div>
-            {p?.images_uploaded != null && (
-              <div className="mt-1.5 text-2xs text-muted-foreground">
-                {p.images_uploaded} photo{p.images_uploaded === 1 ? "" : "s"} uploaded
-              </div>
-            )}
+            {/* THE PHOTO COUNT IS GONE. "3 photos uploaded" is a line of its own for a number
+                nobody acts on — the card already shows the cover shot, and how many more
+                there are changes nothing you would do from here. It was one of two rows
+                pushing every card taller than its content. */}
             {(colors.length > 0 || sizes.length > 0) && (
+              /* SEVEN AND A COUNT, and no more. An unbounded chip list is what made these
+                 cards different heights in the same row — a listing with four colourways sat
+                 next to one with twenty, and the grid had to make room for the tallest. The
+                 chips are a glance at what listed, not the inventory; the number carries the
+                 rest, and Edit opens the real list. */
               <div className="mt-2 flex flex-wrap gap-1">
-                {[...colors, ...sizes].slice(0, 8).map((v) => (
+                {[...colors, ...sizes].slice(0, 7).map((v) => (
                   <span key={v} className="rounded bg-muted px-1.5 py-0.5 text-2xs leading-tight text-muted-foreground">{v}</span>
                 ))}
-                {colors.length + sizes.length > 8 && (
-                  <span className="rounded px-1 py-0.5 text-2xs leading-tight text-muted-foreground/70">+{colors.length + sizes.length - 8}</span>
+                {colors.length + sizes.length > 7 && (
+                  <span className="rounded px-1 py-0.5 text-2xs leading-tight text-muted-foreground/70">+{colors.length + sizes.length - 7}</span>
                 )}
               </div>
             )}

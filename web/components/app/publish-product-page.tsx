@@ -181,12 +181,30 @@ type TtFields = {
   warehouse: string
   weight: string
   unit: string
+  /** Package size. TikTok rejects the whole create call when any of these is zero or absent
+   *  ("all package dimensions must be positive numeric values") — it is not optional, and we
+   *  were sending none at all. Strings because they are typed. */
+  length: string
+  width: string
+  height: string
+  dimUnit: string
   loadErr: string
   loaded: boolean
 }
+/*
+ * A POLY MAILER WITH A FOLDED TEE IN IT, which is what almost everything here ships as.
+ *
+ * A default rather than a blank, because TikTok refuses without one and an empty required
+ * field on a screen with eight others is how a publish fails at the last step. It is EDITABLE
+ * and it is shown, not hidden — this is a number the carrier will bill against, so it must be
+ * possible to see it is wrong. It is not a claim about the product; nothing here reaches the
+ * buyer's listing copy.
+ */
 const TT_EMPTY: TtFields = {
   categories: [], category: null, query: "", warehouses: [], warehouse: "",
-  weight: "", unit: "POUND", loadErr: "", loaded: false,
+  weight: "", unit: "POUND",
+  length: "10", width: "8", height: "1", dimUnit: "INCH",
+  loadErr: "", loaded: false,
 }
 
 /**
@@ -331,6 +349,27 @@ function TiktokFields({ dest, fields, onChange }: {
           <select value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs">
             <option value="POUND">lb</option>
             <option value="KILOGRAM">kg</option>
+          </select>
+        </div>
+      </label>
+
+      {/* PACKAGE SIZE — also required, and the one we were not sending at all.
+          TikTok's refusal names the field but not the fix: "`package_dimensions` is invalid
+          because all package dimensions must be positive numeric values" is what you get for
+          omitting it entirely, so a publish that had every visible field filled in still
+          failed. Prefilled for a poly mailer and editable, because a required number that
+          starts blank is just a later failure. */}
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium">Package size</span>
+        <div className="flex items-center gap-1.5">
+          <Input value={fields.length} onChange={(e) => onChange({ length: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="L" inputMode="decimal" aria-label="Package length" className="h-8 min-w-0 flex-1 text-xs" />
+          <span className="text-2xs text-muted-foreground">×</span>
+          <Input value={fields.width} onChange={(e) => onChange({ width: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="W" inputMode="decimal" aria-label="Package width" className="h-8 min-w-0 flex-1 text-xs" />
+          <span className="text-2xs text-muted-foreground">×</span>
+          <Input value={fields.height} onChange={(e) => onChange({ height: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="H" inputMode="decimal" aria-label="Package height" className="h-8 min-w-0 flex-1 text-xs" />
+          <select value={fields.dimUnit} onChange={(e) => onChange({ dimUnit: e.target.value })} aria-label="Dimension unit" className="eg-select h-8 shrink-0 rounded-md border border-border bg-card px-2 text-xs">
+            <option value="INCH">in</option>
+            <option value="CENTIMETER">cm</option>
           </select>
         </div>
       </label>
@@ -985,6 +1024,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         save_mode: goLive ? "LISTING" : "AS_DRAFT",
         category_id: f.category.id, warehouse_id: f.warehouse,
         package_weight: f.weight, weight_unit: f.unit,
+        package_length: f.length, package_width: f.width, package_height: f.height,
+        dimension_unit: f.dimUnit,
         blank: blank?.sku ?? undefined, printType: method || undefined,
         designId: prefill?.designId, designUrl: prefill?.designUrl, designPos: prefill?.designPos,
       })
@@ -1180,6 +1221,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       !f.category && "a category",
       !f.warehouse && "a warehouse",
       !(Number(f.weight) > 0) && "a package weight",
+      // Caught HERE rather than at TikTok, which answers a zero with a sentence naming a
+      // field the screen never showed. All three, because TikTok validates them together.
+      !(Number(f.length) > 0 && Number(f.width) > 0 && Number(f.height) > 0) && "a package size",
     ].filter(Boolean) as string[]
   }
 

@@ -3388,6 +3388,10 @@ export function publishTiktok(body: {
   images?: string[]; tags?: string[]
   colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>
   category_id: string; warehouse_id: string; package_weight: string | number; weight_unit?: string
+  /** Package size. TikTok validates all three together and refuses the create call when any
+   *  is zero or missing — required, not optional, and we sent none of it until now. */
+  package_length?: string | number; package_width?: string | number; package_height?: string | number
+  dimension_unit?: string
   brand_id?: string; currency?: string; save_mode?: "AS_DRAFT" | "LISTING"
   blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; method?: string
 }) {

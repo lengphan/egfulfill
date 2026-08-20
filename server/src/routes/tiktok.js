@@ -308,6 +308,25 @@ function buildTiktokProductPayload(b, imageUris) {
     package_weight: (b.package_weight != null && String(b.package_weight) !== '')
       ? { value: String(b.package_weight), unit: b.weight_unit || (RESOLVED_REGION === 'us' ? 'POUND' : 'KILOGRAM') }
       : null,   // REQUIRED for physical products
+    /*
+     * PACKAGE DIMENSIONS — also required, and previously not sent AT ALL.
+     *
+     * Omitting the key does not make it optional: TikTok reads the absent field as zeroes and
+     * refuses the whole create with "`package_dimensions` is invalid because all package
+     * dimensions must be positive numeric values". So a listing with a category, a warehouse
+     * and a weight — every field the screen asked for — still failed, and the message named a
+     * field nobody had been shown.
+     *
+     * Sent only when all three are positive. A partial object is the same refusal with an
+     * extra step, and null is what the payload carried before, so the failure mode does not
+     * get worse when a caller omits them.
+     */
+    package_dimensions: (Number(b.package_length) > 0 && Number(b.package_width) > 0 && Number(b.package_height) > 0)
+      ? {
+        length: String(b.package_length), width: String(b.package_width), height: String(b.package_height),
+        unit: b.dimension_unit || (RESOLVED_REGION === 'us' ? 'INCH' : 'CENTIMETER'),
+      }
+      : null,
     // A new key per request so a retry can't create a duplicate product.
     idempotency_key: crypto.randomUUID(),
   };
