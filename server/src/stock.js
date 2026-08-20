@@ -89,6 +89,39 @@ export async function stockMovementsFor(sku, limit = 100) {
 }
 
 /**
+ * MANY SKUs AT ONCE — a product's whole shelf, not one variant of it.
+ *
+ * The Inventory page draws a multi-variant product as a GRID, so its rows have no menu to
+ * hang a per-sku history on; and "why did this product's stock change" is the question
+ * someone actually asks, across every colour and size at once. One query, newest first,
+ * with the sku on each row so the merged list still says which variant moved.
+ */
+export async function stockMovementsForMany(skus, limit = 200) {
+  await ensure();
+  const keys = (Array.isArray(skus) ? skus : []).map((k) => String(k || '').trim().toUpperCase()).filter(Boolean);
+  if (!keys.length) return [];
+  const r = await q(
+    `select id, sku, delta, reason, ref, order_id, note, by_user, at
+       from stock_movements where upper(sku) = any($1)
+      order by at desc, id desc limit $2`,
+    [keys, Math.min(1000, Math.max(1, Number(limit) || 200))]
+  ).catch(() => ({ rows: [] }));
+  return r.rows;
+}
+
+/** The journal total across a set of skus — held against the sum of their shelves. */
+export async function stockJournalSumMany(skus) {
+  await ensure();
+  const keys = (Array.isArray(skus) ? skus : []).map((k) => String(k || '').trim().toUpperCase()).filter(Boolean);
+  if (!keys.length) return 0;
+  const r = await q(
+    `select coalesce(sum(delta),0)::int as n from stock_movements where upper(sku) = any($1)`,
+    [keys]
+  ).catch(() => ({ rows: [{ n: 0 }] }));
+  return Number(r.rows[0]?.n) || 0;
+}
+
+/**
  * Does the shelf agree with its journal? The sum of every movement for a sku, so a caller
  * can hold it against in_stock. They can legitimately differ for a row that existed before
  * this ledger did — which is itself worth SAYING rather than hiding.

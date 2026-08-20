@@ -2,7 +2,7 @@
 // (DB-shaped rows) on every change; we upsert all and drop any SKUs no longer
 // present, so the table mirrors the client. Empty body never wipes (safety).
 import { q } from '../db.js';
-import { recordStockMove, stockMovementsFor, stockJournalSum, STOCK_REASONS } from '../stock.js';
+import { recordStockMove, stockMovementsFor, stockMovementsForMany, stockJournalSum, stockJournalSumMany, STOCK_REASONS } from '../stock.js';
 // Receiving against a PO writes an audit entry and nudges both boards, the same way every
 // other stock-moving route in this file's neighbourhood does.
 import { audit } from '../audit.js';
@@ -537,6 +537,35 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
   });
 
   /**
+   * A WHOLE PRODUCT'S HISTORY — every variant's movements in one list.
+   *
+   * Registered before the per-sku route below only for readability; the paths don't
+   * collide (`/movements` vs `/:sku/movements`). It exists because the Inventory page draws
+   * a multi-variant product as a GRID, whose cells are number inputs with no menu to hang a
+   * per-sku history on — so without this the journal was unreachable for exactly the
+   * products that have the most movement.
+   */
+  app.get('/api/inventory/movements', { preHandler: requireStaff }, async (req) => {
+    const skus = String(req.query?.skus || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 200);
+    if (!skus.length) return { skus: [], inStock: null, journal: 0, movements: [] };
+    const [rows, journal, shelf] = await Promise.all([
+      stockMovementsForMany(skus, Number(req.query?.limit) || 200),
+      stockJournalSumMany(skus),
+      q('select coalesce(sum(in_stock),0)::int as n from inventory where upper(sku) = any($1)',
+        [skus.map((k) => k.toUpperCase())]).then((r) => Number(r.rows[0]?.n) || 0).catch(() => null),
+    ]);
+    return {
+      skus,
+      inStock: shelf,
+      journal,
+      movements: rows.map((m) => ({
+        id: String(m.id), sku: m.sku, delta: Number(m.delta) || 0, reason: m.reason,
+        ref: m.ref || null, orderId: m.order_id || null, note: m.note || null, at: m.at,
+      })),
+    };
+  });
+
+  /**
    * ONE SKU'S HISTORY — why the number is what it is.
    *
    * Staff-readable (not warehouse-only): an operator asking "where did those twelve go" is
@@ -559,7 +588,7 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
       inStock: row ? Number(row.in_stock) || 0 : null,
       journal,
       movements: rows.map((m) => ({
-        id: String(m.id), delta: Number(m.delta) || 0, reason: m.reason,
+        id: String(m.id), sku: m.sku, delta: Number(m.delta) || 0, reason: m.reason,
         ref: m.ref || null, orderId: m.order_id || null, note: m.note || null, at: m.at,
       })),
     };

@@ -15,7 +15,7 @@ import { Barcode } from "@/components/app/barcode"
 import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getStockMovements, resolveSuppliers, getCatalogProducts, getPurchaseOrders, type CatalogProduct, type InventoryItem, type OrderItem, type StockHistory, type SkuVisibility } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getStockMovements, getStockMovementsForSkus, resolveSuppliers, getCatalogProducts, getPurchaseOrders, type CatalogProduct, type InventoryItem, type OrderItem, type StockHistory, type SkuVisibility } from "@/lib/api"
 import { getFactoryList, saveFactoryList, type SavedPOLine } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -95,7 +95,8 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
   const [saved, setSaved] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
-  const [histSku, setHistSku] = useState<string | null>(null)
+  // WHOSE HISTORY — one variant from a row menu, or a whole product from its grid.
+  const [hist, setHist] = useState<{ label: string; skus: string[] } | null>(null)
   // Label printing: pick the variants you actually need, and how many of each.
   // Printing the whole filtered list one-each wasted a roll every time.
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -534,7 +535,9 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                         single={one}
                         meta={meta}
                         sel={sel} setSel={setSel}
-                        edit={edit} setVisibility={setVisibility} remove={remove} onHistory={setHistSku} onZoom={setZoomSku}
+                        edit={edit} setVisibility={setVisibility} remove={remove} onHistory={(sku: string) => setHist({ label: sku, skus: [sku] })}
+                        onProductHistory={(name: string, skus: string[]) => setHist({ label: name, skus })}
+                        onZoom={setZoomSku}
                         onOrder={onOrder}
                       />
                     )
@@ -551,7 +554,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       )}
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} catalog={catalog} />
-      <ScanHistoryDialog sku={histSku} onClose={() => setHistSku(null)} />
+      <ScanHistoryDialog target={hist} onClose={() => setHist(null)} />
 
       {/* Selected variants only — or the whole filtered list if nothing is ticked,
           which keeps the old one-click behaviour for "print everything". */}
@@ -599,7 +602,7 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
  * which is where the count is actually held.
  */
 function ProductGroup({
-  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, edit, setVisibility, remove, onHistory, onZoom, onOrder,
+  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, edit, setVisibility, remove, onHistory, onProductHistory, onZoom, onOrder,
 }: {
   group: Group
   open: boolean
@@ -614,6 +617,8 @@ function ProductGroup({
   setVisibility: (sku: string, v: SkuVisibility) => void
   remove: (sku: string) => void
   onHistory: (sku: string) => void
+  /** The whole product's journal — the grid has no per-row menu to hang one on. */
+  onProductHistory: (name: string, skus: string[]) => void
   onZoom: (sku: string) => void
   /** sku (upper) → units on a placed purchase order. */
   onOrder: Record<string, number>
@@ -949,7 +954,24 @@ function ProductGroup({
             )
               : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
         </td>
-        <td className="px-4 py-2" />
+        {/* THE GRID HAS NO ROW MENU, so this is where a multi-variant product reaches its
+            own history: the cells are number inputs, and the ⋯ that carries "Stock history"
+            only exists on a variant ROW. Without it the journal was unreachable for exactly
+            the products that move the most. One button, in the column the variant rows put
+            their menu in, so the affordance is in the same place either way. */}
+        <td className="px-4 py-2">
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
+              title={`Stock history for all ${group.rows.length} variants of ${group.name}`}
+              aria-label={`Stock history for ${group.name}`}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <ClockCounterClockwise size={15} />
+            </button>
+          </div>
+        </td>
       </tr>
       {/* THE GRID WHEN IT CAN BE ONE, the list when it cannot.
           StockMatrix returns null for anything it can't lay out on two axes — no catalogue
@@ -1244,20 +1266,25 @@ const MOVE_WORD: Record<string, string> = {
   "count-set": "Counted by hand",
 }
 
-function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () => void }) {
+function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus: string[] } | null; onClose: () => void }) {
   const [data, setData] = useState<StockHistory | null>(null)
   const [failed, setFailed] = useState(false)
+  // The set, as a stable string — an array literal is a new object every render, so
+  // depending on it directly would re-fetch the dialog forever.
+  const key = target ? target.skus.join(",") : ""
+  const many = (target?.skus.length ?? 0) > 1
 
   useEffect(() => {
     let live = true
     const id = setTimeout(() => {
-      if (!sku) { setData(null); setFailed(false); return }
-      getStockMovements(sku, 100)
-        .then((r) => { if (live) { setData(r ?? null); setFailed(!r) } })
+      const skus = key ? key.split(",") : []
+      if (!skus.length) { setData(null); setFailed(false); return }
+      const p = skus.length > 1 ? getStockMovementsForSkus(skus, 200) : getStockMovements(skus[0], 100)
+      p.then((r) => { if (live) { setData(r ?? null); setFailed(!r) } })
         .catch(() => { if (live) { setData(null); setFailed(true) } })
     }, 0)
     return () => { live = false; clearTimeout(id) }
-  }, [sku])
+  }, [key])
 
   const rows = data?.movements ?? null
   const when = (s?: string) => {
@@ -1269,13 +1296,16 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
   const gap = data && data.inStock != null ? data.inStock - data.journal : 0
 
   return (
-    <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
+    <Dialog open={!!target} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> Stock history</DialogTitle>
         </DialogHeader>
         <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
-          <span className="tabular-nums text-xs font-medium">{sku}</span>
+          <span className="truncate text-xs font-medium">
+            <span className={many ? "" : "tabular-nums"}>{target?.label}</span>
+            {many && <span className="text-muted-foreground"> · {target?.skus.length} variants</span>}
+          </span>
           {data && (
             <span className="text-xs text-muted-foreground">
               On the shelf <b className="tabular-nums text-foreground">{data.inStock ?? "—"}</b>
@@ -1311,7 +1341,12 @@ function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () =
                     {up ? "+" : "−"}{Math.abs(r.delta)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm">{MOVE_WORD[r.reason] ?? r.reason}</div>
+                    <div className="truncate text-sm">
+                      {MOVE_WORD[r.reason] ?? r.reason}
+                      {/* WHICH variant, but only when the list holds more than one — on a
+                          single sku's history it would be the same string on every line. */}
+                      {many && r.sku && <span className="ms-1.5 tabular-nums text-xs text-muted-foreground">{r.sku}</span>}
+                    </div>
                     {(r.orderId || r.ref || r.note) && (
                       <div className="truncate text-xs text-muted-foreground">
                         {r.orderId ? <span className="tabular-nums">order {r.orderId}</span>

@@ -1678,6 +1678,8 @@ export function scanInventory(body: { sku: string; direction: "in" | "out"; qty?
  */
 export type StockMovement = {
   id: string
+  /** Which variant moved — carried even on a single-sku read, so one dialog renders both. */
+  sku: string
   delta: number
   /** One of the STOCK_REASONS ids — see server/src/stock.js. */
   reason: string
@@ -1686,10 +1688,16 @@ export type StockMovement = {
   note: string | null
   at: string
 }
-export type StockHistory = { sku: string; inStock: number | null; journal: number; movements: StockMovement[] }
+export type StockHistory = { sku?: string; skus?: string[]; inStock: number | null; journal: number; movements: StockMovement[] }
 
 export function getStockMovements(sku: string, limit = 100) {
   return api<StockHistory>(`/api/inventory/${encodeURIComponent(sku)}/movements?limit=${limit}`)
+}
+
+/** A whole product's shelf — every variant's movements merged, newest first. The grid has
+ *  no per-row menu, so this is how a multi-variant product reaches its own journal. */
+export function getStockMovementsForSkus(skus: string[], limit = 200) {
+  return api<StockHistory>(`/api/inventory/movements?skus=${encodeURIComponent(skus.join(","))}&limit=${limit}`)
 }
 
 export function getScanHistory(sku?: string, limit = 100) {
