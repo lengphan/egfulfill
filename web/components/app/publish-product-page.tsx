@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -944,32 +944,31 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * render one frame of the wrong set.
    */
   /*
-   * NULL MEANS "ALL OF THEM", and that is what avoids a seeding effect.
+   * NOTHING IS TICKED TO BEGIN WITH.
    *
-   * The alternative — initialise the array from `referencePhotos` and re-seed it when the
-   * draft changes — needs an effect that writes state the render already depends on, which is
-   * the exact shape this codebase keeps getting bitten by. A null default is computed at read
-   * time instead, so a listing that arrives with six references simply HAS six ticked, and one
-   * that arrives with none has none. Ticking anything materialises the array.
+   * It used to default to all of them, which meant a nine-photo listing opened with nine
+   * references armed and a prompt written from every one — including the size charts and the
+   * thread-colour tables, which teach a photographer nothing. Picking is the point: you look
+   * at the set, choose the two or three that show the shot you want, and brief from those.
+   *
+   * A plain empty array, so there is no seeding effect writing state the render already
+   * depends on — the shape this codebase keeps getting bitten by.
    */
-  const [refPickedRaw, setRefPicked] = useState<number[] | null>(null)
-  const refPicked = useMemo(
-    () => refPickedRaw ?? referencePhotos.map((_, i) => i),
-    [refPickedRaw, referencePhotos])
+  const [refPicked, setRefPicked] = useState<number[]>([])
   const [studioOpen, setStudioOpen] = useState(false)
   const [studioFocus, setStudioFocus] = useState(0)
 
-  /** Open on a specific photo — and make sure that one is actually in the set being read. */
+  /** Open on a specific photo — clicking a tile IS choosing it, so it joins the set. */
   const openStudioOn = (i: number) => {
-    setRefPicked((p) => { const cur = p ?? referencePhotos.map((_, x) => x); return cur.includes(i) ? cur : [...cur, i].sort((a, b) => a - b) })
+    setRefPicked((p) => (p.includes(i) ? p : [...p, i].sort((a, b) => a - b)))
     setStudioFocus(i)
     setStudioOpen(true)
   }
+  /** Open on whatever is already ticked, or on nothing — the studio's own grid is a perfectly
+   *  good place to choose from, so this never forces a selection the way the tile does. */
+  const openStudio = () => { setStudioFocus(refPicked[0] ?? 0); setStudioOpen(true) }
   const toggleRefPick = (i: number) =>
-    setRefPicked((p) => {
-      const cur = p ?? referencePhotos.map((_, x) => x)
-      return cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i].sort((a, b) => a - b)
-    })
+    setRefPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i].sort((a, b) => a - b)))
 
   /** A finished render joins the publishable set — at the END, so it never silently takes
    *  over as the cover photo. Making it primary stays a deliberate press, as it is for
@@ -1498,13 +1497,15 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
              single column of comfortable measure. Only "where does this go" and the button
              sit alongside, and below 1280px even they drop underneath, which is the stacked
              layout this page is best at. */
-          <div className="mx-auto grid w-full max-w-[70rem] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            {/* THE FORM — what the listing looks like.
-                Every group is a SectionCard, the same block every other page in the app is
-                built from. On a page the fields had nothing behind them: a dialog's own
-                edges did the grouping, and without them the form read as one long drift of
-                inputs with no structure and no column boundary. */}
-            <div className="space-y-4">
+          /* PHOTOS SPANS BOTH COLUMNS; the rail starts on the row below it.
+             The rail used to sit level with the photo grid, so on a listing with nine
+             references the pictures — the thing you are actually judging — were squeezed into
+             a column two-thirds of the page while a short shop list held the rest of the width
+             and then ran out of content. Full-bleed for the photos, and the rail comes back in
+             beside the words, where it is the same height as what it sits next to.
+             Wider overall too (76rem), because that column now has real work to do. */
+          <div className="mx-auto grid w-full max-w-[76rem] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="xl:col-span-2">
               {/* The count and the reference-photo caveat ride in the card's own header —
                   repeating "Photos" inside a card called Photos is the kind of doubling a
                   dialog's title bar used to hide. */}
@@ -1513,6 +1514,19 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 description={referencePhotos.length > 0
                   ? `${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} shown, none published`
                   : undefined}
+                /* IN THE HEADER, ABOVE THE RULE. It sat under the grid in a row of its own
+                   that repeated what the tick marks already say. A card's header is where its
+                   one action belongs, and it costs no vertical space there. */
+                actions={referencePhotos.length > 0 ? (
+                  /* NOT disabled when nothing is ticked. A dead button is a dead end — the
+                     studio opens on the same photo grid, which is a perfectly good place to
+                     choose from, and choosing there is one click closer than coming back out
+                     to tick a tile first. */
+                  <Button size="sm" variant="outline" onClick={openStudio}>
+                    <Sparkle size={14} weight="fill" />
+                    Generate Images
+                  </Button>
+                ) : undefined}
                 bodyClassName="space-y-3 p-4"
               >
               <div className="space-y-1.5">
@@ -1521,7 +1535,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     a fixed 6-across made them postage stamps when a listing has one or two.
                     auto-fill at 10rem keeps a thumbnail recognisable at any count and wraps
                     when there are enough to need it. */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2">
+                {/* Bigger tiles now the card owns the full width — 10rem was sized for a
+                    two-thirds column and left the photos smaller than they needed to be for
+                    judging a print. auto-fill still keeps them sane at any count. */}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2.5">
                   {/* FIRST, ALWAYS — and a bare +.
                       It used to sit after the photos, so its position moved every time one
                       was added or removed and the reference photos pushed it into the middle
@@ -1573,8 +1590,24 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       key={`ref-${i}`}
                       className="group relative aspect-square overflow-hidden rounded-lg border border-dashed border-border bg-muted/40"
                     >
+                      {/* GREYED, ALWAYS — even for staff.
+                          The watermark is off for the factory (it lands over the print they
+                          are judging), which left a reference tile looking EXACTLY like a
+                          publishable one: same crop, same colour, same weight in the grid,
+                          with a small tick as the only difference. In a nine-photo listing
+                          that is a set of pictures you cannot tell apart from your own.
+                          Desaturating says "not yours" at a glance without covering the
+                          subject, and it lifts on hover so the shot can still be judged.
+                          An unticked one goes further down, because it is not even feeding
+                          the render. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className={"size-full object-cover transition-opacity " + (refPicked.includes(i) ? "" : "opacity-35")} />
+                      <img src={src} alt=""
+                        className={"size-full object-cover transition-all duration-200 group-hover:grayscale-0 group-hover:opacity-100 "
+                          + (refPicked.includes(i) ? "grayscale-[55%] opacity-75" : "grayscale opacity-30")} />
+                      {/* A cool scrim over the top, so the tile reads as a different KIND of
+                          thing rather than just a duller photograph. Never over the hover
+                          state, and never intercepting the clicks underneath it. */}
+                      <span aria-hidden className="pointer-events-none absolute inset-0 bg-slate-500/15 transition-opacity duration-200 group-hover:opacity-0" />
                       {!staffViewer && <ReferenceWatermark />}
                       {/* NO `title`. The chip already says "Use as reference" in the same
                           spot the native tooltip lands, so both appeared at once and the
@@ -1593,10 +1626,25 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                         aria-pressed={refPicked.includes(i)}
                         aria-label={refPicked.includes(i) ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
                         title={refPicked.includes(i) ? "Using this one — click to drop it" : "Not used — click to add it"}
-                        className={"absolute left-1 top-1 z-10 grid size-5 place-items-center rounded-full border shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/60 " +
-                          (refPicked.includes(i) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/90 text-transparent")}
+                        /* A CIRCLE, AND A TICK INSIDE IT — not two circles.
+                           It used the CheckCircle glyph, which already draws its own ring, so
+                           a round filled button around it rendered a circle inside a circle
+                           with a tiny check squeezed in the middle. Empty ring when unused,
+                           solid fill with a plain check when used: the same two states every
+                           checkbox in the world has. */
+                        className={"absolute left-1 top-1 z-10 grid size-5 place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
+                          (refPicked.includes(i)
+                            /* SAME RING, FILLED IN — that is the whole state change.
+                               A solid violet disc was a third colour dropped onto a
+                               photograph, competing with the print it sits over. White
+                               fill with a dark tick keeps the geometry identical between
+                               the two states, so the eye reads "filled / not filled"
+                               rather than "different badge", and it stays legible on a
+                               dark photo and a pale one alike. */
+                            ? "border-white bg-white text-slate-900"
+                            : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
                       >
-                        <CheckCircle size={11} weight="bold" />
+                        <Check size={11} weight="bold" />
                       </button>
                       <button
                         type="button"
@@ -1628,24 +1676,6 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   saving every one of them to a laptop. This closes it without reopening the
                   path that was removed — it renders OUR photograph, and a render still has to
                   be pressed into the set above. */}
-              {/* THE ENTRY POINT, above the grid rather than buried under it — a row that
-                  says what is selected and offers the one action that uses it. Selecting a
-                  few and generating from just those is the normal way to work: a listing's
-                  six photos are rarely all teaching the same thing. */}
-              {referencePhotos.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                  <Button size="sm" variant="outline" onClick={() => openStudioOn(refPicked[0] ?? 0)} disabled={!refPicked.length}>
-                    <Sparkle size={14} weight="fill" />
-                    Make our own photo
-                  </Button>
-                  <span className="text-2xs text-muted-foreground">
-                    {refPicked.length
-                      ? `from ${refPicked.length} of ${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} — tick the ones to use`
-                      : "tick at least one reference photo to use"}
-                  </span>
-                </div>
-              )}
-
               <ListingPhotoStudio
                 open={studioOpen}
                 onOpenChange={setStudioOpen}
@@ -1661,7 +1691,14 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               />
 
               </SectionCard>
+            </div>
 
+            {/* THE REST OF THE FORM — column one, row two, beside the rail.
+                Every group is a SectionCard, the same block every other page in the app is
+                built from. On a page the fields had nothing behind them: a dialog's own edges
+                did the grouping, and without them the form read as one long drift of inputs
+                with no structure and no column boundary. */}
+            <div className="space-y-4">
               <SectionCard title="Listing" bodyClassName="space-y-4 p-4">
               <label className="flex flex-col gap-1"><span className="text-sm font-medium">Title</span>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Retro Sunset Comfort Colors Tee" />

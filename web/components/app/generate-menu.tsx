@@ -98,18 +98,49 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
        */
       const i = await getDeskImageConfig()
       setImg(i)
-      setImgModel(i.model); setImgSize(i.models.find((m) => m.id === i.model)?.defaultSize || "1K")
+      /*
+       * OPEN ON THE CHEAPEST, at the owner's instruction — for images and for video alike.
+       *
+       * The configured model is Pro, 13.4c a render, and this panel arms the composer the
+       * moment it loads: the default was spending the most on the press most likely to be a
+       * first attempt. A draft is the right first render, and moving up is one select away
+       * with the price on the pill the whole time.
+       *
+       * Chosen by PRICE, never by position. The catalogue is ordered best-first and gains
+       * rows, so `[length - 1]` would silently follow whatever was added last.
+       */
+      const cheapImg = i.models.reduce<{ id: string; size: string; usd: number } | null>((best, m) => {
+        for (const sz of m.sizes) {
+          const usd = m.usd[sz]
+          if (typeof usd !== "number") continue
+          if (!best || usd < best.usd) best = { id: m.id, size: sz, usd }
+        }
+        return best
+      }, null)
+      const imgId = cheapImg?.id || i.model
+      const imgSz = cheapImg?.size || i.models.find((m) => m.id === i.model)?.defaultSize || "1K"
+      setImgModel(imgId); setImgSize(imgSz)
 
       const v = allowVideo ? await getDeskVideoConfig().catch(() => null) : null
       if (v) {
         setVid(v)
-        setVidModel(v.model); setVidRes(v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
+        // Same rule for clips, priced per SECOND — the cheapest resolution on the cheapest model.
+        const cheapVid = v.models.reduce<{ id: string; res: string; usd: number } | null>((best, m) => {
+          for (const r of m.resolutions) {
+            const usd = m.usdPerSec[r]
+            if (typeof usd !== "number") continue
+            if (!best || usd < best.usd) best = { id: m.id, res: r, usd }
+          }
+          return best
+        }, null)
+        setVidModel(cheapVid?.id || v.model)
+        setVidRes(cheapVid?.res || v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
       }
-      const iM = i.models.find((m) => m.id === i.model)
+      const iM = i.models.find((m) => m.id === imgId)
       if (i.enabled && iM) {
         onArm({
-          mode: "image", model: i.model, ratio: "1:1", size: iM.defaultSize,
-          usd: iM.usd[iM.defaultSize] ?? 0, label: `Image · ${iM.defaultSize} · 1:1`, short: `${iM.defaultSize} · 1:1`,
+          mode: "image", model: imgId, ratio: "1:1", size: imgSz,
+          usd: iM.usd[imgSz] ?? 0, label: `Image · ${imgSz} · 1:1`, short: `${imgSz} · 1:1`,
         })
       }
     } catch (e) {

@@ -55,6 +55,55 @@ const PRESETS: { key: string; label: string; text: string }[] = [
 const unit = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`
 const money = (n: number) => `$${n.toFixed(2)}`
 
+/**
+ * ONE REFERENCE TILE, at either size.
+ *
+ * Two jobs, two controls, as SIBLINGS: the picture selects which one is shown big, the
+ * corner tick decides whether the render sees it at all. A button inside a button is invalid
+ * and the inner one never receives the click.
+ *
+ * `big` is the pre-render grid size; the strip size is the default. One component for both so
+ * the tiles keep their identity across the layout change and the browser can tween them,
+ * rather than unmounting one tree and mounting another.
+ *
+ * Module scope, not nested in the dialog: a component defined during render is a new type
+ * every pass, so React remounts every tile on each keystroke (react-hooks/static-components).
+ */
+function RefTile({ src, i, big = false, picked, current, onShow, onToggle }: {
+  src: string; i: number; big?: boolean; picked: boolean; current: boolean
+  onShow: () => void; onToggle: () => void
+}) {
+  return (
+    <div className={"relative transition-[width,height] duration-500 ease-out motion-reduce:transition-none " + (big ? "aspect-square w-full" : "size-14")}>
+      <button
+        type="button"
+        onClick={onShow}
+        aria-label={`Show reference photo ${i + 1}`}
+        aria-current={current}
+        className={"size-full overflow-hidden rounded-md border outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/60 " +
+          (current && !big ? "border-primary ring-1 ring-primary" : "border-border") +
+          (picked ? "" : " opacity-35")}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" className="size-full object-cover" />
+      </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={picked}
+        aria-label={picked ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
+        title={picked ? "Using this one — click to drop it" : "Not used — click to add it"}
+        /* Same two states as the grid on the publish page: one ring, filled or not. */
+        className={"absolute -right-1 -top-1 grid place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
+          (big ? "size-5" : "size-4") + " " +
+          (picked ? "border-white bg-white text-slate-900" : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
+      >
+        <Check size={big ? 11 : 9} weight="bold" />
+      </button>
+    </div>
+  )
+}
+
 export function ListingPhotoStudio({
   open, onOpenChange, references, picked, onPickedChange, focusIndex,
   onUse, product, method, colors, listingTitle,
@@ -107,6 +156,9 @@ export function ListingPhotoStudio({
   const [heroGen, setHeroGen] = useState(0)
 
   const pickedSet = new Set(picked)
+  /** Is there a right-hand side yet? A render, or one on its way — the spinner needs the pane
+   *  open, or the panel would jump sideways the instant the picture arrived. */
+  const showOurs = cands.length > 0 || busy
   const spec = cfg?.models.find((m) => m.id === model) || null
   // A size one variant offers may not exist on another (Lite has no 4K), so switching models
   // can strand an impossible pick — fall through the variant's own default.
@@ -131,8 +183,28 @@ export function ListingPhotoStudio({
     try {
       const c = await getDeskImageConfig()
       setCfg(c)
-      setModel(c.model)
-      setSize(c.models.find((m) => m.id === c.model)?.defaultSize || "1K")
+      /*
+       * THE CHEAPEST OPTION IS THE DEFAULT, at the owner's instruction.
+       *
+       * The configured model is what the chat generator opens on, and it is Pro — 13.4c a
+       * render. A default that spends is the wrong way round for a panel you press while
+       * still deciding what you want: the first press should be a draft, and moving up to Pro
+       * should be a deliberate choice made once the prompt is right.
+       *
+       * Cheapest by the PRICE LIST, not by position — the catalogue is ordered best-first and
+       * gains rows over time, so reading `[length - 1]` would silently pick whatever landed
+       * last. Falls back to the configured model when nothing carries a price.
+       */
+      const cheapest = c.models.reduce<{ id: string; size: string; usd: number } | null>((best, m) => {
+        for (const sz of m.sizes) {
+          const usd = m.usd[sz]
+          if (typeof usd !== "number") continue
+          if (!best || usd < best.usd) best = { id: m.id, size: sz, usd }
+        }
+        return best
+      }, null)
+      setModel(cheapest?.id || c.model)
+      setSize(cheapest?.size || c.models.find((m) => m.id === c.model)?.defaultSize || "1K")
     } catch (e) {
       // Keep the REAL reason. "Couldn't load" alone sends the reader looking in the wrong place.
       setCfgErr(e instanceof Error ? e.message : "Couldn't load the generation settings.")
@@ -186,6 +258,8 @@ export function ListingPhotoStudio({
     const t = setTimeout(() => {
       setHeroRef(focusIndex)
       if (!cfg) loadCfg()
+      // Only when something is actually ticked. Nothing is, by default — the grid opens for
+      // you to choose from, and a read of an empty set would be a call with no input.
       if (picked.length) runRead(picked)
     }, 0)
     return () => clearTimeout(t)
@@ -249,67 +323,75 @@ export function ListingPhotoStudio({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92dvh] w-auto max-w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,74rem)]">
+        {/* The subtitle describes the layout ACTUALLY on screen. Before a render there is no
+            right-hand side, so promising one was describing a pane that wasn't there. */}
         <DialogTitle className="border-b border-border px-4 py-3 text-sm font-semibold">
           Make our own photo
           <span className="ml-2 font-normal text-muted-foreground">
-            theirs on the left, ours on the right — nothing joins the listing until you press Use
+            {showOurs
+              ? "theirs on the left, ours on the right — nothing joins the listing until you press Use"
+              : "pick which of their photos to work from, write the prompt, then generate"}
           </span>
         </DialogTitle>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* ── THE COMPARISON. Two panes of equal weight, because the whole task is holding
-                one against the other. Stacks below `lg`, where side-by-side would make each
-                half too narrow to be worth having. ── */}
-          <div className="grid gap-4 p-4 lg:grid-cols-2">
+          {/* ── ONE PANE, THEN TWO.
+                Before anything is rendered there is nothing to compare against, and a big
+                empty box captioned "nothing here yet" is the worst half of a split screen —
+                it takes the same space as the picture it isn't showing. So the references get
+                the full width as a grid, and the right half opens only when there is
+                something to put in it.
+
+                The transition is a grid-track animation, which needs BOTH states to have the
+                same number of tracks — 1fr 0fr → 1fr 1fr interpolates; 1fr → 1fr 1fr does
+                not. The collapsed pane keeps min-w-0 and overflow-hidden so its contents fold
+                away rather than forcing the track open. Off under prefers-reduced-motion,
+                where the layout simply changes. ── */}
+          <div className={"grid gap-4 p-4 transition-[grid-template-columns,gap] duration-500 ease-out motion-reduce:transition-none " +
+            (showOurs ? "lg:grid-cols-[1fr_1fr]" : "gap-0 lg:grid-cols-[1fr_0fr]")}>
             {/* THEIRS */}
             <section className="min-w-0 space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="eg-label text-muted-foreground">Theirs</h3>
                 <span className="text-2xs text-muted-foreground">{picked.length} of {references.length} used as reference</span>
               </div>
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30">
-                {references[heroRef] ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={references[heroRef]} alt="" className="size-full object-contain" />
-                ) : <span className="text-xs text-muted-foreground">No reference photo</span>}
-              </div>
-              {references.length > 1 && (
-                /* Click a thumb to bring it up; the tick decides whether the render sees it.
-                   Two jobs, two controls — as siblings, because a button inside a button is
-                   invalid and the inner one never gets the click. */
-                <div className="flex flex-wrap gap-1.5">
+              {/* BEFORE: the whole set, as a grid across the full width — that is what there
+                  is to look at, so it gets the room. AFTER: one big one with the rest as
+                  thumbs, because now the thing worth the space is the comparison.
+
+                  The tiles animate their own size rather than being two different trees, so
+                  the pictures glide from grid to strip instead of blinking between layouts. */}
+              {!showOurs ? (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
                   {references.map((src, i) => (
-                    <div key={i} className="relative size-14">
-                      <button
-                        type="button"
-                        onClick={() => setHeroRef(i)}
-                        aria-label={`Show reference photo ${i + 1}`}
-                        aria-current={heroRef === i}
-                        className={"size-full overflow-hidden rounded-md border outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/60 " +
-                          (heroRef === i ? "border-primary ring-1 ring-primary" : "border-border") +
-                          (pickedSet.has(i) ? "" : " opacity-35")}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="size-full object-cover" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleRef(i)}
-                        aria-pressed={pickedSet.has(i)}
-                        aria-label={pickedSet.has(i) ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
-                        className={"absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border text-[9px] outline-none focus-visible:ring-2 focus-visible:ring-ring/60 " +
-                          (pickedSet.has(i) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-transparent")}
-                      >
-                        <Check size={9} weight="bold" />
-                      </button>
-                    </div>
+                    <RefTile key={i} src={src} i={i} big picked={pickedSet.has(i)} current={heroRef === i}
+                      onShow={() => setHeroRef(i)} onToggle={() => toggleRef(i)} />
                   ))}
                 </div>
+              ) : (
+                <>
+                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30">
+                    {references[heroRef] ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={references[heroRef]} alt="" className="size-full object-contain" />
+                    ) : <span className="text-xs text-muted-foreground">No reference photo</span>}
+                  </div>
+                  {references.length > 1 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {references.map((src, i) => (
+                        <RefTile key={i} src={src} i={i} picked={pickedSet.has(i)} current={heroRef === i}
+                          onShow={() => setHeroRef(i)} onToggle={() => toggleRef(i)} />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
-            {/* OURS */}
-            <section className="min-w-0 space-y-2">
+            {/* OURS — overflow-hidden is load-bearing, not tidiness. A 0fr track does not clip
+                on its own, so the heading leaked past the collapsed edge and rendered as "OU"
+                beside the reference grid. */}
+            <section className="min-w-0 space-y-2 overflow-hidden">
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="eg-label text-muted-foreground">Ours</h3>
                 {hero && <span className="text-2xs tabular-nums text-muted-foreground">{hero.size} · {hero.aspectRatio}</span>}
@@ -421,10 +503,10 @@ export function ListingPhotoStudio({
                     size="sm" variant="outline"
                     className="absolute bottom-2 left-2 h-7 bg-background text-xs"
                     onClick={() => runRead(picked)} disabled={reading || !picked.length}
-                    title={picked.length ? "Read the ticked reference photos and write the prompt" : "Tick a reference photo first"}
+                    title={picked.length ? "Read the ticked reference photos and write the prompt" : "Tick a reference photo above first"}
                   >
                     {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
-                    {reading ? "Reading…" : prompt ? "Regenerate" : "Generate prompt"}
+                    {reading ? "Reading…" : !picked.length ? "Pick a photo above" : prompt ? "Regenerate" : "Generate prompt"}
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

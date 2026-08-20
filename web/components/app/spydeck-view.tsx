@@ -713,6 +713,9 @@ export function SpyDeckView() {
 
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<EtsyListing[] | null>(null)
+  /** How many listings Etsy says match the query — NOT how many we fetched. Null outside a
+   *  search, where the list on screen genuinely is everything there is. */
+  const [total, setTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   // Separate from `loading`: the grid already has results on screen while this is true,
   // so it must read as "more coming" and never as "still searching" — a spinner over a
@@ -1124,6 +1127,15 @@ export function SpyDeckView() {
        */
       const first = await searchEtsy(q, { ...shape, pages: 1 })
       const firstRows = first.results ?? []
+      /*
+       * HOW MANY ETSY MATCHED, which is not how many we hold.
+       *
+       * The response has carried Etsy's total all along and the grid threw it away, so the
+       * Results card counted the rows in memory — 400, every single time, because 400 is
+       * our own fetch ceiling (one page of 100 plus three more). A stat that reports the
+       * cap instead of the market is worse than no stat: it looks like an answer.
+       */
+      setTotal(typeof first.count === "number" ? first.count : null)
       setResults(firstRows)
       setSearched(q)
       setLoading(false)
@@ -1151,7 +1163,7 @@ export function SpyDeckView() {
       if (e instanceof ApiError && e.status === 401) setError("Sign in to research Etsy listings.")
       else if (e instanceof ApiError && e.status === 500) setError("Etsy isn't configured on the server yet.")
       else setError(e instanceof Error ? e.message : "Search failed.")
-      setResults([])
+      setResults([]); setTotal(null)
     } finally {
       setLoading(false)
     }
@@ -1218,18 +1230,26 @@ export function SpyDeckView() {
       : view === "uploaded" ? uploaded
         : view === "trending" || results === null ? trendingList
           : resultsList) ?? []
+    // In a search the headline is Etsy's match count; everywhere else the list IS everything,
+    // so the two are the same number and the sub-line below has nothing to add.
+    const searchView = view === "search" && results !== null
+    const matched = searchView && total != null ? total : list.length
     const prices = list.map((l) => l.price).filter((p): p is number => p != null && p > 0).sort((a, b) => a - b)
     const median = prices.length ? prices[Math.floor((prices.length - 1) / 2)] : 0
     const views = list.map((l) => l.views).filter((v): v is number => v != null)
     const shops = new Set(list.map((l) => l.shop_name).filter(Boolean))
     return {
       ready: list.length > 0,
-      count: list.length,
+      count: matched,
+      /** What the median, the keyword cloud and the shop count are actually computed over.
+       *  Shown whenever it differs from the headline, because a median across 400 rows under
+       *  a heading that says 12,000 is a claim about the wrong population. */
+      analysed: matched !== list.length ? list.length : 0,
       median,
       shops: shops.size,
       topViews: views.length ? Math.max(...views) : 0,
     }
-  }, [view, results, trendingList, resultsList, saved, uploaded])
+  }, [view, results, trendingList, resultsList, saved, uploaded, total])
 
   // Cloud: aggregate the actual tags across search results (real niche keywords);
   // before any search, fall back to the curated trending niches.
@@ -1252,7 +1272,19 @@ export function SpyDeckView() {
   return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="Results" value={stats.ready ? String(stats.count) : "—"} sub={searched ? `for "${searched}"` : view === "trending" ? "trending today" : "run a search"} />
+        {/* The number Etsy matched, grouped so a five-figure market reads at a glance —
+            "12483" and "1248" look alike in a big face, and telling them apart is the
+            entire job of this card. The sub-line says what the stats beside it were
+            actually computed over whenever that is a smaller set. */}
+        {/* The number Etsy MATCHED, grouped so a five-figure market reads at a glance —
+            "12483" and "1248" look alike in a big face, and telling those apart is the whole
+            job of this card. It counted rows in memory before, which was 400 for every query
+            ever run, because 400 is our own fetch ceiling. A stat that reports the cap rather
+            than the market is worse than no stat: it looks like an answer.
+
+            No caveat rides here — StatCard drops `sub` deliberately, app-wide. The sample the
+            other three cards are computed over is named once, on the keyword card below. */}
+        <StatCard label="Results" value={stats.ready ? stats.count.toLocaleString("en-US") : "—"} />
         <StatCard label="Median price" value={stats.ready ? money(stats.median) : "—"} sub="typical listing" />
         <StatCard label="Shops" value={stats.ready ? String(stats.shops) : "—"} sub="unique sellers" />
         <StatCard label="Most viewed" value={stats.ready && stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
@@ -1261,6 +1293,14 @@ export function SpyDeckView() {
       {view === "search" && (
         <SectionCard
           title={cloud.live ? "Keywords in these results" : "Trending keywords & niches"}
+          /* WHICH RESULTS, exactly. The Results card now says how many listings Etsy matched
+             — often thousands — while the keywords, the median, the shop count and the top
+             view count are all computed over the few hundred we actually fetch. Said once,
+             here, rather than four times across the stat row: a median under a heading
+             reading 12,483 is otherwise a claim about the wrong population. */
+          description={cloud.live && stats.analysed
+            ? `From the top ${stats.analysed.toLocaleString("en-US")}${searched ? ` for "${searched}"` : ""} by relevance — the same sample behind the price, shop and view stats above.`
+            : undefined}
         >
           <KeywordCloud words={cloud.words} onPick={(t) => run(t)} />
         </SectionCard>
