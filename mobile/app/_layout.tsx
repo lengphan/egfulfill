@@ -1,6 +1,7 @@
 import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { SafeAreaProvider } from "react-native-safe-area-context"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useFonts } from "expo-font"
 import * as SplashScreen from "expo-splash-screen"
 import { useEffect } from "react"
@@ -38,11 +39,17 @@ export default function RootLayout() {
   if (!ready) return null
 
   return (
+    /* GESTURE ROOT, OUTERMOST. react-native-gesture-handler's detectors only receive touches
+       inside this view, and a missing root fails SILENTLY — the gestures simply never fire,
+       which looks like a bug in the screen rather than a missing provider. It wraps
+       everything so any screen can use one without remembering to add it. */
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <StatusBar style="dark" />
       {/* Native stack: real platform transitions and the iOS edge-swipe back, which is the
           single biggest thing a web view cannot give you. */}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }
