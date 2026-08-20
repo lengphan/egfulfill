@@ -461,7 +461,12 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr>
-                    <th className="py-2.5 whitespace-nowrap pl-3 pr-1">
+                    {/* A DECLARED WIDTH, not an intrinsic one. The stock panel below has to
+                        start its first column exactly under the product photo while its rules
+                        run the full width of the row — and it can only do both if it knows how
+                        wide this column is. 3.5rem = pl-3 + the checkbox + the gap + the caret
+                        + pr-1. Changing any of those means changing GUTTER below. */}
+                    <th className="w-14 py-2.5 whitespace-nowrap pl-3 pr-1">
                       <input
                         type="checkbox"
                         aria-label="Select all on this page"
@@ -1016,16 +1021,16 @@ function ProductGroup({
           place is named underneath, as before. */}
       {open && (
         <tr className="border-t border-border">
-          {/* THE PANEL STARTS WHERE THE PICTURE DOES.
-              It was one cell spanning all seven columns with its own px-4, so the grid began
-              at the checkbox's margin and every colour name sat to the LEFT of the product
-              photo it belongs to — a second left edge, a few pixels off the first, which is
-              what "nothing lines up" is made of.
-              Leaving the checkbox column as its own empty cell hands the alignment to the
-              browser: the panel's content edge IS the Item column's edge, whatever width the
-              checkbox and caret happen to take, and the tinted band still runs the full row. */}
-          <td className="bg-muted/20 p-0" />
-          <td colSpan={6} className="bg-muted/20 px-4 py-3">
+          {/* THE RULES RUN THE WHOLE BOX; THE CONTENT STARTS UNDER THE PICTURE.
+              Two requirements that fight, and the fix is to stop leaving either to chance.
+              Leaving the checkbox column as its own empty cell aligned the content perfectly
+              and started every separator two columns in, so each rule stopped short of the
+              panel it was dividing — a line that begins in mid-air reads as a rendering
+              fault. Padding the cell instead put the colour names left of the photo.
+              So the panel spans every column with NO padding of its own (the rules reach both
+              edges) and the first column carries GUTTER, which is the checkbox column's
+              declared width plus the Item cell's own inset. */}
+          <td colSpan={7} className="bg-muted/20 py-3">
             <StockMatrix
               group={group}
               edit={(sku, _f, v) => edit(sku, "in_stock", v)}
@@ -1099,18 +1104,19 @@ function PlainStock({ rows, edit, lowAt }: {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-muted-foreground">
-            <th className="w-px whitespace-nowrap px-2 py-1 text-left font-medium">Variant</th>
-            <th className="min-w-14 px-2 py-1 text-center font-medium">Stock</th>
+            <th className={`${LABEL_W} ${GUTTER} whitespace-nowrap py-1 pe-2 text-left font-medium`}>Variant</th>
+            <th className={`${SIZE_W} px-1 py-1 text-center font-medium`}>Stock</th>
+            <th className="w-auto pe-4" />
           </tr>
         </thead>
         <tbody>
           {rows.map((it) => (
             <tr key={it.sku} className="border-t border-border">
-              <td className="w-px whitespace-nowrap px-2 py-1 font-medium">
+              <td className={`${LABEL_W} ${GUTTER} truncate whitespace-nowrap py-1 pe-2 font-medium`}>
                 <span className="tabular-nums">{it.sku}</span>
                 {it.variant && <span className="ms-2 font-normal text-muted-foreground">{it.variant}</span>}
               </td>
-              <td className="px-1 py-1 text-center">
+              <td className={`${SIZE_W} px-1 py-1 text-center`}>
                 <Input
                   value={String(Number(it.in_stock) || 0)}
                   onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
@@ -1120,6 +1126,7 @@ function PlainStock({ rows, edit, lowAt }: {
                   className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
                 />
               </td>
+              <td className="w-auto pe-4" />
             </tr>
           ))}
         </tbody>
@@ -1127,6 +1134,28 @@ function PlainStock({ rows, edit, lowAt }: {
     </div>
   )
 }
+
+/**
+ * WHERE THE PANEL'S FIRST COLUMN STARTS — the checkbox column's declared width (w-14) plus
+ * the Item cell's own px-4. It puts a colour name exactly under the product photo while the
+ * panel itself spans the row, so its separators reach both edges. Mirrors the `w-14` on the
+ * header's checkbox cell; change both together.
+ */
+const GUTTER = "ps-[4.5rem]"
+/**
+ * EVERY SIZE COLUMN IS THE SAME WIDTH, on every product.
+ *
+ * The columns used to divide whatever space was left, so a product with one size put its
+ * only box in the middle of the row while the product under it put S at a quarter of the
+ * way across — the same reading, at two different x. And because the colour column shrank
+ * to its longest name, "Dark Grey Heather" pushed S further right than "Black" did on the
+ * next product down.
+ *
+ * Fixed widths for both, and a trailing spacer to absorb the rest: One size now lands
+ * exactly where S lands, and S lands in the same place on every product on the page.
+ */
+const LABEL_W = "w-[13rem]"
+const SIZE_W = "w-[4.5rem]"
 
 function StockMatrix({ group, edit, lowAt }: {
   group: { product: CatalogProduct | null; rows: InventoryItem[] }
@@ -1255,29 +1284,35 @@ function StockMatrix({ group, edit, lowAt }: {
               {/* "Colour" only when there IS one. A product whose skus carry sizes and no
                   colour was heading its own name column "Colour" and printing a size under
                   it. */}
-              <th className="w-px whitespace-nowrap px-2 py-1 text-left font-medium">{hasColorAxis ? "Colour" : "Variant"}</th>
+              <th className={`${LABEL_W} ${GUTTER} whitespace-nowrap py-1 pe-2 text-left font-medium`}>
+                {hasColorAxis ? "Colour" : "Variant"}
+              </th>
               {sizeCols.map((z) => (
-                <th key={z || "one"} className="min-w-14 px-2 py-1 text-center font-medium">{sizeHeader(z)}</th>
+                <th key={z || "one"} className={`${SIZE_W} px-1 py-1 text-center font-medium`}>{sizeHeader(z)}</th>
               ))}
+              {/* The spacer takes the slack, so the real columns keep their width instead of
+                  stretching to fill a wide screen. */}
+              <th className="w-auto pe-4" />
             </tr>
           </thead>
           <tbody>
             {colorRows.map((c) => (
               <tr key={c || "one"} className="border-t border-border">
-                {/* The label column takes only what the longest name needs; the width freed
-                    goes to the numbers, which are what the row is for. */}
-                <td className="w-px whitespace-nowrap px-2 py-1 font-medium">
+                <td className={`${LABEL_W} ${GUTTER} truncate whitespace-nowrap py-1 pe-2 font-medium`}>
                   {c ? prettyColorName(c) : (p.name || group.rows[0]?.name || "Stock")}
                 </td>
                 {sizeCols.map((z) => (
-                  <td key={(c || "one") + (z || "one")} className="px-1 py-1 text-center">{cell(at(z, c), c + z)}</td>
+                  <td key={(c || "one") + (z || "one")} className={`${SIZE_W} px-1 py-1 text-center`}>{cell(at(z, c), c + z)}</td>
                 ))}
+                <td className="w-auto pe-4" />
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {leftover.length > 0 && <LeftoverNote rows={leftover} />}
+      {/* Under the table's own first column, not the panel's edge — it is a footnote to the
+          grid, and a footnote that starts somewhere the grid never does reads as a stray. */}
+      {leftover.length > 0 && <div className={`${GUTTER} pe-4`}><LeftoverNote rows={leftover} /></div>}
     </div>
   )
 }
