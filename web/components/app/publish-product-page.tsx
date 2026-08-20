@@ -372,7 +372,29 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
    * text-sm, not text-xs, and a bigger mark: this is the LAST thing the dialog says — the
    * confirmation you read before closing it — and it was set smaller than the form fields
    * above it.
+   *
+   * THE OUTCOME DOES NOT SHARE THE TRUNCATING LINE.
+   *
+   * It used to sit inline after the platform, inside the one cell that clips — so in a 22rem
+   * rail every row lost its ending at once: "CustomBabeUSA · Etsy · Dr…", "OLVERA-TEES ·
+   * TikTok Shop · Inv…". For a refusal that was total, because the actionable half of an API
+   * error is always at the END of the sentence, and the title tooltip carried the shop name
+   * rather than the message. A shop that refused was readable only in the network panel.
+   *
+   * Truncating the successes was quieter and still wrong: "Listed live" and "Draft product
+   * created" are opposite facts that both clip to "Dr…"/"Li…", and which one happened is the
+   * whole question after a publish.
+   *
+   * So the words go on their own line under the name, free to wrap. The row above stays a
+   * scannable three columns — mark, shop, link — and nothing on it can be cut.
    */
+  const failed = outcome.state === "fail"
+  const detail = [outcome.text, outcome.note].filter(Boolean).join(" ")
+  // A green tick already carries "this went well"; green words under it say it twice. Only
+  // the two states that need attention are coloured.
+  const detailCls = failed ? "text-destructive"
+    : outcome.state === "dry" ? "text-amber-700 dark:text-amber-400"
+    : "text-muted-foreground"
   return (
     <div className="grid grid-cols-[1.1rem_minmax(0,1fr)_auto] items-baseline gap-x-3 py-2 text-sm">
       <span className="flex translate-y-px items-center justify-center">
@@ -383,10 +405,6 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
       <span className="min-w-0 truncate" title={[dest.shop_name, dest.platform_label].filter(Boolean).join(" · ")}>
         <span className="font-medium">{dest.shop_name}</span>
         <span className="text-muted-foreground"> · {dest.platform_label}</span>
-        {/* Its own outcome only when it is not the one on the line above the list. */}
-        {!sameForAll && (
-          <span className={mark ? mark.cls : "text-muted-foreground"}> · {outcome.text}{outcome.note ? ` ${outcome.note}` : ""}</span>
-        )}
       </span>
       {/* Last column, so every link starts at the same x — a column of "View" is scannable
           in a way one trailing each sentence is not. Reserved even when a shop has no link,
@@ -396,6 +414,17 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
           ? <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">View →</a>
           : <span className="text-muted-foreground/50">—</span>}
       </span>
+
+      {/* WHAT HAPPENED, IN FULL. Starts under the shop name and runs to the end of the row.
+          `break-words` because a refusal often carries an id, a scope name or a URL with no
+          space in it, and an unbreakable token would push the rail sideways instead of
+          wrapping. Suppressed by `sameForAll`, which is the done screen saying it once above
+          the list rather than three times inside it. */}
+      {!sameForAll && detail && (
+        <p className={"col-start-2 col-end-4 mt-0.5 whitespace-pre-wrap break-words text-xs leading-snug " + detailCls}>
+          {detail}
+        </p>
+      )}
     </div>
   )
 }
@@ -1877,17 +1906,22 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   )}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {/* One sentence about what publishing does, plus only the caveats that apply
-                    to the shops actually ticked. The Shopify one is worth its length:
-                    write_products was added to the OAuth scopes after most shops connected,
-                    and scopes are fixed at grant time, so a store connected before that
-                    refuses every publish however correct the payload is. */}
-                Creates a DRAFT in each shop for you to review, then list.
-                {pickedDests.some((d) => d.platform === "etsy") && " Etsy reuses an existing listing’s category & shipping profile."}
-                {pickedDests.some((d) => d.platform === "shopify") && " A Shopify store connected before publishing was supported must be reconnected first — Shopify grants the permission at connect time, not per request."}
-                {pickedDests.some((d) => d.dry_run) && " One shop is in dry-run mode: it will be validated and nothing will be sent."}
-              </p>
+              {/* THE STANDING PARAGRAPH IS GONE.
+                  Four sentences of documentation sat under the button on every visit, and
+                  three of them described conditions that were not happening — Etsy's profile
+                  reuse and Shopify's connect-time scopes are facts you need WHEN a publish
+                  refuses for that reason, and the refusal now says so on its own line in the
+                  results list above. The button already says what it will do. Permanent prose
+                  explaining a control is what you write instead of a control that explains
+                  itself, and it was pushing the results off the bottom of the rail.
+
+                  The dry-run note stays, because it is the one line that is true BEFORE the
+                  press and changes what the press means. */}
+              {pickedDests.some((d) => d.dry_run) && (
+                <p className="text-xs text-muted-foreground">
+                  One shop is in dry-run mode: it will be validated and nothing will be sent.
+                </p>
+              )}
               </SectionCard>
             </aside>
           </div>
