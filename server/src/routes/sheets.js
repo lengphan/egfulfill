@@ -369,9 +369,21 @@ export function buildTemplate(title, lists = null) {
       // A dependent column points at the chosen product's own list; everything else keeps
       // its fixed one. Both are skipped when there is no catalogue to build lists from,
       // rather than offering a dropdown that would resolve to nothing.
+      /**
+       * NO DOLLAR ON THE PRODUCT CELL, and this is the whole of why it did not work.
+       *
+       * A validation formula is read relative to the TOP-LEFT cell of the range it is set
+       * on, and shifts down with each row — but only for a RELATIVE reference. Sent as
+       * `$K3`, Google normalised it to `Orders!$K$3`: every row in the column then asked
+       * about row 3's product, row 3 is the empty first data row, MATCH returned #N/A, and
+       * all three dropdowns rendered as an empty list with a pencil on it.
+       *
+       * `K3` shifts. The column cannot drift — each rule is set on one column — so nothing
+       * is lost by making it relative in both axes.
+       */
       const depRule = c.dep && hasLists
         ? { condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue:
-              `=INDIRECT("${AXES.find(([a]) => a === c.dep)[1]}_" & MATCH($${colLetter(prodIdx)}3, Lists!$A$2:$A, 0))` }] } }
+              `=INDIRECT("${AXES.find(([a]) => a === c.dep)[1]}_" & MATCH(${colLetter(prodIdx)}3, Lists!$A$2:$A, 0))` }] } }
         : null;
       if (depRule) {
         out.push({ setDataValidation: {
