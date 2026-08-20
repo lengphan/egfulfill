@@ -75,14 +75,27 @@ const T_COLUMNS = [
   { h: 'Ship Email', g: 'ship', duty: '', sample: 'jane@example.com' },
   { h: 'Product Title', g: 'product', duty: 'req', sample: 'Custom Embroidered Tee with Name' },
   { h: 'Listing SKU', g: 'product', duty: '', sample: 'TEE-EMB-NAME-01' },
-  { h: 'Blank SKU', g: 'product', duty: '', sample: 'G5000' },
+  /**
+   * THE BLANK, BY NAME — and the three columns after it narrow to whatever it offers.
+   *
+   * This was 'Blank SKU', a code typed from memory against a frozen example ('G5000'), and
+   * it is gone: once a product, a colour and a size are chosen the sku is DERIVED, which is
+   * what the app itself does (variantSku). Asking a person to hand-type the one field the
+   * system can compute is how a row ends up pointing at a blank we do not stock.
+   *
+   * Old sheets keep working — the importer still reads a 'Blank SKU' column when one is
+   * there, see COL_ALIASES in web/lib/order-import.ts.
+   */
+  { h: 'Blank Product', g: 'product', duty: '', sample: 'Gildan 5000 Heavy Cotton Tee', opts: 'products' },
   // Renamed to match the import dialog. The importer aliases the old spelling, so a sheet
   // downloaded before this keeps working — see COL_ALIASES in web/lib/order-import.ts.
   { h: 'Template/Design ID', g: 'product', duty: '', sample: 'TPL-12' },
   { h: 'Item Quantity', g: 'product', duty: '', sample: '1' },
-  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods' },
-  { h: 'Item Color', g: 'product', duty: '', sample: 'White' },
-  { h: 'Item Size', g: 'product', duty: '', sample: 'L', opts: 'sizes' },
+  // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
+  // fixed list. See LISTS below for how that is wired.
+  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods', dep: 'methods' },
+  { h: 'Item Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
+  { h: 'Item Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
   { h: 'Item Price', g: 'product', duty: '', sample: '24.00' },
   { h: 'Image Link/ID', g: 'product', duty: '', sample: '' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
@@ -138,6 +151,66 @@ function bands() {
   return out;
 }
 
+
+/**
+ * THE LISTS COME FROM THE CATALOGUE, NOT FROM THIS FILE.
+ *
+ * Every dropdown in this template used to be a literal typed here and hand-mirrored into
+ * web/lib/order-import.ts — so the sheet offered 4XL on a product that stops at 2XL, listed
+ * print methods nothing in the catalogue does, and never showed a blank added since the
+ * arrays were last edited. A template whose options don't match the system is worse than no
+ * template: it produces rows that look filled in correctly and import as nonsense.
+ *
+ * So it is read at build time. `data` is where a catalogue product keeps its variants —
+ * same shape web/lib/variant-sku.ts reads.
+ *
+ * Capped at 500 products: each one costs three columns and three named ranges on the hidden
+ * tab, and a sheet with thousands of named ranges is slow to open on the machines this is
+ * filled in on. If the catalogue outgrows that, the cap is the thing to revisit — not the
+ * silent truncation, which is why the count comes back.
+ */
+const LIST_CAP = 500;
+const VALUES_CAP = 200;
+const clean = (xs) => [...new Set((Array.isArray(xs) ? xs : [])
+  .map((v) => String(v == null ? '' : (typeof v === 'object' ? (v.name || v.value || v.size || v.color || '') : v)).trim())
+  .filter(Boolean))].slice(0, VALUES_CAP);
+
+export async function catalogLists() {
+  let rows = [];
+  try {
+    rows = (await q(`select sku, data from catalog_products order by lower(coalesce(data->>'name','')) limit ${LIST_CAP + 1}`)).rows;
+  } catch (e) { return null; }               // no catalogue table → the caller keeps the static lists
+  const products = [];
+  for (const r of rows) {
+    const d = r.data && typeof r.data === 'object' ? r.data : {};
+    const name = String(d.name || r.sku || '').trim();
+    if (!name) continue;
+    // `methods` is a list on some products and a joined `method` string on others — read
+    // both or a product that has one loses half its options (CLAUDE.md §5).
+    const methods = clean([
+      ...(Array.isArray(d.methods) ? d.methods : []),
+      ...String(d.method || '').split(/[,/|]/),
+    ]);
+    products.push({
+      name,
+      sku: String(r.sku || '').trim(),
+      colors: clean(d.colors || d.colours),
+      sizes: clean(d.sizes),
+      methods,
+    });
+    if (products.length >= LIST_CAP) break;
+  }
+  if (!products.length) return null;
+  return { products, truncated: rows.length > LIST_CAP };
+}
+
+/** 0-based column index → A1 letter. */
+function colLetter(i) {
+  let n = i + 1, out = '';
+  while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); }
+  return out;
+}
+
 function cell(v, fmt) {
   return { userEnteredValue: { stringValue: String(v) }, ...(fmt ? { userEnteredFormat: fmt } : {}) };
 }
@@ -152,8 +225,26 @@ function cell(v, fmt) {
  *
  * `gid` is only known after the spreadsheet exists, so requests() takes it.
  */
-export function buildTemplate(title) {
+export function buildTemplate(title, lists = null) {
   const NCOL = T_COLUMNS.length;
+  /**
+   * THE HIDDEN TAB THAT MAKES THE DROPDOWNS TRUE.
+   *
+   * Column A is every product. Then three columns per product — its colours, its sizes, its
+   * print methods — each one a named range. A dependent dropdown is then just:
+   *
+   *     =INDIRECT("PC_" & MATCH($<blank product cell>, Lists!$A$2:$A, 0))
+   *
+   * MATCH gives the product's ROW, and the ranges are named by that number, so nothing has
+   * to slugify a product name into a valid range name and stay matched to it — the one part
+   * of this pattern that rots. An empty product cell makes MATCH #N/A, INDIRECT empty, and
+   * the dropdown simply offers nothing, which is the correct answer to "which colours does
+   * no product come in".
+   */
+  const prodIdx = T_COLUMNS.findIndex((c) => c.opts === 'products');
+  const P = lists && Array.isArray(lists.products) ? lists.products : [];
+  const hasLists = P.length > 0;
+  const AXES = [['colors', 'PC'], ['sizes', 'PS'], ['methods', 'PM']];
   const BANDS = bands();
   // Row 0 = merged band banner, row 1 = column headers, row 2 = the deletable sample.
   const bannerRow = { values: T_COLUMNS.map((c, i) => {
@@ -181,13 +272,33 @@ export function buildTemplate(title) {
     textFormat: { italic: true, foregroundColor: { red: 0.55, green: 0.55, blue: 0.55 } },
   })) };
 
-  const createBody = {
-    properties: { title },
-    sheets: [{
-      properties: { title: 'Orders', gridProperties: { frozenRowCount: 2, columnCount: Math.max(NCOL, 26), rowCount: 1000 } },
-      data: [{ startRow: 0, startColumn: 0, rowData: [bannerRow, headerRow, sampleRow] }],
-    }],
-  };
+  // The Lists grid, built column-first then transposed into rowData.
+  const listCols = [];
+  listCols.push(['Product', ...P.map((p) => p.name)]);
+  for (let i = 0; i < P.length; i++) {
+    for (const [axis] of AXES) listCols.push([P[i].name, ...(P[i][axis] || [])]);
+  }
+  const listRowCount = Math.max(2, ...listCols.map((c) => c.length));
+  const listRows = [];
+  for (let r = 0; r < listRowCount; r++) {
+    listRows.push({ values: listCols.map((c) => cell(c[r] == null ? '' : c[r])) });
+  }
+
+  const sheetsSpec = [{
+    properties: { sheetId: 0, title: 'Orders', gridProperties: { frozenRowCount: 2, columnCount: Math.max(NCOL, 26), rowCount: 1000 } },
+    data: [{ startRow: 0, startColumn: 0, rowData: [bannerRow, headerRow, sampleRow] }],
+  }];
+  if (hasLists) {
+    sheetsSpec.push({
+      properties: {
+        sheetId: 1, title: 'Lists', hidden: true,
+        gridProperties: { columnCount: Math.max(listCols.length, 4), rowCount: Math.max(listRowCount, 100) },
+      },
+      data: [{ startRow: 0, startColumn: 0, rowData: listRows }],
+    });
+  }
+
+  const createBody = { properties: { title }, sheets: sheetsSpec };
 
   const requests = (gid) => {
     const out = [];
@@ -202,7 +313,27 @@ export function buildTemplate(title) {
       } });
       // Dropdown over the data rows only (row 3 down) — never over the header rows, which
       // would flag our own header text as an invalid value.
-      if (c.opts && T_OPTS[c.opts]) {
+      // A dependent column points at the chosen product's own list; everything else keeps
+      // its fixed one. Both are skipped when there is no catalogue to build lists from,
+      // rather than offering a dropdown that would resolve to nothing.
+      const depRule = c.dep && hasLists
+        ? { condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue:
+              `=INDIRECT("${AXES.find(([a]) => a === c.dep)[1]}_" & MATCH($${colLetter(prodIdx)}3, Lists!$A$2:$A, 0))` }] } }
+        : null;
+      if (depRule) {
+        out.push({ setDataValidation: {
+          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
+          rule: { ...depRule, showCustomUi: true, strict: false },
+        } });
+      } else if (c.opts === 'products' && hasLists) {
+        out.push({ setDataValidation: {
+          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
+          rule: {
+            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$A$2:$A${listRowCount}` }] },
+            showCustomUi: true, strict: false,
+          },
+        } });
+      } else if (c.opts && T_OPTS[c.opts]) {
         out.push({ setDataValidation: {
           range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
           rule: {
@@ -216,10 +347,31 @@ export function buildTemplate(title) {
         } });
       }
     });
+    // One named range per axis per product, addressed by the product's ROW — see the note
+    // on the Lists tab above. Column 0 is the product list, so product i starts at 1 + i*3.
+    if (hasLists) {
+      for (let i = 0; i < P.length; i++) {
+        AXES.forEach(([axis, prefix], a) => {
+          const n = (P[i][axis] || []).length;
+          if (!n) return;                      // no values → no range → an empty dropdown
+          const col = 1 + i * 3 + a;
+          out.push({ addNamedRange: { namedRange: {
+            name: `${prefix}_${i + 1}`,
+            range: { sheetId: 1, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: col, endColumnIndex: col + 1 },
+          } } });
+        });
+      }
+    }
     return out;
   };
 
-  return { createBody, requests, columns: T_COLUMNS.map((c) => c.h), duties: T_COLUMNS.map((c) => c.duty), bands: BANDS };
+  return {
+    createBody, requests,
+    columns: T_COLUMNS.map((c) => c.h), duties: T_COLUMNS.map((c) => c.duty), bands: BANDS,
+    // Surfaced so "how many products did this sheet actually get" is answerable without
+    // opening the hidden tab — and so a truncated catalogue is never silent.
+    products: P.length, truncated: !!(lists && lists.truncated),
+  };
 }
 
 // Pull a spreadsheet ID out of a full URL or accept a bare ID.
@@ -415,7 +567,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     const first = ((meta.sheets || [])[0] || {}).properties || {};
     const gid = first.sheetId || 0;
 
-    const tpl = buildTemplate('');
+    const tpl = buildTemplate('', await catalogLists());
     const rowData = tpl.createBody.sheets[0].data[0].rowData;
     const body = { requests: [
       // Header rows rewritten as well as formatted, so an existing master picks up a column
@@ -470,7 +622,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // column order, band merges, dropdown ranges — instead of discovering a bad range as a
   // 400 from Google with a half-built sheet already in someone's Drive.
   app.get('/api/sheets/template-preview', { preHandler: requireAuth }, async () => {
-    const tpl = buildTemplate('EGFUL Orders — preview');
+    const tpl = buildTemplate('EGFUL Orders — preview', await catalogLists());
     const reqs = tpl.requests(0);
     const kind = (r) => Object.keys(r)[0];
     return {
@@ -517,7 +669,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     try { token = await getServiceToken(); }
     catch (e) { reply.code(e.message === 'no_service_account' ? 503 : 502); return { error: e.message === 'no_service_account' ? 'Auto-create is not configured (no service account).' : ('Service account auth failed: ' + e.message) }; }
     const who = (req.user && (req.user.name || req.user.email)) || 'Seller';
-    const tpl = buildTemplate('EGFUL Orders — ' + who);
+    const tpl = buildTemplate('EGFUL Orders — ' + who, await catalogLists());
     const cr = await fetch('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(tpl.createBody) });
     const cd = await cr.json().catch(() => ({}));
     if (!cr.ok || !cd.spreadsheetId) {

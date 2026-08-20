@@ -65,7 +65,19 @@ export const CSV_COLUMNS: CsvColumn[] = [
   // "Listing SKU" belongs to the SELLER's marketplace listing; "Blank SKU" is OUR catalog
   // product, and it is the one production and pricing key on.
   { header: "Listing SKU", key: "item_sku", required: false, section: "product", help: "The SELLER's own SKU on their marketplace listing. Records only — it does not decide what we make. Safe to leave blank." },
-  { header: "Blank SKU", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
+  /**
+   * THE BLANK, BY NAME — and the three columns after it narrow to what it offers.
+   *
+   * It was "Blank SKU": our catalog code, typed from memory against a frozen example. Once
+   * a product, a colour and a size are on the row the sku is DERIVED (variantSku), so
+   * asking a person to hand-type the one field the system can compute only ever produced
+   * rows pointing at blanks we don't stock.
+   *
+   * The KEY is unchanged (`blank`), so every parser, alias and downstream reader keeps
+   * working, and COL_ALIASES still accepts a "Blank SKU" header — a sheet downloaded before
+   * today imports exactly as it did.
+   */
+  { header: "Blank Product", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
   { header: "Template/Design ID", key: "template_id", required: false, section: "product", help: "A saved template — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   { header: "Item Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
@@ -212,7 +224,9 @@ const COL_ALIASES: Record<string, string[]> = {
   // The BLANK we produce on. Without it an imported line can't be costed (pricing matches
   // on the blank), can't be barcoded (the barcode is the stock code), and lands on the
   // board reading "not set up for production yet".
-  blank: ["blank", "blank_sku", "base_product", "base_sku", "catalog_sku", "product_blank"],
+  // "blank_product" is the header the template ships today; "blank_sku" is what it said
+  // before, and every sheet already downloaded still carries it. Both land on `blank`.
+  blank: ["blank", "blank_product", "blank_sku", "base_product", "base_sku", "catalog_sku", "product_blank"],
   // A saved template carries blank + artwork + placement + method in one reference, so a
   // row that names one needs almost nothing else — the remaining columns become overrides.
   template_id: ["template_id", "template", "tpl", "tpl_id", "design_template", "template_design_id", "design_template_id"],
