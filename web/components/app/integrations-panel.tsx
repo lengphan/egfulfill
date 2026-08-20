@@ -12,6 +12,85 @@ import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfi
 // secrets (saved to the DB and to process.env live). Whether a change takes effect
 // immediately depends on the route: those reading process.env at call time pick it up on
 // the next request; any still snapshotting it into a module-level const need a restart.
+/**
+ * A setting that is NOT a secret renders as what it is.
+ *
+ * Every row here went through one masked-password control, which made the USPS switch
+ * unreadable: choosing the live host meant typing a URL you could not see into a field of
+ * dots, and turning "buy direct" on left a row reading `••••••1`. A yes/no is a checkbox, a
+ * fixed pair of hosts is a choice, and an identifier is a plain field you can read back.
+ */
+function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [draft, setDraft] = useState(s.value ?? "")
+  const [editing, setEditing] = useState(false)
+  const commit = async (v: string) => {
+    setBusy(true)
+    try { await setAdminSecret(s.name, v); setEditing(false); onSaved() } catch {} finally { setBusy(false) }
+  }
+
+  if (s.kind === "toggle") {
+    const on = !!s.value && s.value !== "0" && s.value.toLowerCase() !== "false"
+    return (
+      <label className="flex items-center justify-between gap-3 py-0.5 text-sm">
+        <span className="text-muted-foreground">{s.label}</span>
+        <span className="flex items-center gap-2">
+          {busy && <CircleNotch size={12} className="animate-spin text-muted-foreground" />}
+          <input
+            type="checkbox" checked={on} disabled={busy || !s.editable}
+            onChange={(e) => commit(e.target.checked ? "1" : "")}
+            className="size-4 shrink-0 accent-primary"
+          />
+        </span>
+      </label>
+    )
+  }
+
+  if (s.kind === "choice") {
+    return (
+      <div className="space-y-1.5 py-0.5">
+        <span className="text-sm text-muted-foreground">{s.label}</span>
+        <div className="flex flex-col gap-1">
+          {(s.options ?? []).map((o) => (
+            <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio" name={s.name} checked={s.value === o.value} disabled={busy || !s.editable}
+                onChange={() => commit(o.value)} className="size-3.5 shrink-0 accent-primary"
+              />
+              <span className={s.value === o.value ? "text-foreground" : "text-muted-foreground"}>{o.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Plain text — readable, because an identifier you cannot read is one you cannot check.
+  return (
+    <div className="flex items-center justify-between gap-2 py-0.5 text-sm">
+      <span className="shrink-0 text-muted-foreground">{s.label}</span>
+      {editing ? (
+        <span className="flex flex-1 items-center gap-1.5">
+          <Input value={draft} onChange={(e) => setDraft(e.target.value)} className="h-8 flex-1 text-sm" autoFocus />
+          <Button size="sm" className="h-7 px-2" disabled={busy} onClick={() => commit(draft.trim())}>
+            {busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => { setEditing(false); setDraft(s.value ?? "") }}><X size={12} /></Button>
+        </span>
+      ) : (
+        <span className="flex items-center gap-1.5">
+          <span className={s.value ? "text-foreground" : "text-muted-foreground"}>{s.value || "not set"}</span>
+          {s.editable && (
+            <button onClick={() => { setDraft(s.value ?? ""); setEditing(true) }} className="text-muted-foreground transition-colors hover:text-primary" aria-label={`Edit ${s.label}`}>
+              <PencilSimple size={12} />
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState("")
@@ -535,7 +614,9 @@ export function IntegrationsPanel() {
               {(secrets[active.key] ?? []).length > 0 ? (
                 <div className="space-y-1.5 border-t border-border pt-3">
                   {(secrets[active.key] ?? []).map((s) => (
-                    <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
+                    s.kind && s.kind !== "secret"
+                      ? <PlainSettingRow key={s.name} s={s} onSaved={reloadSecrets} />
+                      : <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
                   ))}
                 </div>
               ) : (

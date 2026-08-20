@@ -775,7 +775,10 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
             token: enc({ p: 'usps', mc: rt.mailClass }),
             provider: 'usps', carrier: 'USPS', service: rt.service,
             amount: Number(rt.price), currency: 'USD',
-            days: null, carrierAccount: ''
+            // USPS gives a SPAN as prose ("2-5 day specific delivery…"), never an integer,
+            // so `days` stays null and the readable span rides alongside it. Reusing `days`
+            // would have meant inventing a number USPS did not commit to.
+            days: null, eta: rt.eta || '', test: !!r.test, carrierAccount: ''
           })))
           .catch((e) => ({ _err: 'USPS: ' + e.message }))
       );

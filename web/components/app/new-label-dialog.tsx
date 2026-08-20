@@ -571,9 +571,22 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
                 {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> Getting rates…</> : rates ? "Refresh rates" : <><Truck size={14} weight="bold" /> Get rates</>}
               </Button>
+              {/* WHICH ENVIRONMENT BOUGHT THIS.
+                  USPS's TEM host returns a real-looking PDF with a real-looking tracking
+                  number that is NOT postage — a parcel sent with one does not move. The
+                  only difference visible anywhere is the host that answered, so it is said
+                  here, above the button that spends money, rather than left to be inferred. */}
+              {rates && rates.length > 0 && rates.some((r) => r.test) && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                  <span className="font-semibold">Test environment.</span> Buying here produces a
+                  sample label — it is not valid postage and nothing is charged. Switch USPS to
+                  Live in Settings › API keys when you are ready to ship for real.
+                </div>
+              )}
               {rates && (rates.length === 0 ? (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-                  No rates for this parcel. Check the address and weight, or that the carrier is enabled on your Shippo account.
+                  No rates for this parcel. Check the address and weight, and that a shipping
+                  provider is set up — Shippo, or USPS under Settings › API keys.
                 </div>
               ) : (
                 <div className="max-h-[26rem] space-y-1.5 overflow-y-auto pr-1">
@@ -582,7 +595,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                       <input type="radio" name="rate" checked={pickedToken === r.token} onChange={() => setPickedToken(r.token)} className="size-4 accent-[var(--primary)]" />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium">{r.carrier}{r.service ? ` · ${r.service}` : ""}</div>
-                        <div className="text-2xs text-muted-foreground">{r.days != null ? `${r.days} day${r.days === 1 ? "" : "s"}` : "delivery est. n/a"}</div>
+                        <div className="text-2xs text-muted-foreground">
+                          {r.eta || (r.days != null ? `${r.days} day${r.days === 1 ? "" : "s"}` : "delivery est. n/a")}
+                        </div>
                       </div>
                       <div className="shrink-0 font-semibold tabular-nums">{usd(r.amount)}</div>
                     </label>

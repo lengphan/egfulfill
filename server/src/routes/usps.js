@@ -175,7 +175,27 @@ async function paymentToken() {
   });
   const d = await res.json().catch(() => ({}));
   const token = d.paymentAuthorizationToken || d.token;
-  if (!res.ok || !token) throw new Error('USPS payment authorization failed: ' + (d.error?.message || d.message || JSON.stringify(d).slice(0, 300)));
+  if (!res.ok || !token) {
+    /**
+     * NAME THE ENVIRONMENT, because that IS the diagnosis nine times out of ten.
+     *
+     * USPS answers a payment-authorization failure with "We are having trouble validating
+     * your credit card, please try again later" and a dump of role/MID/CRID — which reads
+     * like a transient glitch and is almost never one. The same credentials authorise fine
+     * against apis-tem and fail against apis.usps.com when the EPS account has no valid
+     * payment method attached in PRODUCTION: TEM has its own test wallet, and passing that
+     * check there says nothing about the live one.
+     *
+     * So the message says which host refused and where the payment method lives. Without
+     * that the natural reading is "retry later", and the retry fails identically forever.
+     */
+    const live = !BASE().includes('-tem');
+    const detail = (d.error?.message || d.message || JSON.stringify(d).slice(0, 300));
+    throw new Error(
+      'USPS payment authorization failed on ' + (live ? 'PRODUCTION (apis.usps.com)' : 'the TEM test host') + ': ' + detail
+      + (live ? ' \u2014 this is the EPS account\u2019s payment method, not the label. Add or re-verify one in the USPS Enterprise Payment System portal (ACH is the usual choice; cards are frequently declined for postage). Switch Environment back to Test to keep working meanwhile.' : '')
+    );
+  }
   _pay = { token, exp: Date.now() + (50 * 60 * 1000), cfg: _cfgKey() };   // ~1h tokens; refresh at 50m
   return _pay.token;
 }
@@ -284,9 +304,27 @@ export async function uspsRates(b) {
    * print postage under it, rather than appearing because nobody got round to excluding it.
    */
   const SHIPPABLE = new Set(['USPS_GROUND_ADVANTAGE', 'PRIORITY_MAIL', 'PRIORITY_MAIL_EXPRESS', 'PARCEL_SELECT']);
+  /**
+   * THE ETA, out of a sentence written for a brochure.
+   *
+   * USPS does not return a number of days. `productDefinition` is marketing copy —
+   * "2-5 day specific delivery, perfect for packages weighing 1 ounce up to 70 lbs" — and
+   * the rate table only wants the span at the front of it. Everything after that is about
+   * the product rather than this parcel, so it is dropped rather than truncated mid-word.
+   *
+   * Parcel Select returns an empty definition and so has no estimate at all. That is
+   * reported as absent rather than guessed at.
+   */
+  const etaOf = (txt) => {
+    const m = String(txt || '').match(/^(\d+)(?:\s*-\s*(\d+))?\s*day/i);
+    if (!m) return '';
+    return m[2] ? m[1] + '\u2013' + m[2] + ' days' : m[1] + ' day' + (m[1] === '1' ? '' : 's');
+  };
   const rates = Object.keys(byClass).filter(function (k) { return SHIPPABLE.has(k); })
-    .map(function (k) { return byClass[k]; }).sort(function (a, c) { return a.price - c.price; });
-  return { ok: true, origin: fromZip, destination: toZip, weightOz, asOf: new Date().toISOString().slice(0, 10), rates: rates };
+    .map(function (k) { return Object.assign({}, byClass[k], { eta: etaOf(byClass[k].days) }); })
+    .sort(function (a, c) { return a.price - c.price; });
+  // `test` travels with the quote so no surface has to work out which host answered it.
+  return { ok: true, test: BASE().includes('-tem'), origin: fromZip, destination: toZip, weightOz, asOf: new Date().toISOString().slice(0, 10), rates: rates };
 }
 
 export function uspsRoutes(app, requireAuth, requireStaff) {

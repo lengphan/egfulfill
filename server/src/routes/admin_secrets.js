@@ -32,16 +32,27 @@ const SECRET_DEFS = [
   { name: 'SHIPPO_API_TOKEN',      label: 'API token',        integration: 'shippo' },
   { name: 'USPS_CONSUMER_KEY',     label: 'Consumer key',     integration: 'usps' },
   { name: 'USPS_CONSUMER_SECRET',  label: 'Consumer secret',  integration: 'usps' },
-  // The rest of the USPS switch, so moving from the TEM test host to live postage is a
-  // form rather than an SSH session. USPS_BASE is the one that decides whether a bought
-  // label is a free sample or real money: apis-tem.usps.com = test, apis.usps.com = live.
-  { name: 'USPS_BASE',             label: 'API host (apis.usps.com = live postage)', integration: 'usps' },
-  { name: 'USPS_CRID',             label: 'CRID',             integration: 'usps' },
-  { name: 'USPS_MID',              label: 'MID',              integration: 'usps' },
-  { name: 'USPS_ACCOUNT_NUMBER',   label: 'EPS account number', integration: 'usps' },
-  // Set to 1 to buy every label straight through USPS, bypassing Shippo/EasyPost. The
-  // switch for "the aggregator's account is refusing, ship through USPS until it is back".
-  { name: 'USPS_DIRECT',           label: 'Buy direct, bypass Shippo (1 = on)', integration: 'usps' },
+  /**
+   * The rest of the USPS switch, so moving from the TEM test host to live postage is a form
+   * rather than an SSH session.
+   *
+   * NOT ALL OF THESE ARE SECRETS, and rendering them as if they were made the panel
+   * unreadable. A CRID is an identifier, a host is a URL, and "buy direct" is a yes/no — but
+   * every row went through the same masked-password control, so switching to live postage
+   * meant typing a URL you could not see into a field showing dots, and turning the direct
+   * switch on left a row reading `••••••1`. `kind` tells the panel what the field IS; only
+   * `secret` is masked.
+   */
+  { name: 'USPS_BASE', label: 'Environment', integration: 'usps', kind: 'choice', options: [
+      { value: 'https://apis-tem.usps.com', label: 'Test — free sample labels, no charge' },
+      { value: 'https://apis.usps.com',     label: 'Live — real postage, charged to EPS' },
+  ] },
+  { name: 'USPS_CRID',             label: 'CRID',               integration: 'usps', kind: 'text' },
+  { name: 'USPS_MID',              label: 'MID',                integration: 'usps', kind: 'text' },
+  { name: 'USPS_ACCOUNT_NUMBER',   label: 'EPS account number', integration: 'usps', kind: 'text' },
+  // Every label goes straight to USPS, bypassing Shippo/EasyPost — the switch for "the
+  // aggregator's account is refusing, ship through USPS until it is back".
+  { name: 'USPS_DIRECT', label: 'Buy direct, bypass Shippo', integration: 'usps', kind: 'toggle' },
   { name: 'SS_API_KEY',            label: 'API key',          integration: 'ss' },
   // Otto needs FOUR credentials, not two: ocConfigured() requires the account email and
   // password as well as the client pair. Listing only the client pair meant a live account
@@ -115,8 +126,14 @@ export function adminSecretsRoutes(app, requireAdmin) {
         const v = (process.env[d.name] || '').trim();
         const editable = SECRET_NAMES.includes(d.name);
         // `last4` stays for older clients; `masked` is the preview to show (head…tail for admins).
+        const kind = d.kind || 'secret';
+        // A non-secret is shown, not masked. `value` is only ever populated for those —
+        // a real credential never leaves this route in the clear.
         return { name: d.name, label: d.label, integration: d.integration, set: !!v,
-                 masked: maskSecret(v, full), last4: v ? v.slice(-4) : null, mode: keyMode(v), editable,
+                 kind, options: d.options || undefined,
+                 value: kind === 'secret' ? undefined : v,
+                 masked: kind === 'secret' ? maskSecret(v, full) : v,
+                 last4: v ? v.slice(-4) : null, mode: keyMode(v), editable,
                  // Whether saving this one reaches the code that uses it, or waits for a
                  // restart. The panel showed a fresh last-4 either way, which is how a save
                  // could look applied while the integration still called with the old key.
