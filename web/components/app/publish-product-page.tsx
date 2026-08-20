@@ -1512,7 +1512,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               <SectionCard
                 title={<>Photos <span className="font-normal text-muted-foreground">({images.length}/{MAX_IMAGES})</span></>}
                 description={referencePhotos.length > 0
-                  ? `${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} shown, none published`
+                  ? `${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} shown, none published${prefill?.referenceNote ? ` — ${prefill.referenceNote}` : ""}`
                   : undefined}
                 /* IN THE HEADER, ABOVE THE RULE. It sat under the grid in a row of its own
                    that repeated what the tick marks already say. A card's header is where its

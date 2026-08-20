@@ -751,7 +751,7 @@ export function SpyDeckView() {
    * other means GO WITH WHAT WE HAVE. Conflating them is what shipped a publish page holding
    * a single reference photo.
    */
-  const [makeDetail, setMakeDetail] = useState<{ forId: string; status: "loading" | "done"; description?: string; images?: string[] } | null>(null)
+  const [makeDetail, setMakeDetail] = useState<{ forId: string; status: "loading" | "done"; description?: string; images?: string[]; error?: string } | null>(null)
 
   /**
    * RE-PUBLISH: the same dialog, reopened with what we already sent.
@@ -796,7 +796,10 @@ export function SpyDeckView() {
         // A failure still resolves to "done": the publish page opens with the card's own
         // cover photo and no description, which is worse than the full set and far better
         // than sitting on a button that never navigates.
-        .catch(() => { if (alive) setMakeDetail({ forId, status: "done" }) })
+        // The REASON is kept, not swallowed. A lookup that fails and a competitor who
+        // posted one photo produced the identical screen — one picture, no explanation —
+        // which is the empty-state-versus-broken-feature confusion CLAUDE.md §4 is about.
+        .catch((e) => { if (alive) setMakeDetail({ forId, status: "done", error: e instanceof Error ? e.message : "Etsy didn't answer" }) })
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [makeListing])
@@ -910,6 +913,16 @@ export function SpyDeckView() {
           tags: l.tags ?? [],
           images: [],
           referenceImages: ((detail?.images?.length ? detail.images : l.images?.length ? l.images : l.image ? [l.image] : []) as string[]).filter(Boolean),
+          /* Only when we FELL BACK. If the detail lookup answered with photos there is
+             nothing to explain; if it failed, or answered with none, the page must not
+             present the cover as though it were the whole set. */
+          referenceNote: detail?.images?.length
+            ? undefined
+            : detail?.error
+              ? `Only the cover photo came across — Etsy wouldn't return this listing's other photos (${detail.error}).`
+              : !l.images?.length
+                ? "Only the cover photo came across — this listing's other photos couldn't be read from Etsy."
+                : undefined,
         },
         source: l,
         returnTo: "/spydeck",

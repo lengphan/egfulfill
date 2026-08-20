@@ -17,6 +17,11 @@ export type PublishPrefill = {
    *  anything in `images` goes to the marketplace, and a set you can see but that silently
    *  doesn't ship is the most misleading arrangement of the three. */
   referenceImages?: string[]
+  /** WHY there are so few of them, when there are. A failed detail lookup used to be
+   *  indistinguishable from a competitor who genuinely posted one photo: the page just
+   *  showed the cover. This carries the reason across the navigation so the Photos panel
+   *  can say which it is. Absent means the set is complete. */
+  referenceNote?: string
   /** Catalog product to produce this on. Sets the cost side of the margin. */
   blank?: CatalogProduct | null
   /** The variant axes as they were PICKED last time, so reopening a published listing
