@@ -29,6 +29,12 @@ const MAP: Record<string, SellerStatusInfo> = {
   // Pending = submitted + charged, awaiting the factory to approve it. STILL cancellable
   // (full refund) — the Cancel button appears alongside this, driven by factory_status.
   in_review: P("Pending", TONE.wait, "pending"),
+  // In Process starts HERE, not at working. Approved means an operator has confirmed the
+  // blank, which is the factory accepting the job — and it is the moment the seller's
+  // cancel window closes (SELLER_ZONE in orders.js stops at in_review). It was reaching
+  // "In Process" only through the unknown-status FALLBACK below, so the one stage where
+  // the seller loses a right was the one stage nothing named.
+  approved: P("In Process", TONE.prod, "production"),
   // In Process = the factory approved it and is making it. Every internal make-stage
   // (awaiting_scan / working, + legacy) collapses to this one label — the factory's steps
   // are not the seller's business.

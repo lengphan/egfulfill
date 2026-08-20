@@ -545,10 +545,25 @@ async function syncAllTiktok(opts = {}) {
  * Marks the order shipped on TikTok (buyer sees tracking). Bound to the order's OWNER shop,
  * no fallback. Throws on any problem. Needs the app's `seller.fulfillment.basic` scope.
  */
+/**
+ * WHICH TikTok ORDER THIS FULFILS — its own id, or the one it is a copy of.
+ *
+ * Same rule as Etsy's receiptIdOf: a duplicate carries `FF-dup-…` because a copy of a
+ * marketplace order is not that order, but it still fulfils the original's receipt. Only a
+ * duplicated_from that is itself a TikTok id is accepted — a copy of a manual order fulfils
+ * nothing on a marketplace, and guessing would push tracking at an unrelated order.
+ */
+function tiktokOrderIdOf(order) {
+  const direct = String((order && order.id) || '').match(/^tiktok-(.+)$/i);
+  if (direct) return direct[1];
+  const meta = order && order.meta && typeof order.meta === 'object' ? order.meta : {};
+  const copied = String(meta.duplicated_from || '').match(/^tiktok-(.+)$/i);
+  return copied ? copied[1] : null;
+}
+
 export async function tiktokPushTracking(order, tracking, carrier) {
-  const m = String((order && order.id) || '').match(/^tiktok-(.+)$/i);
-  if (!m) throw new Error('Not a TikTok order');
-  const orderId = m[1];
+  const orderId = tiktokOrderIdOf(order);
+  if (!orderId) throw new Error('Not a TikTok order');
   const conns = (await q(`select * from platform_connections where platform='tiktok'`)).rows;
   const conn = conns.find((c) => order && String(c.connected_by) === String(order.seller_id))
     || conns.find((c) => order && c.shop_name && c.shop_name === order.store)

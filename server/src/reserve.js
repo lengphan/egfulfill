@@ -131,3 +131,105 @@ export async function reserveForOrder(orderId) {
 export async function releaseForOrder(orderId) {
   return applyReservation(orderId, new Map()).catch(() => null);
 }
+
+// ── PICKED, NOT JUST PROMISED ────────────────────────────────────────────────
+/**
+ * THE SHELF ACTUALLY GOES DOWN NOW.
+ *
+ * This file, replenish.js and orders.js all said "the scan that lowered in_stock" — and no
+ * such code was ever written. Every write to `in_stock` in the server was a hand edit, an
+ * adjustment, a PO receipt or a supplier return; not one came from an order. So a job held
+ * units at Working and gave the hold back at Shipped, and the count ended exactly where it
+ * started while the garment left the building. The floor's answer to that is to correct the
+ * number by hand, which is the same as not having one.
+ *
+ * WORKING IS THE PICK. Committing to make something is when the blank comes off the rack.
+ * Not the postage and not the scan — both of those happen to a parcel that already contains
+ * it, so keying the decrement there means the shelf reads high for the whole time the thing
+ * is being made, which is precisely when someone is deciding whether it can be.
+ *
+ * Recorded per (order, sku) exactly as the hold is, and applied as a DELTA against what this
+ * order has already taken, so working → hold → working settles on one decrement instead of
+ * stacking. That ledger is also what makes it reversible: a move back out of production, a
+ * cancel or a refund credits the quantities THIS ORDER took, rather than recomputing from
+ * lines that may have been edited since.
+ */
+let consumeReady = null;
+async function ensureConsume() {
+  if (!consumeReady) {
+    consumeReady = q(`create table if not exists stock_consumption (
+      order_id   text not null,
+      sku        text not null,
+      qty        integer not null default 0,
+      updated_at timestamptz not null default now(),
+      primary key (order_id, sku)
+    )`).catch(() => {});
+  }
+  return consumeReady;
+}
+
+/** Move this order's take to `want`, applying only the difference. Never throws. */
+async function applyConsumption(orderId, want) {
+  await ensureConsume();
+  const have = new Map(
+    (await q('select sku, qty from stock_consumption where order_id=$1', [orderId])
+      .catch(() => ({ rows: [] }))).rows.map((r) => [String(r.sku).toUpperCase(), Number(r.qty) || 0])
+  );
+  const skus = new Set([...want.keys(), ...have.keys()]);
+  const took = [], gave = [], skipped = [];
+
+  for (const sku of skus) {
+    const target = Math.max(0, want.get(sku) || 0);
+    const current = have.get(sku) || 0;
+    const delta = target - current;                 // >0 take more, <0 give back
+    if (delta === 0) continue;
+
+    // greatest(0, …) so the shelf can never go negative — a count below zero is not a
+    // fact about a warehouse, and it would read as stock owed rather than stock missing.
+    // The consumption row still records the full amount, so giving it back is exact even
+    // when the take was clamped.
+    const r = await q(
+      `update inventory set in_stock = greatest(0, coalesce(in_stock,0) - $2), updated_at = now()
+        where upper(sku) = $1`,
+      [sku, delta]
+    ).catch(() => ({ rowCount: 0 }));
+
+    if (!r.rowCount) {
+      // No shelf under that key — plenty of blanks are bought to order. Nothing is
+      // recorded, so a row created later starts clean rather than owing this order units.
+      if (target > 0) skipped.push(sku);
+      if (current > 0) await q('delete from stock_consumption where order_id=$1 and sku=$2', [orderId, sku]).catch(() => {});
+      continue;
+    }
+
+    if (target > 0) {
+      await q(
+        `insert into stock_consumption (order_id, sku, qty, updated_at) values ($1,$2,$3, now())
+         on conflict (order_id, sku) do update set qty=excluded.qty, updated_at=now()`,
+        [orderId, sku, target]
+      ).catch(() => {});
+    } else {
+      await q('delete from stock_consumption where order_id=$1 and sku=$2', [orderId, sku]).catch(() => {});
+    }
+    (delta > 0 ? took : gave).push({ sku, qty: Math.abs(delta) });
+  }
+  return { took, gave, skipped };
+}
+
+/**
+ * Being MADE — take the blanks off the shelf, and drop the hold that stood in for them.
+ *
+ * The order matters: consume first, release second. A hold released before the decrement
+ * leaves a window in which the units read as free, and that window is exactly when the
+ * replenishment sweep runs.
+ */
+export async function consumeForOrder(orderId) {
+  const out = await applyConsumption(orderId, await needsOf(orderId)).catch(() => null);
+  await releaseForOrder(orderId);
+  return out;
+}
+
+/** Back out of production, cancelled or refunded — put back what this order took. */
+export async function restoreForOrder(orderId) {
+  return applyConsumption(orderId, new Map()).catch(() => null);
+}

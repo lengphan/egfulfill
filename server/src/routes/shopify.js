@@ -325,10 +325,25 @@ function shopifyCarrier(c) {
  * order's OWNER store (no fallback). Throws on any problem. NB: needs the fulfillment-order
  * scopes below — an existing connection must RECONNECT before this works.
  */
+/**
+ * WHICH Shopify ORDER THIS FULFILS — its own id, or the one it is a copy of.
+ *
+ * Same rule as Etsy's receiptIdOf: a duplicate carries `FF-dup-…` because a copy of a
+ * marketplace order is not that order, but it still fulfils the original's receipt. Only a
+ * duplicated_from that is itself a Shopify id is accepted — a copy of a manual order fulfils
+ * nothing on a marketplace, and guessing would push tracking at an unrelated order.
+ */
+function shopifyOrderIdOf(order) {
+  const direct = String((order && order.id) || '').match(/^shopify-(.+)$/i);
+  if (direct) return direct[1];
+  const meta = order && order.meta && typeof order.meta === 'object' ? order.meta : {};
+  const copied = String(meta.duplicated_from || '').match(/^shopify-(.+)$/i);
+  return copied ? copied[1] : null;
+}
+
 export async function shopifyPushTracking(order, tracking, carrier) {
-  const m = String((order && order.id) || '').match(/^shopify-(.+)$/i);
-  if (!m) throw new Error('Not a Shopify order');
-  const orderNumId = m[1];
+  const orderNumId = shopifyOrderIdOf(order);
+  if (!orderNumId) throw new Error('Not a Shopify order');
   const conns = (await q(`select * from platform_connections where platform='shopify'`)).rows;
   const conn = conns.find((c) => order && String(c.connected_by) === String(order.seller_id))
     || conns.find((c) => order && c.shop_name && c.shop_name === order.store)

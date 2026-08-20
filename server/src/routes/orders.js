@@ -18,7 +18,7 @@ import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
-import { reserveForOrder, releaseForOrder } from '../reserve.js';
+import { reserveForOrder, releaseForOrder, consumeForOrder, restoreForOrder } from '../reserve.js';
 import { storageEnabled, putObject, getObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
 import { emitWebhook } from '../webhooks.js';
 
@@ -210,6 +210,28 @@ export function stageDenial(role, current, target, isFactory = false) {
     return 'This order was refunded. That is the end of it.';
   }
 
+  /**
+   * A PAID ORDER CANNOT BE DRAFT. Every role, admin included.
+   *
+   * Draft is not a stage — it is a statement about money: nobody submitted this and nobody
+   * was charged. So an order sitting at Draft with a charge against it is a contradiction
+   * the rest of the system then acts on: the seller's Submit unlocks (their own zone is
+   * ['', 'new', 'draft', 'in_review']), the order reads untouched and editable, and the
+   * money stays taken. This was the operator's rule alone, which meant the two roles most
+   * likely to be tidying up a board were the two who could create the contradiction.
+   *
+   * It takes nothing away. Every real reason to reach for it is already served, and served
+   * honestly: a mis-click steps back one stage inside production, a pause is On hold, and
+   * an order that should not be made is Cancelled — which refunds. Only the word Draft is
+   * refused, because it is the only one of the four that says something untrue.
+   *
+   * Never applies to a factory order: nothing was ever charged on one, so "this has been
+   * paid for" would be a false statement about the floor's own work.
+   */
+  if (!isFactory && (to === '' || to === 'new' || to === 'draft') && posOf(at, isFactory) > posOf('', isFactory)) {
+    return 'This order has been paid for, so it cannot go back to Draft. Step it back one stage, put it on hold, or cancel it to refund.';
+  }
+
   if (role === 'admin') return null;
   if (role === 'warehouse') {
     return MONEY_STAGES.has(to) ? 'Cancelling or refunding is an admin decision.' : null;
@@ -241,9 +263,8 @@ export function stageDenial(role, current, target, isFactory = false) {
     // would be telling them something untrue about their own floor's order. Custody is
     // still protected: the OP_ZONE tests above already stop them touching anything the
     // warehouse holds, so the most this permits is walking back a mis-click of their own.
-    if (!isFactory && (to === '' || to === 'new' || to === 'draft') && posOf(at, isFactory) > posOf('', isFactory)) {
-      return 'This order has been paid for — only warehouse or admin can send it back.';
-    }
+    // (Sending a paid order back to Draft is refused for every role above — this used to
+    // be the only copy of that rule, which is how warehouse and admin kept the hole.)
     return null;
   }
   return 'Your role cannot change production status.';        // designer, and anything new
@@ -531,7 +552,22 @@ const fmtMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
  */
 async function pushMarketplaceTracking(order, tracking, carrier) {
   const id = String((order && order.id) || '');
-  const channel = /^etsy-/i.test(id) ? 'etsy' : /^shopify-/i.test(id) ? 'shopify' : /^tiktok-/i.test(id) ? 'tiktok' : null;
+  /**
+   * WHICH CHANNEL — from the id, or from what this order is a copy OF.
+   *
+   * A duplicate is minted as `FF-dup-…` with source 'manual', deliberately: a copy of an
+   * Etsy order is not that order, and claiming it was would put a fake receipt in the
+   * channel reports. But it still FULFILS the original's receipt — a reprint or a
+   * replacement is the same buyer, still waiting, on the marketplace's clock.
+   *
+   * etsy.js already handles this (receiptIdOf falls back to meta.duplicated_from) and
+   * could never be reached: this line read the id prefix alone, so every duplicate was
+   * dropped as 'not-applicable' before the resolver saw it, and tracking had to be pasted
+   * into the channel by hand on precisely the orders where someone is waiting.
+   */
+  const from = (order && order.meta && typeof order.meta === 'object' && order.meta.duplicated_from) || '';
+  const channelOf = (v) => (/^etsy-/i.test(v) ? 'etsy' : /^shopify-/i.test(v) ? 'shopify' : /^tiktok-/i.test(v) ? 'tiktok' : null);
+  const channel = channelOf(id) || channelOf(String(from));
   if (!channel || !tracking) return { skipped: 'not-applicable' };
   if (process.env.MARKETPLACE_FULFILL_LIVE !== '1') return { channel, dryRun: true, wouldSend: { tracking, carrier } };
   try {
@@ -575,7 +611,9 @@ export async function fulfillMarketplace(orderId, { test = false } = {}) {
   if (!orderId || test) return { skipped: test ? 'test-label' : 'no-order' };
   try {
     const o = (await q(
-      'select id, store, seller_id, tracking, carrier, marketplace_fulfilled_at from orders where id=$1',
+      // `meta` is not decoration here — it carries duplicated_from, which is how a copy
+      // finds the receipt it fulfils. Without it every duplicate fell out as 'not-applicable'.
+      'select id, store, seller_id, tracking, carrier, meta, marketplace_fulfilled_at from orders where id=$1',
       [orderId])).rows[0];
     if (!o || !o.tracking || o.marketplace_fulfilled_at) return { skipped: 'nothing-to-push' };
     const push = await pushMarketplaceTracking(o, o.tracking, o.carrier);
@@ -586,6 +624,48 @@ export async function fulfillMarketplace(orderId, { test = false } = {}) {
   } catch (e) {
     return { error: (e && e.message) || 'push failed' };
   }
+}
+
+/**
+ * WHAT A STAGE DOES TO THE SHELF — in one place, because two routes set stages.
+ *
+ * The order PATCH and the per-item status route were each holding their own half of this
+ * and had already drifted: one reserved on working and released on shipped, the other did
+ * the same but only released once every line was out. Neither ever decremented anything.
+ *
+ *   Pending / Approved   HOLD.      Accepted, not started — the units are committed to this
+ *                                   order and must stop looking available to another, which
+ *                                   is the whole job `reserved` was added for.
+ *   Working              TAKE.      The blank comes off the rack. The hold is dropped in the
+ *                                   same step, or the garment is subtracted twice.
+ *   Shipped / On hold    NOTHING.   Already taken, and it stays taken — a stop pauses the
+ *                                   work, it does not put the fabric back on the shelf.
+ *   Draft / Cancelled / Refunded    GIVE BACK. The work will not happen (or has not begun),
+ *                                   so anything this order took returns, and the hold with it.
+ *
+ * Best-effort by contract: a status change must never fail because a shelf number could not
+ * be adjusted. Every verb inside is idempotent per order, so re-entering a stage settles.
+ */
+async function applyStockForStage(orderId, stage) {
+  const at = normalizeStage(stage);
+  try {
+    if (at === 'working') return await consumeForOrder(orderId);
+    if (at === 'in_review' || at === 'approved') {
+      // Coming BACKWARDS out of production: give the units back first, then hold them
+      // again. Doing it in the other order would leave the hold on top of a decrement.
+      await restoreForOrder(orderId);
+      return await reserveForOrder(orderId);
+    }
+    if (at === '' || at === 'cancelled' || at === 'refunded') {
+      const back = await restoreForOrder(orderId);
+      await releaseForOrder(orderId);
+      return back;
+    }
+    // 'shipped' still releases any hold, for orders that reached working before this
+    // existed and are carrying one with nothing to match it.
+    if (at === 'shipped') return await releaseForOrder(orderId);
+  } catch (e) { /* the shelf must never fail a stage change */ }
+  return null;
 }
 
 export function ordersRoutes(app, requireAuth) {
@@ -1586,6 +1666,29 @@ export function ordersRoutes(app, requireAuth) {
         _refunded = back.refunded || 0;
       }
     }
+    /**
+     * THE ROLE GATE, ON THE ORDER AND NOT ONLY ON THE LINE.
+     *
+     * stageDenial was enforced by the per-item route and by the UI's menu, and by nothing
+     * on this route — so every rule in it (one step at a time, shipped is terminal, money
+     * stages are admin's) was a suggestion to anything holding a staff token. The menu
+     * builds itself from the same function, so this changes no legitimate click; it closes
+     * the API behind it.
+     *
+     * The one exemption is the label: a purchase writes tracking and 'shipped' in a single
+     * patch, and that is a shipment being RECORDED rather than somebody moving a stage. The
+     * ship gate below still applies to it.
+     */
+    if (isStaff(req.user) && (body.factoryStatus !== undefined || body.status !== undefined)) {
+      const want = normalizeStage(String(body.factoryStatus ?? body.status ?? ''));
+      const cur = await q('select factory_status, factory_order from orders where id=$1', [req.params.id])
+        .then((r) => r.rows[0]).catch(() => null);
+      const recordingLabel = body.tracking !== undefined && want === 'shipped';
+      if (cur && !recordingLabel) {
+        const denial = stageDenial(String(req.user.role || ''), cur.factory_status, want, cur.factory_order === true);
+        if (denial) { reply.code(403); return { error: denial }; }
+      }
+    }
     // Same ship gate as the per-item route. Staff-initiated too: a warehouse marking the
     // whole order shipped is making the identical claim, so it answers to the identical
     // facts. Skipped when tracking arrives in the same patch — that IS the label being
@@ -1727,10 +1830,11 @@ export function ordersRoutes(app, requireAuth) {
         after: { status: want, lines: r.rowCount },
       });
     }
-    // Accepting the WHOLE order into production holds its blanks too — the same act as the
-    // per-line route above, reached from the order screen instead of the board.
-    if (normalizeStage(String(body.factoryStatus ?? body.status ?? '')) === 'working') {
-      await reserveForOrder(req.params.id).catch(() => {});
+    // The stage's effect on the shelf, whichever stage it is — see applyStockForStage.
+    // This was `if working: reserve`, which is why nothing was ever given back when an
+    // order moved the other way.
+    if (body.factoryStatus !== undefined || body.status !== undefined) {
+      await applyStockForStage(req.params.id, String(body.factoryStatus ?? body.status ?? ''));
     }
     egBroadcast({ type: 'orders' });
     if (_charged || _refunded) egBroadcast({ type: 'wallet' });
@@ -1779,9 +1883,8 @@ export function ordersRoutes(app, requireAuth) {
        * is what lowers in_stock, so a reservation surviving it subtracts the same garment
        * twice and hides real stock. Cancelled and refunded never consumed anything at all.
        */
-      if (stage === 'shipped' || stage === 'cancelled' || stage === 'refunded') {
-        await releaseForOrder(req.params.id).catch(() => {});
-      }
+      // (The shelf is handled by applyStockForStage above — for EVERY stage, not only
+      //  these three. Cancelled and refunded now put back what the order actually took.)
       if (body.tracking !== undefined || stage === 'shipped') {
         notifyOrderEvent(req.params.id, 'order.shipped');
         // Auto-push tracking to the marketplace (GATED — a dry run until MARKETPLACE_FULFILL_LIVE=1).
@@ -1954,18 +2057,19 @@ export function ordersRoutes(app, requireAuth) {
     // working settles rather than stacks. Only `reserved` moves; a scan is still the only
     // thing that takes a garment off the shelf.
     let design = null, replenish = null, reserved = null;
-    if (normalizeStage(status) === 'working') {
-      reserved = await reserveForOrder(req.params.id).catch(() => null);
-      replenish = await autoReplenish(req.params.id).catch(() => null);
-    }
-    // Shipped gives the hold back, and only once EVERY line is out: a hold that survives
-    // the scan which lowered in_stock subtracts the same garment twice.
-    if (normalizeStage(status) === 'shipped') {
-      const left = await q(
-        `select 1 from order_items where order_id=$1 and coalesce(factory_status,'') <> 'shipped' limit 1`,
-        [req.params.id]
+    // The shelf follows the stage here exactly as it does on the order — one helper, so the
+    // board and the order screen can never disagree about what Working means to inventory.
+    // Only when the WHOLE order has reached the stage, though: this route moves one line,
+    // and stock is held and taken per order. A single line going to Working while its
+    // siblings sit at Approved must not take the other lines' blanks off the shelf.
+    {
+      const want = normalizeStage(status);
+      const behind = await q(
+        `select 1 from order_items where order_id=$1 and coalesce(factory_status,'') <> $2 limit 1`,
+        [req.params.id, status]
       ).catch(() => ({ rowCount: 1 }));
-      if (!left.rowCount) await releaseForOrder(req.params.id).catch(() => {});
+      if (!behind.rowCount) reserved = await applyStockForStage(req.params.id, want);
+      if (want === 'working') replenish = await autoReplenish(req.params.id).catch(() => null);
     }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
     return { ok: true, design, replenish, reserved };

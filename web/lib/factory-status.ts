@@ -295,6 +295,29 @@ export function stageDenialReason(role: string, current: string | null | undefin
     return "This order was refunded. That is the end of it."
   }
 
+  /**
+   * A PAID ORDER CANNOT BE DRAFT. Every role, admin included.
+   *
+   * Draft is not a stage — it is a statement about money: nobody submitted this and nobody
+   * was charged. An order sitting at Draft with a charge against it is a contradiction the
+   * rest of the system then acts on: the seller's Submit unlocks (their zone is '', new,
+   * draft, in_review), the order reads untouched and editable, and the money stays taken.
+   * It was the operator's rule alone, so the two roles most likely to be tidying a board
+   * were the two who could create it.
+   *
+   * Nothing is lost. A mis-click steps back one stage inside production, a pause is On
+   * hold, and an order that should not be made is Cancelled — which refunds. Only the WORD
+   * Draft is refused, because it is the one of the four that says something untrue.
+   *
+   * Never for a factory order: nothing was charged, so "this has been paid for" would be
+   * false about the floor's own work.
+   *
+   * Mirrors stageDenial in server/src/routes/orders.js — change both.
+   */
+  if (!isFactory && (to === "" || to === "new" || to === "draft") && posOf(at, isFactory) > posOf("", isFactory)) {
+    return "This order has been paid for, so it cannot go back to Draft. Step it back one stage, put it on hold, or cancel it to refund."
+  }
+
   if (role === "admin") return null
   if (role === "warehouse") {
     if (MONEY_STAGES.has(to)) return "Cancelling or refunding is an admin decision."
@@ -333,9 +356,8 @@ export function stageDenialReason(role: string, current: string | null | undefin
     // The justification is the CHARGE, so it can't apply to a factory order — nothing was
     // taken, and saying "this order has been paid for" about the floor's own order would
     // be untrue. Custody is still covered by the OP_ZONE tests below.
-    if (!isFactory && (to === "" || to === "new" || to === "draft") && ai > 0) {
-      return "This order has been paid for — only warehouse or admin can send it back."
-    }
+    // (Sending a paid order back to Draft is refused for every role above — this was the
+    // only copy of that rule, which is how warehouse and admin kept the hole.)
     /**
      * AN OPERATOR APPROVES; THE WAREHOUSE STARTS.
      *
