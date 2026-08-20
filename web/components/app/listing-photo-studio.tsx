@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Sparkle, Warning, Check, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
+import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, type DeskImageConfig, type ListingRender, type AiQuote } from "@/lib/api"
+import { promptWarning } from "@/lib/image-gen"
 
 /**
  * THE LISTING PHOTO STUDIO — their shot on the left, ours on the right.
@@ -499,6 +501,16 @@ export function ListingPhotoStudio({
                     placeholder="Describe the photograph we want — or press Generate prompt and edit what comes back."
                     className="max-h-72 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 pb-11 text-sm leading-relaxed outline-none field-sizing-content focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                   />
+                  {/* DESCRIBE IT OUT LOUD. A photograph brief is the longest free text anyone
+                      types in this app and the least like a form field — it is a paragraph of
+                      description, which is the thing dictation is actually good at. It sits in
+                      the box's other corner, opposite Generate prompt. */}
+                  <DictateButton
+                    value={prompt}
+                    onChange={setPrompt}
+                    className="absolute bottom-1.5 right-1.5 size-8 bg-background"
+                    label="Describe the photo out loud"
+                  />
                   <Button
                     size="sm" variant="outline"
                     className="absolute bottom-2 left-2 h-7 bg-background text-xs"
@@ -553,6 +565,17 @@ export function ListingPhotoStudio({
                   </div>
                 </div>
                 {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
+
+                {/* WHAT THIS PROMPT CANNOT PRODUCE, before it is paid for. Not a block — the
+                    person may know exactly what they are doing — but a render that comes back
+                    with a painted-on checkerboard is a charge for something unusable, and the
+                    natural next move is to ask again, and pay again. */}
+                {promptWarning(prompt) && (
+                  <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    <Warning size={14} className="mt-0.5 shrink-0" />
+                    <span>{promptWarning(prompt)}</span>
+                  </div>
+                )}
 
                 {/* THE PRICE, BEFORE THE PRESS. Never discovered on the wallet afterwards, and
                     never rounded away — a batch of four is four charges. */}

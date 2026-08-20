@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText, ImageSquare, FilmSlate } from "@phosphor-icons/react"
+import { DictateButton } from "@/components/app/dictate-button"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment, getAiQuote, type AiQuote } from "@/lib/api"
@@ -1194,6 +1195,16 @@ export default function ChatPage() {
                 disabled={signedOut || !activeId || readOnly || attaching} aria-label="Attach a file">
                 {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={17} />}
               </Button>
+              {/* SPEAK IT. Beside the paperclip and the emoji, because those are the other two
+                  ways of putting something into a message that is not typing it. Dictation
+                  appends to whatever is in the box, so a half-typed sentence can be finished
+                  out loud. */}
+              <DictateButton
+                value={input}
+                onChange={(next) => { setInput(next); if (!readOnly) detectMention(next, next.length) }}
+                disabled={signedOut || !activeId || readOnly}
+                label="Dictate a message"
+              />
               <div className="relative shrink-0">
                 <Button variant="ghost" size="icon" className="size-9" onClick={() => setEmojiOpen((o) => !o)}
                   disabled={signedOut || !activeId || readOnly} aria-label="Emoji">
