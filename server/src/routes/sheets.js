@@ -640,12 +640,24 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     return applyTemplateTo(id, token);
   }
 
-  /** The lists + headers, as one stable string. Any change to either is a new fingerprint. */
-  function fingerprint(tpl, lists) {
-    const P = (lists && lists.products) || [];
+  /**
+   * THE FINGERPRINT IS THE PAYLOAD ITSELF, not a summary of it.
+   *
+   * First written as "the columns plus the product lists", which misses the thing that
+   * actually went wrong: a fix to the VALIDATION FORMULA changed nothing about the
+   * catalogue, so the hash matched, so the automatic refresh decided the sheet was already
+   * current and left a broken formula in it. A template whose refresh cannot see its own
+   * code changes needs a human to remember to force it — which is the button this replaced.
+   *
+   * Hashing the requests covers everything that gets written: formulas, merges, widths,
+   * headers, named ranges, and the lists inside them. Any change to this file that changes
+   * what Google receives changes the hash, and the next config read repairs the master.
+   */
+  function fingerprint(tpl) {
     return crypto.createHash('sha1').update(JSON.stringify([
       tpl.columns,
-      P.map((p) => [p.name, p.colors, p.sizes, p.methods]),
+      tpl.createBody.sheets.map((sh) => sh.data),
+      tpl.requests(0, { listsGid: 1 }),
     ])).digest('hex');
   }
 
@@ -655,7 +667,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     try {
       const lists = await catalogLists();
       const tpl = buildTemplate('', lists);
-      const fp = fingerprint(tpl, lists);
+      const fp = fingerprint(tpl);
       const seen = await q('select value from settings where key=$1', [FP_KEY])
         .then((r) => (r.rows[0] ? String(r.rows[0].value).replace(/^"|"$/g, '') : '')).catch(() => '');
       if (seen === fp) return;
