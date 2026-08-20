@@ -2616,6 +2616,9 @@ export type DeskImageConfig = {
   keySet: boolean; storageReady: boolean
   model: string; models: ImageGenModel[]
   ratios: string[]; ratioHints: Record<string, string>
+  /** What THIS caller pays and what they have left, so a composer can price its button
+   *  rather than making someone find out by pressing it. */
+  quote?: AiQuote
 }
 export function getDeskImageConfig() {
   return api<DeskImageConfig>(`/api/desk/image/config`)
@@ -3310,6 +3313,52 @@ export function rewriteListingCopy(body: {
 }) {
   return api<{ title?: string; description?: string; error?: string; disabled?: boolean }>(
     `/api/publish/rewrite`, { method: "POST", body: JSON.stringify(body) })
+}
+/**
+ * READ THE COMPETITOR'S PHOTOS AND WRITE A PROMPT FOR OURS.
+ *
+ * Renders nothing and spends nothing at Google — it returns words for a person to edit.
+ * On a click only: the same rule as rewriteListingCopy, because a call that can fire on
+ * its own eventually fires forever.
+ *
+ * `images` are the SAME source strings the publish payload carries (an etsystatic URL, a
+ * data: URL, one of our own stored renders); the server resolves them through its one
+ * allowlisted resolver, so nothing here can aim a fetch at an arbitrary host.
+ */
+export function readPhotosForPrompt(body: {
+  images: string[]
+  title?: string; product?: string; method?: string; colors?: string[]
+}) {
+  return api<{ prompt?: string; read?: string; photosRead?: number; error?: string; disabled?: boolean }>(
+    `/api/publish/photo-prompt`, { method: "POST", body: JSON.stringify(body) })
+}
+
+export type ListingRender = {
+  /** Same-origin proxy path to the stored render. Publishable as-is — the server reads it
+   *  back out of storage rather than fetching itself, so it needs no public bucket. */
+  url: string
+  model: string; size: string; aspectRatio: string
+  /** What GOOGLE cost US. Staff-only — absent for a seller, and never their price. */
+  usd?: number
+  /** What the caller actually paid, and whether it came out of the free monthly allowance. */
+  charged: number; free?: boolean
+}
+/**
+ * Render 1–4 CANDIDATES. Nothing lands in the listing — the caller shows them and a press
+ * moves one into the publishable set.
+ *
+ * Partial success is the normal shape, not an edge case: a daily cap or an empty wallet
+ * stops the batch part-way, so `results` and `errors` can both be non-empty and both have
+ * to be shown.
+ */
+export function generateListingPhotos(body: {
+  prompt: string
+  images?: string[]
+  model?: string; aspectRatio?: string; imageSize?: string
+  count?: number
+}) {
+  return api<{ ok?: boolean; results: ListingRender[]; errors: string[]; quote?: AiQuote; error?: string }>(
+    `/api/publish/photo-generate`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getPublishDestinations() {
   return api<{ destinations: PublishDestination[] }>(`/api/publish/destinations`)

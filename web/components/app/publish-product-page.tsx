@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ProductCombobox } from "@/components/app/product-combobox"
 import { SectionCard } from "@/components/app/section-card"
+import { ListingPhotoStudio, type PhotoFocus } from "@/components/app/listing-photo-studio"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
@@ -848,6 +849,24 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   // small is not enough to judge a competitor's shot by, which is the entire reason these
   // are on screen — so the tile opens one full size. The watermark comes with it.
   const [zoom, setZoom] = useState<number | null>(null)
+
+  /**
+   * WHICH REFERENCE PHOTO THE STUDIO WAS POINTED AT.
+   *
+   * A nonce rather than a bare index, because clicking the SAME tile twice is a real
+   * instruction — "read this one again" — and an index alone makes the second press a
+   * no-op. The studio guards on the nonce, so each press reads exactly once.
+   */
+  const [studioFocus, setStudioFocus] = useState<PhotoFocus | null>(null)
+  const focusRef = (i: number) => setStudioFocus((p) => ({ index: i, nonce: (p?.nonce ?? 0) + 1 }))
+
+  /** A finished render joins the publishable set — at the END, so it never silently takes
+   *  over as the cover photo. Making it primary stays a deliberate press, as it is for
+   *  every other photo here. */
+  const useRender = (url: string) => {
+    imgTouched.current = true
+    setImages((p) => (p.length >= MAX_IMAGES || p.includes(url) ? p : [...p, url]))
+  }
   const zoomSrc = zoom === null ? null : referencePhotos[zoom]
   useEffect(() => {
     if (zoom === null) return
@@ -1399,26 +1418,60 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       it read as a second, publishable set; a caption ON the photo cannot be
                       scrolled away from.
                       Dashed border, no hover controls, watermark: everything says "not yours". */}
+                  {/* TWO CONTROLS ON ONE TILE, as SIBLINGS — a button inside a button is
+                      invalid and the inner one never receives the click. The tile itself
+                      points the studio at this photo and has it read; the corner glyph
+                      opens it full size, which is still the only way to judge a shot at
+                      this thumbnail size. */}
                   {referencePhotos.map((src, i) => (
-                    <button
+                    <div
                       key={`ref-${i}`}
-                      type="button"
-                      onClick={() => setZoom(i)}
-                      title="View larger"
-                      aria-label={`View reference photo ${i + 1} larger`}
-                      className="group relative aspect-square cursor-zoom-in overflow-hidden rounded-lg border border-dashed border-border bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      className="group relative aspect-square overflow-hidden rounded-lg border border-dashed border-border bg-muted/40"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt="" className="size-full object-cover" />
                       {!staffViewer && <ReferenceWatermark />}
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
-                        <MagnifyingGlassPlus size={16} weight="bold" className="text-white drop-shadow" />
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => focusRef(i)}
+                        title="Read this photo and write a prompt for ours"
+                        aria-label={`Use reference photo ${i + 1} to write a prompt`}
+                        className="absolute inset-0 flex cursor-pointer items-end justify-center bg-black/35 pb-2 opacity-0 outline-none transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                      >
+                        <span className="flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">
+                          <Sparkle size={10} weight="fill" /> Use as reference
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoom(i)}
+                        title="View larger"
+                        aria-label={`View reference photo ${i + 1} larger`}
+                        className="absolute right-1 top-1 cursor-zoom-in rounded bg-black/45 p-1 text-white opacity-0 outline-none transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50"
+                      >
+                        <MagnifyingGlassPlus size={13} weight="bold" />
+                      </button>
+                    </div>
                   ))}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = "" }} />
               </div>
+
+              {/* THE WAY OUT OF THE REFERENCE STRIP.
+                  Reference photos are shown and never published, which leaves an obvious gap:
+                  you can see the shot that sells and have no way to make your own without
+                  saving every one of them to a laptop. This closes it without reopening the
+                  path that was removed — it renders OUR photograph, and a render still has to
+                  be pressed into the set above. */}
+              <ListingPhotoStudio
+                references={referencePhotos}
+                focus={studioFocus}
+                onUse={useRender}
+                listingTitle={title}
+                product={blank?.name || undefined}
+                method={method || undefined}
+                colors={pickedColors}
+              />
 
               </SectionCard>
 
