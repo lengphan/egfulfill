@@ -1008,17 +1008,6 @@ function cellTone(it: InventoryItem, lowAt: (x: InventoryItem) => number) {
   return "border-border"
 }
 
-/** "and N more with nothing on the shelf" — the way back to the empties. */
-function EmptyToggle({ hidden, showAll, onToggle }: { hidden: number; showAll: boolean; onToggle: () => void }) {
-  if (!hidden && !showAll) return null
-  return (
-    <button type="button" onClick={onToggle}
-      className="text-2xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">
-      {showAll ? "Hide the empty ones" : `Show ${hidden} more with nothing on the shelf`}
-    </button>
-  )
-}
-
 /** The variants a grid could not place — named, never dropped. */
 function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
   return (
@@ -1034,7 +1023,6 @@ function StockMatrix({ group, edit, lowAt }: {
   edit: (sku: string, field: "in_stock", value: number) => void
   lowAt: (it: InventoryItem) => number
 }) {
-  const [showAll, setShowAll] = useState(false)
   const p = group.product
   if (!p) return null
 
@@ -1078,19 +1066,14 @@ function StockMatrix({ group, edit, lowAt }: {
   /**
    * WHAT IS ON THE SHELF, NOT WHAT THE CATALOGUE COULD HOLD.
    *
-   * A cap declares seventeen colours and stocks none of them; a hoodie declares sixty
-   * variants and stocks none. Drawing every one gave seventeen chips reading 0 and sixty
-   * cells reading 0 — pages of a number that means "nothing here", with the two or three
-   * that matter lost among them. Zero is the answer to a question nobody asked.
-   *
-   * So a row has to EARN its place: something on the shelf, or something held for an order.
-   * Everything else is behind one toggle, because you do still need it — setting a count on
-   * a variant that has never had one is exactly when you want the empties.
+   * EVERY VARIANT, ALWAYS. The empties used to be folded behind a "Show 15 more with
+   * nothing on the shelf" toggle, on the reasoning that a zero is the answer to a question
+   * nobody asked. On this page it is the opposite: the grid IS the shelf, and a variant
+   * missing from it cannot be told apart from a variant we do not carry — while setting a
+   * count on a line that has never had one is exactly the job people open this to do.
+   * Hiding it put an extra click in front of the only edit that matters.
    */
-  const has = (x: { it: InventoryItem }) => (Number(x.it.in_stock) || 0) !== 0 || (Number(x.it.reserved) || 0) !== 0
-  const stocked = [...placed.values()].filter(has)
-  const hidden = placed.size - stocked.length
-  const shown = showAll || !stocked.length ? [...placed.values()] : stocked
+  const shown = [...placed.values()]
 
   const sizes = [...new Set(shown.map((x) => x.size).filter(Boolean))].sort(bySize)
   const colors = [...new Set(shown.map((x) => x.color).filter(Boolean))]
@@ -1122,19 +1105,6 @@ function StockMatrix({ group, edit, lowAt }: {
    * wide, which is the pile of rows this exists to replace wearing a header. What matters
    * is which axis VARIES, not how many were found.
    */
-  /**
-   * NOTHING ON THE SHELF IS A SENTENCE, NOT A GRID. A product we stock none of drew
-   * seventeen zeros; one line says the same thing and leaves the row readable.
-   */
-  if (!stocked.length && !showAll) {
-    return (
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs text-muted-foreground">
-        <span>Nothing on the shelf in any of the {placed.size} variants.</span>
-        <EmptyToggle hidden={placed.size} showAll={false} onToggle={() => setShowAll(true)} />
-      </div>
-    )
-  }
-
   if (sizes.length <= 1 || colors.length <= 1) {
     const oneSize = sizes[0] ?? ""
     const oneColor = colors[0] ?? ""
@@ -1159,10 +1129,7 @@ function StockMatrix({ group, edit, lowAt }: {
             </span>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <EmptyToggle hidden={hidden} showAll={showAll} onToggle={() => setShowAll((v) => !v)} />
-          {leftover.length > 0 && <LeftoverNote rows={leftover} />}
-        </div>
+        {leftover.length > 0 && <LeftoverNote rows={leftover} />}
       </div>
     )
   }
@@ -1187,10 +1154,7 @@ function StockMatrix({ group, edit, lowAt }: {
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <EmptyToggle hidden={hidden} showAll={showAll} onToggle={() => setShowAll((v) => !v)} />
-        {leftover.length > 0 && <LeftoverNote rows={leftover} />}
-      </div>
+      {leftover.length > 0 && <LeftoverNote rows={leftover} />}
     </div>
   )
 }
