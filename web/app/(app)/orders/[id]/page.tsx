@@ -13,6 +13,7 @@ import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/c
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
+import { TrueViewTile } from "@/components/app/true-view-tile"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
@@ -691,6 +692,13 @@ export default function OrderDetailPage() {
                       </span>
                       {/* The blank with its artwork placed — the seller sees the same
                           composite the floor will produce from. */}
+                      {/* MOCKUP LEFT, STITCHES RIGHT — the two claims about one job, side
+                          by side. The mockup is what the buyer was sold; the tile beside it
+                          is what the machine will actually sew, from the worksheet the
+                          digitiser sent or from Wilcom. Staff only: the render route is
+                          requireStaff, and a seller is looking at their own product, not at
+                          our production check. */}
+                      <div className="flex shrink-0 items-start gap-2">
                       <div className="relative shrink-0">
                         {/* The line's files, on the corner of its own picture — see
                             LineDownloads for why they are not a link under the text. */}
@@ -714,6 +722,8 @@ export default function OrderDetailPage() {
                             <PenNib size={9} weight="fill" />
                           </span>
                         )}
+                      </div>
+                      {isStaff && <TrueViewTile orderId={id} item={it} files={dfiles} size={144} />}
                       </div>
                       {/* One column holding three stacked zones — identity+price, then
                           the variant fields, then the design action. Previously the

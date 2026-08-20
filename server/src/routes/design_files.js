@@ -79,6 +79,9 @@ export function designFilesRoutes(app, requireAuth) {
      */
     .then(() => q('alter table design_file_data add column if not exists storage_key text'))
     .then(() => q("update design_file_data set storage_key = regexp_replace(url, '^https?://[^/]+/', '') where url is not null and storage_key is null"))
+    // Worksheets already on file were stored before the kind existed. One statement, run at
+    // load like every other late column here — it only ever touches rows nothing looks for.
+    .then(() => q("update design_file_data set kind='sheet' where coalesce(kind,'other')='other' and (lower(file_name) like '%.pdf' or mime='application/pdf')"))
     .then(() => q('create index if not exists design_file_data_order on design_file_data (order_id)'))
     .catch(() => {});
 
@@ -91,6 +94,21 @@ export function designFilesRoutes(app, requireAuth) {
     const n = String(name || '').toLowerCase();
     if (/\.pes$/.test(n)) return 'pes';
     if (/\.(emb|dst|exp|jef|vp3|xxx|hus)$/.test(n)) return 'emb';
+    /**
+     * THE PRODUCTION WORKSHEET — the PDF a digitiser sends beside the stitch file.
+     *
+     * It is the design as it will sew, with the stitch count, the colour changes, the
+     * thread list by brand and code, the machine and the hoop size. Wilcom prints it; so
+     * does every other digitising package. When one arrives with the .DST it is a BETTER
+     * artefact than anything we can render — it is the digitiser's own statement about
+     * their file — and it costs nothing to show, where a TrueView costs an EWA call and
+     * cannot be produced at all for a licence-locked .emb.
+     *
+     * It was landing in 'other', which is the bucket for things nothing looks for. Naming
+     * it is the whole change; visibility is untouched, because that reads `kind === 'pes'
+     * or source === 'seller'` and a worksheet is neither.
+     */
+    if (/\.pdf$/.test(n) || String(mime || '') === 'application/pdf') return 'sheet';
     if (/^image\//.test(String(mime || '')) || /\.(png|jpe?g|webp|gif|svg|tiff?|bmp)$/.test(n)) return 'image';
     return 'other';
   }
