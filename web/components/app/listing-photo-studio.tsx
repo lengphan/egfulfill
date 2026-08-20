@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Sparkle, Warning, Check, X, Eraser } from "@phosphor-icons/react"
+import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -152,6 +152,8 @@ export function ListingPhotoStudio({
   const [size, setSize] = useState("")
   const [ratio, setRatio] = useState("1:1")
   const [count, setCount] = useState(1)
+  /* The four render settings live behind one control — see the note where it renders. */
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const [busy, setBusy] = useState(false)
   const [cands, setCands] = useState<ListingRender[]>([])
@@ -580,41 +582,6 @@ export function ListingPhotoStudio({
                   ))}
                 </div>
 
-                {/* NOT AN EQUAL FOUR-UP. "Nano Banana Pro — best quality" and "1:1 — Etsy /
-                    Shopify / Amazon listing" are the long strings; at 1fr each, the two choices
-                    that change the price were the two you could not read. */}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,2.2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                  <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">Model</div>
-                    <select value={model} className={selectCls}
-                      onChange={(e) => {
-                        const id = e.target.value; setModel(id)
-                        const m = cfg.models.find((x) => x.id === id)
-                        if (m && !m.sizes.includes(size)) setSize(m.defaultSize)
-                      }}>
-                      {cfg.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
-                    <select value={ratio} onChange={(e) => setRatio(e.target.value)} className={selectCls}>
-                      {cfg.ratios.map((r) => <option key={r} value={r}>{cfg.ratioHints[r] ? `${r} — ${cfg.ratioHints[r]}` : r}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">Size</div>
-                    <select value={effSize} onChange={(e) => setSize(e.target.value)} className={selectCls}>
-                      {(spec?.sizes || []).map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">How many</div>
-                    <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={selectCls}>
-                      {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </div>
-                </div>
-                {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
 
                 {/* WHAT THIS PROMPT CANNOT PRODUCE, before it is paid for. Not a block — the
                     person may know exactly what they are doing — but a render that comes back
@@ -634,6 +601,67 @@ export function ListingPhotoStudio({
                     {busy && <CircleNotch size={15} className="animate-spin" />}
                     {busy ? "Rendering…" : "Generate"}
                   </Button>
+
+                  {/* FOUR SETTINGS, ONE CONTROL — the shape the chat composer already uses.
+                      They were a four-up row of labelled selects permanently across the panel,
+                      which is a lot of furniture for choices that are set once and then left
+                      alone: model, shape, size, how many. Laid out flat they also competed
+                      with the prompt box and the Generate button for the same attention.
+                      The trigger SUMMARISES rather than saying "Settings", so the three facts
+                      that change the price stay readable without opening anything — the panel
+                      is for changing them, not for finding out what they are. */}
+                  <div className="relative">
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      onClick={() => setSettingsOpen((o) => !o)}
+                      aria-expanded={settingsOpen}
+                      className="h-9 gap-1.5 font-normal tabular-nums"
+                      title="Model, shape, size and how many"
+                    >
+                      {ratio} · {effSize} · ×{count}
+                      <CaretDown size={11} weight="bold" className="text-muted-foreground" />
+                    </Button>
+                    {settingsOpen && (
+                      <>
+                        {/* Click-away, same as the composer's emoji sheet. */}
+                        <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setSettingsOpen(false)} />
+                        <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <div>
+                            <div className="mb-1 text-2xs text-muted-foreground">Model</div>
+                            <select value={model} className={selectCls}
+                              onChange={(e) => {
+                                const id = e.target.value; setModel(id)
+                                const m = cfg.models.find((x) => x.id === id)
+                                if (m && !m.sizes.includes(size)) setSize(m.defaultSize)
+                              }}>
+                              {cfg.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
+                            <select value={ratio} onChange={(e) => setRatio(e.target.value)} className={selectCls}>
+                              {cfg.ratios.map((r) => <option key={r} value={r}>{cfg.ratioHints[r] ? `${r} — ${cfg.ratioHints[r]}` : r}</option>)}
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="mb-1 text-2xs text-muted-foreground">Size</div>
+                              <select value={effSize} onChange={(e) => setSize(e.target.value)} className={selectCls}>
+                                {(spec?.sizes || []).map((s) => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div className="mb-1 text-2xs text-muted-foreground">How many</div>
+                              <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={selectCls}>
+                                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                          {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <span className="text-xs tabular-nums text-muted-foreground">
                     {batchCost > 0
                       ? <>{count} × {unit(perImage)} = <span className="font-semibold text-foreground">{money(batchCost)}</span></>

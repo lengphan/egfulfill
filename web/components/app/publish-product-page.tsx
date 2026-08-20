@@ -958,14 +958,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   const [studioOpen, setStudioOpen] = useState(false)
   const [studioFocus, setStudioFocus] = useState(0)
 
-  /** Open on a specific photo — clicking a tile IS choosing it, so it joins the set. */
-  const openStudioOn = (i: number) => {
-    setRefPicked((p) => (p.includes(i) ? p : [...p, i].sort((a, b) => a - b)))
-    setStudioFocus(i)
-    setStudioOpen(true)
-  }
-  /** Open on whatever is already ticked, or on nothing — the studio's own grid is a perfectly
-   *  good place to choose from, so this never forces a selection the way the tile does. */
+  /* openStudioOn is gone with the per-tile "Make ours" overlay. A tile click now selects
+     and nothing else, so there is no longer a way to open the studio pointed at one photo —
+     which is the point: it is briefed from the whole ticked set. */
+  /** Open on the first ticked photo. The button is disabled until there is one, so this
+   *  never opens on an empty brief. */
   const openStudio = () => { setStudioFocus(refPicked[0] ?? 0); setStudioOpen(true) }
   const toggleRefPick = (i: number) =>
     setRefPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i].sort((a, b) => a - b)))
@@ -1518,12 +1515,16 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                    that repeated what the tick marks already say. A card's header is where its
                    one action belongs, and it costs no vertical space there. */
                 actions={referencePhotos.length > 0 ? (
-                  /* NOT disabled when nothing is ticked. A dead button is a dead end — the
-                     studio opens on the same photo grid, which is a perfectly good place to
-                     choose from, and choosing there is one click closer than coming back out
-                     to tick a tile first. */
-                  <Button size="sm" variant="outline" onClick={openStudio}>
-                    <Sparkle size={14} weight="fill" />
+                  /* WAITS FOR A PICK. The studio is briefed FROM the ticked photos, so opening
+                     it with none chosen starts on a screen that cannot do anything yet — and
+                     now that the tile itself is the tick, choosing one is a single click in
+                     the grid directly below. The title says what is missing rather than the
+                     button going quiet. */
+                  <Button
+                    size="sm" variant="outline" onClick={openStudio}
+                    disabled={refPicked.length === 0}
+                    title={refPicked.length === 0 ? "Pick at least one reference photo below" : "Generate our own photos from the picked references"}
+                  >
                     Generate Images
                   </Button>
                 ) : undefined}
@@ -1538,7 +1539,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 {/* Bigger tiles now the card owns the full width — 10rem was sized for a
                     two-thirds column and left the photos smaller than they needed to be for
                     judging a print. auto-fill still keeps them sane at any count. */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2.5">
+                {/* 13rem tiles were nearly a third of the row each, so a nine-photo listing filled
+                    the screen with reference material before the listing form was reached.
+                    These are things to pick from, not things to study — the lightbox is gone
+                    and judging a shot happens in the studio. 8.5rem fits roughly twice as
+                    many per row and the whole set lands above the fold. */}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
                   {/* FIRST, ALWAYS — and a bare +.
                       It used to sit after the photos, so its position moved every time one
                       was added or removed and the reference photos pushed it into the middle
@@ -1586,9 +1592,24 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       opens it full size, which is still the only way to judge a shot at
                       this thumbnail size. */}
                   {referencePhotos.map((src, i) => (
-                    <div
+                    /* ONE CONTROL PER TILE, and it is the tile.
+                       There were three: a corner tick, a full-area "Make ours" overlay, and a
+                       corner magnifier. Clicking the obvious target — the photograph — opened
+                       a lightbox, which is not what anyone wants from a picker, and the two
+                       hover controls only existed on hover, so the tile's real behaviour was
+                       invisible until the mouse was already on it.
+                       Now the whole tile toggles selection. The corner circle stays as the
+                       INDICATOR and is no longer a button; making a photo of your own is one
+                       action for the whole set and belongs in the header, not repeated on
+                       every tile. */
+                    <button
                       key={`ref-${i}`}
-                      className="group relative aspect-square overflow-hidden rounded-lg border border-dashed border-border bg-muted/40"
+                      type="button"
+                      onClick={() => toggleRefPick(i)}
+                      aria-pressed={refPicked.includes(i)}
+                      aria-label={refPicked.includes(i) ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
+                      title={refPicked.includes(i) ? "Using this one — click to drop it" : "Not used — click to add it"}
+                      className="group relative aspect-square overflow-hidden rounded-lg bg-muted/40 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/60"
                     >
                       {/* GREYED, ALWAYS — even for staff.
                           The watermark is off for the factory (it lands over the print they
@@ -1620,12 +1641,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           using" has to be answerable at a glance rather than by sweeping the
                           mouse across the row. An unticked tile also dims, so the set reads
                           from across the page. */}
-                      <button
-                        type="button"
-                        onClick={() => toggleRefPick(i)}
-                        aria-pressed={refPicked.includes(i)}
-                        aria-label={refPicked.includes(i) ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
-                        title={refPicked.includes(i) ? "Using this one — click to drop it" : "Not used — click to add it"}
+                      <span
+                        aria-hidden
                         /* A CIRCLE, AND A TICK INSIDE IT — not two circles.
                            It used the CheckCircle glyph, which already draws its own ring, so
                            a round filled button around it rendered a circle inside a circle
@@ -1645,26 +1662,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                             : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
                       >
                         <Check size={11} weight="bold" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openStudioOn(i)}
-                        aria-label={`Make our own photo from reference ${i + 1}`}
-                        className="absolute inset-0 flex cursor-pointer items-end justify-center bg-black/35 pb-2 opacity-0 outline-none transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                      >
-                        <span className="flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">
-                          <Sparkle size={10} weight="fill" /> Make ours
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setZoom({ which: "ref", index: i })}
-                        aria-label={`View reference photo ${i + 1} larger`}
-                        className="absolute right-1 top-1 cursor-zoom-in rounded bg-black/45 p-1 text-white opacity-0 outline-none transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50"
-                      >
-                        <MagnifyingGlassPlus size={13} weight="bold" />
-                      </button>
-                    </div>
+                      </span>
+                    </button>
                   ))}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = "" }} />
