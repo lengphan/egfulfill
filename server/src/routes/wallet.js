@@ -126,13 +126,33 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
   const walletReady = q(`create table if not exists wallet_ledger (
        id bigserial primary key,
        account     text not null,
-       delta       numeric(12,2) not null,
+       -- SIX PLACES, NOT TWO. See the widening below for why; this only affects a fresh DB.
+       delta       numeric(14,6) not null,
        type        text not null default 'adjust',
        ref         text,
        note        text,
        created_by  text,
        created_at  timestamptz not null default now()
      )`)
+    /*
+     * SUB-CENT COSTS EXIST, AND numeric(12,2) SILENTLY ATE THEM.
+     *
+     * `delta` was two decimal places, which is right for every movement this ledger was built
+     * for — a seller is charged in cents and a balance is money. Then AI spend started being
+     * booked: a prompt read from two reference photos costs about $0.0127, and Postgres
+     * rounded that to 0.00 on the way in. The row was written, the note was right, and the
+     * amount was gone. Eighteen of them before it was noticed, and no error anywhere, because
+     * rounding is not a failure — it is the column doing exactly what it was declared to do.
+     *
+     * Six places, so a fraction of a cent survives. Balances are still rendered at two by
+     * every reader, and seller-facing movements are all whole cents by construction, so
+     * nothing a person sees changes; what changes is that SUM(delta) over a thousand prompt
+     * reads is $12.70 instead of $0.00.
+     *
+     * Idempotent and cheap — the table is small and an ALTER that widens a numeric's scale
+     * rewrites it without touching a single stored value.
+     */
+    .then(() => q('alter table wallet_ledger alter column delta type numeric(14,6)').catch(() => {}))
     // Marked-not-deleted — see REAL above. Defaults false so every existing row stays real
     // money until somebody says otherwise.
     .then(() => q('alter table wallet_ledger add column if not exists is_test boolean not null default false').catch(() => {}))
