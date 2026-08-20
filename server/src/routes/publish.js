@@ -15,7 +15,7 @@ import { aiComplete } from './support_ai.js';
 import { imageBytesFrom } from '../images.js';
 import { generateImage, IMAGE_MODELS, ASPECT_RATIOS } from '../gemini.js';
 import { putObject, storageEnabled } from '../storage.js';
-import { readPricing, quoteFor, chargeForGeneration, refundGeneration } from '../ai-pricing.js';
+import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost } from '../ai-pricing.js';
 
 const LABEL = { etsy: 'Etsy', tiktok: 'TikTok Shop', shopify: 'Shopify' };
 
@@ -262,7 +262,15 @@ export function publishRoutes(app, requireAuth) {
     try {
       // keepEmoji: false — the paragraph is read by a person here and pasted into a prompt,
       // and an emoji in a rendering prompt is noise the model tries to draw.
-      const raw = await aiComplete({ system, messages: [{ role: 'user', content }], maxTokens: 900 });
+      //
+      // costRef books what Anthropic charged for READING the photos. It is roughly a cent
+      // with four references and it is pressed repeatedly while the wording is tuned, so it
+      // belongs in the same line as the render it precedes rather than nowhere.
+      const raw = await aiComplete({
+        system, messages: [{ role: 'user', content }], maxTokens: 900,
+        costRef: `aiprompt-${crypto.randomBytes(8).toString('hex')}`,
+        costNote: `Prompt from ${usable.length} reference photo${usable.length === 1 ? '' : 's'}`,
+      });
       const m = /\{[\s\S]*\}/.exec(raw || '');
       let out = null;
       try { out = m ? JSON.parse(m[0]) : null; } catch { out = null; }
@@ -356,6 +364,9 @@ export function publishRoutes(app, requireAuth) {
         errors.push('A photo was generated but could not be saved: ' + ((e && e.message) || 'storage error'));
         continue;
       }
+
+      // Google has billed us for this one — booked before anything else can go wrong with it.
+      await recordGenerationCost(charge.ref, img.usd, `Image · ${img.model} · ${img.size} · ${img.aspectRatio} · listing photo`);
 
       results.push({
         url: `${base}/api/support/asset/${name}`,

@@ -15,7 +15,7 @@ import { q } from '../db.js';
 import { egBroadcast } from '../events.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
 import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
-import { readPricing, quoteFor, chargeForGeneration, refundGeneration } from '../ai-pricing.js';
+import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost } from '../ai-pricing.js';
 import {
   startVideo, checkVideo, fetchVideo, meterVideo, videoConfig, usdFor,
   VIDEO_MODELS, VIDEO_RATIOS, VIDEO_RATIO_HINTS, VIDEO_DURATIONS,
@@ -189,6 +189,13 @@ async function finishVideoJob(job, uri) {
     model: job.model, resolution: job.resolution, seconds: job.seconds,
     usd: usdFor(job.model, job.resolution, job.seconds), fromImage: !!job.from_image,
   };
+  /*
+   * The clip EXISTS by the time we are here, so Veo has billed us for it. Booked against the
+   * job id rather than a charge ref: the job id is stable, unique per clip, and it is the only
+   * one of the two this function is handed — and a clip that is swept twice must book once.
+   */
+  await recordGenerationCost(job.id, meta.usd, `Video · ${job.model} · ${job.resolution} · ${job.seconds}s`);
+
   await q(
     `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
      values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
@@ -413,13 +420,46 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 // ONE Anthropic call path: retry/backoff + error surfacing live here so every AI
 // feature behaves the same. 529 (overloaded) / 429 (rate limit) are transient.
-async function postAnthropic(key, body) {
+/**
+ * Per-million-token USD for the text models, so a call can be priced from what it actually
+ * used rather than estimated from prompt length.
+ *
+ * Matched by PREFIX, because the configured model carries a date suffix
+ * (`claude-haiku-4-5-20251001`) and the price belongs to the family, not the snapshot. An
+ * unknown model prices at 0 rather than guessing — a wrong number in the ledger is worse
+ * than a missing one, and the usage meter still records that the call happened.
+ */
+const TEXT_PRICES = [
+  { p: 'claude-opus-', in: 5, out: 25 },
+  { p: 'claude-sonnet-', in: 3, out: 15 },
+  { p: 'claude-haiku-', in: 1, out: 5 },
+];
+/** What one completion cost us, from the usage the API reports back. Cache reads and writes
+ *  are priced at the input rate here — they are a fraction of it in reality, so this errs
+ *  HIGH, which is the safe direction for a cost line. */
+export function textCallUsd(model, usage) {
+  if (!usage) return 0;
+  const row = TEXT_PRICES.find((x) => String(model || '').startsWith(x.p));
+  if (!row) return 0;
+  const inTok = (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+  const outTok = usage.output_tokens || 0;
+  return (inTok / 1e6) * row.in + (outTok / 1e6) * row.out;
+}
+
+/**
+ * `onUsage` is an out-channel, not a return-shape change: every existing caller of this
+ * function and of aiComplete expects a plain string back, and threading a tuple through all
+ * six of them to add an accounting line would be a change to code that has nothing to do
+ * with accounting.
+ */
+async function postAnthropic(key, body, onUsage) {
   const headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
   let r, detail = '';
   for (let attempt = 0; attempt < 3; attempt++) {
     r = await fetch(API_URL, { method: 'POST', headers, body });
     if (r.ok) {
       const data = await r.json();
+      if (onUsage) { try { onUsage(data.usage || null); } catch { /* accounting must never break a reply */ } }
       return (Array.isArray(data.content) ? data.content : []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
     }
     detail = await r.text().catch(() => '');
@@ -438,11 +478,25 @@ async function postAnthropic(key, body) {
  * Throws { disabled: true } when no key is set, so callers can say so precisely
  * instead of reporting a generic failure.
  */
-export async function aiComplete({ system, messages, maxTokens = 900, keepEmoji = false }) {
+export async function aiComplete({ system, messages, maxTokens = 900, keepEmoji = false, costRef = null, costNote = null }) {
   const cfg = await aiConfig();
   const { key, model } = cfg;
   if (!key) { const e = new Error('The assistant is off — an admin can add the AI key in Settings › Integrations.'); e.disabled = true; e.status = 503; throw e; }
-  const out = await postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }));
+  /*
+   * BOOK THE WORDS TOO, when the caller names a ref.
+   *
+   * A prompt written from four reference photos is about a cent — small beside a render, and
+   * not nothing when it is pressed all day. Opt-in rather than automatic: this same function
+   * answers support chats and order briefs, where per-message ledger rows would bury the
+   * costs that matter under thousands that do not. A caller that wants its spend tracked
+   * passes a ref; everything else is metered by the usage meter and left out of the books.
+   */
+  const out = await postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }), costRef
+    ? (usage) => {
+      const usd = textCallUsd(model, usage);
+      if (usd > 0) recordGenerationCost(costRef, usd, costNote || `Text · ${model}`).catch(() => {});
+    }
+    : null);
   /*
    * Stripped HERE, not at each call site, so a feature added later is emoji-free without
    * anyone having to remember. The chat assistant was only the visible half — order briefs,
@@ -963,6 +1017,14 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       // client offers a switch to a less contended model rather than just "try later".
       return { ok: false, disabled: !!e.disabled, overloaded: !!e.overloaded, refunded: Number(charge.usd) > 0, error: e.message || 'Image generation failed' };
     }
+
+    /*
+     * GOOGLE HAS BILLED US BY THIS POINT, so the cost is booked here — before storage, and
+     * regardless of what happens next. The refund path below gives the SELLER their money
+     * back when we cannot keep the file, which is right, but it does not get ours back from
+     * Google. Booking after the store would have hidden exactly the failures worth seeing.
+     */
+    await recordGenerationCost(charge.ref, img.usd, `Image · ${img.model} · ${img.size} · ${img.aspectRatio}`);
 
     // Store PRIVATE and hand back a same-origin proxy URL, exactly like a chat upload:
     // it loads in an <img> without a public bucket, and it is only reachable via the

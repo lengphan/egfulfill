@@ -163,6 +163,13 @@ function txMeta(type: string, delta: number): { label: string; tone: string } {
   if (t === "expedite-cost") return { label: "Dispatch fee", tone: AM }
   if (t === "sample-cost") return { label: "Sample", tone: AM }
   if (t === "sample-cost-credit") return { label: "Sample refund", tone: EM }
+  // AI, both directions and told apart. Without these three, every generation row in the
+  // history fell through to a bare "Debit"/"Credit" — the row that says what a press cost,
+  // labelled as nothing in particular.
+  if (t === "aigen-cost") return { label: "AI generation", tone: AM }
+  if (t === "aigen-in") return { label: "AI billed on", tone: EM }
+  if (t === "aigen-out") return { label: "AI generation", tone: MUT }
+  if (t.startsWith("aigen-refund")) return { label: "AI refund", tone: EM }
   if (t === "withdrawal") return { label: "Payout", tone: MUT }
   if (t === "manual-income") return { label: "Income", tone: EM }
   if (t === "manual-expense") return { label: "Expense", tone: AM }
@@ -461,12 +468,27 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // worsen every product's apparent cost. They must be in ONE of the two, though — left out
   // of both, Profit reads high by exactly what sourcing spent.
   const fees = s ? s.postage + s.design + s.dispatch + (s.samples ?? 0) : 0
-  const profit = s ? s.revenue - s.productCost - fees - s.refundsOut : 0
+  const aiCost = s?.aiCost ?? 0
+  const aiRevenue = s?.aiRevenue ?? 0
+  /**
+   * AI IS IN THE PROFIT LINE, on both sides.
+   *
+   * The same rule the samples comment above states: a cost that is booked but listed nowhere
+   * still moves the balance, so Profit would read HIGH by exactly what generation spent.
+   * `aiRevenue` is added for the mirror reason — sellers paying for renders is income the
+   * revenue line does not carry, and leaving it out would understate by exactly what they paid.
+   */
+  const profit = s ? s.revenue + aiRevenue - s.productCost - fees - aiCost - s.refundsOut : 0
   const kpis = isFactoryWallet && s
     ? [
         { label: "Revenue", value: usd(s.revenue), sub: "order charges received", tone: "pos" as const },
         { label: "Product cost", value: usd(s.productCost), sub: "blanks booked (COGS)", tone: "mut" as const },
         { label: "Fees & partner", value: usd(fees), sub: "postage · design · dispatch · samples", tone: "mut" as const },
+        /* ITS OWN CARD, at the owner's request — and it earns one: this is the only cost here
+           incurred by a BUTTON rather than by an order, so it is the only one that can run up
+           with nothing shipped. The sub names what came back from sellers when any did, so a
+           card reading $40 is not mistaken for $40 lost. */
+        { label: "AI generation", value: usd(aiCost), sub: aiRevenue > 0 ? `renders & prompts · ${usd(aiRevenue)} billed on` : "renders & prompts", tone: "mut" as const },
         // SIGNED when negative. usd() renders Math.abs(), so a factory running at a loss
         // read "Profit $103.75" — identical to earning it — with only the tone to say
         // otherwise. A minus sign is not decoration on this number.

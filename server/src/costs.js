@@ -43,6 +43,19 @@ export const COST_TYPES = {
    * and "what it cost us to pay them", which are negotiated with different people.
    */
   bank: 'bank-fee',
+  /**
+   * WHAT THE AI ACTUALLY COST US — Google for a render, Anthropic for the words.
+   *
+   * Its own type, not folded into anything else, because it is the one cost here that is
+   * incurred by a BUTTON rather than by an order: a staffer pressing Generate spends 3c to
+   * 24c with nothing shipped and no margin to sit against. Averaging that into COGS would
+   * quietly worsen every product's cost for spend that has no product behind it.
+   *
+   * Distinct from the `aigen` type as well, which is the opposite direction — what a SELLER
+   * paid US for a generation. Revenue and cost on the same activity, and one line reporting
+   * both nets them into a number that describes neither.
+   */
+  aigen: 'aigen-cost',
 };
 
 /**
@@ -56,7 +69,7 @@ export const COST_TYPES = {
  * purchase or the partner push it describes — losing one accounting row is bad, failing a
  * customer's dispatch over it is worse.
  *
- * @param {'label'|'dispatch'|'design'|'blanks'|'sample'} kind
+ * @param {'label'|'dispatch'|'design'|'blanks'|'sample'|'bank'|'aigen'} kind
  * @param {number} amount   positive; what we PAID (stored as a negative delta)
  * @param {string} ref      stable id for the thing, e.g. `label-FF-1042`
  */

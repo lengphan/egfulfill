@@ -215,6 +215,41 @@ export async function chargeForGeneration(user, kind) {
 }
 
 /**
+ * BOOK WHAT THE GENERATION COST US — the other side of chargeForGeneration.
+ *
+ * `chargeForGeneration` records what the SELLER paid; this records what WE paid Google or
+ * Anthropic for the same press. They are opposite directions on one activity, and until now
+ * only the first existed: a staff render moved no money at all, so the factory's own AI spend
+ * — every press of a button that bills at 3c to 24c — appeared in no report anywhere. Seller
+ * renders were worse than invisible, showing pure revenue against a cost we never wrote down.
+ *
+ * Booked at the moment it is INCURRED and never recomputed from today's price list, the same
+ * rule the rest of costs.js follows: model prices move, and a report that recalculates history
+ * from current rates misstates it.
+ *
+ * Idempotent on `ref`, which is the generation's own id — the same one the charge and any
+ * refund carry — so a retried request books once and a cost can be lined up against the
+ * charge it belongs to.
+ *
+ * Best-effort, never throws: losing an accounting row is bad, failing a render the user has
+ * already paid for is worse.
+ *
+ * @param {string} ref     the generation's id (`charge.ref`)
+ * @param {number} usd     what the provider charged US, positive
+ * @param {string} note    human line for the ledger — model, size, what it was for
+ */
+export async function recordGenerationCost(ref, usd, note) {
+  const amt = Number(usd);
+  if (!ref || !isFinite(amt) || amt <= 0) return;
+  try {
+    const { recordCost } = await import('./costs.js');
+    await recordCost('aigen', amt, String(ref), note || 'AI generation');
+  } catch (e) {
+    console.error('[ai-pricing] could not book generation cost for', ref, String(e));
+  }
+}
+
+/**
  * Give it back. Called on every path where the render did not happen — a refusal, an
  * overload, a storage failure, or a video job that failed minutes later.
  *

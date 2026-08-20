@@ -325,6 +325,21 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
       // SUM(delta), so a type nobody lists still LOWERS the total while appearing in no
       // line — money visibly gone and nowhere accounted for.
       samples: costOf('sample-cost'),
+      /**
+       * AI GENERATION, BOTH DIRECTIONS, as two lines that are never netted.
+       *
+       * `aiCost` is what Google and Anthropic charged US — a cost incurred by a BUTTON
+       * rather than by an order, with nothing shipped behind it. `aiRevenue` is what sellers
+       * paid us for their own generations. Reporting one number would describe neither: the
+       * factory's own renders are pure cost, a seller's are margin, and a single figure hides
+       * which of the two just moved.
+       *
+       * `aigen-in` was already flowing through the ledger unnamed — seller money arriving in
+       * a type no line listed, which is precisely the failure the NAMED set below exists to
+       * catch. Named now rather than left for the audit to find again.
+       */
+      aiCost: costOf('aigen-cost'),
+      aiRevenue: pos('aigen-in'),
       // What the BANK took to move our money, kept out of productCost on purpose: "what
       // the supplier charged" and "what it cost us to pay them" are negotiated with
       // different people, and adding them together loses both answers.
@@ -366,6 +381,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
       'topup', 'refund-in', 'refund-out',
       'subscription-in', 'withdrawal', 'blanks-cost', 'label-cost', 'design-partner-cost',
       'design-pay-out', 'expedite-cost', 'sample-cost', 'bank-fee',
+      'aigen-cost', 'aigen-in', 'aigen-out', 'aigen-refund-in', 'aigen-refund-out',
       'manual-adjust-in', 'manual-adjust-out', 'adjust', 'opening', 'test-cleanup',
       'topup-fee',
     ]);
@@ -473,6 +489,11 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
       -- partner column, so this only catches anything booked without one. (No backticks in
       -- here: this whole block is a template literal, and one closes it mid-comment.)
       when type like 'bank-fee%'            then 'suppliers'
+      -- aigen-cost is DELIBERATELY unmapped, like design-pay-out above. This export is the
+      -- statement we reconcile a vendor's invoice against; Google and Anthropic bill a card
+      -- and send no invoice to agree, so listing them here would add a partner nobody can
+      -- reconcile. The spend is still in the summary and in the balance — it just is not a
+      -- partner debt.
     end)`;
 
   app.get('/api/wallet/export', { preHandler: requireAuth }, async (req, reply) => {

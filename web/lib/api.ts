@@ -322,6 +322,13 @@ export type WalletSummary = {
   design: number       // Pink Design
   dispatch: number     // byeastside pick fee
   samples: number      // sourcing samples (sample-cost)
+  /** What Google and Anthropic charged US per generation (aigen-cost) — a cost incurred by a
+   *  button, with nothing shipped behind it. */
+  aiCost?: number
+  /** What sellers paid US for their own generations (aigen-in). Kept apart from `aiCost`
+   *  because netting them describes neither: factory renders are pure cost, seller renders
+   *  are margin, and one figure hides which just moved. */
+  aiRevenue?: number
 }
 export type WalletResponse = {
   account: string
