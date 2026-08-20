@@ -84,6 +84,9 @@ export default function OrderDetail() {
   const [moving, setMoving] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  /* Warehouse/admin only — see printLabel below. Read here so both the callback and the
+     control can ask the same question. */
+  const canStampPrinted = me?.role === "admin" || me?.role === "warehouse"
 
   const load = useCallback(async () => {
     if (!id) return
@@ -147,6 +150,17 @@ export default function OrderDetail() {
     setPrinting(true)
     try {
       await printOrderLabel(String(o.id))
+      /**
+       * PRINTING IS OPEN; STAMPING IS NOT — the same split the web makes
+       * (`canStampPrinted` in web/components/app/dispatch-board.tsx).
+       *
+       * POST /api/orders/:id/label-printed is warehouse/admin, because the stamp asserts a
+       * label is on a parcel, and that is a custody claim. Opening the label to print it
+       * asserts nothing, so an operator keeps it. This called the stamp unconditionally, so
+       * an operator's every print ended in "Not stamped as printed: Warehouse or admin
+       * only" — an error on a job that had in fact just succeeded.
+       */
+      if (!canStampPrinted) return
       const r = await markLabelPrinted(String(o.id))
       if (r.error) Alert.alert("Sent to the printer", `Not stamped as printed: ${r.error}`)
       else await load()
@@ -163,7 +177,7 @@ export default function OrderDetail() {
           : [{ text: "OK" }],
       )
     } finally { setPrinting(false) }
-  }, [o, load])
+  }, [o, load, canStampPrinted])
 
   const code = o?.tracking ?? null
   const link = trackingLink(o?.carrier, code)
