@@ -196,10 +196,22 @@ async function finishVideoJob(job, uri) {
    */
   await recordGenerationCost(job.id, meta.usd, `Video · ${job.model} · ${job.resolution} · ${job.seconds}s`);
 
+  /*
+   * SAME TWO-ROW SHAPE as the image path, and for the same reason: this posted the person's
+   * own prompt under the assistant's name, so their request appeared on the wrong side of the
+   * thread. The asker's row is written with the job id so a clip swept twice still inserts
+   * once — the same de-dupe the assistant row has always had.
+   */
+  await q(
+    `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
+     values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
+    [job.thread_id, job.user_id || null, 'staff', job.prompt || '',
+     JSON.stringify({ by: 'You', ts: Date.now() - 1, prompt: true }), 'vidq-' + job.id]);
   await q(
     `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
      values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
-    [job.thread_id, null, 'assistant', job.prompt || '', attachment, JSON.stringify(meta), job.id]);
+    [job.thread_id, null, 'assistant', `Generated · ${job.model} · ${job.resolution} · ${job.seconds}s`,
+     attachment, JSON.stringify(meta), job.id]);
   meterVideo(job.model, job.resolution, job.seconds, true);
   egBroadcast({ type: 'order-message' });
 }
@@ -1058,12 +1070,38 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     const base = (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
     const attachment = { url: `${base}/api/support/asset/${name}`, name: prompt.slice(0, 80), mime: img.mime, size: img.buffer.length };
 
-    const clientId = 'img-' + crypto.randomBytes(8).toString('hex');
+    /*
+     * TWO ROWS: WHO ASKED, AND WHAT CAME BACK.
+     *
+     * This wrote ONE row — sender_role 'assistant', body = the prompt — so the words the
+     * person had just typed into the composer were posted as the ASSISTANT saying them. On
+     * screen their own request appeared on the wrong side of the conversation, under the
+     * assistant's name and avatar, as if the AI had asked for the picture and then supplied
+     * it. The composer clears on send and never rendered the prompt itself, so that stray row
+     * was the only trace of it, which is why it read as the assistant talking to itself.
+     *
+     * The prompt belongs to the person who wrote it, and the image belongs to the assistant.
+     * Two rows say that; one row cannot.
+     *
+     * The assistant row keeps a SHORT factual caption rather than an empty body. toMessages()
+     * drops bodiless rows, so an image with no text disappears from the model's own view of
+     * the thread — the next question about "that image" would be asked of a model that cannot
+     * see one. Naming the model and size is also the honest label for a render: it is what
+     * was made and what it cost to make.
+     */
+    const stamp = crypto.randomBytes(8).toString('hex');
     const meta = { by: 'EGFUL Assistant', ai: true, image: true, ts: Date.now(), model: img.model, size: img.size, aspect: img.aspectRatio, usd: img.usd, refs: img.refsUsed || 0 };
+    const askedBy = req.user?.name || req.user?.email || 'You';
+    await q(
+      `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
+       values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
+      [threadId, String(req.user.sub || ''), charge.staff ? 'staff' : 'seller', prompt,
+       JSON.stringify({ by: askedBy, ts: Date.now() - 1, prompt: true }), 'imgq-' + stamp]);
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
        values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
-      [threadId, null, 'assistant', prompt, attachment, JSON.stringify(meta), clientId]);
+      [threadId, null, 'assistant', `Generated · ${img.model} · ${img.size} · ${img.aspectRatio}`,
+       attachment, JSON.stringify(meta), 'img-' + stamp]);
     egBroadcast({ type: 'order-message' });
 
     // `usd` is what GOOGLE cost us and is staff-only reading; `charged` is what the seller

@@ -11,6 +11,7 @@ import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
 import { GenerateButton, AnimateImageButton, type GenSettings } from "@/components/app/generate-menu"
+import { promptWarning } from "@/lib/image-gen"
 import { UserAvatar } from "@/components/app/user-avatar"
 
 const nowMs = () => Date.now()
@@ -1005,6 +1006,17 @@ export default function ChatPage() {
               {aiNote && (
                 <div className="mx-auto max-w-sm rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
                   {aiNote}
+                </div>
+              )}
+              {/* SAID BEFORE THE PRESS, while the composer is armed to generate.
+                  JPEG is the only format this API returns and it has no alpha, so a prompt
+                  asking for a removed background does not fail — it comes back with a grey
+                  checkerboard PAINTED ON, charged for and unusable. The natural next move is
+                  to ask again, which is how one impossible request becomes a run of paid
+                  renders that cannot converge. */}
+              {gen?.mode === "image" && promptWarning(input) && (
+                <div className="mx-auto max-w-md rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  {promptWarning(input)}
                 </div>
               )}
             </>
