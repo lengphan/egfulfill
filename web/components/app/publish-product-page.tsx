@@ -1539,12 +1539,13 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 {/* Bigger tiles now the card owns the full width — 10rem was sized for a
                     two-thirds column and left the photos smaller than they needed to be for
                     judging a print. auto-fill still keeps them sane at any count. */}
-                {/* 13rem tiles were nearly a third of the row each, so a nine-photo listing filled
-                    the screen with reference material before the listing form was reached.
-                    These are things to pick from, not things to study — the lightbox is gone
-                    and judging a shot happens in the studio. 8.5rem fits roughly twice as
-                    many per row and the whole set lands above the fold. */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
+                {/* 11rem. It was 13, and briefly 8.5 — the 8.5 was sized against "too big" on a
+                    screen at 110% zoom, so it over-corrected and landed at thumbnail size.
+                    Modestly under the original is still right: with the lightbox gone these
+                    are things to PICK from rather than study, and judging a shot happens in
+                    the studio. This keeps a nine-photo listing off the whole viewport without
+                    shrinking the print past recognising. */}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2.5">
                   {/* FIRST, ALWAYS — and a bare +.
                       It used to sit after the photos, so its position moved every time one
                       was added or removed and the reference photos pushed it into the middle
