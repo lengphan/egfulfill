@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Storefront, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, CheckCircle, Warning, XCircle, Sparkle } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ProductCombobox } from "@/components/app/product-combobox"
 import { SectionCard } from "@/components/app/section-card"
-import { ListingPhotoStudio, type PhotoFocus } from "@/components/app/listing-photo-studio"
+import { ListingPhotoStudio } from "@/components/app/listing-photo-studio"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
@@ -259,18 +259,26 @@ function TiktokFields({ dest, fields, onChange }: {
 
       {/* Leaf category — required. Search then pick from the tree. */}
       <div className="space-y-1">
-        <div className="text-xs font-medium">Category {fields.category && <span className="text-muted-foreground">· {fields.category.local_name}</span>}</div>
-        <Input
-          value={fields.query}
-          onChange={(e) => onChange({ query: e.target.value })}
-          /* An empty list after a FAILED load is not a loading list. Showing the error above
-             while the field still said "Loading categories…" left the two halves of the
-             screen contradicting each other, and the spinner-ish wording is the one people
-             believe — so it read as slow rather than broken. */
-          placeholder={fields.categories.length ? "Search categories…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
-          disabled={!fields.categories.length && !!fields.loadErr}
-          className="h-8 text-xs"
-        />
+        {/* THE NAME OF THE PICK IS NOT REPEATED HERE. The select two lines down already
+            shows it, so "Category · Family Clothing Sets" above a box reading "Family
+            Clothing Sets" was the same words twice, with a floating search pill wedged
+            between them — three controls' worth of chrome for one choice. */}
+        <div className="text-xs font-medium">Category</div>
+        {/* ONE CONTROL, TWO ROWS. The filter sits directly on top of the list it filters,
+            sharing an outline — a detached pill above a detached box reads as two unrelated
+            fields, which is exactly how it looked. */}
+        <div className="overflow-hidden rounded-md border border-border bg-card focus-within:ring-2 focus-within:ring-ring/40">
+          <input
+            value={fields.query}
+            onChange={(e) => onChange({ query: e.target.value })}
+            /* An empty list after a FAILED load is not a loading list. Showing the error above
+               while the field still said "Loading categories…" left the two halves of the
+               screen contradicting each other, and the spinner-ish wording is the one people
+               believe — so it read as slow rather than broken. */
+            placeholder={fields.categories.length ? "Type to filter…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
+            disabled={!fields.categories.length && !!fields.loadErr}
+            className="block h-8 w-full border-b border-border bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground"
+          />
         {/* A DROPDOWN, with the box above it as a filter rather than as the only way in.
             It used to be search-only: the list appeared while you typed and vanished when you
             stopped, so with an empty box there was nothing to open and no way to see what was
@@ -285,7 +293,7 @@ function TiktokFields({ dest, fields, onChange }: {
           }}
           disabled={!fields.categories.length}
           aria-label="TikTok leaf category"
-          className="eg-select h-8 w-full rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="eg-select block h-8 w-full border-0 bg-transparent px-2 text-xs outline-none"
         >
           <option value="">
             {fields.categories.length ? "Choose a category…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
@@ -297,6 +305,7 @@ function TiktokFields({ dest, fields, onChange }: {
           )}
           {matches.map((c) => <option key={c.id} value={c.id}>{c.local_name || c.id}</option>)}
         </select>
+        </div>
         {fields.query.trim() && matches.length === 0 && (
           <p className="text-xs text-muted-foreground">No leaf category matches that.</p>
         )}
@@ -855,6 +864,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    */
   const referencePhotos = useMemo(() => (prefill?.referenceImages ?? []).filter(Boolean), [prefill])
 
+
   /**
    * WHO THE WATERMARK IS FOR.
    *
@@ -877,17 +887,50 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   // Which reference photo the lightbox is showing, or null for closed. A thumbnail this
   // small is not enough to judge a competitor's shot by, which is the entire reason these
   // are on screen — so the tile opens one full size. The watermark comes with it.
-  const [zoom, setZoom] = useState<number | null>(null)
+  /* ONE piece of state for BOTH strips — only one lightbox can be open, and two states would
+     have to agree about that. `which` picks the list Prev/Next walks, so paging stays inside
+     the set you opened instead of running off the end of it into the other one. */
+  const [zoom, setZoom] = useState<{ which: "ref" | "own"; index: number } | null>(null)
 
   /**
-   * WHICH REFERENCE PHOTO THE STUDIO WAS POINTED AT.
+   * THE REFERENCE SET, PICKED ON THE GRID.
    *
-   * A nonce rather than a bare index, because clicking the SAME tile twice is a real
-   * instruction — "read this one again" — and an index alone makes the second press a
-   * no-op. The studio guards on the nonce, so each press reads exactly once.
+   * It lives here rather than inside the studio because it is ticked in two places — the tiles
+   * in this grid and the thumb strip in the dialog — and two copies would disagree the moment
+   * one of them moved. Everything is on by default: the point of the feature is not having to
+   * gather the photos by hand.
+   *
+   * Seeded from a function so a listing that arrives with six references starts with six
+   * ticked, and re-seeded by key when the draft changes rather than by an effect that would
+   * render one frame of the wrong set.
    */
-  const [studioFocus, setStudioFocus] = useState<PhotoFocus | null>(null)
-  const focusRef = (i: number) => setStudioFocus((p) => ({ index: i, nonce: (p?.nonce ?? 0) + 1 }))
+  /*
+   * NULL MEANS "ALL OF THEM", and that is what avoids a seeding effect.
+   *
+   * The alternative — initialise the array from `referencePhotos` and re-seed it when the
+   * draft changes — needs an effect that writes state the render already depends on, which is
+   * the exact shape this codebase keeps getting bitten by. A null default is computed at read
+   * time instead, so a listing that arrives with six references simply HAS six ticked, and one
+   * that arrives with none has none. Ticking anything materialises the array.
+   */
+  const [refPickedRaw, setRefPicked] = useState<number[] | null>(null)
+  const refPicked = useMemo(
+    () => refPickedRaw ?? referencePhotos.map((_, i) => i),
+    [refPickedRaw, referencePhotos])
+  const [studioOpen, setStudioOpen] = useState(false)
+  const [studioFocus, setStudioFocus] = useState(0)
+
+  /** Open on a specific photo — and make sure that one is actually in the set being read. */
+  const openStudioOn = (i: number) => {
+    setRefPicked((p) => { const cur = p ?? referencePhotos.map((_, x) => x); return cur.includes(i) ? cur : [...cur, i].sort((a, b) => a - b) })
+    setStudioFocus(i)
+    setStudioOpen(true)
+  }
+  const toggleRefPick = (i: number) =>
+    setRefPicked((p) => {
+      const cur = p ?? referencePhotos.map((_, x) => x)
+      return cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i].sort((a, b) => a - b)
+    })
 
   /** A finished render joins the publishable set — at the END, so it never silently takes
    *  over as the cover photo. Making it primary stays a deliberate press, as it is for
@@ -896,21 +939,26 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     imgTouched.current = true
     setImages((p) => (p.length >= MAX_IMAGES || p.includes(url) ? p : [...p, url]))
   }
-  const zoomSrc = zoom === null ? null : referencePhotos[zoom]
+  const zoomList = zoom?.which === "own" ? images : referencePhotos
+  const zoomSrc = zoom ? zoomList[zoom.index] : null
   useEffect(() => {
     if (zoom === null) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
       e.preventDefault()
       const step = e.key === "ArrowRight" ? 1 : -1
-      setZoom((i) => (i === null ? i : (i + step + referencePhotos.length) % referencePhotos.length))
+      setZoom((z) => {
+        if (!z) return z
+        const n = (z.which === "own" ? images : referencePhotos).length
+        return n ? { ...z, index: (z.index + step + n) % n } : z
+      })
     }
     // CAPTURE. A bubble-phase listener here never fires — something between the popup and
     // the window stops arrow keys on the way up (verified: a capture listener sees the same
     // keypress a bubble one misses), so the gallery simply didn't respond to the keyboard.
     window.addEventListener("keydown", onKey, true)
     return () => window.removeEventListener("keydown", onKey, true)
-  }, [zoom, referencePhotos.length])
+  }, [zoom, referencePhotos, images])
 
   /**
    * ONE SHOP, one outcome. These three never throw and never set the shared banner: a
@@ -1143,6 +1191,24 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
   const isDone = (id: string) => outcomes[id]?.state === "ok" || outcomes[id]?.state === "dry"
   const allDone = pickedDests.length > 0 && pickedDests.every((d) => isDone(d.connection_id))
   const anyFailed = pickedDests.some((d) => outcomes[d.connection_id]?.state === "fail")
+  /**
+   * HAS THIS LISTING ALREADY GONE OUT?
+   *
+   * Two ways it can have. One is in THIS run — a shop reported ok, and `isDone` already stops
+   * that shop being sent twice. The other is that the draft was opened from a listing that
+   * exists in a shop, which SpyDeck's Uploaded card does; nothing in the outcomes says so,
+   * and pressing Publish there creates a DUPLICATE in the shop rather than editing anything.
+   *
+   * The flag rides on the draft's SHAPE, not on its heading: a heading is a display string
+   * somebody will reword. An edit-existing draft is the one that arrives already carrying
+   * publishable images — SpyDeck's "make one like this" hands over `images: []` on purpose,
+   * because a listing built from a competitor has none of its own photos yet.
+   *
+   * The word on the button is a guard, not a block. It does not stop a deliberate second
+   * send; it refuses to call it by the same name as the first.
+   */
+  const anyPublished = pickedDests.some((d) => outcomes[d.connection_id]?.state === "ok")
+    || (draft?.prefill?.images?.length ?? 0) > 0
 
   /**
    * Publish to every ticked shop, one after another.
@@ -1435,6 +1501,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
                       {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-2xs font-semibold uppercase text-primary-foreground">Primary</span>}
                       <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                        {/* ZOOM ON THE PUBLISHABLE PHOTOS TOO. Only the competitor's shots
+                            opened full size, which had it exactly backwards: the photos that
+                            are actually going to a marketplace were the ones you could not
+                            inspect before sending them. */}
+                        <button onClick={() => setZoom({ which: "own", index: i })} aria-label={`View photo ${i + 1} larger`}
+                          className="cursor-zoom-in rounded bg-white/90 p-1 text-black"><MagnifyingGlassPlus size={11} weight="bold" /></button>
                         {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">Primary</button>}
                         <button onClick={() => removeImage(i)} aria-label="Remove photo" className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
                       </div>
@@ -1458,23 +1530,43 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       className="group relative aspect-square overflow-hidden rounded-lg border border-dashed border-border bg-muted/40"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className="size-full object-cover" />
+                      <img src={src} alt="" className={"size-full object-cover transition-opacity " + (refPicked.includes(i) ? "" : "opacity-35")} />
                       {!staffViewer && <ReferenceWatermark />}
+                      {/* NO `title`. The chip already says "Use as reference" in the same
+                          spot the native tooltip lands, so both appeared at once and the
+                          tooltip covered the photo — two labels for one action, one of them
+                          on top of the thing you are trying to look at. aria-label carries
+                          the full sentence for a screen reader, which is where the longer
+                          wording actually belongs. */}
+                      {/* THE TICK IS ALWAYS VISIBLE, not on hover. It is the control that
+                          decides which photos the render is briefed from, so "which ones am I
+                          using" has to be answerable at a glance rather than by sweeping the
+                          mouse across the row. An unticked tile also dims, so the set reads
+                          from across the page. */}
                       <button
                         type="button"
-                        onClick={() => focusRef(i)}
-                        title="Read this photo and write a prompt for ours"
-                        aria-label={`Use reference photo ${i + 1} to write a prompt`}
+                        onClick={() => toggleRefPick(i)}
+                        aria-pressed={refPicked.includes(i)}
+                        aria-label={refPicked.includes(i) ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
+                        title={refPicked.includes(i) ? "Using this one — click to drop it" : "Not used — click to add it"}
+                        className={"absolute left-1 top-1 z-10 grid size-5 place-items-center rounded-full border shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/60 " +
+                          (refPicked.includes(i) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/90 text-transparent")}
+                      >
+                        <CheckCircle size={11} weight="bold" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openStudioOn(i)}
+                        aria-label={`Make our own photo from reference ${i + 1}`}
                         className="absolute inset-0 flex cursor-pointer items-end justify-center bg-black/35 pb-2 opacity-0 outline-none transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                       >
                         <span className="flex items-center gap-1 rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">
-                          <Sparkle size={10} weight="fill" /> Use as reference
+                          <Sparkle size={10} weight="fill" /> Make ours
                         </span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setZoom(i)}
-                        title="View larger"
+                        onClick={() => setZoom({ which: "ref", index: i })}
                         aria-label={`View reference photo ${i + 1} larger`}
                         className="absolute right-1 top-1 cursor-zoom-in rounded bg-black/45 p-1 text-white opacity-0 outline-none transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50"
                       >
@@ -1492,9 +1584,31 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   saving every one of them to a laptop. This closes it without reopening the
                   path that was removed — it renders OUR photograph, and a render still has to
                   be pressed into the set above. */}
+              {/* THE ENTRY POINT, above the grid rather than buried under it — a row that
+                  says what is selected and offers the one action that uses it. Selecting a
+                  few and generating from just those is the normal way to work: a listing's
+                  six photos are rarely all teaching the same thing. */}
+              {referencePhotos.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <Button size="sm" variant="outline" onClick={() => openStudioOn(refPicked[0] ?? 0)} disabled={!refPicked.length}>
+                    <Sparkle size={14} weight="fill" />
+                    Make our own photo
+                  </Button>
+                  <span className="text-2xs text-muted-foreground">
+                    {refPicked.length
+                      ? `from ${refPicked.length} of ${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} — tick the ones to use`
+                      : "tick at least one reference photo to use"}
+                  </span>
+                </div>
+              )}
+
               <ListingPhotoStudio
+                open={studioOpen}
+                onOpenChange={setStudioOpen}
                 references={referencePhotos}
-                focus={studioFocus}
+                picked={refPicked}
+                onPickedChange={setRefPicked}
+                focusIndex={studioFocus}
                 onUse={useRender}
                 listingTitle={title}
                 product={blank?.name || undefined}
@@ -1896,14 +2010,18 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     shops understates it, and after a partial failure the button's job has
                     changed to retrying only what failed — which the label has to admit, or
                     it reads as "publish everything again" and nobody presses it. */}
+                {/* ONE WORD, AND A GUARD.
+                    The shops are ticked directly above, so "to 3 shops" repeated a list the
+                    eye had just read, and the shop glyph decorated a button whose position
+                    and colour already say what it is.
+                    What the label MUST still carry is the difference between a first send and
+                    a second one: publishing again over shops that already took the listing
+                    creates a DUPLICATE in each of them, and that is not something to discover
+                    afterwards. So the word changes with the state — Retry after a partial
+                    failure, Reupload once anything has gone out. */}
                 <Button onClick={publish} disabled={busy || !dests?.length}>
-                  {busy ? <CircleNotch size={15} className="animate-spin" /> : (
-                    <><Storefront size={14} weight="bold" />
-                      {anyFailed
-                        ? "Retry the ones that failed"
-                        : pickedDests.length > 1 ? `Publish draft to ${pickedDests.length} shops` : "Publish draft"}
-                    </>
-                  )}
+                  {busy && <CircleNotch size={15} className="animate-spin" />}
+                  {anyFailed ? "Retry" : anyPublished ? "Reupload" : "Publish"}
                 </Button>
               </div>
               {/* THE STANDING PARAGRAPH IS GONE.
@@ -1940,23 +2058,27 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       <Dialog open={zoomSrc != null} onOpenChange={(o) => { if (!o) setZoom(null) }}>
         <DialogContent className="w-auto max-w-[calc(100vw-2rem)] gap-3 p-3 sm:max-w-[min(92vw,900px)]">
           <DialogTitle className="pr-10 text-xs font-medium text-muted-foreground">
-            Reference photo {(zoom ?? 0) + 1} of {referencePhotos.length} — the competitor’s own shot, not published with your listing
+            {zoom?.which === "own"
+              ? `Photo ${(zoom.index ?? 0) + 1} of ${images.length}${zoom.index === 0 ? " — the cover photo" : ""}`
+              : `Reference photo ${(zoom?.index ?? 0) + 1} of ${referencePhotos.length} — the competitor’s own shot, not published with your listing`}
           </DialogTitle>
           <div className="relative flex max-h-[72dvh] justify-center overflow-hidden rounded-lg bg-muted/40">
             {zoomSrc && (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={zoomSrc} alt="" className="max-h-[72dvh] w-auto max-w-full object-contain" />
-                {!staffViewer && <ReferenceWatermark big />}
+                {/* The mark survives the zoom, or the zoom is simply the way to get a clean
+                    copy of someone else's photo. Ours carries none — it is ours. */}
+                {zoom?.which === "ref" && !staffViewer && <ReferenceWatermark big />}
               </>
             )}
           </div>
-          {referencePhotos.length > 1 && (
+          {zoomList.length > 1 && (
             <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setZoom((i) => (i === null ? i : (i - 1 + referencePhotos.length) % referencePhotos.length))}>
+              <Button variant="outline" size="sm" onClick={() => setZoom((z) => (z ? { ...z, index: (z.index - 1 + zoomList.length) % zoomList.length } : z))}>
                 <CaretLeft size={13} weight="bold" /> Prev
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setZoom((i) => (i === null ? i : (i + 1) % referencePhotos.length))}>
+              <Button variant="outline" size="sm" onClick={() => setZoom((z) => (z ? { ...z, index: (z.index + 1) % zoomList.length } : z))}>
                 Next <CaretRight size={13} weight="bold" />
               </Button>
             </div>
