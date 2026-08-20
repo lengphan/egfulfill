@@ -76,6 +76,24 @@ const CRID   = () => (process.env.USPS_CRID || '').trim();
 const MID    = () => (process.env.USPS_MID || '').trim();
 const ACCT   = () => (process.env.USPS_ACCOUNT_NUMBER || '').trim();
 const ACCT_TYPE = () => (process.env.USPS_ACCOUNT_TYPE || 'EPS').trim();
+/**
+ * BUY USPS-DIRECT FOR EVERYTHING, ignoring the aggregator.
+ *
+ * `directUsps` already existed as a per-call flag, but nothing in the UI ever set it, so
+ * in practice there was no way to reach the direct path while an aggregator token was
+ * still present — and an aggregator whose ACCOUNT is refusing (a declined card, a
+ * restricted balance) is configured, so shippingEnabled() stays true and every buy keeps
+ * going to the thing that is broken.
+ *
+ * This is the switch for that situation, and it is deliberately global and blunt: it is
+ * for "Shippo is down, ship through USPS until it is back", which is a state of the
+ * business for a day or a week, not a decision to make per parcel.
+ *
+ * It does NOT make the aggregator failure fall through silently — that is still refused
+ * on purpose, because a Shippo failure surfacing as a USPS EPS billing error sends you
+ * debugging the wrong system. This is somebody deciding, in advance and on the record.
+ */
+const DIRECT = () => /^(1|true|yes|on)$/i.test((process.env.USPS_DIRECT || '').trim());
 
 /**
  * A cached token is only valid for the credentials that minted it.
@@ -202,7 +220,7 @@ function _parseLabelMultipart(ct, ab, imgType0) {
 export function uspsRoutes(app, requireAuth, requireStaff) {
   // Connectivity/qualification check — surfaces exactly which step is wired.
   app.get('/api/usps/test', { preHandler: requireStaff }, async () => {
-    const out = { base: BASE(), env: BASE().includes('-tem') ? 'TEM (test)' : 'PRODUCTION',
+    const out = { base: BASE(), env: BASE().includes('-tem') ? 'TEM (test)' : 'PRODUCTION', buyDirect: DIRECT(),
       consumerKey: !!KEY(), consumerSecret: !!SECRET(), crid: !!CRID(), mid: !!MID(), account: !!ACCT() };
     try { await oauthToken(); out.oauth = 'ok'; out.scopes = _oauth.scope || '(none returned)'; out.requestedScope = process.env.USPS_SCOPE || '(default — none requested)'; }
     catch (e) { out.oauth = 'FAILED: ' + e.message; return out; }
@@ -556,7 +574,7 @@ function withBillingHint(msg) {
       // buy a REAL label through it (test keys → real design, watermarked, no charge).
       // Restricted to USPS here so a UPS test-account gap can't fail the buy.
       // Pass directUsps:true to SKIP the aggregator and buy USPS-direct (Labels 3.0).
-      if (shippingEnabled() && !b.directUsps) {
+      if (shippingEnabled() && !b.directUsps && !DIRECT()) {
         try {
           const buy = await aggregatorBuyCheapest(to, from,
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
@@ -581,7 +599,7 @@ function withBillingHint(msg) {
       }
       // No aggregator configured, and USPS-direct wasn't explicitly asked for. Say so
       // plainly rather than attempting a path that needs USPS EPS billing approval.
-      if (!shippingEnabled() && !b.directUsps && !process.env.USPS_MOCK) {
+      if (!shippingEnabled() && !b.directUsps && !DIRECT() && !process.env.USPS_MOCK) {
         reply.code(400);
         return { error: 'No shipping provider is configured. Set SHIPPO_API_TOKEN (or EASYPOST_API_KEY) on the server, or pass directUsps to buy through USPS EPS.' };
       }

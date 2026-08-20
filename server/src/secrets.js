@@ -22,7 +22,7 @@ export const SECRET_NAMES = [
   // where an admin already goes to point an integration at a different account, and the
   // alternative was an SSH session to edit .env. USPS_BASE is what flips TEM (test, free
   // sample labels) to apis.usps.com (real postage against the EPS account).
-  'USPS_BASE', 'USPS_CRID', 'USPS_MID', 'USPS_ACCOUNT_NUMBER',
+  'USPS_BASE', 'USPS_CRID', 'USPS_MID', 'USPS_ACCOUNT_NUMBER', 'USPS_DIRECT',
   'SHIPPO_API_TOKEN',
   'USPS_CONSUMER_KEY', 'USPS_CONSUMER_SECRET',
   'SS_ACCOUNT_NUMBER', 'SS_API_KEY',

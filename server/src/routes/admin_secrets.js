@@ -39,6 +39,9 @@ const SECRET_DEFS = [
   { name: 'USPS_CRID',             label: 'CRID',             integration: 'usps' },
   { name: 'USPS_MID',              label: 'MID',              integration: 'usps' },
   { name: 'USPS_ACCOUNT_NUMBER',   label: 'EPS account number', integration: 'usps' },
+  // Set to 1 to buy every label straight through USPS, bypassing Shippo/EasyPost. The
+  // switch for "the aggregator's account is refusing, ship through USPS until it is back".
+  { name: 'USPS_DIRECT',           label: 'Buy direct, bypass Shippo (1 = on)', integration: 'usps' },
   { name: 'SS_API_KEY',            label: 'API key',          integration: 'ss' },
   // Otto needs FOUR credentials, not two: ocConfigured() requires the account email and
   // password as well as the client pair. Listing only the client pair meant a live account
