@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, CaretDown, QrCode as QrCodeIcon, DotsThree } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
@@ -63,7 +63,6 @@ const VIS: { id: SkuVisibility; label: string; pill: string }[] = [
   { id: "public", label: "Public", pill: "text-violet-700 dark:text-violet-400" },
 ]
 const visOf = (it: InventoryItem): SkuVisibility => (it.visibility === "seller" || it.visibility === "public" ? it.visibility : "factory")
-const avail = (it: InventoryItem) => num(it.in_stock) - num(it.reserved)
 const isOut = (it: InventoryItem) => num(it.in_stock) <= 0
 const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reorder_at ?? 25)
 
@@ -114,11 +113,6 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    * would otherwise send somebody shopping.
    */
   const [onOrder, setOnOrder] = useState<Record<string, number>>({})
-  /** Which product groups are expanded. Collapsed by default — the point of grouping is a
-   *  table of PRODUCTS, and a page that opens with every variant showing is the flat list
-   *  again with extra indentation. */
-  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set())
-
   const load = useCallback(() => {
     if (!getToken()) { setItems([]); return }
     getInventory().then((r) => setItems(r ?? [])).catch(() => setItems([]))
@@ -420,6 +414,24 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             </span>
           )}
           <div className="ml-auto flex items-center gap-2">
+            {/* SELECT-ALL CAME OFF THE TABLE HEAD WITH THE TABLE HEAD. It lived in a column
+                header; there are no column headers spanning the page any more, so it lives
+                with the actions it feeds. Still this PAGE only — ticking a box must never
+                quietly select hundreds of rows nobody can see. */}
+            <label className="flex eg-control cursor-pointer">
+              <input
+                type="checkbox"
+                aria-label="Select every variant on this page"
+                checked={pageSkus.length > 0 && pageSkus.every((k) => sel.has(k))}
+                onChange={(e) => {
+                  const next = new Set(sel)
+                  pageSkus.forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
+                  setSel(next)
+                }}
+                className="size-3.5 accent-[var(--primary)]"
+              />
+              Select page
+            </label>
             {sel.size > 0 && (
               <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
             )}
@@ -457,102 +469,32 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           <div className="py-16 text-center text-sm text-muted-foreground">{(items.length ?? 0) === 0 ? "No inventory yet — add an item." : "No items match."}</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-border text-left eg-label text-muted-foreground">
-                  <tr>
-                    {/* A DECLARED WIDTH, not an intrinsic one. The stock panel below has to
-                        start its first column exactly under the product photo while its rules
-                        run the full width of the row — and it can only do both if it knows how
-                        wide this column is. 3.5rem = pl-3 + the checkbox + the gap + the caret
-                        + pr-1. Changing any of those means changing GUTTER below. */}
-                    <th className="w-14 py-2.5 whitespace-nowrap pl-3 pr-1">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all on this page"
-                        checked={pageSkus.length > 0 && pageSkus.every((k) => sel.has(k))}
-                        onChange={(e) => {
-                          const next = new Set(sel)
-                          // Only this page — ticking a header shouldn't silently select
-                          // hundreds of rows the user can't see. Every VARIANT on the page,
-                          // including the ones inside collapsed groups: the group is a way
-                          // of reading the table, not a subset of what it holds.
-                          pageSkus.forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
-                          setSel(next)
-                        }}
-                      />
-                    </th>
-                    {/*
-                      * SIX COLUMNS, NOT ELEVEN.
-                      *
-                      * Eleven never fitted, and the table had been coping by hiding five of
-                      * them at breakpoints — Labels under xl, SKU and Visibility under md,
-                      * Reserved and Reorder-at under 1536px. So a laptop showed a different
-                      * table from the one the design assumed, and the columns that vanished
-                      * were picked by what could be spared rather than by what the row is.
-                      *
-                      * Folded instead of dropped. Stock, Reserved and Available were three
-                      * columns holding one sentence — 40, 2 held, 38 to sell — where only
-                      * the first is typed and the third is arithmetic on the other two.
-                      * Labels belongs to printing and now lives in the print sheet, which
-                      * is the only place a sticker count means anything. Reorder-at and
-                      * Visibility are set once and read rarely; they are on the row's own
-                      * menu, and Visibility still shows on the row when it is NOT the
-                      * default, because "this sku is public" is worth seeing unasked.
-                      */}
-                    <th className="px-4 py-2.5 whitespace-nowrap">Item</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap">SKU</th>
-                    {/* RIGHT, like the figures under it. The header was centred over a
-                        column of right-aligned numbers, so the word sat to the left of the
-                        digits it names — which is the whole of "the Stock column looks
-                        crooked". A number column is read up its right edge. */}
-                    <th className="px-4 py-2.5 whitespace-nowrap text-right">Stock</th>
-                    <th className="px-4 py-2.5 whitespace-nowrap">Status</th>
-                    <th className="sticky right-0 z-10 bg-card px-4 py-2.5 whitespace-nowrap" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.pageItems.map((g) => {
-                    const one = g.rows.length === 1
-                    /**
-                     * A SEARCH THAT MATCHES A VARIANT MUST SHOW THE VARIANT.
-                     *
-                     * The filter already reads `it.variant`, so typing "camo green" did
-                     * narrow the table correctly — to a COLLAPSED product row that named
-                     * the cap and said "17 variants", with nothing to say which one matched
-                     * or that anything had. The search worked and looked broken.
-                     *
-                     * Derived, not an effect that opens groups into `openKeys`: writing the
-                     * search's findings into the same state the caret uses means clearing
-                     * the box leaves those groups hanging open, and every keystroke
-                     * rewrites a set the user also controls.
-                     */
-                    const isOpen = openKeys.has(g.key) || (!!search && !one)
-                    const allSel = g.rows.every((r) => sel.has(r.sku))
-                    return (
-                      <ProductGroup
-                        key={g.key}
-                        group={g}
-                        open={isOpen}
-                        onToggle={() => setOpenKeys((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n })}
-                        selected={allSel}
-                        onSelect={(on) => {
-                          const next = new Set(sel)
-                          for (const r of g.rows) { if (on) next.add(r.sku); else next.delete(r.sku) }
-                          setSel(next)
-                        }}
-                        single={one}
-                        meta={meta}
-                        sel={sel} setSel={setSel}
-                        edit={edit} setVisibility={setVisibility} remove={remove} onHistory={(sku: string) => setHist({ label: sku, skus: [sku] })}
-                        onProductHistory={(name: string, skus: string[]) => setHist({ label: name, skus })}
-                        onZoom={setZoomSku}
-                        onOrder={onOrder}
-                      />
-                    )
-                  })}
-                </tbody>
-              </table>
+            {/* NO TABLE HEAD, because there is no longer one table. Each product carries
+                its own column headings over its own numbers, which is the only place they
+                mean anything: "S, M, L, XL" belongs to a tee and "One size" to a cap, and a
+                single header row above both could only ever be right for one of them. */}
+            <div className="divide-y divide-border">
+              {paged.pageItems.map((g) => {
+                const allSel = g.rows.every((r) => sel.has(r.sku))
+                return (
+                  <ProductSheet
+                    key={g.key}
+                    group={g}
+                    selected={allSel}
+                    onSelect={(on: boolean) => {
+                      const next = new Set(sel)
+                      for (const r of g.rows) { if (on) next.add(r.sku); else next.delete(r.sku) }
+                      setSel(next)
+                    }}
+                    meta={meta}
+                    sel={sel} setSel={setSel}
+                    edit={edit} setVisibility={setVisibility} remove={remove}
+                    onProductHistory={(name: string, skus: string[]) => setHist({ label: name, skus })}
+                    onZoom={setZoomSku}
+                    onOrder={onOrder}
+                  />
+                )
+              })}
             </div>
             <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} noun="products" />
           </>
@@ -607,441 +549,165 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
 }
 
 /**
- * A product and its variants — one <tbody> row when there is one variant, a summary row
- * plus an openable list when there are several.
+ * ONE PRODUCT, AS A SHEET — heading, then its numbers. No caret, no summary row.
  *
- * THE SUMMARY ROW DOES NOT TAKE EDITS. Its numbers are sums across sizes, and there is no
- * honest answer to "set in stock to 40" on a row that stands for eight skus — it would have
- * to pick one, or spread, and either is a number nobody typed. Editing lives on the variant,
- * which is where the count is actually held.
+ * This was a table row per product with the grid folded behind a disclosure, and the table
+ * was pretending to be two things at once: a row could be a PRODUCT or a VARIANT, so SKU,
+ * Stock and Status meant something different depending which kind you were looking at.
+ * "17 SKUs" sat under a column headed SKU; a summed count sat under a column you could not
+ * type in. Half the table was a header for the other half, and the only editable thing on
+ * the page — the counts — was one click away on every product.
+ *
+ * So the product row stops being a row. It is a heading over its own grid, always open, and
+ * the page becomes one continuous sheet you scroll and type into. Status is gone: it said
+ * "Out / Low / In stock" about numbers that are on screen saying it themselves, in a column
+ * that cost width all day.
  */
-function ProductGroup({
-  group, open, onToggle, selected, onSelect, single, meta, sel, setSel, edit, setVisibility, remove, onHistory, onProductHistory, onZoom, onOrder,
+function ProductSheet({
+  group, selected, onSelect, meta, sel, setSel, edit, setVisibility, remove,
+  onProductHistory, onZoom, onOrder,
 }: {
   group: Group
-  open: boolean
-  onToggle: () => void
   selected: boolean
   onSelect: (on: boolean) => void
-  single: boolean
   meta: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>
   sel: Set<string>
   setSel: (s: Set<string>) => void
   edit: (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => void
   setVisibility: (sku: string, v: SkuVisibility) => void
   remove: (sku: string) => void
-  onHistory: (sku: string) => void
-  /** The whole product's journal — the grid has no per-row menu to hang one on. */
   onProductHistory: (name: string, skus: string[]) => void
   onZoom: (sku: string) => void
-  /** sku (upper) → units on a placed purchase order. */
   onOrder: Record<string, number>
 }) {
-  /**
-   * THE ROW TINT HAS TO REACH THE STICKY COLUMNS.
-   *
-   * Visibility and the row actions are `position: sticky` and carry `bg-card`, because a
-   * sticky cell must be opaque or the columns scrolling under it show through. That
-   * background is painted on the CELL, and a cell's own background covers the row's — so a
-   * variant row's tint stopped dead at Status and the last two columns stayed white. On a
-   * 17-variant product that reads as a rendering fault, which is exactly what it looked
-   * like: the shading that says "these belong to the product above" simply gave up
-   * two-thirds of the way across.
-   *
-   * The tint goes on as a pseudo-element OVER the opaque base rather than as a second
-   * background (an element only gets one). Selected beats indented explicitly — both
-   * classes used to be emitted at once and which won was left to stylesheet order.
-   */
-  // Second press arms the removal — see the note on the ⋯ menu below.
+  // Second press arms the removal — the count is the warning, so it is in the label.
   const [killing, setKilling] = useState(false)
+  const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
+  const reserved = group.rows.reduce((n, r) => n + num(r.reserved), 0)
+  const out = group.rows.filter(isOut).length
+  const one = group.rows.length === 1
+  const sku = group.product?.sku || (one ? group.rows[0].sku : null)
+  const supplier = group.rows.map((r) => r.supplier || meta[r.sku]?.supplier).find(Boolean)
+  // Reorder point and visibility are stored per sku and are, in practice, a decision about
+  // the PRODUCT — nobody stocks Navy to 25 and Black to 40. They were on each variant row's
+  // menu; there are no variant rows now, so they act on every variant at once and say so.
+  const reorderAt = group.rows[0]?.reorder_at ?? 25
+  const visSame = group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
 
-  const tintOf = (it: InventoryItem, indented: boolean) =>
-    sel.has(it.sku) ? "bg-primary/[0.04]" : indented ? "bg-muted/30" : ""
-  const stickyTint = (it: InventoryItem, indented: boolean) =>
-    sel.has(it.sku)
-      ? " before:absolute before:inset-0 before:bg-primary/[0.04] before:content-['']"
-      : indented
-        ? " before:absolute before:inset-0 before:bg-muted/30 before:content-['']"
-        : ""
-
-  const row = (it: InventoryItem, indented: boolean) => (
-    <tr key={it.sku} className={"border-t border-border " + tintOf(it, indented)}>
-      {/* THE DISCLOSURE LIVES BESIDE THE CHECKBOX, in its own column, on every row —
-          expandable or not. It used to sit inside the Item cell, so a grouped product's
-          photo started 20px right of a single product's and the thumbnails never lined up.
-          A column of pictures that is not a column is harder to scan than no pictures. */}
-      <td className="py-2 pl-3 pr-1">
-        <div className="flex items-center gap-1">
-          <input
-            type="checkbox"
-            aria-label={`Select ${it.sku}`}
-            checked={sel.has(it.sku)}
-            onChange={(e) => {
-              const next = new Set(sel)
-              if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
-              setSel(next)
-            }}
-          />
-          <span className="size-5 shrink-0" aria-hidden />
-        </div>
-      </td>
-      <td className="px-4 py-2">
-        {/* THE CARET GETS ITS OWN COLUMN, on every row, expandable or not. It used to sit
-            inside the flex only where there was something to expand, so a grouped product's
-            photo started 20px right of a single product's and the thumbnails never lined
-            up — a column of pictures that is not a column is harder to scan than no
-            pictures at all. */}
-        <div className={"flex w-auto min-w-0 items-center gap-2.5 md:w-[23rem] " + (indented ? "pl-[4.25rem]" : "")}>
-          {!indented && <span className="hidden md:contents"><Thumb src={group.image} name={group.name} /></span>}
-          <div className="min-w-0">
-            {/* TWO LINES, then ellipsis. One line at 220px cut "OTTO CAP OTTO FLEX Fitte…"
-                off before the part that tells it from the next Otto cap; letting it run
-                free would hand one column the whole row. Two lines is enough for a real
-                product name and still a bounded row height. */}
-            <div className="line-clamp-2 font-medium leading-tight" title={indented ? undefined : (it.name || group.name || undefined)}>
-              {indented ? (it.variant || meta[it.sku]?.variant || it.sku) : (it.name || group.name || "—")}
-            </div>
-            {/* Variant first — it is what tells two rows of one style apart. Then who sells
-                it: typed if someone typed it, else resolved from the supplier catalogues by
-                sku, so the next restock does not start with a search. */}
-            {!indented && (it.variant || meta[it.sku]?.variant) && (
-              <div className="truncate text-xs text-muted-foreground">{it.variant || meta[it.sku]?.variant}</div>
-            )}
-            {(it.supplier || meta[it.sku]?.supplier) && (
-              <div className="truncate text-2xs text-muted-foreground">{it.supplier || meta[it.sku]?.supplier}</div>
-            )}
-            {/* NO "not in any supplier catalogue" BADGE. It landed on nearly every row —
-                anything we stock that isn't a live S&S/Otto sku, which is most of what a
-                factory holds — so it read as a warning about the table rather than about a
-                row, and it pushed every line onto two. The same answer is still one click
-                away and deliberate: the "No longer stocked" filter above lists exactly these
-                rows when that is the question being asked. */}
+  return (
+    <section className="border-b border-border last:border-b-0">
+      <header className="flex items-center gap-3 px-4 py-2.5">
+        <input
+          type="checkbox"
+          aria-label={`Select ${group.name}`}
+          checked={selected}
+          onChange={(e) => onSelect(e.target.checked)}
+          className="size-3.5 shrink-0"
+        />
+        <Thumb src={group.image} name={group.name} size={34} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium leading-tight" title={group.name}>{group.name}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            {one ? <span className="tabular-nums">{group.rows[0].sku}</span> : `${group.rows.length} variants`}
+            {sku && !one && <span className="tabular-nums"> · {sku}</span>}
+            {supplier && <span> · {supplier}</span>}
           </div>
         </div>
-      </td>
-      <td className="px-4 py-2">
-        {/* SKU as TEXT, and the code is one click on it. The inline barcode was a 22px
-            thumbnail no scanner could read, and a separate icon column was too much width
-            for it — that reasoning still holds and the column is still not coming back.
-
-            WHAT IT LACKED WAS ANY SIGN OF BEING A CONTROL. Styled as plain mono text with
-            hover:underline and nothing at rest, so on a table of 17 variants it read as a
-            column of data — and the only visible route to a code was tick, Print labels,
-            pick a type, which is three steps to answer "what do I point the phone at".
-            The glyph is inside the cell, not beside it: it costs no column, and it is the
-            thing that says a code is here. */}
-        {/* PLAIN TEXT AGAIN. The sku was a button carrying a small code glyph, so on
-            seventeen variants a column of data grew seventeen tiny marks and every sku
-            looked pressable for a reason nobody could guess. The code is a named item in
-            the row menu now — "Barcode" says what it is, which a 13px glyph never did. */}
-        <span className="block w-[15rem] max-w-full break-all tabular-nums text-xs font-medium">
-          {it.sku}
-        </span>
-        {/* VISIBILITY SPEAKS UP ONLY WHEN IT IS NOT THE DEFAULT.
-            The control moved to the row menu, and a setting behind a menu is a setting
-            nobody audits — but "Factory only" is what almost every row is, and printing it
-            on all of them is the column we just removed. So the quiet default stays quiet
-            and the two that let a sku out of the building say so. */}
-        {visOf(it) !== "factory" && (
-          <span className={"mt-0.5 block text-2xs font-medium " + (VIS.find((v) => v.id === visOf(it))?.pill ?? "")}>
-            {VIS.find((v) => v.id === visOf(it))?.label}
-          </span>
-        )}
-      </td>
-      {/*
-        * ONE CELL, ONE SENTENCE: what is here, what is spoken for, what is left.
-        *
-        * These were three columns and a fourth off-screen, and only the first is a fact
-        * anyone types. Reserved is held by the system — accepting an order into production
-        * reserves its blanks and shipping or cancelling releases them — and Available is
-        * arithmetic on the other two. Three headings for one answer, two of which stood
-        * down on a laptop, so the number people actually act on was the one most often
-        * missing.
-        *
-        * The held/available line only appears when something IS held: on a shelf with
-        * nothing reserved, "0 held → 40 available" is two numbers restating the one above.
-        */}
-      {/* The other half of the column's right edge — the group row above is right-aligned
-          too, so a product's figure and its variants' land on the same x. */}
-      <td className="px-4 py-2 text-right">
-        <div className="flex flex-col items-end gap-0.5">
-          <Input
-            value={String(num(it.in_stock))}
-            onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-            inputMode="numeric"
-            aria-label={`In stock for ${it.sku}`}
-            className="relative z-[1] h-8 w-16 text-right tabular-nums"
-          />
-          {num(it.reserved) > 0 && (
-            <span
-              className="whitespace-nowrap text-2xs text-muted-foreground tabular-nums"
-              title={`${num(it.reserved)} held for orders in production`}
-            >
-              {num(it.reserved)} held → <span className="font-medium text-foreground">{avail(it)}</span> free
-            </span>
-          )}
+        {/* THE TOTAL IS A CAPTION, NOT A COLUMN. It used to sit in the Stock column beside
+            editable variant counts, which made a figure nobody can type into look like one
+            they should. Held is in the title, where it was already. */}
+        <div
+          className="shrink-0 text-right"
+          title={reserved > 0 ? `${stock} on the shelf · ${reserved} held for orders · ${stock - reserved} free` : `${stock} on the shelf`}
+        >
+          <div className="text-sm font-semibold tabular-nums leading-none">{stock}</div>
+          <div className="mt-0.5 text-2xs text-muted-foreground">
+            {out === group.rows.length ? "none on the shelf" : out ? `${out} out` : "on the shelf"}
+          </div>
         </div>
-      </td>
-      <td className="px-4 py-2">
-        {/* nowrap: the visibility column narrowed this one enough that "In stock" wrapped
-            onto two lines and the row grew a step. */}
-        {isOut(it) ? <span className="whitespace-nowrap text-xs font-medium text-red-700">Out</span>
-          : isLow(it) ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">Low</span>
-            : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
-        {/* ON ORDER, beside the word that would otherwise send somebody shopping. Only when
-            the shelf is short — a count of what is coming means nothing next to "In stock",
-            and it is the Out and Low rows that get bought twice. */}
-        {(isOut(it) || isLow(it)) && (onOrder[String(it.sku).toUpperCase()] ?? 0) > 0 && (
-          <span className="block whitespace-nowrap text-2xs text-muted-foreground"
-                title="Units on a purchase order that has been placed but not yet received">
-            {onOrder[String(it.sku).toUpperCase()]} on order
-          </span>
-        )}
-      </td>
-      {/*
-        * THE SETTINGS THAT ARE SET ONCE LIVE ON THE ROW'S OWN MENU.
-        *
-        * Reorder-at and Visibility each held a column all day for a value that is chosen
-        * when a sku is created and then read a handful of times a year — and both were
-        * hidden on a laptop anyway, so the columns were paying rent on a wide monitor and
-        * disappearing on the machine most of this work happens on.
-        *
-        * Not a DropdownMenu: these are a number field and a select, which is a form, and a
-        * menu is a list of commands. Scan history and Remove come along because this is now
-        * the one place a row's actions are, rather than two loose glyphs beside a select.
-        */}
-      <td className={"sticky right-0 z-10 bg-card px-4 py-2" + stickyTint(it, indented)}>
-        <div className="relative z-[1] flex items-center justify-end">
-          <Popover>
-            <PopoverTrigger
-              aria-label={`Settings and actions for ${it.sku}`}
-              title="Reorder point, visibility, history, remove"
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-            >
-              <DotsThree size={18} weight="bold" />
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 space-y-3 p-3">
-              <div className="truncate tabular-nums text-2xs text-muted-foreground">{it.sku}</div>
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-xs font-medium">Reorder at</span>
-                <Input
-                  value={String(it.reorder_at ?? 25)}
-                  onChange={(e) => edit(it.sku, "reorder_at", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                  inputMode="numeric"
-                  aria-label={`Reorder point for ${it.sku}`}
-                  className="h-8 w-16 text-center"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium">Visibility</span>
-                <select
-                  value={visOf(it)}
-                  onChange={(e) => setVisibility(it.sku, e.target.value as SkuVisibility)}
-                  aria-label={`Visibility for ${it.sku}`}
-                  className="eg-select h-8 w-full rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                >
-                  {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-                </select>
-              </label>
-              {/* BARCODE, NAMED. It used to be a 13px glyph welded to the sku, which said a
-                  code existed only if you already knew the mark. Here it is a word, next to
-                  the other two things you do to a row. */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2">
+        <Popover>
+          <PopoverTrigger
+            aria-label={`Actions for ${group.name}`}
+            title="Reorder point, visibility, history, remove"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <DotsThree size={18} weight="bold" />
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 space-y-3 p-3">
+            <div className="truncate text-2xs text-muted-foreground">
+              {one ? group.rows[0].sku : `${group.rows.length} variants · applies to all`}
+            </div>
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium">Reorder at</span>
+              <Input
+                value={String(reorderAt)}
+                onChange={(e) => {
+                  const v = Number(e.target.value.replace(/[^0-9]/g, "")) || 0
+                  group.rows.forEach((r) => edit(r.sku, "reorder_at", v))
+                }}
+                inputMode="numeric"
+                aria-label={`Reorder point for ${group.name}`}
+                className="h-8 w-16 text-center"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium">Visibility</span>
+              <select
+                value={visSame ? visOf(group.rows[0]) : ""}
+                onChange={(e) => { const v = e.target.value as SkuVisibility; group.rows.forEach((r) => setVisibility(r.sku, v)) }}
+                aria-label={`Visibility for ${group.name}`}
+                className="eg-select h-8 w-full rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                {/* A product whose variants disagree shows that rather than the first one's
+                    setting — picking any option then makes them agree, which is the fix. */}
+                {!visSame && <option value="">Mixed — pick one to settle it</option>}
+                {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+              </select>
+            </label>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2">
+              <button
+                type="button"
+                onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ClockCounterClockwise size={14} /> Stock history
+              </button>
+              {/* Barcode is a fact about ONE sku — you hold a gun to the screen and scan it.
+                  Offered only when the product IS one sku; otherwise the label printer is
+                  the right door, and it takes the whole selection. */}
+              {one && (
                 <button
-                  onClick={() => onZoom(it.sku)}
+                  type="button"
+                  onClick={() => onZoom(group.rows[0].sku)}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <QrCodeIcon size={14} /> Barcode
                 </button>
-                <button
-                  onClick={() => { navigator.clipboard?.writeText(it.sku).catch(() => {}) }}
-                  title="Copy this sku to the clipboard"
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Copy SKU
-                </button>
-                <button
-                  onClick={() => onHistory(it.sku)}
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <ClockCounterClockwise size={14} /> Scan history
-                </button>
-                <button
-                  onClick={() => remove(it.sku)}
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-red-600"
-                >
-                  <Trash size={14} /> Remove
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      </td>
-    </tr>
-  )
-
-  if (single) return row(group.rows[0], false)
-
-  const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
-  const reserved = group.rows.reduce((n, r) => n + num(r.reserved), 0)
-  const out = group.rows.filter(isOut).length
-  const low = group.rows.filter(isLow).length
-
-  return (
-    <>
-      <tr className={"border-t border-border " + (selected ? "bg-primary/[0.04]" : "")}>
-        <td className="py-2 pl-3 pr-1">
-          <div className="flex items-center gap-1">
-            <input type="checkbox" aria-label={`Select all ${group.rows.length} variants of ${group.name}`} checked={selected} onChange={(e) => onSelect(e.target.checked)} />
-            {/* Points DOWN at what it will reveal and flips up when it is open — the two
-                states are the same glyph rotated, so the row never changes width. */}
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-expanded={open}
-              aria-label={`${open ? "Hide" : "Show"} the ${group.rows.length} variants of ${group.name}`}
-              className={"grid size-5 shrink-0 place-items-center rounded transition-colors hover:bg-accent "
-                + (open ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <CaretDown size={12} weight="bold" className={"transition-transform " + (open ? "rotate-180" : "")} />
-            </button>
-          </div>
-        </td>
-        <td className="px-4 py-2">
-          <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-auto min-w-0 items-center gap-2.5 md:w-[23rem] text-left">
-            <Thumb src={group.image} name={group.name} />
-            <span className="min-w-0">
-              <span className="line-clamp-2 font-medium leading-tight" title={group.name}>{group.name}</span>
-              <span className="block text-xs text-muted-foreground">{group.rows.length} variants</span>
-            </span>
-          </button>
-        </td>
-        <td className="px-4 py-2 text-xs text-muted-foreground">
-          {/* NOT one of the variants' skus. Printing the first would read as the product's
-              own code and get scanned as one. */}
-          <span className="tabular-nums">{group.rows.length} SKUs</span>
-          {/* VISIBILITY ONLY WHEN IT IS NOT THE DEFAULT, and only when the variants agree.
-              Showing the first row's setting as if it were the product's is how a public
-              sku hides behind a "Factory only" label — so disagreement says so instead. */}
-          {(() => {
-            const same = group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
-            if (!same) return <span className="block text-2xs text-amber-700">Mixed visibility</span>
-            const v = visOf(group.rows[0])
-            if (v === "factory") return null
-            const meta = VIS.find((x) => x.id === v)
-            return <span className={"block text-2xs font-medium " + (meta?.pill ?? "")}>{meta?.label}</span>
-          })()}
-        </td>
-        {/* ONE RIGHT EDGE FOR THE WHOLE COLUMN. A product row printed a bare number and a
-            variant row a centred pill, so the two never landed on the same x — a column
-            meant for comparing figures down the page could not be. */}
-        <td className="px-4 py-2 text-right">
-          {/* ONE FIGURE, AND THE SPLIT ON HOVER.
-              First it was a second line under the count ("3 held → -3 free"), which turned a
-              column of numbers into a column of sentences. Then it was a superscript, which
-              was worse in a different way: it hung above the baseline of the one column whose
-              job is to be read straight down, so no two figures sat on the same line.
-              What is held is in the title. The column is for the count. */}
-          <span
-            className="font-semibold tabular-nums"
-            title={reserved > 0 ? `${stock} on the shelf · ${reserved} held for orders in production · ${stock - reserved} free` : `${stock} on the shelf`}
-          >
-            {stock}
-          </span>
-        </td>
-        <td className="px-4 py-2">
-          {/**
-            * THE SAME THREE WORDS AS A VARIANT ROW — Out, Low, In stock. A product and a
-            * variant are in the same three states and there is no reason to say them
-            * differently. This column read "All out" on one line and "Out" on the next,
-            * "3 out" here and "Low" below: four spellings of three states, stacked.
-            *
-            * The count is the DETAIL, so it sits beside the word in the quieter weight
-            * rather than replacing it.
-            */}
-          {out === group.rows.length ? <span className="whitespace-nowrap text-xs font-medium text-red-700">Out</span>
-            : out || low ? (
-              <span className="whitespace-nowrap text-xs font-medium text-amber-700">
-                Low <span className="font-normal text-muted-foreground">{out ? `· ${out} out` : `· ${low}`}</span>
-              </span>
-            )
-              : <span className="whitespace-nowrap text-xs font-medium text-emerald-700">In stock</span>}
-        </td>
-        {/* THE PRODUCT ROW GETS THE SAME ⋯, in the same column.
-            A multi-variant product opens into a GRID of number inputs — no variant rows, so
-            no row menu, so no history and NO BIN: there was literally no way to remove a
-            product whose skus happened to form a matrix, which is most of them. The menu is
-            here, at the product level, holding the two things that are about the product
-            rather than about one sku. */}
-        <td className="px-4 py-2">
-          <div className="flex items-center justify-end">
-            <Popover>
-              <PopoverTrigger
-                aria-label={`Actions for ${group.name}`}
-                title="Stock history, remove"
-                className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              )}
+              <button
+                type="button"
+                onClick={() => { if (!killing) { setKilling(true); return } group.rows.forEach((r) => remove(r.sku)); setKilling(false) }}
+                className={"inline-flex items-center gap-1.5 text-xs transition-colors hover:text-red-600 "
+                  + (killing ? "font-medium text-red-600" : "text-muted-foreground")}
               >
-                <DotsThree size={18} weight="bold" />
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-60 space-y-2 p-3">
-                <div className="truncate text-2xs text-muted-foreground">{group.rows.length} variants</div>
-                <button
-                  type="button"
-                  onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
-                  className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <ClockCounterClockwise size={14} /> Stock history
-                </button>
-                {/* TWO PRESSES, because one press removes every variant. The count is in the
-                    confirm rather than in a dialog — the number IS the warning. */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!killing) { setKilling(true); return }
-                    group.rows.forEach((r) => remove(r.sku))
-                    setKilling(false)
-                  }}
-                  className={"flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-xs transition-colors hover:bg-accent "
-                    + (killing ? "font-medium text-red-600" : "text-muted-foreground hover:text-red-600")}
-                >
-                  <Trash size={14} /> {killing ? `Remove all ${group.rows.length}?` : "Remove"}
-                </button>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </td>
-      </tr>
-      {/* ONE PANEL FOR EVERY PRODUCT.
-          This used to branch: a product whose skus decomposed into sizes and colours opened
-          into a grid, and everything else opened into the table's own variant ROWS. So the
-          same click gave two completely different things depending on whether a sku string
-          happened to parse — different left edges, different type, numbers at a different x
-          down the page. StockMatrix handles all of them now and falls back to a one-column
-          table of the same shape (PlainStock) rather than to rows. A variant it still can't
-          place is named underneath, as before. */}
-      {open && (
-        <tr className="border-t border-border">
-          {/* THE RULES RUN THE WHOLE BOX; THE CONTENT STARTS UNDER THE PICTURE.
-              Two requirements that fight, and the fix is to stop leaving either to chance.
-              Leaving the checkbox column as its own empty cell aligned the content perfectly
-              and started every separator two columns in, so each rule stopped short of the
-              panel it was dividing — a line that begins in mid-air reads as a rendering
-              fault. Padding the cell instead put the colour names left of the photo.
-              So the panel spans every column with NO padding of its own (the rules reach both
-              edges) and the first column carries GUTTER, which is the checkbox column's
-              declared width plus the Item cell's own inset. */}
-          <td colSpan={7} className="bg-muted/20 py-3">
-            <StockMatrix
-              group={group}
-              edit={(sku, _f, v) => edit(sku, "in_stock", v)}
-              lowAt={(it) => Number(it.reorder_at ?? 25)}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+                <Trash size={14} /> {killing ? (one ? "Remove?" : `Remove all ${group.rows.length}?`) : "Remove"}
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </header>
+      <StockMatrix
+        group={group}
+        sel={sel}
+        setSel={setSel}
+        onOrder={onOrder}
+        edit={(s, _f, v) => edit(s, "in_stock", v)}
+        lowAt={(it) => Number(it.reorder_at ?? 25)}
+      />
+    </section>
   )
 }
+
 
 /**
  * A PRODUCT'S STOCK AS A GRID — colours down, sizes across.
@@ -1094,10 +760,13 @@ function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
  * parse. One column instead of six is a smaller table; it is still a table, under the same
  * header, with its numbers at the same x as every other product's.
  */
-function PlainStock({ rows, edit, lowAt }: {
+function PlainStock({ rows, edit, lowAt, sel, setSel, onOrder }: {
   rows: InventoryItem[]
   edit: (sku: string, field: "in_stock", value: number) => void
   lowAt: (it: InventoryItem) => number
+  sel: Set<string>
+  setSel: (s: Set<string>) => void
+  onOrder: Record<string, number>
 }) {
   return (
     <div className="overflow-x-auto">
@@ -1112,7 +781,18 @@ function PlainStock({ rows, edit, lowAt }: {
         <tbody>
           {rows.map((it) => (
             <tr key={it.sku} className="border-t border-border">
-              <td className={`${LABEL_W} ${GUTTER} truncate whitespace-nowrap py-1 pe-2 font-medium`}>
+              <td className={`${LABEL_W} ${GUTTER} relative truncate whitespace-nowrap py-1 pe-2 font-medium`}>
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${it.sku}`}
+                  checked={sel.has(it.sku)}
+                  onChange={(e) => {
+                    const next = new Set(sel)
+                    if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
+                    setSel(next)
+                  }}
+                  className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
+                />
                 <span className="tabular-nums">{it.sku}</span>
                 {it.variant && <span className="ms-2 font-normal text-muted-foreground">{it.variant}</span>}
               </td>
@@ -1122,7 +802,9 @@ function PlainStock({ rows, edit, lowAt }: {
                   onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
                   inputMode="numeric"
                   aria-label={`In stock for ${it.sku}`}
-                  title={`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`}
+                  title={[`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`,
+                          (onOrder[String(it.sku).toUpperCase()] ?? 0) > 0
+                            ? `${onOrder[String(it.sku).toUpperCase()]} on order` : null].filter(Boolean).join(" · ")}
                   className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
                 />
               </td>
@@ -1136,12 +818,15 @@ function PlainStock({ rows, edit, lowAt }: {
 }
 
 /**
- * WHERE THE PANEL'S FIRST COLUMN STARTS — the checkbox column's declared width (w-14) plus
- * the Item cell's own px-4. It puts a colour name exactly under the product photo while the
- * panel itself spans the row, so its separators reach both edges. Mirrors the `w-14` on the
- * header's checkbox cell; change both together.
+ * WHERE A COLOUR NAME STARTS — directly under the PRODUCT name above it.
+ *
+ * 5.5rem is the sheet heading's own run-up, added once: px-4 (1) + the checkbox (0.875) +
+ * gap-3 (0.75) + the thumbnail (2.125) + gap-3 (0.75). The row's own checkbox is then
+ * absolutely placed at left-4, under the product's. Two things line up down the left edge
+ * of the whole page instead of each product inventing its own margin — which is what
+ * "nothing lines up" always turns out to be. Change the heading, change this.
  */
-const GUTTER = "ps-[4.5rem]"
+const GUTTER = "ps-[5.5rem]"
 /**
  * EVERY SIZE COLUMN IS THE SAME WIDTH, on every product.
  *
@@ -1157,15 +842,19 @@ const GUTTER = "ps-[4.5rem]"
 const LABEL_W = "w-[13rem]"
 const SIZE_W = "w-[4.5rem]"
 
-function StockMatrix({ group, edit, lowAt }: {
+function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
   group: { product: CatalogProduct | null; rows: InventoryItem[] }
   edit: (sku: string, field: "in_stock", value: number) => void
   lowAt: (it: InventoryItem) => number
+  sel: Set<string>
+  setSel: (s: Set<string>) => void
+  /** How many of each sku a purchase order already covers — see the cell's title. */
+  onOrder: Record<string, number>
 }) {
   const p = group.product
   // No catalogue product = no declared sizes or colours to build axes from. Same panel,
   // one column. See PlainStock.
-  if (!p) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} />
+  if (!p) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} sel={sel} setSel={setSel} onOrder={onOrder} />
 
   /**
    * THE AXES COME FROM THE SHELF, NOT THE CATALOGUE.
@@ -1204,7 +893,7 @@ function StockMatrix({ group, edit, lowAt }: {
   }
   // Nothing resolves — the skus don't decompose against this product's sizes and colours.
   // Still a table, still under a header; the list stays honest by naming each sku.
-  if (!placed.size) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} />
+  if (!placed.size) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} sel={sel} setSel={setSel} onOrder={onOrder} />
 
   /**
    * WHAT IS ON THE SHELF, NOT WHAT THE CATALOGUE COULD HOLD.
@@ -1224,18 +913,28 @@ function StockMatrix({ group, edit, lowAt }: {
   const at = (size: string, color: string) =>
     shown.find((x) => x.size === size && x.color === color)?.it ?? null
 
-  const cell = (it: InventoryItem | null, key: string) =>
-    it ? (
+  const cell = (it: InventoryItem | null, key: string) => {
+    if (!it) return <span key={key} className="inline-block w-12 text-center text-muted-foreground/30">·</span>
+    // WHAT IS ALREADY COMING. A cell reading 0 with a PO against it is a different
+    // situation from a cell reading 0 with nothing coming, and the second is the one that
+    // needs someone. It rode on the old variant row as a chip; here it is in the title,
+    // because a grid of forty cells cannot carry forty chips and stay a grid.
+    const due = onOrder[String(it.sku).toUpperCase()] ?? 0
+    const held = Number(it.reserved) || 0
+    return (
       <Input
         key={key}
         value={String(Number(it.in_stock) || 0)}
         onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
         inputMode="numeric"
         aria-label={`In stock for ${it.sku}`}
-        title={`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`}
+        title={[`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`,
+                held > 0 ? `${held} held for orders` : null,
+                due > 0 ? `${due} on order` : null].filter(Boolean).join(" · ")}
         className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
       />
-    ) : <span key={key} className="inline-block w-12 text-center text-muted-foreground/30">·</span>
+    )
+  }
 
   /**
    * ONE TABLE, ALWAYS — even when an axis has a single value.
@@ -1267,6 +966,8 @@ function StockMatrix({ group, edit, lowAt }: {
    * one-size-fits-all, it is a size called Adjustable, and saying so is more useful.
    */
   const sizeHeader = (z: string) => (!z || isOneSize(z) ? "One size" : z)
+  /** Every sku on one colour's row — what its checkbox selects. */
+  const rowSkus = (c: string) => shown.filter((x) => x.color === c).map((x) => x.it.sku)
 
   return (
     <div className="space-y-2">
@@ -1298,7 +999,24 @@ function StockMatrix({ group, edit, lowAt }: {
           <tbody>
             {colorRows.map((c) => (
               <tr key={c || "one"} className="border-t border-border">
-                <td className={`${LABEL_W} ${GUTTER} truncate whitespace-nowrap py-1 pe-2 font-medium`}>
+                {/* SELECTION SURVIVED THE ROWS. Ticking a product used to be one checkbox
+                    per VARIANT, and those rows are gone — so a restock of "Black, every
+                    size" would have meant ticking the whole product or nothing. One box per
+                    colour, at the same x as the product's above it, takes that colour's
+                    sizes. Per-size selection is genuinely lost; the search box narrows to a
+                    single variant when that is what you need. */}
+                <td className={`${LABEL_W} ${GUTTER} relative truncate whitespace-nowrap py-1 pe-2 font-medium`}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${c ? prettyColorName(c) : "this variant"}`}
+                    checked={rowSkus(c).length > 0 && rowSkus(c).every((k) => sel.has(k))}
+                    onChange={(e) => {
+                      const next = new Set(sel)
+                      rowSkus(c).forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
+                      setSel(next)
+                    }}
+                    className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
+                  />
                   {c ? prettyColorName(c) : (p.name || group.rows[0]?.name || "Stock")}
                 </td>
                 {sizeCols.map((z) => (
