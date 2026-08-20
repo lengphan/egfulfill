@@ -32,6 +32,13 @@ const SECRET_DEFS = [
   { name: 'SHIPPO_API_TOKEN',      label: 'API token',        integration: 'shippo' },
   { name: 'USPS_CONSUMER_KEY',     label: 'Consumer key',     integration: 'usps' },
   { name: 'USPS_CONSUMER_SECRET',  label: 'Consumer secret',  integration: 'usps' },
+  // The rest of the USPS switch, so moving from the TEM test host to live postage is a
+  // form rather than an SSH session. USPS_BASE is the one that decides whether a bought
+  // label is a free sample or real money: apis-tem.usps.com = test, apis.usps.com = live.
+  { name: 'USPS_BASE',             label: 'API host (apis.usps.com = live postage)', integration: 'usps' },
+  { name: 'USPS_CRID',             label: 'CRID',             integration: 'usps' },
+  { name: 'USPS_MID',              label: 'MID',              integration: 'usps' },
+  { name: 'USPS_ACCOUNT_NUMBER',   label: 'EPS account number', integration: 'usps' },
   { name: 'SS_API_KEY',            label: 'API key',          integration: 'ss' },
   // Otto needs FOUR credentials, not two: ocConfigured() requires the account email and
   // password as well as the client pair. Listing only the client pair meant a live account

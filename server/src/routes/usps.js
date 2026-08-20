@@ -55,34 +55,57 @@ function _svcPref(mc) {
   return '';
 }
 
-const KEY    = process.env.USPS_CONSUMER_KEY || '';
-const SECRET = process.env.USPS_CONSUMER_SECRET || '';
-const BASE   = (process.env.USPS_BASE || 'https://apis-tem.usps.com').replace(/\/+$/, '');
-const CRID   = process.env.USPS_CRID || '';
-const MID    = process.env.USPS_MID || '';
-const ACCT   = process.env.USPS_ACCOUNT_NUMBER || '';
-const ACCT_TYPE = process.env.USPS_ACCOUNT_TYPE || 'EPS';
+/**
+ * READ AT CALL TIME, NOT AT IMPORT. (CLAUDE.md: "Read integration keys at call time".)
+ *
+ * Every one of these was a module-level `const`, so process.env was snapshotted once at
+ * boot. Saving a USPS key in Settings › Integrations writes it to the DB and into
+ * process.env immediately (secrets.js) — but this module never looked again, so the
+ * running code kept calling USPS with the OLD credentials and the panel showed a fresh
+ * last-4 as if it had worked. That is why USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET are in
+ * RESTART_REQUIRED: the restart was the workaround for this line.
+ *
+ * It matters most right now, because switching from the TEM test environment to live
+ * postage means changing BASE and the key together — and doing that without a redeploy is
+ * the difference between a click and an SSH session.
+ */
+const KEY    = () => (process.env.USPS_CONSUMER_KEY || '').trim();
+const SECRET = () => (process.env.USPS_CONSUMER_SECRET || '').trim();
+const BASE   = () => (process.env.USPS_BASE || 'https://apis-tem.usps.com').trim().replace(/\/+$/, '');
+const CRID   = () => (process.env.USPS_CRID || '').trim();
+const MID    = () => (process.env.USPS_MID || '').trim();
+const ACCT   = () => (process.env.USPS_ACCOUNT_NUMBER || '').trim();
+const ACCT_TYPE = () => (process.env.USPS_ACCOUNT_TYPE || 'EPS').trim();
 
-let _oauth = { token: '', exp: 0 };
-let _pay   = { token: '', exp: 0 };
+/**
+ * A cached token is only valid for the credentials that minted it.
+ *
+ * The caches were keyed on nothing, so a token minted against apis-tem survived a switch
+ * to apis.usps.com and every live call went out with a test-environment bearer — which
+ * fails in a way that looks like a credential problem rather than a stale cache. Stamping
+ * the config into the cache key makes a config change invalidate them for free.
+ */
+const _cfgKey = () => BASE() + '|' + KEY();
+let _oauth = { token: '', exp: 0, cfg: '' };
+let _pay   = { token: '', exp: 0, cfg: '' };
 
 // 1) OAuth — client_credentials. Cached until ~1 min before expiry.
 async function oauthToken() {
-  if (_oauth.token && Date.now() < _oauth.exp - 60000) return _oauth.token;
-  if (!KEY || !SECRET) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
+  if (_oauth.token && _oauth.cfg === _cfgKey() && Date.now() < _oauth.exp - 60000) return _oauth.token;
+  if (!KEY() || !SECRET()) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
   // By default the token carries whatever scopes the app is entitled to. If the
   // Payments scope isn't included (→ "Insufficient OAuth scope" on payment-auth),
   // set USPS_SCOPE in .env to request it explicitly once USPS grants it.
-  var _body = { grant_type: 'client_credentials', client_id: KEY, client_secret: SECRET };
+  var _body = { grant_type: 'client_credentials', client_id: KEY(), client_secret: SECRET() };
   if (process.env.USPS_SCOPE) _body.scope = process.env.USPS_SCOPE;
-  const res = await fetch(`${BASE}/oauth2/v3/token`, {
+  const res = await fetch(`${BASE()}/oauth2/v3/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(_body).toString()
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok || !d.access_token) throw new Error('USPS OAuth failed: ' + (d.error_description || d.error || ('HTTP ' + res.status)));
-  _oauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000), scope: d.scope || '' };
+  _oauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000), scope: d.scope || '', cfg: _cfgKey() };
   return _oauth.token;
 }
 
@@ -91,40 +114,40 @@ async function oauthToken() {
 // (all entitled scopes) often omits it, so we mint a token that EXPLICITLY requests
 // the addresses scope. If the app isn't entitled to that scope yet, USPS rejects the
 // token request → we fall back to the default token (same behaviour as before).
-let _addrOauth = { token: '', exp: 0 };
+let _addrOauth = { token: '', exp: 0, cfg: '' };
 async function addressToken() {
-  if (_addrOauth.token && Date.now() < _addrOauth.exp - 60000) return _addrOauth.token;
-  if (!KEY || !SECRET) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
+  if (_addrOauth.token && _addrOauth.cfg === _cfgKey() && Date.now() < _addrOauth.exp - 60000) return _addrOauth.token;
+  if (!KEY() || !SECRET()) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
   const scope = process.env.USPS_ADDRESSES_SCOPE || 'addresses';
   try {
-    const res = await fetch(`${BASE}/oauth2/v3/token`, {
+    const res = await fetch(`${BASE()}/oauth2/v3/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: KEY, client_secret: SECRET, scope }).toString()
+      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: KEY(), client_secret: SECRET(), scope }).toString()
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || !d.access_token) return oauthToken();   // not entitled to this scope → default token
-    _addrOauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000), scope: d.scope || '' };
+    _addrOauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000), scope: d.scope || '', cfg: _cfgKey() };
     return _addrOauth.token;
   } catch { return oauthToken(); }
 }
 
 // 2) Payment authorization token — needs CRID + MID + EPS account.
 async function paymentToken() {
-  if (_pay.token && Date.now() < _pay.exp - 60000) return _pay.token;
-  if (!CRID || !MID || !ACCT) throw new Error('Server missing USPS_CRID / USPS_MID / USPS_ACCOUNT_NUMBER (needed for the payment token)');
+  if (_pay.token && _pay.cfg === _cfgKey() && Date.now() < _pay.exp - 60000) return _pay.token;
+  if (!CRID() || !MID() || !ACCT()) throw new Error('Server missing USPS_CRID / USPS_MID / USPS_ACCOUNT_NUMBER (needed for the payment token)');
   const tok = await oauthToken();
   // Per Payments 3.0 spec: PAYER needs CRID + accountType + accountNumber (EPS).
   // LABEL_OWNER needs CRID + MID + manifestMID (NOT account fields). manifestMID
   // defaults to the MID (matches USPS's MinimumPaymentAuthorizationRequest example).
-  const MANIFEST_MID = process.env.USPS_MANIFEST_MID || MID;
+  const MANIFEST_MID = process.env.USPS_MANIFEST_MID || MID();
   const body = {
     roles: [
-      { roleName: 'PAYER',       CRID, MID, manifestMID: MANIFEST_MID, accountType: ACCT_TYPE, accountNumber: ACCT },
-      { roleName: 'LABEL_OWNER', CRID, MID, manifestMID: MANIFEST_MID }
+      { roleName: 'PAYER',       CRID: CRID(), MID: MID(), manifestMID: MANIFEST_MID, accountType: ACCT_TYPE(), accountNumber: ACCT() },
+      { roleName: 'LABEL_OWNER', CRID: CRID(), MID: MID(), manifestMID: MANIFEST_MID }
     ]
   };
-  const res = await fetch(`${BASE}/payments/v3/payment-authorization`, {
+  const res = await fetch(`${BASE()}/payments/v3/payment-authorization`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
     body: JSON.stringify(body)
@@ -132,7 +155,7 @@ async function paymentToken() {
   const d = await res.json().catch(() => ({}));
   const token = d.paymentAuthorizationToken || d.token;
   if (!res.ok || !token) throw new Error('USPS payment authorization failed: ' + (d.error?.message || d.message || JSON.stringify(d).slice(0, 300)));
-  _pay = { token, exp: Date.now() + (50 * 60 * 1000) };   // ~1h tokens; refresh at 50m
+  _pay = { token, exp: Date.now() + (50 * 60 * 1000), cfg: _cfgKey() };   // ~1h tokens; refresh at 50m
   return _pay.token;
 }
 
@@ -179,8 +202,8 @@ function _parseLabelMultipart(ct, ab, imgType0) {
 export function uspsRoutes(app, requireAuth, requireStaff) {
   // Connectivity/qualification check — surfaces exactly which step is wired.
   app.get('/api/usps/test', { preHandler: requireStaff }, async () => {
-    const out = { base: BASE, env: BASE.includes('-tem') ? 'TEM (test)' : 'PRODUCTION',
-      consumerKey: !!KEY, consumerSecret: !!SECRET, crid: !!CRID, mid: !!MID, account: !!ACCT };
+    const out = { base: BASE(), env: BASE().includes('-tem') ? 'TEM (test)' : 'PRODUCTION',
+      consumerKey: !!KEY(), consumerSecret: !!SECRET(), crid: !!CRID(), mid: !!MID(), account: !!ACCT() };
     try { await oauthToken(); out.oauth = 'ok'; out.scopes = _oauth.scope || '(none returned)'; out.requestedScope = process.env.USPS_SCOPE || '(default — none requested)'; }
     catch (e) { out.oauth = 'FAILED: ' + e.message; return out; }
     // Does the granted token include the scopes the label flow needs? Note the
@@ -196,7 +219,7 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       const at = await addressToken();
       out.addressTokenScope = _addrOauth.scope || '(fell back to default token)';
       const p = new URLSearchParams({ streetAddress: '1600 Pennsylvania Ave NW', city: 'Washington', state: 'DC', ZIPCode: '20500' });
-      const ar = await fetch(`${BASE}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + at } });
+      const ar = await fetch(`${BASE()}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + at } });
       const ad = await ar.json().catch(() => ({}));
       out.addresses = ar.ok ? 'ok' : ('FAILED: ' + ((ad.error && (ad.error.message || ad.error)) || ad.message || ('HTTP ' + ar.status)));
     } catch (e) { out.addresses = 'FAILED: ' + e.message; }
@@ -205,10 +228,10 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
     // EPS account / funds inquiry (Payments 3.0 GET /payment-account). Also needs
     // the `payments` scope, so it 403s until USPS grants it — but once it works it
     // reports whether the EPS account exists and is funded.
-    if (ACCT) {
+    if (ACCT()) {
       try {
         const oauth = await oauthToken();
-        const r = await fetch(`${BASE}/payments/v3/payment-account/${encodeURIComponent(ACCT)}?accountType=${ACCT_TYPE}`, { headers: { Authorization: 'Bearer ' + oauth } });
+        const r = await fetch(`${BASE()}/payments/v3/payment-account/${encodeURIComponent(ACCT())}?accountType=${ACCT_TYPE()}`, { headers: { Authorization: 'Bearer ' + oauth } });
         const d = await r.json().catch(() => ({}));
         out.epsAccount = r.ok ? { ok: true, accountType: d.accountType, nonProfit: d.nonProfitStatus } : ('FAILED: ' + ((d.error && (d.error.message || d.error)) || ('HTTP ' + r.status)));
       } catch (e) { out.epsAccount = 'FAILED: ' + e.message; }
@@ -267,7 +290,7 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       const oauth = await addressToken();
       const p = new URLSearchParams();
       ['streetAddress', 'secondaryAddress', 'city', 'state', 'ZIPCode'].forEach((k) => { if (qy[k]) p.set(k, qy[k]); });
-      const res = await fetch(`${BASE}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + oauth } });
+      const res = await fetch(`${BASE()}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + oauth } });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         let msg = (data.error && (data.error.message || data.error)) || data.message || ('HTTP ' + res.status);
@@ -599,7 +622,7 @@ function withBillingHint(msg) {
           mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10)   // required by Labels 3.0
         }
       };
-      const res = await fetch(`${BASE}/labels/v3/label`, {
+      const res = await fetch(`${BASE()}/labels/v3/label`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'multipart/form-data',
                    Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay },
@@ -646,7 +669,7 @@ function withBillingHint(msg) {
       if (!toZip || !fromZip) { reply.code(400); return { error: 'origin (fromZip) + destination (toZip) ZIP are required' }; }
       if (process.env.USPS_MOCK) {
         return { ok: true, mock: true, origin: fromZip, destination: toZip, weightOz: Number(b.weightOz) || 8, asOf: new Date().toISOString().slice(0, 10),
-          rates: [{ mailClass: 'USPS_GROUND_ADVANTAGE', service: 'USPS Ground Advantage', price: 6.74, zone: '—', days: '2-5 days' }, { mailClass: 'PRIORITY_MAIL', service: 'Priority Mail', price: 9.85, zone: '—', days: '1-3 days' }] };
+          rates: [{ mailClass: 'USPS_GROUND_ADVANTAGE', service: 'USPS Ground Advantage', price: 6.74, zone: '—', days: '2-5 days' }, { mailClass: 'PRIORITY_MAIL', service: 'Priority Mail', price: 9.85, zone: '—', days: '1-3 days' }] };  // allow-listed classes only — see SHIPPABLE below
       }
       const oauth = await oauthToken();
       const payload = {
@@ -654,9 +677,9 @@ function withBillingHint(msg) {
         weight: Math.max(0.0625, (Number(b.weightOz) || 8) / 16),
         length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 3,
         mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10),
-        accountType: ACCT_TYPE, accountNumber: ACCT, priceType: 'COMMERCIAL'
+        accountType: ACCT_TYPE(), accountNumber: ACCT(), priceType: 'COMMERCIAL'
       };
-      const res = await fetch(`${BASE}/prices/v3/total-rates/search`, {
+      const res = await fetch(`${BASE()}/prices/v3/total-rates/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + oauth },
         body: JSON.stringify(payload)
       });
@@ -673,7 +696,28 @@ function withBillingHint(msg) {
           }
         });
       });
-      const rates = Object.keys(byClass).map(function (k) { return byClass[k]; }).sort(function (a, c) { return a.price - c.price; });
+      /**
+       * ONLY CLASSES THAT MAY LAWFULLY CARRY MERCHANDISE.
+       *
+       * USPS returns 11 classes for a t-shirt and this list is sorted cheapest-first, so
+       * the top of it was: Marketing Mail $0.05, Bound Printed Matter $1.22, Connect Local
+       * $2.95, Library Mail $4.17, Media Mail $4.39 — and the first class we can actually
+       * use, Ground Advantage, sat NINTH at $8.40.
+       *
+       * Every one of those five is restricted to printed matter, books or media. Putting a
+       * garment in Media Mail is not a cheaper option, it is mail fraud — and the label
+       * route already defaults to USPS_GROUND_ADVANTAGE precisely because someone thought
+       * about this once. Anything that rate-shops "the cheapest" off this endpoint would
+       * have undone that on the first click, which is exactly what a cheapest-first list
+       * invites a human to do.
+       *
+       * An allow-list, not a block-list: a class USPS adds later must be reviewed before we
+       * print postage under it, rather than appearing in the table because nobody has got
+       * round to excluding it.
+       */
+      const SHIPPABLE = new Set(['USPS_GROUND_ADVANTAGE', 'PRIORITY_MAIL', 'PRIORITY_MAIL_EXPRESS', 'PARCEL_SELECT']);
+      const rates = Object.keys(byClass).filter(function (k) { return SHIPPABLE.has(k); })
+        .map(function (k) { return byClass[k]; }).sort(function (a, c) { return a.price - c.price; });
       return { ok: true, origin: fromZip, destination: toZip, weightOz: Number(b.weightOz) || 8, asOf: new Date().toISOString().slice(0, 10), rates: rates };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
@@ -708,7 +752,7 @@ function withBillingHint(msg) {
           mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10)
         }
       };
-      const res = await fetch(`${BASE}/labels/v3/return-label`, {
+      const res = await fetch(`${BASE()}/labels/v3/return-label`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'multipart/form-data', Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay },
         body: JSON.stringify(payload)
       });
@@ -728,7 +772,7 @@ function withBillingHint(msg) {
       if (!tracking) { reply.code(400); return { error: 'tracking number required' }; }
       if (process.env.USPS_MOCK) return { ok: true, mock: true, trackingNumber: tracking, status: 'CANCELED' };
       const oauth = await oauthToken(); const pay = await paymentToken();
-      const res = await fetch(`${BASE}/labels/v3/label/${encodeURIComponent(tracking)}`, {
+      const res = await fetch(`${BASE()}/labels/v3/label/${encodeURIComponent(tracking)}`, {
         method: 'DELETE', headers: { Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay }
       });
       const raw = await res.text();

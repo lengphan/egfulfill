@@ -17,6 +17,12 @@ export const SECRET_NAMES = [
   'STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY',
   'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET',
   'VIETQR_API_USERNAME', 'VIETQR_API_PASSWORD',
+  // The rest of the USPS switch. Not secrets in the cryptographic sense — a CRID and an
+  // EPS account number are identifiers, and USPS_BASE is a hostname — but this panel is
+  // where an admin already goes to point an integration at a different account, and the
+  // alternative was an SSH session to edit .env. USPS_BASE is what flips TEM (test, free
+  // sample labels) to apis.usps.com (real postage against the EPS account).
+  'USPS_BASE', 'USPS_CRID', 'USPS_MID', 'USPS_ACCOUNT_NUMBER',
   'SHIPPO_API_TOKEN',
   'USPS_CONSUMER_KEY', 'USPS_CONSUMER_SECRET',
   'SS_ACCOUNT_NUMBER', 'SS_API_KEY',
@@ -59,7 +65,9 @@ const ALLOWED = new Set(SECRET_NAMES);
 export const RESTART_REQUIRED = new Set([
   'SHOPIFY_API_KEY', 'SHOPIFY_API_SECRET',          // shopify.js:11
   'TIKTOK_APP_KEY', 'TIKTOK_APP_SECRET',            // tiktok.js:15
-  'USPS_CONSUMER_KEY', 'USPS_CONSUMER_SECRET',      // usps.js:33
+  // USPS was here until 2026-08-20. usps.js now reads every value at CALL time and keys
+  // its OAuth/payment token caches on (base + key), so a save applies to the very next
+  // request — including a switch between the TEM test host and live postage.
   'META_APP_ID', 'META_APP_SECRET',                 // ads.js:17
   'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET',
   'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID', // ads.js:21
