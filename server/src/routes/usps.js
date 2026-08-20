@@ -17,7 +17,7 @@ import { audit } from '../audit.js';
 import { recordUsage } from '../usage.js';
 import { recordCost } from '../costs.js';
 import { shipFromForOrder } from './factory_settings.js';
-import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress } from './shipping.js';
+import { shippingEnabled, aggregatorBuyCheapest, aggregatorBuyRate, aggregatorVerifyAddress, decodeRateToken } from './shipping.js';
 import { recordShipment } from '../shipments-store.js';
 import { missingArtwork, fulfillMarketplace } from './orders.js';
 
@@ -94,6 +94,9 @@ const ACCT_TYPE = () => (process.env.USPS_ACCOUNT_TYPE || 'EPS').trim();
  * debugging the wrong system. This is somebody deciding, in advance and on the record.
  */
 const DIRECT = () => /^(1|true|yes|on)$/i.test((process.env.USPS_DIRECT || '').trim());
+/** Readable from shipping.js, which has to know whether to quote USPS alongside (or instead
+ *  of) the aggregator. Exported as a function so it stays call-time like the rest. */
+export const uspsDirectEnabled = () => DIRECT();
 
 /**
  * A cached token is only valid for the credentials that minted it.
@@ -215,6 +218,75 @@ function _parseLabelMultipart(ct, ab, imgType0) {
     try { const data = JSON.parse(ab.toString('utf8')); tracking = data.trackingNumber || (data.labelMetadata && data.labelMetadata.trackingNumber) || ''; labelImage = data.labelImage || (data.labelMetadata && data.labelMetadata.labelImage) || ''; } catch (e) {}
   }
   return { tracking: tracking, labelImage: labelImage, imgType: imgType, cost: cost };
+}
+
+/**
+ * USPS-DIRECT RATES, as a function rather than only a route.
+ *
+ * `/api/shipping/rates` needs these too — it is the endpoint the label dialog quotes from,
+ * and it could previously only answer with EasyPost or Shippo rates. So when the aggregator
+ * is unreachable (a declined card, a restricted account, no token at all) the rate table
+ * came back EMPTY, the dialog refuses to buy without a picked rate, and USPS-direct was
+ * unreachable from the UI no matter what was configured. One shared function, two callers.
+ *
+ * Throws on a bad request or a USPS error; the route turns that into a 400.
+ */
+export async function uspsRates(b) {
+  const toZip = String(b.toZip || b.destinationZIPCode || '').replace(/\D/g, '').slice(0, 5);
+  const fromZip = String(b.fromZip || b.originZIPCode || process.env.USPS_ORIGIN_ZIP || '').replace(/\D/g, '').slice(0, 5);
+  if (!toZip || !fromZip) throw new Error('origin (fromZip) + destination (toZip) ZIP are required');
+  const weightOz = Number(b.weightOz) || 8;
+  if (process.env.USPS_MOCK) {
+    return { ok: true, mock: true, origin: fromZip, destination: toZip, weightOz, asOf: new Date().toISOString().slice(0, 10),
+      rates: [{ mailClass: 'USPS_GROUND_ADVANTAGE', service: 'USPS Ground Advantage', price: 6.74, zone: '\u2014', days: '2-5 days' },
+              { mailClass: 'PRIORITY_MAIL', service: 'Priority Mail', price: 9.85, zone: '\u2014', days: '1-3 days' }] };
+  }
+  const oauth = await oauthToken();
+  const payload = {
+    originZIPCode: fromZip, destinationZIPCode: toZip,
+    weight: Math.max(0.0625, weightOz / 16),
+    length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 3,
+    mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10),
+    accountType: ACCT_TYPE(), accountNumber: ACCT(), priceType: 'COMMERCIAL'
+  };
+  const res = await fetch(`${BASE()}/prices/v3/total-rates/search`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + oauth },
+    body: JSON.stringify(payload)
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error('USPS rates failed: ' + raw.slice(0, 300));
+  let data = {}; try { data = JSON.parse(raw); } catch (e) {}
+  const byClass = {};
+  (data.rateOptions || []).forEach(function (opt) {
+    (opt.rates || []).forEach(function (rt) {
+      const mc = rt.mailClass || rt.productName || ''; const price = Number(rt.price);
+      if (!mc || !isFinite(price)) return;
+      if (!byClass[mc] || price < byClass[mc].price) {
+        byClass[mc] = { mailClass: mc, service: rt.productName || rt.description || mc, price: price, zone: rt.zone || '', days: rt.productDefinition || (rt.commitment && rt.commitment.name) || '', startDate: rt.startDate || '', endDate: rt.endDate || '' };
+      }
+    });
+  });
+  /**
+   * ONLY CLASSES THAT MAY LAWFULLY CARRY MERCHANDISE.
+   *
+   * USPS returns 11 classes for a t-shirt and this list is sorted cheapest-first, so the top
+   * of it was: Marketing Mail $0.05, Bound Printed Matter $1.22, Connect Local $2.95,
+   * Library Mail $4.17, Media Mail $4.39 — and the first class we can actually use, Ground
+   * Advantage, sat NINTH at $8.40.
+   *
+   * Every one of those five is restricted to printed matter, books or media. Putting a
+   * garment in Media Mail is not a cheaper option, it is mail fraud — and the label route
+   * already defaults to USPS_GROUND_ADVANTAGE precisely because someone thought about this
+   * once. Anything that rate-shops "the cheapest" off this list would have undone that on
+   * the first click, which is exactly what a cheapest-first table invites a human to do.
+   *
+   * An allow-list, not a block-list: a class USPS adds later must be reviewed before we
+   * print postage under it, rather than appearing because nobody got round to excluding it.
+   */
+  const SHIPPABLE = new Set(['USPS_GROUND_ADVANTAGE', 'PRIORITY_MAIL', 'PRIORITY_MAIL_EXPRESS', 'PARCEL_SELECT']);
+  const rates = Object.keys(byClass).filter(function (k) { return SHIPPABLE.has(k); })
+    .map(function (k) { return byClass[k]; }).sort(function (a, c) { return a.price - c.price; });
+  return { ok: true, origin: fromZip, destination: toZip, weightOz, asOf: new Date().toISOString().slice(0, 10), rates: rates };
 }
 
 export function uspsRoutes(app, requireAuth, requireStaff) {
@@ -558,7 +630,24 @@ function withBillingHint(msg) {
       // A SPECIFIC rate the operator picked in the multi-carrier rate table (UPS, USPS, …).
       // Bought and recorded through the SAME path as a USPS label, so cost/PDF/void-ref land
       // on the order identically — the only difference is which carrier's rate it is.
-      if (b.rateToken) {
+      /**
+       * A USPS-DIRECT RATE IS NOT AN AGGREGATOR RATE, and the token says which.
+       *
+       * `/api/shipping/rates` now also quotes USPS directly, and stamps those rows
+       * `{p:'usps', mc:<mailClass>}`. There is no rate object on anyone's server to buy
+       * against — the mail class IS the selection — so such a token must never be handed to
+       * aggregatorBuyRate, which would fail looking for a rate id that was never minted.
+       *
+       * And when USPS_DIRECT is on, an aggregator token is ignored outright: the operator
+       * has already said to bypass the aggregator, and honouring a stale token from a
+       * previous quote would silently send the buy back to the system being bypassed. This
+       * was the hole that made USPS_DIRECT a switch that turned nothing on — the label
+       * dialog ALWAYS sends a rateToken, so the direct path below was unreachable from the UI.
+       */
+      const _tok = b.rateToken ? decodeRateToken(b.rateToken) : null;
+      if (_tok && _tok.p === 'usps' && _tok.mc) b.mailClass = _tok.mc;
+      const _useAggregatorToken = !!b.rateToken && !(_tok && _tok.p === 'usps') && !DIRECT() && !b.directUsps;
+      if (_useAggregatorToken) {
         try {
           const buy = await aggregatorBuyRate(b.rateToken, b.rate || {}, b.orderId);
           if (buy && buy.tracking) {
@@ -574,7 +663,8 @@ function withBillingHint(msg) {
       // buy a REAL label through it (test keys → real design, watermarked, no charge).
       // Restricted to USPS here so a UPS test-account gap can't fail the buy.
       // Pass directUsps:true to SKIP the aggregator and buy USPS-direct (Labels 3.0).
-      if (shippingEnabled() && !b.directUsps && !DIRECT()) {
+      // A USPS token has already chosen USPS — never hand it to the aggregator's cheapest.
+      if (shippingEnabled() && !b.directUsps && !DIRECT() && !(_tok && _tok.p === 'usps')) {
         try {
           const buy = await aggregatorBuyCheapest(to, from,
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
@@ -599,7 +689,9 @@ function withBillingHint(msg) {
       }
       // No aggregator configured, and USPS-direct wasn't explicitly asked for. Say so
       // plainly rather than attempting a path that needs USPS EPS billing approval.
-      if (!shippingEnabled() && !b.directUsps && !DIRECT() && !process.env.USPS_MOCK) {
+      // Picking a USPS-direct rate IS asking for the direct path, so it must not trip the
+      // "no provider configured" refusal — that check exists for a buy with no route at all.
+      if (!shippingEnabled() && !b.directUsps && !DIRECT() && !(_tok && _tok.p === 'usps') && !process.env.USPS_MOCK) {
         reply.code(400);
         return { error: 'No shipping provider is configured. Set SHIPPO_API_TOKEN (or EASYPOST_API_KEY) on the server, or pass directUsps to buy through USPS EPS.' };
       }
@@ -680,64 +772,8 @@ function withBillingHint(msg) {
   // ── Live rates (Prices API) — powers the Shipping "Label" tab rate table + rate-shopping.
   // body: { toZip, fromZip?, weightOz?, length?, width?, height? } → cheapest rate per mail class.
   app.post('/api/usps/rates', { preHandler: requireStaff }, async (req, reply) => {
-    try {
-      const b = req.body || {};
-      const toZip = String(b.toZip || b.destinationZIPCode || '').replace(/\D/g, '').slice(0, 5);
-      const fromZip = String(b.fromZip || b.originZIPCode || process.env.USPS_ORIGIN_ZIP || '').replace(/\D/g, '').slice(0, 5);
-      if (!toZip || !fromZip) { reply.code(400); return { error: 'origin (fromZip) + destination (toZip) ZIP are required' }; }
-      if (process.env.USPS_MOCK) {
-        return { ok: true, mock: true, origin: fromZip, destination: toZip, weightOz: Number(b.weightOz) || 8, asOf: new Date().toISOString().slice(0, 10),
-          rates: [{ mailClass: 'USPS_GROUND_ADVANTAGE', service: 'USPS Ground Advantage', price: 6.74, zone: '—', days: '2-5 days' }, { mailClass: 'PRIORITY_MAIL', service: 'Priority Mail', price: 9.85, zone: '—', days: '1-3 days' }] };  // allow-listed classes only — see SHIPPABLE below
-      }
-      const oauth = await oauthToken();
-      const payload = {
-        originZIPCode: fromZip, destinationZIPCode: toZip,
-        weight: Math.max(0.0625, (Number(b.weightOz) || 8) / 16),
-        length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 3,
-        mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10),
-        accountType: ACCT_TYPE(), accountNumber: ACCT(), priceType: 'COMMERCIAL'
-      };
-      const res = await fetch(`${BASE()}/prices/v3/total-rates/search`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + oauth },
-        body: JSON.stringify(payload)
-      });
-      const raw = await res.text();
-      if (!res.ok) { reply.code(400); return { error: 'USPS rates failed: ' + raw.slice(0, 300) }; }
-      let data = {}; try { data = JSON.parse(raw); } catch (e) {}
-      const byClass = {};
-      (data.rateOptions || []).forEach(function (opt) {
-        (opt.rates || []).forEach(function (rt) {
-          const mc = rt.mailClass || rt.productName || ''; const price = Number(rt.price);
-          if (!mc || !isFinite(price)) return;
-          if (!byClass[mc] || price < byClass[mc].price) {
-            byClass[mc] = { mailClass: mc, service: rt.productName || rt.description || mc, price: price, zone: rt.zone || '', days: rt.productDefinition || (rt.commitment && rt.commitment.name) || '', startDate: rt.startDate || '', endDate: rt.endDate || '' };
-          }
-        });
-      });
-      /**
-       * ONLY CLASSES THAT MAY LAWFULLY CARRY MERCHANDISE.
-       *
-       * USPS returns 11 classes for a t-shirt and this list is sorted cheapest-first, so
-       * the top of it was: Marketing Mail $0.05, Bound Printed Matter $1.22, Connect Local
-       * $2.95, Library Mail $4.17, Media Mail $4.39 — and the first class we can actually
-       * use, Ground Advantage, sat NINTH at $8.40.
-       *
-       * Every one of those five is restricted to printed matter, books or media. Putting a
-       * garment in Media Mail is not a cheaper option, it is mail fraud — and the label
-       * route already defaults to USPS_GROUND_ADVANTAGE precisely because someone thought
-       * about this once. Anything that rate-shops "the cheapest" off this endpoint would
-       * have undone that on the first click, which is exactly what a cheapest-first list
-       * invites a human to do.
-       *
-       * An allow-list, not a block-list: a class USPS adds later must be reviewed before we
-       * print postage under it, rather than appearing in the table because nobody has got
-       * round to excluding it.
-       */
-      const SHIPPABLE = new Set(['USPS_GROUND_ADVANTAGE', 'PRIORITY_MAIL', 'PRIORITY_MAIL_EXPRESS', 'PARCEL_SELECT']);
-      const rates = Object.keys(byClass).filter(function (k) { return SHIPPABLE.has(k); })
-        .map(function (k) { return byClass[k]; }).sort(function (a, c) { return a.price - c.price; });
-      return { ok: true, origin: fromZip, destination: toZip, weightOz: Number(b.weightOz) || 8, asOf: new Date().toISOString().slice(0, 10), rates: rates };
-    } catch (e) { reply.code(400); return { error: e.message }; }
+    try { return await uspsRates(req.body || {}); }
+    catch (e) { reply.code(400); return { error: e.message }; }
   });
 
   // ── Return label (merchant-funded, Scan-Based Payment: charged only when the customer ships it).

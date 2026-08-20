@@ -36,6 +36,7 @@ const epAuth = () => 'Basic ' + Buffer.from(epKey() + ':').toString('base64');
 const shAuth = () => 'ShippoToken ' + shToken();
 
 function enc(obj) { return Buffer.from(JSON.stringify(obj)).toString('base64'); }
+export function decodeRateToken(tok) { return dec(tok); }
 function dec(tok) { try { return JSON.parse(Buffer.from(String(tok || ''), 'base64').toString('utf8')); } catch (e) { return null; } }
 
 // USPS requires the SENDER to have a phone or email. The label modal doesn't collect
@@ -730,16 +731,55 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
     return out;
   });
 
+  /**
+   * USPS-direct, loaded at CALL time.
+   *
+   * usps.js already imports this module, so a static import back would be a cycle in the
+   * two files that buy postage. A dynamic import is resolved once and cached by the module
+   * system, and it cannot be affected by which route file registers first.
+   */
+  let _usps = null;
+  const uspsMod = async () => (_usps || (_usps = await import('./usps.js')));
+
   // Merged, cheapest-first rates from all enabled providers.
   app.post('/api/shipping/rates', guard, async (req, reply) => {
-    if (!epKey() && !shToken()) { reply.code(400); return { error: 'No shipping provider configured (set EASYPOST_API_KEY or SHIPPO_API_TOKEN)' }; }
     const b = req.body || {};
     const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await shipFromForOrder(b.orderId)) || {}, true), pc = parcel(b.parcel || b);
     if (!to.zip || !to.street1) { reply.code(400); return { error: 'Recipient street + ZIP required' }; }
     if (!from.zip || !from.street1) { reply.code(400); return { error: 'Sender street + ZIP required' }; }
+    /**
+     * QUOTE USPS DIRECTLY when the aggregator is switched off or simply is not there.
+     *
+     * This endpoint is what the label dialog quotes from, and it could only ever answer with
+     * EasyPost or Shippo rates — so when the aggregator was unreachable (a declined card, a
+     * restricted account, no token at all) it returned a bare 400, the rate table came back
+     * empty, and the dialog refuses to buy without a picked rate. USPS-direct was therefore
+     * unreachable from the UI no matter what was configured, which made USPS_DIRECT a switch
+     * that turned nothing on.
+     */
+    const { uspsRates, uspsDirectEnabled } = await uspsMod();
+    const direct = uspsDirectEnabled();
+    // Nothing configured at all is no longer a refusal: USPS answers if it has credentials,
+    // and says why in one sentence if it does not.
+    const useAggregator = (epKey() || shToken()) && !direct;
     const jobs = [];
-    if (epKey()) jobs.push(epRates(to, from, pc).catch((e) => ({ _err: 'EasyPost: ' + e.message })));
-    if (shToken()) jobs.push(shRates(to, from, pc, b.extra).catch((e) => ({ _err: 'Shippo: ' + e.message })));
+    if (useAggregator && epKey()) jobs.push(epRates(to, from, pc).catch((e) => ({ _err: 'EasyPost: ' + e.message })));
+    if (useAggregator && shToken()) jobs.push(shRates(to, from, pc, b.extra).catch((e) => ({ _err: 'Shippo: ' + e.message })));
+    if (!useAggregator) {
+      jobs.push(
+        uspsRates({ fromZip: from.zip, toZip: to.zip, weightOz: pc.weightOz, length: pc.length, width: pc.width, height: pc.height })
+          .then((r) => (r.rates || []).map((rt) => ({
+            // The token carries the MAIL CLASS, because that is the only thing the direct
+            // buy needs back. An aggregator token names a rate object on their side; there
+            // is no such object here, so the class IS the selection.
+            token: enc({ p: 'usps', mc: rt.mailClass }),
+            provider: 'usps', carrier: 'USPS', service: rt.service,
+            amount: Number(rt.price), currency: 'USD',
+            days: null, carrierAccount: ''
+          })))
+          .catch((e) => ({ _err: 'USPS: ' + e.message }))
+      );
+    }
     const results = await Promise.all(jobs);
     const rates = [], errors = [];
     results.forEach((r) => { if (Array.isArray(r)) rates.push(...r); else if (r && r._err) errors.push(r._err); });
