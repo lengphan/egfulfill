@@ -1355,7 +1355,6 @@ export function DesignCanvasDialog({
    * One flag for both, not one each: they are halves of the same subject, and two separate
    * disclosures on one short column is more chrome than the panels save.
    */
-  const [embOpen, setEmbOpen] = useState(false)
 
   /**
    * THE SUGGESTION IS GONE, deliberately, and this note is what is left of it.
@@ -1947,10 +1946,18 @@ export function DesignCanvasDialog({
           * The garment yields rather than the panel, because the panel is what was just
           * asked for. It comes back to full size the moment the drawer closes.
           */}
-        {/* STICKY, so the garment is still there when the drawer under it is being read. The
-            window is sized not to scroll at all — this is what holds if a long thread list or
-            a narrow screen makes it scroll anyway. */}
-        <div className={"relative mx-auto w-full self-start md:sticky md:top-2 " + (embOpen ? "max-w-[min(100%,38vh)]" : "max-w-[min(100%,62vh)]")}>
+        {/**
+          * THE GARMENT KEEPS ITS SIZE. All of it, drawer open or shut.
+          *
+          * Opening Embroidery used to shrink it to 38vh to make room, which fixed the
+          * scrolling by taking it out of the one thing this window exists to show. The panel
+          * is what should give way, not the picture: the thread list has its own ceiling and
+          * its own scrollbar now, so a design with fourteen cones is read inside the list
+          * rather than by shrinking the garment or pushing Save off the screen.
+          *
+          * Sticky as well, so on a short screen the garment stays put while the list moves.
+          */}
+        <div className="relative mx-auto w-full self-start max-w-[min(100%,62vh)] md:sticky md:top-2">
           <DesignStage
             className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
             designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
@@ -2263,26 +2270,18 @@ export function DesignCanvasDialog({
             same picker on the same line — two places to change one fact, and the second one
             reachable only by opening a dialog. What this window needs from it is not a
             control but a sentence, and that is in the header above. */}
-        {/* ONE LINE WHEN CLOSED, saying what is behind it and whether it is done — a
-            disclosure that hides its own state is just a hidden panel. */}
-        {isEmb && (
-          <button
-            type="button"
-            onClick={() => setEmbOpen((v) => !v)}
-            aria-expanded={embOpen}
-            className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-2 text-left transition-colors hover:bg-accent"
-          >
-            <span className="min-w-0">
-              <span className="block text-xs font-medium">Embroidery</span>
-              <span className="block truncate text-2xs text-muted-foreground">
-                {[hasMachineFile ? "machine file attached" : "no machine file",
-                  threads.length ? `${threads.length} thread${threads.length === 1 ? "" : "s"}` : null]
-                  .filter(Boolean).join(" · ")}
-              </span>
-            </span>
-            <CaretDown size={14} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (embOpen ? "rotate-180" : "")} />
-          </button>
-        )}
+        {/* THE "EMBROIDERY · NO MACHINE FILE" STRIP IS GONE.
+            ────────────────────────────────────────────────────────────────────────────
+            It was a disclosure header whose whole summary was an absence. "No machine file"
+            is not news on a screen whose Upload button is the way to attach one — it reported
+            that you had not yet done the thing the control above it exists to do, and it
+            reported it in a closed drawer, so the actual controls behind it were a click away
+            for no reason.
+
+            What was BEHIND it is kept and now simply shown: the thread read-out, Show
+            stitches, Send to Board and Apply-to-all-lines. None of those are about a file we
+            already hold — they are the routes a person still has to take — and hiding them
+            behind a line that said "no machine file" is what made them hard to find. */}
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads.
             `order-last` rather than moving the block: it sits first in the markup for historical
@@ -2302,8 +2301,12 @@ export function DesignCanvasDialog({
           * derivation with no input has nothing to be wrong about. The moment artwork lands
           * the card appears with the colours in it, which is the answer it was promising.
           */}
-        {isEmb && embOpen && designUrl && (
-          <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
+        {isEmb && designUrl && (
+          /* A CEILING AND ITS OWN SCROLLBAR. Two cones fit; fourteen would have pushed the
+             action bar off the bottom of the window, which is what shrinking the garment was
+             papering over. The list scrolls, the picture does not move, and Save stays where
+             it is. */
+          <div className="order-last max-h-[17vh] overflow-y-auto rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 {/* Count the ROWS, not the saved cone list. They are not the same number:
@@ -2537,7 +2540,7 @@ export function DesignCanvasDialog({
             {/* One green, from the success token — this step hand-picked emerald while the
                 partner step beside it used success, so two "done" states were two colours.
                 The middle state is the brand tone, not green: it is under way, not finished. */}
-            {isEmb && embOpen && (
+            {isEmb && (
             <div className="border-t border-border pt-2.5">
               {/**
                 * Same trim as the card above: the border carries the state, so the circle and
