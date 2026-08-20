@@ -958,12 +958,16 @@ function ProductGroup({
           place is named underneath it. */}
       {open && (matrixable ? (
         <tr className="border-t border-border">
-          {/* SEVEN, which is how many the table has — a checkbox, the disclosure, the
-              picture, Item, SKU, Stock and Status. It said four, so the panel stopped
-              two-thirds across and the tinted band ended in mid-air with the Stock and
-              Status columns hanging past it. A panel that doesn't span its row reads as a
-              broken cell, not as the product's own area. */}
-          <td colSpan={7} className="bg-muted/20 p-0">
+          {/* THE PANEL STARTS WHERE THE PICTURE DOES.
+              It was one cell spanning all seven columns with its own px-4, so the grid began
+              at the checkbox's margin and every colour name sat to the LEFT of the product
+              photo it belongs to — a second left edge, a few pixels off the first, which is
+              what "nothing lines up" is made of.
+              Leaving the checkbox column as its own empty cell hands the alignment to the
+              browser: the panel's content edge IS the Item column's edge, whatever width the
+              checkbox and caret happen to take, and the tinted band still runs the full row. */}
+          <td className="bg-muted/20 p-0" />
+          <td colSpan={6} className="bg-muted/20 px-4 py-3">
             <StockMatrix
               group={group}
               edit={(sku, _f, v) => edit(sku, "in_stock", v)}
@@ -1116,7 +1120,7 @@ function StockMatrix({ group, edit, lowAt }: {
         : [{ label: [oneSize, oneColor ? prettyColorName(oneColor) : ""].filter(Boolean).join(" · ") || "Stock",
              it: at(oneSize, oneColor) }]
     return (
-      <div className="space-y-2 px-4 py-3">
+      <div className="space-y-2">
         {/* COLUMNS, NOT A WRAP. Ragged chips put every label at a different x, so seventeen
             of them are seventeen things to find rather than a list to read down. A fixed
             grid lines the names up and the numbers up, which is the whole reason a table
@@ -1135,9 +1139,16 @@ function StockMatrix({ group, edit, lowAt }: {
   }
 
   return (
-    <div className="space-y-2 px-4 py-3">
+    <div className="space-y-2">
       <div className="overflow-x-auto">
-        <table className="text-xs">
+        {/* FULL WIDTH, so the rules are rules.
+            The grid sized itself to its contents, which left it occupying the first third
+            of a very wide row: the size columns bunched against the colour names, and every
+            separator stopped dead under 3XL with two-thirds of the row unruled — a line
+            that ends in the middle of a panel reads as a rendering fault rather than a
+            divider. At w-full the columns take the space evenly and each rule crosses the
+            whole panel, which is the only way a row of six numbers is read across. */}
+        <table className="w-full text-xs">
           <thead>
             <tr className="text-muted-foreground">
               <th className="px-2 py-1 text-left font-medium">Colour</th>
@@ -1147,7 +1158,9 @@ function StockMatrix({ group, edit, lowAt }: {
           <tbody>
             {colors.map((c) => (
               <tr key={c} className="border-t border-border">
-                <td className="whitespace-nowrap px-2 py-1 font-medium">{prettyColorName(c)}</td>
+                {/* The colour column takes only what the longest name needs; the width
+                    freed goes to the numbers, which are what the row is for. */}
+                <td className="w-px whitespace-nowrap px-2 py-1 font-medium">{prettyColorName(c)}</td>
                 {sizes.map((z) => <td key={z} className="px-1 py-1 text-center">{cell(at(z, c), c + z)}</td>)}
               </tr>
             ))}
