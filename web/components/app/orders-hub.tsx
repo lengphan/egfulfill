@@ -23,6 +23,32 @@ import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { isApprovable } from "@/components/app/approve-order-button"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
+
+/**
+ * The width a row of these columns actually WANTS, in px.
+ *
+ * The columns are fixed rem tracks (order-columns.ts) plus two flexible ones. A plain `Nrem`
+ * track counts as itself; a `minmax(Nrem, …)` counts as its FLOOR — reading the floor matters,
+ * because List is minmax(12rem,1fr) and treating it as the generic 5rem fallback would
+ * under-report the row's real minimum by 7rem and reintroduce the silent horizontal overflow
+ * this figure exists to prevent. `minmax(0,Nfr)` tracks have no intrinsic width, so they get a
+ * 5rem FLOOR: above it Customer and Items keep absorbing slack and truncating, which is the
+ * documented trade; below it they would be unreadable, and that is where sideways scrolling
+ * takes over from squeezing.
+ *
+ * Module scope, not a hook, because it is asked TWICE and of different sets — once of the
+ * columns being drawn, and once of the full set, to decide whether the full set even fits.
+ */
+function minPxFor(cols: FactoryColId[], dispatchOn: boolean): number {
+  const lead = dispatchOn ? 1.25 + 1.5 : 1.5
+  const fixed = cols.reduce((n, id) => {
+    const g = FACTORY_COLS[id].grid
+    const rem = /^([0-9.]+)rem$/.exec(g) ?? /^minmax\(\s*([0-9.]+)rem/.exec(g)
+    return n + (rem ? Number(rem[1]) : 5)
+  }, lead)
+  // gap-x-3 is 0.75rem between every track, and px-5 is 1.25rem of gutter each side.
+  return Math.round((fixed + cols.length * 0.75 + 2.5) * 16)
+}
 import { useIsNarrow } from "@/lib/use-narrow"
 import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress, resolvedOrderStage } from "@/lib/factory-status"
@@ -1080,11 +1106,81 @@ export function OrdersHub() {
    * Driven from the SAME `cell` map as the table — a separate mobile renderer would be a
    * second place for "what does Status mean", and those drift.
    */
-  const narrow = useIsNarrow()
+  const viewportNarrow = useIsNarrow()
+  /**
+   * HOW WIDE THE LIST ACTUALLY IS — measured, not assumed from the viewport.
+   *
+   * `useIsNarrow` switches at 767px and the full column set needs about 1320px, so everything
+   * between them scrolled sideways: a small tablet, an iPad in either orientation, a window
+   * taking half of a 2560 monitor. That is a 550px dead zone, and it covers most of the widths
+   * people actually work at — which is why this queue "isn't responsive" anywhere but a
+   * maximised laptop, while the phone layout it already had looked fine.
+   *
+   * So the switch is not a breakpoint. The row already knows the width it needs, so the only
+   * honest question is whether the box it is drawn in is that wide. Hiding a column raises the
+   * answer immediately, which no fixed breakpoint could do.
+   */
+  const [listW, setListW] = useState(0)
+  const roRef = useRef<ResizeObserver | null>(null)
+  /**
+   * A CALLBACK REF, NOT useRef + useEffect.
+   *
+   * The effect version ran once on mount, found the list still behind its loading state, got
+   * null, and — with an empty dep array — never looked again. So the width stayed 0, the guard
+   * `listW > 0` never opened, and the whole thing silently did nothing on exactly the screens
+   * it was written for. It measured clean in a test only because the queue had not rendered
+   * at all.
+   *
+   * A callback ref fires when the node actually appears, and again with null when it goes, so
+   * there is no moment to miss and nothing to re-run.
+   *
+   * SAFE AGAINST THE LOOP THIS CODEBASE ALMOST DIED OF (CLAUDE.md 2.8): the observation is an
+   * EVENT — the browser reporting a size that has already changed — never a fetch on a
+   * condition its own result satisfies. A change under 2px is ignored so sub-pixel jitter
+   * cannot ping-pong, and the element measured is the SCROLLER, whose own width is set by the
+   * page and not by the grid overflowing inside it.
+   */
+  const listRef = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect()
+    roRef.current = null
+    if (!el || typeof ResizeObserver === "undefined") return
+    const measure = (node: HTMLDivElement) => {
+      const w = Math.round(node.clientWidth)
+      setListW((prev) => (Math.abs(prev - w) < 2 ? prev : w))
+    }
+    measure(el)
+    const ro = new ResizeObserver(() => measure(el))
+    ro.observe(el)
+    roRef.current = ro
+  }, [])
   // Store rides along on a phone. It is the one column that says whose order a row is, and
   // a stacked cell costs a narrow card almost nothing — it is already a label/value list, so
   // the second line lands under the first either way.
   const NARROW_COLS: FactoryColId[] = ["order", "status", "age", "units", "store"]
+  /**
+   * NARROW = the full set does not fit, or the viewport is a phone.
+   *
+   * Measured against the FULL set (`visibleData`), never the set currently drawn — asking
+   * whether the narrowed columns fit would be circular: they always do, so it would never
+   * come back out of narrow mode once it went in.
+   *
+   * `listW > 0` gates on having measured at all. Before the first observation the width is 0,
+   * and treating that as "too narrow" would flash the stacked layout on every desktop load —
+   * the same first-frame-at-the-wrong-width problem useIsNarrow's server snapshot avoids.
+   */
+  const fullMinPx = useMemo(() => minPxFor(visibleData, dispatchOn), [visibleData, dispatchOn])
+  /*
+   * THE ESTIMATE, DELIBERATELY, and not the row's measured scrollWidth.
+   *
+   * Measuring the real overflow and collapsing on any of it was tried and over-corrected: at a
+   * 1600px viewport the queue's box is 1137px and the row wants 1228, so a big desktop monitor
+   * folded into stacked cards over 91px of scroll. A dense table scrolling a little is the
+   * documented trade in this file; hiding half its columns is not.
+   *
+   * The floor catches what actually hurts — 363px to 743px of hidden columns between 768 and
+   * 1280 — and leaves the rest to scroll, which is what every dense table does.
+   */
+  const narrow = viewportNarrow || (listW > 0 && listW < fullMinPx)
   const rowCols = useMemo(
     () => (narrow ? visibleData.filter((id) => NARROW_COLS.includes(id)) : visibleData),
     // NARROW_COLS is a module-level constant in spirit; listing it would only churn the memo.
@@ -1106,25 +1202,8 @@ export function OrdersHub() {
    * clipped; a narrow screen or a zoomed one scrolls sideways, which is what every dense
    * table does.
    */
-  const gridMinPx = useMemo(() => {
-    const lead = dispatchOn ? 1.25 + 1.5 : 1.5
-    const fixed = gridCols.reduce((n, id) => {
-      const g = FACTORY_COLS[id].grid
-      // A plain `Nrem` track, or the FLOOR of a `minmax(Nrem, …)` one. Reading the minmax
-      // floor matters: List is minmax(12rem,1fr), and treating it as the generic 5rem
-      // fallback would under-report the row's real minimum by 7rem and reintroduce exactly
-      // the silent horizontal overflow this figure exists to prevent.
-      const rem = /^([0-9.]+)rem$/.exec(g) ?? /^minmax\(\s*([0-9.]+)rem/.exec(g)
-      // minmax(0,Nfr) tracks have no intrinsic width. 5rem is a FLOOR, not a target: above it
-      // Customer and Items keep absorbing the slack and truncating, which is the documented
-      // trade (see order-columns.ts) and keeps a 1600px desktop scroll-free. Below it they'd
-      // be unreadable, so that is where sideways scrolling takes over from squeezing — and,
-      // crucially, from the silent clipping that came before.
-      return n + (rem ? Number(rem[1]) : 5)
-    }, lead)
-    // gap-x-3 is 0.75rem between every track, and px-5 is 1.25rem of gutter each side.
-    return Math.round((fixed + gridCols.length * 0.75 + 2.5) * 16)
-  }, [gridCols, dispatchOn])
+  /** The same sum, for the columns actually being drawn — what pins the row's minWidth. */
+  const gridMinPx = useMemo(() => minPxFor(gridCols, dispatchOn), [gridCols, dispatchOn])
 
   // No minWidth on a phone: that figure is precisely what forces the sideways scroll, and a
   // stacked row has no need of it.
@@ -1685,8 +1764,14 @@ export function OrdersHub() {
               clutter: columns with no titles are just text at different x-positions.
               Same template as every row below, from the same list of ids. */}
           {/* ONE scroller around the header AND the rows. Two separate ones would let the
-              titles drift out of line with the columns they name. */}
-          <div className="overflow-x-auto">
+              titles drift out of line with the columns they name.
+
+              MEASURED HERE, on the scroller's own box rather than on the grid inside it. The
+              grid can be 1320px wide while this element is 900px — that difference IS the
+              sideways scroll, and it is the outer number that decides whether the full column
+              set is honest at this width. Observing the inner grid would just measure the
+              overflow it already caused. */}
+          <div ref={listRef} className="overflow-x-auto">
           <div
             /* Sentence case, NOT uppercase+tracking. Same family as the stage pills a few
                pixels above (both Inter) — but 13px/medium sentence case over 11px/semibold
