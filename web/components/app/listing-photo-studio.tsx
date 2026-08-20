@@ -533,55 +533,140 @@ export function ListingPhotoStudio({
                   </div>
                 )}
 
-                {/* THE PROMPT, AND THE BUTTON THAT FILLS IT, IN ONE BOX.
-                    They were two rows and a sentence: a wide outline button, the model's
-                    remark about how the competitor shot it, and then the field. The remark
-                    read like an explanation of the button rather than a note about the photo,
-                    and three rows of chrome sat above the one control that matters. The button
-                    now lives in the corner of the box it writes into, which is the only place
-                    it needs to be, and it says which press this is — Generate the first time,
-                    Regenerate once there are words to replace.
-
-                    field-sizing grows the box with its content, capped so a long prompt cannot
-                    push Generate off the screen; rows={6} is the Safari fallback. pb-11 keeps
-                    the last line clear of the button sitting over it. */}
-                <div className="relative">
+                {/* ── ONE COMPOSER. EVERYTHING THAT ACTS ON THE PROMPT LIVES INSIDE IT. ──
+                    It had become a box with a crowd around it: two buttons floating over the
+                    textarea, a row of preset pills under it, then a separate row holding
+                    Generate, the settings pill and the price. Five clusters at four different
+                    left edges, for one job — which is what makes the eye hunt.
+                    Now the border is the container, the way the chat composer works: write at
+                    the top, everything that acts on what you wrote along the bottom, and the
+                    press that spends money alone on the right where a primary action belongs.
+                    focus-within moves the ring to the whole box so the textarea can lose its
+                    own border and stop drawing a second rectangle inside the first. ── */}
+                <div className="rounded-lg border border-input transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40">
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    rows={6}
-                    placeholder="Describe the photograph we want — or press Generate prompt and edit what comes back."
-                    className="max-h-72 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 pb-11 text-sm leading-relaxed outline-none field-sizing-content focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                    rows={8}
+                    placeholder="Describe the photograph we want — or press Write from photos and edit what comes back."
+                    /* Bigger, because this is a paragraph and it was being written through a
+                       letterbox. field-sizing still grows it; the cap stops a long brief
+                       pushing the toolbar off screen. */
+                    className="min-h-44 max-h-96 w-full resize-y border-0 bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none field-sizing-content"
                   />
-                  {/* DESCRIBE IT OUT LOUD. A photograph brief is the longest free text anyone
-                      types in this app and the least like a form field — it is a paragraph of
-                      description, which is the thing dictation is actually good at. It sits in
-                      the box's other corner, opposite Generate prompt. */}
-                  <DictateButton
-                    value={prompt}
-                    onChange={setPrompt}
-                    className="absolute bottom-1.5 right-1.5 size-8 bg-background"
-                    label="Describe the photo out loud"
-                  />
-                  <Button
-                    size="sm" variant="outline"
-                    className="absolute bottom-2 left-2 h-7 bg-background text-xs"
-                    onClick={() => runRead(picked)} disabled={reading || !picked.length}
-                    title={picked.length ? "Read the ticked reference photos and write the prompt" : "Tick a reference photo above first"}
-                  >
-                    {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
-                    {reading ? "Reading…" : !picked.length ? "Pick a photo above" : prompt ? "Regenerate" : "Generate prompt"}
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {PRESETS.map((p) => (
-                    <Button key={p.key} size="sm" variant={preset === p.key ? "secondary" : "outline"}
-                      className="h-7 text-xs" onClick={() => applyPreset(p.key)} title={p.text}>
-                      {p.label}
-                    </Button>
-                  ))}
-                </div>
 
+                  {/* The presets ADD a sentence to the prompt, so they sit with the prompt
+                      rather than with the render controls. One scrolling line — they are a
+                      menu of starting points, not four decisions to weigh. */}
+                  <div className="flex gap-1.5 overflow-x-auto px-2 pb-2">
+                    {PRESETS.map((p) => (
+                      <Button key={p.key} size="sm" variant={preset === p.key ? "secondary" : "ghost"}
+                        className="h-7 shrink-0 text-xs font-normal" onClick={() => applyPreset(p.key)} title={p.text}>
+                        {p.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1 border-t border-border px-1.5 py-1.5">
+                    {/* NOT "Generate prompt". There were two buttons a few centimetres apart
+                        whose labels both began with Generate, one of which spends money and
+                        one of which does not — the single worst pair of names available. This
+                        one WRITES THE BRIEF by reading the ticked photos; the other renders.
+                        Different verbs, so the expensive one is unmistakable. */}
+                    <Button
+                      size="sm" variant="ghost"
+                      className="h-8 gap-1.5 text-xs font-normal"
+                      onClick={() => runRead(picked)} disabled={reading || !picked.length}
+                      title={picked.length ? "Read the ticked reference photos and write the brief" : "Tick a reference photo above first"}
+                    >
+                      {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
+                      {reading ? "Reading…" : !picked.length ? "Pick a photo above" : prompt ? "Rewrite from photos" : "Write from photos"}
+                    </Button>
+
+                    {/* A photograph brief is the longest free text anyone types in this app and
+                        the least like a form field, which is exactly what dictation is good at. */}
+                    <DictateButton
+                      value={prompt}
+                      onChange={setPrompt}
+                      className="size-8 shrink-0"
+                      label="Describe the photo out loud"
+                    />
+
+                    {/* FOUR SETTINGS, ONE CONTROL — the shape the chat composer already uses.
+                        The trigger SUMMARISES rather than saying "Settings", so the three facts
+                        that change the price stay readable without opening anything; the panel
+                        is for changing them, not for finding out what they are. */}
+                    <div className="relative">
+                      <Button
+                        type="button" variant="ghost" size="sm"
+                        onClick={() => setSettingsOpen((o) => !o)}
+                        aria-expanded={settingsOpen}
+                        className="h-8 gap-1.5 text-xs font-normal tabular-nums"
+                        title="Model, shape, size and how many"
+                      >
+                        {ratio} · {effSize} · ×{count}
+                        <CaretDown size={11} weight="bold" className="text-muted-foreground" />
+                      </Button>
+                      {settingsOpen && (
+                        <>
+                          {/* Click-away, same as the composer's emoji sheet. */}
+                          <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setSettingsOpen(false)} />
+                          <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 shadow-lg">
+                            <div>
+                              <div className="mb-1 text-2xs text-muted-foreground">Model</div>
+                              <select value={model} className={selectCls}
+                                onChange={(e) => {
+                                  const id = e.target.value; setModel(id)
+                                  const m = cfg.models.find((x) => x.id === id)
+                                  if (m && !m.sizes.includes(size)) setSize(m.defaultSize)
+                                }}>
+                                {cfg.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
+                              <select value={ratio} onChange={(e) => setRatio(e.target.value)} className={selectCls}>
+                                {cfg.ratios.map((r) => <option key={r} value={r}>{cfg.ratioHints[r] ? `${r} — ${cfg.ratioHints[r]}` : r}</option>)}
+                              </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="mb-1 text-2xs text-muted-foreground">Size</div>
+                                <select value={effSize} onChange={(e) => setSize(e.target.value)} className={selectCls}>
+                                  {(spec?.sizes || []).map((s) => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <div className="mb-1 text-2xs text-muted-foreground">How many</div>
+                                <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={selectCls}>
+                                  {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                      {/* THE PRICE, IMMEDIATELY BEFORE THE PRESS — never discovered on the
+                          wallet afterwards, and never rounded away: a batch of four is four
+                          charges. */}
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {batchCost > 0
+                          ? <>{count} × {unit(perImage)} = <span className="font-semibold text-foreground">{money(batchCost)}</span></>
+                          : "no charge"}
+                        {!staffViewer && freeLeft > 0 && <> · {freeLeft} free left this month</>}
+                        {!staffViewer && quote?.imagesLeftToday != null && <> · {quote.imagesLeftToday} left today</>}
+                      </span>
+                      <Button size="sm" className="h-8" onClick={generate} disabled={busy || !prompt.trim()}>
+                        {busy && <CircleNotch size={14} className="animate-spin" />}
+                        {busy ? "Rendering…" : "Generate"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
 
                 {/* WHAT THIS PROMPT CANNOT PRODUCE, before it is paid for. Not a block — the
                     person may know exactly what they are doing — but a render that comes back
@@ -593,83 +678,6 @@ export function ListingPhotoStudio({
                     <span>{promptWarning(prompt)}</span>
                   </div>
                 )}
-
-                {/* THE PRICE, BEFORE THE PRESS. Never discovered on the wallet afterwards, and
-                    never rounded away — a batch of four is four charges. */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button onClick={generate} disabled={busy || !prompt.trim()}>
-                    {busy && <CircleNotch size={15} className="animate-spin" />}
-                    {busy ? "Rendering…" : "Generate"}
-                  </Button>
-
-                  {/* FOUR SETTINGS, ONE CONTROL — the shape the chat composer already uses.
-                      They were a four-up row of labelled selects permanently across the panel,
-                      which is a lot of furniture for choices that are set once and then left
-                      alone: model, shape, size, how many. Laid out flat they also competed
-                      with the prompt box and the Generate button for the same attention.
-                      The trigger SUMMARISES rather than saying "Settings", so the three facts
-                      that change the price stay readable without opening anything — the panel
-                      is for changing them, not for finding out what they are. */}
-                  <div className="relative">
-                    <Button
-                      type="button" variant="outline" size="sm"
-                      onClick={() => setSettingsOpen((o) => !o)}
-                      aria-expanded={settingsOpen}
-                      className="h-9 gap-1.5 font-normal tabular-nums"
-                      title="Model, shape, size and how many"
-                    >
-                      {ratio} · {effSize} · ×{count}
-                      <CaretDown size={11} weight="bold" className="text-muted-foreground" />
-                    </Button>
-                    {settingsOpen && (
-                      <>
-                        {/* Click-away, same as the composer's emoji sheet. */}
-                        <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setSettingsOpen(false)} />
-                        <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 shadow-lg">
-                          <div>
-                            <div className="mb-1 text-2xs text-muted-foreground">Model</div>
-                            <select value={model} className={selectCls}
-                              onChange={(e) => {
-                                const id = e.target.value; setModel(id)
-                                const m = cfg.models.find((x) => x.id === id)
-                                if (m && !m.sizes.includes(size)) setSize(m.defaultSize)
-                              }}>
-                              {cfg.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
-                            <select value={ratio} onChange={(e) => setRatio(e.target.value)} className={selectCls}>
-                              {cfg.ratios.map((r) => <option key={r} value={r}>{cfg.ratioHints[r] ? `${r} — ${cfg.ratioHints[r]}` : r}</option>)}
-                            </select>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <div className="mb-1 text-2xs text-muted-foreground">Size</div>
-                              <select value={effSize} onChange={(e) => setSize(e.target.value)} className={selectCls}>
-                                {(spec?.sizes || []).map((s) => <option key={s} value={s}>{s}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <div className="mb-1 text-2xs text-muted-foreground">How many</div>
-                              <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={selectCls}>
-                                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
-                              </select>
-                            </div>
-                          </div>
-                          {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {batchCost > 0
-                      ? <>{count} × {unit(perImage)} = <span className="font-semibold text-foreground">{money(batchCost)}</span></>
-                      : "no charge"}
-                    {!staffViewer && freeLeft > 0 && <> · {freeLeft} free left this month</>}
-                    {!staffViewer && quote?.imagesLeftToday != null && <> · {quote.imagesLeftToday} left today</>}
-                  </span>
-                </div>
 
                 {genErrs.map((e, i) => (
                   <div key={i} className="flex items-start gap-1.5 text-xs text-destructive">
