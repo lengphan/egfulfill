@@ -409,14 +409,52 @@ export function spydeckRoutes(app, requireAuth) {
    */
   app.get('/api/spydeck/listing/:id/detail', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
     await ensure();
+    const id = String(req.params.id);
     try {
+      /*
+       * TODAY'S POOL FIRST — free, no Etsy call. gridRow strips `images` and `description`
+       * on the way out, but the POOL still holds both, so a trending listing is answered
+       * from memory.
+       */
       const cached = await q("select value from settings where key='spydeck_trending'");
       const v = readSetting(cached.rows[0]);
       const hit = Array.isArray(v && v.products)
-        ? v.products.find((l) => String(l.listing_id) === String(req.params.id))
+        ? v.products.find((l) => String(l.listing_id) === id)
         : null;
-      if (!hit) { reply.code(404); return { error: 'Not in today\'s feed' }; }
-      return { listing_id: hit.listing_id, description: hit.description || '', images: hit.images || [] };
+      if (hit && (hit.images || []).length) {
+        return { listing_id: hit.listing_id, description: hit.description || '', images: hit.images || [] };
+      }
+
+      /*
+       * NOT IN THE POOL — WHICH IS THE COMMON CASE, and it used to 404.
+       *
+       * Only the trending feed is cached. A listing reached from Search, from Saved, or by
+       * browsing a competitor's shop was never in it, so this returned "Not in today's feed"
+       * and the publish page opened with ONE reference photo — the grid card's cover — for a
+       * listing with eight. That looked like the competitor only had one photo rather than
+       * like a lookup that failed, which is the worst kind of empty state.
+       *
+       * The batch endpoint answers by id and carries both fields we need. One read-only GET
+       * on the app key, for one listing, on a click — not a per-card cost.
+       */
+      const b = await etsyPublicGet(`/listings/batch?listing_ids=${encodeURIComponent(id)}&includes=Images`);
+      const row = (b.ok && b.data && Array.isArray(b.data.results)) ? b.data.results[0] : null;
+      if (row) {
+        const images = (row.images || [])
+          .map((im) => im && (im.url_fullxfull || im.url_570xN || im.url_300x300))
+          .filter(Boolean);
+        return {
+          listing_id: row.listing_id,
+          description: row.description || (hit && hit.description) || '',
+          // The pool's cover is better than nothing if Etsy hands back no Images include.
+          images: images.length ? images : (hit && hit.images) || [],
+        };
+      }
+
+      // Genuinely nothing. Say so as a 404 — the client falls back to the card's cover photo
+      // and the page still works, just with the one picture it already had.
+      if (hit) return { listing_id: hit.listing_id, description: hit.description || '', images: hit.images || [] };
+      reply.code(404); return { error: 'That listing could not be read from Etsy' };
     } catch (e) {
       reply.code(500); return { error: e.message };
     }

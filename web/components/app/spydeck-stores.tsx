@@ -15,6 +15,9 @@ import { CARD_ACTION_PRIMARY, CARD_ACTION_ICON } from "@/lib/card-actions"
 // Shared listing-level handlers, threaded from SpyDeckView so a competitor's product can be
 // saved or turned into a draft with the exact same flow as any other research card.
 type Handlers = {
+  /** The listing whose photos are being collected right now, so its card can say so. Passed
+   *  straight through to ResultCard, which does the comparing. */
+  openingId?: string | number | null
   savedIds: Set<string>
   uploadedIds: Set<string>
   onToggleSave: (l: EtsyListing, wasSaved: boolean) => void
@@ -286,7 +289,7 @@ export function StoresTab(h: Handlers) {
                 saved={h.savedIds.has(String(l.listing_id))}
                 uploaded={h.uploadedIds.has(String(l.listing_id))}
                 onToggleSave={h.onToggleSave} onSearchTag={h.onSearchTag} onMakeProduct={h.onMakeProduct}
-                onSource={h.onSource}
+                openingId={h.openingId} onSource={h.onSource}
               />
             ))}
           </div>

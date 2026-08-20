@@ -86,7 +86,6 @@ export function ListingPhotoStudio({
 
   const [prompt, setPrompt] = useState("")
   const [preset, setPreset] = useState<string | null>(null)
-  const [read, setRead] = useState<string | null>(null)
   const [reading, setReading] = useState(false)
   const [readErr, setReadErr] = useState<string | null>(null)
 
@@ -160,7 +159,6 @@ export function ListingPhotoStudio({
       // something to lose. Silently merging into text somebody wrote is worse than either.
       setPrompt(r.prompt)
       setPreset(null)
-      setRead(r.read || null)
     } catch (e) {
       setReadErr(e instanceof Error ? e.message : "Couldn't read those photos.")
     } finally {
@@ -393,30 +391,42 @@ export function ListingPhotoStudio({
 
             {cfg?.enabled && (
               <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => runRead(picked)} disabled={reading || !picked.length}>
-                    {reading ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-                    {reading ? "Reading the photos…" : prompt ? "Re-read the photos" : "Read the photos → write a prompt"}
-                  </Button>
-                  {read && <span className="min-w-0 flex-1 text-2xs text-muted-foreground">{read}</span>}
-                </div>
                 {readErr && (
                   <div className="flex items-start gap-1.5 text-2xs text-destructive">
                     <Warning size={12} className="mt-0.5 shrink-0" /><span>{readErr}</span>
                   </div>
                 )}
 
-                {/* THE PROMPT. It is the box, not a hidden setting — the whole reason reading is
-                    a separate step from rendering is so this can be reviewed before money moves.
-                    field-sizing grows it with its content, capped so a long prompt cannot push
-                    Generate off the screen; rows={6} is the Safari fallback. */}
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={6}
-                  placeholder="Describe the photograph we want — or press Read the photos and edit what comes back."
-                  className="max-h-72 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm leading-relaxed outline-none field-sizing-content focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                />
+                {/* THE PROMPT, AND THE BUTTON THAT FILLS IT, IN ONE BOX.
+                    They were two rows and a sentence: a wide outline button, the model's
+                    remark about how the competitor shot it, and then the field. The remark
+                    read like an explanation of the button rather than a note about the photo,
+                    and three rows of chrome sat above the one control that matters. The button
+                    now lives in the corner of the box it writes into, which is the only place
+                    it needs to be, and it says which press this is — Generate the first time,
+                    Regenerate once there are words to replace.
+
+                    field-sizing grows the box with its content, capped so a long prompt cannot
+                    push Generate off the screen; rows={6} is the Safari fallback. pb-11 keeps
+                    the last line clear of the button sitting over it. */}
+                <div className="relative">
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={6}
+                    placeholder="Describe the photograph we want — or press Generate prompt and edit what comes back."
+                    className="max-h-72 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 pb-11 text-sm leading-relaxed outline-none field-sizing-content focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                  />
+                  <Button
+                    size="sm" variant="outline"
+                    className="absolute bottom-2 left-2 h-7 bg-background text-xs"
+                    onClick={() => runRead(picked)} disabled={reading || !picked.length}
+                    title={picked.length ? "Read the ticked reference photos and write the prompt" : "Tick a reference photo first"}
+                  >
+                    {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
+                    {reading ? "Reading…" : prompt ? "Regenerate" : "Generate prompt"}
+                  </Button>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {PRESETS.map((p) => (
                     <Button key={p.key} size="sm" variant={preset === p.key ? "secondary" : "outline"}

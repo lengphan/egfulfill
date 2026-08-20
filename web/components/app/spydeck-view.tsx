@@ -451,12 +451,16 @@ function Spec({ k, v }: { k: string; v: string }) {
 // Memoised: the trending grid re-renders on every keystroke/filter/save, and each card ran
 // estFor() + detectTrademarks() (a regex over ~40 brands) on every one of those. With stable
 // callbacks from the parent, memo means a card only re-renders when ITS own data changes.
-export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct, onOpenShop, onSource }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void; onOpenShop?: (l: EtsyListing) => void; onSource?: (l: EtsyListing) => void }) {
+export const ResultCard = memo(function ResultCard({ l, saved, uploaded, openingId, onToggleSave, onSearchTag, onMakeProduct, onOpenShop, onSource }: { l: EtsyListing; saved: boolean; uploaded?: boolean; openingId?: string | number | null; onToggleSave: (l: EtsyListing, wasSaved: boolean) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void; onOpenShop?: (l: EtsyListing) => void; onSource?: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
   // Keyed on the listing only, so toggling the save heart doesn't re-run the brand regex.
   const tmHits = useMemo(() => detectTrademarks(`${l.title} ${(l.tags ?? []).join(" ")}`), [l.title, l.tags])
+  // Which listing the page is currently collecting photos for. Compared HERE rather than at
+  // each of the four call sites, two of which pass these props straight through and have no
+  // `l` in scope to compare against.
+  const opening = openingId != null && String(openingId) === String(l.listing_id)
   const [copied, setCopied] = useState(false)
   const copyAll = async () => {
     try { await navigator.clipboard.writeText(tags.join(", ")); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
@@ -568,6 +572,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
             <button
               type="button"
               onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onMakeProduct(l) }}
+              disabled={opening}
               className={uploaded
                 ? cn(CARD_ACTION_SECONDARY, "flex-1 border-emerald-600/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400")
                 : cn(CARD_ACTION_PRIMARY, "flex-1")}
@@ -580,7 +585,10 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, onToggl
                   this listing prefilled, and nothing reaches a shop until that form is
                   submitted. A button that names a finished action it doesn't perform is the
                   reason people press it twice. */}
-              {uploaded ? "Uploaded" : "Create product"}
+              {/* IT COLLECTS THE PHOTOS FIRST, so it has to say so. The click now waits for
+                  the competitor's full image set before navigating — under a second, but a
+                  button that looks idle for that long gets pressed again. */}
+              {opening ? "Collecting photos…" : uploaded ? "Uploaded" : "Create product"}
             </button>
             {/* Sourcing is admin-only server-side, so the button only exists for an admin —
                 anyone else would be clicking a control that always 403s. */}
@@ -732,7 +740,15 @@ export function SpyDeckView() {
   // opened card stays in state for the render in which a new card opens — and the publish
   // dialog seeds itself from a setTimeout closure captured on exactly that render, so the
   // new card's title arrived beside the old card's description.
-  const [makeDetail, setMakeDetail] = useState<{ forId?: string; description?: string; images?: string[] } | null>(null)
+  /**
+   * The heavy half of the listing being made into a product.
+   *
+   * `status` exists because "not fetched yet" and "fetch failed" used to be the same value
+   * (null), and the navigation below cannot tell them apart without it — one means WAIT, the
+   * other means GO WITH WHAT WE HAVE. Conflating them is what shipped a publish page holding
+   * a single reference photo.
+   */
+  const [makeDetail, setMakeDetail] = useState<{ forId: string; status: "loading" | "done"; description?: string; images?: string[] } | null>(null)
 
   /**
    * RE-PUBLISH: the same dialog, reopened with what we already sent.
@@ -769,11 +785,15 @@ export function SpyDeckView() {
     if (!makeListing) return
     let alive = true
     // Deferred: setState straight from an effect body cascades a render before paint.
+    const forId = String(makeListing.listing_id)
     const id = setTimeout(() => {
-      setMakeDetail(null)
+      setMakeDetail({ forId, status: "loading" })
       getSpydeckListingDetail(makeListing.listing_id)
-        .then((d) => { if (alive) setMakeDetail({ ...d, forId: String(makeListing.listing_id) }) })
-        .catch(() => { if (alive) setMakeDetail(null) })   // publish still works, just without a prefilled body
+        .then((d) => { if (alive) setMakeDetail({ ...d, forId, status: "done" }) })
+        // A failure still resolves to "done": the publish page opens with the card's own
+        // cover photo and no description, which is worse than the full set and far better
+        // than sitting on a button that never navigates.
+        .catch(() => { if (alive) setMakeDetail({ forId, status: "done" }) })
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [makeListing])
@@ -853,7 +873,20 @@ export function SpyDeckView() {
   useEffect(() => {
     if (!makeListing) return
     const l = makeListing
-    const detail = makeDetail && makeDetail.forId === String(l.listing_id) ? makeDetail : null
+    const detail = makeDetail && makeDetail.forId === String(l.listing_id) && makeDetail.status === "done"
+      ? makeDetail : null
+    /*
+     * WAIT FOR THE PHOTOS BEFORE LEAVING.
+     *
+     * This used to navigate on the same tick the fetch STARTED, so the draft was stashed with
+     * `detail` still null and the competitor's photos — the entire input to the photo studio —
+     * arrived at a page that had already been left. A publish page is a navigation, not a
+     * dialog: there is no second chance to fill the prefill in afterwards.
+     *
+     * Bounded by the fetch itself, which always resolves to `done` even on failure, so this
+     * cannot wait forever on a dead endpoint.
+     */
+    if (makeDetail?.forId === String(l.listing_id) && makeDetail.status === "loading") return
     const id = setTimeout(() => {
       const draftId = stashPublishDraft({
         prefill: {
@@ -1337,7 +1370,7 @@ export function SpyDeckView() {
             uploadedIds={uploadedIds}
             onToggleSave={toggleSave}
             onSearchTag={onSearchTag}
-            onMakeProduct={setMakeListing}
+            onMakeProduct={setMakeListing} openingId={makeListing?.listing_id ?? null}
             onSource={isAdmin ? setSourceListing : undefined}
             jumpShop={jumpShop}
           />
@@ -1381,7 +1414,7 @@ export function SpyDeckView() {
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {trendingPaged.pageItems.map((l) => (
-                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
+                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} openingId={makeListing?.listing_id ?? null} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
                 ))}
               </div>
               <Pagination page={trendingPaged.page} pageCount={trendingPaged.pageCount} perPage={trendingPaged.perPage} total={trendingPaged.total} start={trendingPaged.start} onPage={trendingPaged.setPage} onPerPage={trendingPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -1419,7 +1452,7 @@ export function SpyDeckView() {
             <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {savedPaged.pageItems.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={onSearchTag} onMakeProduct={setMakeListing} openingId={makeListing?.listing_id ?? null} onOpenShop={openShopFromListing} onSource={isAdmin ? setSourceListing : undefined} />
               ))}
             </div>
             <Pagination page={savedPaged.page} pageCount={savedPaged.pageCount} perPage={savedPaged.perPage} total={savedPaged.total} start={savedPaged.start} onPage={savedPaged.setPage} onPerPage={savedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -1452,7 +1485,7 @@ export function SpyDeckView() {
                 uploaded={uploadedIds.has(String(l.listing_id))}
                 onToggleSave={toggleSave}
                 onSearchTag={onSearchTag}
-                onMakeProduct={setMakeListing}
+                onMakeProduct={setMakeListing} openingId={makeListing?.listing_id ?? null}
                 onOpenShop={openShopFromListing}
               />
             ))}
