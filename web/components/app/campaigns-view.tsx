@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getAdsConfig, getAdConnections, getAdCampaigns, createAdCampaign, setAdCampaignStatus, type AdsConfig, type AdConnection, type AdsResponse } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { PageTitle } from "@/components/app/page-title"
+import { EmptyState } from "@/components/app/empty-state"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const int = (n: number) => (n ?? 0).toLocaleString("en-US")
@@ -179,10 +180,7 @@ export function CampaignsView() {
           </SectionCard>
         </>
       ) : !loading && connected ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-          <Megaphone size={22} weight="duotone" />
-          <div className="text-sm">No campaigns in this window.</div>
-        </div>
+        <EmptyState icon={Megaphone} title="No campaigns in this window" />
       ) : null}
 
       <NewCampaignDialog open={newOpen} onOpenChange={setNewOpen} cfg={cfg} onCreated={() => load(days)} />

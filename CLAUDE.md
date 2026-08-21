@@ -357,6 +357,54 @@ control told you what it did until you read it.
   only 33% of buttons primary — so almost nothing on a page claimed to be the main action.
 - **Never give a checkbox a button's chrome.** If it toggles, it looks like a toggle.
 
+### A rule with no component is a wish (2026-08-21)
+
+This section is the method, and it exists because the two before it kept being violated by
+sessions that had read them.
+
+**The evidence.** §4 has said for a while that the underline is the ONLY active tab treatment.
+It was violated **14 times across 12 files** — and `tabsListVariants` in `components/ui/tabs.tsx`
+even declared `defaultVariants: { variant: "line" }` with a comment saying the filled tray was
+retired app-wide, while `TabsList` destructured `variant = "default"` and overrode it. The cva
+default had never once applied. Eight surfaces rendered the tray the comment said nothing used.
+
+Nobody was careless. There was simply nothing to import, so every new bar was fourteen lines
+of fresh Tailwind — and fresh Tailwind is where a house style goes to die.
+
+**So: write the rule AND ship the primitive that is the rule.** A rule alone regresses at the
+speed new files are created.
+
+| The rule | The primitive | Was |
+|---|---|---|
+| Tabs and filter rows are a rule under the live word | `components/app/tab-bar.tsx` | 14 hand-rolled capsule groups |
+| A drop target has a mark, a line, a note, a way out | `components/app/dropzone.tsx` | ~30 zones · 3 radii · 2 border widths · 4 paddings · 4 grounds |
+| An empty region has the same four parts | `components/app/empty-state.tsx` | 53 regions · **9** vertical paddings · the mark in 13 of 53 |
+| A field is a field, an action is an action | `.eg-control` · `Button` · `buttonVariants` | checkboxes in field chrome; a file `<label>` in field chrome |
+
+**THE FOUR PARTS** (`components/app/region.tsx`) — a dropzone, an empty list, a search that
+matched nothing and a first-run panel are ONE object wearing four hats:
+
+1. **The mark** — a glyph in a tile. Never a loose outline. This is the single biggest
+   difference between a region that reads as a place and one that reads as a gap: a 20px
+   stroke floating in whitespace is decoration the eye reads past; the same glyph on a small
+   filled square is an object it lands on.
+2. **The line** — what is missing, or what to do. `text-sm font-medium`. One line.
+3. **The note** — why, or what is allowed. `text-xs text-muted-foreground`, `max-w-xs`.
+   Optional. An empty region may carry one sentence because there is nothing else to read;
+   a populated screen may not (see the section below).
+4. **The way out** — at most one action. A second PEER route (record instead of upload) goes
+   under an "or", because two equal routes to one end need a word between them or the first
+   button reads as the thing you were supposed to press.
+
+**Before adding a region or a bar of any kind, grep for the primitive.** If one exists, import
+it; if the design genuinely differs, extend the primitive rather than forking it. If you find
+yourself typing `border-dashed`, `rounded-full px-3 py-1`, or a centred `py-16` column, you
+are re-deriving something that exists.
+
+**And when a rule is violated in double figures, the rule is not the fix.** Extract the
+primitive, convert every site, and record the count in the commit — the count is what tells
+the next session whether the thing held.
+
 ### Prose under a control is a defect (2026-08-21)
 
 The owner spends real time deleting explanatory subtitles, and they keep coming back
