@@ -1,15 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { CircleNotch, Warning, X, DownloadSimple } from "@phosphor-icons/react"
+import { CircleNotch, Warning, X, DownloadSimple, FilmSlate, ArrowSquareOut, Prohibit } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { EmptyState } from "@/components/app/empty-state"
+import { getUser } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DictateButton } from "@/components/app/dictate-button"
 import { TabBar } from "@/components/app/tab-bar"
+import Link from "next/link"
 import {
   getDeskImageConfig, generateListingPhotos,
-  type DeskImageConfig, type ListingRender,
+  getDeskVideoConfig, generateDeskVideo, getDeskVideoJob,
+  type DeskImageConfig, type DeskVideoConfig, type ListingRender,
 } from "@/lib/api"
 import {
   STUDIO_TEMPLATES, TEMPLATE_GROUPS, fillTemplate,
@@ -31,6 +35,25 @@ import {
  * THE PRICE IS ON SCREEN BEFORE THE PRESS, every time, like every other paid surface here.
  */
 export default function StudioPage() {
+  /**
+   * ADMIN ONLY, SAID HERE TOO — the sidebar entry is gone for every other role, and a
+   * removed link is not a guard: the URL still resolves.
+   *
+   * What happened before was the worst of the three options. The page rendered in full —
+   * title, four tabs, the template grid — and every press came back with the server's
+   * "Generating images is limited to admins and sellers" in red. A screen that cannot be
+   * READ versus one that does not exist has to say which (CLAUDE.md §4), and this said
+   * neither: it looked like a working page that was broken.
+   *
+   * Deferred, like every other role read on these pages: getUser() reads storage, which
+   * does not exist during the prerender.
+   */
+  const [role, setRole] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    const id = setTimeout(() => setRole(getUser()?.role ?? null), 0)
+    return () => clearTimeout(id)
+  }, [])
+
   const [cfg, setCfg] = useState<DeskImageConfig | null>(null)
   const [cfgErr, setCfgErr] = useState<string | null>(null)
   const [group, setGroup] = useState<TemplateGroup>("product")
@@ -56,6 +79,57 @@ export default function StudioPage() {
   const [busy, setBusy] = useState(false)
   const [errs, setErrs] = useState<string[]>([])
   const [shots, setShots] = useState<ListingRender[]>([])
+
+  /**
+   * ── THE CLIP ──────────────────────────────────────────────────────────────────────────
+   *
+   * The Motion tab used to end in a sentence: "Generate here first, then animate from the
+   * result." There was nothing to press. Veo has been wired end to end for a while, but the
+   * only way to reach it was to ARM THE CHAT COMPOSER — open a chat channel, press a
+   * settings panel, describe the motion in the message box — so the page with the motion
+   * templates on it, whose templates already carry a written `motion` brief, was the one
+   * place that could not make a clip.
+   *
+   * So: a still is a still and a clip is a clip, and both are one press from the same
+   * picture. Which is the choice this page should have been offering all along.
+   *
+   * IT DOES NOT COME BACK HERE, and the button says so. The server posts the finished video
+   * into the caller's own chat thread — that is where a 1–3 minute job's result lives, and
+   * inventing a second delivery route for it would be two places for one file. `jobs` keeps
+   * the spinner honest until then; the poll returns a STATUS, never a url.
+   */
+  const [vid, setVid] = useState<DeskVideoConfig | null>(null)
+  const [jobs, setJobs] = useState<Record<string, { status: string; usd: number; error?: string | null }>>({})
+  /**
+   * EVERY POLL THIS PAGE STARTED, so leaving the page stops all of them.
+   *
+   * A bare setInterval inside an async handler survives unmount and keeps hitting the API
+   * from a page nobody is looking at. That is the family §2.8 is about — an unbounded loop
+   * with nothing releasing it — even though this one is slow enough not to hurt.
+   */
+  const polls = useRef<number[]>([])
+  useEffect(() => () => { polls.current.forEach(clearInterval); polls.current = [] }, [])
+
+  useEffect(() => {
+    let alive = true
+    // A failure here is not an error on this page — it means video is off, and the Animate
+    // button simply does not appear. Nothing about making a still depends on it.
+    getDeskVideoConfig().then((c) => { if (alive) setVid(c.enabled ? c : null) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  /** The cheapest clip these settings can buy, derived from the catalogue rather than named:
+   *  a hardcoded tier becomes wrong the day a cheaper one ships. */
+  const clipSpec = useMemo(() => {
+    if (!vid?.models?.length) return null
+    const priced = vid.models
+      .flatMap((m) => m.resolutions.map((res) => ({ model: m.id, res, rate: m.usdPerSec[res] ?? Infinity })))
+      .sort((a, b) => a.rate - b.rate)
+    const pick = priced[0]
+    if (!pick || !Number.isFinite(pick.rate)) return null
+    const secs = Math.min(...(vid.durations?.length ? vid.durations : [8]))
+    return { ...pick, secs, usd: pick.rate * secs }
+  }, [vid])
 
   useEffect(() => {
     let alive = true
@@ -117,8 +191,72 @@ export default function StudioPage() {
     } finally { setBusy(false) }
   }
 
+  /**
+   * Start a clip from one still. The MOTION brief comes from the template — it is the field
+   * that made this a motion template in the first place — and falls back to the still's own
+   * brief for a template that has none, which is the honest thing to send rather than an
+   * empty prompt.
+   *
+   * Polling stops when the job leaves `pending`; there is no retry and no ceiling to breach,
+   * because the interval is cleared on the terminal status and on unmount (CLAUDE.md §2.8).
+   */
+  const animate = async (shot: ListingRender) => {
+    const name = shot.url.split("/api/support/asset/")[1]
+    if (!name || !clipSpec || !open) return
+    setJobs((j) => ({ ...j, [shot.url]: { status: "starting", usd: clipSpec.usd } }))
+    try {
+      const r = await generateDeskVideo({
+        prompt: open.motion || prompt.trim(),
+        imageName: name,
+        aspectRatio: open.ratio,
+        resolution: clipSpec.res,
+        durationSeconds: clipSpec.secs,
+        model: clipSpec.model,
+      })
+      if (!r.ok || !r.jobId) {
+        setJobs((j) => ({ ...j, [shot.url]: { status: "error", usd: 0, error: r.error || "The clip didn't start." } }))
+        return
+      }
+      const id = r.jobId
+      setJobs((j) => ({ ...j, [shot.url]: { status: "pending", usd: r.usd ?? clipSpec.usd } }))
+      /* A CEILING, because "keep asking until it answers" has no end. Veo takes 1–3
+         minutes; at 10s a tick, 60 tries is ten minutes, which is well past any clip that
+         is still coming. After that the chat thread is the answer, not this page. */
+      let tries = 0
+      const tick = window.setInterval(async () => {
+        const stop = () => { clearInterval(tick); polls.current = polls.current.filter((t) => t !== tick) }
+        if (++tries > 60) { stop(); setJobs((j) => ({ ...j, [shot.url]: { status: "slow", usd: j[shot.url]?.usd ?? 0 } })); return }
+        try {
+          const s = await getDeskVideoJob(id)
+          if (s.status && s.status !== "pending") {
+            stop()
+            setJobs((j) => ({ ...j, [shot.url]: { status: s.status, usd: j[shot.url]?.usd ?? 0, error: s.error } }))
+          }
+        } catch { stop() }
+      }, 10_000)
+      polls.current.push(tick)
+    } catch (e) {
+      setJobs((j) => ({ ...j, [shot.url]: { status: "error", usd: 0, error: e instanceof Error ? e.message : "The clip didn't start." } }))
+    }
+  }
+
   const shown = STUDIO_TEMPLATES.filter((t) => t.group === group)
   const money = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`
+
+  // undefined = the role has not been read yet. Rendering the refusal in that frame would
+  // flash "not for you" at an admin on every load.
+  if (role === undefined) return null
+  if (role !== "admin") {
+    return (
+      <SectionCard title="Studio" bodyClassName="p-4">
+        <EmptyState
+          icon={Prohibit}
+          title="Studio is for admins"
+          note="Generating spends from the platform account. Listing photos are made from the publish dialog instead."
+        />
+      </SectionCard>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -205,12 +343,10 @@ export default function StudioPage() {
             </div>
           </div>
 
-          {open.motion && (
-            <p className="text-xs text-muted-foreground">
-              A clip is made from a still you have approved, not from the brief — so the frame is
-              paid for once and animated once. Generate here first, then animate from the result.
-            </p>
-          )}
+          {/* THE SENTENCE THAT USED TO BE HERE said "generate here first, then animate from
+              the result" — an instruction for a control that did not exist on this page. It
+              is a button on each still now, so the words are gone: a control explains itself
+              in its label (CLAUDE.md §4). */}
 
           {errs.map((e, i) => (
             <div key={i} className="flex items-start gap-1.5 text-xs text-alert">
@@ -229,16 +365,62 @@ export default function StudioPage() {
               nothing else to read — and it is carrying the fact people actually ask about:
               these are CANDIDATES. Nothing is written into a listing, by anything, ever. */}
           <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {shots.map((s) => (
-              <div key={s.url} className="overflow-hidden rounded-lg bg-muted/40">
+            {shots.map((s) => {
+              const job = jobs[s.url]
+              return (
+              <div key={s.url} className="overflow-hidden rounded-lg border border-border bg-muted/40">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={s.url} alt="" className="w-full object-contain" />
-                <a href={s.url} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
-                  <DownloadSimple size={13} /> Open
-                </a>
+                <div className="flex items-center justify-center gap-1 border-t border-border px-1 py-1">
+                  <a href={s.url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                    <DownloadSimple size={13} /> Open
+                  </a>
+                  {/* EITHER OUTPUT, FROM THE SAME PICTURE. The still is already paid for, so
+                      this is the only place a clip can start without buying a second frame —
+                      which is exactly why it lives on the image rather than in the toolbar. */}
+                  {clipSpec && !job && (
+                    <button type="button" onClick={() => void animate(s)}
+                      title={`Animate this still — ${clipSpec.secs}s at ${clipSpec.res}, ${money(clipSpec.usd)}`}
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                      <FilmSlate size={13} /> Animate
+                      <span className="tabular-nums opacity-70">{money(clipSpec.usd)}</span>
+                    </button>
+                  )}
+                  {/* The sweeper writes `done` or `failed`; this page adds `starting` and
+                      `error` for a request that never reached it. Anything else is still in
+                      flight — a status this page has not heard of must not read as success. */}
+                  {job && !["error", "failed", "done", "slow"].includes(job.status) && (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
+                      <CircleNotch size={13} className="animate-spin" /> Rendering
+                    </span>
+                  )}
+                  {/* WHERE IT WENT. The server posts the clip into your own chat thread, so
+                      the finished state is a LINK to it — not a claim that it is on this
+                      page, which it never will be. */}
+                  {job?.status === "done" && (
+                    <Link href="/chat"
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent">
+                      <FilmSlate size={13} /> Clip in chat <ArrowSquareOut size={11} />
+                    </Link>
+                  )}
+                  {/* STILL RUNNING, and this page stopped watching. Not a failure and not a
+                      success — the clip is the thread's to deliver, so it points there. */}
+                  {job?.status === "slow" && (
+                    <Link href="/chat"
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                      <FilmSlate size={13} /> Still rendering — it lands in chat <ArrowSquareOut size={11} />
+                    </Link>
+                  )}
+                  {(job?.status === "error" || job?.status === "failed") && (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-alert" title={job.error ?? undefined}>
+                      <Warning size={13} /> Clip failed
+                    </span>
+                  )}
+                </div>
               </div>
-            ))}
+              )
+            })}
             {/* One frame per render still on its way, in the ratio it will come back in. */}
             {busy && Array.from({ length: count }, (_, i) => (
               <div key={`pending-${i}`} className="flex animate-pulse items-center justify-center rounded-lg bg-muted/60"

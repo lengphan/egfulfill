@@ -1,5 +1,4 @@
-import { Sparkle,
-  SquaresFour,
+import { SquaresFour,
   ShoppingBag,
   Tag,
   Binoculars,
@@ -29,7 +28,11 @@ export const sellerNav: NavSection[] = [
       { label: "Reports", href: "/reports", icon: ChartBar },
       { label: "Wallet", href: "/wallet", icon: Wallet },
       { label: "Design Lab", href: "/design", icon: PenNib },
-      { label: "Studio", href: "/studio", icon: Sparkle },
+      /* STUDIO IS NOT A SELLER PAGE. A seller generates listing photos from the publish
+         dialog, on the listing they are generating them FOR — which is the only place the
+         product, the colour and the cost are already known. A standalone generator in their
+         sidebar is a second route to the same spend with none of that context, and it is not
+         what the page is for: Studio makes OUR marketing and site imagery. */
       { label: "Chat", href: "/chat", icon: ChatCircleDots },
     ],
   },
