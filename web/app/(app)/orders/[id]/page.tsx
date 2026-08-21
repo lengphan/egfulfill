@@ -760,6 +760,21 @@ export default function OrderDetailPage() {
                                 <span className="font-medium text-foreground">{card.lane_label || card.col || "Incoming"}</span>
                               </span>
                             )}
+                            {/* WHICH RECIPE THIS CAME OFF, for the factory only.
+                                A template is a placement recipe — artwork, where it sits,
+                                which blank — and picking one used to leave no trace, so a
+                                submitted order carried the RESULT of TPL-12 with no memory
+                                that TPL-12 existed. Recorded on the artwork now (per line,
+                                per side), which is what makes "what else have we cut from
+                                this one" an index lookup rather than a perceptual guess.
+                                Absent for artwork somebody simply dropped, which is most
+                                of it — so this appears only when it says something. */}
+                            {isStaff && design?.template_id && (
+                              <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={`This artwork was placed from template ${design.template_id}`}>
+                                Template
+                                <span className="font-medium tabular-nums text-foreground">{design.template_id}</span>
+                              </span>
+                            )}
                             {/* The bare mono sku that sat here is gone: it printed the SAME
  string the strip above already labels "Listing SKU", one row
  below it and with nothing to say which of the two skus it

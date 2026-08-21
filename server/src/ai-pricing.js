@@ -103,8 +103,11 @@ export async function writePricing(patch) {
   return next;
 }
 
-/** A team member spends the OWNER's wallet, the same resolution orders and design files use. */
-async function effectiveSeller(user) {
+/** A team member spends the OWNER's wallet, the same resolution orders and design files use.
+ *  Exported because anything HUNG off a generation — the render history, for one — has to be
+ *  filed under the same account the money came out of, or a team member's renders would be
+ *  invisible to the owner who paid for them. */
+export async function effectiveSeller(user) {
   if (!user || isStaff(user)) return null;
   try {
     const r = await q(

@@ -43,6 +43,18 @@ export const C = {
   card: "#FFFFFF",
   /** A flat neutral fill: a chip ground, a pressed row, an inactive segment. */
   accent: "#F2F2F2",
+  /**
+   * THE LIVE TAB's ground, and the only reason it is not `accent` is that it is measured
+   * against WHITE (the bar) rather than against the page.
+   *
+   * A light grey on white can only ever be ~1.2:1 — #F2F2F2 is 1.12:1, this is 1.23:1 — so a
+   * pill of this family CANNOT be what tells you which tab is live, and no darker grey fixes
+   * that without becoming a slab. It is a supporting cue. The state is carried by INK and
+   * WEIGHT: the live tab is #0A0A0A at F.semi (17.68:1 on the pill) against 60% ink at
+   * F.medium (5.25:1 on the bar), which is a 3.4x jump in strength plus a weight change —
+   * two channels, neither of them hue, so it survives greyscale and colour-blindness both.
+   */
+  tabActive: "#E8E8E8",
   /** A WELL IN THE PAPER, not a card on it — a slightly deeper tone of the same paper reads
    *  as recessed and needs no line around it. */
   accentPaper: "#F1F1F1",
@@ -75,6 +87,14 @@ export const C = {
    *
    * `web is canonical, mobile extends` — so the value comes from there rather than being
    * chosen again here. ONE LINE TO CHANGE: every use reads this token.
+   *
+   * NEVER IN CHROME (2026-08-21). It was a 42px disc behind the live tab glyph — so the one
+   * bright thing in the app was also the most permanent thing in it, present on every screen
+   * in the same spot, which is how an accent stops being a signal and becomes a background.
+   * The web is the check here: `--pop` renders in three places over there (the unread dot,
+   * the unread row tint, one badge in studio) and in NO navigation surface at all. The tab
+   * bar's live item is a neutral ground now. The only use left in this app is the orders
+   * batch bar, which appears when a selection exists and leaves when it does not — a signal.
    *
    * ALWAYS A FILL, ALWAYS WITH `onPop` ON IT. Never type, never a border, never a hairline.
    * Ink on it is 7.51:1; its own shape against the page is 2.45:1, so — exactly as with the

@@ -4,6 +4,7 @@
 // server is the source of truth. Templates are a shared library (like the catalog).
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { isStaff } from '../auth.js';
 import { storageEnabled, putObject, getObject, fromDataUrl } from '../storage.js';
 
 /**
@@ -200,7 +201,37 @@ export function templatesRoutes(app, requireAuth) {
     // Rows are returned as stored: newer ones carry /api/templates/art/<hash> paths, older
     // ones still hold inline base64. Both render in an <img> with no client change, which is
     // what makes this migration invisible rather than a cutover.
-    const r = await q(`select id, seq, name, data, composite, layers from templates where owner_id=$1 order by updated_at desc limit 200`, [req.user.sub]);
+    /**
+     * A TEMPLATE IS THE FACTORY'S, NOT ONE PERSON'S — for staff.
+     *
+     * This file's own header has said "templates are a shared library (like the catalog)"
+     * since it was written, and the query said `owner_id = $1`. So every staff account had
+     * its own private, empty list: a placement recipe saved in the Design Lab by one person
+     * was invisible to the operator who needed it, and the library's empty state told them
+     * to go and save one from the Design Lab — which they had, on a different account.
+     *
+     * A placement recipe for a blank we stock is a factory asset. It is also what every
+     * comparable platform does: Printful stores a product template on the ACCOUNT, above any
+     * store, and controls reach with a role.
+     *
+     * SELLERS ARE UNCHANGED, and that is the line that matters. A seller sees their own rows
+     * and nothing else — never another seller's, never the factory's — because a seller
+     * learning what another seller sells is the one thing this codebase refuses outright.
+     * Staff see staff. `coalesce(u.role,'seller')` keeps an orphaned owner_id out of the
+     * shared pool rather than defaulting it in.
+     *
+     * DELETE is deliberately NOT widened (see below): seeing someone's template is not the
+     * same permission as removing it.
+     */
+    const staff = isStaff(req.user);
+    const r = await q(
+      `select t.id, t.seq, t.name, t.data, t.composite, t.layers, t.owner_id
+         from templates t
+         left join users u on u.id = t.owner_id
+        where t.owner_id = $1
+           or ($2 and coalesce(u.role, 'seller') <> 'seller')
+        order by t.updated_at desc limit 200`,
+      [req.user.sub, staff]);
     return r.rows;
   });
 

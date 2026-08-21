@@ -1119,6 +1119,23 @@ export function DesignCanvasDialog({
  const [libOpen, setLibOpen] = useState(false)
   /** Which tab the library lands on. Pressing Template must not drop you on Designs. */
  const [libSource, setLibSource] = useState<"designs" | "templates">("designs")
+  /**
+   * WHERE THIS FACE'S ARTWORK CAME FROM — three states, per side.
+   *
+   * A template is a placement recipe, and picking one used to throw its identity away the
+   * moment the pieces landed on the canvas: the submitted order carried the RESULT of TPL-12
+   * with no memory that TPL-12 existed, so the factory could not ask what else had been cut
+   * from the same one.
+   *
+   * absent  — this session has not changed where the artwork came from. The save omits the
+   *           field and the server keeps whatever is already recorded.
+   * ""      — replaced from somewhere that is NOT a template (an upload, a library image, a
+   *           customer's reference photo). The save clears it: attributing a new picture to
+   *           a recipe it was never cut from is worse than recording nothing.
+   * "TPL-…" — picked from that template.
+   */
+ const [tplBySide, setTplBySide] = useState<Record<string, string>>({})
+ const noteArtSource = useCallback((side: string, tpl: string) => setTplBySide((m) => ({ ...m, [side]: tpl })), [])
  const [over, setOver] = useState(false)
   /** The explicit machine-file picker. Dropping one already worked; there was no BUTTON,
    * so a seller who had cut their own file and didn't think to drag it had no route. */
@@ -1676,7 +1693,7 @@ export function DesignCanvasDialog({
  setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
  return
     }
- readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f.name); setDesignSize(f.size); setPos(DEFAULT_POS) }, setErr)
+ readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f.name); setDesignSize(f.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
   }
 
  const removeArtwork = async () => {
@@ -1773,6 +1790,9 @@ export function DesignCanvasDialog({
  const r = await postOrderDesign(orderId, {
  sku: item.sku ?? "", line_id: item.line_id, side: sd, data: art.data,
  name: art.name || item.name, pos: { x: art.pos.x, y: art.pos.y, w: art.pos.w, r: art.pos.r }, phash,
+          // OMITTED unless this session changed where the artwork came from — the server
+          // reads an absent field as "keep what you have" and "" as "clear it".
+          ...(sd in tplBySide ? { template_id: tplBySide[sd] } : {}),
         })
  if (r.error) throw new Error(r.error)
  done[sd] = { data: art.data, pos: art.pos }
@@ -2605,7 +2625,7 @@ export function DesignCanvasDialog({
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {item.design_src && (
                   <button onClick={() => {
-                    setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS)
+                    setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS); noteArtSource(sideName, "")
                     /* NAME IT. These three routes in — the buyer's file, the library and a
                        template — all set the artwork and left `designName` holding whatever
                        the PREVIOUS file was called, so the save recorded the wrong name and
@@ -2944,7 +2964,7 @@ export function DesignCanvasDialog({
  open={libOpen} onOpenChange={setLibOpen}
  initialSource={libSource}
  onPick={(u, d) => {
-            setErr(null); setDesignUrl(u); setPos(DEFAULT_POS)
+            setErr(null); setDesignUrl(u); setPos(DEFAULT_POS); noteArtSource(sideName, "")
             setDesignName(d?.name || "From library"); setDesignSize(null)
           }}
           /* A TEMPLATE BRINGS ITS PLACEMENT. Taking only the picture and centring it is what
@@ -2961,6 +2981,8 @@ export function DesignCanvasDialog({
  setDesignUrl(art)
  setDesignName(t.name ? `${t.name} · template` : "From a template"); setDesignSize(null)
  setPos(first?.pos ?? l.pos ?? DEFAULT_POS)
+            // The recipe's identity, kept. See tplBySide.
+ noteArtSource(sideName, String(t.id))
           }}
         />
         {/* The partner route for print methods. Anchored to the LINE (orderId + sku), which
