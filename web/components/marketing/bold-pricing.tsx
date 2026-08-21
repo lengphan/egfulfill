@@ -30,7 +30,7 @@ const examples = [
 
 export function BoldPricing() {
   return (
-    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <PlateHero
         title="Simple,"
         accent="pay-as-you-go."
@@ -43,7 +43,7 @@ export function BoldPricing() {
           <Rise preset="bloom" className="rounded-2xl border border-black/[0.09] bg-white p-9">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45">Everything, included</div>
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="font-display font-black leading-none tracking-[-0.04em]" style={HEADING}>$0</span>
+              <span className="font-display font-semibold leading-none tracking-[-0.032em]" style={HEADING}>$0</span>
               <span className="text-[15px] text-black/50">/ month to start</span>
             </div>
             <p className="mt-3 max-w-md text-[15px] leading-relaxed text-black/55">
@@ -55,7 +55,7 @@ export function BoldPricing() {
                   {/* The tick sits in an accent chip rather than being an accent-coloured
                       glyph: at 12px a lime tick on white is nearly invisible, and the accent
                       is a fill in this system, not an ink colour. */}
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[#FAF8F3]" style={{ background: ACCENT }}>
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--mk-accent-ink)]" style={{ background: ACCENT }}>
                     <Check size={12} weight="bold" />
                   </span>
                   <span className="text-black/75">{i}</span>
@@ -75,7 +75,7 @@ export function BoldPricing() {
               {examples.map((e) => (
                 <li key={e.name} className="flex items-center justify-between py-4">
                   <span className="text-[15px] text-black/75">{e.name}</span>
-                  <span className="text-lg font-display font-black tabular-nums tracking-tight">{e.price}</span>
+                  <span className="text-lg font-display font-semibold tabular-nums tracking-tight">{e.price}</span>
                 </li>
               ))}
             </ul>
@@ -90,7 +90,7 @@ export function BoldPricing() {
           two sets of padding and a white gutter inside its own rounded corner. */}
       <section className="px-6 pb-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
+          <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
             Only pay when it ships.
           </h2>
           <div className="mt-8 flex justify-center">

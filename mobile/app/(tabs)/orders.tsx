@@ -224,9 +224,10 @@ export default function Orders() {
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: 18, paddingBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-          {/* The one DISPLAY moment on the screen. Playfair is a high-contrast serif — it
-              earns its place at 34pt and would be mud at 13, which is why nothing else here
-              uses it. */}
+          {/* The one DISPLAY moment on the screen — a weight and a size, not a second
+              alphabet. It used to be Playfair, on the argument that a high-contrast serif
+              earns its place at 34pt; the face is dropped on both front-ends now, so what
+              makes this the title is that it is 32pt bold with the tracking pulled in. */}
           <Text style={{ fontSize: 32, fontFamily: F.display, color: C.fg, marginTop: 6, letterSpacing: -0.6 }}>Orders</Text>
           {staff && orders !== null && (
             <Pressable

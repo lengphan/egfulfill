@@ -512,11 +512,11 @@ export function DesignMaker() {
    * twenty lines, and the copy that drifts is the one that stops restoring `pos` — which
    * puts the artwork back centred and looks like the template never saved it.
    */
- const applyTemplate = (t: ProductTemplate) => {
- const l = (t.layers ?? {}) as { sides?: Record<string, SideStack>; images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
- const d = (t.data ?? {}) as { blank?: string | null; printArea?: { w?: number; h?: number } }
- templateId.current = String(t.id)
- if (t.name) setName(t.name)
+  const applyTemplate = (t: ProductTemplate) => {
+    const l = (t.layers ?? {}) as { sides?: Record<string, SideStack>; images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
+    const d = (t.data ?? {}) as { blank?: string | null; blankSku?: string | null; printArea?: { w?: number; h?: number } }
+    templateId.current = String(t.id)
+    if (t.name) setName(t.name)
     // A template saved BEFORE the stack has one artwork and a position; one saved
     // after has the list. Reading images first means a new template never falls back
     // to its own compatibility fields and loses its upper layers.
@@ -548,8 +548,21 @@ export function DesignMaker() {
     // measured when the template was saved; the size now comes from whichever product this
     // is opened on, so restoring the old number would print the new garment to the old
     // garment's measurements.
- const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
- if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
+    /*
+     * THE SKU FIRST, THEN THE NAME.
+     *
+     * The save writes both — `blank` is the name, `blankSku` the sku — and this read only
+     * ever looked at the name, so `blankSku` was written by every template and read by
+     * nothing. Rename a product, or hold two that share a name, and reopening the template
+     * found the wrong blank or none at all: the artwork comes back onto a garment nobody
+     * chose.
+     *
+     * A sku is the identity; a name is a label somebody edits. Name stays as the fallback,
+     * for templates saved before blankSku existed.
+     */
+    const byName = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
+    const p = (d.blankSku ? catalogRef.current.find((x) => x.sku === d.blankSku) : null) ?? byName
+    if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
   }
 
  useEffect(() => {
@@ -918,8 +931,25 @@ export function DesignMaker() {
  style={{ transform: zoom === 1 ? undefined : `scale(${zoom})` }}
             >
               <DesignStage
- className="w-full"
- mockup={faceUrl || mockup}
+                className="w-full"
+                /* THE FRONT IS NOT A STAND-IN FOR THE BACK.
+                 *
+                 * This was `faceUrl || mockup`, and `mockup` is the product's FRONT image. So
+                 * a side the product has no picture for drew the front garment while the
+                 * switcher above still read "Back" — you positioned a back print against a
+                 * front photo, against the front's print zone, and nothing said so. The
+                 * comment on `side` fifty lines up says the side must drive both the image and
+                 * the zone; this line quietly undid it.
+                 *
+                 * faceUrl already makes that distinction — it falls back to the type outline
+                 * on FRONT only, and to nothing elsewhere. Same rule here: `mockup` is a front
+                 * fallback, for a product whose imagery resolves through mockupOf rather than
+                 * through designFaces, and it applies on the front alone.
+                 *
+                 * A PLAIN BLOCK COMMENT, not the JSX form. This is an ATTRIBUTE LIST, where
+                 * a JSX comment is a syntax error — the file does not compile, and the branch
+                 * this arrived on did not. CLAUDE.md records the same trap on design-canvas. */
+                mockup={faceUrl || (side === "front" ? mockup : "")}
                 // The stack, not a single artwork. `designUrl`/`pos` are left unset here on
                 // purpose: passing both would draw the bottom layer twice.
  images={images} updateImage={updateImage}

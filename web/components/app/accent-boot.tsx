@@ -3,8 +3,13 @@
 import { useEffect } from "react"
 import { getBranding } from "@/lib/api"
 import { applyStoredAccent, rememberAccent } from "@/lib/accent"
+import { applyStoredSkin, rememberSkin } from "@/lib/skin"
 
 /** One fetch per tab, not per navigation. The accent changes about as often as the logo. */
+/* AND THE SKIN, off the SAME fetch. Two attributes on <html> from one call rather than a
+   second hook with a second request for a second field of the same record — the branding
+   endpoint already returns both, and two loaders for one row is how they end up disagreeing
+   about which one arrived first. */
 let asked = false
 
 /**
@@ -27,8 +32,11 @@ let asked = false
 export function useAccent() {
   useEffect(() => {
     applyStoredAccent()
+    applyStoredSkin()
     if (asked) return
     asked = true
-    getBranding().then((b) => rememberAccent(b.accent)).catch(() => { /* the default is fine */ })
+    getBranding()
+      .then((b) => { rememberAccent(b.accent); rememberSkin(b.skin) })
+      .catch(() => { /* the default is fine */ })
   }, [])
 }

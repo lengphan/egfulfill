@@ -29,6 +29,36 @@ export function methodCode(printType) {
 }
 
 /**
+ * The words a PERSON reads for each code.
+ *
+ * The import sheet used to offer the codes themselves — DTG, EMB, APL — because that is
+ * what the importer normalises against. But a seller filling in a spreadsheet has no reason
+ * to know our shorthand, and "APL" in a dropdown is a guess rather than a choice. So the
+ * sheet offers these and methodCode() above reads them back: it matches on /APPLIQ/,
+ * /EMB/, /DIRECT/ and friends, so "Appliqué" and "APL" both resolve to APL and a sheet
+ * downloaded before today keeps importing unchanged.
+ *
+ * Mirrors METHOD_TABLE's labels in web/lib/print-method.ts. That is the third hand-kept
+ * copy the note at the top of this file already warns about — change them together.
+ */
+export const METHOD_LABELS = {
+  DTF: 'DTF printing',
+  DTG: 'DTG printing',
+  EMB: 'Embroidery',
+  APL: 'Appliqué',
+  LSR: 'Laser',
+  SCR: 'Screen print',
+  SUB: 'Sublimation',
+  VNL: 'Vinyl',
+};
+
+/** Code -> label, falling back to whatever came in so an unknown code still prints. */
+export function methodLabel(code) {
+  const k = String(code || '').toUpperCase();
+  return METHOD_LABELS[k] || String(code || '');
+}
+
+/**
  * Methods that go OUT to the design partner.
  *
  * Deliberately a list of what leaves rather than what stays. A new method added to the

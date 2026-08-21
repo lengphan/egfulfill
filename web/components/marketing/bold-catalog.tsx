@@ -85,8 +85,8 @@ function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () 
       className={
         "rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors " +
         (on
-          ? "border-[#0B0B0C] bg-[#0B0B0C] text-[#FAF8F3]"
-          : "border-black/[0.14] text-black/70 hover:border-black/40 hover:text-[#0B0B0C]")
+          ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
+          : "border-black/[0.14] text-black/70 hover:border-black/40 hover:text-[var(--mk-ink)]")
       }
     >
       {label}
@@ -116,7 +116,7 @@ function SwatchDot({ name, on, onClick }: { name: string; on: boolean; onClick: 
       title={name}
       className={
         "size-6 rounded-full border border-black/20 transition-shadow " +
-        (on ? "ring-2 ring-[#0B0B0C] ring-offset-2 ring-offset-[#F2F1EC]" : "hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[#F2F1EC]")
+        (on ? "ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-surface)]" : "hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-surface)]")
       }
       style={{ background: swatchBg(name) ?? NEUTRAL_CHIP }}
     />
@@ -173,7 +173,7 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
               />
             </div>
           ) : (
-            <div className="flex size-full items-center justify-center text-[#FAF8F3]/45">
+            <div className="flex size-full items-center justify-center text-[var(--mk-accent-ink)]/45">
               <TShirt size={40} weight="duotone" />
             </div>
           )}
@@ -188,7 +188,7 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
                 one figure was quoting a price you cannot always order at — and a product with
                 a single price must not be dressed up as a range either. The server says which
                 it is (priceVaries); this only reads it. */}
-            <span className="text-lg font-black tabular-nums">
+            <span className="text-lg font-semibold tabular-nums">
               {p.priceVaries && <span className="mr-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-black/45">from</span>}
               {usd(from)}
             </span>
@@ -347,7 +347,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
    */
 
   return (
-    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <PlateHero
         title="What we"
         accent="can make."
@@ -418,7 +418,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                     <button
                       type="button"
                       onClick={() => { setSel(NO_SELECTION); setQuery("") }}
-                      className="text-[12px] font-semibold underline underline-offset-4 text-black/55 hover:text-[#0B0B0C]"
+                      className="text-[12px] font-semibold underline underline-offset-4 text-black/55 hover:text-[var(--mk-ink)]"
                     >
                       Clear
                     </button>
@@ -523,7 +523,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
 
       <section className="px-6 pb-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
+          <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
             Pick a blank, upload art, ship it.
           </h2>
           <div className="mt-8 flex justify-center">

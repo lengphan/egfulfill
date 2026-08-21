@@ -4,13 +4,51 @@ import { Suspense, useCallback, useEffect, useState } from "react"
 import { Plus, PenNib, Trash } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TemplatesPanel } from "@/components/app/templates-panel"
+import { MachineFilesPanel } from "@/components/app/machine-files-panel"
 import { DesignLabTabs, useDesignLabTab } from "@/components/app/design-lab-tabs"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { DesignStudioDialog } from "@/components/app/design-studio"
 import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, type LibraryDesign } from "@/lib/api"
+import { proxiedImageSrc } from "@/lib/order-image"
 import { getToken } from "@/lib/auth"
 import { EmptyState } from "@/components/app/empty-state"
+
+/**
+ * A LIBRARY THUMBNAIL, and what it does when the picture is not there.
+ *
+ * Two separate failures were rendering as one:
+ *
+ *  1. A marketplace thumb (etsystatic, Shopify, TikTok) was hotlinked straight into `src`,
+ *     so it answered to THEIR referrer and CORS rules rather than ours. proxiedImageSrc
+ *     routes those through /api/etsy/img-proxy — same origin, a content type, a day of
+ *     cache — which is the route the canvas reader has used all along.
+ *  2. Whatever still failed showed the ALT TEXT: a paragraph of Etsy listing title sitting
+ *     where a square picture should be, in a grid of square pictures. That is not an empty
+ *     state, it is a broken one wearing an empty one's clothes.
+ *
+ * So the placeholder is the answer to both — the same pen mark a design with no thumbnail
+ * gets — and alt stays empty, because the name is already printed under the tile and a
+ * screen reader does not need it twice.
+ *
+ * Module scope, not inside the map: react-hooks/static-components refuses a component
+ * defined during render, and this one needs its own broken flag per row.
+ */
+function LibraryThumb({ thumb, name }: { thumb?: string | null; name?: string | null }) {
+  const [broken, setBroken] = useState(false)
+  const placeholder = <PenNib size={26} weight="duotone" className="text-muted-foreground/40" />
+  if (!thumb || broken) return placeholder
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={proxiedImageSrc(thumb)}
+      alt=""
+      title={name ?? undefined}
+      className="size-full object-cover"
+      onError={() => setBroken(true)}
+    />
+  )
+}
 
 const fmtDate = (s?: string) => {
  if (!s) return ""
@@ -105,19 +143,11 @@ function DesignLab() {
               {list.map((d) => (
                 <Card key={String(d.id)} className="group flex flex-col gap-0 overflow-hidden p-0">
                   <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
-                    {d.thumb ? (
-                      // object-COVER, not contain. A design library holds artwork of every
-                      // shape — a square logo, a wide banner, a tall label — and contain sat
-                      // each one at a different visual size inside the square, floating in
-                      // grey bands, so a tidy grid read as crooked even though the frames
-                      // were identical. Cover fills every frame edge to edge, so the
-                      // thumbnails are uniform; the whole artwork is one click (or one drop)
-                      // away, which is where its exact bounds actually matter.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-cover" />
-                    ) : (
-                      <PenNib size={26} weight="duotone" className="text-muted-foreground/40" />
-                    )}
+                    {/* object-COVER, not contain — see LibraryThumb. A design library holds
+                        artwork of every shape, and contain sat each one at a different visual
+                        size inside the square, floating in grey bands, so a tidy grid read as
+                        crooked even though the frames were identical. */}
+                    <LibraryThumb thumb={d.thumb} name={d.name} />
                     <button
  onClick={() => remove(d.id)}
  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"
@@ -175,6 +205,8 @@ function DesignLab() {
             </div>
           )}
         </SectionCard>
+      ) : tab === "machine" ? (
+        <MachineFilesPanel />
       ) : (
         <TemplatesPanel />
       )}

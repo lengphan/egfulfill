@@ -80,14 +80,27 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Blank Product", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
   { header: "Template ID", key: "template_id", required: false, section: "product", help: "A SHORTCUT: a saved template already carries the blank, the placement and the artwork, so a row with one ignores Image ID and the variant columns. Leave it blank and the row is built from the columns instead. Type the number — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   { header: "Image ID", key: "hero_image", required: false, section: "product", help: "THE ARTWORK, placed at the product’s default print area. A row needs this or a Template ID, not both. URL of the listing photo shown on the card." },
+  /**
+   * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
+   * only one that is not artwork.
+   *
+   * Template ID and Image ID both hand us a PICTURE we then cut a machine file from. This
+   * hands us the machine file itself, which is what actually arrives: sellers send .EMB.
+   * Their only route in was the designer, one line at a time, so forty units of one design
+   * meant forty uploads of one file.
+   *
+   * It does NOT replace the artwork. A line still wants a picture — that is what the mockup
+   * shows and what the floor checks the sewing against — so this sits alongside Template ID
+   * rather than instead of it. What it replaces is the upload.
+   */
+  { header: "Machine File ID", key: "machine_file_id", required: false, section: "product", help: "YOUR OWN STITCH FILE, from Design Lab › Machine files. Type the reference off its card (MF-12). It is attached to THIS row’s unit, not to the whole order — so a two-line order can carry two different files. Embroidered lines only: there is no machine to run a stitch file on a DTG line, so a row that names one is rejected rather than charged for a file nothing can use." },
   { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
-  { header: "Print Type", key: "print_type", required: false, section: "product", help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
+  { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
   { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
   { header: "Size", key: "item_size", required: false, section: "product", help: "Garment size." },
   { header: "Price", key: "item_price", required: false, section: "product", help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
   // ── EXTRAS ────────────────────────────────────────────────────────────────
   { header: "Store Name", key: "store_name", required: false, section: "extras", help: "Which shop the order came from." },
-  { header: "Shipping Service", key: "shipping_service", required: false, section: "extras", help: "Requested method (e.g. Standard). Saved with the order." },
   { header: "Internal Notes", key: "internal_notes", required: false, section: "extras", help: "Private note for your team. Saved with the order." },
 ]
 
@@ -183,12 +196,27 @@ export const ITEM_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"
  *
  * Mirrored by T_OPTS.services in server/src/routes/sheets.js — change both.
  */
+/**
+ * KEPT THOUGH THE COLUMN IS GONE (2026-08-21). Shipping Service was dropped from the
+ * template — the label screen picks the class at buy time against the live Shippo account,
+ * so a value typed into a sheet days earlier was never consulted.
+ *
+ * The KEY, its aliases and the read at rowsToRecords all stay, because every sheet already
+ * in a seller's Drive still carries the column: dropping the alias would turn a working
+ * file into an unknown-column error at exactly the moment they re-import.
+ */
 export const SHIPPING_SERVICES = [
   "USPS Ground Advantage", "USPS Priority Mail", "USPS Priority Mail Express",
 ]
 
 export const COLUMN_OPTIONS: Record<string, string[]> = {
-  print_type: PRODUCT_METHODS.map((m) => m.key.toUpperCase()),
+  /**
+   * THE WORDS, NOT THE KEYS. This was `m.key.toUpperCase()` — DTG, EMB, APL — which is what
+   * the importer normalises against, so it was correct and unreadable: nobody filling in a
+   * spreadsheet knows that APL is Appliqué. `label` is the same row of the same table, and
+   * methodCode() on the server matches it back by regex, so both spellings import.
+   */
+  print_type: PRODUCT_METHODS.map((m) => m.label),
   ship_state: US_STATES,
   /**
    * HEADER SPELLINGS, not size values — this was `ITEM_SIZES`, so the aliases for the size
@@ -198,7 +226,6 @@ export const COLUMN_OPTIONS: Record<string, string[]> = {
    * headers, which would have made that the normal case.
    */
   item_size: ["item_size", "size", "variant_size", "lineitem_size", "line_item_size", "item_sizes"],
-  shipping_service: SHIPPING_SERVICES,
 }
 
 // Template header row. Bands are carried by the sheet's banner row and by colour, so the
@@ -244,6 +271,10 @@ const COL_ALIASES: Record<string, string[]> = {
   item_color: ["item_color", "color", "colour", "variant_color"],
   item_size: ["item_size", "size", "variant_size"],
   design_file_url: ["design_file_url", "design", "design_url", "artwork", "art_url", "design_file"],
+  // Every spelling somebody might already have in a sheet. "emb"/"emb_file" are here
+  // because .EMB is what actually arrives and it is what people call the column.
+  machine_file_id: ["machine_file_id", "machine_file", "machine", "mf", "mf_id", "stitch_file",
+    "stitch_file_id", "emb", "emb_file", "emb_id", "dst", "pes", "machine_file_ref"],
   hero_image: ["hero_image", "image_link_id", "image_link", "image_id", "hero", "hero_img", "hero_url", "product_image", "product_img", "product_photo", "listing_image", "listing_img", "main_image", "image", "image_url", "img_url", "photo"],
   internal_notes: ["internal_notes", "notes", "note", "internal_note", "order_note"],
   shipping_service: ["shipping_service", "service", "ship_method", "shipping_method"],
@@ -412,6 +443,9 @@ export type ImportItem = {
   name: string; sku: string; img: string; qty: number; unitPrice: number
   color: string; size: string; printType: string; designUrl: string; blank: string
   templateId: string; notes: string
+  /** The seller's own stitch file, by library reference (`MF-12`). Resolved and attached
+   *  AFTER the order exists, against this line's own id — see the import dialog. */
+  machineFileId: string
   /**
    * Filled by applyTemplates, read by the order write — placement, and the other faces.
    *
@@ -473,6 +507,7 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
         // `templateId` names a saved design to apply, which fills the rest.
         blank: S(r.blank),
         templateId: S(r.template_id),
+        machineFileId: S(r.machine_file_id),
         notes: S(r.internal_notes),
       }
     })

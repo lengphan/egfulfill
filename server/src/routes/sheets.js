@@ -14,7 +14,7 @@
 import crypto from 'crypto';
 import { q } from '../db.js';
 import { productSizes, productColors } from '../variant-sku.js';
-import { methodCode } from '../print-route.js';
+import { methodCode, methodLabel } from '../print-route.js';
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY || '';
 const TEMPLATE_URL = process.env.SHEETS_TEMPLATE_URL || '';
@@ -106,29 +106,42 @@ const T_COLUMNS = [
    */
   { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
   { h: 'Image ID', g: 'product', duty: '', sample: '' },
+  /**
+   * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
+   * only one that is not artwork.
+   *
+   * Template ID and Image ID hand us a PICTURE we cut a machine file from. This hands us the
+   * machine file, which is what actually arrives: sellers send .EMB. It rides beside the
+   * other two because it answers the same question, and this list is a HAND-KEPT MIRROR of
+   * web/lib/order-import.ts's CSV_COLUMNS — change one and change the other, or the sheet we
+   * hand out stops importing itself.
+   */
+  { h: 'Machine File ID', g: 'product', duty: '', sample: '' },
   { h: 'Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
-  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods', dep: 'methods' },
+  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG printing', opts: 'methods', dep: 'methods' },
   { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
   { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
   { h: 'Price', g: 'product', duty: '', sample: '24.00' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
-  { h: 'Shipping Service', g: 'extras', duty: '', sample: 'USPS Priority Mail', opts: 'services' },
   { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
 ];
 
 // Dropdown value lists. Mirrors COLUMN_OPTIONS in web/lib/order-import.ts; `methods` mirrors
 // PRODUCT_METHODS in web/lib/print-method.ts.
 const T_OPTS = {
-  methods: ['DTG', 'DTF', 'EMB', 'APL', 'LSR', 'SCR', 'SUB', 'VNL'],
+  // THE WORDS, NOT OUR SHORTHAND. This was the eight codes, because the importer normalises
+  // against codes — but "APL" in a seller's dropdown is a guess rather than a choice.
+  // methodCode() matches these back by regex (/APPLIQ/, /EMB/, /DIRECT/ …), so a sheet
+  // already in someone's Drive that still says "APL" imports exactly as it did.
+  // Mirrors METHOD_LABELS in server/src/print-route.js — change both.
+  methods: ['DTG printing', 'DTF printing', 'Embroidery', 'Appliqué', 'Laser', 'Screen print', 'Sublimation', 'Vinyl'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'One Size'],
-  // ONLY what the label screen can buy — three USPS mail classes. UPS and FedEx were
-  // listed here and could not be honoured: the picker offers USPS and nothing else, so
-  // "FedEx 2Day" in the sheet quietly became USPS Ground Advantage at the label. Checked
-  // against the live Shippo account 2026-08-10: usps + ups connected, no FedEx account.
-  // Mirrors SHIPPING_SERVICES in web/lib/order-import.ts — change both.
-  services: ['USPS Ground Advantage', 'USPS Priority Mail', 'USPS Priority Mail Express'],
+  // `services` was here and went with the Shipping Service column (2026-08-21). The label
+  // screen picks the class at buy time against the live Shippo account, so a value typed
+  // into a spreadsheet days earlier was never consulted — SHIPPING_SERVICES in
+  // web/lib/order-import.ts survives for the sheets already in sellers' Drives.
   states: ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'],
 };
 
@@ -217,7 +230,7 @@ export async function catalogLists() {
     const methods = clean([
       ...(Array.isArray(d.methods) ? d.methods : []),
       ...String(d.method || '').split(/[,/|+&]|\band\b/i),
-    ]).map((m) => methodCode(m)).filter((m) => T_OPTS.methods.includes(m));
+    ]).map((m) => methodLabel(methodCode(m))).filter((m) => T_OPTS.methods.includes(m));
     /**
      * COLOURS ARE THE KEYS OF `colorImages`, NOT A `colors` FIELD.
      *
@@ -662,6 +675,33 @@ function toCopyUrl(url) {
  * at all. A bound script IS carried into every copy someone makes, so it is a one-time paste
  * on the master and then it travels.
  */
+/**
+ * THE MANIFEST, which is the half that decides how frightening this looks.
+ *
+ * Left to itself Apps Script infers a BROAD scope (all of your spreadsheets), which is a
+ * sensitive scope — so an unpublished project triggers the unverified-app interstitial, and
+ * the seller's first contact with our template is "Advanced -> Go to (unsafe)". People
+ * abandon there, and they are right to.
+ *
+ * The script only ever reaches the sheet it is bound to: it uses SpreadsheetApp alone and
+ * never openById/openByUrl/DriveApp, so `spreadsheets.currentonly` is not a compromise, it
+ * is what the code actually does. That scope is NON-sensitive, so the interstitial goes and
+ * consent reads "only the specific spreadsheet you use this with".
+ *
+ * It does NOT remove the copy-dialog banner ("the attached Apps Script file ... will also be
+ * copied"). That fires because a bound script exists at all, and no scope changes it.
+ *
+ * timeZone/runtime/exceptionLogging mirror the project defaults so pasting this cannot
+ * silently undo a setting someone chose in Project Settings.
+ */
+const APPS_MANIFEST = JSON.stringify({
+  timeZone: 'Asia/Ho_Chi_Minh',
+  dependencies: {},
+  exceptionLogging: 'STACKDRIVER',
+  runtimeVersion: 'V8',
+  oauthScopes: ['https://www.googleapis.com/auth/spreadsheets.currentonly'],
+}, null, 2);
+
 const APPS_SCRIPT = `/**
  * EGFULFILL order-import helper.
  *
@@ -741,6 +781,7 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
     script: APPS_SCRIPT,
     // Named here so the instructions and the template can't disagree about which tab.
     tab: 'Orders', listsTab: 'Lists',
+    manifest: APPS_MANIFEST,
   }));
 
   app.get('/api/sheets/config', async (req) => {

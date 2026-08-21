@@ -25,7 +25,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getSheetsAppsScript, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getSheetsAppsScript, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
@@ -193,30 +193,41 @@ export function ImportOrdersDialog({
   // Google's force-a-copy URL for our master template, and (admins only) whether one has
   // been configured yet. Server-supplied: the master lives in a setting, not in the bundle.
   const [copyUrl, setCopyUrl] = useState("")
+  // The master itself, for the admin who has to open it. `copyUrl` is the seller's
+  // force-a-copy form and lands on Google's copy dialog, which is the wrong door for
+  // Extensions -> Apps Script.
+  const [masterUrl, setMasterUrl] = useState("")
   const [needsTemplate, setNeedsTemplate] = useState(false)
   // Admin-only setup. The master's formatting looks after itself; the helper script below is
   // the one step Google will not let us perform on someone's behalf.
   const [isTemplateAdmin, setIsTemplateAdmin] = useState(false)
   const [helper, setHelper] = useState<string | null>(null)
+  // The manifest is the half that removes the "unsafe" interstitial — see APPS_MANIFEST
+  // in server/src/routes/sheets.js. Served with the script so the two cannot drift.
+  const [manifest, setManifest] = useState<string | null>(null)
   const [helperOpen, setHelperOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [tplInput, setTplInput] = useState("")
   const [tplSaving, setTplSaving] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState<{ imported: number } | null>(null)
+  const [done, setDone] = useState<{ imported: number; mfAttached: number; mfFailed: string[] } | null>(null)
   // The seller's saved templates, fetched ONLY when a parsed sheet actually names one.
   // Composites are base64 images, so this is not a payload to pull on the off-chance.
   const [templates, setTemplates] = useState<ImportTemplate[] | null>(null)
   const [templatesFailed, setTemplatesFailed] = useState(false)
+  /** What each `MF-…` in the sheet resolves to — null for a reference that does not, which
+   *  covers "no such file" and "not yours" identically and on purpose. */
+  const [machineFiles, setMachineFiles] = useState<Record<string, MachineFile | null> | null>(null)
+  const [machineLookupFailed, setMachineLookupFailed] = useState(false)
 
   const loadSheetsConfig = useCallback(() => {
     setConfigErr(false)
     return getSheetsConfig()
       .then((c) => {
         setSheetsEnabled(!!c.enabled)
-        setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
+        setCopyUrl(c.copyUrl || ""); setMasterUrl(c.templateUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
       })
-      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false); setConfigErr(true) })
+      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setMasterUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false); setConfigErr(true) })
   }, [])
 
   useEffect(() => {
@@ -244,6 +255,27 @@ export function ImportOrdersDialog({
     if (error) { setError(error); setRecords(null); return }
     setError(null)
     setRecords(records)
+    /**
+     * AND THE MACHINE FILES THE SHEET NAMES — resolved HERE, not at import.
+     *
+     * "Recognise and read that file" has to happen while the sheet is still on screen. A
+     * reference that does not resolve is a line that arrives with no stitch file, and an
+     * embroidered line with no stitch file is a job the floor cannot start — discovering
+     * that after the orders exist means going back through them by hand.
+     *
+     * Metadata only: the resolve returns names and sizes, never bytes. The bytes never
+     * touch the browser on this path at all.
+     */
+    const refs = [...new Set(records.map((r) => String(r.machine_file_id || "").trim()).filter(Boolean))]
+    if (refs.length) {
+      resolveMachineFiles(refs)
+        .then((m) => setMachineFiles(m ?? {}))
+        // A LOOKUP THAT FAILED IS NOT A LOOKUP THAT FOUND NOTHING. Empty would render as
+        // "none of these exist" and invite someone to fix ids that are perfectly good.
+        .catch(() => { setMachineFiles(null); setMachineLookupFailed(true) })
+    } else {
+      setMachineFiles(null); setMachineLookupFailed(false)
+    }
     // Only now do we know whether templates matter. Fetching them up front would pull
     // every composite (base64 images) for the majority of imports that name none.
     if (records.some((r) => String(r.template_id || "").trim())) {
@@ -299,6 +331,37 @@ export function ImportOrdersDialog({
    * line arrives with no blank and no artwork, and the moment to fix a typo is while the
    * sheet is still open.
    */
+  /**
+   * WHAT THE MACHINE FILE ID COLUMN WILL DO — computed before the import, like the template
+   * one above and for the same reason.
+   *
+   * THREE OUTCOMES, and the third is the one worth catching early: a reference that resolves
+   * fine but names a row that is not embroidered. A stitch file has no machine to run on a
+   * DTG line, so it would be a check fee raised for a file nothing can use (CLAUDE.md §4).
+   * The server refuses it too — this is the half that refuses it while the typo is still
+   * fixable.
+   */
+  const machineOutcome = useMemo(() => {
+    if (!records) return null
+    const rows = records.filter((r) => r._valid && String(r.machine_file_id || "").trim())
+    if (!rows.length) return null
+    const typed = rows.length
+    if (machineLookupFailed || !machineFiles) return { typed, ok: 0, unknown: [] as string[], wrongMethod: [] as string[], failed: machineLookupFailed }
+    const unknown = new Set<string>()
+    const wrongMethod = new Set<string>()
+    let ok = 0
+    for (const r of rows) {
+      const ref = String(r.machine_file_id || "").trim()
+      if (!machineFiles[ref]) { unknown.add(ref); continue }
+      // The row's own method. Blank is allowed through — the line has not said it ISN'T
+      // embroidery, and the server makes the final call against the saved line.
+      const m = String(r.print_type || "").toUpperCase()
+      if (m && !/EMB|STITCH|EMBROID/.test(m)) { wrongMethod.add(ref); continue }
+      ok++
+    }
+    return { typed, ok, unknown: [...unknown], wrongMethod: [...wrongMethod], failed: false }
+  }, [records, machineFiles, machineLookupFailed])
+
   const templateOutcome = useMemo(() => {
     if (!records || !templates) return null
     const typed = records.filter((r) => r._valid && String(r.template_id || "").trim()).length
@@ -384,10 +447,33 @@ export function ImportOrdersDialog({
       const orders = templates ? applyTemplates(groupToOrders(records), templates).orders : groupToOrders(records)
       const existing = await getOrders().catch(() => [])
       const baseSeq = nextSellerSeq(existing ?? [])
+      /* One seed per RUN, so two imports of the same sheet cannot mint the same line ids —
+         line_id is identity, and a collision would attach the second import's files to the
+         first import's lines. Order index and line index make it unique within the run. */
+      const newIdSeed = Date.now().toString(36)
       let imported = 0
+      // What the stitch-file column actually did. Reported rather than assumed: an
+      // embroidered line that arrives without its file is the one failure here that looks
+      // exactly like success until the floor picks the job up.
+      let mfAttached = 0
+      const mfFailed: string[] = []
       for (let i = 0; i < orders.length; i++) {
         const o = orders[i]
-        const items = o.items.map((it) => ({
+        /**
+         * WE MINT THE LINE IDS, exactly as we mint the order id two lines down and for the
+         * same stated reason: "trusting the response to echo an id back is a dependency this
+         * doesn't need — we minted it."
+         *
+         * Here it is not a convenience, it is the whole requirement. A machine file has to
+         * land on the UNIT ROW that asked for it, and `createOrder` returns `{ ok, id }` —
+         * no line ids at all. Without minting, the only handle on a line after import is its
+         * SKU, and two lines of the same SKU are different jobs (§5): keying on sku alone
+         * would put one row's file on its sibling. The server honours a supplied lineId and
+         * mints its own only when there isn't one.
+         */
+        const lineIds = o.items.map((_, li) => `FFL-${newIdSeed}${i.toString(36)}-${li.toString(36)}`)
+        const items = o.items.map((it, li) => ({
+          lineId: lineIds[li],
           name: it.name, sku: it.sku || undefined, img: it.img || undefined,
           qty: it.qty, unitPrice: it.unitPrice, color: it.color || undefined,
           size: it.size || undefined, printType: it.printType || undefined,
@@ -449,7 +535,37 @@ export function ImportOrdersDialog({
            */
           const orderId = newId || r.id || undefined
           if (orderId) {
-            for (const it of o.items) {
+            for (let li = 0; li < o.items.length; li++) {
+              const it = o.items[li]
+              /**
+               * THE SELLER'S OWN STITCH FILE, ON THIS LINE.
+               *
+               * By REFERENCE — the browser sends an id and a line id, never the bytes. One
+               * .EMB across forty lines is one object and forty rows pointing at it; posting
+               * the file per line would be 320MB across the wire against a 60MB body limit.
+               *
+               * `lineIds[li]`, never the sku. This is the whole point of minting them: the
+               * file has to reach the unit row that named it, and a sheet can legitimately
+               * carry two lines of one SKU with two different files.
+               *
+               * Best-effort per line, like the design rows below: a file that fails to
+               * attach must not undo an order that was created. It is COUNTED, though —
+               * silently importing an embroidered line with no stitch file is a job the
+               * floor cannot start, and the count is what the summary reports.
+               */
+              const mfRef = String(it.machineFileId || "").trim()
+              const mf = mfRef ? machineFiles?.[mfRef] : null
+              if (mfRef) {
+                if (!mf) {
+                  mfFailed.push(`${mfRef} — no such file in your library`)
+                } else {
+                  const a = await attachMachineFile(mf.id, { orderId, lineId: lineIds[li] }).catch((e: unknown) => ({
+                    error: e instanceof Error ? e.message : "attach failed",
+                  }))
+                  if (a?.error) mfFailed.push(`${mfRef} on ${it.name || it.sku || "a line"} — ${a.error}`)
+                  else mfAttached++
+                }
+              }
               const faces = (it.templateSides?.length
                 ? it.templateSides
                 : it.designUrl && (it.templatePos || it.templateId)
@@ -478,7 +594,7 @@ export function ImportOrdersDialog({
           }
         }
       }
-      setDone({ imported })
+      setDone({ imported, mfAttached, mfFailed })
       onImported?.(imported)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Import failed.")
@@ -501,6 +617,26 @@ export function ImportOrdersDialog({
             </span>
             <div className="font-semibold">Imported {done.imported} {done.imported === 1 ? "order" : "orders"}</div>
             <div className="text-sm text-muted-foreground">They’re in your orders queue now.</div>
+            {/* WHAT THE STITCH-FILE COLUMN DID, said here rather than left to be discovered.
+                An embroidered line that arrives without its file is the one failure on this
+                screen that looks exactly like success until the floor picks the job up. */}
+            {done.mfAttached > 0 && (
+              <div className="text-sm text-muted-foreground">
+                {done.mfAttached} machine {done.mfAttached === 1 ? "file" : "files"} attached, each to its own line.
+              </div>
+            )}
+            {done.mfFailed.length > 0 && (
+              <div className="w-full space-y-1 rounded-lg border border-alert/30 bg-alert/5 p-2.5 text-left">
+                <div className="text-sm font-medium text-alert">
+                  {done.mfFailed.length} machine {done.mfFailed.length === 1 ? "file" : "files"} not attached
+                </div>
+                {/* The server's own sentence, per line — it says WHICH file and WHY (unknown
+                    reference, wrong print method, no such line). Collapsing them to a count
+                    would throw away the only part anyone can act on. */}
+                {done.mfFailed.map((m, i) => <div key={i} className="text-xs text-muted-foreground">{m}</div>)}
+                <div className="text-xs text-muted-foreground">The orders imported. Attach these from the line’s designer.</div>
+              </div>
+            )}
             <Button className="w-full" onClick={() => onOpenChange(false)}>Done</Button>
           </div>
         ) : (
@@ -632,6 +768,18 @@ export function ImportOrdersDialog({
                         <Button onClick={makeSheetCopy}>
                           Make a copy in Google Sheets
                         </Button>
+                        {/* FOREWARNING, not a subtitle. Google shows "the attached Apps Script
+                            file and functionality will also be copied" on the copy dialog, and
+                            nothing on our side suppresses it — it fires because the template has
+                            a bound helper script at all. An unexplained security banner at a
+                            seller's first contact with us reads as "is this safe"; the same
+                            banner, expected, reads as "yes, that's the helper". §4 allows a
+                            warning to carry its reason, and no label on this button can. */}
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Google will ask you to confirm a helper script — it narrows the Colour,
+                          Size and Print Type lists to the product you pick, and reads nothing but
+                          your own copy.
+                        </p>
                         <p className="mt-2 text-xs text-muted-foreground">
                           Opens your own copy in your Drive — every column already in place, required
                           ones blue, dropdowns filled in. It is yours; nothing is shared with us.
@@ -678,7 +826,7 @@ export function ImportOrdersDialog({
                           className="ms-auto text-2xs text-primary hover:underline"
                           onClick={() => {
                             setHelperOpen((v) => !v)
-                            if (!helper) getSheetsAppsScript().then((r) => setHelper(r.script)).catch(() => setHelper(""))
+                            if (!helper) getSheetsAppsScript().then((r) => { setHelper(r.script); setManifest(r.manifest || "") }).catch(() => { setHelper(""); setManifest("") })
                           }}
                         >
                           {helperOpen ? "Hide" : "Show me how"}
@@ -686,17 +834,22 @@ export function ImportOrdersDialog({
                       </div>
                       {helperOpen && (
                         <div className="space-y-2">
-                          <p className="text-2xs text-muted-foreground">
-                            Without this, those three columns offer every colour, size and method in the
-                            catalogue — a real list, just not narrowed to the row&apos;s product. Sheets
-                            cannot narrow it with a formula, so it takes a small script.
-                          </p>
-                          <ol className="list-inside list-decimal space-y-0.5 text-2xs text-muted-foreground">
-                            <li>Open the master → <span className="font-medium text-foreground">Extensions → Apps Script</span></li>
-                            <li>Replace whatever is in the editor with the code below</li>
-                            <li><span className="font-medium text-foreground">Save</span>. Nothing else — the trigger is built in</li>
-                            <li>In the sheet, pick a Blank Product on any row. Google asks the copy&apos;s owner to authorise the script the first time</li>
-                          </ol>
+                          {/* THE LINK IS THE FIRST STEP, not a sentence describing it. This panel
+                              carried a paragraph and a four-item list and no way to reach the file
+                              they were about, so the one thing an admin actually needed — the
+                              master's address — was the one thing not on screen. The route lives in
+                              the label; §4 says a control explains itself there or in its title. */}
+                          {masterUrl && (
+                            <a
+                              href={masterUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Opens the master template. Paste the script under Extensions → Apps Script, then Save — the trigger is built in. Copies made afterwards carry it; ones already made do not."
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-2xs font-medium transition-colors hover:bg-accent"
+                            >
+                              Open the master → Extensions → Apps Script
+                            </a>
+                          )}
                           <textarea
                             readOnly
                             value={helper ?? "Loading…"}
@@ -716,6 +869,20 @@ export function ImportOrdersDialog({
                           >
                             {copied ? "Copied" : "Copy the script"}
                           </button>
+                          {manifest && (
+                            <div className="space-y-1 border-t border-border pt-2">
+                              <div className="text-2xs font-medium">
+                                appsscript.json — Project Settings → Show &quot;appsscript.json&quot; manifest file in editor
+                              </div>
+                              <textarea
+                                readOnly
+                                value={manifest}
+                                onFocus={(e) => e.currentTarget.select()}
+                                title="Restricts the script to this one spreadsheet. Without it Apps Script infers a broad, sensitive scope and Google shows the seller an unverified-app warning on first run."
+                                className="h-24 w-full rounded-lg border border-border bg-card p-2 font-mono text-[10px] leading-tight"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -821,6 +988,32 @@ export function ImportOrdersDialog({
                             their blank and artwork from a saved template.
                             {templateOutcome.unmatched.length > 0 && <> No template matches <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span> — check the number on the template card.</>}
                             {templateOutcome.ambiguous.length > 0 && <> More than one template is called <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span>, so those lines were left alone — use the TPL- number instead.</>}
+                          </>}
+                    </span>
+                  </div>
+                )}
+                {/* THE SAME BAR FOR THE STITCH FILES, and it earns its own row rather than
+                    joining the template one: they resolve against different libraries and
+                    fail for different reasons, and one sentence covering both would have to
+                    be vague about which column to go and fix. */}
+                {machineOutcome && (
+                  <div className={"flex items-start gap-2 border-b border-border px-4 py-2 text-xs "
+                    + (machineOutcome.unknown.length || machineOutcome.wrongMethod.length || machineOutcome.failed
+                      ? "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                      : "text-muted-foreground")}>
+                    {machineOutcome.unknown.length || machineOutcome.wrongMethod.length || machineOutcome.failed
+                      ? <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
+                      : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
+                    <span>
+                      {machineOutcome.failed
+                        ? "Your machine files couldn't be looked up, so the Machine File ID column won't attach anything — those lines will arrive without a stitch file."
+                        : <>
+                            {machineOutcome.ok} of {machineOutcome.typed} {machineOutcome.typed === 1 ? "line" : "lines"} will get
+                            their stitch file, attached to that line only.
+                            {machineOutcome.unknown.length > 0 && <> Nothing in your library matches <span className="tabular-nums">{machineOutcome.unknown.join(", ")}</span> — check the reference on the file&rsquo;s card in Design Lab.</>}
+                            {/* Named separately from "unknown" because the fix is different:
+                                the reference is right and the ROW is wrong. */}
+                            {machineOutcome.wrongMethod.length > 0 && <> <span className="tabular-nums">{machineOutcome.wrongMethod.join(", ")}</span> {machineOutcome.wrongMethod.length === 1 ? "is on a line" : "are on lines"} that {machineOutcome.wrongMethod.length === 1 ? "isn&rsquo;t" : "aren&rsquo;t"} embroidered — a stitch file has no machine to run there, so it won&rsquo;t be attached.</>}
                           </>}
                     </span>
                   </div>

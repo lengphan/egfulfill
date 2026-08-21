@@ -36,6 +36,7 @@ import { passwordResetRoutes } from './routes/password-reset.js';
 import { shippingRoutes } from './routes/shipping.js';
 import { designLibraryRoutes } from './routes/design_library.js';
 import { designFilesRoutes } from './routes/design_files.js';
+import { machineFilesRoutes } from './routes/machine_files.js';
 import { sheetsRoutes } from './routes/sheets.js';
 import { walletRoutes } from './routes/wallet.js';
 import { cashAccountRoutes } from './routes/cash_accounts.js';
@@ -565,6 +566,7 @@ passwordResetRoutes(app, requireAuth, requireStaff);   // forgot/reset (admin-me
 shippingRoutes(app, requireAuth, requireStaff);        // EasyPost + Shippo rate-shop + labels
 designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads" design gallery + cross-seller duplicate detection (staff-only)
 designFilesRoutes(app, requireAuth);                   // machine deliverable files (.pes/.emb) stored server-side, access-controlled (staff any; seller own)
+machineFilesRoutes(app, requireAuth);                  // the seller's own .EMB LIBRARY — bytes once, referenced by MF-<seq>; attach copies a reference onto a LINE
 sheetsRoutes(app, requireAuth, requireAdmin);          // Google Sheets order import; admin sets the master template a seller copies
 billingRoutes(app, requireAuth, requireAdmin);                       // subscription plan + SpyDeck add-on, charged from the wallet (402 names the shortfall so the client can offer a top-up)
 planRoutes(app, requireAuth, requireStaff, requireAdmin);  // volume tiers: the admin ladder + a seller's own meter. PRICES ORDERS — pricing.js reads the same ladder; an empty ladder is the off switch

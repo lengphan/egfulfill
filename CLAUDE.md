@@ -242,26 +242,48 @@ No backend test suite. USPS smoke test: `node --env-file=.env check-usps.mjs`.
 
 ### Marketing + auth (`web/app/(marketing)/`, `/login`, `/signup`)
 
-**Exaggerated Minimalism.** Ink and paper carry the page, type does the work decoration
-usually does, and there is ONE accent. Kit: [web/components/marketing/bold-kit.tsx](web/components/marketing/bold-kit.tsx)
-— import from it, never re-declare a colour or a primitive in a page.
+**Ink on white, one accent.** Type does the work decoration usually does. Kit:
+[web/components/marketing/bold-kit.tsx](web/components/marketing/bold-kit.tsx) — import from
+it, never re-declare a colour or a primitive in a page.
 
-| Token | Value | Use |
+**THE VALUES ARE NOT IN THE KIT ANY MORE (2026-08-21).** Every constant it exports holds a
+`var(--mk-…)` reference, and the values live in [web/app/globals.css](web/app/globals.css)
+under `[data-skin]`. Nothing at a call site changed — a CSS variable is a legal inline style
+value — and the palette can now move on a running site instead of by deploy. An admin picks
+a skin in Settings › Branding; the server stores a KEY and allow-lists it (`branding.js`),
+exactly as the accent already worked. **Adding a skin is CSS + the allow-list + the gate,
+never a hex typed into a field.**
+
+| Token | `studio` (default) | Use |
 |---|---|---|
-| `ACCENT` | `#6633FF` | the hero plate, the header bar, CTA bands, chart bars |
-| `ACCENT_INK` | `#0B0B0C` | the typed accent phrase — ink, not a second hue |
-| `INK` | `#0B0B0C` | all display and body type |
-| `SURFACE` | `#FAF8F3` | the page below the plate |
+| `ACCENT` | `#0A0A0A` | the hero plate, CTA bands, chart bars |
+| `ACCENT_INK` | `#FFFFFF` | what sits ON the plate |
+| `INK` | `#0A0A0A` | all display and body type |
+| `SURFACE` | `#FFFFFF` | the page |
+| `ACID` | `#D4F897` | the one bright thing — a fill on the plate, never on white (1.1:1) |
+| `HAIRLINE` | `#E4E4E7` | a card's rule — NOT `AUTH_EDGE`, which is a control's, at a 3:1 floor |
 
-- **The banner is the colour; the page is paper.** A cool plate over a warm page is the whole
-  look. The tension is deliberate — it failed once only because the warm tone was also
-  carrying a coloured hero.
+The other skin is `press`: the electric-violet plate over warm paper `#F2F1EC` this site ran
+until 2026-08-21. It is kept in full and still measured — a picker with one option is not a
+picker — but **`studio` is the house style now**; the beige was dropped deliberately, because
+a warm off-white is the loudest signal of printed rather than made.
+
+- **Display type is `font-semibold`, not `font-black`.** 31 uses of black at 90px were the
+  last thing on these pages reading as a poster. Tracking is `-0.03em`: a lighter weight
+  needs less of it, or the counters close.
+- **`HEX` is the escape hatch and it is narrow.** Two cases only — an `<input type="color">`,
+  which resolves a variable name to `#000000` without complaining, and a colour that gets
+  PERSISTED (the lookbook stores a seller's brand accent). A colour that is merely painted
+  never belongs there. `check-skins.mjs` fails if `HEX` drifts from the default skin.
 - **ONE ink colour in a headline.** A dark tint of the plate used as foreground reads muddy —
   the eye sees one hue at two strengths rather than a decision. Colour lives in the plate.
-- **CONTRAST IS MEASURED, NOT EYEBALLED.** Cream on the old periwinkle `#A5B7FF` was 1.83:1 — a ghost, never type
-  a reader needs (`PLATE_GHOST` documents that exception). Ink on it is 10.13:1. If cream must
-  carry words the plate has to come down to ~`#4259D6` (5.45:1). Light plate and readable cream
-  cannot both be true; every time the plate moved this session the lettering had to be re-measured.
+- **CONTRAST IS MEASURED, NOT EYEBALLED — and a measurement in a comment is only a claim.**
+  `node tools/check-skins.mjs` measures all eight pairs per skin, and it earned itself on the
+  first run: `PLATE_ACCENT` was `#1E2A78`, chosen when the plate was the light periwinkle
+  `#A5B7FF` where it genuinely was 6.53:1. The plate moved to violet; this never moved with
+  it, so the real figure was **2.10:1** — and the kit's note still said 6.53. Nothing rendered
+  it, which is exactly why it survived: a dead export cannot look wrong. Run the gate after
+  touching any colour.
 - **The header has ONE appearance** at every scroll position (`site-header.tsx`, `PLATE_ROUTES`).
   A header that swaps background, links and buttons at 24px of scroll reads as a glitch.
 - **Motion is spatial and always opt-out.** Words rise from a mask; the accent phrase types
@@ -278,13 +300,17 @@ usually does, and there is ONE accent. Kit: [web/components/marketing/bold-kit.t
 **Dither is retired.** `dither-image.tsx` is referenced by nothing; don't build on it.
 
 ### App + boards (`web/app/(app)/`, `web/app/(boards)/`)
-shadcn tokens in [web/app/globals.css](web/app/globals.css). The palette is periwinkle now,
-not violet, and it is split by JOB:
+shadcn tokens in [web/app/globals.css](web/app/globals.css). The chrome carries NO hue —
+every neutral is chroma 0 — and the tokens are split by JOB:
 
-- `--primary` — the deep step (`#4046C2` light / `#8A9CFC` dark). It inks ~247 pieces of TEXT
-  as well as filling buttons, so it can never be a light value.
-- `--brand` — `#6633FF`, the marketing plate. Large FILLS only (filled buttons via
-  `bg-brand`), never text.
+- `--primary` — near-black, `oklch(0.175 0 0)`. It inks ~247 pieces of TEXT as well as filling
+  ~206 buttons, so it can never be a light value, and it is the one token **a skin may not
+  move**: a value that is merely a nice fill blanks a quarter of the product. (The file's own
+  notes still describe an earlier periwinkle and then a cobalt step; the declaration is the
+  truth, and the two ahead of it are history.)
+- `--brand` — the marketing plate, and the ONE app token a skin may move. Large FILLS only
+  (filled buttons via `bg-brand`), never text — which is precisely why it is safe to theme
+  and `--primary` is not: brand is only ever a ground we control the foreground of.
 - Canvas is **white**; cards are white and separated by the border. The sidebar carries the
   colour — one bounded block that is never underneath the data. A tinted canvas behind a
   700-row queue is a sheet you read *through* all day.
@@ -326,10 +352,18 @@ here on 2026-08-19 and the two front-ends genuinely differ.
   face, which is why the app shipped for months in system sans at weight 800 with no
   `useFonts` call and an empty `assets/fonts` — the look people call "AI-generated". Every
   piece of type comes through `F` in the theme; a `fontWeight` without a `fontFamily` is a bug.
-- **Playfair Display for display, Inter for everything else** — the same pair the web loads.
-  Playfair earns its place at 30pt+ and is mud at 13, so it takes screen titles and nothing
-  else. Body is `F.body` (400). The app previously had 25 declarations at weight 900 and
-  exactly one at 400, which is why no line ever looked more important than another.
+- **ONE face: Inter.** Playfair was dropped on the web first (`--font-display` resolves to the
+  body stack) and mobile followed on 2026-08-21 — three weights of it were still being
+  downloaded and still setting every screen title, so the two halves of one product had
+  different letterforms in the place a seller looks first. `F.display` / `displaySemi` /
+  `displayMed` all survive as WEIGHTS; a title is a heavier line, not a second alphabet.
+  Body is `F.body` (400). The app previously had 25 declarations at weight 900 and exactly
+  one at 400, which is why no line ever looked more important than another.
+- **`C.pop` is the web's rose (`#F472DC`), converted — not chosen here.** It was coral, which
+  `check-pop-presets.mjs` had already ruled out: coral's band sits between `alert` and
+  `backorder` with negative dark-mode headroom, and the shipped value was 0.048 in OKLab from
+  dark `backorder`. An accent that reads as an order status is the one thing an accent must
+  not do, least of all on a factory floor.
 - **Paper all the way down.** Warm paper, sections divided by a hairline rule via `SECTION` —
   never a white card. White-on-warm is two near-identical surfaces held apart by a border,
   and it reads as stuck-on. Cards also nest: the queue had four different left margins in one

@@ -27,6 +27,10 @@ const TABS = [
   // carrying a param makes it a value change, which the hook does track.
   { key: "library", label: "Images", href: "/design?tab=library" },
   { key: "templates", label: "Templates", href: "/design?tab=templates" },
+  // BESIDE Templates, not inside it. A template is a blank plus artwork plus where it sits;
+  // a machine file is the cut file, which has no placement to carry and no blank it belongs
+  // to — the same .EMB runs on a cap and on a left chest. Two questions, two surfaces.
+  { key: "machine", label: "Machine files", href: "/design?tab=machine" },
   // "Design", not "Design maker". It sits beside two one-word toggles, and the bar reads as
   // a set of three — a two-word member of a three-word set is the one the eye stops on.
   { key: "maker", label: "Design", href: "/design/maker" },
@@ -39,7 +43,10 @@ export function useDesignLabTab(): DesignLabTab {
   const pathname = usePathname()
   const search = useSearchParams()
   if (pathname?.startsWith("/design/maker")) return "maker"
-  return search.get("tab") === "templates" ? "templates" : "library"
+  const tab = search.get("tab")
+  // An explicit list rather than a chain of ternaries: a fourth surface arriving is where a
+  // chain quietly starts answering "library" for a tab that exists.
+  return tab === "templates" || tab === "machine" ? tab : "library"
 }
 
 export function DesignLabTabs({ className }: { className?: string }) {

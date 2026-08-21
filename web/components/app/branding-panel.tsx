@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getBranding, setBranding, uploadBrandingAsset, type Branding } from "@/lib/api"
 import { ACCENTS, rememberAccent, type AccentKey } from "@/lib/accent"
+import { SKINS, rememberSkin, type SkinKey } from "@/lib/skin"
 
 /**
  * BRANDING — the marks and the name, changeable without a deploy.
@@ -35,6 +36,7 @@ export function BrandingPanel() {
   const [busy, setBusy] = useState<null | "save" | "favicon" | "logo">(null)
   const [saved, setSaved] = useState(false)
   const [accent, setAccentState] = useState<AccentKey>("rose")
+  const [skin, setSkinState] = useState<SkinKey>("studio")
   const [err, setErr] = useState<string | null>(null)
   /**
    * A CACHE-BUSTER THAT DOES NOT REPEAT ITSELF.
@@ -58,6 +60,7 @@ export function BrandingPanel() {
       .then((r) => {
         setB(r); setAppName(r.appName ?? "")
         if (r.accent === "rose" || r.accent === "lime") setAccentState(r.accent)
+        if (r.skin === "studio" || r.skin === "press") setSkinState(r.skin)
       })
       .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't load branding."))
   }, [])
@@ -90,6 +93,21 @@ export function BrandingPanel() {
     } catch (e) {
       setAccentState(before); rememberAccent(before)
       setErr(e instanceof Error ? e.message : "Couldn't save the accent.")
+    }
+  }
+
+  /** Same shape as pickAccent, and for the same reason: a palette that waits for a round
+   *  trip before it moves reads as a control that did nothing. Reverted if the save fails,
+   *  so the panel never shows a skin the server does not hold. */
+  const pickSkin = async (key: SkinKey) => {
+    const before = skin
+    setSkinState(key); rememberSkin(key); setErr(null)
+    try {
+      const r = await setBranding({ skin: key })
+      if (r.error) throw new Error(r.error)
+    } catch (e) {
+      setSkinState(before); rememberSkin(before)
+      setErr(e instanceof Error ? e.message : "Couldn't save the palette.")
     }
   }
 
@@ -186,6 +204,50 @@ export function BrandingPanel() {
         </label>
 
         <div>
+          <p className="text-sm font-medium">Palette</p>
+          {/**
+            * THE SITE'S COLOURS, CHANGEABLE WITHOUT A DEPLOY — which is the whole reason this
+            * exists. Every previous palette change was a code edit and a release, and on a
+            * site carrying live orders that is the last thing anyone wants to be doing in
+            * order to try a shade.
+            *
+            * A KEY, not a colour, exactly as the accent below. globals.css owns the values
+            * under [data-skin="…"], the server allow-lists the keys, and the swatches paint
+            * themselves from that same declaration — so this panel cannot preview one
+            * palette and apply another.
+            */}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {SKINS.map((sk) => (
+              <button
+                key={sk.key}
+                type="button"
+                onClick={() => void pickSkin(sk.key)}
+                aria-pressed={skin === sk.key}
+                className={"flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors " +
+                  (skin === sk.key ? "border-foreground" : "border-border hover:border-foreground/30")}
+              >
+                {/* THE PLATE OVER THE PAPER, which is the one thing that actually separates
+                    the two: a dark rectangle on white, or a violet one on warm paper. Both
+                    resolved through data-skin, never from a hex typed in here. */}
+                <span data-skin={sk.key} className="grid size-6 shrink-0 place-items-center overflow-hidden rounded-md border border-border"
+                  style={{ background: "var(--mk-surface)" }}>
+                  <span className="size-3 rounded-[3px]" style={{ background: "var(--mk-accent)" }} />
+                </span>
+                <span>
+                  <span className="block text-sm font-medium">{sk.label}</span>
+                  <span className="block text-xs text-muted-foreground">{sk.what}</span>
+                </span>
+                {skin === sk.key && <Check size={14} weight="bold" className="ml-1 shrink-0" />}
+              </button>
+            ))}
+          </div>
+          {/* THE LIMIT, SAID PLAINLY rather than discovered. The public marketing pages are
+              served to people with no session, so they render whatever globals.css declares
+              on :root — this choice reaches the app, the boards and sign-in. */}
+          <p className="mt-2 text-xs text-muted-foreground">Applies to the app, the boards and sign-in. The public pages use the built-in default.</p>
+        </div>
+
+        <div>
           <p className="text-sm font-medium">Accent</p>
           {/* The one colour in the app, and it carries one meaning: something is new and it
               is for you. Unread badge, unread dot, unread row — nothing else, because an
@@ -236,7 +298,7 @@ export function BrandingPanel() {
         <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
           <Warning size={14} className="mt-0.5 shrink-0" />
           <span>
-            The accent above is the only colour that can be changed here, and only between presets that have been measured. The rest is set in code: <strong>--primary</strong> inks around 247 pieces of text as well as filling buttons, and the status colours (shipped, hold, alert) carry meaning on the floor — so a free picker could make a quarter of the app unreadable without anyone noticing. Ask and they can be changed properly, with the contrast measured.
+            The palette and the accent are chosen from presets that have been measured, never typed as a colour. What a preset cannot reach is set in code: <strong>--primary</strong> inks around 247 pieces of text as well as filling buttons, and the status colours (shipped, hold, alert) carry meaning on the floor — so a free picker could make a quarter of the app unreadable without anyone noticing. Ask for another preset and it can be added properly, with the contrast measured.
           </span>
         </div>
       </div>

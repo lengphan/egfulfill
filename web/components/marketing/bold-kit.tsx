@@ -30,7 +30,25 @@ import { useMotionPreset } from "./motion-provider"
 // The bands and the plate are now the same electric violet.
 //
 // Paper measures 5.68:1 on it, so the bands carry cream lettering as real readable type.
-export const ACCENT = "#6633FF"        // electric violet — the plate/fill
+/**
+ * ── EVERY COLOUR BELOW IS NOW A VARIABLE, NOT A VALUE ────────────────────────────────────
+ *
+ * They were thirteen hex literals in this file, imported by thirteen other files and written
+ * into ~150 inline `style` objects. That is a good structure — §4's "import from the kit,
+ * never re-declare a colour in a page" is exactly why changing the site's palette is a
+ * one-file job rather than a sweep. But a hex compiled into JSX can only be changed by
+ * editing and deploying, and the ask was for the palette to be movable NOW, on a running
+ * site, without a code change reaching anywhere near live data.
+ *
+ * So each constant holds a `var()` reference instead of the digits. Nothing at a call site
+ * changes — `style={{ background: SURFACE }}` is still valid, because a CSS variable is a
+ * legal inline style value — and the VALUES move to globals.css under `[data-skin]`, beside
+ * the app's own tokens, where an admin's choice can reach them.
+ *
+ * The measurements in the notes below belong to the PRESS skin, which is what these literals
+ * used to be. Each skin carries its own, checked by `node tools/check-skins.mjs`.
+ */
+export const ACCENT = "var(--mk-accent)"        // the plate/fill
 // The accent phrase is INK, like the rest of the headline — no second type colour.
 //
 // A dark purple on a light purple plate is a tint of the background wearing itself as
@@ -41,8 +59,8 @@ export const ACCENT = "#6633FF"        // electric violet — the plate/fill
 //
 // The typed phrase still reads as distinct because it MOVES: it types, holds and rewrites
 // itself. Motion is the differentiator, which is a stronger one than a hue nobody can name.
-export const ACCENT_INK = "#FAF8F3"
-export const INK = "#0B0B0C"
+export const ACCENT_INK = "var(--mk-accent-ink)"
+export const INK = "var(--mk-ink)"
 // WARM PAPER, under a cool periwinkle banner. Chosen deliberately, not by default.
 //
 // It was briefly swapped to a cool off-white because a warm page under a cool accent puts two
@@ -52,7 +70,7 @@ export const INK = "#0B0B0C"
 // purple hero as well; now the purple has its own plate and the paper is only ever the page.
 //
 // Both letterings clear it comfortably: ink 18.54:1, the accent purple 13.11:1.
-export const SURFACE = "#F2F1EC"
+export const SURFACE = "var(--mk-surface)"
 
 /**
  * PAPER LETTERING ON THE PLATE — a deliberate, decorative-only exception.
@@ -70,22 +88,23 @@ export const SURFACE = "#F2F1EC"
 export const PLATE_GHOST = SURFACE
 
 /**
- * The accent word on the plate — a DEEPER shade of the plate's own hue.
+ * The accent word on the plate.
  *
- * The instinct on a bright background is a lighter accent, and it cannot work: #A5B7FF sits
- * at L* 75.5, so it IS the light colour. Cream measures 1.83:1 on it and pure white only
- * 1.94:1 — white is not the fix, because the problem is the plate's lightness, not which pale
- * tone sits on it. Bright plate takes dark type; light type needs a dark plate. Not both.
+ * IT USED TO BE A DEEPER SHADE OF THE PLATE — #1E2A78, and the note here read "6.53:1,
+ * comfortably past the 4.5:1 body-text floor". That was true against the LIGHT periwinkle
+ * #A5B7FF this was chosen for. The plate then moved to electric violet and this did not move
+ * with it, so the real figure was 2.10:1 — well under the floor, and the paragraph saying
+ * otherwise stayed for as long as the value did.
  *
- * #1E2A78 is 6.53:1 here — comfortably past the 4.5:1 body-text floor, so it is real readable
- * type rather than a decorative ghost. Same hue family as the plate, which is what makes it
- * read as a deliberate accent instead of an unrelated colour dropped in.
+ * Nothing renders it, which is exactly why it survived: a dead export cannot look wrong.
+ * `tools/check-skins.mjs` is what found it, and it is the argument for the gate — the
+ * measurement in a comment is a claim, and only the tool is a check.
  *
- * A drop shadow was considered and rejected: it changes no measured contrast, and a blur
- * behind font-display font-black display type reads as a smudge. If cream must be kept, the only version
- * that works is a HARD zero-blur ink offset — a deliberate letterpress style, not a patch.
+ * A deeper tint of the ground only works while the GROUND IS LIGHT: on a dark plate the
+ * accent word has to be lighter than the plate, so it is the site's one accent in both
+ * skins. 16.66:1 on studio's near-black, 5.07:1 on press's violet.
  */
-export const PLATE_ACCENT = '#1E2A78'
+export const PLATE_ACCENT = "var(--mk-plate-accent)"
 
 /**
  * THE DEEP PLATE — the home hero only.
@@ -120,12 +139,12 @@ export const PLATE_DEEP = ACCENT
  * black on it is 16.56:1, white fails outright. It is a LIGHT colour, so it needs the dark
  * ground; on paper it measures 1.12:1 and disappears entirely.
  */
-export const ACID = '#D4F897'
+export const ACID = "var(--mk-acid)"
 
 /**
  * INK CARRYING ACID — the one dark-on-bright pair, as a class string.
  *
- * `bg-[#0B0B0C] text-[#D4F897]` was retyped in four places across three files: the support
+ * `bg-[var(--mk-ink)] text-[var(--mk-acid)]` was retyped in four places across three files: the support
  * bubble's send button and its own message bubbles, and a table header in bold-product.
  * §4 is explicit that a colour is imported from this kit and never re-declared in a page,
  * and Tailwind needs a STATIC string, so a constant that holds the class is the form that
@@ -134,7 +153,7 @@ export const ACID = '#D4F897'
  * Ink on ACID measures 16.56:1 — see the note above; this pair is always a fill carrying
  * ink, never type on paper.
  */
-export const INK_ON_ACID = "bg-[#0B0B0C] text-[#D4F897]"
+export const INK_ON_ACID = "bg-[var(--mk-ink)] text-[var(--mk-acid)]"
 
 /**
  * THE AUTH GROUND — login, signup, forgot, reset.
@@ -161,10 +180,38 @@ export const INK_ON_ACID = "bg-[#0B0B0C] text-[#D4F897]"
  * lighten it to calm the page down — the fields stop being findable.
  */
 export const AUTH_GROUND = SURFACE
-export const AUTH_FIELD = '#FFFFFF'
-export const AUTH_EDGE = '#8A8577'
-/** Secondary type on AUTH_GROUND — 5.06:1, so it stays real text rather than a hint. */
-export const AUTH_MUTED = '#6B6659'
+export const AUTH_FIELD = "var(--mk-auth-field)"
+export const AUTH_EDGE = "var(--mk-auth-edge)"
+/** Secondary type on AUTH_GROUND — real text rather than a hint, in both skins. */
+export const AUTH_MUTED = "var(--mk-auth-muted)"
+/** The rule around a CARD, not around a control. See the note beside the token: an edge has
+ *  a 3:1 floor because a field you cannot find is a field you cannot fill; a hairline
+ *  separates two areas nobody interacts with, and at 3:1 it becomes the loudest thing on a
+ *  page whose whole job is one form. */
+export const HAIRLINE = "var(--mk-hairline)"
+
+/**
+ * THE LITERAL DIGITS — for the places a `var()` legally cannot go.
+ *
+ * There are exactly two kinds and both are real:
+ *
+ *   1. `<input type="color">`. Its value must parse as a colour; handed "var(--mk-accent)"
+ *      it silently falls back to #000000, and a `placeholder` prints the words.
+ *   2. A colour that gets PERSISTED. The lookbook stores a seller's brand accent per
+ *      seller, and writing a variable name into the database means the row means whatever
+ *      the theme happened to be when it was saved — and nothing at all outside a browser.
+ *
+ * Kept in step with the DEFAULT skin's declaration in globals.css by tools/check-skins.mjs,
+ * which fails if they disagree. It is still one source of truth; this is the escape hatch
+ * from it, and it is narrow on purpose — a colour that is merely PAINTED never belongs here.
+ */
+export const HEX = {
+  accent: "#0A0A0A",
+  ink: "#0A0A0A",
+  acid: "#D4F897",
+  surface: "#FFFFFF",
+  paper: "#FFFFFF",
+} as const
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
 export const DISPLAY = { fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" } as const
@@ -303,18 +350,18 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
     // and a black-on-violet box with cream type was the one place the accent went missing —
     // the green now carries the label and the arrow, tying the button to the plate it sits
     // on. 16.56:1 on the ink ground, so it is louder AND more readable than the cream was.
-    ink: "bg-[#0B0B0C] text-[#D4F897] hover:bg-[#26262a] focus-visible:ring-[#0B0B0C]",
+    ink: "bg-[var(--mk-ink)] text-[var(--mk-acid)] hover:bg-[color-mix(in_oklch,var(--mk-ink)_86%,white)] focus-visible:ring-[var(--mk-ink)]",
     // Violet fill, LIME label — the same action pair as the app's default button and the
     // selected nav item. It used to be violet with INK on it, which measures 2.75:1 and
     // fails outright; the tone was unused, so it shipped broken rather than being noticed.
-    accent: "text-[#D4F897] hover:brightness-110 focus-visible:ring-[#0B0B0C]",
+    accent: "text-[var(--mk-acid)] hover:brightness-110 focus-visible:ring-[var(--mk-ink)]",
     // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
-    acid: "text-[#0B0B0C] hover:brightness-95 focus-visible:ring-[#0B0B0C]",
+    acid: "text-[var(--mk-ink)] hover:brightness-95 focus-visible:ring-[var(--mk-ink)]",
     // The secondary on a LIGHT ground: an ink outline. This was a copy of ghostLight —
     // cream on cream — which is only ever right over a dark plate.
-    ghost: "border border-[#0B0B0C]/25 text-[#0B0B0C] hover:border-[#0B0B0C]/60 hover:bg-[#0B0B0C]/[0.04] focus-visible:ring-[#0B0B0C]",
+    ghost: "border border-[var(--mk-ink)]/25 text-[var(--mk-ink)] hover:border-[var(--mk-ink)]/60 hover:bg-[var(--mk-ink)]/[0.04] focus-visible:ring-[var(--mk-ink)]",
     // The ghost outline inverted, for use ON the deep plate where ink would disappear.
-    ghostLight: "border border-[#FAF8F3]/30 text-[#FAF8F3] hover:border-[#FAF8F3]/60 hover:bg-[#FAF8F3]/10 focus-visible:ring-[#FAF8F3]",
+    ghostLight: "border border-[var(--mk-accent-ink)]/30 text-[var(--mk-accent-ink)] hover:border-[var(--mk-accent-ink)]/60 hover:bg-[var(--mk-accent-ink)]/10 focus-visible:ring-[var(--mk-accent-ink)]",
   }
   return (
     <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "accent" ? { background: ACCENT } : tone === "acid" ? { background: ACID } : undefined}>
@@ -389,7 +436,7 @@ export function PlateHero({ title, accent, sub, children }: {
   return (
     <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
-        <h1 className="mx-auto max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: INK }}>
+        <h1 className="mx-auto max-w-5xl text-center font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ ...DISPLAY, color: INK }}>
           <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACCENT} /></> : null}
         </h1>
         {sub && (

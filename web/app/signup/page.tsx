@@ -127,12 +127,11 @@ export default function SignupPage() {
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Email</span>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required />
-          <span className="text-xs text-muted-foreground">We only use this for sign-in and password resets.</span>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Username <span className="font-normal text-muted-foreground">— optional</span></span>
           <Input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="yourstorename2026" autoComplete="username" />
-          <span className="text-xs text-muted-foreground">Another way to sign in. 12–30 characters: letters, numbers, dot, dash or underscore.</span>
+          <span className="text-xs text-muted-foreground">12–30 characters: letters, numbers, dot, dash or underscore.</span>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Password</span>

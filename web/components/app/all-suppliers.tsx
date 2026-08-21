@@ -330,7 +330,19 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       // lookbook sent to trade buyers — and calling this one by that name is what had five
       // Active products read as five on the marketing site when one was there.
  setMsg(`Added "${product.name ?? "product"}" to Products.`)
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't add to Products.") }
+    } catch (e) {
+      /*
+       * RETHROWN, not swallowed into `msg`.
+       *
+       * A refusal used to land in the same muted-grey strip at the top of this page that
+       * announces a SUCCESS — same size, same colour, same position — while the review
+       * dialog had already closed itself and the card still read "Add to Products". Three
+       * signals all saying nothing happened, and the one sentence explaining why dressed as
+       * good news. The dialog keeps itself open now and prints this in red beside the
+       * button, which is where the person is looking.
+       */
+      throw e instanceof Error ? e : new Error("Couldn't add to Products.")
+    }
   }
 
  const favorite = (it: Item, on: boolean) => {

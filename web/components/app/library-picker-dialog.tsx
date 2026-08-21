@@ -5,6 +5,7 @@ import { PenNib, CircleNotch, MagnifyingGlass, Stack } from "@phosphor-icons/rea
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getDesignLibrary, getDesignLibraryItem, getTemplates, type LibraryDesign, type ProductTemplate } from "@/lib/api"
+import { proxiedImageSrc } from "@/lib/order-image"
 import { TabBar } from "@/components/app/tab-bar"
 
 type Source = "designs" | "templates"
@@ -30,12 +31,17 @@ export function LibraryPickerDialog({
   onOpenChange,
   onPick,
   onPickTemplate,
+  initialSource = "designs",
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   onPick: (dataUrl: string, design: LibraryDesign) => void
   /** Passed by callers that can restore a template's placement and blank, not just its art. */
   onPickTemplate?: (t: ProductTemplate) => void
+  /** Which tab to land on. A caller that opened this BECAUSE somebody pressed Template must
+   *  not drop them on Designs and make them find the other tab — that is the same click
+   *  they were trying to avoid. */
+  initialSource?: Source
 }) {
   const [source, setSource] = useState<Source>("designs")
   const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
@@ -47,14 +53,14 @@ export function LibraryPickerDialog({
     if (!open) return
     let alive = true
     const id = setTimeout(() => {
-      setDesigns(null); setTemplates(null); setQ(""); setSource("designs")
+      setDesigns(null); setTemplates(null); setQ(""); setSource(initialSource)
       getDesignLibrary().then((r) => alive && setDesigns(r ?? [])).catch(() => alive && setDesigns([]))
       // Both lists up front: the tab has to be able to say how many are behind it, and a
       // count that appears a second after the tab does reads as the list still loading.
       getTemplates().then((r) => alive && setTemplates(r ?? [])).catch(() => alive && setTemplates([]))
     }, 0)
     return () => { alive = false; clearTimeout(id) }
-  }, [open])
+  }, [open, initialSource])
 
   const term = q.trim().toLowerCase()
   /** Untitled things are findable too — the id is what the card shows when a name is absent. */
@@ -118,6 +124,7 @@ export function LibraryPickerDialog({
           <TabBar
             size="sm"
             ariaLabel="Library source"
+            spacing="none"
             className="border-b-0"
             items={[
               { id: "designs" as const, label: "Designs", count: designs?.length },
@@ -159,7 +166,12 @@ export function LibraryPickerDialog({
                   <div className="relative flex aspect-square items-center justify-center bg-muted">
                     {d.thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-contain p-1" />
+                      /* Through our origin — the same library rows the Design page draws, so
+                         the same marketplace hotlink and the same broken tile. See
+                         proxiedImageSrc. No onError guard here on purpose: this grid is a
+                         picker, and a row you cannot see is still a row you can press to get
+                         the full artwork, which is fetched separately. */
+                      <img src={proxiedImageSrc(d.thumb)} alt={d.name ?? ""} className="size-full object-contain p-1" />
                     ) : (
                       <PenNib size={22} weight="duotone" className="text-muted-foreground/40" />
                     )}

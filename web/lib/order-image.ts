@@ -13,6 +13,35 @@ export type DesignBlob = { data?: string; pos?: unknown; name?: string; kind?: s
 // The leading-slash case is NOT cosmetic: storage-backed artwork now comes back as
 // /api/order_designs/art/<hash>.png, and without this it was treated as bare base64 and
 // prefixed with a data:image/png header — turning a working path into a broken image.
+/**
+ * MARKETPLACE CDNs, and the reason a thumbnail goes through us.
+ *
+ * MIRRORS the ALLOWED list in server/src/routes/etsy.js's /api/etsy/img-proxy — change both.
+ * It lived only in thread-match.ts, where it existed to make a canvas readable; that is the
+ * SAME list for a different reason, so it is defined here (the one place image sources are
+ * resolved) and thread-match imports it rather than keeping a second copy.
+ */
+export const MARKETPLACE_CDN = /(^|\.)(etsystatic\.com|shopify\.com|shopifycdn\.net|shopifycdn\.com|tiktokcdn\.com|tiktokcdn-us\.com|ibyteimg\.com|byteimg\.com)$/i
+
+/**
+ * A marketplace image, served through our own origin.
+ *
+ * Etsy/Shopify/TikTok artwork was rendered straight into `<img src>`, so every one of them
+ * was a hotlink: subject to their referrer rules, their CORS, and their retention. When one
+ * stopped answering the tile showed the ALT TEXT — a paragraph of listing title where a
+ * picture should be, which is what "the order images can't be read" looks like.
+ *
+ * The proxy already existed for canvas reads and sets both a content type and a day of
+ * cache. Anything not on the list is returned untouched: our own paths, data: URLs and
+ * same-origin storage links have no reason to make the round trip.
+ */
+export function proxiedImageSrc(url?: string | null): string {
+  if (!url || !/^https?:\/\//i.test(url)) return url || ""
+  let host = ""
+  try { host = new URL(url).hostname } catch { return url }
+  return MARKETPLACE_CDN.test(host) ? `/api/etsy/img-proxy?url=${encodeURIComponent(url)}` : url
+}
+
 export function designSrc(d?: string | null): string {
   if (!d) return ""
   return d.startsWith("data:") || d.startsWith("http") || d.startsWith("/") ? d : `data:image/png;base64,${d}`
