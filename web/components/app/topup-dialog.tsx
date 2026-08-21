@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
-import { CheckCircle, Warning, CircleNotch, Copy, Check, UploadSimple, X, Sparkle, CaretDown } from "@phosphor-icons/react"
+import { CheckCircle, Warning, CircleNotch, Copy, Check, X, Sparkle, CaretDown } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
 import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type TopupConfig } from "@/lib/api"
+import { Dropzone } from "@/components/app/dropzone"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -359,7 +360,6 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
  useSeedAmount(cfg, amount, setAmount)
  const [ref, setRef] = useState("")
  const [proof, setProof] = useState<{ name: string; dataUrl: string } | null>(null)
- const [dragOver, setDragOver] = useState(false)
  const [phase, setPhase] = useState<"form" | "sent">("form")
  const [saving, setSaving] = useState(false)
  const [error, setError] = useState<string | null>(null)
@@ -455,17 +455,12 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
             </Button>
           </div>
         ) : (
-          <label
- onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
- onDragLeave={() => setDragOver(false)}
- onDrop={(e) => { e.preventDefault(); setDragOver(false); takeFile(e.dataTransfer.files?.[0]) }}
- className={"flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed px-4 py-6 text-center transition-colors " + (dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
-          >
-            <UploadSimple size={20} className="text-muted-foreground" />
-            <span className="text-sm font-medium">Drop a screenshot or <span className="text-primary">browse</span></span>
-            <span className="text-xs text-muted-foreground">Helps us confirm your transfer faster</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
-          </label>
+          <Dropzone
+            accept="image/*"
+            onFiles={(files) => takeFile(files[0])}
+            label="Drop a screenshot, or click to browse"
+            hint="Helps us confirm your transfer faster"
+          />
         )}
       </div>
 
