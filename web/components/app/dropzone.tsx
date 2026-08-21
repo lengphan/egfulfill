@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { CircleNotch, UploadSimple, type Icon } from "@phosphor-icons/react"
+import { CheckCircle, CircleNotch, UploadSimple, WarningCircle, X, type Icon } from "@phosphor-icons/react"
 import { RegionMark, REGION_LINE, REGION_NOTE } from "@/components/app/region"
 import { cn } from "@/lib/utils"
 
@@ -16,14 +16,119 @@ import { cn } from "@/lib/utils"
  *
  * THE PARTS ARE NOT THIS FILE'S — they are the four in components/app/region.tsx, shared
  * with EmptyState so a drop target and an empty list cannot drift apart. This file adds only
- * what is specific to accepting a file: the dashed edge, the drag state, and the input.
+ * what is specific to accepting a file: the dashed edge, the drag state, the input, and the
+ * RECEIPT.
  *
- * A GROUND, though, is this file's. A 1px dashed rule around nothing reads as an empty box
- * that failed to load; a visible fill says the area is a target. bg-muted/20 on a white card
- * is not a fill.
+ * A GROUND, though, is this file's. A dashed rule around nothing reads as an empty box that
+ * failed to load; a visible fill says the area is a target. bg-muted/20 on a white card is
+ * not a fill.
+ *
+ * ── THE RECEIPT ──────────────────────────────────────────────────────────────────────────
+ *
+ * A drop target that looks identical before and after the drop is the single most-reported
+ * fault in this app: "the files have no file names, no occurrence, or any indication that
+ * the files have been uploaded". It was true of every one of the thirty. Dropping a file
+ * would set some state deep in a page, and the thing you had just dropped ONTO said nothing.
+ *
+ * So `files` is not decoration and not optional-in-spirit: if a zone accepts a file and the
+ * file stays around, the zone owes you a row with its NAME, its SIZE and its STATE. It is the
+ * only proof the drop landed, and it is where the way OUT lives — you cannot remove a file
+ * you were never shown.
  */
+
+/** One row of the receipt. `size`, `thumb` and `error` are all optional — a data: url from a
+ *  library has no File behind it and therefore no byte count to print. */
+export type DroppedFile = {
+  name: string
+  size?: number | null
+  /** A small preview, when the thing dropped is an image we can already show. */
+  thumb?: string | null
+  status?: "uploading" | "done" | "error"
+  /** One more FACT about this file — "saved", "not saved yet", "front". Never a sentence
+   *  explaining the control it sits under. */
+  note?: string | null
+  /** Carries its own reason — a refusal is the answer, not a subtitle (CLAUDE.md §4). */
+  error?: string | null
+  onRemove?: () => void
+}
+
+/**
+ * BYTES, IN WORDS. Written eight separate times as `(n / 1024 / 1024).toFixed(1)`, which is
+ * why a 4KB SVG reported "0.0MB" — an honest zero that reads as a failed upload.
+ */
+export function formatBytes(n: number | null | undefined): string | null {
+  if (n == null || !Number.isFinite(n) || n < 0) return null
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`
+}
+
+/** The last path segment of a url, decoded, with the query dropped — a name for a file that
+ *  arrived as a link rather than as a File. null when there is nothing name-shaped in it
+ *  (a data: url, or a path ending in a slash), because a made-up name is worse than none. */
+export function fileNameFrom(url: string | null | undefined): string | null {
+  if (!url || url.startsWith("data:")) return null
+  try {
+    const path = url.split(/[?#]/)[0]
+    const last = path.split("/").filter(Boolean).pop()
+    if (!last || !last.includes(".")) return null
+    return decodeURIComponent(last)
+  } catch { return null }
+}
+
+/**
+ * ONE ROW OF THE RECEIPT, exported so a surface that keeps its own list outside a Dropzone
+ * (the designer's stage, where the "zone" is the garment itself) prints the same row rather
+ * than inventing a ninth one.
+ */
+export function FileRow({ file, className }: { file: DroppedFile; className?: string }) {
+  const size = formatBytes(file.size)
+  const state = file.status ?? "done"
+  const facts = [size, file.note].filter(Boolean).join(" · ")
+  return (
+    <div
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-2.5 py-2 text-left",
+        state === "error" && "border-alert/40 bg-alert/5",
+        className,
+      )}
+    >
+      <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-muted">
+        {file.thumb
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={file.thumb} alt="" className="size-full object-contain" />
+          : state === "uploading" ? <CircleNotch size={14} className="animate-spin text-muted-foreground" />
+          : state === "error" ? <WarningCircle size={14} weight="bold" className="text-alert" />
+          : <CheckCircle size={14} weight="bold" className="text-shipped" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-medium text-foreground">{file.name}</span>
+        {/* NOT A SUBTITLE. This line only ever carries FACTS the row cannot show otherwise —
+            the byte count, or the reason it was refused. It is never an explanation of the
+            control above it. */}
+        {(file.error || facts || state === "uploading") && (
+          <span className={cn("block truncate text-2xs", file.error ? "text-alert" : "text-muted-foreground")}>
+            {file.error ?? (state === "uploading" ? "Uploading…" : facts)}
+          </span>
+        )}
+      </span>
+      {file.onRemove && (
+        <button
+          type="button"
+          onClick={file.onRemove}
+          aria-label={`Remove ${file.name}`}
+          title={`Remove ${file.name}`}
+          className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <X size={12} weight="bold" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function Dropzone({
-  onFiles, accept, multiple = false, icon, label, hint, action,
+  onFiles, accept, multiple = false, icon, label, hint, action, files,
   slim = false, busy = null, disabled = false, className,
 }: {
   onFiles: (files: FileList) => void
@@ -36,6 +141,8 @@ export function Dropzone({
   hint?: string
   /** A second route in, under an "or". */
   action?: React.ReactNode
+  /** THE RECEIPT — what is currently on this zone. See the note at the top of the file. */
+  files?: DroppedFile[]
   /** One inline row, for a zone under a list that already has files in it. */
   slim?: boolean
   /** Text to show beside a spinner while something is uploading. */
@@ -46,8 +153,9 @@ export function Dropzone({
   const ref = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   const I = icon ?? UploadSimple
+  const receipt = files?.length ? files : null
 
-  const take = (files?: FileList | null) => { if (files && files.length) onFiles(files) }
+  const take = (f?: FileList | null) => { if (f && f.length) onFiles(f) }
 
   return (
     <div
@@ -55,11 +163,21 @@ export function Dropzone({
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { if (disabled) return; e.preventDefault(); setOver(false); take(e.dataTransfer.files) }}
       className={cn(
-        "flex flex-col items-center justify-center border-dashed transition-colors",
-        slim ? "gap-2 rounded-lg border px-3 py-2" : "gap-2.5 rounded-xl border-2 px-6 py-7 text-center",
+        /**
+         * ONE HAIRLINE, NOT TWO PIXELS.
+         *
+         * The 2px dashed rule is the single most dated thing on these surfaces — it is the
+         * default every framework ships and it shouts at a resting control that is asking
+         * for nothing. A 1px dash on a filled panel with a generous radius reads as a place
+         * to put something; the heavy dash reads as a validation error.
+         */
+        "flex flex-col items-center justify-center border border-dashed transition-colors duration-150",
+        slim ? "gap-2 rounded-lg px-3 py-2" : "gap-3 rounded-xl px-6 py-8 text-center",
         disabled ? "cursor-not-allowed border-border bg-muted/40 opacity-60"
-          : over ? "border-primary bg-primary/5"
-          : "border-border bg-muted/40 hover:border-primary/50 hover:bg-accent/60",
+          // The drag state is the one moment this control should be loud: a solid edge, so
+          // dashed→solid is itself the signal that the file will land here.
+          : over ? "border-solid border-primary bg-primary/[0.06]"
+          : "border-border bg-muted/40 hover:border-muted-foreground/40 hover:bg-muted/70",
         className,
       )}
     >
@@ -93,6 +211,20 @@ export function Dropzone({
           <span className="text-xs text-muted-foreground">or</span>
           {action}
         </>
+      )}
+
+      {/* THE RECEIPT, inside the zone rather than under it — the answer belongs on the thing
+          that was asked. Left-aligned against a centred zone on purpose: a file name is read,
+          not admired, and centred names of different lengths give a list no left edge. */}
+      {receipt && !slim && (
+        <div className="mt-1 flex w-full flex-col gap-1.5">
+          {receipt.map((f, i) => <FileRow key={`${f.name}-${i}`} file={f} />)}
+        </div>
+      )}
+      {receipt && slim && (
+        <span className="truncate text-2xs text-muted-foreground">
+          {receipt.length === 1 ? receipt[0].name : `${receipt.length} files`}
+        </span>
       )}
 
       <input
