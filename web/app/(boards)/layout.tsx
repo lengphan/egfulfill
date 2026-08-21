@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { CircleNotch } from "@phosphor-icons/react"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
+import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { TopBar } from "@/components/app/topbar"
 import { getUser, getToken } from "@/lib/auth"
@@ -12,6 +13,8 @@ import { STAFF_ROLES, staffNav, landingFor } from "@/lib/staff-nav"
 // Staff-only shell. Sellers (or signed-out) are bounced to the seller dashboard, and a
 // staffer who hits a board their role can't access is sent to their own landing board.
 export default function BoardsLayout({ children }: { children: React.ReactNode }) {
+  // Before any branch: AppShell has three, and one of them silently missed this.
+  useAccent()
   const router = useRouter()
   const pathname = usePathname()
   const [ok, setOk] = useState<boolean | null>(null)

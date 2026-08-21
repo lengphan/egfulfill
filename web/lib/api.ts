@@ -1007,16 +1007,24 @@ export type CatalogProduct = {
 // AI assistant config (admin) — key status + model, editable in Settings › Integrations.
 export type AiModel = { id: string; label: string }
 export type AiConfig = { keySet?: boolean; last4?: string | null; masked?: string | null; fromEnv?: boolean; model?: string; models?: AiModel[]; ok?: boolean; error?: string }
-// ── Branding (admin): the marks and names, editable without a deploy ──────────
-// Scope is deliberately favicon / logo / app name. The PALETTE stays in code: --primary
-// inks ~247 pieces of text as well as filling buttons, the status colours carry meaning on
-// the floor, and contrast here is measured rather than eyeballed — so a colour picker in an
-// admin panel is a way to make a quarter of the app unreadable without anyone noticing.
-export type Branding = { appName?: string; logoUrl?: string; faviconUrl?: string; error?: string }
+// ── Branding (admin): the marks, the name and the accent, editable without a deploy ──
+// The PALETTE still stays in code: --primary inks ~247 pieces of text as well as filling
+// buttons, the status colours carry meaning on the floor, and contrast here is measured
+// rather than eyeballed — so a colour PICKER in an admin panel is a way to make a quarter of
+// the app unreadable without anyone noticing.
+//
+// `accent` is the vetted-preset exception, and it is a KEY, never a colour: globals.css owns
+// the values under [data-pop="…"], the server allow-lists the keys, and both have been
+// through tools/check-pop-presets.mjs. See lib/accent.ts.
+export type Branding = {
+  appName?: string; logoUrl?: string; faviconUrl?: string
+  accent?: string; accents?: string[]
+  error?: string
+}
 export function getBranding() {
   return api<Branding>(`/api/branding`)
 }
-export function setBranding(body: { appName?: string; logoUrl?: string }) {
+export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string }) {
   return api<Branding & { ok?: boolean }>(`/api/admin/branding`, { method: "PUT", body: JSON.stringify(body) })
 }
 /** `dataUrl` is a base64 data URL read from a file input. Max 2MB, PNG/JPEG/WebP/SVG/ICO. */
@@ -2112,6 +2120,42 @@ export function refreshTracking(id: string) {
  * Deliberately not derived from `orders.total`: that is what buyers paid sellers on their
  * marketplaces (GMV through the platform), not money that reaches us.
  */
+/**
+ * THE OVERVIEW'S FIGURES, COMPUTED ON THE SERVER.
+ *
+ * The dashboard used to fetch every order and reduce them in the browser — 890 orders and
+ * 2,321 KB to render six numbers. This is the same arithmetic done where the rows already
+ * are, and it answers in about two kilobytes. See server/src/routes/reports.js.
+ *
+ * `counts` is the whole floor; `windowed` is the same shape bounded by `days`, because "what
+ * is on the line now" and "where did this week's intake go" are different questions.
+ */
+export type OverviewCounts = {
+  total: number; draft: number; pending: number; approved: number; working: number
+  shipped: number; onHold: number; cancelled: number; refunded: number; createdToday?: number
+}
+export type OverviewLineRow = { id: string; n: number; oldest: string | null; byPlatform: Record<string, number> }
+export type Overview = {
+  days: number
+  counts: OverviewCounts
+  windowed: OverviewCounts
+  money: { gmv: number; orders: number; aov: number }
+  /** Daily GMV scaled 0..1 — the shape of the run, which is all the sparkline draws. */
+  gmvBars: number[]
+  speed: {
+    production: { days: number | null; n: number }
+    transit: { days: number | null; n: number }
+    total: { days: number | null; n: number }
+    onTime: { pct: number | null; n: number }
+  }
+  line: OverviewLineRow[]
+  recent: { id: string; seq?: number | null; store?: string | null; source?: string | null; customer: string | null; total: number; stage: string; created_at?: string | null }[]
+}
+
+export function getOverview(days = 30, windowLine = false) {
+  return api<Overview>(`/api/reports/overview?days=${days}${windowLine ? "&windowLine=1" : ""}`)
+}
+
 export type FactoryPnl = {
   days: number
   income: number

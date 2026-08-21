@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getBranding, setBranding, uploadBrandingAsset, type Branding } from "@/lib/api"
+import { ACCENTS, rememberAccent, type AccentKey } from "@/lib/accent"
 
 /**
  * BRANDING — the marks and the name, changeable without a deploy.
@@ -17,14 +18,23 @@ import { getBranding, setBranding, uploadBrandingAsset, type Branding } from "@/
  * this app is measured rather than eyeballed — cream on the periwinkle plate is 1.83:1, a
  * documented ghost. A free colour picker here is a way to make a quarter of the app
  * unreadable in four seconds, and nobody would notice until a seller could not read their
- * own order status. Colours belong behind vetted presets with a contrast gate; that is a
- * separate piece of work, not a text field.
+ * own order status.
+ *
+ * THE ACCENT IS THE EXCEPTION, and it is the vetted-preset-with-a-contrast-gate version this
+ * comment used to describe as future work. It is a KEY, not a colour: the values live in
+ * globals.css, the server allow-lists the keys, and both went through
+ * tools/check-pop-presets.mjs, which measures ink contrast on the fill and OKLab distance to
+ * every reserved status colour in both themes. There are two, and two is the honest number —
+ * an accent has to be a light enough FILL to carry dark text, which is exactly the band dark
+ * mode packs every status colour into. The swatches paint themselves from the same CSS
+ * declaration the app runs on, so this panel cannot show one colour and apply another.
  */
 export function BrandingPanel() {
   const [b, setB] = useState<Branding | null>(null)
   const [appName, setAppName] = useState("")
   const [busy, setBusy] = useState<null | "save" | "favicon" | "logo">(null)
   const [saved, setSaved] = useState(false)
+  const [accent, setAccentState] = useState<AccentKey>("rose")
   const [err, setErr] = useState<string | null>(null)
   /**
    * A CACHE-BUSTER THAT DOES NOT REPEAT ITSELF.
@@ -45,7 +55,10 @@ export function BrandingPanel() {
 
   const load = useCallback(() => {
     getBranding()
-      .then((r) => { setB(r); setAppName(r.appName ?? "") })
+      .then((r) => {
+        setB(r); setAppName(r.appName ?? "")
+        if (r.accent === "rose" || r.accent === "lime") setAccentState(r.accent)
+      })
       .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't load branding."))
   }, [])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
@@ -60,6 +73,24 @@ export function BrandingPanel() {
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save.")
     } finally { setBusy(null) }
+  }
+
+  /**
+   * Paint FIRST, then save. Waiting for the round trip to show the colour makes choosing an
+   * accent feel broken on a slow connection — you click a swatch and nothing happens. And if
+   * the save fails the paint is put back, so the panel never shows an accent the server does
+   * not hold.
+   */
+  const pickAccent = async (key: AccentKey) => {
+    const before = accent
+    setAccentState(key); rememberAccent(key); setErr(null)
+    try {
+      const r = await setBranding({ accent: key })
+      if (r.error) throw new Error(r.error)
+    } catch (e) {
+      setAccentState(before); rememberAccent(before)
+      setErr(e instanceof Error ? e.message : "Couldn't save the accent.")
+    }
   }
 
   const upload = async (kind: "favicon" | "logo", file?: File) => {
@@ -154,6 +185,36 @@ export function BrandingPanel() {
           <span className="text-xs text-muted-foreground">Shown on the phone home screen, which fits about 12 characters.</span>
         </label>
 
+        <div>
+          <p className="text-sm font-medium">Accent</p>
+          {/* The one colour in the app, and it carries one meaning: something is new and it
+              is for you. Unread badge, unread dot, unread row — nothing else, because an
+              accent spent on two things is just a second UI colour. */}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => void pickAccent(a.key)}
+                aria-pressed={accent === a.key}
+                className={"flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors " +
+                  (accent === a.key ? "border-foreground" : "border-border hover:border-foreground/30")}
+              >
+                {/* data-pop on the SWATCH: globals.css declares [data-pop="…"] as a plain
+                    attribute rule, so the chip resolves var(--pop) to that preset's own
+                    value — the same declaration the app runs on. A hex copied into this file
+                    is how a settings panel ends up previewing a colour it doesn't apply. */}
+                <span data-pop={a.key} className="size-6 shrink-0 rounded-md" style={{ background: "var(--pop)" }} />
+                <span>
+                  <span className="block text-sm font-medium">{a.label}</span>
+                  <span className="block text-xs text-muted-foreground">{a.what}</span>
+                </span>
+                {accent === a.key && <Check size={14} weight="bold" className="ml-1 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {err && <p className="text-sm text-destructive">{err}</p>}
 
         <div className="flex flex-wrap items-center gap-3">
@@ -175,7 +236,7 @@ export function BrandingPanel() {
         <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
           <Warning size={14} className="mt-0.5 shrink-0" />
           <span>
-            Colours and typefaces are set in code, not here. <strong>--primary</strong> inks around 247 pieces of text as well as filling buttons, and the status colours (shipped, hold, alert) carry meaning on the floor — so a picker in this panel could make a quarter of the app unreadable without anyone noticing. Ask and they can be changed properly, with the contrast measured.
+            The accent above is the only colour that can be changed here, and only between presets that have been measured. The rest is set in code: <strong>--primary</strong> inks around 247 pieces of text as well as filling buttons, and the status colours (shipped, hold, alert) carry meaning on the floor — so a free picker could make a quarter of the app unreadable without anyone noticing. Ask and they can be changed properly, with the contrast measured.
           </span>
         </div>
       </div>

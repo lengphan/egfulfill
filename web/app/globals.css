@@ -208,16 +208,26 @@
    * This is distinct from the emerald that means SHIPPED on the floor — that stays a status
    * chip. This is the ink for "a number moved the right way". */
     --success: oklch(0.48 0.135 158);
-  /* CORAL #FE9179. ONE LINE TO CHANGE — every use reads this token, so swapping the pop is
- a single edit here and nothing else, in either theme.
-     Measured: L 0.77, chroma 0.137. Roughly twice the colour of the pale tints tried first,
- which is the whole difference between a tint and a colour — at L 0.90 only yellow-green
- can stay vivid, every other hue goes pastel. Ink on it 8.64:1; white on it 2.20:1, so it
- is ALWAYS a fill carrying dark text and never a text colour or a hairline.
-     0.264 from `hold` in OKLab and far from alert despite the warm hue, because alert is a
- mid-tone red and this is light. Warm against an entirely cool grey system, which is what
- makes it read as a decision rather than as another UI colour. */
-    --pop: oklch(0.77 0.137 33);
+  /* THE POP — the one accent in an otherwise chroma-0 grey system. It means "this is new,
+     and it is for you": the unread badge, the unread dot, the unread row. Nothing else.
+     ALWAYS a fill carrying dark text, never a text colour and never a hairline.
+
+     ROSE, not the coral this started as. tools/check-pop-presets.mjs sweeps the whole hue
+     circle against every reserved status colour in BOTH themes, and coral's band (hue 30–50)
+     is the single worst place on it: headroom −0.002, meaning there is no lightness and no
+     chroma at coral's hue that clears the floor in dark mode. It is boxed in by `alert` (25)
+     and `backorder` (50), and dark mode lifts every status into one bright band, closing the
+     gap coral has in light. Shipped coral measured 0.048 from dark `backorder` — an accent
+     that reads as an order status, which is the one thing an accent must never do.
+
+     Moving it cost nothing: --pop was defined in both themes and rendered NOWHERE, so this
+     changes a colour that had never once been on screen. Ink on rose is 7.48:1 light /
+     7.67:1 dark, and it clears every status by more than `hold`↔`alert` clear each other —
+     the closest pair on the floor, which nobody confuses.
+
+     ONE LINE TO CHANGE, still: an admin picks between the vetted presets in Settings ›
+     Branding, which sets data-pop on <html>; the values live at the bottom of this file. */
+    --pop: oklch(0.74 0.200 335);
     --pop-foreground: oklch(0.175 0 0);
     --status-hold: oklch(0.52 0.115 75);
     --status-shipped: oklch(0.46 0.120 158);
@@ -349,7 +359,9 @@
     --accent: oklch(0.245 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --success: oklch(0.80 0.155 158);
-    --pop: oklch(0.74 0.140 33);
+    /* A shade more chroma than light: a dark surface eats saturation, and this is the value
+       measured at 0.184 from dark `working`, its nearest reserved neighbour. */
+    --pop: oklch(0.74 0.235 335);
     --pop-foreground: oklch(0.145 0 0);
     --status-hold: oklch(0.76 0.125 75);
     --status-shipped: oklch(0.76 0.135 158);
@@ -774,3 +786,31 @@ td[align="right"] {
   .eg-scroll-slim { scrollbar-color: color-mix(in oklch, currentColor 18%, transparent) transparent; }
   .eg-scroll-slim::-webkit-scrollbar-thumb { background: color-mix(in oklch, currentColor 18%, transparent); }
 }
+
+/* ── THE ACCENT PRESETS ────────────────────────────────────────────────────────
+ * An admin picks the pop in Settings › Branding, and that sets data-pop on <html>.
+ *
+ * THE VALUES LIVE HERE, NOT IN THE DATABASE. The server stores a KEY — "rose", "lime" — and
+ * never a colour, so what can be selected is exactly what has been measured. A stored hex
+ * would mean the next person to add a preset does it in a text field, which is precisely the
+ * free colour picker branding.js refused to build: a quarter of the app unreadable in four
+ * seconds, and nobody notices until a seller cannot read their own order status.
+ *
+ * THERE ARE ONLY TWO, and that is the honest number. tools/check-pop-presets.mjs sweeps
+ * every hue against every reserved status colour in both themes; the accent has to be a
+ * light-enough FILL to carry dark text (L ≳ 0.68), which is exactly the band dark mode packs
+ * every status into. Orchid (310) and cyan (215) clear the floor in dark ONLY as pale
+ * near-white tints — the washed-out look already rejected once. Four swatches of which two
+ * quietly lie in dark mode is worse than two that don't.
+ *
+ * Attribute selectors, not :root-only, so a SWATCH can wear data-pop and paint itself with
+ * var(--pop) — the settings panel previews each preset from the same declaration the app
+ * runs on, and cannot show you one colour and then apply another. Run the gate after
+ * touching any of this: `node tools/check-pop-presets.mjs`. */
+[data-pop="rose"] { --pop: oklch(0.74 0.200 335); --pop-foreground: oklch(0.175 0 0); }
+.dark[data-pop="rose"], .dark [data-pop="rose"] { --pop: oklch(0.74 0.235 335); --pop-foreground: oklch(0.145 0 0); }
+
+[data-pop="lime"] { --pop: oklch(0.89 0.195 112); --pop-foreground: oklch(0.175 0 0); }
+/* Lime is the same colour in both themes — at L 0.89 it is already above the whole dark
+   palette, so it needs no dark step, only the darker ink. */
+.dark[data-pop="lime"], .dark [data-pop="lime"] { --pop-foreground: oklch(0.145 0 0); }
