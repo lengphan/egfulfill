@@ -17,6 +17,7 @@ import { getOrders, type OrderRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { revenueSeries, channelBreakdown, topProducts, orderTotalOf, orderTs } from "@/lib/analytics"
 import { sellerStatus } from "@/lib/order-status"
+import { EmptyState } from "@/components/app/empty-state"
 
 const DAY = 864e5
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: (Number(n) || 0) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
@@ -99,9 +100,15 @@ export function ReportsView() {
       {/* Same rule as the dashboard: an all-zero chart asserts zero revenue. */}
       {orders === null && loadErr ? (
         <SectionCard title="Revenue">
-          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-            No revenue data to chart — your orders couldn&apos;t be loaded.
-          </div>
+          {/* NOT an empty chart. The orders failed to load, so the honest reading is
+              "unknown", not "zero" — a blank chart claiming no revenue is a lie the data
+              cannot support. */}
+          <EmptyState
+            icon={Warning}
+            size="sm"
+            title="Couldn't load your orders"
+            note="So there is nothing to chart yet — this isn't zero revenue, it's unknown."
+          />
         </SectionCard>
       ) : (
         <RevenueChart data={series} />

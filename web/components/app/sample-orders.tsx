@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { getSampleOrders, placeSampleOrder, setSampleOrderStatus, getAlibabaOrder,
  type SampleOrder } from "@/lib/api"
+import { EmptyState } from "@/components/app/empty-state"
 
 export const usd = (n?: number | null) =>
  n == null ? "—" : `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -231,10 +232,12 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
       {items === null ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
-          <Package size={22} />
-          No samples recorded yet. Record one from a supplier&apos;s row and its cost books straight to the factory wallet.
-        </div>
+        <EmptyState
+          icon={Package}
+          size="sm"
+          title="No samples recorded yet"
+          note="Record one from a supplier’s row and its cost books straight to the factory wallet."
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

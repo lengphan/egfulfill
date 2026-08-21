@@ -25,6 +25,7 @@ import { startEtsyConnect } from "@/lib/etsy-oauth"
 import { startShopifyConnect } from "@/lib/shopify-oauth"
 import { startTikTokConnect } from "@/lib/tiktok-oauth"
 import { getUser } from "@/lib/auth"
+import { EmptyState } from "@/components/app/empty-state"
 
 const fmtDate = (s: string | null) => {
  if (!s) return "never"
@@ -438,15 +439,11 @@ export function StoresManager() {
             ))}
           </div>
         ) : connected.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-14 text-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-              <Storefront size={26} weight="duotone" />
-            </span>
-            <div className="font-medium">No shops connected yet</div>
-            <div className="max-w-xs text-sm text-muted-foreground">
-              Connect a marketplace below to start syncing orders into one queue.
-            </div>
-          </div>
+          <EmptyState
+            icon={Storefront}
+            title="No shops connected yet"
+            note="Connect a marketplace below to start syncing orders into one queue."
+          />
         ) : (
           <div className="divide-y divide-border">
             {connected.map((c) => (

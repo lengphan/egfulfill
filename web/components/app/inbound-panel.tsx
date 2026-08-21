@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, CaretRight, Check, Warning } from "@phosphor-icons/react"
+import { CircleNotch, CaretRight, Check, Warning, Truck } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import {
   type PurchaseOrder, type InventoryItem,
 } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { EmptyState } from "@/components/app/empty-state"
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -123,10 +124,12 @@ export function InboundPanel() {
       {pos === null ? (
         <div className="flex justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
       ) : inbound.length === 0 ? (
-        <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-          Nothing on order. Purchase orders you place — including Alibaba orders imported from
-          Purchasing — wait here until the goods arrive.
-        </div>
+        <EmptyState
+          icon={Truck}
+          size="sm"
+          title="Nothing on order"
+          note="Purchase orders you place — including Alibaba orders imported from Purchasing — wait here until the goods arrive."
+        />
       ) : (
         <div className="divide-y divide-border">
           {inbound.map((po) => {

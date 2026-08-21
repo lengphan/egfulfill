@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, ArrowsClockwise, ChartBar, Check } from "@phosphor-icons/react"
 import { getUsageSummary, setUsageConfig, type UsageSummary, type UsagePlatform } from "@/lib/api"
+import { EmptyState } from "@/components/app/empty-state"
 
 const WINDOWS = [{ d: 7, label: "7 days" }, { d: 30, label: "30 days" }, { d: 90, label: "90 days" }]
 const money = (n: number) => "$" + (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -117,7 +118,7 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
       {loading && !data ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
       ) : !data ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">Couldn&apos;t load usage. Try refresh.</div>
+        <EmptyState icon={Warning} size="sm" title="Couldn't load usage" note="This is unknown rather than zero — try refreshing." />
       ) : (
         <>
           {/* Alert banner when any platform crosses its monthly threshold. */}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Archive } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getCatalogExports, type CatalogExport } from "@/lib/api"
+import { EmptyState } from "@/components/app/empty-state"
 
 const when = (s: string) =>
  new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
@@ -38,15 +39,12 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
       ) : rows.length === 0 ? (
         // Says what to do, not just that there's nothing — this list only fills when
         // somebody presses Save, and that isn't obvious from an empty table.
-        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-          <Archive size={26} weight="duotone" className="opacity-50" />
-          <p className="text-sm">No catalogues saved yet.</p>
-          <p className="max-w-md text-xs">
-            Open <strong>Create lookbook</strong> and press <strong>Save this version</strong> before you
- send one. It records the styles and prices as they were, so you can reopen exactly
- what the buyer saw.
-          </p>
-        </div>
+        <EmptyState
+          icon={Archive}
+          size="sm"
+          title="No catalogues saved yet"
+          note="Open Create lookbook and press Save this version before you send one — it records styles and prices as they were."
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
