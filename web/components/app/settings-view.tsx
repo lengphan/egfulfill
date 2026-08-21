@@ -869,7 +869,7 @@ function ReadOnlyFor({ on, children }: { on: boolean; children: React.ReactNode 
     </>
   )
 }
-function MoneyField({ label, hint, value, onChange }: { label: string; hint?: string; value: string; onChange: (v: string) => void }) {
+function MoneyField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   // Translated HERE rather than at ~30 call sites. The value stays a number and the $ stays
   // a $ — only the caption moves.
   const tl = useLabelT()
@@ -880,7 +880,6 @@ function MoneyField({ label, hint, value, onChange }: { label: string; hint?: st
         <CurrencyDollar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" inputMode="decimal" className="h-9 pl-7" />
       </div>
-      {hint && <span className="text-xs text-muted-foreground">{tl("settingsHint", hint)}</span>}
     </label>
   )
 }
@@ -950,12 +949,12 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
  * we pay a designer. Grouping says which is which; the two-column grid stops the list
  * looking longer than it is.
  */
-function FeeGroup({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+function FeeGroup({ title, children }: { title: string; children: React.ReactNode }) {
   const q = useContext(SettingsSearch)
   // Filter the ROWS, not just the group. Opening a fold because one field matched and then
   // showing all fourteen of its fields is the same "where is it" problem one level down.
   // A group whose own title matches keeps all its rows — you asked for the group.
-  const groupItself = !!q && [title, hint].join(" ").toLowerCase().includes(q)
+  const groupItself = !!q && title.toLowerCase().includes(q)
   const rows = !q || groupItself
     ? children
     : Children.toArray(children).filter((c) => matches(c, q))
@@ -963,7 +962,6 @@ function FeeGroup({ title, hint, children }: { title: string; hint: string; chil
   return (
     <section className="mt-5 first:mt-0">
       <h4 className="eg-label text-primary">{title}</h4>
-      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
       {/* THREE TRACKS ON A WIDE SCREEN. At two columns a group of three fees put one on a
           row of its own, which reads as a different KIND of thing rather than the third
           alternative it is. Pairs still sit side by side; nothing here is wider than a
@@ -1049,7 +1047,7 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
   const folds = Children.toArray(children).filter(
     (c): c is React.ReactElement<FoldProps> => isValidElement(c)
   )
-  const visible = folds.filter((f) => matches([f.props.title, f.props.hint, f.props.children], q))
+  const visible = folds.filter((f) => matches([f.props.title, f.props.children], q))
   const active = visible.find((f) => f.props.title === picked) ?? visible[0]
 
   if (!visible.length) {
@@ -1089,7 +1087,6 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
             {active.props.status && (
               <span className="rounded-md bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">{active.props.status}</span>
             )}
-            {active.props.hint && <span className="text-xs text-muted-foreground">{active.props.hint}</span>}
           </div>
           {active.props.children}
         </div>
@@ -1350,7 +1347,7 @@ function PlatformPanel() {
       </div>
       <FoldGroup>
       {!isOperator && (
-      <Fold title="Warehouse ship-from address" hint="the sender on every label" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
+      <Fold title="Warehouse ship-from address" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Where parcels are tendered from. Set once for the whole team. If returns come back
@@ -1404,7 +1401,7 @@ function PlatformPanel() {
           (Shippo) / return_address (EasyPost). Left blank, the carrier falls back to the
           sender, which is what happened before this field existed. */}
       {!isOperator && (
-      <Fold title="Return address" hint="where undeliverable parcels come back to" status={returnAddr.street ? "set" : "using ship-from"}>
+      <Fold title="Return address" status={returnAddr.street ? "set" : "using ship-from"}>
         <p className="mb-3 text-xs text-muted-foreground">
           Only needed if returns come back to a <b>different address</b> than the one you ship
           from. Leave it blank and returns follow the ship-from address above. The name here is
@@ -1434,7 +1431,7 @@ function PlatformPanel() {
       </Fold>
       )}
       {!isOperator && (
-      <Fold title="Fees" hint="design charges, payout, file price, default shipping">
+      <Fold title="Fees">
         {/* MONEY OUT first, then money in, and the direction is written into every hint.
             These sat together unlabelled when the payout was called "design fee", which is
             how a rate paid TO a designer read as a charge made to a seller. */}
@@ -1443,38 +1440,33 @@ function PlatformPanel() {
             thing that confuses is not each fee — it is not knowing they are alternatives. */}
         <FeeGroup
           title="Design work — what a seller pays"
-          hint="One of these three, never two: it depends on who cut the machine file."
         >
-          <MoneyField label="Standard" hint="We cut it — their artwork, ordinary difficulty" value={designStd} onChange={setDesignStd} />
-          <MoneyField label="Complex" hint="We cut it — intricate. Quoted first, charged only if accepted" value={designCx} onChange={setDesignCx} />
-          <MoneyField label="Their own file" hint="They sent it — we open and check rather than cut" value={checkFee} onChange={setCheckFee} />
+          <MoneyField label="Standard" value={designStd} onChange={setDesignStd} />
+          <MoneyField label="Complex" value={designCx} onChange={setDesignCx} />
+          <MoneyField label="Their own file" value={checkFee} onChange={setCheckFee} />
         </FeeGroup>
 
         <FeeGroup
           title="The file itself — what a seller pays"
-          hint="Charged separately, when they want to download the .pes/.emb. Paying for the work and owning the file are two transactions."
         >
-          <MoneyField label="Standard" hint="Download the machine file for an ordinary design" value={embPrice} onChange={setEmbPrice} />
-          <MoneyField label="Complex" hint="Download it when the design work was complex" value={embCx} onChange={setEmbCx} />
+          <MoneyField label="Standard" value={embPrice} onChange={setEmbPrice} />
+          <MoneyField label="Complex" value={embCx} onChange={setEmbCx} />
         </FeeGroup>
 
         <FeeGroup
           title="What we pay out"
-          hint="Money leaving us, not a seller charge — the only figure on this page that does."
         >
-          <MoneyField label="Designer payout" hint="Per approved design, to the designer who claimed it" value={designFee} onChange={setDesignFee} />
+          <MoneyField label="Designer payout" value={designFee} onChange={setDesignFee} />
         </FeeGroup>
         <FeeGroup
           title="Seller payouts"
-          hint="The limits a seller sees when cashing out their wallet. A payout can never exceed their balance regardless of these."
         >
-          <MoneyField label="Minimum payout" hint="Smallest amount a seller can request" value={payoutMin} onChange={setPayoutMin} />
-          <MoneyField label="Maximum payout" hint="Largest single request. Set 0 for no cap beyond the seller's balance." value={payoutMax} onChange={setPayoutMax} />
+          <MoneyField label="Minimum payout" value={payoutMin} onChange={setPayoutMin} />
+          <MoneyField label="Maximum payout" value={payoutMax} onChange={setPayoutMax} />
         </FeeGroup>
         {isAdminUser && (
           <FeeGroup
             title="VietQR top-up rate"
-            hint="USD→VND. A seller picks a dollar amount to add; this converts it to the VND their QR charges, and that exact USD credits on payment."
           >
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium">Base rate — VND per $1</span>
@@ -1505,9 +1497,8 @@ function PlatformPanel() {
         {isAdminUser && (
           <FeeGroup
             title="Top-up amounts"
-            hint="Applies to EVERY method (Transfer, QR, Card). The minimum a seller may add, and the quick-amount buttons shown in Add Funds."
           >
-            <MoneyField label="Minimum top-up" hint="Smallest amount a seller can add, any method. Currently $200." value={vqrMin} onChange={setVqrMin} />
+            <MoneyField label="Minimum top-up" value={vqrMin} onChange={setVqrMin} />
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium">Quick amounts</span>
               <Input value={vqrSmall} onChange={(e) => setVqrSmall(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="50, 100, 200, 500, 1000" className="h-9" />
@@ -1522,7 +1513,6 @@ function PlatformPanel() {
         )}
         <FeeGroup
           title="Product & shipping"
-          hint="What a blank sells for, and what carriage adds. Unrelated to design — separated so the design decisions above can be read on their own."
         >
           <div className="sm:col-span-2"><MarkupFormula value={baseMarkup} onChange={setBaseMarkup} /></div>
           {/* Both shipping fields moved to "Shipping by product type" below. They were
@@ -1536,7 +1526,6 @@ function PlatformPanel() {
               real label through the rates above and must never pay both. */}
           <MoneyField
             label="TikTok label fee"
-            hint="Per TikTok-shipped order, charged on import. TikTok made the label, so there's no carriage to buy — this is handling. 0 = off."
             value={tiktokLabelFee} onChange={setTiktokLabelFee}
           />
         </FeeGroup>
@@ -1547,7 +1536,7 @@ function PlatformPanel() {
           category and every product in it inherits a blank for the Design Maker, instead
           of an upload per product. A product's own mockup still wins. */}
       {!isOperator && (
-      <Fold title="Partner rates" hint="what outside partners cost us, per job" status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
+      <Fold title="Partner rates" status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Neither partner can be billed through an API — byeastside and Pink Design both
@@ -1558,17 +1547,14 @@ function PlatformPanel() {
         <div className="grid gap-3 sm:grid-cols-2">
           <MoneyField
             label="Dispatch — what byeastside charges us"
-            hint="Per label they pick. Booked as expedite-cost when a label is pushed."
             value={expediteCost} onChange={setExpediteCost}
           />
           <MoneyField
             label="Dispatch — what we charge the seller"
-            hint="Per expedited order. Charged to the seller's wallet at push time."
             value={expediteFee} onChange={setExpediteFee}
           />
           <MoneyField
             label="Design — what Pink Design charges us"
-            hint="Per outsourced task. Booked when the card is approved."
             value={designPartnerCost} onChange={setDesignPartnerCost}
           />
         </div>
@@ -1598,7 +1584,7 @@ function PlatformPanel() {
       )}
 
       {!isOperator && (
-      <Fold title="Peak-season capacity" hint="per-seller order limits + the delay notice" status={capacityMode ? "on" : "off"}>
+      <Fold title="Peak-season capacity" status={capacityMode ? "on" : "off"}>
         {/* Master switch — off = no header counters, no notice, limits ignored. */}
         <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <input type="checkbox" checked={capacityMode} onChange={(e) => setCapacityMode(e.target.checked)} className="size-4 accent-primary" />
@@ -1650,7 +1636,7 @@ function PlatformPanel() {
           which meant setting a hex here, navigating back, and looking. They are not platform
           policy like a postage band. (components/app/lookbook-branding-dialog.tsx) */}
 
-      <Fold title="Embroidery threads" hint="the cones you actually stock" status={`${threads.length} cones`}>
+      <Fold title="Embroidery threads" status={`${threads.length} cones`}>
 
         <p className="mb-3 text-xs text-muted-foreground">
           Thread matching picks the nearest cone <em>you stock</em>. The built-in starter
@@ -1752,7 +1738,7 @@ function PlatformPanel() {
         </div>
       </Fold>
 
-      <Fold title="Positions / Design Surfaces" hint="sides + positioning outlines per category" status={`${types.length} types`}>
+      <Fold title="Positions / Design Surfaces" status={`${types.length} types`}>
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
@@ -1914,7 +1900,7 @@ function PlatformPanel() {
           which card is active and when it expires — the card itself is changed in Shippo's
           own dashboard, which is where card details belong. */}
       {!isOperator && (
-      <Fold title="Postage card" hint="the card Shippo charges each label to">
+      <Fold title="Postage card">
         <ShippoBillingPanel />
       </Fold>
       )}
@@ -1926,7 +1912,7 @@ function PlatformPanel() {
           the bands as though it took precedence. It took nothing: pricing.js reaches the
           bands first and one of them always matches, so that field was edited and saved and
           changed no invoice. It is gone, and what remains is the two figures that bill. */}
-      <Fold title="Shipping" hint="what a seller pays to send one parcel">
+      <Fold title="Shipping">
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
@@ -1944,7 +1930,6 @@ function PlatformPanel() {
         <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <MoneyField
             label="Each additional item"
-            hint="Per extra UNIT in the same parcel — 3× of one tee pays one rate above and two of these."
             value={shipExtra} onChange={setShipExtra}
           />
         </div>
@@ -1955,7 +1940,7 @@ function PlatformPanel() {
           than for the one kind of surcharge that was in it first — the per-side charge
           belongs here too, and "Print method surcharge" would have read as the wrong home
           for it. */}
-      <Fold title="Surcharge" hint="added per unit on top of the base cost">
+      <Fold title="Surcharge">
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">Added to the base cost per unit. A product can override this for its own methods.</p>
@@ -1971,7 +1956,6 @@ function PlatformPanel() {
         <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <MoneyField
             label="Each additional side"
-            hint="The first print is in the base cost. A front-and-back item pays this once; front, back and sleeve pays it twice."
             value={bands.method_side ?? ""} onChange={(v) => setBand("method_side", v)}
           />
         </div>
@@ -2085,14 +2069,13 @@ function LimitCell({
  * shipped nothing when it may have shipped thousands. Undefined prints a dash and says why
  * underneath; a real 0 prints 0.
  */
-function UserStat({ label, value, hint }: { label: string; value?: number; hint?: string }) {
+function UserStat({ label, value }: { label: string; value?: number }) {
   return (
     <div className="min-w-0">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-medium tabular-nums">
         {value == null ? <span className="text-muted-foreground/50">—</span> : value.toLocaleString("en-US")}
       </div>
-      {hint && <div className="text-2xs leading-tight text-muted-foreground">{hint}</div>}
     </div>
   )
 }
@@ -2108,12 +2091,12 @@ function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolea
       {ownsOrders ? (
         <>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-            <UserStat label="Units shipped" value={u.items_shipped} hint="lifetime" />
-            <UserStat label="Units waiting" value={u.items_waiting} hint="excludes cancelled" />
+            <UserStat label="Units shipped" value={u.items_shipped} />
+            <UserStat label="Units waiting" value={u.items_waiting} />
             {/* The number the volume ladder reads — last month earns, this month spends — so
                 a rung can be checked here rather than taken on faith. */}
-            <UserStat label="Units last month" value={u.units_last_month} hint="sets this month's tier" />
-            <UserStat label="Orders" value={u.orders_total} hint={u.last_order_at ? `last ${fmtDate(u.last_order_at)}` : "none yet"} />
+            <UserStat label="Units last month" value={u.units_last_month} />
+            <UserStat label="Orders" value={u.orders_total} />
           </div>
           {!measured && (
             <p className="mt-3 text-xs text-muted-foreground">

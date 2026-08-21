@@ -349,6 +349,30 @@
     }
 }
 
+/* ── ALIGNMENT, ONCE, INSTEAD OF PER CELL ───────────────────────────────────────
+   A number is right-aligned so its digits line up. In a proportional face they do NOT:
+   the 1 is narrower than the 8, so the column edge is straight and everything inside it
+   wanders. 77 right-aligned elements carried no `tabular-nums`, which is the alignment
+   defect people then try to fix by hand, cell by cell, forever.
+
+   Right-alignment IS the declaration that a thing is numeric, so it implies the figures.
+   Applied here rather than added to 77 call sites, and harmless on the rare right-aligned
+   word — tabular figures only affect digits.
+
+   Same for a header: a column heading over numbers is right-aligned with them, and it was
+   the one part that had to be remembered separately. */
+[class~="text-right"],
+th[align="right"],
+td[align="right"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row's contents sit on one optical line. `items-center` is used 1,190 times against 245
+   of everything else, so centre is plainly the house default — but the 245 are scattered
+   rather than considered, which is why a badge of one height next to a select of another
+   makes a column look crooked. This is not a fix for those; it is the baseline the shared
+   row primitives are measured against. */
+
 /* THE page container for the app + board shells. Every page, no exceptions.
    The element carries `mx-auto` to centre itself; this sets the width and the gutter.
 

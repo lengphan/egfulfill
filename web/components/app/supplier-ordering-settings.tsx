@@ -19,7 +19,6 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
     <label className="flex flex-col gap-1">
       <span className="text-sm font-medium">{label}</span>
       {children}
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </label>
   )
 }
@@ -115,12 +114,12 @@ export function SupplierOrderingSettings() {
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">S&amp;S Activewear</h3>
 
-        <Row label="Ordering email" hint="S&S look payment methods up by the person on the account, so this decides which are offered.">
+        <Row label="Ordering email">
           <Input value={form.ss_order_email ?? ""} onChange={(e) => set("ss_order_email", e.target.value)}
             placeholder="buyer@yourcompany.com" />
         </Row>
 
-        <Row label="Pays with" hint="Saved on your S&S account. We store only their reference to it — never a card number.">
+        <Row label="Pays with">
           {ssProfiles?.available ? (
             <select value={form.ss_payment_profile ?? ""} onChange={(e) => set("ss_payment_profile", e.target.value)} className={selectCls}>
               <option value="">Account terms (no card)</option>
@@ -135,7 +134,7 @@ export function SupplierOrderingSettings() {
           )}
         </Row>
 
-        <Row label="Ships with" hint="The service every S&S order defaults to.">
+        <Row label="Ships with">
           <select value={form.ss_shipping_method ?? ""} onChange={(e) => set("ss_shipping_method", e.target.value)} className={selectCls}>
             <option value="">— use the account default —</option>
             {(opts.suppliers.ss.shippingMethods ?? []).map((m) => (
@@ -161,7 +160,7 @@ export function SupplierOrderingSettings() {
                 placeholder="buyer@yourcompany.com" />
             </Row>
 
-            <Row label="Pays with" hint="Otto's billing terms for your account.">
+            <Row label="Pays with">
               <select value={form.otto_payment_method ?? ""} onChange={(e) => set("otto_payment_method", e.target.value)} className={selectCls}>
                 <option value="">— choose —</option>
                 {asOptions(opts.suppliers.otto.paymentMethods).map((o) => (
@@ -178,7 +177,7 @@ export function SupplierOrderingSettings() {
               <OttoCardOnFile />
             </div>
 
-            <Row label="Order as" hint="Otto require a customer and a contact on every order.">
+            <Row label="Order as">
               <select value={form.otto_customer ?? ""} onChange={(e) => set("otto_customer", e.target.value)} className={selectCls}>
                 <option value="">— choose a customer —</option>
                 {(opts.ottoCustomers ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -193,7 +192,7 @@ export function SupplierOrderingSettings() {
               </select>
             </Row>
 
-            <Row label="Ships with" hint="Otto reject a service they can't run — if an order fails with no_service, the error now lists what they will accept.">
+            <Row label="Ships with">
               <select value={form.otto_shipping_method ?? ""} onChange={(e) => set("otto_shipping_method", e.target.value)} className={selectCls}>
                 <option value="">— choose —</option>
                 {asOptions(opts.suppliers.otto.shippingMethods).map((o) => (

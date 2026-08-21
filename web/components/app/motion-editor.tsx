@@ -47,13 +47,13 @@ const CURVES: { label: string; value: [number, number, number, number] }[] = [
 ]
 const curveKey = (e: readonly number[]) => e.join(",")
 
-const FIELDS: { key: keyof typeof LIMITS; label: string; hint: string; unit: string }[] = [
-  { key: "y", label: "Vertical travel", hint: "Positive rises from below.", unit: "px" },
-  { key: "x", label: "Horizontal travel", hint: "Negative comes from the left.", unit: "px" },
-  { key: "scale", label: "Start scale", hint: "1 is no zoom. Under 0.9 reads as a popup.", unit: "×" },
-  { key: "duration", label: "Duration", hint: "How long one element takes.", unit: "s" },
-  { key: "delay", label: "Delay", hint: "Held before it starts.", unit: "s" },
-  { key: "stagger", label: "Stagger", hint: "Added per sibling — what makes a grid a sequence.", unit: "s" },
+const FIELDS: { key: keyof typeof LIMITS; label: string; unit: string }[] = [
+  { key: "y", label: "Vertical travel", unit: "px" },
+  { key: "x", label: "Horizontal travel", unit: "px" },
+  { key: "scale", label: "Start scale", unit: "×" },
+  { key: "duration", label: "Duration", unit: "s" },
+  { key: "delay", label: "Delay", unit: "s" },
+  { key: "stagger", label: "Stagger", unit: "s" },
 ]
 
 const RANGE =
@@ -62,8 +62,8 @@ const RANGE =
 
 /** One labelled slider with a live numeric readout. Defined at module scope — a component
  *  declared inside render remounts every keystroke (react-hooks/static-components). */
-function Slider({ label, hint, unit, value, min, max, step, onChange }: {
-  label: string; hint: string; unit: string; value: number
+function Slider({ label, unit, value, min, max, step, onChange }: {
+  label: string; unit: string; value: number
   min: number; max: number; step: number; onChange: (n: number) => void
 }) {
   return (
@@ -79,7 +79,6 @@ function Slider({ label, hint, unit, value, min, max, step, onChange }: {
         min={min} max={max} step={step}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <span className="mt-1 block text-2xs leading-snug text-muted-foreground">{hint}</span>
     </label>
   )
 }
@@ -160,7 +159,7 @@ export function MotionEditor({ value, onChange }: {
         <div className="space-y-4">
           {FIELDS.map((f) => (
             <Slider
-              key={f.key} label={f.label} hint={f.hint} unit={f.unit}
+              key={f.key} label={f.label} unit={f.unit}
               value={preset[f.key]}
               min={LIMITS[f.key].min} max={LIMITS[f.key].max} step={LIMITS[f.key].step}
               onChange={(n) => set(f.key, clampField(f.key, n))}
