@@ -13,25 +13,27 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // THE ACTION PAIR — violet fill, lime label, and NO border in either mode.
-        //
-        // A borderless button is findable only if its FILL clears 3:1 against what's behind
-        // it. Lime is 1.19:1 on the white page, so it can never be the fill on a light
-        // surface — every attempt to make it work there ended in an outline, and an outline
-        // repeated down a table row reads as a grid of rules rather than as definition.
-        // Swapping the jobs solves it outright: the violet fills (6.03:1) and the lime becomes
-        // the label (5.07:1). Nothing is drawn around anything.
-        //
-        // Dark inverts, and has to. No single violet does both jobs there: by the time one is
-        // light enough to hold a shape against the dark card (L >= 0.59) the lime label has
-        // fallen under 4.5:1. The lime fill has no such conflict on a dark ground — 16.56:1
-        // in both directions — so dark runs lime fill + ink label. Same two colours, opposite
-        // jobs, which is exactly the rule the selected sidebar item already follows per mode.
-        // Both come straight from --brand / --brand-foreground, so the pair is defined once.
-        //
-        // Hover lightens the violet and dims the lime: on a dark fill, brightening reads as
-        // hover, where dimming would read as disabled — and the reverse on a light one.
-        default: "bg-brand text-brand-foreground hover:brightness-110 dark:hover:brightness-95",
+        /**
+         * THE PRIMARY ACTION IS INK. Near-black on paper, near-white on the dark ground,
+         * white/ink label respectively — 18.97:1 and 17.36:1.
+         *
+         * It was a violet fill with a lime label, and the long note that used to sit here
+         * explained at length why the two had to swap jobs between modes. That whole problem
+         * is gone with the colour: ink needs no such reasoning, works identically in both
+         * directions, and is the same move every restrained tool UI makes, because a
+         * borderless fill only needs to clear 3:1 against what is behind it and black
+         * clears everything.
+         *
+         * SHAPE SAYS KIND, WEIGHT SAYS IMPORTANCE. That is the whole hierarchy: `default` is
+         * the one thing this screen is for, `outline` is a real but secondary action, `ghost`
+         * is a minor one, `destructive` undoes something. A filter or a toggle is NOT a
+         * button and should not borrow one of these — see the note in CLAUDE.md.
+         *
+         * Hover shifts the fill toward the page rather than brightening it: brightness on a
+         * near-black surface is almost invisible, which left the old hover doing nothing at
+         * all once the violet went.
+         */
+        default: "bg-brand text-brand-foreground hover:bg-[color-mix(in_oklch,var(--brand),var(--background)_18%)]",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:

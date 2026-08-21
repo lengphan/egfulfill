@@ -340,6 +340,54 @@ here on 2026-08-19 and the two front-ends genuinely differ.
   `order_items`, so the detail screen can draw everything immediately. Sliding into a spinner
   is what reads as "the whole page flashes"; the native stack animation was never the problem.
 
+### Shape says KIND, weight says IMPORTANCE (2026-08-21)
+
+Measured on the inventory toolbar, where a category select, a "no longer stocked" toggle
+and a "Print labels" action all rendered as the same outlined lozenge — so nothing about a
+control told you what it did until you read it.
+
+- **A filter, a select or a toggle is a FIELD.** `.eg-control` — same `rounded-lg` and
+  `--input` border as an `Input`, normal weight, no fill. It is something you SET.
+- **A button is an action.** `rounded-lg`, medium weight, and a FILL when it matters.
+- **`rounded-full` is reserved** for things that are genuinely round: count badges, avatars.
+  It is not a button shape and not a filter shape.
+- **The variants are a hierarchy, not a palette.** `default` = the one thing this screen is
+  for · `outline` = a real but secondary action · `ghost` = minor · `destructive` = undoes
+  something. Measured usage was outline 211 · ghost 69 · secondary 12 · destructive 4, with
+  only 33% of buttons primary — so almost nothing on a page claimed to be the main action.
+- **Never give a checkbox a button's chrome.** If it toggles, it looks like a toggle.
+
+### Prose under a control is a defect (2026-08-21)
+
+The owner spends real time deleting explanatory subtitles, and they keep coming back
+because every session writes new ones. `SectionCard` is used **105 times and passes a
+`description` once** — so these are not coming from a component anyone can fix. They are
+**852 hand-written** `text-xs text-muted-foreground` lines scattered through the JSX, each
+typed by hand and each removable only by hand.
+
+- **A control explains itself in its label, or in its `title`.** If a button needs a
+  sentence underneath, the label is wrong — fix the label.
+- **Never explain a control that is already on screen.** "Press Generate to make a photo"
+  under a button marked Generate is the shape to watch for.
+- An **empty state** may carry one sentence, because there is nothing else to read. A
+  populated screen may not.
+- A **refusal** carries its reason — that is not a subtitle, it is the answer.
+
+Applies to this file's own habits too: several of this session's UI additions put a
+sentence under a control and had to be removed again.
+
+### Alignment is set once, not per cell (2026-08-21)
+
+- **Right-alignment implies tabular figures** and globals.css now does that for every
+  `text-right` cell. Never add `tabular-nums` beside `text-right` again; it is already
+  there. 77 elements were right-aligned WITHOUT it, so their digits never lined up — which
+  is the defect people then chase cell by cell.
+- **A variable-width element followed by anything else belongs in a GRID, not a flex row.**
+  A status badge is a different width per row, so everything after it starts at a different
+  x and the column reads crooked all the way down. Give the badge a fixed track.
+- `items-center` is used 1,190 times against 245 of everything else. Centre is the house
+  default; anything else needs a reason.
+
 ### Honesty in UI
 No placeholder avatars beside invented numbers. No empty state that looks identical to a
 broken feature — if a thing can't be read versus doesn't exist, **say which**.
