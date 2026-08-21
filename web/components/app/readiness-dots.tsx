@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CircleNotch, DownloadSimple } from "@phosphor-icons/react"
+import { CircleNotch, DownloadSimple, CheckCircle, Circle, DotsThreeCircle } from "@phosphor-icons/react"
 import { getOrderHistory, downloadDesignFile, designForLine, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -47,12 +47,31 @@ type State = "todo" | "doing" | "done"
  * legibility, no glare.
  */
 export const CHIP_TONE = {
-  done: "bg-primary/10 text-primary hover:bg-primary/15",
-  doing:
-    "bg-amber-100 text-amber-800 hover:bg-amber-200/70 " +
-    "dark:bg-amber-400/15 dark:text-amber-300 dark:hover:bg-amber-400/25",
-  todo: "bg-muted text-muted-foreground/70 hover:bg-muted/80",
+  done: "text-primary hover:bg-primary/10",
+  doing: "text-amber-700 hover:bg-amber-500/10 dark:text-amber-300",
+  todo: "text-muted-foreground/70 hover:bg-muted",
 } as const
+
+/**
+ * THE STATE IS A MARK, NOT A BACKGROUND.
+ *
+ * These were four solid tinted capsules in a row — Label · Scan · Design · Stock — and at a
+ * glance a row of four identical filled shapes says nothing at all. It reads as decoration,
+ * or as four alarms, which is the exact misreading the fixed-shape rule above was written
+ * to prevent; the rule held the SHAPE constant and then spent the only remaining channel,
+ * fill, on all four of them equally.
+ *
+ * A glyph carries it instead: a filled tick for done, a middling mark for in-flight, a
+ * hollow ring for not started. That is a difference in SHAPE, so it survives being scanned
+ * fast, printed, or looked at by someone who cannot separate violet from amber — colour is
+ * now the second signal rather than the only one. And with the fill gone the four of them
+ * stop being the loudest thing in a row whose job is the order number beside them.
+ *
+ * The tint stays on HOVER, which is where a background belongs on something clickable: it
+ * says "this opens" at the moment you are about to press it, and is silent otherwise.
+ */
+export const CHIP_GLYPH = { done: CheckCircle, doing: DotsThreeCircle, todo: Circle } as const
+export const CHIP_WEIGHT = { done: "fill", doing: "fill", todo: "regular" } as const
 
 /** A file reachable from a tag. `href` opens directly; `designId` goes through the API so
  *  the paywall and the seller/staff checks still apply. */
@@ -73,6 +92,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
   // THIS column it isn't an alarm — the tags are a progress track, and a middle state is
   // exactly what amber reads as anywhere else it appears on a timeline.
   const cls = CHIP_TONE[state]
+  const Glyph = CHIP_GLYPH[state]
   const tl = useLabelT()
   const [rows, setRows] = useState<AuditRow[] | null>(null)
 
@@ -102,8 +122,9 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         // 12px, not the 11px this was condensed to — that read as small print you had to
         // lean in for. Still lighter than the 13px/semibold it started at, which made four
         // chips the loudest thing in a row whose job is the order number beside them.
-        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-2xs font-medium transition-colors " + cls}
+        className={"eg-tap inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 text-2xs font-medium transition-colors " + cls}
       >
+        <Glyph size={12} weight={CHIP_WEIGHT[state]} className="shrink-0" />
         {tl("ui", label)}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-0">

@@ -64,7 +64,7 @@ import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { AddItemDialog } from "@/components/app/inventory-view"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
-import { ReadinessStrip, CHIP_TONE } from "@/components/app/readiness-dots"
+import { ReadinessStrip, CHIP_TONE, CHIP_GLYPH, CHIP_WEIGHT } from "@/components/app/readiness-dots"
 import { useT, useLabelT } from "@/lib/i18n"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -227,7 +227,9 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
   // per-line NUMBERS live in the expanded detail, not here, to keep the row a clean pill.
   // The literal same strings the three chips beside it use — imported, not re-typed, so a
   // tone can never drift between the fourth pill and the other three.
-  const tone = state === "in" ? CHIP_TONE.done : state === "out" ? CHIP_TONE.doing : CHIP_TONE.todo
+  const stockState = state === "in" ? "done" as const : state === "out" ? "doing" as const : "todo" as const
+  const tone = CHIP_TONE[stockState]
+  const StockGlyph = CHIP_GLYPH[stockState]
   // Always "Stock" — it used to say "In stock" / "No stock" / "Stock", which broke the one
   // rule the three chips beside it keep (see readiness-dots.tsx): a chip whose text changes
   // row to row can't be compared down a column, and it was the widest thing in the cell for
@@ -251,8 +253,11 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
       // px-2 (see the Tag in readiness-dots.tsx). Sitting in the same row a size larger and
       // a notch wider, "Stock" read as a different KIND of thing from Label/Scan/Design
       // when it is the fourth of the same set.
-      className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-2xs font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
+      className={"eg-tap inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 text-2xs font-medium transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
     >
+      {/* The same glyph set as the three beside it — imported, not re-chosen, so the fourth
+          of the set can never drift into a different mark for the same state. */}
+      <StockGlyph size={12} weight={CHIP_WEIGHT[stockState]} className="shrink-0" />
       {sending ? "Sending…" : label}
     </button>
   )
