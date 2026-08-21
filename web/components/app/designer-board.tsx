@@ -613,6 +613,7 @@ export function DesignerBoard() {
           items={[{ id: "board", label: "Board" }, { id: "list", label: "List" }, ...(canSeeHistory ? [{ id: "history" as const, label: "History" }] : [])]}
           value={view}
           onChange={setView}
+          spacing="none"
           className="border-b-0"
         />
       </div>

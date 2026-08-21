@@ -33,13 +33,32 @@ export type TabBarItem<T extends string> = {
 }
 
 export function TabBar<T extends string>({
-  items, value, onChange, size = "md", className, ariaLabel,
+  items, value, onChange, size = "md", spacing = "default", className, ariaLabel,
 }: {
   items: readonly TabBarItem<T>[]
   value: T
   onChange: (id: T) => void
   /** `sm` for a bar inside a dialog or a card header; `md` for a page's own tabs. */
   size?: "sm" | "md"
+  /**
+   * AIR UNDER THE RULE — and the reason there was none.
+   *
+   * Every call site drops this bar into a `space-y-4` column and expects the 16px that
+   * gives. It never arrived: Tailwind v4's `space-y-*` sets `margin-bottom` on each child
+   * that is not the last, through a zero-specificity `:where()`, so the bar's own `-mb-px`
+   * WON — and the gap under the rule was not 16px, it was minus one. Measured: -mb-px → -1,
+   * mb-4 → 16, mb-6 → 24. Twelve pages had their tabs sitting directly on their content and
+   * no caller could fix it by adding spacing to the column, because the column was never
+   * what set it.
+   *
+   * -1px was never the intent. It was added so a bar sitting flush on a container's own
+   * border draws one line rather than two, which is a real job on exactly two call sites —
+   * the ones passing `border-b-0`. Everywhere else it silently cancelled the layout.
+   *
+   * 24px, not 16: a rule is a DIVIDER, and it needs more beneath it than two paragraphs need
+   * between them. That difference is what says the tabs are above the content, not part of it.
+   */
+  spacing?: "default" | "none"
   className?: string
   ariaLabel?: string
 }) {
@@ -47,8 +66,9 @@ export function TabBar<T extends string>({
   const pad = size === "sm" ? "pb-1.5" : "pb-2"
   const gap = size === "sm" ? "gap-4" : "gap-5"
   return (
-    // -mb-px so the bar's own rule sits ON the container's, not one pixel below it.
-    <nav aria-label={ariaLabel} className={cn("-mb-px flex border-b border-border", gap, className)}>
+    // `none` keeps -mb-px, so the bar's own rule sits ON the container's rather than one
+    // pixel below it. Otherwise the bar owns the space under its own line.
+    <nav aria-label={ariaLabel} className={cn("flex border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap, className)}>
       {items.map((t) => {
         const on = value === t.id
         const I = t.icon

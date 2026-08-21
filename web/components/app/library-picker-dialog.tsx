@@ -118,6 +118,7 @@ export function LibraryPickerDialog({
           <TabBar
             size="sm"
             ariaLabel="Library source"
+            spacing="none"
             className="border-b-0"
             items={[
               { id: "designs" as const, label: "Designs", count: designs?.length },

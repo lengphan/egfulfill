@@ -1,11 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CircleNotch, Warning, X, DownloadSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DictateButton } from "@/components/app/dictate-button"
+import { TabBar } from "@/components/app/tab-bar"
 import {
   getDeskImageConfig, generateListingPhotos,
   type DeskImageConfig, type ListingRender,
@@ -34,6 +35,15 @@ export default function StudioPage() {
   const [cfgErr, setCfgErr] = useState<string | null>(null)
   const [group, setGroup] = useState<TemplateGroup>("product")
   const [open, setOpen] = useState<StudioTemplate | null>(null)
+  /**
+   * WHERE THE EDITOR IS, so pressing a template does something you can SEE.
+   *
+   * The brief opens in a second card BELOW the template grid — four rows of tiles down, off
+   * the bottom of the window on any short one. So a click on a template changed nothing
+   * visible, which is indistinguishable from a card that does not respond, and the answer
+   * to "where does my picture come out" was "somewhere you have not scrolled to".
+   */
+  const editorRef = useRef<HTMLDivElement | null>(null)
 
   // What the slots get filled with. Deliberately two plain fields rather than a product
   // picker: this page makes marketing and site imagery as well as listing photos, and most
@@ -72,6 +82,9 @@ export default function StudioPage() {
     setOpen(t)
     setPrompt(fillTemplate(t.prompt, { product, colour }))
     setShots([]); setErrs([])
+    // After the card exists. A ref read in the same tick is still null on the first pick,
+    // which is the one that matters — nothing was open before it.
+    setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0)
   }, [product, colour])
 
   /* Re-filling on a subject change is an EVENT, not an effect.
@@ -121,18 +134,11 @@ export default function StudioPage() {
         }
         bodyClassName="space-y-4 p-4"
       >
-        {/* A rule under the live word — the app's tab treatment, not a row of pills. */}
-        <nav className="-mb-px flex gap-4 border-b border-border">
-          {TEMPLATE_GROUPS.map((g) => (
-            <button key={g.id} type="button" onClick={() => setGroup(g.id)}
-              className={"relative pb-2 text-sm transition-colors " +
-                (group === g.id
-                  ? "font-medium text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-foreground"
-                  : "text-muted-foreground hover:text-foreground")}>
-              {g.label}
-            </button>
-          ))}
-        </nav>
+        {/* THE SHARED BAR, not a sixteenth copy of it. This was fourteen lines of fresh
+            Tailwind reproducing tab-bar.tsx by hand — the exact thing that component's own
+            header says it exists to stop, and the reason its spacing could not be fixed in
+            one place. (digitizer-studio.tsx still carries its own copy.) */}
+        <TabBar ariaLabel="Studio templates" items={TEMPLATE_GROUPS} value={group} onChange={setGroup} />
 
         {cfgErr ? (
           <p className="text-sm text-alert">{cfgErr}</p>
@@ -171,6 +177,7 @@ export default function StudioPage() {
       </SectionCard>
 
       {open && (
+        <div ref={editorRef} className="scroll-mt-4">
         <SectionCard
           title={open.name}
           actions={<Button variant="ghost" size="icon-sm" onClick={() => setOpen(null)} aria-label="Close"><X size={14} /></Button>}
@@ -211,21 +218,45 @@ export default function StudioPage() {
             </div>
           ))}
 
-          {shots.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {shots.map((s) => (
-                <div key={s.url} className="overflow-hidden rounded-lg bg-muted/40">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.url} alt="" className="w-full object-contain" />
-                  <a href={s.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
-                    <DownloadSimple size={13} /> Open
-                  </a>
-                </div>
-              ))}
+          {/* THE RESULT HAS A PLACE BEFORE IT EXISTS.
+              This rendered only once `shots` had something in it, so until a render came
+              back there was nothing on screen to say a picture was coming, where it would
+              appear, or what shape it would be — and while one WAS rendering the only sign
+              was a spinner inside the button, at the far end of a toolbar. An empty frame in
+              the right shape answers all three before the money is spent.
+
+              The one sentence is allowed here because this is an empty state and there is
+              nothing else to read — and it is carrying the fact people actually ask about:
+              these are CANDIDATES. Nothing is written into a listing, by anything, ever. */}
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {shots.map((s) => (
+              <div key={s.url} className="overflow-hidden rounded-lg bg-muted/40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.url} alt="" className="w-full object-contain" />
+                <a href={s.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+                  <DownloadSimple size={13} /> Open
+                </a>
+              </div>
+            ))}
+            {/* One frame per render still on its way, in the ratio it will come back in. */}
+            {busy && Array.from({ length: count }, (_, i) => (
+              <div key={`pending-${i}`} className="flex animate-pulse items-center justify-center rounded-lg bg-muted/60"
+                style={{ aspectRatio: open.ratio.replace(":", " / ") }}>
+                <CircleNotch size={18} className="animate-spin text-muted-foreground" />
+              </div>
+            ))}
+          </div>
+          {!busy && shots.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
+              <span aria-hidden className="rounded-sm bg-muted" style={{ aspectRatio: open.ratio.replace(":", " / "), height: "3.5rem" }} />
+              <p className="text-xs text-muted-foreground">
+                {open.ratio} candidates appear here. Download the ones you want — nothing is added to a listing.
+              </p>
             </div>
           )}
         </SectionCard>
+        </div>
       )}
     </div>
   )
