@@ -158,13 +158,23 @@ export function StaffDashboard() {
    * The window is part of the request, because the server does the bucketing too.
    */
  const load = useCallback(() => {
- if (!getToken()) { setLoadErr(t("dash.errSignedOut")); return }
+    /*
+     * The no-token branch is the ONLY synchronous setState in here, and it is the whole
+     * reason this used to be wrapped in setTimeout(fn, 0) — the lint rule bans setting state
+     * during an effect, and the deferral bought the rule off by pushing the fetch behind a
+     * macrotask. That is a frame the page spends doing nothing before it even asks.
+     *
+     * A microtask satisfies the rule and starts the request in the same tick. The success
+     * path never needed deferring at all: its setState happens in a .then(), long after the
+     * effect has returned.
+     */
+ if (!getToken()) { queueMicrotask(() => setLoadErr(t("dash.errSignedOut"))); return }
  const days = range === "today" ? 1 : range === "7d" ? 7 : range === "all" ? 365 : 30
  getOverview(days, isAdmin && range !== "all")
       .then((r) => { setOv(r ?? null); setLoadErr(null) })
       .catch((e) => setLoadErr(e instanceof Error ? e.message : t("dash.errServer")))
   }, [t, range, isAdmin])
- useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+ useEffect(() => { load() }, [load])
 
   // Time-of-day greeting + today's date. Client component, so `new Date()` is the browser's
   // local clock — the reader's own morning, not the server's.
@@ -208,8 +218,12 @@ export function StaffDashboard() {
  useEffect(() => {
  if (!isAdmin) return
  const days = rangeMeta.id === "today" ? 1 : rangeMeta.id === "7d" ? 7 : rangeMeta.id === "all" ? 365 : 30
- const t = setTimeout(() => { getFactoryPnl(days).then(setPnl).catch(() => setPnl(null)) }, 0)
- return () => clearTimeout(t)
+    // Nothing here sets state synchronously — the fetch does it in .then() — so it starts
+    // now rather than one frame from now. `live` is what stops a stale range's answer from
+    // landing after a newer one.
+ let live = true
+ getFactoryPnl(days).then((r) => { if (live) setPnl(r) }).catch(() => { if (live) setPnl(null) })
+ return () => { live = false }
   }, [isAdmin, rangeMeta])
   // Summed by the server over the same window this component asked for.
  const money = { revenue: ov?.money.gmv ?? 0, count: ov?.money.orders ?? 0, aov: ov?.money.aov ?? 0 }
