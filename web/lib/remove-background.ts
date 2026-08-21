@@ -28,13 +28,24 @@ export type RemoveBgResult =
   | { error: string }
 
 /**
- * @param src        Image source. MUST be same-origin or proxied — a remote image taints the
- *                   canvas and `getImageData` throws (see canvasReadableSrc in thread-match).
- * @param tolerance  0-100. How far a pixel's colour may sit from the sampled background and
- *                   still count as background. 12 is conservative; ~18 suits a photographed
- *                   backdrop with shadow in it.
+ * IT PICKS ITS OWN THRESHOLD, from the image.
+ *
+ * This took a `tolerance` number and every surface put a slider on it, which asked the
+ * person cutting out a signature to guess a colour distance in RGB space — a unit nobody
+ * has an intuition for, on a value whose right answer is different for every picture. The
+ * honest reading of "I moved the slider until it looked right" is that the tool knew what
+ * it needed and made someone find it by hand.
+ *
+ * The image already says what it needs. A flat white studio backdrop has edge pixels sitting
+ * within a couple of units of each other; a photographed sheet of paper with a shadow across
+ * it spreads over thirty. That SPREAD is the threshold — measure how far the background
+ * varies from itself and admit exactly that much, rather than a constant that is too tight
+ * for one and too loose for the other.
+ *
+ * @param src  Image source. MUST be same-origin or proxied — a remote image taints the
+ *             canvas and `getImageData` throws (see canvasReadableSrc in thread-match).
  */
-export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgResult> {
+export function removeBackground(src: string): Promise<RemoveBgResult> {
   return new Promise((resolve) => {
     if (!src) { resolve({ error: "There is no artwork to work on yet." }); return }
     const img = new Image()
@@ -109,8 +120,42 @@ export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgR
        * what it actually is — and that is the whole difference between a cut-out that prints
        * clean and one that prints with a fringe.
        */
-      const inner = (Math.max(0, Math.min(100, tolerance)) / 100) * 441
-      const outer = inner * 2.4 + 24
+      /*
+       * THE THRESHOLD, MEASURED — how far the background varies FROM ITSELF.
+       *
+       * Every sample in the winning cluster is background by definition, so the spread of
+       * those samples around their own mean is exactly the tolerance this image needs. A
+       * seamless white sweep sits inside 2-3 units and gets a tight cut that keeps the
+       * anti-aliasing on a hairline; a photographed sheet with a shadow across it spreads
+       * over thirty and gets a threshold that actually reaches the shadow.
+       *
+       * mean + 2.5 sd covers the tail without chasing the one outlier that landed on the
+       * subject. Floored at 18 because JPEG ringing exists even on a synthetic flat fill,
+       * and capped at 90 because past that a "background" is wide enough to include most
+       * artwork and the answer should be a refusal rather than an erasure.
+       */
+      const devs = best.map((qq) => dist(qq, bg))
+      const mean = devs.reduce((a, b) => a + b, 0) / Math.max(1, devs.length)
+      const sd = Math.sqrt(devs.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, devs.length))
+      const measured = Math.max(18, Math.min(90, mean + sd * 2.5))
+      /*
+       * HOW FAR THE BACKDROP IS ALLOWED TO WANDER — and the border already knows.
+       *
+       * The travelling reference follows a gradient by taking small steps, and a small step
+       * is also how you walk INTO a subject whose edge is gentle: a pale grey logo on white
+       * is a jump of about thirty, a blurred edge is a ramp of ones. Tested, and both were
+       * erased outright — the tool eating the artwork it was asked to cut out, which is
+       * worse than leaving a fringe.
+       *
+       * What separates the two is not the step, it is the RANGE. On a vignette the border
+       * itself spans the whole gradient — the corners ARE the dark end — so a wide range is
+       * evidence that a wide range is legitimate. On flat white the border spans nothing, so
+       * anything far from white is the subject, however gently it got there.
+       *
+       * Measured across every edge sample rather than the winning cluster, because the
+       * cluster is by definition the part that agreed.
+       */
+      const edgeMax = edge.reduce((m, qq) => Math.max(m, dist(qq, bg)), 0)
       const distAt = (i: number) => Math.hypot(d[i] - bg[0], d[i + 1] - bg[1], d[i + 2] - bg[2])
 
       /*
@@ -120,56 +165,189 @@ export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgR
        * anti-aliased edge pixels are reached and can be softened; how much each one loses is
        * then decided by its own distance, not by having been reached.
        */
+      const source = new Uint8ClampedArray(d)          // pristine, so a pass can be re-run
       const seen = new Uint8Array(w * h)
       const stack = new Int32Array(w * h)
-      let sp = 0
-      const push = (p: number) => { if (!seen[p] && distAt(p * 4) <= outer) { seen[p] = 1; stack[sp++] = p } }
-      for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x) }
-      for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1) }
+      /*
+       * WHAT EACH PIXEL IS JUDGED AGAINST — its own patch of background, not the average of
+       * the border.
+       *
+       * One global colour is the wrong reference for any backdrop that CHANGES across the
+       * frame: a vignette, a drop shadow, a lit sweep. The border is the pale end of it, so
+       * the dark end sits further away than any threshold measured on the border admits, and
+       * the cut stops partway leaving a dark collar around the subject. Widening the
+       * threshold until it reaches the far end is the same knob that starts eating pale
+       * artwork — which is exactly the trade the slider was asking someone to make by hand.
+       *
+       * So the flood carries a reference WITH it. A pixel is admitted when it is close to
+       * the pixel it was reached FROM, and the reference then drifts halfway toward it. A
+       * gradient is a sequence of small steps, so the flood walks the whole of it however
+       * deep it goes; the subject's edge is one large step, so it stops there. The threshold
+       * stops being a guess about the image and becomes a statement about smoothness.
+       */
+      const ref = new Uint8Array(w * h * 3)
+      const edgePixels = new Int32Array(w * h)
+      const soft = new Uint8Array(w * h)
 
-      let cleared = 0
-      while (sp > 0) {
-        const p = stack[--sp]
-        const i = p * 4
-        const dd = distAt(i)
-        // 0 at the background colour, 1 at the far edge of the band.
-        const t = dd <= inner ? 0 : Math.min(1, (dd - inner) / Math.max(1, outer - inner))
-        const a = Math.round(t * d[i + 3])
-        if (a < d[i + 3]) {
-          /*
-           * DECONTAMINATE what survives. A partly-transparent pixel still holds the colour it
-           * was blended WITH — un-mix it, or a black signature keeps a pale grey rim that no
-           * amount of feathering hides, and it shows the moment the cut-out is placed on any
-           * colour other than the one it was lifted from.
-           *
-           * Standard un-premultiply: P = C·a + bg·(1-a)  ⇒  C = (P - bg·(1-a)) / a.
-           * Only above a floor, because at very low alpha the division amplifies noise into
-           * confetti — those pixels are nearly invisible anyway.
-           */
-          if (a > 24) {
-            const af = a / 255
-            for (let k = 0; k < 3; k++) {
-              d[i + k] = Math.max(0, Math.min(255, Math.round((d[i + k] - bg[k] * (1 - af)) / af)))
-            }
+      const pass = (inner: number) => {
+        const outer = inner * 2.4 + 24
+        /*
+         * How big a jump counts as an EDGE rather than more backdrop.
+         *
+         * The measured spread already IS "how much this background varies", so a step of
+         * one whole spread is the honest reading: anything inside it is the backdrop being
+         * itself. At 0.55 of it a noisy paper lost a fifth of its backdrop to speckle —
+         * grain between neighbouring pixels routinely exceeds half the spread, so the flood
+         * kept meeting "edges" that were two grains of noise.
+         *
+         * It is still nowhere near a real boundary: black artwork on white is a jump of
+         * 200+, and the largest step this ever allows is 90.
+         */
+        const step = Math.max(14, inner)
+        // The ceiling the wandering reference may not cross — see edgeMax.
+        const roam = Math.max(inner, edgeMax * 1.25 + 12)
+        d.set(source)
+        seen.fill(0)
+        soft.fill(0)
+        let sp = 0
+        // Boundary pixels: softened after the flood, never spread from. See admit().
+        let ep = 0
+        /*
+         * TOUCHED IS NOT THE SAME AS TRUSTED.
+         *
+         * A pixel past `roam` is not backdrop — but if it is inside the soft band it is an
+         * anti-aliased pixel on the boundary and still needs its alpha ramped, or the cut-out
+         * gets a hard jagged edge. Softening it is right; letting it SPREAD is what erased a
+         * pale grey logo in testing: the reference followed into the subject, every pixel
+         * inside then matched its own neighbours perfectly, and the whole shape dissolved.
+         *
+         * So it is marked seen and softened against the sampled background, and never pushed
+         * — the flood dies at the boundary instead of walking through it.
+         */
+        const admit = (p: number, r0: number, g0: number, b0: number) => {
+          if (seen[p]) return
+          const i = p * 4
+          if (Math.hypot(source[i] - r0, source[i + 1] - g0, source[i + 2] - b0) > step) return
+          if (distAt(i) > roam) {
+            /*
+             * NOTED, NOT CLOSED. Marking it `seen` here was a regression the tests caught:
+             * on a smooth vignette the pixels hovering just past `roam` formed a ring the
+             * flood could never re-enter, so it died a third of the way in — 87% cleared
+             * became 66%. It is only recorded for softening; a later neighbour whose
+             * reference has drifted closer can still admit it properly.
+             */
+            if (!soft[p] && distAt(i) <= inner * 2.4 + 24) { soft[p] = 1; edgePixels[ep++] = p }
+            return
           }
-          d[i + 3] = a
-          if (a === 0) cleared++
+          seen[p] = 1
+          // Drift halfway: the reference follows the gradient instead of anchoring to where
+          // the flood started, which is what lets it cross an arbitrarily deep sweep.
+          ref[p * 3] = (r0 + source[i]) >> 1
+          ref[p * 3 + 1] = (g0 + source[i + 1]) >> 1
+          ref[p * 3 + 2] = (b0 + source[i + 2]) >> 1
+          stack[sp++] = p
         }
-        const x = p % w, y = (p / w) | 0
-        if (x > 0) push(p - 1)
-        if (x < w - 1) push(p + 1)
-        if (y > 0) push(p - w)
-        if (y < h - 1) push(p + w)
+        // The border seeds still answer to the SAMPLED background — that is what keeps "this
+        // image has no even backdrop" a refusal rather than a slow erasure from one corner.
+        const seed = (p: number) => {
+          if (seen[p] || distAt(p * 4) > outer) return
+          seen[p] = 1
+          ref[p * 3] = source[p * 4]; ref[p * 3 + 1] = source[p * 4 + 1]; ref[p * 3 + 2] = source[p * 4 + 2]
+          stack[sp++] = p
+        }
+        for (let x = 0; x < w; x++) { seed(x); seed((h - 1) * w + x) }
+        for (let y = 0; y < h; y++) { seed(y * w); seed(y * w + w - 1) }
+
+        let n = 0
+        while (sp > 0) {
+          const p = stack[--sp]
+          const i = p * 4
+          const rr = ref[p * 3], rg = ref[p * 3 + 1], rb = ref[p * 3 + 2]
+          const dd = Math.hypot(source[i] - rr, source[i + 1] - rg, source[i + 2] - rb)
+          // 0 at the background colour, 1 at the far edge of the band.
+          const t = dd <= inner ? 0 : Math.min(1, (dd - inner) / Math.max(1, outer - inner))
+          const a = Math.round(t * d[i + 3])
+          if (a < d[i + 3]) {
+            /*
+             * DECONTAMINATE what survives. A partly-transparent pixel still holds the colour
+             * it was blended WITH — un-mix it, or a black signature keeps a pale grey rim
+             * that no amount of feathering hides, and it shows the moment the cut-out is
+             * placed on any colour other than the one it was lifted from.
+             *
+             * Standard un-premultiply: P = C·a + bg·(1-a)  ⇒  C = (P - bg·(1-a)) / a.
+             * Only above a floor, because at very low alpha the division amplifies noise into
+             * confetti — those pixels are nearly invisible anyway.
+             */
+            if (a > 24) {
+              const af = a / 255
+              const local = [rr, rg, rb]
+              for (let k = 0; k < 3; k++) {
+                d[i + k] = Math.max(0, Math.min(255, Math.round((d[i + k] - local[k] * (1 - af)) / af)))
+              }
+            }
+            d[i + 3] = a
+            if (a === 0) n++
+          }
+          const x = p % w, y = (p / w) | 0
+          if (x > 0) admit(p - 1, rr, rg, rb)
+          if (x < w - 1) admit(p + 1, rr, rg, rb)
+          if (y > 0) admit(p - w, rr, rg, rb)
+          if (y < h - 1) admit(p + w, rr, rg, rb)
+        }
+        // The boundary ring, softened against the SAMPLED background — they were never
+        // backdrop, so judging them against a reference that walked here would be judging
+        // them against themselves.
+        for (let q = 0; q < ep; q++) {
+          const p = edgePixels[q]
+          if (seen[p]) continue          // the flood reached it properly in the end
+          const i = p * 4
+          const dd = distAt(i)
+          const t = dd <= inner ? 0 : Math.min(1, (dd - inner) / Math.max(1, outer - inner))
+          const a = Math.round(t * d[i + 3])
+          if (a < d[i + 3]) {
+            if (a > 24) {
+              const af = a / 255
+              for (let k = 0; k < 3; k++) d[i + k] = Math.max(0, Math.min(255, Math.round((d[i + k] - bg[k] * (1 - af)) / af)))
+            }
+            d[i + 3] = a
+            if (a === 0) n++
+          }
+        }
+        return n
+      }
+
+      /*
+       * A LADDER OF THREE, NOT A LOOP.
+       *
+       * The measured threshold is right for a backdrop that varies smoothly. It is wrong for
+       * one with a hard step in it — a vignette, a fold, a drop shadow with an edge — where
+       * the flood reaches that step and stops, taking a rim off the border and leaving the
+       * rest. What comes back is 1% cleared and a picture that looks untouched, which is the
+       * failure that sent everyone to the slider.
+       *
+       * So: try the measured value, and if it barely moved, try again wider. Three fixed
+       * rungs, decided before any of them runs — never a while-loop on a condition the work
+       * itself changes (CLAUDE.md §2.8). Each pass is a fresh flood over the ORIGINAL pixels,
+       * so a wider rung is not compounding the last one.
+       *
+       * 2% is "it did nothing". A real cut-out of a subject on a backdrop is tens of percent;
+       * a genuine near-miss — artwork that fills its frame — refuses below, which is correct.
+       */
+      const LADDER = [measured, measured * 1.7, measured * 2.6]
+      let cleared = 0
+      for (const inner of LADDER) {
+        cleared = pass(inner)
+        if (cleared >= w * h * 0.02) break
       }
 
       if (!cleared) {
-        resolve({ error: "No even background found around the edges — try a higher tolerance." })
+        resolve({ error: "There is no even background around the edges of this image to lift off." })
         return
       }
       // Everything cleared means the backdrop matched the whole picture; returning a blank
       // PNG would look like the tool destroyed the artwork.
-      if (cleared >= w * h) {
-        resolve({ error: "That would erase the whole image — try a lower tolerance." })
+      if (cleared >= w * h * 0.985) {
+        resolve({ error: "The artwork is too close in colour to its background to separate them." })
         return
       }
 
@@ -187,10 +365,11 @@ export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgR
 /**
  * The whole Remove-background control, minus the markup.
  *
- * TWO surfaces run this — the Design maker's right panel and the mini designer's "Your
- * design" card — and they need identical behaviour: the same tolerance, the same refusals,
- * and the same undo. Writing it twice is how they drift, so the state lives here and each
- * surface only decides what the buttons look like.
+ * THREE surfaces run this — the Design maker, the mini designer and the photo studio — and
+ * they need identical behaviour: the same refusals and the same undo. Writing it twice is
+ * how they drift, so the state lives here and each surface only decides what the button
+ * looks like. There is no longer a setting to keep in step, which is the best version of
+ * that: the threshold is measured from the image (see removeBackground).
  *
  * UNDO, not "place it again". Removal rewrites the artwork in place, and the honest way to
  * offer a way back is to keep the bytes we replaced rather than telling someone to go and
@@ -205,7 +384,6 @@ export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgR
 export function useBackgroundRemoval(url: string, apply: (next: string) => void) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState("")
-  const [tolerance, setTolerance] = useState(12)
   /** What we replaced, and what we replaced it WITH — the pair is what makes undo safe. */
   const [swap, setSwap] = useState<{ before: string; after: string } | null>(null)
 
@@ -220,7 +398,7 @@ export function useBackgroundRemoval(url: string, apply: (next: string) => void)
       // clean up. Route anything that isn't already a data: url through the img proxy so it
       // arrives same-origin, the same rule the thread matcher and the design maker follow.
       const readable = url.startsWith("data:") ? url : canvasReadableSrc(url)
-      const r = await removeBackground(readable, tolerance)
+      const r = await removeBackground(readable)
       if ("error" in r) { setMsg(r.error); return }
       // The result is a data: url, so whatever saves next persists the CUT-OUT rather than a
       // link back to the original — which is what makes the removal stick everywhere the
@@ -235,7 +413,12 @@ export function useBackgroundRemoval(url: string, apply: (next: string) => void)
        * the border and leaves everything else. Without a number the only way to find out is
        * to place the design and notice later.
        */
-      setMsg(`Cleared ${Math.round((r.cleared / Math.max(1, r.pixels)) * 100)}% — nudge the tolerance and run it again if that is too much or too little.`)
+      /*
+       * NOTHING TO SAY ON SUCCESS. The share cleared was worth printing while there was a
+       * dial to turn with it; without one it is a number nobody can act on, sitting under a
+       * picture that already shows what happened. Failures still speak — those name
+       * something the person can actually do.
+       */
     } finally {
       setBusy(false)
     }
@@ -248,8 +431,5 @@ export function useBackgroundRemoval(url: string, apply: (next: string) => void)
     setMsg("")
   }
 
-  /** Nudging the slider retires the message — it described the previous attempt. */
-  const changeTolerance = (v: number) => { setTolerance(v); setMsg("") }
-
-  return { busy, msg, tolerance, changeTolerance, run, undo, canUndo }
+  return { busy, msg, run, undo, canUndo }
 }
