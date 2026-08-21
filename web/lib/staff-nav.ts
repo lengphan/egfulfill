@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
+import { Sparkle, Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -97,6 +97,7 @@ export const STAFF_TOOLS: StaffNavItem[] = [
   // error anywhere.
   { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
+  { label: "Studio", href: "/studio", icon: Sparkle, roles: ["operator", "warehouse", "admin", "designer"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },

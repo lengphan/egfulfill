@@ -123,7 +123,10 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         // 12px, not the 11px this was condensed to — that read as small print you had to
         // lean in for. Still lighter than the 13px/semibold it started at, which made four
         // chips the loudest thing in a row whose job is the order number beside them.
- className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1 py-0.5 text-2xs transition-colors " + cls}
+ /* text-xs, not 2xs. 2xs was survivable while these were tinted capsules — the pill gave
+   the word presence and you read the SHAPE, not the letters. With the chrome gone the type
+   is all there is, so it has to be type you can actually read. */
+        className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1 py-0.5 text-xs transition-colors " + cls}
       >
         {tl("ui", label)}
       </PopoverTrigger>
@@ -266,7 +269,7 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
  const designFiles = designFilesAll.filter((f) => f.href || f.designId)
 
  return (
-    <span className={"inline-flex items-center gap-1 " + (className ?? "")}>
+    <span className={"inline-flex items-center gap-2 " + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={ready.label.state}
  title={ready.label.status} status={ready.label.status} files={labelFile} />
