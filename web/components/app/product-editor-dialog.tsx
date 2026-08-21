@@ -244,7 +244,16 @@ export function ProductEditorDialog({
  open: boolean
  onOpenChange: (v: boolean) => void
  product: CatalogProduct | null
- onSave: (p: CatalogProduct) => void
+  /**
+   * May be async, and if it REJECTS the dialog stays open and says so.
+   *
+   * It was `=> void`, called without await, on the line before an unconditional
+   * `onOpenChange(false)` — so the window closed the instant you pressed the button whether
+   * the save reached the server or not. A refusal then landed as a muted grey line on the
+   * page behind it, in the same grey as the success message, on a card that had quietly not
+   * changed. "Add to Products does nothing" is that, every time.
+   */
+ onSave: (p: CatalogProduct) => void | Promise<void>
  newIdSeed: number
   /** The next free EG SKU, pre-filled for a NEW product. This dialog never set a sku at
    * all, which is why two catalogue rows carry none — and a product without one can't be
@@ -778,7 +787,9 @@ export function ProductEditorDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ourSku])
 
+ const [saving, setSaving] = useState(false)
  const save = () => {
+ if (saving) return
  if (!name.trim()) { setErr("Give the product a name."); return }
  const colorImages: Record<string, string> = {}
  for (const c of colors) colorImages[c] = colorImgs[c] || ""
@@ -899,8 +910,15 @@ export function ProductEditorDialog({
         }
       })).catch(() => {})
     }
- onSave(next)
- onOpenChange(false)
+ void (async () => {
+ setSaving(true); setErr(null)
+ try {
+ await onSave(next)
+ onOpenChange(false)        // ONLY on success. The whole point.
+      } catch (e) {
+ setErr(e instanceof Error ? e.message : "Couldn't save that product.")
+      } finally { setSaving(false) }
+    })()
   }
 
  return (
@@ -1898,7 +1916,10 @@ export function ProductEditorDialog({
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save}>{ctaLabel ?? (product ? "Save changes" : "Add product")}</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? <CircleNotch size={14} className="animate-spin" /> : null}
+            {saving ? "Saving…" : (ctaLabel ?? (product ? "Save changes" : "Add product"))}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

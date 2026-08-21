@@ -30,12 +30,17 @@ export function LibraryPickerDialog({
   onOpenChange,
   onPick,
   onPickTemplate,
+  initialSource = "designs",
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   onPick: (dataUrl: string, design: LibraryDesign) => void
   /** Passed by callers that can restore a template's placement and blank, not just its art. */
   onPickTemplate?: (t: ProductTemplate) => void
+  /** Which tab to land on. A caller that opened this BECAUSE somebody pressed Template must
+   *  not drop them on Designs and make them find the other tab — that is the same click
+   *  they were trying to avoid. */
+  initialSource?: Source
 }) {
   const [source, setSource] = useState<Source>("designs")
   const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
@@ -47,14 +52,14 @@ export function LibraryPickerDialog({
     if (!open) return
     let alive = true
     const id = setTimeout(() => {
-      setDesigns(null); setTemplates(null); setQ(""); setSource("designs")
+      setDesigns(null); setTemplates(null); setQ(""); setSource(initialSource)
       getDesignLibrary().then((r) => alive && setDesigns(r ?? [])).catch(() => alive && setDesigns([]))
       // Both lists up front: the tab has to be able to say how many are behind it, and a
       // count that appears a second after the tab does reads as the list still loading.
       getTemplates().then((r) => alive && setTemplates(r ?? [])).catch(() => alive && setTemplates([]))
     }, 0)
     return () => { alive = false; clearTimeout(id) }
-  }, [open])
+  }, [open, initialSource])
 
   const term = q.trim().toLowerCase()
   /** Untitled things are findable too — the id is what the card shows when a name is absent. */

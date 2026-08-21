@@ -124,10 +124,26 @@ export function ProductsCatalog() {
   }, [])
 
   // Whole-catalog persist on any staff add/edit/delete.
- const persist = (next: CatalogProduct[]) => { setProducts(next); saveCatalogProducts(next).catch(() => {}) }
+  /**
+   * The optimistic write is kept — the grid should move under your hand — but the failure is
+   * no longer thrown away. `.catch(() => {})` meant a save the server REFUSED looked exactly
+   * like one it accepted: the row sat there looking right until a reload removed it. The
+   * previous list goes back and the reason is re-thrown, so the editor dialog that asked for
+   * the save is the thing that reports it.
+   */
+ const persist = async (next: CatalogProduct[]) => {
+ const prev = products
+ setProducts(next)
+ try {
+ await saveCatalogProducts(next)
+    } catch (e) {
+ setProducts(prev)
+ throw e instanceof Error ? e : new Error("Couldn't save the catalogue.")
+    }
+  }
  const saveProduct = (p: CatalogProduct) => {
  const list = products ?? []
- persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
+ return persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
   }
  const deleteProduct = (id: CatalogProduct["id"]) => persist((products ?? []).filter((x) => x.id !== id))
 

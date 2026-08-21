@@ -1117,6 +1117,8 @@ export function DesignCanvasDialog({
    * done before the server has been re-read. */
  const [justAttachedFile, setJustAttachedFile] = useState(false)
  const [libOpen, setLibOpen] = useState(false)
+  /** Which tab the library lands on. Pressing Template must not drop you on Designs. */
+ const [libSource, setLibSource] = useState<"designs" | "templates">("designs")
  const [over, setOver] = useState(false)
   /** The explicit machine-file picker. Dropping one already worked; there was no BUTTON,
    * so a seller who had cut their own file and didn't think to drag it had no route. */
@@ -2081,7 +2083,7 @@ export function DesignCanvasDialog({
             </button>
             <button
  type="button"
- onClick={() => setLibOpen(true)}
+ onClick={() => { setLibSource("designs"); setLibOpen(true) }}
  title="Pick from the library — saved designs and templates"
  aria-label="Open the design library"
  className={railBtn}
@@ -2094,10 +2096,25 @@ export function DesignCanvasDialog({
  only way to reuse a placement was to redo it by eye on the next order. */}
             <button
  type="button"
- onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
- disabled={!designUrl || tplBusy}
- title={designUrl ? "Save this artwork and its placement as a template" : "Add artwork first"}
- aria-label="Save as a template"
+              /*
+               * ONE CONTROL THAT MEANS "TEMPLATES", both ways round.
+               *
+               * It was save-only and `disabled={!designUrl}`, so on an empty canvas — which is
+               * exactly when a template is what you want — it was a greyed-out mark whose
+               * tooltip told you to go and do something else first. That reads as broken, and
+               * the only real route to USING a template was the Library button's second tab,
+               * which nothing here said.
+               *
+               * With artwork it still saves the placement. Without, it opens the library ON
+               * the Templates tab, which is what the word promises.
+               */
+ onClick={() => {
+ if (designUrl) { setTplName((v) => (v === null ? defaultTplName : null)); return }
+ setLibSource("templates"); setLibOpen(true)
+              }}
+ disabled={tplBusy}
+ title={designUrl ? "Save this artwork and its placement as a template" : "Start from a saved template"}
+ aria-label={designUrl ? "Save as a template" : "Start from a saved template"}
  aria-expanded={tplName !== null}
  className={railBtn + (tplName !== null ? " bg-primary/10 text-primary" : "")}
             >
@@ -2925,6 +2942,7 @@ export function DesignCanvasDialog({
         </div>
         <LibraryPickerDialog
  open={libOpen} onOpenChange={setLibOpen}
+ initialSource={libSource}
  onPick={(u, d) => {
             setErr(null); setDesignUrl(u); setPos(DEFAULT_POS)
             setDesignName(d?.name || "From library"); setDesignSize(null)
