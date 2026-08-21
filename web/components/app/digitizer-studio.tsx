@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown, TShirt } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
  getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
@@ -92,16 +92,22 @@ export function DigitizerStudio() {
         </div>
       </div>
 
-      <div className="flex w-fit rounded-full border border-border p-0.5">
+      {/* A rule under the live word — the app's one tab treatment (tabsListVariants `line`).
+          These were a capsule group with a filled active pill, which is the same shape a
+          primary BUTTON has: three things that look pressable, one of which looks pressed. */}
+      <nav className="-mb-px flex gap-5 border-b border-border">
         {([{ id: "create", label: "Create", icon: PencilSimple }, { id: "library", label: "Library", icon: ImageSquare }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
- const Icon = t.icon
- return (
-            <button key={t.id} onClick={() => setTab(t.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> <TabLabel>{t.label}</TabLabel>
+          const Icon = t.icon
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={"eg-tap relative inline-flex items-center gap-1.5 pb-2 text-sm transition-colors " + (tab === t.id
+                ? "font-medium text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-foreground"
+                : "text-muted-foreground hover:text-foreground")}>
+              <Icon size={15} /> <TabLabel>{t.label}</TabLabel>
             </button>
           )
         })}
-      </div>
+      </nav>
 
       {tab === "create" ? <CreateTab /> : tab === "library" ? <BrowseTab /> : <HistoryTab />}
     </div>
@@ -847,16 +853,96 @@ function CreateTab() {
  const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
  const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
 
- return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_1fr]">
-      {/* LEFT — image, text, colour, sequence, readout, actions */}
-      <div className="space-y-4">
-        {/* Images — drop several. Each becomes its own layer you arrange + reorder below. */}
+  return (
+    /*
+     * CANVAS LEFT, SETTINGS RIGHT.
+     *
+     * It was the other way round: a 400px control column on the left and the design pushed to
+     * the right edge. That is backwards for a tool you ARRANGE in — the thing you drag is the
+     * thing that should own the page, and every control is a thing you touch once and leave
+     * alone. Reading order put four blocks of settings between you and your own artwork.
+     *
+     * So the rail is one bounded column on the right that scrolls by itself, and the canvas
+     * gets the whole rest of the width and stays put while you scroll it.
+     */
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)]">
+      {/* ── LEFT — the design. Drop, drag, resize, rotate. ────────────────────────── */}
+      <div className="order-1 space-y-2">
+        <div className={"grid gap-2 " + (res?.trueview && compare ? "xl:grid-cols-2" : "grid-cols-1")}>
+          <div className="space-y-1">
+            {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
+                background click reaches here, dropping the selection (hides border/handles).
+                THE CANVAS ITSELF TAKES A DROP. The only drop target used to be a dashed box in
+                the control column, so "drag and drop" meant aiming at a 3cm strip beside the
+                600px area that looks exactly like where a picture goes. */}
+            <div
+              onPointerDown={() => setOpenLayer(null)}
+              onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => { e.preventDefault(); setOver(false); void addImages(e.dataTransfer.files) }}
+              style={{ background: garment }}
+              className={"relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border transition-colors lg:min-h-[620px] " + (over ? "border-primary ring-2 ring-ring/40" : "border-border")}
+            >
+              {!ready && (
+                <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image here, or type text on the right.</div>
+              )}
+              {ready && err && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-hold/10 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
+              )}
+              {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
+                  while it renders) and you drag / resize / rotate it in place. This IS the design;
+                  Generate merges the layers into one .emb. No divergent combined render underneath. */}
+              {/* Array order = stack order: later layers render last (on top), matching the panel.
+                  Each box is sized in REAL mm (its stitched preview × the image scale), so the box
+                  IS the true footprint and resizing an image scales it for real. */}
+              {layers.map((l, i) => {
+                const r = resById[l.id]
+                const s = l.tf.scale || 1  // scale sizes BOTH: image → digitize width, text → letter height
+                const effW = (r?.width || NOMINAL_MM) * s
+                const effH = (r?.height || NOMINAL_MM) * s
+                return (
+                <LayerBoxEditor key={l.id} z={i + 1} wmm={effW} hmm={effH} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
+                  isImg(l)
+                    ? (resById[l.id]?.trueview
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={`data:image/png;base64,${resById[l.id]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                        // eslint-disable-next-line @next/next/no-img-element
+                        : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
+                    : (resById["text"]?.trueview
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
+                        : /* The ghost is lettering stitched in the SELECTED CONE on the SELECTED GARMENT, so
+                             its colour is `color` — not text-foreground, which is near-white in dark
+                             mode and disappeared completely against a pale garment (and would do the
+                             same in light mode on a black one). The canvas is the blank, not the page. */
+                          <span className="truncate px-1 text-center font-bold leading-none" style={{ color, fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
+                } />
+                )
+              })}
+            </div>
+            <div className="text-center text-2xs text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
+          </div>
+          {res?.trueview && compare && (
+            <div className="space-y-1">
+              <div style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[620px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`data:image/png;base64,${res.trueview}`} alt="Generated stitched output" className="max-h-full max-w-full object-contain p-3" />
+              </div>
+              <div className="text-center text-2xs text-muted-foreground">Stitched result — what EWA actually generated{shownStitches ? ` · ${shownStitches.toLocaleString()} stitches` : ""}. Regenerate after moving layers.</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── RIGHT — the rail. Everything you set, in one column that scrolls on its own so the
+             canvas beside it never moves. ─────────────────────────────────────────── */}
+      <div className="order-2 flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        {/* Artwork — drop several. Each becomes its own layer you arrange + reorder below. */}
         <div>
-          <label className={labelCls}>Images</label>
+          <label className={labelCls}>Artwork</label>
           <div className="space-y-1.5">
             {imgLayers.map((im) => (
-              <div key={im.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-2">
+              <div key={im.id} className="flex items-center gap-3 rounded-lg border border-border bg-background p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.thumb} alt="" className="size-10 shrink-0 rounded-md border border-border object-contain" />
                 <span className="min-w-0 flex-1 truncate text-sm">{im.name}</span>
@@ -864,18 +950,18 @@ function CreateTab() {
               </div>
             ))}
             <label
- onDragOver={(e) => { e.preventDefault(); setOver(true) }}
- onDragLeave={() => setOver(false)}
- onDrop={(e) => { e.preventDefault(); setOver(false); void addImages(e.dataTransfer.files) }}
- className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-4 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
+              onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => { e.preventDefault(); setOver(false); void addImages(e.dataTransfer.files) }}
+              className={"flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed py-2.5 text-center text-xs font-medium transition-colors " + (over ? "border-primary bg-primary/5" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
             >
-              <ImageSquare size={18} className="text-muted-foreground" />
-              <span className="text-xs font-medium">{imgLayers.length ? "Add another image" : "Drop an image to embroider"}</span>
-              <span className="text-2xs text-muted-foreground">or click to choose — optional</span>
+              <ImageSquare size={15} />
+              {imgLayers.length ? "Add another image" : "Choose an image"}
               <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void addImages(e.target.files); e.currentTarget.value = "" }} />
             </label>
           </div>
         </div>
+
         <div>
           <label className={labelCls}>Text {imgLayers.length ? "(stitched with the images)" : "(optional)"}</label>
           <input value={text} onChange={(e) => onTextChange(e.target.value)} placeholder="Type to add lettering…" className={inputCls} />
@@ -904,7 +990,7 @@ function CreateTab() {
           </div>
           {palette.length ? (
             <>
-              <button onClick={() => setShowPalette((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-primary/40">
+              <button onClick={() => setShowPalette((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40">
                 <span className="size-6 shrink-0 rounded-md border border-border" style={{ background: color }} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{selCone?.name ?? "Custom colour"}</span>
@@ -912,8 +998,8 @@ function CreateTab() {
                 </span>
               </button>
               {showPalette && (
-                <div className="mt-2 rounded-lg border border-border bg-card p-2.5">
-                  <input value={pQuery} onChange={(e) => setPQuery(e.target.value)} placeholder="Search cones by name or code…" className="mb-2 h-8 w-full rounded-md border border-border bg-background px-2.5 text-xs outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
+                <div className="mt-2 rounded-lg border border-border bg-background p-2.5">
+                  <input value={pQuery} onChange={(e) => setPQuery(e.target.value)} placeholder="Search cones by name or code…" className="mb-2 h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
                   <div className="grid max-h-44 grid-cols-8 gap-1.5 overflow-y-auto">
                     {cones.map((c) => (
                       <button key={c.code} onClick={() => { setColor(c.hex); setShowPalette(false); setPQuery("") }} title={`${c.name} · ${c.code}`} className={"aspect-square rounded-md border-2 transition-transform hover:scale-110 " + (color.toLowerCase() === c.hex.toLowerCase() ? "border-foreground" : "border-transparent")} style={{ background: c.hex }} />
@@ -926,24 +1012,106 @@ function CreateTab() {
           ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
         </div>
 
+        {/* Garment colour — the preview backdrop, so you can judge the stitching on the blank
+            you'll actually embroider. Cosmetic (doesn't touch the .emb). */}
+        <div>
+          <span className={labelCls}>Garment</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {GARMENTS.map((g) => (
+              <button key={g.color} title={g.name} onClick={() => setGarment(g.color)}
+                className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : "border border-black/15")}
+                style={{ background: g.color }} />
+            ))}
+            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-2xs text-muted-foreground" title="Custom colour">
+              +<input type="color" value={garment} onChange={(e) => setGarment(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
+            </label>
+          </div>
+          {res?.trueview && (
+            <button onClick={() => setCompare((c) => !c)} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+              <Eye size={13} />{compare ? "Hide stitched result" : "Compare with stitched result"}
+            </button>
+          )}
+        </div>
+
+        {/* SIZE — the two numbers that decide whether a design fits a placement.
+            INCHES, and only inches. It carried the size in mm with a separate inches readout
+            beside it — the same two numbers twice. The floor sizes placements in inches, so
+            that is the unit; mm survives underneath, because it is what EWA is given. */}
+        <div>
+          <span className={labelCls}>Size (inches)</span>
+          {/* Empty until there is something to measure. An enabled-looking input with no value
+              reads as a field that failed to load, not as "nothing here yet". */}
+          {!footprint ? (
+            <div className="text-sm text-muted-foreground">—</div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <input
+                  inputMode="decimal"
+                  value={wDraft ?? inOf(footprint.w)}
+                  onChange={(e) => setWDraft(e.target.value)}
+                  // Commit, then drop the draft so the box snaps back to the size actually
+                  // achieved — clampScale can land short of the target, and showing the number
+                  // you asked for instead of the one you got would hide that.
+                  onBlur={() => { if (wDraft != null) { resizeTo(inToMm(wDraft)); setWDraft(null) } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
+                  aria-label="Design width in inches"
+                  className="h-8 w-16 rounded-lg border border-input bg-background px-2 text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                />
+                <span className="text-sm text-muted-foreground">×</span>
+                {/* EITHER dimension can be typed. Both drive the SAME uniform resize — a layer
+                    carries one scale, so there is no way to stretch one axis without lying about
+                    what was actually produced. Pin the one the placement is stated in and the
+                    other follows. */}
+                <input
+                  inputMode="decimal"
+                  value={hDraft ?? inOf(footprint.h)}
+                  onChange={(e) => setHDraft(e.target.value)}
+                  onBlur={() => { if (hDraft != null) { resizeToHeight(inToMm(hDraft)); setHDraft(null) } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setHDraft(null) }}
+                  aria-label="Design height in inches"
+                  className="h-8 w-16 rounded-lg border border-input bg-background px-2 text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                />
+              </div>
+              {/* Same placements as the digitize modal, so a size learned in one is the same
+                  button in the other. */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {PLACEMENTS.map((pl) => (
+                  <button
+                    key={pl.label}
+                    onClick={() => { setWDraft(null); resizeTo(Math.min(pl.w, pl.h * (footprint.w / footprint.h))) }}
+                    className="eg-tap rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {pl.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Layers — the elements in this design, TOP of the list = stitched on top. Each opens a
- move / resize / rotate panel feeding its <transform>; the carets reorder the stack. */}
+            move / resize / rotate panel feeding its <transform>; the carets reorder the stack. */}
         {layers.length > 0 && (
           <div>
-            <span className={labelCls}>Layers <span className="font-normal opacity-60">· top of the list stitches on top</span></span>
+            {/* Just "Layers". The trailing "· top of the list stitches on top" rode inside an
+                eg-label, so it came out UPPERCASE and wrapped the heading over two lines in a
+                340px rail — a sentence of explanation sitting on top of a control that already
+                shows its own order and carries carets to change it. */}
+            <span className={labelCls} title="Top of the list stitches on top">Layers</span>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {/* Reversed so the on-top (last-stitched) layer sits at the top of the list. */}
               {layers.slice().reverse().map((l) => {
- const ai = layers.findIndex((x) => x.id === l.id)
- return (
+                const ai = layers.findIndex((x) => x.id === l.id)
+                return (
                   <div
- key={l.id}
- draggable
- onDragStart={() => setDragId(l.id)}
- onDragOver={(e) => e.preventDefault()}
- onDrop={() => { if (dragId) reorderTo(dragId, l.id); setDragId(null) }}
- onDragEnd={() => setDragId(null)}
- className={"transition-colors " + (dragId === l.id ? "opacity-40" : dragId ? "hover:bg-primary/5" : "")}
+                    key={l.id}
+                    draggable
+                    onDragStart={() => setDragId(l.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => { if (dragId) reorderTo(dragId, l.id); setDragId(null) }}
+                    onDragEnd={() => setDragId(null)}
+                    className={"transition-colors " + (dragId === l.id ? "opacity-40" : dragId ? "hover:bg-primary/5" : "")}
                   >
                     <div className="flex items-center gap-2 px-3 py-2 text-sm">
                       {isImg(l) ? (
@@ -965,7 +1133,7 @@ function CreateTab() {
                     </div>
                     {openLayer === l.id && (
                       <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-2xs text-muted-foreground">
-                        <span className="min-w-0 truncate">Drag the box on the preview — corner to resize, top nub to rotate</span>
+                        <span className="min-w-0 truncate">Drag the box on the canvas — corner to resize, top nub to rotate</span>
                         <button type="button" onClick={() => setLayerTf(l.id, IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
                       </div>
                     )}
@@ -976,166 +1144,30 @@ function CreateTab() {
           </div>
         )}
 
-        {/* Two explicit generate actions, side by side — grab whichever you need. Machine file
-            = the .emb (stitches only, for the embroidery machine); PNG = the rendered image. */}
-        <div className="flex gap-2">
-          <button onClick={() => void generateAnd("emb")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-            {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} EMB
-          </button>
-          <button onClick={() => void generateAnd("png")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
-            PNG
-          </button>
-        </div>
         {err && <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
-      </div>
 
-      {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
-      <div className="space-y-2 lg:sticky lg:top-4">
-        {/* Garment colour — the preview backdrop, so you can judge the stitching on the blank you'll
- actually embroider. Cosmetic (doesn't touch the .emb). */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"><TShirt size={14} /> Garment</span>
-            {GARMENTS.map((g) => (
-              <button key={g.color} title={g.name} onClick={() => setGarment(g.color)}
- className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "border border-black/15")}
- style={{ background: g.color }} />
-            ))}
-            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-2xs text-muted-foreground" title="Custom colour">
-              +<input type="color" value={garment} onChange={(e) => setGarment(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
-            </label>
+        {/* The foot of the rail: what came out, and the two ways to take it away. Machine file
+            = the .emb (stitches only, for the embroidery machine); PNG = the rendered image.
+            mt-auto pins it to the bottom when the rail is shorter than the canvas. */}
+        <div className="mt-auto space-y-2 border-t border-border pt-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-2xs text-muted-foreground">Stitches</div>
+              <div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xs text-muted-foreground">File</div>
+              <div className="text-base font-semibold">{ext ?? "—"}</div>
+            </div>
           </div>
-          {res?.trueview && (
-            <button onClick={() => setCompare((c) => !c)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">
-              <Eye size={13} />{compare ? "Hide stitched result" : "Compare with stitched result"}
+          <div className="flex gap-2">
+            <button onClick={() => void generateAnd("emb")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+              {status === "generating" ? <CircleNotch size={14} className="animate-spin" /> : null} EMB
             </button>
-          )}
-        </div>
-        {/* SIZE TABLE — above the preview, where the arrangement it describes actually is.
-            It used to sit at the bottom of the left column, under the layer list, so the two
- numbers that decide whether a design fits a placement were the furthest thing on
- screen from the design. */}
-        <div className="mb-2 flex flex-wrap items-end gap-x-5 gap-y-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
-          <div>
-            <div className="text-2xs text-muted-foreground">Stitches</div>
-            <div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div>
+            <button onClick={() => void generateAnd("png")} disabled={busy || !ready} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
+              PNG
+            </button>
           </div>
-
-          {/* Editable, and LIVE — driven by the layer boxes, so it reads a real size while you
- are still arranging instead of "—" until the first generate. */}
-          {/* INCHES, and only inches. This bar carried the size in mm with a separate inches
- readout beside it — the same two numbers twice, in a strip whose whole job is to
- answer "does this fit the placement". The floor sizes placements in inches, so
- that is the unit; mm survives underneath, because it is what EWA is given. */}
-          <div>
-            <div className="text-2xs text-muted-foreground">Width × height (in)</div>
-            {/* Empty until there is something to measure. An enabled-looking input with no
- value reads as a field that failed to load, not as "nothing here yet". */}
-            {!footprint ? (
-              <div className="text-base font-semibold">—</div>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <input
- inputMode="decimal"
- value={wDraft ?? inOf(footprint.w)}
- onChange={(e) => setWDraft(e.target.value)}
-                  // Commit, then drop the draft so the box snaps back to the size actually
-                  // achieved — clampScale can land short of the target, and showing the number
-                  // you asked for instead of the one you got would hide that.
- onBlur={() => { if (wDraft != null) { resizeTo(inToMm(wDraft)); setWDraft(null) } }}
- onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
- aria-label="Design width in inches"
- className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                />
-                <span className="text-sm text-muted-foreground">×</span>
-                {/* EITHER dimension can be typed now. Both drive the SAME uniform resize —
- a layer carries one scale, so there is no way to stretch one axis without
- lying about what was actually produced. Pin the one the placement is
- stated in and the other follows. */}
-                <input
- inputMode="decimal"
- value={hDraft ?? inOf(footprint.h)}
- onChange={(e) => setHDraft(e.target.value)}
- onBlur={() => { if (hDraft != null) { resizeToHeight(inToMm(hDraft)); setHDraft(null) } }}
- onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setHDraft(null) }}
- aria-label="Design height in inches"
- className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Same placements as the digitize modal, so a size learned in one is the same
- button in the other. */}
-          {footprint && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {PLACEMENTS.map((pl) => (
-                <button
- key={pl.label}
- onClick={() => { setWDraft(null); resizeTo(Math.min(pl.w, pl.h * (footprint.w / footprint.h))) }}
- className="eg-tap rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  {pl.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="ml-auto">
-            <div className="text-2xs text-muted-foreground">File</div>
-            <div className="text-base font-semibold">{ext ?? "—"}</div>
-          </div>
-        </div>
-
-        <div className={"grid gap-2 " + (res?.trueview && compare ? "xl:grid-cols-2" : "grid-cols-1")}>
-          <div className="space-y-1">
-            {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
- background click reaches here, dropping the selection (hides border/handles). */}
-            <div onPointerDown={() => setOpenLayer(null)} style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[600px]">
-              {!ready && (
-                <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
-              )}
-              {ready && err && (
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-hold/10/95 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
-              )}
-              {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
- while it renders) and you drag / resize / rotate it in place. This IS the design;
-                  Generate merges the layers into one .emb. No divergent combined render underneath. */}
-              {/* Array order = stack order: later layers render last (on top), matching the panel.
-                  Each box is sized in REAL mm (its stitched preview × the image scale), so the box
-                  IS the true footprint and resizing an image scales it for real. */}
-              {layers.map((l, i) => {
- const r = resById[l.id]
- const s = l.tf.scale || 1  // scale sizes BOTH: image → digitize width, text → letter height
- const effW = (r?.width || NOMINAL_MM) * s
- const effH = (r?.height || NOMINAL_MM) * s
- return (
-                <LayerBoxEditor key={l.id} z={i + 1} wmm={effW} hmm={effH} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
- isImg(l)
-                    ? (resById[l.id]?.trueview
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={`data:image/png;base64,${resById[l.id]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
-                        // eslint-disable-next-line @next/next/no-img-element
- : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
- : (resById["text"]?.trueview
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
- : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
-                } />
-                )
-              })}
-            </div>
-            <div className="text-center text-2xs text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
-          </div>
-          {res?.trueview && compare && (
-            <div className="space-y-1">
-              <div style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[600px]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`data:image/png;base64,${res.trueview}`} alt="Generated stitched output" className="max-h-full max-w-full object-contain p-3" />
-              </div>
-              <div className="text-center text-2xs text-muted-foreground">Stitched result — what EWA actually generated{shownStitches ? ` · ${shownStitches.toLocaleString()} stitches` : ""}. Regenerate after moving layers.</div>
-            </div>
-          )}
         </div>
       </div>
     </div>
