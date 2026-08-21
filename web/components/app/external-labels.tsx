@@ -121,8 +121,8 @@ function progressOf(u: DispatchUpload): { label: string; tone: "wait" | "warn" |
 const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
  wait: "text-muted-foreground",
  warn: "text-hold",
- ok: "text-emerald-700 dark:text-emerald-400",
- part: "text-sky-700 dark:text-sky-400",
+ ok: "text-shipped",
+ part: "text-packed",
 }
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
@@ -247,7 +247,7 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
  if (!depth && !err) return null
  if (!depth) {
  return (
-      <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[90vw] rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 shadow-lg dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+      <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[90vw] rounded-xl border border-alert/30 bg-alert/12 px-3 py-2 text-xs text-alert shadow-lg">
         {err}
         <button onClick={() => setErr(null)} className="ml-2 font-semibold underline">Dismiss</button>
       </div>

@@ -1416,13 +1416,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       // "Placed" for that is the same lie as reading it for a dry run, and
                       // costs someone a search through a portal that has never seen it.
  : po.status === "placed" && isSandboxOrder(po)
-                      ? <span className="whitespace-nowrap text-xs font-medium text-violet-700"
+                      ? <span className="whitespace-nowrap text-xs font-medium text-working"
  title="Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.">
                           Sandbox
                         </span>
- : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-sky-700">Placed</span>
+ : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-packed">Placed</span>
  : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
- : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
+ : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-shipped"><CheckCircle size={11} weight="fill" /> Received</span>}
                     {/**
               * RECEIVE THE WHOLE DELIVERY, at the top where a box gets opened.
               *
@@ -1473,7 +1473,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  const past = sentSs && mins != null && mins >= 10
  return (
                             <button onClick={() => cancelPO(po)} disabled={busy === po.num}
- className="text-xs font-medium text-muted-foreground hover:text-red-600"
+ className="text-xs font-medium text-muted-foreground hover:text-alert"
  title={past
                                 ? "Past S&S's usual 10-minute window — we'll still ask them, and tell you what they say"
  : sentSs
@@ -1529,7 +1529,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  exactly when you need to know there's more than one. */}
                               {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">box {t.box}</span>}
                               {t.deliveredAt
-                                ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                ? <span className="inline-flex items-center gap-1 rounded-full bg-shipped/12 px-2 py-0.5 font-medium text-shipped">
                                     <CheckCircle size={10} weight="fill" /> delivered
                                   </span>
  : t.lastUpdate?.status
@@ -1555,7 +1555,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                                 {r.note ? ` · ${r.note}` : ""}
                               </span>
                               {r.status === "credited" ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-shipped/12 px-2 py-0.5 font-medium text-shipped">
                                   <CheckCircle size={10} weight="fill" /> {usd(r.credit)} credited
                                 </span>
                               ) : (
@@ -1694,7 +1694,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       {msg && (
         <div ref={msgRef} className={"rounded-lg border px-4 py-2 text-sm " + (
  msg.tone === "warn" ? "border-hold/20 bg-hold/10 text-hold"
- : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+ : msg.ok ? "border-shipped/30 bg-shipped/12 text-shipped"
  : "border-destructive/30 bg-destructive/10 text-destructive")}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="min-w-0 font-medium">{msg.text}</span>
@@ -1995,7 +1995,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         )
                       })()}
                       <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
- className="self-center text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
+ className="self-center text-muted-foreground hover:text-alert" title="Drop — not ordering this">
                         <Trash size={14} />
                       </button>
                      </div>

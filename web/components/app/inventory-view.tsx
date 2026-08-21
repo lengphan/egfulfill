@@ -59,8 +59,8 @@ const imageFor = (p: CatalogProduct | null, variant?: string | null): string => 
 const VIS: { id: SkuVisibility; label: string; pill: string }[] = [
   /* `pill` is kept for the summary row's plain label; the control itself no longer tints. */
   { id: "factory", label: "Factory only", pill: "text-muted-foreground" },
-  { id: "seller", label: "Sellers", pill: "text-sky-700 dark:text-sky-400" },
-  { id: "public", label: "Public", pill: "text-violet-700 dark:text-violet-400" },
+  { id: "seller", label: "Sellers", pill: "text-packed" },
+  { id: "public", label: "Public", pill: "text-working" },
 ]
 const visOf = (it: InventoryItem): SkuVisibility => (it.visibility === "seller" || it.visibility === "public" ? it.visibility : "factory")
 const isOut = (it: InventoryItem) => num(it.in_stock) <= 0
@@ -687,8 +687,8 @@ function ProductSheet({
               <button
  type="button"
  onClick={() => { if (!killing) { setKilling(true); return } group.rows.forEach((r) => remove(r.sku)); setKilling(false) }}
- className={"inline-flex items-center gap-1.5 text-xs transition-colors hover:text-red-600 "
-                  + (killing ? "font-medium text-red-600" : "text-muted-foreground")}
+ className={"inline-flex items-center gap-1.5 text-xs transition-colors hover:text-alert "
+                  + (killing ? "font-medium text-alert" : "text-muted-foreground")}
               >
                 <Trash size={14} /> {killing ? (one ? "Remove?" : `Remove all ${group.rows.length}?`) : "Remove"}
               </button>
@@ -736,7 +736,7 @@ function ProductSheet({
  */
 function cellTone(it: InventoryItem, lowAt: (x: InventoryItem) => number) {
  const stock = Number(it.in_stock) || 0
- if (stock <= 0) return "border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300"
+ if (stock <= 0) return "border-alert/30 text-alert"
  if (stock <= lowAt(it)) return "border-hold/20 text-hold"
  return "border-border"
 }
@@ -1175,10 +1175,10 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
  const up = r.delta > 0
  return (
                 <div key={r.id} className="flex items-center gap-3 py-2">
-                  <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (up ? "bg-emerald-100 text-success" : "bg-hold/15 text-hold")}>
+                  <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (up ? "bg-shipped/12 text-success" : "bg-hold/15 text-hold")}>
                     {up ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
                   </span>
-                  <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (up ? "text-success" : "text-red-600")}>
+                  <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (up ? "text-success" : "text-alert")}>
                     {up ? "+" : "−"}{Math.abs(r.delta)}
                   </span>
                   <div className="min-w-0 flex-1">

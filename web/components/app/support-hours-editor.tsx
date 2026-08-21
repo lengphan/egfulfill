@@ -72,7 +72,7 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
           <div className="space-y-4">
             {avail && (
               <div className={"flex items-center gap-2 rounded-lg border px-3 py-2 text-sm " + (avail.open
-                ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+                ? "border-shipped/30 bg-shipped/12 text-shipped"
  : "border-hold/30 bg-hold/10 text-hold")}>
                 {avail.open ? <CheckCircle size={15} weight="fill" /> : <Moon size={15} weight="fill" />}
                 <span>{avail.open ? "Open now" : `Closed right now${avail.resumesLabel ? ` — back ${avail.resumesLabel}` : ""}`}</span>
@@ -129,7 +129,7 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
         )}
 
         <DialogFooter>
-          {saved && <span className="mr-auto self-center text-xs text-success dark:text-emerald-400">Saved — applies immediately.</span>}
+          {saved && <span className="mr-auto self-center text-xs text-success">Saved — applies immediately.</span>}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           {isAdmin && <Button onClick={save} disabled={busy || !cfg}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save</Button>}
         </DialogFooter>

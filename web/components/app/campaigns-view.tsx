@@ -17,7 +17,7 @@ const int = (n: number) => (n ?? 0).toLocaleString("en-US")
 const DAYS = [7, 14, 30, 90]
 
 const CHANNEL: Record<string, { label: string; cls: string }> = {
- meta: { label: "Meta", cls: "bg-sky-100 text-sky-700" },
+ meta: { label: "Meta", cls: "bg-packed/12 text-packed" },
  google: { label: "Google", cls: "bg-hold/15 text-hold" },
 }
 
@@ -117,7 +117,7 @@ export function CampaignsView() {
       {/* Only surface a fetch error once ads are actually configured — otherwise the
           "not configured" card above already explains it, and a raw error next to it
  reads as a second, unrelated fault. */}
-      {err && anyEnabled && <div className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"><Warning size={14} weight="fill" /> {err}</div>}
+      {err && anyEnabled && <div className="flex items-center gap-1.5 rounded-lg border border-alert/30 bg-alert/12 px-3 py-2 text-sm text-alert"><Warning size={14} weight="fill" /> {err}</div>}
 
       {/* Per-channel failures — one channel down must not look like zero spend. */}
       {data?.errors?.map((e, i) => (
@@ -159,13 +159,13 @@ export function CampaignsView() {
                       <td className="px-4 py-2.5"><div className="max-w-[260px] truncate font-medium">{c.name}</div><div className="truncate text-xs text-muted-foreground">{c.account}</div></td>
                       <td className="px-4 py-2.5"><span className={"rounded-full px-2 py-0.5 text-xs font-semibold uppercase " + (CHANNEL[c.channel]?.cls ?? "bg-muted")}>{CHANNEL[c.channel]?.label ?? c.channel}</span></td>
                       <td className="px-4 py-2.5">
-                        <span className={"rounded-full px-2 py-0.5 text-xs font-medium capitalize " + (c.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground")}>{c.status || "—"}</span>
+                        <span className={"rounded-full px-2 py-0.5 text-xs font-medium capitalize " + (c.status === "active" ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>{c.status || "—"}</span>
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{c.dailyBudget != null ? usd(c.dailyBudget) : "—"}</td>
                       <td className="px-4 py-2.5 text-right font-medium tabular-nums">{usd(c.spend)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{int(c.clicks)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{int(c.conversions)}</td>
-                      <td className={"px-4 py-2.5 text-right font-semibold tabular-nums " + ((c.roas ?? 0) >= 1 ? "text-success" : c.roas != null ? "text-red-600" : "text-muted-foreground")}>{c.roas != null ? `${c.roas}x` : "—"}</td>
+                      <td className={"px-4 py-2.5 text-right font-semibold tabular-nums " + ((c.roas ?? 0) >= 1 ? "text-success" : c.roas != null ? "text-alert" : "text-muted-foreground")}>{c.roas != null ? `${c.roas}x` : "—"}</td>
                       <td className="px-4 py-2.5 text-right">
                         <Button size="sm" variant="ghost" disabled={busy === c.id} onClick={() => toggle(c.channel, c.id, c.status)} title={c.status === "active" ? "Pause" : "Resume"}>
                           {busy === c.id ? <CircleNotch size={13} className="animate-spin" /> : c.status === "active" ? <Pause size={13} weight="fill" /> : <Play size={13} weight="fill" />}

@@ -110,7 +110,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
         </DialogHeader>
 
         {done ? (
-          <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <div className="flex items-start gap-2 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-sm text-shipped">
             <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{done}</span>
           </div>
         ) : (
@@ -130,7 +130,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
                 <button
  type="button" onClick={() => { setDir(1); setConfirming(false) }}
  className={"flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
-                    (dir === 1 ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-border text-muted-foreground hover:bg-accent")}
+                    (dir === 1 ? "border-shipped/30 bg-shipped/12 text-shipped" : "border-border text-muted-foreground hover:bg-accent")}
                 >
                   <Plus size={14} weight="bold" /> Money in
                 </button>

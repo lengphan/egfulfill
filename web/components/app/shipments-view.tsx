@@ -416,7 +416,7 @@ export function ShipmentsView() {
  row itself there is nothing to tell it from a parcel that is
  actually going somewhere. */}
                         {s.test && (
-                          <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">TEST</span>
+                          <span className="shrink-0 rounded bg-draft/20 px-1.5 py-0.5 text-2xs font-medium text-draft">TEST</span>
                         )}
                       </div>
                       {s.state && <div className="text-2xs text-muted-foreground">{s.state}</div>}

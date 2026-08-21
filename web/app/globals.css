@@ -6,20 +6,20 @@
 
 @theme inline {
     /* Type scale. 11px and 10px were arbitrary values used 200 and 96 times — a de-facto
-       scale step that wasn't in the scale, so nothing stopped the next one being 11.5. Named
-       here so dense UI has a legitimate step to reach for instead of inventing one.
+ scale step that wasn't in the scale, so nothing stopped the next one being 11.5. Named
+ here so dense UI has a legitimate step to reach for instead of inventing one.
        NOTE: the print components (label sheets, catalog print, QR captions) size text in
-       millimetres of paper and keep their own arbitrary values on purpose. */
+ millimetres of paper and keep their own arbitrary values on purpose. */
     /* SIX STEPS, and nothing between them.
        11 · 12 · 14 · 18 · 24 · 36. Nine sizes were in use across the app — including 34 AND
        36, and 10 AND 11 AND 12. A pair that close is not a level of hierarchy: the eye
-       cannot resolve it as a decision, so it reads the screen as misaligned rather than
-       ranked, which is the "patchy" feeling. Three of those steps were removed rather than
-       renamed; what is left is far enough apart to mean something.
+ cannot resolve it as a decision, so it reads the screen as misaligned rather than
+ ranked, which is the "patchy" feeling. Three of those steps were removed rather than
+ renamed; what is left is far enough apart to mean something.
        10px is gone: `text-2xs` was a step below the smallest legible caption, used 137
-       times, and at 10px Inter's counters close up on a laptop screen.
+ times, and at 10px Inter's counters close up on a laptop screen.
        NOTE: the print components (label sheets, catalog print, QR captions) size text in
-       millimetres of paper and keep their own arbitrary values on purpose. */
+ millimetres of paper and keep their own arbitrary values on purpose. */
     --text-2xs: 0.6875rem;   /* 11px — the smallest step */
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
@@ -57,8 +57,8 @@
     --color-success: var(--success);
   /* THE STATUS SET, as tokens rather than fixed Tailwind shades.
    *
-   * amber/emerald/red were written literally in ~930 places — `bg-amber-100`,
-   * `text-amber-700`, `dark:bg-amber-950` — so no theme change could ever reach the colours
+   * amber/emerald/red were written literally in ~930 places — `bg-hold/12`,
+   * `text-hold`, `` — so no theme change could ever reach the colours
    * people actually look at. That is why the palette landed and the pages still looked
    * mismatched: the chrome moved and the meaning did not.
    *
@@ -83,6 +83,11 @@
     --color-shipped: var(--status-shipped);
     --color-alert: var(--status-alert);
     --color-info: var(--status-info);
+    --color-working: var(--status-working);
+    --color-pending: var(--status-pending);
+    --color-packed: var(--status-packed);
+    --color-backorder: var(--status-backorder);
+    --color-draft: var(--status-draft);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -151,9 +156,9 @@
    * beautifully and is invisible as text on white. Setting --primary to it would have blanked
    * `text-primary` in 247 places.
    *
-   *   --primary  a deeper step of the same hue: legible as ink on white, and solid enough
-   *              to hold white text as a button fill. Same family, works in both roles.
-   *   --brand    the marketing lime itself, for large fills where WE control the foreground
+   *   --primary a deeper step of the same hue: legible as ink on white, and solid enough
+   * to hold white text as a button fill. Same family, works in both roles.
+   *   --brand the marketing lime itself, for large fills where WE control the foreground
    *              (hero plates, highlight chips). Never use it for text.
    *
    * Status colours are untouched: emerald still means shipped, amber still means warning.
@@ -194,7 +199,7 @@
     --muted-foreground: oklch(0.545 0 0);
     --accent: oklch(0.962 0 0);
     --accent-foreground: oklch(0.205 0 0);
-  /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-emerald-600` was used in 56 places
+  /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-shipped` was used in 56 places
    * as the "positive" signal — and being a hardcoded shade it had no dark variant, so it
    * measured 3.77:1 on the light card and 4.06:1 on the dark one. It failed the 4.5:1 body
    * floor in BOTH modes: the single most-repeated status text in the product was the one
@@ -204,41 +209,50 @@
    * chip. This is the ink for "a number moved the right way". */
     --success: oklch(0.48 0.135 158);
   /* CORAL #FE9179. ONE LINE TO CHANGE — every use reads this token, so swapping the pop is
-     a single edit here and nothing else, in either theme.
+ a single edit here and nothing else, in either theme.
      Measured: L 0.77, chroma 0.137. Roughly twice the colour of the pale tints tried first,
-     which is the whole difference between a tint and a colour — at L 0.90 only yellow-green
-     can stay vivid, every other hue goes pastel. Ink on it 8.64:1; white on it 2.20:1, so it
-     is ALWAYS a fill carrying dark text and never a text colour or a hairline.
+ which is the whole difference between a tint and a colour — at L 0.90 only yellow-green
+ can stay vivid, every other hue goes pastel. Ink on it 8.64:1; white on it 2.20:1, so it
+ is ALWAYS a fill carrying dark text and never a text colour or a hairline.
      0.264 from `hold` in OKLab and far from alert despite the warm hue, because alert is a
-     mid-tone red and this is light. Warm against an entirely cool grey system, which is what
-     makes it read as a decision rather than as another UI colour. */
+ mid-tone red and this is light. Warm against an entirely cool grey system, which is what
+ makes it read as a decision rather than as another UI colour. */
     --pop: oklch(0.77 0.137 33);
     --pop-foreground: oklch(0.175 0 0);
     --status-hold: oklch(0.52 0.115 75);
     --status-shipped: oklch(0.46 0.120 158);
     --status-alert: oklch(0.50 0.170 25);
     --status-info: oklch(0.50 0.115 240);
+    /* The rest of the floor's reserved vocabulary (CLAUDE.md §4), derived at ONE lightness
+ and chroma so they read as a family rather than as eight unrelated Tailwind shades.
+ violet/indigo stay despite the app dropping purple from its chrome — these are
+       MEANINGS on the floor, not decoration, and a status is exempt from a brand decision. */
+    --status-working: oklch(0.50 0.115 285);
+    --status-pending: oklch(0.50 0.115 268);
+    --status-packed: oklch(0.50 0.115 235);
+    --status-backorder: oklch(0.52 0.115 50);
+    --status-draft: oklch(0.52 0.010 250);
     /* The design stage's ground — see .eg-studio-bed.
        NEAR-WHITE, not grey. A mid grey is what design tools use, but this stage sits inside
-       a white app canvas: a grey slab in the middle of white panels reads as a hole in the
-       page rather than a surface. So it matches the canvas and keeps only a whisper of
-       neutral — enough that a white garment still has an edge, and that the grid is legible
-       as a grid. Neutral rather than the warm cream it used to borrow from --muted, because
-       this is the one surface whose job is judging artwork colour. */
+ a white app canvas: a grey slab in the middle of white panels reads as a hole in the
+ page rather than a surface. So it matches the canvas and keeps only a whisper of
+ neutral — enough that a white garment still has an edge, and that the grid is legible
+ as a grid. Neutral rather than the warm cream it used to borrow from --muted, because
+ this is the one surface whose job is judging artwork colour. */
     --studio-bed: oklch(0.982 0.002 255);
     --destructive: oklch(0.577 0.245 27.325);
     /* HAIRLINES ARE NEUTRAL, because every surface they sit on is.
        These were oklch(… 0.013 91) and oklch(… 0.015 91) — hue 91 is yellow, so every line
-       in the light theme carried a warm olive cast. That was the only warm element in the
-       system: --background, --card and --foreground are all chroma 0, and --primary is
-       hue 283.5, violet. 91 against 283 is 192 degrees apart, near enough complementary, so
-       a taupe rule a centimetre from a periwinkle control read as a colour decision nobody
-       made — which is what "muddy" is.
+ in the light theme carried a warm olive cast. That was the only warm element in the
+ system: --background, --card and --foreground are all chroma 0, and --primary is
+ hue 283.5, violet. 91 against 283 is 192 degrees apart, near enough complementary, so
+ a taupe rule a centimetre from a periwinkle control read as a colour decision nobody
+ made — which is what "muddy" is.
        Chroma 0 makes the line agree with the surface instead of arguing with it, and the
-       lightness comes UP a step so a 1px rule reads as a hairline rather than a soft grey
-       band. Contrast is the thing that makes a line look thin; the width was never the
-       problem. Dark mode is left alone — its border shares hue 285 with its own surface,
-       which is the same rule, already satisfied. */
+ lightness comes UP a step so a 1px rule reads as a hairline rather than a soft grey
+ band. Contrast is the thing that makes a line look thin; the width was never the
+ problem. Dark mode is left alone — its border shares hue 285 with its own surface,
+ which is the same rule, already satisfied. */
     --border: oklch(0.905 0 0);
     --input: oklch(0.928 0 0);
     --ring: oklch(0.38 0 0);
@@ -283,10 +297,10 @@
 
 .dark {
     /* NEUTRAL, matching light mode's "true grey, chroma 0". These were warm — hue ~45
-       with chroma — a leftover of the old beige palette, which over a near-black reads
-       as brown haze rather than black, and is what made dark mode look faded. Surfaces
-       are also further apart now (0.145 → 0.205) so a card separates from the page
-       without needing a border to do it. */
+ with chroma — a leftover of the old beige palette, which over a near-black reads
+ as brown haze rather than black, and is what made dark mode look faded. Surfaces
+ are also further apart now (0.145 → 0.205) so a card separates from the page
+ without needing a border to do it. */
   /* SURFACES CARRY THE BRAND IN DARK MODE, not trim.
    *
    * The flatness was measurable, and it was not a shortage of accent: card-vs-canvas was
@@ -341,6 +355,11 @@
     --status-shipped: oklch(0.76 0.135 158);
     --status-alert: oklch(0.70 0.160 25);
     --status-info: oklch(0.72 0.115 240);
+    --status-working: oklch(0.74 0.115 285);
+    --status-pending: oklch(0.74 0.115 268);
+    --status-packed: oklch(0.74 0.115 235);
+    --status-backorder: oklch(0.76 0.120 50);
+    --status-draft: oklch(0.74 0.010 250);
     --studio-bed: oklch(0.245 0.008 255);
     --destructive: oklch(0.704 0.191 22.216);
     /* The ONLY thing separating a card from the canvas now, so it stays strong. */
@@ -378,70 +397,70 @@
   * {
     @apply border-border outline-ring/50;
     }
-  body {
+ body {
     @apply bg-background text-foreground;
     }
-  html {
+ html {
     @apply font-sans;
     /* Always reserve the scrollbar gutter so switching between a tall page (has a
-       scrollbar) and a short one (doesn't) never shifts the content horizontally. */
-    scrollbar-gutter: stable;
+ scrollbar) and a short one (doesn't) never shifts the content horizontally. */
+ scrollbar-gutter: stable;
     }
 
   /* `.font-display` now resolves to the body sans like everything else. It keeps its own
-     rule rather than being deleted, because ~100 call sites name it and a class that exists
-     is cheaper than a sweep — and because display type still wants tighter tracking than
-     body, which is a property of SIZE, not of the typeface that was dropped. */
+ rule rather than being deleted, because ~100 call sites name it and a class that exists
+ is cheaper than a sweep — and because display type still wants tighter tracking than
+ body, which is a property of SIZE, not of the typeface that was dropped. */
   .font-display {
-    font-optical-sizing: auto;
-    letter-spacing: -0.022em;
+ font-optical-sizing: auto;
+ letter-spacing: -0.022em;
     }
 }
 
 /* ── ALIGNMENT, ONCE, INSTEAD OF PER CELL ───────────────────────────────────────
    A number is right-aligned so its digits line up. In a proportional face they do NOT:
-   the 1 is narrower than the 8, so the column edge is straight and everything inside it
-   wanders. 77 right-aligned elements carried no `tabular-nums`, which is the alignment
-   defect people then try to fix by hand, cell by cell, forever.
+ the 1 is narrower than the 8, so the column edge is straight and everything inside it
+ wanders. 77 right-aligned elements carried no `tabular-nums`, which is the alignment
+ defect people then try to fix by hand, cell by cell, forever.
 
    Right-alignment IS the declaration that a thing is numeric, so it implies the figures.
    Applied here rather than added to 77 call sites, and harmless on the rare right-aligned
-   word — tabular figures only affect digits.
+ word — tabular figures only affect digits.
 
    Same for a header: a column heading over numbers is right-aligned with them, and it was
-   the one part that had to be remembered separately. */
+ the one part that had to be remembered separately. */
 [class~="text-right"],
 th[align="right"],
 td[align="right"] {
-  font-variant-numeric: tabular-nums;
+ font-variant-numeric: tabular-nums;
 }
 
 /* A row's contents sit on one optical line. `items-center` is used 1,190 times against 245
-   of everything else, so centre is plainly the house default — but the 245 are scattered
-   rather than considered, which is why a badge of one height next to a select of another
-   makes a column look crooked. This is not a fix for those; it is the baseline the shared
-   row primitives are measured against. */
+ of everything else, so centre is plainly the house default — but the 245 are scattered
+ rather than considered, which is why a badge of one height next to a select of another
+ makes a column look crooked. This is not a fix for those; it is the baseline the shared
+ row primitives are measured against. */
 
 /* THE page container for the app + board shells. Every page, no exceptions.
    The element carries `mx-auto` to centre itself; this sets the width and the gutter.
 
    The first attempt at the too-wide-row problem capped non-tabular pages at a 1100px
-   reading width and let tables opt out at 1600. That traded one inconsistency for a worse
-   one: adjacent pages in the same sidebar sat at visibly different widths, so moving
-   between them shifted the whole layout sideways — and a capped page whose panels are
-   left-aligned left a large empty right-hand side that reads as broken rather than as
-   margin. Having TWO widths was the thing that looked wrong, not the number either was
-   set to.
+ reading width and let tables opt out at 1600. That traded one inconsistency for a worse
+ one: adjacent pages in the same sidebar sat at visibly different widths, so moving
+ between them shifted the whole layout sideways — and a capped page whose panels are
+ left-aligned left a large empty right-hand side that reads as broken rather than as
+ margin. Having TWO widths was the thing that looked wrong, not the number either was
+ set to.
 
    So: one width for every page, and the extra breathing room comes from the GUTTER rather
-   than from a cap. Dense surfaces keep the pixels they need — nothing regains horizontal
-   scrolling, which was the real hazard of capping — while a wider side margin on a large
-   monitor stops content running into the chrome.
+ than from a cap. Dense surfaces keep the pixels they need — nothing regains horizontal
+ scrolling, which was the real hazard of capping — while a wider side margin on a large
+ monitor stops content running into the chrome.
 
    The gutter steps with the viewport instead of jumping once, so there is no single width
-   at which the margin visibly snaps. Below 1024px it is unchanged, which is why nothing on
-   a laptop moves. These set `padding-inline`, so they override the shell's `px-4 md:px-8`
-   at these widths rather than fighting it. */
+ at which the margin visibly snaps. Below 1024px it is unchanged, which is why nothing on
+ a laptop moves. These set `padding-inline`, so they override the shell's `px-4 md:px-8`
+ at these widths rather than fighting it. */
 .eg-content { max-width: 1600px; }
 
 /**
@@ -459,11 +478,11 @@ td[align="right"] {
  * being read as a label, not as a sentence.
  */
 .eg-label {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  line-height: 1.35;
+ font-size: var(--text-2xs);
+ font-weight: 600;
+ letter-spacing: 0.12em;
+ text-transform: uppercase;
+ line-height: 1.35;
 }
 
 /**
@@ -480,72 +499,72 @@ td[align="right"] {
  */
 /* ── A FILTER IS NOT A BUTTON ────────────────────────────────────────────────────
    This was `border-radius: 9999px` — so a category select, a "no longer stocked" toggle
-   and a "Print labels" ACTION all rendered as the same outlined lozenge. Shape is the only
-   thing that tells you what a control DOES before you read it, and spending it on all three
-   equally is why a toolbar reads as a row of interchangeable chips.
+ and a "Print labels" ACTION all rendered as the same outlined lozenge. Shape is the only
+ thing that tells you what a control DOES before you read it, and spending it on all three
+ equally is why a toolbar reads as a row of interchangeable chips.
 
    So: SHAPE SAYS KIND. A filter or a toggle is a FIELD — same rounded-lg as an Input,
-   because that is what it is, something you set. A Button keeps rounded-lg too but carries
-   a FILL when it matters, and weight is what separates them. Fully-round stays reserved for
-   things that are genuinely round: count badges and avatars.
+ because that is what it is, something you set. A Button keeps rounded-lg too but carries
+ a FILL when it matters, and weight is what separates them. Fully-round stays reserved for
+ things that are genuinely round: count badges and avatars.
 
    Height matches the Button's default so a mixed row still sits on one line.
    ── */
 .eg-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  height: 2rem;
-  padding-inline: 0.625rem;
-  border-radius: var(--radius-lg, 0.5rem);
-  border: 1px solid var(--input);
-  background: var(--background);
-  font-size: 0.875rem;
-  font-weight: 400;          /* a field is not emphasised; an action is */
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--foreground);
+ display: inline-flex;
+ align-items: center;
+ gap: 0.375rem;
+ height: 2rem;
+ padding-inline: 0.625rem;
+ border-radius: var(--radius-lg, 0.5rem);
+ border: 1px solid var(--input);
+ background: var(--background);
+ font-size: 0.875rem;
+ font-weight: 400;          /* a field is not emphasised; an action is */
+ line-height: 1;
+ white-space: nowrap;
+ color: var(--foreground);
 }
 .eg-control:hover { background: var(--muted); }
 .eg-control:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent); }
 /* THE GUTTER, WIDENED. Content used to start 32px from the sidebar on a laptop and 48px on
-   a large monitor — close enough to the chrome that the page read as one continuous slab,
-   and the space that WAS there sat inside the cards rather than around them. A page needs
-   air at its edge before it needs air in its middle: that is the difference between a
-   dashboard that looks composed and one that looks like it filled the window.
+ a large monitor — close enough to the chrome that the page read as one continuous slab,
+ and the space that WAS there sat inside the cards rather than around them. A page needs
+ air at its edge before it needs air in its middle: that is the difference between a
+ dashboard that looks composed and one that looks like it filled the window.
    Still stepped rather than jumping once, so no single width makes the margin snap, and
-   still unchanged below 1024px — a laptop has no room to give away. */
+ still unchanged below 1024px — a laptop has no room to give away. */
 @media (min-width: 1024px) { .eg-content { padding-inline: 4rem; } }
 @media (min-width: 1280px) { .eg-content { padding-inline: 5rem; } }
 @media (min-width: 1440px) { .eg-content { padding-inline: 6.5rem; } }
 @media (min-width: 1800px) { .eg-content { padding-inline: 8rem; } }
 
 /* CONTENT ZOOM. One rule for the WHOLE app — the level is a custom property on <html>
-   written by lib/zoom.ts, so it survives client-side navigation, refresh and sign-out
+ written by lib/zoom.ts, so it survives client-side navigation, refresh and sign-out
    (logout removes named keys, never the whole store) and needs no provider.
 
    On <body>, not on the content container. Scoping it to the content alone left the sidebar
-   and top bar at their original size, which read as the page and its chrome disagreeing —
-   and the nav is text you have to read too. Everything scales together now, including the
-   fixed sidebar and the `md:pl-60` gutter that has to keep matching its width.
+ and top bar at their original size, which read as the page and its chrome disagreeing —
+ and the nav is text you have to read too. Everything scales together now, including the
+ fixed sidebar and the `md:pl-60` gutter that has to keep matching its width.
 
    `zoom`, not transform: scale() — it relayouts. A transform keeps the unscaled layout box
-   and overlaps everything around it.
+ and overlaps everything around it.
 
    Note for anything dense: media queries still read the REAL viewport, so a breakpoint will
-   not fire just because zoom left the content short of room. Give wide things their own
-   overflow-x container rather than a breakpoint (see the orders table).
+ not fire just because zoom left the content short of room. Give wide things their own
+ overflow-x container rather than a breakpoint (see the orders table).
 
    NOT on <body>: Base UI portals popups to document.body, and a popup positioned from a
-   zoomed trigger's rect would then have that zoom applied twice, sliding it away from the
-   control that opened it. The wrapper keeps portals outside the zoomed subtree, so their
-   coordinates land where the rect said. See app/layout.tsx. */
+ zoomed trigger's rect would then have that zoom applied twice, sliding it away from the
+ control that opened it. The wrapper keeps portals outside the zoomed subtree, so their
+ coordinates land where the rect said. See app/layout.tsx. */
 .eg-zoom-root { zoom: var(--eg-zoom, 1); }
 
 /* Portalled surfaces sit outside .eg-zoom-root, so they would otherwise stay at 100% while
-   the page behind them grew. Scale the popup itself — never the positioner, whose inline
-   left/top are computed in unzoomed pixels and must stay that way. Dialogs are excluded:
-   they are centred by their own positioner and already sized to the viewport. */
+ the page behind them grew. Scale the popup itself — never the positioner, whose inline
+ left/top are computed in unzoomed pixels and must stay that way. Dialogs are excluded:
+ they are centred by their own positioner and already sized to the viewport. */
 [data-slot="dropdown-menu-content"],
 [data-slot="dropdown-menu-sub-content"],
 [data-slot="popover-content"],
@@ -553,18 +572,18 @@ td[align="right"] {
 
 /* Print — only the label sheet (Inventory → Print labels, Orders → Labels).
    The sheet is portalled to <body> (see label-sheet.tsx) precisely so we can
-   display:none its siblings. The previous rule used `visibility:hidden`, which hides
-   an element but KEEPS its layout box — the whole app still occupied its full height,
-   so one label printed across 4 near-blank pages. */
+ display:none its siblings. The previous rule used `visibility:hidden`, which hides
+ an element but KEEPS its layout box — the whole app still occupied its full height,
+ so one label printed across 4 near-blank pages. */
 @media print {
   @page { margin: 10mm; }
-  html, body { height: auto !important; background: #fff !important; }
+ html, body { height: auto !important; background: #fff !important; }
   /* Remove everything that isn't the sheet — space and all. */
-  body > *:not(.eg-print-root) { display: none !important; }
+ body > *:not(.eg-print-root) { display: none !important; }
   /* Let the sheet flow as normal page content instead of a fixed overlay. On screen the
-     sheet is a bounded, centred preview window; printing has to undo every part of that —
-     the backdrop, the card's height cap and its scroll container — or the printer is handed
-     a 900px-tall box with a scrollbar in it and prints one page of the first few labels. */
+ sheet is a bounded, centred preview window; printing has to undo every part of that —
+ the backdrop, the card's height cap and its scroll container — or the printer is handed
+ a 900px-tall box with a scrollbar in it and prints one page of the first few labels. */
   .eg-print-root { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; padding: 0 !important; backdrop-filter: none !important; }
   .eg-print-card { max-width: none !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; display: block !important; background: #fff !important; }
   .eg-print-body { max-height: none !important; overflow: visible !important; background: #fff !important; }
@@ -573,8 +592,8 @@ td[align="right"] {
   /* Never split a label across a page break. */
   .print-area > * { break-inside: avoid; page-break-inside: avoid; }
   /* Thermal stock feeds ONE label at a time, so each label is its own page. Borders come
-     off in print — a printed hairline is just wasted ink on a sticker, and on a die-cut
-     label the edge IS the border. */
+ off in print — a printed hairline is just wasted ink on a sticker, and on a die-cut
+ label the edge IS the border. */
   .print-area.flex > .eg-label { page-break-after: always; break-after: page; }
   .print-area.flex > .eg-label:last-child { page-break-after: auto; break-after: auto; }
   .eg-label { border: 0 !important; }
@@ -602,154 +621,154 @@ td[align="right"] {
 
 /* ── Dithered hero plate ──────────────────────────────────────────────────────
    A 1-bit Atkinson-dithered image on a near-black canvas. The source is
-   black-on-white, so `invert` flips it and `screen` keeps true black transparent
-   to the canvas — that's what makes it read as light drawn on darkness rather
-   than a grey photo sitting in a box.
+ black-on-white, so `invert` flips it and `screen` keeps true black transparent
+ to the canvas — that's what makes it read as light drawn on darkness rather
+ than a grey photo sitting in a box.
 
    The mask is doing the real work: it fades the plate out through the middle so
-   the headline lands on near-solid black. Without it the dither pattern runs
-   straight through the type and the whole thing becomes unreadable — the picture
-   is atmosphere, not a competitor to the words.
+ the headline lands on near-solid black. Without it the dither pattern runs
+ straight through the type and the whole thing becomes unreadable — the picture
+ is atmosphere, not a competitor to the words.
 
    Fixed pixel dimensions, NOT `cover`: a dither is a fixed grid of dots, and
-   scaling it resamples that grid into moiré. Better to crop than to stretch. */
+ scaling it resamples that grid into moiré. Better to crop than to stretch. */
 /* Holds the <DitherImage> canvas. No background-image of its own — the canvas
-   paints itself; this just sizes it and fades the bottom edge into the next
-   section. Type is protected by .eg-hero-scrim layered ON TOP, not by punching a
-   hole here: a hole removed the stairway of folded blanks, which is the whole
-   reason this image was chosen. Darken above it; don't delete it. */
+ paints itself; this just sizes it and fades the bottom edge into the next
+ section. Type is protected by .eg-hero-scrim layered ON TOP, not by punching a
+ hole here: a hole removed the stairway of folded blanks, which is the whole
+ reason this image was chosen. Darken above it; don't delete it. */
 /* Readability scrim: sits between the plate and the words. Strongest where the
-   headline is, so contrast is guaranteed regardless of what the photo does there. */
+ headline is, so contrast is guaranteed regardless of what the photo does there. */
 /* The marketing hero is always dark, in both themes — it's a brand surface, not a
-   themed app surface, so it must not invert into a white block in light mode. */
+ themed app surface, so it must not invert into a white block in light mode. */
 .eg-hero { background: #0b0b0c; }
 
 /* The same plate behind the auth pages, so sign-in belongs to the same brand
-   rather than looking like a different product's form. The canvas fills the page;
-   this wrapper dims it and fades it out radially so it dissolves into the canvas
-   instead of ending in a hard rectangle. */
+ rather than looking like a different product's form. The canvas fills the page;
+ this wrapper dims it and fades it out radially so it dissolves into the canvas
+ instead of ending in a hard rectangle. */
 /* ── Touch targets ────────────────────────────────────────────────────────────
    On a touch screen the boards' small controls (filter pills, tab toggles, sm
-   buttons) are 24–28px tall against ~44px guidance. Rather than resize them —
-   which would wreck the density these dense tables are designed around, and
-   change desktop too — expand the HIT AREA with a centred transparent
-   pseudo-element. Layout and visual size are untouched; only what a finger can
-   land on grows.
+ buttons) are 24–28px tall against ~44px guidance. Rather than resize them —
+ which would wreck the density these dense tables are designed around, and
+ change desktop too — expand the HIT AREA with a centred transparent
+ pseudo-element. Layout and visual size are untouched; only what a finger can
+ land on grows.
 
    Capped at 40px, not 44: at 44 the areas of adjacent controls in a tight action
-   row overlap enough that the later one in DOM order steals taps from its
-   neighbour, which is a worse bug than a slightly small target. */
+ row overlap enough that the later one in DOM order steals taps from its
+ neighbour, which is a worse bug than a slightly small target. */
 @media (pointer: coarse) {
-  [data-slot="button"],
-  [data-slot="dropdown-menu-trigger"],
+ [data-slot="button"],
+ [data-slot="dropdown-menu-trigger"],
   .eg-tap {
-    position: relative;
+ position: relative;
   }
-  [data-slot="button"]::after,
-  [data-slot="dropdown-menu-trigger"]::after,
+ [data-slot="button"]::after,
+ [data-slot="dropdown-menu-trigger"]::after,
   .eg-tap::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    translate: -50% -50%;
-    width: max(100%, 40px);
-    height: max(100%, 40px);
+ content: "";
+ position: absolute;
+ top: 50%;
+ left: 50%;
+ translate: -50% -50%;
+ width: max(100%, 40px);
+ height: max(100%, 40px);
     /* Purely a target — never paints, never intercepts hover styling. */
-    pointer-events: auto;
+ pointer-events: auto;
   }
 }
 
 /* Native <select> arrows are drawn by the OS — dark, chunky, and different on every
-   platform, which is why they stood out next to our own dropdowns. Replaced with the same
-   thin caret the custom dropdowns use, inlined as a data URI so it needs no asset.
+ platform, which is why they stood out next to our own dropdowns. Replaced with the same
+ thin caret the custom dropdowns use, inlined as a data URI so it needs no asset.
 
    The stroke is a literal colour rather than currentColor because a background-image
-   can't inherit it, so the two themes carry their own copy — matched to the neutral
+ can't inherit it, so the two themes carry their own copy — matched to the neutral
    --muted-foreground the CaretDown icons use, not a blue-tinted grey. */
 .eg-select {
   -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 0.85rem;
-  padding-right: 1.75rem;
+ appearance: none;
+ background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+ background-repeat: no-repeat;
+ background-position: right 0.5rem center;
+ background-size: 0.85rem;
+ padding-right: 1.75rem;
 }
 .dark .eg-select {
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b4b4b4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+ background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b4b4b4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
 }
 .eg-select::-ms-expand { display: none; }
 
 /* Studio bed for the Design Maker — the graph-paper ground the mockup sits on.
    It lives on the PANEL rather than the stage so the grid fills the whole column;
-   painted on the square stage it stopped at the square's edge and left bare panel
-   around it, which read as the grid failing to extend. */
+ painted on the square stage it stopped at the square's edge and left bare panel
+ around it, which read as the grid failing to extend. */
 .eg-studio-bed {
   /* ITS OWN COLOUR, not --muted.
      The bed borrowed the app's muted surface, which in this theme is a warm cream — and a
-     warm ground is the wrong thing to judge artwork on. It tints how you read whites, and a
-     natural or ivory garment (half the Comfort Colors range) sits on it almost invisibly.
+ warm ground is the wrong thing to judge artwork on. It tints how you read whites, and a
+ natural or ivory garment (half the Comfort Colors range) sits on it almost invisibly.
      Neutral grey is what every design tool uses here for the same reason: it takes no side
-     on hue, so the artwork and the blank are the only colours in the frame. Slightly deeper
-     than the panel around it, so the stage reads as a surface you work ON rather than more
-     page. */
-  background-color: var(--studio-bed);
-  background-image:
-    radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.55), transparent 62%),
-    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
-  background-size: 100% 100%, 32px 32px, 32px 32px;
+ on hue, so the artwork and the blank are the only colours in the frame. Slightly deeper
+ than the panel around it, so the stage reads as a surface you work ON rather than more
+ page. */
+ background-color: var(--studio-bed);
+ background-image:
+ radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.55), transparent 62%),
+ linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+ linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+ background-size: 100% 100%, 32px 32px, 32px 32px;
 }
 .dark .eg-studio-bed {
-  background-image:
-    radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.06), transparent 62%),
-    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+ background-image:
+ radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.06), transparent 62%),
+ linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+ linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
 }
 
 /* Transparency checker, behind the artwork preview in the Design Maker's right panel.
    Background removal is only legible against one: on a plain card, "the backdrop is gone"
-   and "the backdrop is white" render identically, so the tool would look broken every time
-   it worked on white. Kept mid-grey in both themes — a checker that inverts with the theme
-   reads as part of the artwork. */
+ and "the backdrop is white" render identically, so the tool would look broken every time
+ it worked on white. Kept mid-grey in both themes — a checker that inverts with the theme
+ reads as part of the artwork. */
 .eg-checker {
-  background-color: #fff;
-  background-image:
-    linear-gradient(45deg, rgba(0, 0, 0, 0.09) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.09) 75%),
-    linear-gradient(45deg, rgba(0, 0, 0, 0.09) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.09) 75%);
-  background-size: 14px 14px;
-  background-position: 0 0, 7px 7px;
+ background-color: #fff;
+ background-image:
+ linear-gradient(45deg, rgba(0, 0, 0, 0.09) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.09) 75%),
+ linear-gradient(45deg, rgba(0, 0, 0, 0.09) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.09) 75%);
+ background-size: 14px 14px;
+ background-position: 0 0, 7px 7px;
 }
 
 /* Scroller for panels that scroll inside the layout (the left nav above all).
    HIDDEN AT REST, revealed on hover. The platform default is a wide, high-contrast bar; on a
-   coloured sidebar it reads as a border someone drew by accident, and it is permanent for a
-   control you only need while actually dragging. Transparent until the pointer is over the
-   panel, then a thin tinted thumb — the space is still reserved, so revealing it never shifts
-   the nav's contents sideways.
+ coloured sidebar it reads as a border someone drew by accident, and it is permanent for a
+ control you only need while actually dragging. Transparent until the pointer is over the
+ panel, then a thin tinted thumb — the space is still reserved, so revealing it never shifts
+ the nav's contents sideways.
 
    No hover on touch, so `@media (hover: none)` keeps a faint thumb permanently visible there:
-   on a touch device the bar is the only thing saying the panel scrolls at all. */
+ on a touch device the bar is the only thing saying the panel scrolls at all. */
 .eg-scroll-slim {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 200ms ease;
+ scrollbar-width: thin;
+ scrollbar-color: transparent transparent;
+ transition: scrollbar-color 200ms ease;
 }
 .eg-scroll-slim:hover,
 .eg-scroll-slim:focus-within {
-  scrollbar-color: color-mix(in oklch, currentColor 26%, transparent) transparent;
+ scrollbar-color: color-mix(in oklch, currentColor 26%, transparent) transparent;
 }
 .eg-scroll-slim::-webkit-scrollbar { width: 5px; height: 5px; }
 .eg-scroll-slim::-webkit-scrollbar-track { background: transparent; }
 .eg-scroll-slim::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 9999px;
-  transition: background 200ms ease;
+ background: transparent;
+ border-radius: 9999px;
+ transition: background 200ms ease;
 }
 .eg-scroll-slim:hover::-webkit-scrollbar-thumb,
 .eg-scroll-slim:focus-within::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, currentColor 26%, transparent);
+ background: color-mix(in oklch, currentColor 26%, transparent);
 }
 @media (hover: none) {
   .eg-scroll-slim { scrollbar-color: color-mix(in oklch, currentColor 18%, transparent) transparent; }

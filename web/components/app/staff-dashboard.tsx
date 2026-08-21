@@ -490,7 +490,7 @@ export function StaffDashboard() {
               <>
                 <ProductionLine orders={lineOrders} />
                 {stats.attention > 0 && (
-                  <Link href="/production" className="flex items-center gap-2 bg-hold/10 px-5 py-2.5 text-xs font-medium text-hold transition-colors hover:bg-hold/15 dark:hover:bg-amber-950/50">
+                  <Link href="/production" className="flex items-center gap-2 bg-hold/10 px-5 py-2.5 text-xs font-medium text-hold transition-colors hover:bg-hold/15 dark:hover:bg-hold/50">
                     <Warning size={14} weight="fill" className="shrink-0" />
                     <span>{stats.attention === 1 ? t("dash.onHoldOne") : t("dash.onHold", { n: stats.attention })}</span>
                     <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />

@@ -87,7 +87,7 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
  className="h-8 w-20 rounded-lg border border-border bg-card px-2 text-right text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </label>
-              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-red-600 hover:text-red-700">Reject</Button>
+              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-alert hover:text-alert">Reject</Button>
               <Button size="sm" onClick={() => review(t, "confirm")} disabled={busy === t.id}>{busy === t.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Confirm &amp; credit</>}</Button>
             </div>
           </div>
@@ -137,7 +137,7 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-red-600 hover:text-red-700">Reject</Button>
+                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-alert hover:text-alert">Reject</Button>
                 <Button size="sm" onClick={() => act(p, "pay")} disabled={busy === p.id}>{busy === p.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark paid</>}</Button>
               </div>
             </div>
@@ -153,7 +153,7 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
 // negative being "Charge" and everything positive "Deposit".
 function txMeta(type: string, delta: number): { label: string; tone: string } {
  const t = String(type || "").toLowerCase()
- const EM = "bg-emerald-100 text-emerald-700", MUT = "bg-muted text-muted-foreground", AM = "bg-hold/15 text-hold"
+ const EM = "bg-shipped/12 text-shipped", MUT = "bg-muted text-muted-foreground", AM = "bg-hold/15 text-hold"
  if (t === "order-charge-in") return { label: "Revenue", tone: EM }
  if (t === "order-charge-out" || t === "charge") return { label: "Order charge", tone: MUT }
  if (t === "topup") return { label: "Deposit", tone: EM }
@@ -379,7 +379,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  ref: r.ref || "",
  method: r.method || "—",
  label: "Declined",
- tone: "bg-red-100 text-red-700",
+ tone: "bg-alert/12 text-alert",
  rejected: true,
  amount: Number(r.amount_usd) || 0,
  balance: NaN,          // no movement — rendered as "—" rather than a made-up figure
@@ -623,7 +623,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             <div
  className={
                 "mt-1.5 text-xs font-medium " +
-                (k.tone === "pos" ? "text-success" : k.tone === "neg" ? "text-red-600" : "text-muted-foreground")
+                (k.tone === "pos" ? "text-success" : k.tone === "neg" ? "text-alert" : "text-muted-foreground")
               }
             >
               {k.sub}
@@ -661,7 +661,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  return (
                   <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className={rejected ? "bg-red-100 text-red-700" : "bg-hold/15 text-hold"}>
+                      <Badge variant="secondary" className={rejected ? "bg-alert/12 text-alert" : "bg-hold/15 text-hold"}>
                         {rejected ? "Rejected" : selfServe ? "Awaiting payment" : "Awaiting confirmation"}
                       </Badge>
                       <span className="text-muted-foreground">

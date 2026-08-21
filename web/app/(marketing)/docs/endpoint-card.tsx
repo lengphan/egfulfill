@@ -13,7 +13,7 @@ const LANGS: [Lang, string][] = [["curl", "cURL"], ["js", "JavaScript"], ["pytho
 
 /** Indent a pretty-printed JSON body so it sits correctly inside generated code. */
 const indent = (json: string, spaces: number) =>
-  json.split("\n").map((l, i) => (i === 0 ? l : " ".repeat(spaces) + l)).join("\n")
+ json.split("\n").map((l, i) => (i === 0 ? l : " ".repeat(spaces) + l)).join("\n")
 
 /**
  * Build a runnable snippet for one endpoint.
@@ -23,26 +23,26 @@ const indent = (json: string, spaces: number) =>
  * changes, and the wrong one is worse than none.
  */
 function snippet(e: ApiEndpoint, lang: Lang): string {
-  const path = e.param ? e.path.replace(/:(\w+)/, e.param.placeholder) : e.path
-  const url = BASE + path
-  const hasBody = !!e.body
+ const path = e.param ? e.path.replace(/:(\w+)/, e.param.placeholder) : e.path
+ const url = BASE + path
+ const hasBody = !!e.body
 
-  if (lang === "curl") {
-    const lines = [`curl -X ${e.method} ${url} \\`, `  -H "X-API-Key: ${KEY}"`]
-    if (hasBody) {
-      lines[lines.length - 1] += " \\"
-      lines.push(`  -H "Content-Type: application/json" \\`)
-      lines.push(`  -d '${e.body}'`)
+ if (lang === "curl") {
+ const lines = [`curl -X ${e.method} ${url} \\`, `  -H "X-API-Key: ${KEY}"`]
+ if (hasBody) {
+ lines[lines.length - 1] += " \\"
+ lines.push(`  -H "Content-Type: application/json" \\`)
+ lines.push(`  -d '${e.body}'`)
     }
-    return lines.join("\n")
+ return lines.join("\n")
   }
 
-  if (lang === "js") {
-    const opts = [`  method: "${e.method}",`, `  headers: {`, `    "X-API-Key": "${KEY}",`]
-    if (hasBody) opts.push(`    "Content-Type": "application/json",`)
-    opts.push(`  },`)
-    if (hasBody) opts.push(`  body: JSON.stringify(${indent(e.body!, 2)}),`)
-    return [
+ if (lang === "js") {
+ const opts = [` method: "${e.method}",`, ` headers: {`, `    "X-API-Key": "${KEY}",`]
+ if (hasBody) opts.push(`    "Content-Type": "application/json",`)
+ opts.push(`  },`)
+ if (hasBody) opts.push(` body: JSON.stringify(${indent(e.body!, 2)}),`)
+ return [
       `const res = await fetch("${url}", {`,
       ...opts,
       `})`,
@@ -51,9 +51,9 @@ function snippet(e: ApiEndpoint, lang: Lang): string {
   }
 
   // python
-  const args = [`  "${url}",`, `  headers={"X-API-Key": "${KEY}"},`]
-  if (hasBody) args.push(`  json=${indent(e.body!, 2).replace(/true/g, "True").replace(/false/g, "False").replace(/null/g, "None")},`)
-  return [
+ const args = [`  "${url}",`, ` headers={"X-API-Key": "${KEY}"},`]
+ if (hasBody) args.push(` json=${indent(e.body!, 2).replace(/true/g, "True").replace(/false/g, "False").replace(/null/g, "None")},`)
+ return [
     `import requests`,
     ``,
     `res = requests.${e.method.toLowerCase()}(`,
@@ -64,23 +64,23 @@ function snippet(e: ApiEndpoint, lang: Lang): string {
 }
 
 /** `onAccent` restyles for the accent header strip — the muted-foreground default is
- *  near-invisible on it, and a copy button nobody can see is a copy button nobody uses. */
+ * near-invisible on it, and a copy button nobody can see is a copy button nobody uses. */
 function CopyButton({ text, label, onAccent }: { text: string; label: string; onAccent?: boolean }) {
-  const [done, setDone] = useState(false)
-  return (
+ const [done, setDone] = useState(false)
+ return (
     <button
-      type="button"
-      aria-label={`Copy ${label}`}
-      onClick={() => {
-        navigator.clipboard?.writeText(text)
-        setDone(true)
-        setTimeout(() => setDone(false), 1400)
+ type="button"
+ aria-label={`Copy ${label}`}
+ onClick={() => {
+ navigator.clipboard?.writeText(text)
+ setDone(true)
+ setTimeout(() => setDone(false), 1400)
       }}
-      className={
+ className={
         "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " +
         (onAccent
           ? "text-white/80 hover:bg-white/15 hover:text-white"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground")
+ : "text-muted-foreground hover:bg-accent hover:text-foreground")
       }
     >
       {done ? <><Check size={12} weight="bold" /> Copied</> : <><Copy size={12} weight="bold" /> Copy</>}
@@ -93,15 +93,15 @@ function CopyButton({ text, label, onAccent }: { text: string; label: string; on
  * playground where the same call can actually be sent with a real key.
  */
 export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
-  const [lang, setLang] = useState<Lang>("curl")
-  const code = snippet(e, lang)
+ const [lang, setLang] = useState<Lang>("curl")
+ const code = snippet(e, lang)
 
-  return (
+ return (
     <div className="rounded-lg border border-border p-4 transition-colors hover:border-primary/30">
       <div className="flex flex-wrap items-center gap-2">
         <span className={
           "rounded px-1.5 py-0.5 tabular-nums text-[11px] font-semibold " +
-          (e.method === "GET" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")
+          (e.method === "GET" ? "bg-shipped/12 text-shipped" : "bg-packed/12 text-packed")
         }>{e.method}</span>
         <code className="tabular-nums text-sm">{e.path}</code>
         <span className="ml-auto text-sm font-medium">{e.title}</span>
@@ -111,18 +111,18 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
 
       {/* Request, in whichever language they actually write in. The language tabs live
           IN the header strip now rather than floating above the block — they name what
-          the block contains, which is what the strip is for. */}
+ the block contains, which is what the strip is for. */}
       <div className="mt-3">
         <TitledBlock
-          title={
+ title={
             <span className="flex items-center gap-1">
               {LANGS.map(([id, label]) => (
                 <button
-                  key={id}
-                  type="button"
-                  onClick={() => setLang(id)}
-                  aria-pressed={lang === id}
-                  className={
+ key={id}
+ type="button"
+ onClick={() => setLang(id)}
+ aria-pressed={lang === id}
+ className={
                     "rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " +
                     // On the accent strip the ACTIVE tab is the readable one and the rest
                     // recede — inverted from the old light bar, where active meant darker.
@@ -134,18 +134,18 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
               ))}
             </span>
           }
-          actions={
+ actions={
             <>
               <CopyButton text={code} label={`${e.title} request`} onAccent />
               {/* Through /login, not straight at /developers.
                   These docs are PUBLIC, so most people clicking this have no session, and
-                  pointing them at an authenticated board meant landing on someone else's
-                  dashboard or a bare redirect that lost the endpoint. Login sends an
-                  existing session straight on without showing the form, and routes by role
-                  afterwards — so a seller lands on their board, not an admin one. */}
+ pointing them at an authenticated board meant landing on someone else's
+ dashboard or a bare redirect that lost the endpoint. Login sends an
+ existing session straight on without showing the form, and routes by role
+ afterwards — so a seller lands on their board, not an admin one. */}
               <a
-                href={`/login?next=${encodeURIComponent(`/developers?endpoint=${e.id}`)}`}
-                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+ href={`/login?next=${encodeURIComponent(`/developers?endpoint=${e.id}`)}`}
+ className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-white/80 transition-colors hover:bg-white/15 hover:text-white"
               >
                 Try it <ArrowSquareOut size={11} weight="bold" />
               </a>
@@ -159,8 +159,8 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
       {e.response && (
         <div className="mt-3">
           <TitledBlock
-            title={<span className="uppercase tracking-widest">Response</span>}
-            actions={<CopyButton text={e.response} label={`${e.title} response`} onAccent />}
+ title={<span className="uppercase tracking-widest">Response</span>}
+ actions={<CopyButton text={e.response} label={`${e.title} response`} onAccent />}
           >
             {e.response}
           </TitledBlock>

@@ -89,7 +89,7 @@ export function ShopAnalyzer() {
         </Button>
       </div>
 
-      {err && <div className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"><Warning size={14} weight="fill" /> {err}</div>}
+      {err && <div className="flex items-center gap-1.5 rounded-lg border border-alert/30 bg-alert/12 px-3 py-2 text-sm text-alert"><Warning size={14} weight="fill" /> {err}</div>}
 
       {!s && !running && !err && (
         <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">

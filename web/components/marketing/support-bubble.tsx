@@ -369,16 +369,16 @@ export function SupportBubble() {
           * same class of thing as a placeholder avatar beside an invented number.
           */}
         {done && office?.open !== false && (
-          <p className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">
+          <p className="mt-3 flex items-center gap-2 rounded-lg bg-shipped/12 px-3 py-2 text-xs leading-relaxed text-shipped">
             <span aria-hidden className="flex shrink-0 gap-0.5">
-              <span className="size-1.5 animate-bounce rounded-full bg-emerald-600 [animation-delay:-300ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-emerald-600 [animation-delay:-150ms]" />
-              <span className="size-1.5 animate-bounce rounded-full bg-emerald-600" />
+              <span className="size-1.5 animate-bounce rounded-full bg-shipped [animation-delay:-300ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-shipped [animation-delay:-150ms]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-shipped" />
             </span>
             Connecting you with an agent…
           </p>
         )}
-        {done && office?.open === false && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
+        {done && office?.open === false && <p className="mt-3 rounded-lg bg-shipped/12 px-3 py-2 text-xs leading-relaxed text-shipped">Passed to a person — we&apos;ll reply to {email || "your email"}.</p>}
       </div>
 
       {needIdentity ? (

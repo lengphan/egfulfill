@@ -20,20 +20,20 @@ const KEY_STORE = "eg_playground_key" // convenience only — sessionStorage, ne
  * identify WHICH key. Everything between is the secret.
  */
 function maskKey(k: string): string {
-  const v = String(k || "")
-  if (!v) return ""
-  const m = v.match(/^(egk_(?:test|live)_)(.*)$/)
-  const prefix = m ? m[1] : v.slice(0, 4)
-  const body = m ? m[2] : v.slice(4)
+ const v = String(k || "")
+ if (!v) return ""
+ const m = v.match(/^(egk_(?:test|live)_)(.*)$/)
+ const prefix = m ? m[1] : v.slice(0, 4)
+ const body = m ? m[2] : v.slice(4)
   // prefix + first 4 + eight dots + last 4 — the SAME shape Settings › API keys renders from
   // its stored prefix + last4, so the two can be compared at a glance.
-  if (body.length <= 8) return prefix + "•".repeat(Math.max(0, body.length))
-  return prefix + body.slice(0, 4) + "••••••••" + body.slice(-4)
+ if (body.length <= 8) return prefix + "•".repeat(Math.max(0, body.length))
+ return prefix + body.slice(0, 4) + "••••••••" + body.slice(-4)
 }
 
 const methodTone: Record<string, string> = {
-  GET: "bg-emerald-100 text-emerald-700",
-  POST: "bg-sky-100 text-sky-700",
+  GET: "bg-shipped/12 text-shipped",
+  POST: "bg-packed/12 text-packed",
 }
 
 type DevTab = "api" | "webhooks"
@@ -51,19 +51,19 @@ type DevTab = "api" | "webhooks"
 function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
   // No icons — see the note in design-lab-tabs.tsx. Two words each; a mark in front of
   // them is decoration competing with the label.
-  const items: { id: DevTab; label: string }[] = [
+ const items: { id: DevTab; label: string }[] = [
     { id: "api", label: "API Explorer" },
     { id: "webhooks", label: "Webhooks" },
   ]
-  return (
+ return (
     <nav aria-label="Developer sections" className={cn(tabsListVariants(), "h-8 w-fit")}>
       {items.map(({ id, label }) => (
         <button
-          key={id}
-          type="button"
-          aria-current={tab === id ? "page" : undefined}
-          onClick={() => onTab(id)}
-          className={cn(tabsTriggerVariants({ active: tab === id }), "px-3")}
+ key={id}
+ type="button"
+ aria-current={tab === id ? "page" : undefined}
+ onClick={() => onTab(id)}
+ className={cn(tabsTriggerVariants({ active: tab === id }), "px-3")}
         >
           {label}
         </button>
@@ -73,77 +73,77 @@ function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
 }
 
 export function ApiPlayground() {
-  const [tab, setTab] = useState<DevTab>("api")
-  const [env, setEnv] = useState<"test" | "live">("test")
-  const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
+ const [tab, setTab] = useState<DevTab>("api")
+ const [env, setEnv] = useState<"test" | "live">("test")
+ const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
   // Keys render masked. Revealing is deliberate and per-view, never remembered — a key
   // left legible is a key that ends up in a screen share or a screenshot.
-  const [revealed, setRevealed] = useState(false)
-  const apiKey = keys[env]
+ const [revealed, setRevealed] = useState(false)
+ const apiKey = keys[env]
   // ?endpoint=<id> preselects one, so "Try it" in the public docs lands on the call you
   // were reading instead of the top of the list. Read once at mount rather than through
   // useSearchParams, which would need a Suspense boundary for a value that never changes
   // after load. Unknown ids fall back to the first entry.
-  const [selected, setSelected] = useState<ApiEndpoint>(() => {
-    if (typeof window === "undefined") return API_ENDPOINTS[0]
-    const want = new URLSearchParams(window.location.search).get("endpoint")
-    return API_ENDPOINTS.find((e) => e.id === want) ?? API_ENDPOINTS[0]
+ const [selected, setSelected] = useState<ApiEndpoint>(() => {
+ if (typeof window === "undefined") return API_ENDPOINTS[0]
+ const want = new URLSearchParams(window.location.search).get("endpoint")
+ return API_ENDPOINTS.find((e) => e.id === want) ?? API_ENDPOINTS[0]
   })
-  const [body, setBody] = useState(selected.body ?? "")
-  const [param, setParam] = useState(selected.param?.placeholder ?? "")
-  const [sending, setSending] = useState(false)
-  const [res, setRes] = useState<{ status: number; ok: boolean; text: string } | null>(null)
-  const [copied, setCopied] = useState(false)
+ const [body, setBody] = useState(selected.body ?? "")
+ const [param, setParam] = useState(selected.param?.placeholder ?? "")
+ const [sending, setSending] = useState(false)
+ const [res, setRes] = useState<{ status: number; ok: boolean; text: string } | null>(null)
+ const [copied, setCopied] = useState(false)
 
   // Restore previously pasted/generated keys per environment (session-scoped).
-  useEffect(() => {
-    const id = setTimeout(() => {
-      try {
-        setKeys({ test: sessionStorage.getItem(KEY_STORE + "_test") || "", live: sessionStorage.getItem(KEY_STORE + "_live") || "" })
+ useEffect(() => {
+ const id = setTimeout(() => {
+ try {
+ setKeys({ test: sessionStorage.getItem(KEY_STORE + "_test") || "", live: sessionStorage.getItem(KEY_STORE + "_live") || "" })
       } catch {}
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
-  const rememberKey = (k: string) => {
-    setKeys((prev) => ({ ...prev, [env]: k }))
-    try { sessionStorage.setItem(KEY_STORE + "_" + env, k) } catch {}
+ const rememberKey = (k: string) => {
+ setKeys((prev) => ({ ...prev, [env]: k }))
+ try { sessionStorage.setItem(KEY_STORE + "_" + env, k) } catch {}
   }
 
-  const pick = (e: ApiEndpoint) => {
-    setSelected(e)
-    setBody(e.body ?? "")
-    setParam(e.param?.placeholder ?? "")
-    setRes(null)
+ const pick = (e: ApiEndpoint) => {
+ setSelected(e)
+ setBody(e.body ?? "")
+ setParam(e.param?.placeholder ?? "")
+ setRes(null)
   }
 
-  const resolvedPath = useMemo(
+ const resolvedPath = useMemo(
     () => (selected.param ? selected.path.replace(`:${selected.param.name}`, encodeURIComponent(param || selected.param.placeholder)) : selected.path),
-    [selected, param]
+ [selected, param]
   )
 
 
-  const send = async () => {
-    setSending(true); setRes(null)
-    try {
-      const init: RequestInit = {
-        method: selected.method,
-        headers: { "X-API-Key": apiKey.trim(), ...(selected.method === "POST" ? { "Content-Type": "application/json" } : {}) },
+ const send = async () => {
+ setSending(true); setRes(null)
+ try {
+ const init: RequestInit = {
+ method: selected.method,
+ headers: { "X-API-Key": apiKey.trim(), ...(selected.method === "POST" ? { "Content-Type": "application/json" } : {}) },
       }
-      if (selected.method === "POST") init.body = body || "{}"
-      const r = await fetch(resolvedPath, init)
-      const text = await r.text()
-      let pretty = text
-      try { pretty = JSON.stringify(JSON.parse(text), null, 2) } catch {}
-      setRes({ status: r.status, ok: r.ok, text: pretty })
+ if (selected.method === "POST") init.body = body || "{}"
+ const r = await fetch(resolvedPath, init)
+ const text = await r.text()
+ let pretty = text
+ try { pretty = JSON.stringify(JSON.parse(text), null, 2) } catch {}
+ setRes({ status: r.status, ok: r.ok, text: pretty })
     } catch (e) {
-      setRes({ status: 0, ok: false, text: e instanceof Error ? e.message : "Request failed (network)." })
+ setRes({ status: 0, ok: false, text: e instanceof Error ? e.message : "Request failed (network)." })
     } finally {
-      setSending(false)
+ setSending(false)
     }
   }
 
-  if (tab === "webhooks") {
-    return (
+ if (tab === "webhooks") {
+ return (
       <div className="space-y-4">
         <DevTabs tab={tab} onTab={setTab} />
         <WebhooksPanel />
@@ -151,7 +151,7 @@ export function ApiPlayground() {
     )
   }
 
-  return (
+ return (
     <div className="space-y-4">
       <DevTabs tab={tab} onTab={setTab} />
       {/* Getting started — collapsed by default so the test key is the focus */}
@@ -182,20 +182,20 @@ export function ApiPlayground() {
 
       {/* Key bar */}
       <SectionCard
-        title={<span className="flex items-center gap-2">Your API key
-          <span className={"rounded-full px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env === "live" ? "Live" : "Sandbox"}</span>
+ title={<span className="flex items-center gap-2">Your API key
+          <span className={"rounded-full px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-alert/12 text-alert" : "bg-shipped/12 text-shipped")}>{env === "live" ? "Live" : "Sandbox"}</span>
         </span>}
-        actions={
+ actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(["test", "live"] as const).map((m) => (
-              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? "Live" : "Sandbox"}</button>
+              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-alert text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? "Live" : "Sandbox"}</button>
             ))}
           </div>
         }
       >
         <div className="space-y-3 p-5">
           {env === "live" && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="flex items-start gap-2 rounded-lg border border-alert/30 bg-alert/12 px-3 py-2 text-sm text-alert">
               <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> <span><b>Live mode</b> — a live key (egk_live_…) makes calls create <b>real</b> orders. Use a test key while building.</span>
             </div>
           )}
@@ -203,34 +203,34 @@ export function ApiPlayground() {
             <div className="relative min-w-0 flex-1">
               <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               {/* Masked by default. Still a real input while revealed so a key can be
-                  pasted or corrected; masked it is read-only, because typing into a
-                  masked field would silently replace the key with bullets. */}
+ pasted or corrected; masked it is read-only, because typing into a
+ masked field would silently replace the key with bullets. */}
               <Input
-                value={revealed || !apiKey ? apiKey : maskKey(apiKey)}
-                onChange={(e) => rememberKey(e.target.value)}
-                readOnly={!!apiKey && !revealed}
-                placeholder={env === "live" ? "Paste your egk_live_… key from Settings → API keys" : "Paste your egk_test_… key from Settings → API keys"}
-                className="pl-9 pr-20 font-mono text-xs"
+ value={revealed || !apiKey ? apiKey : maskKey(apiKey)}
+ onChange={(e) => rememberKey(e.target.value)}
+ readOnly={!!apiKey && !revealed}
+ placeholder={env === "live" ? "Paste your egk_live_… key from Settings → API keys" : "Paste your egk_test_… key from Settings → API keys"}
+ className="pl-9 pr-20 font-mono text-xs"
               />
               {apiKey && (
                 <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
                   <button
-                    type="button"
-                    onClick={() => setRevealed((v) => !v)}
-                    aria-label={revealed ? "Hide key" : "Reveal key"}
-                    title={revealed ? "Hide" : "Reveal"}
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+ type="button"
+ onClick={() => setRevealed((v) => !v)}
+ aria-label={revealed ? "Hide key" : "Reveal key"}
+ title={revealed ? "Hide" : "Reveal"}
+ className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     {revealed ? <EyeSlash size={14} weight="bold" /> : <Eye size={14} weight="bold" />}
                   </button>
                   {/* Copies the REAL key whether or not it is on screen — the point of
-                      masking is that you never need to look at it. */}
+ masking is that you never need to look at it. */}
                   <button
-                    type="button"
-                    onClick={async () => { try { await navigator.clipboard.writeText(apiKey); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
-                    aria-label="Copy key"
-                    title="Copy"
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+ type="button"
+ onClick={async () => { try { await navigator.clipboard.writeText(apiKey); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
+ aria-label="Copy key"
+ title="Copy"
+ className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
                   </button>
@@ -252,9 +252,9 @@ export function ApiPlayground() {
         <div className="space-y-1 rounded-xl border border-border p-2">
           {API_ENDPOINTS.map((e) => (
             <button
-              key={e.id}
-              onClick={() => pick(e)}
-              className={
+ key={e.id}
+ onClick={() => pick(e)}
+ className={
                 "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors " +
                 (selected.id === e.id ? "bg-primary/10 text-primary" : "hover:bg-accent")
               }
@@ -286,11 +286,11 @@ export function ApiPlayground() {
                 <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">Request body</span>
                   <textarea
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    rows={Math.min(16, (body.match(/\n/g)?.length ?? 6) + 2)}
-                    spellCheck={false}
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+ value={body}
+ onChange={(e) => setBody(e.target.value)}
+ rows={Math.min(16, (body.match(/\n/g)?.length ?? 6) + 2)}
+ spellCheck={false}
+ className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                   />
                 </label>
               )}
@@ -304,9 +304,9 @@ export function ApiPlayground() {
 
           {res && (
             <SectionCard
-              title="Response"
-              actions={
-                <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + (res.ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+ title="Response"
+ actions={
+                <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + (res.ok ? "bg-shipped/12 text-shipped" : "bg-alert/12 text-alert")}>
                   {res.status || "ERR"}
                 </span>
               }

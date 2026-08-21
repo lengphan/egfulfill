@@ -10,32 +10,32 @@ const money = (n: number) => "$" + (n || 0).toLocaleString(undefined, { minimumF
 // One platform row: the live meter (read) plus, for admins, a compact cost/limit editor. The
 // monthly $ limit only ALERTS — nothing is throttled — so this never gates a live call.
 function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: boolean; onSaved: () => void }) {
-  const [cost, setCost] = useState((p.costPerCallCents / 100).toString())
-  const [limit, setLimit] = useState(p.monthlyLimitDollars ? String(p.monthlyLimitDollars) : "")
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+ const [cost, setCost] = useState((p.costPerCallCents / 100).toString())
+ const [limit, setLimit] = useState(p.monthlyLimitDollars ? String(p.monthlyLimitDollars) : "")
+ const [saving, setSaving] = useState(false)
+ const [saved, setSaved] = useState(false)
 
-  const save = async () => {
-    setSaving(true); setSaved(false)
-    try {
-      await setUsageConfig({
-        platform: p.key,
-        costPerCallCents: Math.max(0, Math.round(parseFloat(cost || "0") * 100)),
-        monthlyLimitCents: Math.max(0, Math.round(parseFloat(limit || "0") * 100)),
+ const save = async () => {
+ setSaving(true); setSaved(false)
+ try {
+ await setUsageConfig({
+ platform: p.key,
+ costPerCallCents: Math.max(0, Math.round(parseFloat(cost || "0") * 100)),
+ monthlyLimitCents: Math.max(0, Math.round(parseFloat(limit || "0") * 100)),
       })
-      setSaved(true); setTimeout(() => setSaved(false), 1500); onSaved()
+ setSaved(true); setTimeout(() => setSaved(false), 1500); onSaved()
     } finally { setSaving(false) }
   }
 
-  const pct = p.pct == null ? null : Math.min(100, p.pct)
-  return (
-    <div className={"rounded-xl border p-3 " + (p.over ? "border-red-300 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20" : "border-border bg-card")}>
+ const pct = p.pct == null ? null : Math.min(100, p.pct)
+ return (
+    <div className={"rounded-xl border p-3 " + (p.over ? "border-alert/30 bg-alert/50" : "border-border bg-card")}>
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{p.label}</div>
           <div className="text-2xs text-muted-foreground">
             {p.calls.toLocaleString()} call{p.calls === 1 ? "" : "s"}
-            {p.errors > 0 && <span className="text-red-600 dark:text-red-400"> · {p.errors} failed</span>}
+            {p.errors > 0 && <span className="text-alert"> · {p.errors} failed</span>}
           </div>
         </div>
         <div className="text-right">
@@ -48,11 +48,11 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
       {p.monthlyLimitDollars > 0 && (
         <div className="mt-2">
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className={"h-full rounded-full " + (p.over ? "bg-red-500" : "bg-primary")} style={{ width: `${pct ?? 0}%` }} />
+            <div className={"h-full rounded-full " + (p.over ? "bg-alert" : "bg-primary")} style={{ width: `${pct ?? 0}%` }} />
           </div>
           <div className="mt-1 flex items-center justify-between text-2xs text-muted-foreground">
             <span>{money(p.estMonthlyDollars)}/mo projected</span>
-            <span className={p.over ? "font-medium text-red-600 dark:text-red-400" : ""}>{p.pct}% of {money(p.monthlyLimitDollars)}</span>
+            <span className={p.over ? "font-medium text-alert" : ""}>{p.pct}% of {money(p.monthlyLimitDollars)}</span>
           </div>
         </div>
       )}
@@ -62,15 +62,15 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
           <label className="flex-1 text-2xs text-muted-foreground">
             Est. $/call
             <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="decimal" placeholder="0.00"
-              className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums outline-none focus:border-primary" />
+ className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums outline-none focus:border-primary" />
           </label>
           <label className="flex-1 text-2xs text-muted-foreground">
             Alert at $/mo
             <input value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="decimal" placeholder="none"
-              className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums outline-none focus:border-primary" />
+ className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums outline-none focus:border-primary" />
           </label>
           <button onClick={() => void save()} disabled={saving}
-            className="inline-flex h-[30px] items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+ className="inline-flex h-[30px] items-center gap-1 rounded-md bg-primary px-2.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
             {saving ? <CircleNotch size={13} className="animate-spin" /> : saved ? <Check size={13} weight="bold" /> : null}
             {saved ? "Saved" : "Save"}
           </button>
@@ -81,18 +81,18 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
 }
 
 export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
-  const [days, setDays] = useState(30)
-  const [data, setData] = useState<UsageSummary | null>(null)
-  const [loading, setLoading] = useState(true)
+ const [days, setDays] = useState(30)
+ const [data, setData] = useState<UsageSummary | null>(null)
+ const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try { setData(await getUsageSummary(days)) } catch { setData(null) } finally { setLoading(false) }
+ const load = useCallback(async () => {
+ setLoading(true)
+ try { setData(await getUsageSummary(days)) } catch { setData(null) } finally { setLoading(false) }
   }, [days])
   // Defer out of the effect body (react-hooks/set-state-in-effect — the pattern used across app pages).
-  useEffect(() => { const t = setTimeout(() => void load(), 0); return () => clearTimeout(t) }, [load])
+ useEffect(() => { const t = setTimeout(() => void load(), 0); return () => clearTimeout(t) }, [load])
 
-  return (
+ return (
     <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -103,7 +103,7 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
           <div className="flex rounded-lg border border-border p-0.5">
             {WINDOWS.map((w) => (
               <button key={w.d} onClick={() => setDays(w.d)}
-                className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (days === w.d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
+ className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (days === w.d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
                 {w.label}
               </button>
             ))}
@@ -122,7 +122,7 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
         <>
           {/* Alert banner when any platform crosses its monthly threshold. */}
           {data.totals.alerts.length > 0 && (
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-alert/30 bg-alert/12 px-3 py-2 text-sm text-alert">
               <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
               <span>{data.totals.alerts.length} platform{data.totals.alerts.length === 1 ? "" : "s"} projected to exceed the monthly alert threshold: <strong>{data.platforms.filter((p) => p.over).map((p) => p.label).join(", ")}</strong>.</span>
             </div>

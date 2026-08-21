@@ -12,53 +12,53 @@ import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, type Librar
 import { getToken } from "@/lib/auth"
 
 const fmtDate = (s?: string) => {
-  if (!s) return ""
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+ if (!s) return ""
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 function DesignLab() {
-  const tab = useDesignLabTab()
-  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
-  const [signedOut, setSignedOut] = useState(false)
-  const [studioOpen, setStudioOpen] = useState(false)
+ const tab = useDesignLabTab()
+ const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
+ const [signedOut, setSignedOut] = useState(false)
+ const [studioOpen, setStudioOpen] = useState(false)
 
-  const load = useCallback(() => {
-    if (!getToken()) { setSignedOut(true); setDesigns([]); return }
-    getDesignLibrary().then((r) => setDesigns(r ?? [])).catch(() => setDesigns([]))
+ const load = useCallback(() => {
+ if (!getToken()) { setSignedOut(true); setDesigns([]); return }
+ getDesignLibrary().then((r) => setDesigns(r ?? [])).catch(() => setDesigns([]))
   }, [])
   // Only when the Library tab is actually showing. Thumbs are base64 data URLs, so
   // landing on ?tab=templates used to pull the whole library down to render none of it.
   // `designs` gates the refetch: switching tabs keeps this component mounted, so the
   // list survives and coming back doesn't re-download it.
-  useEffect(() => {
-    if (tab !== "library" || designs !== null) return
-    const id = setTimeout(load, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ if (tab !== "library" || designs !== null) return
+ const id = setTimeout(load, 0)
+ return () => clearTimeout(id)
   }, [tab, designs, load])
 
-  const remove = async (id: number | string) => {
-    setDesigns((prev) => (prev ?? []).filter((d) => d.id !== id))
-    try { await deleteDesignLibrary(id) } catch { load() }
+ const remove = async (id: number | string) => {
+ setDesigns((prev) => (prev ?? []).filter((d) => d.id !== id))
+ try { await deleteDesignLibrary(id) } catch { load() }
   }
 
-  const [copied, setCopied] = useState<string | null>(null)
-  const [editId, setEditId] = useState<string | number | null>(null)
-  const list = designs ?? []
+ const [copied, setCopied] = useState<string | null>(null)
+ const [editId, setEditId] = useState<string | number | null>(null)
+ const list = designs ?? []
 
   // Rename in place. Reads the input's own value (uncontrolled) so there's no stale-draft
   // state, and skips the request when the name is unchanged. The id — the import reference —
   // never changes; only the label does.
-  const commitName = async (id: string | number, value: string) => {
-    setEditId(null)
-    const name = value.trim()
-    const cur = list.find((d) => d.id === id)
-    if (!name || (cur && (cur.name || "") === name)) return
-    setDesigns((prev) => (prev ?? []).map((d) => (d.id === id ? { ...d, name } : d)))
-    try { await renameDesignLibrary(id, name) } catch { load() }
+ const commitName = async (id: string | number, value: string) => {
+ setEditId(null)
+ const name = value.trim()
+ const cur = list.find((d) => d.id === id)
+ if (!name || (cur && (cur.name || "") === name)) return
+ setDesigns((prev) => (prev ?? []).map((d) => (d.id === id ? { ...d, name } : d)))
+ try { await renameDesignLibrary(id, name) } catch { load() }
   }
 
-  return (
+ return (
     <div className="space-y-4">
       <DesignLabTabs />
 
@@ -77,8 +77,8 @@ function DesignLab() {
         */}
       {tab === "library" ? (
         <SectionCard
-          title="Your images"
-          actions={
+ title="Your images"
+ actions={
             <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
               <Plus size={14} weight="bold" /> Add artwork
             </Button>
@@ -122,40 +122,40 @@ function DesignLab() {
                       <PenNib size={26} weight="duotone" className="text-muted-foreground/40" />
                     )}
                     <button
-                      onClick={() => remove(d.id)}
-                      className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
-                      aria-label="Delete image"
+ onClick={() => remove(d.id)}
+ className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"
+ aria-label="Delete image"
                     >
                       <Trash size={13} weight="bold" />
                     </button>
                   </div>
                   {/* flex-1 + flex-col so the meta row can pin to the BOTTOM (mt-auto below).
                       The card stretches to its grid row's height, and without this the
-                      date + ID sat directly under the title — so a one-line title and a
-                      wrapped one put their badges at different heights across a row, which
-                      is the other half of the crooked look. Pinned, every badge lands on
-                      the same line regardless of title length. */}
+ date + ID sat directly under the title — so a one-line title and a
+ wrapped one put their badges at different heights across a row, which
+ is the other half of the crooked look. Pinned, every badge lands on
+ the same line regardless of title length. */}
                   <div className="flex flex-1 flex-col p-3">
                     {/* Click the title to rename. Uncontrolled input keyed off the design id
-                        so remounting per row starts from the right value; Enter/blur saves,
+ so remounting per row starts from the right value; Enter/blur saves,
                         Esc reverts. */}
                     {editId === d.id ? (
                       <input
-                        autoFocus
-                        defaultValue={d.name || ""}
-                        onFocus={(e) => e.currentTarget.select()}
-                        onBlur={(e) => commitName(d.id, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() }
-                          else if (e.key === "Escape") { e.currentTarget.value = d.name || ""; e.currentTarget.blur() }
+ autoFocus
+ defaultValue={d.name || ""}
+ onFocus={(e) => e.currentTarget.select()}
+ onBlur={(e) => commitName(d.id, e.target.value)}
+ onKeyDown={(e) => {
+ if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() }
+ else if (e.key === "Escape") { e.currentTarget.value = d.name || ""; e.currentTarget.blur() }
                         }}
-                        className="w-full rounded-md border border-primary/50 bg-background px-1.5 py-0.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40"
+ className="w-full rounded-md border border-primary/50 bg-background px-1.5 py-0.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40"
                       />
                     ) : (
                       <button
-                        onClick={() => setEditId(d.id)}
-                        title="Click to rename"
-                        className="eg-tap block max-w-full truncate text-left text-sm font-semibold transition-colors hover:text-primary"
+ onClick={() => setEditId(d.id)}
+ title="Click to rename"
+ className="eg-tap block max-w-full truncate text-left text-sm font-semibold transition-colors hover:text-primary"
                       >
                         {d.name || "Untitled"}
                       </button>
@@ -163,11 +163,11 @@ function DesignLab() {
                     <div className="mt-auto flex items-center gap-1.5 pt-1.5">
                       <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
                       {/* The ID, visible and copyable — the reference sellers put on an import
-                          sheet, so it's shown at a readable size, not a tiny caption. */}
+ sheet, so it's shown at a readable size, not a tiny caption. */}
                       <button
-                        onClick={() => { navigator.clipboard?.writeText(`IMG-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
-                        title="Copy this image's reference"
-                        className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+ onClick={() => { navigator.clipboard?.writeText(`IMG-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
+ title="Copy this image's reference"
+ className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
                         {copied === String(d.id) ? "Copied ✓" : `IMG-${d.id}`}
                       </button>
@@ -191,10 +191,10 @@ export default function DesignPage() {
   // useSearchParams (via useDesignLabTab) needs a Suspense boundary to prerender.
   // The fallback mirrors the default (Library) view — bar plus the same 8-card grid the
   // loading state uses — so the page doesn't collapse to a sliver and pop back.
-  return (
+ return (
     <>
     <Suspense
-      fallback={
+ fallback={
         <div className="space-y-4">
           <div className="h-8 w-72 animate-pulse rounded-2xl bg-muted" />
           <Card className="gap-0 overflow-hidden p-0">

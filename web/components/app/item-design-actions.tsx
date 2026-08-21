@@ -15,10 +15,10 @@ type CardState = OrderDesignStatus["bySku"][string]
  * column, which is also what the partner's webhook drives, so one mapping serves both. */
 const LANE: Record<string, { label: string; tone: string; icon: typeof Eye }> = {
  incoming:   { label: "Queued", tone: "bg-muted text-muted-foreground", icon: Clock },
- inprogress: { label: "Designing", tone: "bg-sky-100 text-sky-700", icon: Clock },
- review:     { label: "In review", tone: "bg-violet-100 text-violet-700", icon: Eye },
+ inprogress: { label: "Designing", tone: "bg-packed/12 text-packed", icon: Clock },
+ review:     { label: "In review", tone: "bg-working/12 text-working", icon: Eye },
  fix:        { label: "Needs fix", tone: "bg-hold/15 text-hold", icon: Clock },
- approved:   { label: "Approved", tone: "bg-emerald-100 text-emerald-700", icon: CheckCircle },
+ approved:   { label: "Approved", tone: "bg-shipped/12 text-shipped", icon: CheckCircle },
 }
 
 const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }

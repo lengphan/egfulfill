@@ -377,7 +377,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
 
         {result ? (
           <div className="space-y-3 py-2">
-            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+            <div className="rounded-lg border border-shipped/30 bg-shipped/12 p-3 text-sm text-shipped">
               Label bought — <span className="tabular-nums">{result.trackingNumber}</span>
               {result.service ? ` · ${result.service}` : ""}{result.cost != null ? ` · $${result.cost.toFixed(2)}` : ""}
             </div>

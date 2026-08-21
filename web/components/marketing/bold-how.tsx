@@ -13,39 +13,39 @@ import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/ma
  */
 const steps = [
   {
-    icon: PlugsConnected,
-    title: "Connect your stores",
-    body: "Sign in to Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
-    detail: ["No CSV exports", "Every store, one login", "Existing orders backfilled"],
+ icon: PlugsConnected,
+ title: "Connect your stores",
+ body: "Sign in to Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
+ detail: ["No CSV exports", "Every store, one login", "Existing orders backfilled"],
   },
   {
-    icon: PenNib,
-    title: "Upload your designs",
-    body: "Add artwork once and map it to a product. The mini designer sets placement and size, generates the print files, and matches embroidery thread — so every order comes out right.",
-    detail: ["Reusable design library", "Print files made for you", "Placement handled"],
+ icon: PenNib,
+ title: "Upload your designs",
+ body: "Add artwork once and map it to a product. The mini designer sets placement and size, generates the print files, and matches embroidery thread — so every order comes out right.",
+ detail: ["Reusable design library", "Print files made for you", "Placement handled"],
   },
   {
-    icon: RocketLaunch,
-    title: "We make and ship it",
-    body: "You submit an order; we accept it, produce it on a vetted network, buy the cheapest label, and push tracking back to your shop. You watch orders go out.",
-    detail: ["Reviewed before production", "Cheapest-label shipping", "Tracking pushed back"],
+ icon: RocketLaunch,
+ title: "We make and ship it",
+ body: "You submit an order; we accept it, produce it on a vetted network, buy the cheapest label, and push tracking back to your shop. You watch orders go out.",
+ detail: ["Reviewed before production", "Cheapest-label shipping", "Tracking pushed back"],
   },
 ]
 
 const journey = [
   { label: "Draft", tone: "bg-black/[0.06] text-black/60", body: "Lands in your queue the moment it syncs. Edit it, add items — nothing is charged yet." },
-  { label: "Pending", tone: "bg-indigo-100 text-indigo-700", body: "You submit it and we accept it into production. Still cancellable, for a full refund." },
-  { label: "In process", tone: "bg-violet-100 text-violet-700", body: "Being made — printed or stitched, scanned, checked, packed. Nothing for you to do." },
-  { label: "Fulfilled", tone: "bg-emerald-100 text-emerald-700", body: "Out the door on the cheapest label, with tracking pushed back to your shop." },
+  { label: "Pending", tone: "bg-pending/12 text-pending", body: "You submit it and we accept it into production. Still cancellable, for a full refund." },
+  { label: "In process", tone: "bg-working/12 text-working", body: "Being made — printed or stitched, scanned, checked, packed. Nothing for you to do." },
+  { label: "Fulfilled", tone: "bg-shipped/12 text-shipped", body: "Out the door on the cheapest label, with tracking pushed back to your shop." },
 ]
 
 export function BoldHow() {
-  return (
+ return (
     <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
       <PlateHero
-        title="Three steps."
-        accent="Then it runs."
-        sub="Connect, upload, submit. Everything after that happens without you opening a shipping screen."
+ title="Three steps."
+ accent="Then it runs."
+ sub="Connect, upload, submit. Everything after that happens without you opening a shipping screen."
       />
 
       <section className="mx-auto max-w-6xl px-6 py-16">
@@ -56,7 +56,7 @@ export function BoldHow() {
                 {String(i + 1).padStart(2, "0")}
               </div>
               {/* No icon plate — the 01/02/03 above already carries the step, and stacking a
-                  filled accent tile under it repeated the same idea in a louder colour. */}
+ filled accent tile under it repeated the same idea in a louder colour. */}
               <h2 className="mt-5 text-xl font-bold tracking-tight">{s.title}</h2>
               <p className="mt-2 text-[15px] leading-relaxed text-black/60">{s.body}</p>
               <ul className="mt-5 space-y-1.5">

@@ -1456,7 +1456,7 @@ export function ProductEditorDialog({
             </div>
             {pkg ? (
               <div className={"mt-3 flex items-start gap-2 rounded-lg border p-2.5 text-xs " +
-                (pkg.billedOnSize ? "border-primary/40 bg-primary/5 text-foreground" : "border-emerald-300 bg-emerald-50 text-emerald-800")}>
+                (pkg.billedOnSize ? "border-primary/40 bg-primary/5 text-foreground" : "border-shipped/30 bg-shipped/12 text-shipped")}>
                 <Question size={14} weight="bold" className="mt-0.5 shrink-0" />
                 {pkg.billedOnSize ? (
                   <span>

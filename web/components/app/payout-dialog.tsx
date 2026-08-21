@@ -116,7 +116,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
 
         {done ? (
           <div className="space-y-3 py-2 text-center">
-            <CheckCircle size={40} weight="fill" className="mx-auto text-emerald-500" />
+            <CheckCircle size={40} weight="fill" className="mx-auto text-shipped" />
             <div className="font-medium">Payout requested</div>
             <p className="text-sm text-muted-foreground">Admin will review your details and pay it out. You&apos;ll see it in your wallet history once paid.</p>
             <Button className="w-full" onClick={() => onOpenChange(false)}>Done</Button>

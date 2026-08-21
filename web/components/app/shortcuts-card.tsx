@@ -19,151 +19,151 @@ export type ShortcutItem = { label: string; href: string; icon: Icon; desc?: str
  * the column heights line up instead of leaving a lopsided gap.
  */
 export function ShortcutsCard({
-  title,
-  catalog,
-  defaults,
-  storageKey,
+ title,
+ catalog,
+ defaults,
+ storageKey,
 }: {
   /** Defaults to the translated "Jump to" — a default parameter can't call the hook. */
-  title?: string
-  catalog: ShortcutItem[]
-  defaults: string[]
-  storageKey: string
+ title?: string
+ catalog: ShortcutItem[]
+ defaults: string[]
+ storageKey: string
 }) {
-  const t = useT()
+ const t = useT()
   // Tile labels ARE nav labels, so they translate through the shared `nav.` namespace the
   // sidebar already uses — the launcher can't drift from the menu it links into.
-  const nl = useLabelT()
-  const byHref = useMemo(() => Object.fromEntries(catalog.map((c) => [c.href, c])), [catalog])
+ const nl = useLabelT()
+ const byHref = useMemo(() => Object.fromEntries(catalog.map((c) => [c.href, c])), [catalog])
   // Only ever keep hrefs that still exist in the catalog — a role change or a removed page
   // must not leave a dead tile behind.
-  const clean = useCallback((hrefs: string[]) => hrefs.filter((h) => byHref[h]), [byHref])
+ const clean = useCallback((hrefs: string[]) => hrefs.filter((h) => byHref[h]), [byHref])
 
-  const [hrefs, setHrefs] = useState<string[]>(() => clean(defaults))
-  const [editing, setEditing] = useState(false)
-  const [addOpen, setAddOpen] = useState(false)
+ const [hrefs, setHrefs] = useState<string[]>(() => clean(defaults))
+ const [editing, setEditing] = useState(false)
+ const [addOpen, setAddOpen] = useState(false)
   // The card clips its own overflow (rounded corners), so the add-menu can't be a plain
   // absolute child — it gets cut off. Anchor it with position:fixed from the button's rect,
   // which a plain overflow ancestor doesn't clip.
-  const addBtnRef = useRef<HTMLButtonElement>(null)
-  const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null)
-  const dragFrom = useRef<number | null>(null)
-  const [dragOver, setDragOver] = useState<number | null>(null)
+ const addBtnRef = useRef<HTMLButtonElement>(null)
+ const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null)
+ const dragFrom = useRef<number | null>(null)
+ const [dragOver, setDragOver] = useState<number | null>(null)
 
-  const toggleAdd = () => {
-    if (addOpen) { setAddOpen(false); return }
-    const r = addBtnRef.current?.getBoundingClientRect()
-    if (r) {
-      const W = 224 // w-56
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
-      const below = window.innerHeight - r.bottom
-      const above = r.top
+ const toggleAdd = () => {
+ if (addOpen) { setAddOpen(false); return }
+ const r = addBtnRef.current?.getBoundingClientRect()
+ if (r) {
+ const W = 224 // w-56
+ const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
+ const below = window.innerHeight - r.bottom
+ const above = r.top
       // Flip upward when the button sits low and there's more room above, and cap the menu
       // to whatever space that side actually has so it never runs off the screen edge.
-      if (below < 200 && above > below) {
-        setMenuPos({ bottom: window.innerHeight - r.top + 4, left, maxHeight: above - 12 })
+ if (below < 200 && above > below) {
+ setMenuPos({ bottom: window.innerHeight - r.top + 4, left, maxHeight: above - 12 })
       } else {
-        setMenuPos({ top: r.bottom + 4, left, maxHeight: below - 12 })
+ setMenuPos({ top: r.bottom + 4, left, maxHeight: below - 12 })
       }
     }
-    setAddOpen(true)
+ setAddOpen(true)
   }
 
   // Load the saved layout after mount (localStorage is client-only). Deferred to dodge
   // react-hooks/set-state-in-effect, the pattern used across the app pages.
-  useEffect(() => {
-    const id = setTimeout(() => {
-      try {
-        const v = JSON.parse(localStorage.getItem(storageKey) || "null")
-        if (Array.isArray(v) && v.length) setHrefs(clean(v.map(String)))
+ useEffect(() => {
+ const id = setTimeout(() => {
+ try {
+ const v = JSON.parse(localStorage.getItem(storageKey) || "null")
+ if (Array.isArray(v) && v.length) setHrefs(clean(v.map(String)))
       } catch { /* keep defaults */ }
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [storageKey, clean])
 
-  const persist = useCallback((next: string[]) => {
-    setHrefs(next)
-    try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* ignore */ }
+ const persist = useCallback((next: string[]) => {
+ setHrefs(next)
+ try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* ignore */ }
   }, [storageKey])
 
-  const shown = hrefs.map((h) => byHref[h]).filter(Boolean) as ShortcutItem[]
-  const available = catalog.filter((c) => !hrefs.includes(c.href))
+ const shown = hrefs.map((h) => byHref[h]).filter(Boolean) as ShortcutItem[]
+ const available = catalog.filter((c) => !hrefs.includes(c.href))
 
   // Fixed at six slots — a stable 3×2 grid that lines up with the table height and never
   // grows. To add a seventh you remove one first, which is the whole point: it stays tidy.
-  const MAX = 6
-  const remove = (href: string) => persist(hrefs.filter((h) => h !== href))
-  const add = (href: string) => { if (hrefs.length < MAX) persist([...hrefs, href]); setAddOpen(false) }
-  const canAdd = hrefs.length < MAX && available.length > 0
+ const MAX = 6
+ const remove = (href: string) => persist(hrefs.filter((h) => h !== href))
+ const add = (href: string) => { if (hrefs.length < MAX) persist([...hrefs, href]); setAddOpen(false) }
+ const canAdd = hrefs.length < MAX && available.length > 0
 
-  const onDrop = (to: number) => {
-    const from = dragFrom.current
-    dragFrom.current = null
-    setDragOver(null)
-    if (from === null || from === to) return
-    const next = [...hrefs]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
-    persist(next)
+ const onDrop = (to: number) => {
+ const from = dragFrom.current
+ dragFrom.current = null
+ setDragOver(null)
+ if (from === null || from === to) return
+ const next = [...hrefs]
+ const [moved] = next.splice(from, 1)
+ next.splice(to, 0, moved)
+ persist(next)
   }
 
-  return (
+ return (
     <SectionCard
-      title={title ?? t("dash.jumpTo")}
-      className="h-full"
-      bodyClassName="flex flex-1 flex-col"
-      actions={
+ title={title ?? t("dash.jumpTo")}
+ className="h-full"
+ bodyClassName="flex flex-1 flex-col"
+ actions={
         <button
-          onClick={() => { setEditing((e) => !e); setAddOpen(false) }}
-          aria-pressed={editing}
-          className={"eg-tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors " + (editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+ onClick={() => { setEditing((e) => !e); setAddOpen(false) }}
+ aria-pressed={editing}
+ className={"eg-tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors " + (editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
         >
           {editing ? <><Check size={13} weight="bold" /> {t("dash.done")}</> : <><PencilSimple size={13} weight="bold" /> {t("dash.edit")}</>}
         </button>
       }
     >
       {/* auto-rows-fr makes every tile-row share the card's height equally, so the tiles
-          grow to meet a taller neighbour instead of the card leaving empty space below. */}
+ grow to meet a taller neighbour instead of the card leaving empty space below. */}
       <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-2 p-3">
         {shown.map((q, i) => {
-          const Icon = q.icon
-          const dragProps = editing ? {
-            draggable: true,
-            onDragStart: () => { dragFrom.current = i },
-            onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOver(i) },
-            onDragLeave: () => setDragOver((c) => (c === i ? null : c)),
-            onDrop: () => onDrop(i),
-            onDragEnd: () => { dragFrom.current = null; setDragOver(null) },
+ const Icon = q.icon
+ const dragProps = editing ? {
+ draggable: true,
+ onDragStart: () => { dragFrom.current = i },
+ onDragOver: (e: React.DragEvent) => { e.preventDefault(); setDragOver(i) },
+ onDragLeave: () => setDragOver((c) => (c === i ? null : c)),
+ onDrop: () => onDrop(i),
+ onDragEnd: () => { dragFrom.current = null; setDragOver(null) },
           } : {}
-          const tileCls = "group relative flex min-h-[96px] flex-col items-start justify-center gap-2.5 rounded-lg border p-4 transition-colors " +
+ const tileCls = "group relative flex min-h-[96px] flex-col items-start justify-center gap-2.5 rounded-lg border p-4 transition-colors " +
             (dragOver === i ? "border-primary bg-primary/5 " : "border-border ") +
             (editing ? "cursor-grab bg-card active:cursor-grabbing" : "hover:border-primary/40 hover:bg-accent")
-          const inner = (
+ const inner = (
             <>
               {/* Bare, monochrome, no tinted plate. Four tiles in a grid each wearing the same
-                  violet chip meant the eye met four identical coloured squares before it read a
-                  single word — the icon was slowing recognition down rather than speeding it up.
+ violet chip meant the eye met four identical coloured squares before it read a
+ single word — the icon was slowing recognition down rather than speeding it up.
                   The accent is kept for things that need you, not for every tile. */}
               <span className="flex items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={22} /></span>
               <span className="min-w-0">
                 <span className="block text-base font-semibold leading-tight tracking-tight">{nl("nav", q.label)}</span>
                 {/* NOT truncated. The description is the whole reason the tile isn't just a
-                    word — clipping "Dispatch + shipments" to "Dispatch + ship…" costs the
-                    reader the distinction it was added to make, and a mid-word ellipsis is
-                    most of what made this grid look unfinished. It wraps to a second line
-                    instead, which the taller tile now has room for. */}
+ word — clipping "Dispatch + shipments" to "Dispatch + ship…" costs the
+ reader the distinction it was added to make, and a mid-word ellipsis is
+ most of what made this grid look unfinished. It wraps to a second line
+ instead, which the taller tile now has room for. */}
                 {q.desc && <span className="mt-1 block text-sm leading-snug text-muted-foreground">{q.desc}</span>}
               </span>
             </>
           )
-          if (editing) {
-            return (
+ if (editing) {
+ return (
               <div key={q.href} {...dragProps} className={tileCls}>
                 <DotsSix size={14} className="absolute right-2 top-2 text-muted-foreground/50" />
                 <button
-                  aria-label={t("dash.removeShortcut", { label: nl("nav", q.label) })}
-                  onClick={() => remove(q.href)}
-                  className="eg-tap absolute right-1.5 bottom-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground shadow-sm transition-colors hover:text-red-600"
+ aria-label={t("dash.removeShortcut", { label: nl("nav", q.label) })}
+ onClick={() => remove(q.href)}
+ className="eg-tap absolute right-1.5 bottom-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground shadow-sm transition-colors hover:text-alert"
                 >
                   <X size={11} weight="bold" />
                 </button>
@@ -171,16 +171,16 @@ export function ShortcutsCard({
               </div>
             )
           }
-          return (
+ return (
             <Link key={q.href} href={q.href} className={tileCls}>{inner}</Link>
           )
         })}
 
         {editing && canAdd && (
           <button
-            ref={addBtnRef}
-            onClick={toggleAdd}
-            className="eg-tap flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+ ref={addBtnRef}
+ onClick={toggleAdd}
+ className="eg-tap flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
             <Plus size={20} weight="bold" />
             <span className="text-sm font-medium">{t("dash.addShortcut")}</span>
@@ -191,10 +191,10 @@ export function ShortcutsCard({
             <div className="fixed inset-0 z-40" onClick={() => setAddOpen(false)} />
             <div className="fixed z-50 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-xl" style={{ top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, maxHeight: menuPos.maxHeight }}>
               {available.map((c) => {
-                const Icon = c.icon
-                return (
+ const Icon = c.icon
+ return (
                   <button key={c.href} onClick={() => add(c.href)} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent">
-                    <Icon size={18} weight="regular"  className="shrink-0 text-primary" />
+                    <Icon size={18} weight="regular" className="shrink-0 text-primary" />
                     {nl("nav", c.label)}
                   </button>
                 )

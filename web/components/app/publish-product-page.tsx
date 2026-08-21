@@ -1629,7 +1629,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                       {/* A cool scrim over the top, so the tile reads as a different KIND of
  thing rather than just a duller photograph. Never over the hover
  state, and never intercepting the clicks underneath it. */}
-                      <span aria-hidden className="pointer-events-none absolute inset-0 bg-slate-500/15 transition-opacity duration-200 group-hover:opacity-0" />
+                      <span aria-hidden className="pointer-events-none absolute inset-0 bg-draft/15 transition-opacity duration-200 group-hover:opacity-0" />
                       {!staffViewer && <ReferenceWatermark />}
                       {/* NO `title`. The chip already says "Use as reference" in the same
  spot the native tooltip lands, so both appeared at once and the
@@ -1659,7 +1659,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  the two states, so the eye reads "filled / not filled"
  rather than "different badge", and it stays legible on a
  dark photo and a pale one alike. */
-                            ? "border-white bg-white text-slate-900"
+                            ? "border-white bg-white text-draft"
  : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
                       >
                         <Check size={11} weight="bold" />

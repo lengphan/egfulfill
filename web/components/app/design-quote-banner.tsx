@@ -59,7 +59,7 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
 
  if (done) {
  return (
-      <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+      <div className="flex items-start gap-2 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-xs text-shipped">
         <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" /><span>{done}</span>
       </div>
     )

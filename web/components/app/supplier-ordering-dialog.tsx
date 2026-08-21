@@ -369,7 +369,7 @@ export function SupplierOrderingDialog({
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     S&amp;S Activewear
                     {opts.keys?.ss?.set
-                      ? <span className="whitespace-nowrap text-2xs font-medium text-emerald-700">connected</span>
+                      ? <span className="whitespace-nowrap text-2xs font-medium text-shipped">connected</span>
  : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">no key</span>}
                   </h3>
                   <KeyRow label="Account number" name="SS_ACCOUNT_NUMBER" shown={opts.keys?.ss?.account ?? null}
@@ -386,7 +386,7 @@ export function SupplierOrderingDialog({
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     Otto Cap
                     {opts.keys?.otto?.set
-                      ? <span className="whitespace-nowrap text-2xs font-medium text-emerald-700">connected</span>
+                      ? <span className="whitespace-nowrap text-2xs font-medium text-shipped">connected</span>
  : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">no key</span>}
                   </h3>
                   {/* Username/password aren't in the editable set server-side — only the
@@ -412,7 +412,7 @@ export function SupplierOrderingDialog({
 
               {msg && (
                 <div className={"mt-4 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm " +
-                  (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>
+                  (msg.ok ? "border-shipped/30 bg-shipped/12 text-shipped" : "border-destructive/30 bg-destructive/10 text-destructive")}>
                   {msg.ok ? <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" /> : <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />}
                   <span>{msg.text}</span>
                 </div>

@@ -33,8 +33,8 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
   // compete with a grey gloss on every one of them. The label carries the meaning;
   // On-time absorbs its yardstick into its name rather than losing it.
  const rows: { icon: typeof Timer; label: string; stat: SpeedStat; accent: string }[] = [
-    { icon: Timer, label: tl("speed", "Production"), stat: s.production, accent: "text-violet-600 dark:text-violet-400" },
-    { icon: Truck, label: tl("speed", "Transit"), stat: s.transit, accent: "text-sky-600 dark:text-sky-400" },
+    { icon: Timer, label: tl("speed", "Production"), stat: s.production, accent: "text-working" },
+    { icon: Truck, label: tl("speed", "Transit"), stat: s.transit, accent: "text-packed" },
     { icon: Clock, label: tl("speed", "Total lead time"), stat: s.total, accent: "text-foreground" },
   ]
 
@@ -71,7 +71,7 @@ export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; load
             <SealCheck size={17} weight="regular" className="shrink-0 text-muted-foreground" />
             <div className="min-w-0 truncate text-sm font-medium leading-tight">{tl("speed", "On-time vs ETA")}</div>
             <div className="ml-auto text-right">
-              <div className={"text-xl font-bold tabular-nums leading-none " + (s.onTime.pct === null ? "text-muted-foreground" : s.onTime.pct >= 90 ? "text-success dark:text-emerald-400" : s.onTime.pct >= 75 ? "text-hold" : "text-red-600")}>{s.onTime.pct === null ? "—" : `${s.onTime.pct}%`}</div>
+              <div className={"text-xl font-bold tabular-nums leading-none " + (s.onTime.pct === null ? "text-muted-foreground" : s.onTime.pct >= 90 ? "text-success" : s.onTime.pct >= 75 ? "text-hold" : "text-alert")}>{s.onTime.pct === null ? "—" : `${s.onTime.pct}%`}</div>
               <div className="mt-1 text-2xs text-muted-foreground">{s.onTime.n ? t("dash.ofDelivered", { n: s.onTime.n }) : t("dash.collecting")}</div>
             </div>
           </div>

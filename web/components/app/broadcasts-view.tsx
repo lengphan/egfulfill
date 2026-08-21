@@ -43,9 +43,9 @@ function inWords(n: number): string {
 
 const STATUS: Record<string, { label: string; cls: string }> = {
  draft: { label: "Draft", cls: "bg-muted text-muted-foreground" },
- sending: { label: "Sending", cls: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300" },
- sent: { label: "Sent", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
- failed: { label: "Failed", cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
+ sending: { label: "Sending", cls: "bg-packed/12 text-packed" },
+ sent: { label: "Sent", cls: "bg-shipped/12 text-shipped" },
+ failed: { label: "Failed", cls: "bg-alert/12 text-alert" },
 }
 
 /** The audience, said as a sentence rather than as a filter object. */
@@ -236,7 +236,7 @@ function EmailBrandingCard() {
         </div>
       </div>
           <DialogFooter className="mt-2 flex-wrap items-center gap-3">
-            {saved && <span className="mr-auto text-xs text-success dark:text-emerald-400">Saved — applies to the next send.</span>}
+            {saved && <span className="mr-auto text-xs text-success">Saved — applies to the next send.</span>}
             {err && <span className="mr-auto text-xs text-destructive">{err}</span>}
             <Button size="sm" onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save branding</Button>
           </DialogFooter>
@@ -562,7 +562,7 @@ export function BroadcastsView() {
             No mail transport is configured, so nothing can be sent. Set <code>BREVO_API_KEY</code> on the server.
           </div>
         )}
-        {err && <div className="mb-3 rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{err}</div>}
+        {err && <div className="mb-3 rounded-lg border border-alert/30 bg-alert/12 p-2.5 text-xs text-alert">{err}</div>}
 
         {rows.length === 0 ? (
           <div className="py-14 text-center">
@@ -636,7 +636,7 @@ export function BroadcastsView() {
  counter. Open the broadcast and every address is listed with
  its own reason; that is the place to read it. */}
                             {b.failed_count > 0 && (
-                              <div className="text-xs text-red-600 dark:text-red-400">{b.failed_count} failed</div>
+                              <div className="text-xs text-alert">{b.failed_count} failed</div>
                             )}
                           </>
                         )}
@@ -855,7 +855,7 @@ export function BroadcastsView() {
             {viewing?.last_error && (
               /* The transport's OWN words, kept verbatim. The row shows a short human line;
  this is where the raw text belongs — you came here to look for it. */
-              <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs leading-snug text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+              <div className="rounded-lg border border-alert/30 bg-alert/12 p-2.5 text-xs leading-snug text-alert">
                 <div className="font-medium">{viewing.failed_count.toLocaleString("en-US")} didn&apos;t get it</div>
                 <div className="mt-0.5 tabular-nums opacity-90">{viewing.last_error}</div>
               </div>
@@ -883,14 +883,14 @@ export function BroadcastsView() {
                           {/* The reason sits under the address it belongs to — a failure list
  that doesn't say why is just a shorter list. */}
                           {d.status === "failed" && d.error && (
-                            <span className="mt-0.5 block tabular-nums text-2xs leading-snug text-red-700 dark:text-red-300">{d.error}</span>
+                            <span className="mt-0.5 block tabular-nums text-2xs leading-snug text-alert">{d.error}</span>
                           )}
                         </span>
                         {d.extra && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">added</span>}
                         <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs ${
  d.status === "sent"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
- : "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
+                            ? "bg-shipped/12 text-shipped"
+ : "bg-alert/12 text-alert"
                         }`}>
                           {d.status === "sent" ? "delivered" : "failed"}
                         </span>

@@ -414,7 +414,7 @@ function ApiKeysPanel() {
             <button
  key={m}
  onClick={() => setMode(m)}
- className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (mode === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}
+ className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (mode === m ? (m === "live" ? "bg-alert text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}
             >
               {m}
             </button>
@@ -423,7 +423,7 @@ function ApiKeysPanel() {
       }
     >
       {mode === "live" && (
-        <div className="flex items-start gap-2 border-b border-border bg-red-50 px-5 py-2.5 text-xs text-red-700">
+        <div className="flex items-start gap-2 border-b border-border bg-alert/12 px-5 py-2.5 text-xs text-alert">
           <Warning size={14} weight="fill" className="mt-px shrink-0" />
           <span><b>Live mode</b> — a live key (egk_live_…) makes calls create <b>real</b> orders. Use a test key while building.</span>
         </div>
@@ -440,17 +440,17 @@ function ApiKeysPanel() {
         <Button size="sm" onClick={onCreate} disabled={creating}>
           <Plus size={14} weight="bold" /> {creating ? "Generating…" : `Generate ${mode} key`}
         </Button>
-        {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+        {err && <span className="text-xs font-medium text-alert">{err}</span>}
       </div>
 
       {/* freshly created key — shown once */}
       {fresh && (
-        <div className="border-b border-border bg-emerald-50 px-5 py-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+        <div className="border-b border-border bg-shipped/12 px-5 py-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-shipped">
             <Check size={15} weight="bold" /> Copy your new key now — it won&apos;t be shown again.
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg border border-emerald-200 bg-white px-3 py-2 tabular-nums text-sm">
+            <code className="flex-1 truncate rounded-lg border border-shipped/30 bg-white px-3 py-2 tabular-nums text-sm">
               {fresh.key}
             </code>
             <Button size="sm" variant="outline" onClick={copy}>
@@ -497,7 +497,7 @@ function ApiKeysPanel() {
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{k.label || "Test key"}</span>
                   <Badge variant="secondary" className="text-2xs uppercase">{k.mode}</Badge>
-                  {k.revoked_at && <span className="text-2xs font-medium text-red-600">revoked</span>}
+                  {k.revoked_at && <span className="text-2xs font-medium text-alert">revoked</span>}
                 </div>
                 <div className="mt-0.5 tabular-nums text-xs text-muted-foreground">
                   {/* prefix••••last4 — the SAME shape the API Explorer shows, so a key can be
@@ -509,7 +509,7 @@ function ApiKeysPanel() {
                 <Button
  size="sm"
  variant="ghost"
- className="text-muted-foreground hover:text-red-600"
+ className="text-muted-foreground hover:text-alert"
  onClick={() => onRevoke(k.id)}
                 >
                   Revoke
@@ -728,7 +728,7 @@ function TeamPanel() {
         <Button size="sm" onClick={onInvite} disabled={busy}>
           <Plus size={14} weight="bold" /> {busy ? "Inviting…" : "Invite"}
         </Button>
-        {err && <span className="text-xs font-medium text-red-600">{err}</span>}
+        {err && <span className="text-xs font-medium text-alert">{err}</span>}
       </div>
 
       {members === null ? (
@@ -783,7 +783,7 @@ function TeamPanel() {
                 <Button
  size="sm"
  variant="ghost"
- className="shrink-0 text-muted-foreground hover:text-red-600"
+ className="shrink-0 text-muted-foreground hover:text-alert"
  onClick={() => setRemoving(m)}
                 >
                   Remove
@@ -832,7 +832,7 @@ function TeamPanel() {
           <ul className="space-y-1.5 text-sm text-muted-foreground">
             <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />Your orders, wallet, stores and design files are hidden from them right away.</li>
             <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />Work they did stays on your account — nothing of yours is deleted.</li>
-            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-emerald-500/60" />Their account is <span className="font-medium text-foreground">not</span> deleted. They keep the same login and go back to their own empty seller board.</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-shipped/60" />Their account is <span className="font-medium text-foreground">not</span> deleted. They keep the same login and go back to their own empty seller board.</li>
             <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />To bring them back later, invite the same email again.</li>
           </ul>
           <DialogFooter>
@@ -1487,7 +1487,7 @@ function PlatformPanel() {
                   <span className="shrink-0 text-xs text-muted-foreground">→ $1 =</span>
                   <Input value={t.rate} onChange={(e) => setTier(i, "rate", e.target.value)} inputMode="numeric" placeholder="26000" className="h-9 flex-1" />
                   <span className="shrink-0 text-xs text-muted-foreground">₫</span>
-                  <button type="button" onClick={() => removeTier(i)} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-red-600" aria-label="Remove tier"><X size={15} weight="bold" /></button>
+                  <button type="button" onClick={() => removeTier(i)} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-alert" aria-label="Remove tier"><X size={15} weight="bold" /></button>
                 </div>
               ))}
               <button type="button" onClick={addTier} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Plus size={13} weight="bold" /> Add tier</button>
@@ -1685,7 +1685,7 @@ function PlatformPanel() {
                   <button
  type="button"
  onClick={() => setThreads((p) => p.filter((_, j) => j !== i))}
- className="text-muted-foreground hover:text-red-600"
+ className="text-muted-foreground hover:text-alert"
  title={`Remove ${t.name || t.code}`}
                   >
                     <Trash size={14} />
@@ -3204,7 +3204,7 @@ function ShippoBillingPanel() {
         * result, not a stale reading — this panel is fetched live on every open.
         */}
       {b.blocked && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+        <div className="rounded-lg border border-alert/30 bg-alert/12 p-2 text-xs text-alert">
           <p className="font-medium">Shippo is refusing labels on this account.</p>
           <p className="mt-1">
             It is <strong>unpaid invoices</strong>, not the card on file — changing the card doesn&apos;t settle an amount
@@ -3247,7 +3247,7 @@ function ShippoBillingPanel() {
  came here for, and it is not always the one flagged default. */}
                 {m.charging && <Badge variant="secondary" className="bg-primary text-primary-foreground">Charging</Badge>}
                 {m.default && !m.charging && <Badge variant="secondary" className="bg-primary/10 text-primary">Default</Badge>}
-                <Badge variant="secondary" className={m.active ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-muted text-muted-foreground"}>
+                <Badge variant="secondary" className={m.active ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground"}>
                   {m.active ? "Active" : "Inactive"}
                 </Badge>
               </span>

@@ -258,7 +258,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
  like it did nothing. */}
               {note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
               {savedCount > 0 && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-shipped">
                   <Check size={13} weight="bold" />
                   {savedCount} saved — open Sourcing to compare and move them along.
                 </p>

@@ -114,7 +114,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
         <span className="w-28 shrink-0 truncate text-sm text-muted-foreground">{s.label}</span>
         <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-8 flex-1 font-mono text-sm" autoFocus />
         <Button size="sm" className="h-7 px-2" disabled={busy || !val.trim()} onClick={() => save(false)}>{busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}</Button>
-        {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-red-600" title="Clear" disabled={busy} onClick={() => save(true)}>Clear</Button>}
+        {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-alert" title="Clear" disabled={busy} onClick={() => save(true)}>Clear</Button>}
         <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => { setEditing(false); setVal("") }}><X size={12} /></Button>
       </div>
     )
@@ -150,10 +150,10 @@ type Result = { level: Level; detail?: string }
 // Active — the purple "Configured" vs green "Live" split just looked like two things.
 // A solid tinted pill per status — no coloured dot.
 const LEVEL_META: Record<Level, { label: string; pill: string }> = {
- live: { label: "Active", pill: "bg-emerald-100 text-emerald-700" },
- configured: { label: "Active", pill: "bg-emerald-100 text-emerald-700" },
+ live: { label: "Active", pill: "bg-shipped/12 text-shipped" },
+ configured: { label: "Active", pill: "bg-shipped/12 text-shipped" },
  off: { label: "Inactive", pill: "bg-muted text-muted-foreground" },
- error: { label: "Error", pill: "bg-red-100 text-red-700" },
+ error: { label: "Error", pill: "bg-alert/12 text-alert" },
  restricted: { label: "Staff only", pill: "bg-hold/15 text-hold" },
  checking: { label: "Checking…", pill: "bg-muted text-muted-foreground animate-pulse" },
 }
@@ -716,7 +716,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
             <div className="text-xs text-muted-foreground">Powers the account-aware auto-reply in seller Support chat.</div>
           </div>
         </div>
-        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
           {cfg?.keySet ? "Active" : "Inactive"}
         </span>
       </div>
@@ -858,7 +858,7 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
             <div className="text-xs text-muted-foreground">Product images from a prompt, in staff&rsquo;s own My EG chat. Not offered to sellers.</div>
           </div>
         </div>
-        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (active ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
           {active ? "Active" : "Inactive"}
         </span>
       </div>
