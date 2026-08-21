@@ -10,6 +10,7 @@ import { getSiteContentAdmin, setSiteContent, uploadHeroImage } from "@/lib/api"
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/site-content"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { MotionEditor } from "@/components/app/motion-editor"
+import { Dropzone } from "@/components/app/dropzone"
 
 // Module-scope so they're stable across renders (react-hooks/static-components forbids
 // defining components inside render).
@@ -122,7 +123,6 @@ export function SiteContentPanel() {
   // The stored URL didn't load in the <img>: almost always a storage/CDN that isn't public,
   // not a broken editor. Say so instead of showing a broken-image glyph.
  const [imgBroken, setImgBroken] = useState(false)
- const [dragging, setDragging] = useState(false)
  const fileRef = useRef<HTMLInputElement>(null)
 
  const load = useCallback(() => {
@@ -255,22 +255,15 @@ export function SiteContentPanel() {
                 </div>
               </div>
             ) : (
-              <div
- role="button"
- tabIndex={0}
- onClick={() => fileRef.current?.click()}
- onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileRef.current?.click() } }}
- onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
- onDragLeave={() => setDragging(false)}
- onDrop={(e) => { e.preventDefault(); setDragging(false); onPickImage(e.dataTransfer.files?.[0]) }}
- className={"flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-10 text-sm transition-colors " +
-                  (dragging ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground") +
-                  (uploading ? " pointer-events-none opacity-60" : "")}
-              >
-                {uploading ? <CircleNotch size={20} className="animate-spin" /> : <ImageIcon size={20} />}
-                {uploading ? "Uploading…" : "Drag an image here, or click to choose"}
-                <span className="text-xs">JPEG, PNG, WebP or AVIF · big photos are resized automatically</span>
-              </div>
+              <Dropzone
+                icon={ImageIcon}
+                accept="image/*"
+                disabled={uploading}
+                busy={uploading ? "Uploading…" : null}
+                onFiles={(files) => onPickImage(files[0])}
+                label="Drag an image here, or click to choose"
+                hint="JPEG, PNG, WebP or AVIF · big photos are resized automatically"
+              />
             )}
             <span className="mt-1 block text-xs text-muted-foreground">
               Optional. Sits behind the hero under a scrim, so the text stays readable. Landscape works best — around 1600×900 (16:9). Leave empty for the default gradient. Press Save to publish — it&apos;s live within a minute.

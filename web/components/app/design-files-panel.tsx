@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
+import { FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, setDesignFilePrice, downloadDesignFile, deleteDesignFile, filesForLine, postOrderDesign, getOrderDesigns, designsBySide, sidesForLine, type DesignFileRow, type OrderDesign, type OrderItem } from "@/lib/api"
@@ -11,6 +11,7 @@ import { getUser } from "@/lib/auth"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { VariantField } from "@/components/app/variant-field"
 import { isEmbroidery } from "@/lib/variant-resolve"
+import { Dropzone } from "@/components/app/dropzone"
 
 /**
  * WHICH LINE IS THIS FILE FOR? — guessed from its name, never decided by it.
@@ -292,11 +293,9 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
    * renders inside an expanded card, never in the list.
    */
  const [placedMap, setPlacedMap] = useState<Record<string, Record<string, OrderDesign>> | null>(null)
- const [over, setOver] = useState(false)
  const [busy, setBusy] = useState<string | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [role, setRole] = useState("")
- const inputRef = useRef<HTMLInputElement>(null)
  const confirm = useConfirm()
 
  const canPrice = role === "admin" || role === "warehouse"
@@ -394,22 +393,13 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
 
  return (
     <div className="space-y-2">
-      {/* Drop zone — the thing that didn't exist before. */}
-      <div
- onDragOver={(e) => { e.preventDefault(); setOver(true) }}
- onDragLeave={() => setOver(false)}
- onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}
- onClick={() => inputRef.current?.click()}
- className={
-          "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors " +
-          (over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/40")
-        }
-      >
-        {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
-        <span className="text-xs font-medium">{busy ? `Uploading ${busy}…` : "Drop files here or click to browse"}</span>
-        {!compact && <span className="text-2xs text-muted-foreground">.pes goes to the seller · .emb + images stay on the factory boards</span>}
-        <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => { if (e.target.files) upload(e.target.files); e.target.value = "" }} />
-      </div>
+      <Dropzone
+        multiple
+        onFiles={upload}
+        busy={busy ? `Uploading ${busy}…` : null}
+        label="Drop files here, or click to browse"
+        hint={compact ? undefined : ".pes goes to the seller · .emb + images stay on the factory boards"}
+      />
 
       {err && <div className="flex items-center gap-1.5 text-xs text-destructive"><Warning size={12} weight="fill" /> {err}</div>}
 
@@ -510,9 +500,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  const [files, setFiles] = useState<DesignFileRow[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
  const [err, setErr] = useState<string | null>(null)
- const [over, setOver] = useState(false)
  const [role, setRole] = useState("")
- const inputRef = useRef<HTMLInputElement>(null)
  const confirm = useConfirm()
   // Only staff may remove a file — this card is also shown to sellers, who must never be
   // able to delete a factory working file.
@@ -710,26 +698,21 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * element on a card whose actual subject is the list — which is what made an order that
    * already had artwork look like one still waiting for it.
    */
+  /* THE SHARED DROPZONE. This was the weakest of the app's thirty hand-rolled ones: a 1px
+     dashed rule around no ground at all, with a bare 18px glyph — so it read as an empty box
+     that had failed to load rather than as somewhere to drop a file, and the two lines of
+     explanation underneath were doing work the structure should have been doing. Same
+     component as every other drop target now. */
  const dropZone = (slim = false) => (
-    <div
- onDragOver={(e) => { e.preventDefault(); setOver(true) }}
- onDragLeave={() => setOver(false)}
- onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
- onClick={() => inputRef.current?.click()}
- className={
-        "flex cursor-pointer rounded-xl border border-dashed transition-colors " +
-        (slim ? "items-center justify-center gap-2 px-3 py-2 " : "flex-col items-center justify-center gap-1 border-2 p-4 text-center ") +
-        (over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/40")
-      }
-    >
-      {busy ? <CircleNotch size={slim ? 14 : 18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={slim ? 14 : 18} weight="bold" className="text-muted-foreground" />}
-      <span className={slim ? "text-2xs font-medium text-muted-foreground" : "text-xs font-medium"}>
-        {busy ? `Sending ${busy}…` : slim ? "Add another machine file or design image" : "Have a machine file or a design image? Drop it here"}
-      </span>
-      {!slim && <span className="text-2xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>}
-      <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
- onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = "" }} />
-    </div>
+    <Dropzone
+      slim={slim}
+      multiple
+      accept={MACHINE_ACCEPT + ",image/*"}
+      onFiles={stage}
+      busy={busy ? `Sending ${busy}…` : null}
+      label={slim ? "Add another machine file or design image" : "Have a machine file or a design image? Drop it here"}
+      hint="Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)"
+    />
   )
 
   /**
@@ -1003,7 +986,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
-          No files on this order yet. Machine files appear here once we&apos;ve cut them — or send us your own machine file or a design image.
+          {/* The empty state says what an empty list MEANS, and stops. The second half of
+              this sentence — "or send us your own machine file or a design image" — was the
+              dropzone's own label written a second time, six millimetres above the dropzone.
+              A control that needs the sentence above it repeated inside it is one control
+              too many sentences. */}
+          No files on this order yet. Machine files appear here once we&apos;ve cut them.
         </p>
         {dropZone()}
         {queue}
