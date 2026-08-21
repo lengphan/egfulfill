@@ -333,7 +333,7 @@ export function ProductsCatalog() {
                     <button
  onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
  title="Design this product"
- className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow hover:bg-primary/90"
+ className="flex size-7 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground shadow hover:bg-primary/90"
                     >
                       <PenNib size={13} weight="bold" />
                     </button>
