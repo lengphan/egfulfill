@@ -157,6 +157,22 @@ export function ListingPhotoStudio({
 
   const [busy, setBusy] = useState(false)
   const [cands, setCands] = useState<ListingRender[]>([])
+  /**
+   * RENDERS PROMOTED TO REFERENCES — ours feeding the next one.
+   *
+   * The brief could only ever be built from the COMPETITOR's photos, so the second render
+   * could not be told "like the one you just made, but on a model". That is the normal way
+   * this work goes: the first pass establishes the look and every pass after it is an edit
+   * of that look, and without this the only way to say so was to describe the render in
+   * words to a model that had just produced it.
+   *
+   * Held as URLs rather than indices because `picked` indexes the PAGE's reference array,
+   * which these are not part of — they are ours, they may be discarded, and they must not
+   * renumber the competitor set when they are.
+   */
+  const [usedAsRef, setUsedAsRef] = useState<string[]>([])
+  const toggleRenderRef = (url: string) =>
+    setUsedAsRef((p) => (p.includes(url) ? p.filter((u) => u !== url) : [...p, url]))
   const [genErrs, setGenErrs] = useState<string[]>([])
 
   /*
@@ -225,8 +241,8 @@ export function ListingPhotoStudio({
   }, [])
 
   /** Read the ticked references and put the result in the box. A CLICK, never anything automatic. */
-  const runRead = useCallback(async (idxs: number[]) => {
-    const imgs = idxs.map((i) => references[i]).filter(Boolean)
+  const runRead = useCallback(async (idxs: number[], extra: string[] = []) => {
+    const imgs = [...idxs.map((i) => references[i]), ...extra].filter(Boolean)
     if (!imgs.length) { setReadErr("Tick at least one reference photo first."); return }
     setReading(true); setReadErr(null)
     try {
@@ -303,7 +319,7 @@ export function ListingPhotoStudio({
     try {
       const r = await generateListingPhotos({
         prompt: prompt.trim(),
-        images: picked.map((i) => references[i]).filter(Boolean),
+        images: [...picked.map((i) => references[i]), ...usedAsRef].filter(Boolean),
         model, aspectRatio: ratio, imageSize: effSize, count,
       })
       // Partial success is the NORMAL shape here, not an edge case: a daily cap or an empty
@@ -467,10 +483,24 @@ export function ListingPhotoStudio({
                       <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-transparent via-white/45 to-transparent motion-reduce:animate-none" />
                     )}
                     <div className="absolute inset-0 flex items-center justify-center">
+                      {/* A SPINNER, NOT ONLY A SHEEN.
+                          The sheen was meant to say "working" without a spinner, the way the
+                          image tools do. It did not read — the frame looked the same whether
+                          a render was in flight or the panel was simply waiting to be used,
+                          and a wash that slow is easy to miss entirely on a bright screen.
+                          Under prefers-reduced-motion the sheen is off, which left NOTHING
+                          moving at all. A turning ring is unambiguous, and the words say
+                          which of the two states this is and how many are coming. */}
+                      {busy ? (
+                        <span className="flex flex-col items-center gap-2 text-xs font-medium text-primary">
+                          <CircleNotch size={26} className="animate-spin" />
+                          Rendering {count > 1 ? `${count} photos` : "a photo"}…
+                        </span>
+                      ) : null}
                       {/* The violet itself, not --brand-foreground. That token is the LIME half of the
                           action pair — it is a label colour for a solid violet fill, and at
                           1.19:1 on a near-white tint it would be invisible. */}
-                      <ImageSquare size={30} weight="light" className="text-primary/40" />
+                      {!busy && <ImageSquare size={30} weight="light" className="text-primary/40" />}
                     </div>
                   </div>
                 )}
@@ -485,6 +515,22 @@ export function ListingPhotoStudio({
                       title={hero.cutOut ? "Background already removed" : "Lift the backdrop off and keep it as a PNG — done in your browser, no charge"}>
                       {cutting === hero.url ? <CircleNotch size={13} className="animate-spin" /> : <Eraser size={13} weight="bold" />}
                       {hero.cutOut ? "Background removed" : cutting === hero.url ? "Removing…" : "Remove background"}
+                    </Button>
+                    {/* FEED IT BACK IN. A render can brief the next one, which is how this
+                        work actually goes — the first pass sets the look and every pass after
+                        is an edit of it. Ghost when off, secondary when on, so the state is
+                        the fill and the label stays put. */}
+                    <Button
+                      size="sm"
+                      variant={usedAsRef.includes(hero.url) ? "secondary" : "ghost"}
+                      className={usedAsRef.includes(hero.url) ? "" : "text-muted-foreground"}
+                      onClick={() => toggleRenderRef(hero.url)}
+                      title={usedAsRef.includes(hero.url)
+                        ? "The next render and Write from photos will both see this one"
+                        : "Use this render as a reference for the next one"}
+                    >
+                      <Check size={13} weight="bold" />
+                      {usedAsRef.includes(hero.url) ? "Used as reference" : "Use as reference"}
                     </Button>
                     <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => drop(hero.url)}>
                       <X size={13} weight="bold" /> Discard
@@ -507,11 +553,18 @@ export function ListingPhotoStudio({
                       onClick={() => setHeroGen(i)}
                       aria-label={`Show render ${i + 1}`}
                       aria-current={heroGen === i}
-                      className={"size-14 overflow-hidden rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring/60 " +
-                        (heroGen === i ? "border-primary ring-1 ring-primary" : "border-border")}
+                      className={"relative size-14 overflow-hidden rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/60 " +
+                        (heroGen === i ? "ring-2 ring-primary" : "")}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={c.url} alt="" className="size-full object-cover" />
+                      {/* The SAME mark the reference strip uses, so "this one is feeding the
+                          render" looks identical on both sides of the window. */}
+                      {usedAsRef.includes(c.url) && (
+                        <span aria-hidden className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-2 border-white bg-white text-slate-900 shadow-sm">
+                          <Check size={9} weight="bold" />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -596,11 +649,18 @@ export function ListingPhotoStudio({
                     <Button
                       size="sm" variant="ghost"
                       className="h-8 gap-1.5 text-xs font-normal"
-                      onClick={() => runRead(picked)} disabled={reading || !picked.length}
-                      title={picked.length ? "Read the ticked reference photos and write the brief" : "Tick a reference photo above first"}
+                      onClick={() => runRead(picked, usedAsRef)} disabled={reading || (!picked.length && !usedAsRef.length)}
+                      /* A promoted RENDER counts as a photo to read, the same as a ticked
+                         reference — so the label and the tooltip ask for one only when there
+                         is genuinely nothing on either side to read. */
+                      title={(picked.length || usedAsRef.length)
+                        ? "Read the ticked photos and write the brief"
+                        : "Tick a reference photo above, or use one of our renders"}
                     >
                       {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
-                      {reading ? "Reading…" : !picked.length ? "Pick a photo above" : prompt ? "Rewrite from photos" : "Write from photos"}
+                      {reading ? "Reading…"
+                        : (!picked.length && !usedAsRef.length) ? "Pick a photo first"
+                        : prompt ? "Rewrite from photos" : "Write from photos"}
                     </Button>
 
                     {/* A photograph brief is the longest free text anyone types in this app and
