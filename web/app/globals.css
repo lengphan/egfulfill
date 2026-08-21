@@ -67,6 +67,18 @@
    * `text-hold` work like any utility — and because the token flips per theme, every
    * `dark:` twin of these classes becomes unnecessary rather than needing to be kept in
    * step by hand. */
+  /* THE ONE POP — the brand lime, kept from the old violet/lime pair.
+   *
+   * It is a LIGHT colour: 1.15:1 as text on paper, which is invisible, against 15.96:1 for
+   * ink ON it. So it is only ever a FILL CARRYING INK — a badge, a highlight, one thing at a
+   * time — and never a text colour, a border on white, or a second accent. bold-kit already
+   * documents the same constraint for the marketing side.
+   *
+   * It sits 0.475 from shipped and 0.423 from hold in OKLab, so unlike the coral that was
+   * considered (0.042 from alert — indistinguishable from "something is wrong") it cannot be
+   * mistaken for a status. */
+    --color-pop: var(--pop);
+    --color-pop-foreground: var(--pop-foreground);
     --color-hold: var(--status-hold);
     --color-shipped: var(--status-shipped);
     --color-alert: var(--status-alert);
@@ -147,7 +159,7 @@
    * Status colours are untouched: emerald still means shipped, amber still means warning.
    * Those carry meaning on the floor and must not be crowded by a brand hue.
    */
-    --primary: oklch(0.50 0.115 255);
+    --primary: oklch(0.175 0 0);
   /* WHITE, NOT LIME. Every filled button in the product read as lime on electric violet —
    * 5.08:1, the weakest pair in the app, on the most-pressed control. White on cobalt is
    * 6.02:1: more contrast and one less colour. */
@@ -163,7 +175,7 @@
    * 4.5:1. The lime fill has no such problem on a dark ground — 16.56:1 both ways — so dark
    * runs lime fill + ink label. Same two colours, opposite jobs, exactly the rule the
    * selected nav item already follows in each mode. */
-    --brand: oklch(0.50 0.115 255);
+    --brand: oklch(0.175 0 0);
     --brand-foreground: oklch(1 0 0);
   /* THE NEUTRALS ARE BEIGE, not grey. This is what lets the beige actually spread.
    *
@@ -180,8 +192,8 @@
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.965 0 0);
     --muted-foreground: oklch(0.545 0 0);
-    --accent: oklch(0.962 0.012 255);
-    --accent-foreground: oklch(0.44 0.115 255);
+    --accent: oklch(0.962 0 0);
+    --accent-foreground: oklch(0.205 0 0);
   /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-emerald-600` was used in 56 places
    * as the "positive" signal — and being a hardcoded shade it had no dark variant, so it
    * measured 3.77:1 on the light card and 4.06:1 on the dark one. It failed the 4.5:1 body
@@ -191,6 +203,17 @@
    * This is distinct from the emerald that means SHIPPED on the floor — that stays a status
    * chip. This is the ink for "a number moved the right way". */
     --success: oklch(0.48 0.135 158);
+  /* CORAL #FE9179. ONE LINE TO CHANGE — every use reads this token, so swapping the pop is
+     a single edit here and nothing else, in either theme.
+     Measured: L 0.77, chroma 0.137. Roughly twice the colour of the pale tints tried first,
+     which is the whole difference between a tint and a colour — at L 0.90 only yellow-green
+     can stay vivid, every other hue goes pastel. Ink on it 8.64:1; white on it 2.20:1, so it
+     is ALWAYS a fill carrying dark text and never a text colour or a hairline.
+     0.264 from `hold` in OKLab and far from alert despite the warm hue, because alert is a
+     mid-tone red and this is light. Warm against an entirely cool grey system, which is what
+     makes it read as a decision rather than as another UI colour. */
+    --pop: oklch(0.77 0.137 33);
+    --pop-foreground: oklch(0.175 0 0);
     --status-hold: oklch(0.52 0.115 75);
     --status-shipped: oklch(0.46 0.120 158);
     --status-alert: oklch(0.50 0.170 25);
@@ -218,7 +241,7 @@
        which is the same rule, already satisfied. */
     --border: oklch(0.905 0 0);
     --input: oklch(0.928 0 0);
-    --ring: oklch(0.50 0.115 255);
+    --ring: oklch(0.38 0 0);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
    * every one clears 3:1 against the chart surface. Amber and green are deliberately not
@@ -226,7 +249,7 @@
    * worst pair available here. The order is identical in dark mode, because colour has to
    * follow the SERIES, not its rank — a filter that drops one series must never repaint
    * the survivors. */
-    --chart-1: oklch(0.50 0.115 255); /* cobalt — series 1 IS the signal colour */
+    --chart-1: oklch(0.30 0 0); /* cobalt — series 1 IS the signal colour */
     --chart-2: oklch(0.6498 0.1306 73.7); /* amber   #BE811A */
     --chart-3: oklch(0.6449 0.1198 224.9); /* teal    #0E9CC4 */
     --chart-4: oklch(0.5839 0.1981 358.4); /* magenta #D0357A */
@@ -250,12 +273,12 @@
    * so "you are here" in the app is the same gesture as the accent phrase on the site. */
     --sidebar: oklch(0.968 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.50 0.115 255);
+    --sidebar-primary: oklch(0.175 0 0);
     --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: oklch(0.925 0 0);
     --sidebar-accent-foreground: oklch(0.145 0 0);
     --sidebar-border: oklch(0.895 0 0);
-    --sidebar-ring: oklch(0.50 0.115 255);
+    --sidebar-ring: oklch(0.38 0 0);
 }
 
 .dark {
@@ -301,17 +324,19 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.175 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.655 0.125 255);
+    --primary: oklch(0.955 0 0);
     --primary-foreground: oklch(0.145 0 0);
-    --brand: oklch(0.655 0.125 255);
+    --brand: oklch(0.955 0 0);
     --brand-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.215 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.215 0 0);
     --muted-foreground: oklch(0.715 0 0);
-    --accent: oklch(0.245 0.030 255);
-    --accent-foreground: oklch(0.92 0.08 285);
+    --accent: oklch(0.245 0 0);
+    --accent-foreground: oklch(0.985 0 0);
     --success: oklch(0.80 0.155 158);
+    --pop: oklch(0.74 0.140 33);
+    --pop-foreground: oklch(0.145 0 0);
     --status-hold: oklch(0.76 0.125 75);
     --status-shipped: oklch(0.76 0.135 158);
     --status-alert: oklch(0.70 0.160 25);
@@ -321,10 +346,10 @@
     /* The ONLY thing separating a card from the canvas now, so it stays strong. */
     --border: oklch(0.315 0 0);
     --input: oklch(0.265 0 0);
-    --ring: oklch(0.655 0.125 255);
+    --ring: oklch(0.72 0 0);
   /* Dark mode is SELECTED, not flipped: its own steps measured against the dark surface,
    * in the SAME hue order as light so series 3 is teal on both. */
-    --chart-1: oklch(0.655 0.125 255); /* cobalt, lifted for the dark ground */
+    --chart-1: oklch(0.86 0 0); /* cobalt, lifted for the dark ground */
     --chart-2: oklch(0.6584 0.1243 74.5); /* amber   #BE8529 */
     --chart-3: oklch(0.6476 0.1074 220.6); /* teal    #2A9DBC */
     --chart-4: oklch(0.6439 0.1904 357.4); /* magenta #E24F8E */
@@ -341,12 +366,12 @@
      * reserved use of lime never appeared. The nav was violet on violet-tinted panel on
      * violet-tinted canvas, which is why the dark app reads as having no accent at all.
      * Ink on this lime is 16.56:1; the violet block it replaces was 4.9:1 against the panel. */
-    --sidebar-primary: oklch(0.655 0.125 255);
+    --sidebar-primary: oklch(0.955 0 0);
     --sidebar-primary-foreground: oklch(0.145 0 0);
     --sidebar-accent: oklch(0.235 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.315 0 0);
-    --sidebar-ring: oklch(0.655 0.125 255);
+    --sidebar-ring: oklch(0.72 0 0);
 }
 
 @layer base {
