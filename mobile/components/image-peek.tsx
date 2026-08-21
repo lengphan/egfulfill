@@ -185,7 +185,7 @@ export function ImagePeek({ shots, index, onClose }: {
     /* `none` — the entrance is ours. Modal's own fade on top of it was the double animation
        that made opening feel like two separate events. */
     <Modal visible={open} transparent animationType="none" onRequestClose={finish}>
-      <Animated.View style={[{ flex: 1, backgroundColor: "rgba(11,11,12,0.96)" }, groundStyle]} />
+      <Animated.View style={[{ flex: 1, backgroundColor: "rgba(10,10,10,0.96)" }, groundStyle]} />
       <Animated.View
         style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, contentStyle]}
       >

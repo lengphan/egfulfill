@@ -10,6 +10,39 @@ import { ChatBubble } from "@/components/chat-bubble"
  * money. Deliberately not a mirror of the web nav — a tab bar with nine entries is a menu,
  * and the point of the phone app is that it is quick.
  */
+
+/**
+ * THE ACTIVE TAB IS A CORAL DISC, not a coral glyph.
+ *
+ * The pop measures 2.10:1 against paper, so as a LINE — which is all an icon is — it would
+ * be a ghost. lib/theme.ts states the rule: the coral is ALWAYS a fill carrying dark text,
+ * never type and never a hairline. So the colour goes BEHIND the glyph and the glyph goes to
+ * ink on top of it (8.74:1), which puts the one coloured thing in the chrome exactly where
+ * the eye already is.
+ *
+ * Genuinely round, which is the one shape a single centred glyph earns — and it echoes the
+ * capsule the bar itself already is.
+ */
+function TabGlyph({ name, focused, color }: {
+  name: keyof typeof Ionicons.glyphMap
+  focused: boolean
+  color: string
+}) {
+  return (
+    <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+      <View
+        style={{
+          width: 42, height: 42, borderRadius: 21,
+          alignItems: "center", justifyContent: "center",
+          backgroundColor: focused ? C.pop : "transparent",
+        }}
+      >
+        <Ionicons name={name} size={27} color={color} />
+      </View>
+    </View>
+  )
+}
+
 export default function TabsLayout() {
   const insets = useSafeAreaInsets()
   /*
@@ -33,12 +66,12 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: C.fg,
+        tabBarActiveTintColor: C.onPop,
         /* HARDER TO SPOT because the inactive tint was C.muted — a warm grey drawn to sit
            quietly under body copy, which is the opposite of what a control needs. A tab you
            cannot find is not restraint. Ink at 55% keeps the live one clearly ahead while
            leaving the rest legible at arm's length. */
-        tabBarInactiveTintColor: "rgba(11,11,12,0.55)",
+        tabBarInactiveTintColor: "rgba(10,10,10,0.55)",
         /*
          * A FLOATING BAR, ICONS ONLY.
          *
@@ -78,10 +111,10 @@ export default function TabsLayout() {
            * blur on purpose: expo-blur is a native module and would need a fresh dev build
            * before anyone could see it.
            */
-          backgroundColor: Platform.OS === "android" ? "rgba(252,251,248,0.985)" : "rgba(252,251,248,0.94)",
+          backgroundColor: Platform.OS === "android" ? "rgba(251,251,251,0.985)" : "rgba(251,251,251,0.94)",
           borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: "rgba(11,11,12,0.06)",
+          borderColor: "rgba(10,10,10,0.06)",
           paddingBottom: 0,
           ...Platform.select({
             ios: {
@@ -116,9 +149,7 @@ export default function TabsLayout() {
         options={{
           title: "Today",
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name={focused ? "today" : "today-outline"} size={27} color={color} />
-            </View>
+            <TabGlyph name={focused ? "today" : "today-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -127,9 +158,7 @@ export default function TabsLayout() {
         options={{
           title: "Orders",
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name={focused ? "cube" : "cube-outline"} size={27} color={color} />
-            </View>
+            <TabGlyph name={focused ? "cube" : "cube-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -138,9 +167,7 @@ export default function TabsLayout() {
         options={{
           title: "Scan",
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name={focused ? "scan" : "scan-outline"} size={27} color={color} />
-            </View>
+            <TabGlyph name={focused ? "scan" : "scan-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -149,9 +176,7 @@ export default function TabsLayout() {
         options={{
           title: "Wallet",
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name={focused ? "wallet" : "wallet-outline"} size={27} color={color} />
-            </View>
+            <TabGlyph name={focused ? "wallet" : "wallet-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -160,9 +185,7 @@ export default function TabsLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color, focused }) => (
-            <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name={focused ? "settings" : "settings-outline"} size={27} color={color} />
-            </View>
+            <TabGlyph name={focused ? "settings" : "settings-outline"} focused={focused} color={color} />
           ),
         }}
       />
