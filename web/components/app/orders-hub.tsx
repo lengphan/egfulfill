@@ -72,6 +72,7 @@ import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
+import { EmptyState } from "@/components/app/empty-state"
 
 const nowId = () => Date.now()
 // Not on the floor yet — the spec can still be set.
@@ -1684,28 +1685,26 @@ export function OrdersHub() {
         ) : loadErr ? (
           /* Reported, never silently empty — and it says the count is UNKNOWN rather than
  zero, because the stat cards above are reading the same failed list. */
-          <div className="flex flex-col items-center gap-2 py-16 text-center">
-            <Warning size={24} weight="fill" className="text-hold" />
-            <div className="font-medium text-foreground">{tl("ui", "Couldn't load your orders")}</div>
-            <div className="max-w-sm text-sm text-muted-foreground">
-              This is a problem reaching the server, not an empty queue — the counts above are
- unknown rather than zero. {loadErr}
-            </div>
-            <button onClick={load} className="eg-tap mt-1 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent">
-              {tl("ui", "Try again")}
-            </button>
-          </div>
+          <EmptyState
+            icon={Warning}
+            title={tl("ui", "Couldn't load your orders")}
+            note={`This is a problem reaching the server, not an empty queue — the counts above are unknown rather than zero. ${loadErr}`}
+            action={
+              /* A real Button. This was a hand-rolled bordered span doing a button's job,
+                 which is the same class of thing as a checkbox in field chrome. */
+              <Button size="sm" variant="outline" onClick={load}>{tl("ui", "Try again")}</Button>
+            }
+          />
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-            <Package size={24} weight="duotone" />
-            <div className="font-medium text-foreground">{tl("ui", "Nothing here")}</div>
-            {/* Names what's actually narrowing the list — "no matches for OLVERA-TEES ·
- last 7 days" is recoverable, "Nothing here" over a filter you forgot you set
- is not. */}
-            {/* Already translated inside — it composes a sentence from the active filters,
- so it takes the translators rather than returning a string to look up. */}
-            <div className="text-sm">{emptyOrdersMessage(orders.length, query, filterCtx, t, tl)}</div>
-          </div>
+          /* The note NAMES what is narrowing the list — "no matches for OLVERA-TEES · last
+             7 days" is recoverable, "Nothing here" over a filter you forgot you set is not.
+             Already translated inside: it composes a sentence from the active filters, so it
+             takes the translators rather than returning a string to look up. */
+          <EmptyState
+            icon={Package}
+            title={tl("ui", "Nothing here")}
+            note={emptyOrdersMessage(orders.length, query, filterCtx, t, tl)}
+          />
         ) : (
           <>
           {/* Batch dispatch bar. Two conditions, both necessary:

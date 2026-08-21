@@ -9,6 +9,7 @@ import { getInventory, getScanHistory, scanInventory, undoScan, type InventoryIt
 import { getToken, getUser } from "@/lib/auth"
 import { parseScan, exactSkuReady, scanBeep, buzz, cameraSupported, startCameraScan, releaseCamera } from "@/lib/barcode-scan"
 import { PageTitle } from "@/components/app/page-title"
+import { EmptyState } from "@/components/app/empty-state"
 
 type Entry = { key: string; sku: string; qty: number; dir: "in" | "out"; ok: boolean; label: string; sub: string; scanId?: string }
 
@@ -265,10 +266,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
       {/* Session log — mis-scans happen constantly, so undo is one tap */}
       <SectionCard title="This session">
         {log.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-            <BarcodeIcon size={22} weight="duotone" />
-            <div className="text-sm">Scans show up here as you go.</div>
-          </div>
+          <EmptyState icon={BarcodeIcon} size="sm" title="Scans show up here as you go" />
         ) : (
           <div className="divide-y divide-border">
             {log.map((e) => (

@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getTemplates, deleteTemplate, getCatalogProducts, type ProductTemplate, type CatalogProduct } from "@/lib/api"
 import { productImage } from "@/components/app/product-picker-dialog"
+import { EmptyState } from "@/components/app/empty-state"
 
 /**
  * Saved product templates — a blank + artwork setup you can reopen instead of rebuilding.
@@ -69,16 +70,16 @@ export function TemplatesPanel() {
           <CircleNotch size={15} className="animate-spin" /> Loading…
         </div>
       ) : list.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-10 text-center">
-          <Stack size={26} weight="duotone" className="text-muted-foreground/50" />
-          <div className="text-sm font-medium">No templates yet</div>
-          <div className="max-w-xs text-sm text-muted-foreground">
-            Build a blank + artwork setup in the design maker and save it — it&apos;ll appear here, ready to reopen.
-          </div>
-          <Button size="sm" className="mt-1" onClick={() => router.push("/design/maker")}>
-            <Plus size={14} weight="bold" /> Make a template
-          </Button>
-        </div>
+        <EmptyState
+          icon={Stack}
+          title="No templates yet"
+          note="Build a blank + artwork setup in the design maker and save it — it’ll appear here, ready to reopen."
+          action={
+            <Button size="sm" onClick={() => router.push("/design/maker")}>
+              <Plus size={14} weight="bold" /> Make a template
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-4">
           {list.map((t) => {

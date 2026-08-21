@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, Trash, CircleNotch, Copy, Check, Warning, ClockCounterClockwise, CheckCircle } from "@phosphor-icons/react"
+import { Plus, Trash, CircleNotch, Copy, Check, Warning, ClockCounterClockwise, CheckCircle, Broadcast } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import {
  getWebhooks, createWebhook, deleteWebhook, testWebhook, getWebhookDeliveries,
   WEBHOOK_EVENTS, type WebhookEndpoint, type WebhookDelivery, type WebhookTestResult,
 } from "@/lib/api"
+import { EmptyState } from "@/components/app/empty-state"
 
 const when = (s?: string) => {
  if (!s) return "—"
@@ -167,9 +168,12 @@ export function WebhooksPanel() {
             <CircleNotch size={15} className="animate-spin" /> Loading…
           </div>
         ) : list.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No endpoints yet. Add one above, then send a test event to check your wiring.
-          </p>
+          <EmptyState
+            icon={Broadcast}
+            size="sm"
+            title="No endpoints yet"
+            note="Add one above, then send a test event to check your wiring."
+          />
         ) : (
           <div className="space-y-2">
             {list.map((w) => {

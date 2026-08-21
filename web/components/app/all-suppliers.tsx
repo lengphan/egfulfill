@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { MagnifyingGlass, UploadSimple, CircleNotch } from "@phosphor-icons/react"
+import { MagnifyingGlass, UploadSimple, CircleNotch, Package } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -24,6 +24,7 @@ import {
 import { getToken, getUser } from "@/lib/auth"
 import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
 import { nextEgSku } from "@/lib/sku"
+import { EmptyState } from "@/components/app/empty-state"
 
 const PAGE = 30
 
@@ -606,7 +607,11 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       ) : (
         <>
           {visible.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">{anyFilter ? "No loaded blanks match these filters — load more to widen the pool." : `No blanks match “${debounced}”.`}</div>
+            <EmptyState
+              icon={Package}
+              title={anyFilter ? "No loaded blanks match these filters" : "No blanks match that search"}
+              note={anyFilter ? "Load more to widen the pool." : `Nothing loaded matches “${debounced}”.`}
+            />
           ) : (
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 lg:grid-cols-4">
               {paged.pageItems.map((it) => (

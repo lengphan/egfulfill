@@ -10,6 +10,7 @@ import { getLedgerPartners, getLedgerExport, ledgerExportUrl, type LedgerRowOut,
 import { getToken } from "@/lib/auth"
 import { LedgerEntryDialog } from "@/components/app/ledger-entry-dialog"
 import { PageTitle } from "@/components/app/page-title"
+import { EmptyState } from "@/components/app/empty-state"
 
 const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -192,9 +193,11 @@ export function BillingView() {
         {rows === null ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
         ) : rows.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">
-            Nothing booked in this period{partner ? ` for ${label(partner)}` : ""}.
-          </div>
+          <EmptyState
+            icon={Receipt}
+            title="Nothing booked in this period"
+            note={partner ? `No costs recorded for ${label(partner)} in this window.` : undefined}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

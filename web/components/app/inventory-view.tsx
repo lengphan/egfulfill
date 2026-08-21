@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
@@ -24,6 +24,7 @@ import { prettyColorName } from "@/lib/color-name"
 import { bySize, isOneSize } from "@/lib/size-order"
 import { PageTitle } from "@/components/app/page-title"
 import { TabBar } from "@/components/app/tab-bar"
+import { EmptyState } from "@/components/app/empty-state"
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -468,7 +469,11 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         {items === null ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">{(items.length ?? 0) === 0 ? "No inventory yet — add an item." : "No items match."}</div>
+          <EmptyState
+            icon={Package}
+            title={(items.length ?? 0) === 0 ? "No inventory yet" : "No items match"}
+            note={(items.length ?? 0) === 0 ? "Add an item to start tracking stock." : "Nothing matches that search or filter."}
+          />
         ) : (
           <>
             {/* NO TABLE HEAD, because there is no longer one table. Each product carries
@@ -1166,11 +1171,11 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
           </p>
         )}
         {failed ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Couldn&apos;t read this SKU&apos;s history.</div>
+          <EmptyState icon={Warning} size="sm" title="Couldn't read this SKU's history" note="This is a problem reaching the server, not an empty history." />
         ) : rows === null ? (
           <div className="flex justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
         ) : rows.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Nothing has moved this SKU yet.</div>
+          <EmptyState icon={ClockCounterClockwise} size="sm" title="Nothing has moved this SKU yet" />
         ) : (
           <div className="max-h-80 divide-y divide-border overflow-auto">
             {rows.map((r) => {

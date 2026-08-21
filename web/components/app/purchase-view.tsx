@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
-import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwise, ArrowSquareOut } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwise, ArrowSquareOut, FileText } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -26,6 +26,7 @@ import { ReceiveScanDialog } from "@/components/app/receive-scan-dialog"
 import { CardEntryDialog } from "@/components/app/card-entry-dialog"
 import { usableCard, type CardDetails } from "@/lib/otto-card"
 import { getToken } from "@/lib/auth"
+import { EmptyState } from "@/components/app/empty-state"
 
 const num = (v: unknown) => Number(v) || 0
 const isLow = (it: InventoryItem) => num(it.in_stock) <= (it.reorder_at ?? 25)
@@ -1821,10 +1822,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           }
         >
           {saved.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              Nothing waiting to be ordered. Items land here when an order runs stock short,
- or add them yourself with <strong>Add items</strong>.
-            </div>
+            <EmptyState
+              icon={ShoppingCart}
+              size="sm"
+              title="Nothing waiting to be ordered"
+              note="Items land here when an order runs stock short — or add them yourself with Add items."
+            />
           ) : (
             <div className="divide-y divide-border">
               {toOrderGroups.map((g) => (
@@ -2093,9 +2096,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           )}
           {pos !== null && drafts.length === 0 && placed.length === 0 && (
             <SectionCard title="Nothing on order">
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                No drafts, nothing in flight. Start one with <strong>New purchase order</strong>, or from a reorder suggestion above.
-              </div>
+              <EmptyState
+                icon={FileText}
+                size="sm"
+                title="No drafts, nothing in flight"
+                note="Start one with New purchase order, or from a reorder suggestion above."
+              />
             </SectionCard>
           )}
         </TabsContent>

@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CurrencyDollar, CircleNotch, Warning } from "@phosphor-icons/react"
+import { CurrencyDollar, CircleNotch, Warning, Coins } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { getWallet, type LedgerRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { PageTitle } from "@/components/app/page-title"
+import { EmptyState } from "@/components/app/empty-state"
 
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -63,7 +64,7 @@ export function DesignerEarnings() {
           </StatGrid>
           <div className="overflow-hidden rounded-2xl border border-border">
             {ledger.rows.length === 0 ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">No earnings yet — credit a designer from an approved card.</div>
+              <EmptyState icon={Coins} title="No earnings yet" note="Credit a designer from an approved card." />
             ) : (
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">

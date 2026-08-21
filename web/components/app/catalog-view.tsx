@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent } from "@phosphor-icons/react"
+import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent, Tag } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -17,6 +17,7 @@ import { PartnerSheets } from "@/components/app/partner-sheets"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { colorsOf } from "@/components/app/products-catalog"
 import { sizesOf } from "@/lib/variant-resolve"
+import { EmptyState } from "@/components/app/empty-state"
 
 const money = (n: number | string | null | undefined) =>
  n == null || n === "" ? "—" : `$${(Number(n) || 0).toFixed(2)}`
@@ -243,12 +244,17 @@ export function CatalogView() {
           // "No products in the catalogue yet" directly under its own "Not signed in"
           // banner — asserting a fact about data it had just said it couldn't read. Same
           // mistake the shipments list made; worth not making twice.
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            {err
-              ? "Couldn't load products, so this isn't empty — it's unknown."
- : q ? `Nothing matches “${q}”.`
- : "No products in the catalogue yet."}
-          </p>
+          /* THREE OUTCOMES, NOT TWO. A failed load is not an empty catalogue, and CLAUDE.md's
+             honesty rule turns on exactly this: if a thing cannot be READ versus does not
+             EXIST, say which. The icon changes too — a warning, not a tag. */
+          <EmptyState
+            icon={err ? Warning : Tag}
+            title={err ? "Couldn't load the catalogue" : q ? "Nothing matches that search" : "No products yet"}
+            note={err
+              ? "So this isn't empty — it's unknown. Try again in a moment."
+              : q ? `Nothing in the catalogue matches “${q}”.`
+              : "Products you publish appear here."}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
