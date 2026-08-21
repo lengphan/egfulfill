@@ -16,6 +16,14 @@
  * import that re-posted an 8MB .EMB per line would be 320MB across the wire against a 60MB
  * body limit; it is now one row per line pointing at one object.
  *
+ * THAT LAST SENTENCE HOLDS ONLY WHILE OBJECT STORAGE IS ON, which is worth saying rather
+ * than leaving to be discovered. With storage off, an upload falls back to keeping the file
+ * inline in `data` — and an attach then has no key to point at, so it copies the inline
+ * bytes per line. Forty lines would be forty copies in Postgres. Production has storage on
+ * (R2), so this is the degraded path and not the normal one; the alternative is losing the
+ * upload outright when the bucket hiccups, which is worse. Found by running it against a
+ * real database with storage off, which is the only reason this note exists.
+ *
  * THE ID PEOPLE TYPE is `MF-<seq>`, mirroring `TPL-<seq>` and `IMG-<id>`. A base36 key is
  * unique and unreadable, and nobody copies one off a card into a spreadsheet by eye.
  *
@@ -271,7 +279,8 @@ export function machineFilesRoutes(app, requireAuth) {
    *
    * This is the whole point of the table. The browser sends an id and a line, never bytes:
    * the row written into `design_file_data` carries the SAME `storage_key`, so one object
-   * serves every line that references it.
+   * serves every line that references it. (When storage is off there is no key and the
+   * inline bytes are copied instead — see the note at the top of the file.)
    *
    * THREE THINGS IT WILL NOT DO, each of which is a real failure this design exists to stop:
    *
