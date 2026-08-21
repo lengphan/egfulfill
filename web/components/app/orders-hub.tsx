@@ -196,7 +196,7 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
     >
       <span className="font-medium text-foreground/70">Stock:</span>{" "}
       <span className={none
-        ? "font-semibold text-red-600 dark:text-red-400"
+        ? "font-semibold text-alert"
  : enough
           ? "text-foreground"
  : "font-semibold text-hold"}>
@@ -2973,7 +2973,7 @@ export function OrdersHub() {
  value={normalizeStage(it.factory_status)}
  onChange={(e) => advanceItem(o, it, e.target.value)}
  disabled={busy === key}
- className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300" : "border-border bg-card hover:border-primary/40")}
+ className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-alert/30 bg-alert/12 text-alert" : "border-border bg-card hover:border-primary/40")}
  aria-label={`Status for ${it.name || it.sku}`}
  title={tl("ui", "Set this item's status — forward or back")}
                               >

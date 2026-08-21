@@ -37,8 +37,8 @@ export const orderUrl = (tradeId?: string | null) =>
  tradeId ? `https://biz.alibaba.com/ta/detail.htm?orderId=${encodeURIComponent(tradeId)}` : null
 
 const STATUS: Record<SampleOrder["status"], { label: string; pill: string }> = {
- placed: { label: "Placed", pill: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300" },
- received: { label: "Received", pill: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
+ placed: { label: "Placed", pill: "bg-pending/12 text-pending" },
+ received: { label: "Received", pill: "bg-shipped/12 text-shipped" },
  cancelled: { label: "Cancelled", pill: "bg-muted text-muted-foreground" },
 }
 

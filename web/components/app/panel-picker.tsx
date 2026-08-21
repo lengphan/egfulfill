@@ -90,7 +90,7 @@ export function PanelPicker({
                 "rounded-md px-1.5 py-0.5 font-medium transition-colors " +
                 (o.value === value
                   ? "bg-hold/20 text-hold"
- : "bg-hold/15 text-hold hover:bg-hold/20 dark:hover:bg-amber-900/50")
+ : "bg-hold/15 text-hold hover:bg-hold/20 dark:hover:bg-hold/50")
               }
             >
               {o.label}

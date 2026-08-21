@@ -19,7 +19,7 @@ const usd0 = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US
 function Success({ title, sub, onDone }: { title: string; sub: string; onDone: () => void }) {
  return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
-      <span className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-success">
+      <span className="flex size-14 items-center justify-center rounded-full bg-shipped/12 text-success">
         <CheckCircle size={30} weight="fill" />
       </span>
       <div className="font-semibold">{title}</div>
@@ -246,7 +246,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
                     {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 eg-label text-primary-foreground">Best rate</span>}
                     <span className="text-lg font-semibold tabular-nums">{usd0(t.usd)}</span>
                     <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
-                    {saveVnd > 0 && <span className="w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">save {vnd(saveVnd)}</span>}
+                    {saveVnd > 0 && <span className="w-fit rounded-full bg-shipped/12 px-2 py-0.5 text-xs font-semibold text-shipped">save {vnd(saveVnd)}</span>}
                   </button>
                 )
               })}
@@ -450,7 +450,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={proof.dataUrl} alt="Payment receipt" className="size-14 shrink-0 rounded-lg border border-border object-cover" />
             <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{proof.name}</span>
-            <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" onClick={() => setProof(null)} aria-label="Remove screenshot">
+            <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-alert" onClick={() => setProof(null)} aria-label="Remove screenshot">
               <X size={15} weight="bold" />
             </Button>
           </div>

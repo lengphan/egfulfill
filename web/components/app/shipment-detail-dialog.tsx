@@ -292,7 +292,7 @@ export function ShipmentDetailDialog({
           <DialogTitle className="flex items-baseline gap-3 pe-8">
             <span className="truncate tabular-nums">{isLoose ? s.id : s.num.startsWith("#") ? s.num : plainNum(s.id)}</span>
             {s.test && (
-              <span className="shrink-0 self-center rounded bg-slate-200 px-1.5 py-0.5 text-2xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200">TEST</span>
+              <span className="shrink-0 self-center rounded bg-draft/20 px-1.5 py-0.5 text-2xs font-medium text-draft">TEST</span>
             )}
             {s.price != null && (
               <span className={"ms-auto shrink-0 text-xl font-semibold tabular-nums "
@@ -482,8 +482,8 @@ export function ShipmentDetailDialog({
                           {/* The import date earns its place: two orders for one buyer are
  told apart by when they arrived and by nothing else here. */}
                           <span>Imported {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : "—"}</span>
-                          {c.matchedZip && <span className="text-emerald-700 dark:text-emerald-400">· address matches</span>}
-                          {c.matchedName && <span className="text-sky-700 dark:text-sky-400">· name matches</span>}
+                          {c.matchedZip && <span className="text-shipped">· address matches</span>}
+                          {c.matchedName && <span className="text-packed">· name matches</span>}
                           {!c.matchedZip && !c.matchedName && <span className="text-hold">· weak match</span>}
                         </div>
                       </div>

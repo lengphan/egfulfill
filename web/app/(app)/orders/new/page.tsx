@@ -300,7 +300,7 @@ export default function NewOrderPage() {
  disabled={lines.length === 1}
  aria-label="Remove item"
  title="Remove item"
- className="absolute right-3 top-1.5 flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-red-600 disabled:pointer-events-none disabled:opacity-30"
+ className="absolute right-3 top-1.5 flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-alert disabled:pointer-events-none disabled:opacity-30"
               >
                 <X size={13} weight="bold" />
               </button>

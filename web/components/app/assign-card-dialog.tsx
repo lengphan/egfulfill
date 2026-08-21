@@ -90,7 +90,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
         </DialogHeader>
 
         {done ? (
-          <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <div className="flex items-start gap-2 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-sm text-shipped">
             <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" />
             <span>
               Attached to <strong>{picked ? numOf(picked) : "the order"}</strong>. Its design tag

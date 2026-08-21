@@ -25,78 +25,78 @@ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
  * assumption; restocking fees and partial credits get typed over it.
  */
 export function PoReturnDialog({
-  po, onClose, onDone,
+ po, onClose, onDone,
 }: { po: PurchaseOrder | null; onClose: () => void; onDone: () => void }) {
-  const [qty, setQty] = useState<Record<string, string>>({})
-  const [credit, setCredit] = useState<Record<string, string>>({})
-  const [rma, setRma] = useState("")
-  const [note, setNote] = useState("")
+ const [qty, setQty] = useState<Record<string, string>>({})
+ const [credit, setCredit] = useState<Record<string, string>>({})
+ const [rma, setRma] = useState("")
+ const [note, setNote] = useState("")
   // S&S refuse a return without a reason code, and their codes are specific enough that
   // free text can't substitute — "damaged" and "picking error" settle differently.
-  const [reason, setReason] = useState("1")
-  const [replace, setReplace] = useState(false)
-  const [raised, setRaised] = useState<{ ra: string | null; label: string | null }[] | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+ const [reason, setReason] = useState("1")
+ const [replace, setReplace] = useState(false)
+ const [raised, setRaised] = useState<{ ra: string | null; label: string | null }[] | null>(null)
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
 
-  useEffect(() => {
-    const t = setTimeout(() => { setQty({}); setCredit({}); setRma(""); setNote(""); setErr(null) }, 0)
-    return () => clearTimeout(t)
+ useEffect(() => {
+ const t = setTimeout(() => { setQty({}); setCredit({}); setRma(""); setNote(""); setErr(null) }, 0)
+ return () => clearTimeout(t)
   }, [po?.num])
 
-  if (!po) return null
+ if (!po) return null
 
-  const picked = po.items
+ const picked = po.items
     .map((l) => ({ l, q: parseInt(qty[l.sku] ?? "", 10) || 0 }))
     .filter((x) => x.q > 0)
-  const expected = picked.reduce((s, { l, q }) => {
-    const typed = Number(credit[l.sku])
-    return s + (isFinite(typed) && credit[l.sku] !== "" ? typed : num(l.price) * q)
+ const expected = picked.reduce((s, { l, q }) => {
+ const typed = Number(credit[l.sku])
+ return s + (isFinite(typed) && credit[l.sku] !== "" ? typed : num(l.price) * q)
   }, 0)
 
   // Whether this PO can be returned through the API. S&S key returns to the INVOICE, so
   // without one we can only record it locally and let someone raise it by hand.
-  const invoiceNumber = String(((po?.meta ?? {}) as Record<string, unknown>).invoiceNumber ?? "")
-  const isSs = /s&s|activewear/i.test(po?.supplier || "")
-  const canApi = isSs && !!invoiceNumber
+ const invoiceNumber = String(((po?.meta ?? {}) as Record<string, unknown>).invoiceNumber ?? "")
+ const isSs = /s&s|activewear/i.test(po?.supplier || "")
+ const canApi = isSs && !!invoiceNumber
 
-  const submit = async () => {
-    setBusy(true); setErr(null)
-    try {
+ const submit = async () => {
+ setBusy(true); setErr(null)
+ try {
       // Raise it with S&S FIRST when we can. If they refuse, nothing is recorded locally —
       // a local return that the supplier never heard of is worse than no return, because
       // the stock is off the shelf and nobody is expecting the box.
-      if (canApi) {
-        const r = await ssReturn({
-          lines: picked.map(({ l, q }) => ({
-            invoiceNumber, sku: l.sku, qty: q, returnReason: reason,
-            isReplace: replace, returnReasonComment: note.trim() || undefined,
+ if (canApi) {
+ const r = await ssReturn({
+ lines: picked.map(({ l, q }) => ({
+ invoiceNumber, sku: l.sku, qty: q, returnReason: reason,
+ isReplace: replace, returnReasonComment: note.trim() || undefined,
           })),
         })
-        if (r.error) { setErr(r.error); return }
-        if (r.returns?.length) {
-          setRaised(r.returns.map((x) => ({ ra: x.raNumber, label: x.labelUrl })))
+ if (r.error) { setErr(r.error); return }
+ if (r.returns?.length) {
+ setRaised(r.returns.map((x) => ({ ra: x.raNumber, label: x.labelUrl })))
         }
       }
-      const r = await returnPoLines(po.num, {
-        lines: picked.map(({ l, q }) => {
-          const typed = Number(credit[l.sku])
-          return { sku: l.sku, qty: q, credit: isFinite(typed) && credit[l.sku] !== "" ? typed : num(l.price) * q }
+ const r = await returnPoLines(po.num, {
+ lines: picked.map(({ l, q }) => {
+ const typed = Number(credit[l.sku])
+ return { sku: l.sku, qty: q, credit: isFinite(typed) && credit[l.sku] !== "" ? typed : num(l.price) * q }
         }),
-        rma: rma.trim() || undefined,
-        note: note.trim() || undefined,
+ rma: rma.trim() || undefined,
+ note: note.trim() || undefined,
       })
-      if (r.error) { setErr(r.error); return }
-      onDone()
+ if (r.error) { setErr(r.error); return }
+ onDone()
       // Hold the dialog open when S&S gave us an RA number and a label — closing would
       // throw away the only link to the label the box can't go back without.
-      if (!raised) onClose()
+ if (!raised) onClose()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't record that return.")
+ setErr(e instanceof Error ? e.message : "Couldn't record that return.")
     } finally { setBusy(false) }
   }
 
-  return (
+ return (
     <Dialog open={!!po} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -116,17 +116,17 @@ export function PoReturnDialog({
                 </div>
               </div>
               <Input
-                value={qty[l.sku] ?? ""}
-                onChange={(e) => setQty((p) => ({ ...p, [l.sku]: e.target.value.replace(/[^0-9]/g, "") }))}
-                placeholder="0" inputMode="numeric" disabled={busy}
-                className="h-8 w-16 text-center" aria-label={`Quantity of ${l.sku} to return`}
+ value={qty[l.sku] ?? ""}
+ onChange={(e) => setQty((p) => ({ ...p, [l.sku]: e.target.value.replace(/[^0-9]/g, "") }))}
+ placeholder="0" inputMode="numeric" disabled={busy}
+ className="h-8 w-16 text-center" aria-label={`Quantity of ${l.sku} to return`}
               />
               <Input
-                value={credit[l.sku] ?? ""}
-                onChange={(e) => setCredit((p) => ({ ...p, [l.sku]: e.target.value.replace(/[^0-9.]/g, "") }))}
-                placeholder={usd(num(l.price) * (parseInt(qty[l.sku] ?? "", 10) || 0)).replace("$", "")}
-                inputMode="decimal" disabled={busy || !(parseInt(qty[l.sku] ?? "", 10) > 0)}
-                className="h-8 w-24 text-right tabular-nums" aria-label={`Expected credit for ${l.sku}`}
+ value={credit[l.sku] ?? ""}
+ onChange={(e) => setCredit((p) => ({ ...p, [l.sku]: e.target.value.replace(/[^0-9.]/g, "") }))}
+ placeholder={usd(num(l.price) * (parseInt(qty[l.sku] ?? "", 10) || 0)).replace("$", "")}
+ inputMode="decimal" disabled={busy || !(parseInt(qty[l.sku] ?? "", 10) > 0)}
+ className="h-8 w-24 text-right tabular-nums" aria-label={`Expected credit for ${l.sku}`}
               />
             </div>
           ))}
@@ -137,7 +137,7 @@ export function PoReturnDialog({
             <label className="block space-y-1">
               <span className="text-sm font-medium">Reason</span>
               <select value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+ className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                 {Object.entries(SS_RETURN_REASONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </label>
@@ -145,27 +145,27 @@ export function PoReturnDialog({
           {isSs && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)}
-                     disabled={busy} className="size-4 accent-primary" />
+ disabled={busy} className="size-4 accent-primary" />
               Send a replacement instead of a credit
             </label>
           )}
           <div className="grid grid-cols-2 gap-2">
             <Input value={rma} onChange={(e) => setRma(e.target.value)} disabled={busy}
-                   placeholder="RMA / reference" className="h-9" />
+ placeholder="RMA / reference" className="h-9" />
             <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={busy}
-                   placeholder="Reason" className="h-9" />
+ placeholder="Reason" className="h-9" />
           </div>
           {/* Said plainly: this is our record, not a message to the supplier. */}
           <p className="text-xs text-muted-foreground">
             Stock comes off the shelf now.{" "}
             {canApi
               ? <>This <strong>is</strong> raised with S&amp;S — they return an RA number and a shipping label.</>
-              : isSs
+ : isSs
                 ? <>This PO has no invoice number yet, so S&amp;S can&apos;t be told: they key returns to the invoice, not the order. Fetch the order status first, or raise it by hand and record their reference above.</>
-                : <>This does <strong>not</strong> notify {po.supplier || "the supplier"} — raise it with them the usual way and record their reference above.</>}
+ : <>This does <strong>not</strong> notify {po.supplier || "the supplier"} — raise it with them the usual way and record their reference above.</>}
           </p>
           {raised && (
-            <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <div className="space-y-1 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-sm text-shipped">
               {raised.map((r, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2">
                   <span>RA <strong>{r.ra ?? "—"}</strong></span>

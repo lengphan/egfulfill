@@ -24,7 +24,7 @@ const STATUS_TONE: Record<string, string> = {
  announced: "bg-muted text-muted-foreground",
  in_transit: "bg-hold/15 text-hold",
  received: "bg-blue-100 text-blue-700",
- shelved: "bg-emerald-100 text-emerald-700",
+ shelved: "bg-shipped/12 text-shipped",
  closed: "bg-muted text-muted-foreground",
  cancelled: "bg-muted text-muted-foreground",
 }
@@ -148,7 +148,7 @@ export function ConsignmentPanel() {
  return (
     <div className="space-y-4">
       {msg && (
-        <div className={"rounded-lg border p-3 text-sm " + (msg.tone === "ok" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-hold/30 bg-hold/10 text-hold")}>
+        <div className={"rounded-lg border p-3 text-sm " + (msg.tone === "ok" ? "border-shipped/30 bg-shipped/12 text-shipped" : "border-hold/30 bg-hold/10 text-hold")}>
           {msg.text}
         </div>
       )}

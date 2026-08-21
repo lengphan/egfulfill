@@ -229,7 +229,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
       <div className="space-y-3 border-t border-border px-5 py-4">
         {msg && (
           <div className={"flex items-start gap-2 rounded-lg border px-3 py-2 text-sm " +
-            (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>
+            (msg.ok ? "border-shipped/30 bg-shipped/12 text-shipped" : "border-destructive/30 bg-destructive/10 text-destructive")}>
             {msg.ok ? <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" /> : <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />}
             <span>{msg.text}</span>
           </div>

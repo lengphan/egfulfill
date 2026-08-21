@@ -227,7 +227,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
  publish lands as a DRAFT; the seller activates it on the marketplace. */}
         <span className={
           "absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 eg-label text-white shadow-sm " +
-          (live ? "bg-emerald-600" : "bg-hold")
+          (live ? "bg-shipped" : "bg-hold")
         }>
           {live ? <><CheckCircle size={11} weight="fill" /> Live</> : <>Draft</>}
         </span>
@@ -574,7 +574,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
  onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); onMakeProduct(l) }}
  disabled={opening}
  className={uploaded
-                ? cn(CARD_ACTION_SECONDARY, "flex-1 border-emerald-600/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400")
+                ? cn(CARD_ACTION_SECONDARY, "flex-1 border-shipped/30 bg-shipped/10 text-shipped hover:bg-shipped/15")
  : cn(CARD_ACTION_PRIMARY, "flex-1")}
             >
               {/* LETTERING ONLY. A card is already a photograph with a price, a shop name and

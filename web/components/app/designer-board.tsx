@@ -161,11 +161,11 @@ const canDeleteCard = () => { const r = getUser()?.role; return r === "admin" ||
 // Mirrors the design_lanes seed in server/src/routes/design_cards.js. `system` marks the
 // two load-bearing lanes: incoming (the fallback) and approved (which credits a designer).
 const DEFAULT_LANES: DesignLane[] = [
-  { id: "incoming", label: "Incoming", accent: "bg-slate-400", sort: 0, system: true },
-  { id: "inprogress", label: "In progress", accent: "bg-violet-500", sort: 1, system: false },
+  { id: "incoming", label: "Incoming", accent: "bg-draft", sort: 0, system: true },
+  { id: "inprogress", label: "In progress", accent: "bg-working", sort: 1, system: false },
   { id: "review", label: "In review", accent: "bg-hold", sort: 2, system: false },
-  { id: "fix", label: "Fix", accent: "bg-red-500", sort: 3, system: false },
-  { id: "approved", label: "Approved", accent: "bg-emerald-500", sort: 4, system: true },
+  { id: "fix", label: "Fix", accent: "bg-alert", sort: 3, system: false },
+  { id: "approved", label: "Approved", accent: "bg-shipped", sort: 4, system: true },
 ]
 // A card's lane, validated against the CURRENT lanes — an unknown col (a lane that was
 // deleted, say) falls back to the first lane rather than vanishing from the board.
@@ -179,15 +179,20 @@ const laneMeta = (id: string, lanes: DesignLane[]) =>
  lanes.find((l) => l.id === id) ?? DEFAULT_LANES.find((l) => l.id === id) ?? { id, label: id, accent: "bg-muted-foreground", sort: 99, system: false }
 // A lane accent (a bg-*-500 swatch) → a solid tinted STATUS pill, no dot. Literal classes
 // so Tailwind keeps them; an unmapped custom accent falls back to neutral.
+/* KEYS ARE DATA, VALUES ARE STYLING. The key is the accent class STORED on a lane, so it
+   must keep its literal Tailwind name — a sweep that rewrote both sides collapsed two
+   distinct lanes onto one key and lost a mapping. Only the right-hand side moves to tokens.
+   Colours outside the floor's reserved set (blue, teal, rose, cyan, lime, pink, green) map
+   to the nearest reserved meaning rather than inventing a token per hue. */
 const LANE_PILL: Record<string, string> = {
-  "bg-slate-400": "bg-slate-100 text-slate-700", "bg-slate-500": "bg-slate-100 text-slate-700",
-  "bg-violet-500": "bg-violet-100 text-violet-700", "bg-hold": "bg-hold/15 text-hold",
-  "bg-red-500": "bg-red-100 text-red-700", "bg-emerald-500": "bg-emerald-100 text-emerald-700",
-  "bg-blue-500": "bg-blue-100 text-blue-700", "bg-sky-500": "bg-sky-100 text-sky-700",
-  "bg-green-500": "bg-green-100 text-green-700", "bg-orange-500": "bg-orange-100 text-orange-700",
-  "bg-pink-500": "bg-pink-100 text-pink-700", "bg-indigo-500": "bg-indigo-100 text-indigo-700",
-  "bg-teal-500": "bg-teal-100 text-teal-700", "bg-rose-500": "bg-rose-100 text-rose-700",
-  "bg-cyan-500": "bg-cyan-100 text-cyan-700", "bg-lime-500": "bg-lime-100 text-lime-700",
+  "bg-slate-400": "bg-draft/12 text-draft", "bg-slate-500": "bg-draft/12 text-draft",
+  "bg-violet-500": "bg-working/12 text-working", "bg-hold": "bg-hold/15 text-hold",
+  "bg-red-500": "bg-alert/12 text-alert", "bg-emerald-500": "bg-shipped/12 text-shipped",
+  "bg-blue-500": "bg-info/12 text-info", "bg-sky-500": "bg-packed/12 text-packed",
+  "bg-green-500": "bg-shipped/12 text-shipped", "bg-orange-500": "bg-backorder/12 text-backorder",
+  "bg-pink-500": "bg-alert/12 text-alert", "bg-indigo-500": "bg-pending/12 text-pending",
+  "bg-teal-500": "bg-packed/12 text-packed", "bg-rose-500": "bg-alert/12 text-alert",
+  "bg-cyan-500": "bg-info/12 text-info", "bg-lime-500": "bg-shipped/12 text-shipped",
 }
 const lanePill = (accent?: string) => LANE_PILL[String(accent || "")] ?? "bg-muted text-muted-foreground"
 // Partner keys are storage values ("pinkdesign"); the board shows a human name. Unknown
@@ -713,7 +718,7 @@ export function DesignerBoard() {
  onClick={(e) => { e.stopPropagation(); void removeLane(col) }}
  title={`Delete the ${col.label} lane`}
  aria-label={`Delete ${col.label} lane`}
- className="eg-tap shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:bg-red-50 hover:text-red-600"
+ className="eg-tap shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:bg-alert/12 hover:text-alert"
                     >
                       <X size={13} weight="bold" />
                     </button>
@@ -756,7 +761,7 @@ export function DesignerBoard() {
  className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
                         >
                           <CardArt key={String(c.thumb ?? c.id)} card={c} imgClass="size-full object-cover" iconSize={26} />
-                          {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-2xs font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                          {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-pending/90 px-1.5 py-0.5 text-2xs font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Top-right tag = WHO owns this card's queue. A partner card shows the
  partner (pink). Otherwise, if someone on OUR side has claimed it, their
                               NAME shows here — VIOLET when a designer claimed it (e.g. Abdul), SLATE
@@ -767,7 +772,7 @@ export function DesignerBoard() {
                           ) : c.claimed_by ? (
                             <span
  title={`Claimed by ${c.claimed_by}${c.claimed_role ? ` (${c.claimed_role})` : ""}`}
- className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-2xs font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
+ className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-2xs font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-draft/90")}
                             >
                               <span className="truncate">{String(c.claimed_by)}</span>
                             </span>
@@ -781,7 +786,7 @@ export function DesignerBoard() {
  only the tooltip said otherwise. Two different facts cannot
  share one appearance; the icon is the cheapest way to say
  which of the two you are looking at. */
-                            <span title={`Seller · ${c.seller_name}${c.created_by_name ? ` · sent by ${c.created_by_name}` : ""}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-slate-600/90 px-1.5 py-0.5 text-2xs font-medium text-white">
+                            <span title={`Seller · ${c.seller_name}${c.created_by_name ? ` · sent by ${c.created_by_name}` : ""}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-draft/90 px-1.5 py-0.5 text-2xs font-medium text-white">
                               <Storefront size={9} weight="fill" className="shrink-0 opacity-80" />
                               <span className="truncate">{String(c.seller_name)}</span>
                             </span>
@@ -805,7 +810,7 @@ export function DesignerBoard() {
                             })
  if (ok) void removeCard(c.id)
                           }}
- className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+ className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-alert focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <X size={11} weight="bold" />
                         </button>}
@@ -937,7 +942,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
         )}
       </div>
       <span className="max-w-[220px] truncate font-medium">{cardLabel(c)}</span>
-      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-2xs font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+      {isEmbCard(c) && <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-2xs font-medium text-pending"><Needle size={9} weight="bold" /> EMB</span>}
     </div>
   ) },
   { id: "order", label: "Order", cell: (c) => <span title={c.order_id ? String(c.order_id) : undefined} className="whitespace-nowrap tabular-nums text-xs text-muted-foreground">{c.order_id ? shortOrderRef(String(c.order_id)) : "—"}</span> },
@@ -1278,7 +1283,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {/* Compact meta line — method / priority / product, order state, customer, claimer.
             Status moved up to the header, so it isn't repeated here. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
+          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-pending"><Needle size={10} weight="bold" /> Embroidery</span>}
           {card.priority && card.priority !== "normal" && <span className="whitespace-nowrap text-xs font-medium text-hold">{String(card.priority)}</span>}
           <span>{card.product || card.type || "No product / type set"}</span>
           <span aria-hidden>·</span>
@@ -1330,7 +1335,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
                 <div key={f.url + i} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
                   <Paperclip size={12} weight="bold" className="shrink-0 text-muted-foreground" />
                   <a href={f.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate hover:underline">{f.name || f.url}</a>
-                  <button onClick={() => removeRefFile(i)} className="shrink-0 text-muted-foreground hover:text-red-600" title="Remove"><Trash size={13} /></button>
+                  <button onClick={() => removeRefFile(i)} className="shrink-0 text-muted-foreground hover:text-alert" title="Remove"><Trash size={13} /></button>
                 </div>
               ))}
             </div>
@@ -1415,11 +1420,11 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             Shown as openable links since a folder can't be previewed. */}
         {card.vendor && Array.isArray(card.vendor_files) && card.vendor_files.length > 0 && (
           <div className="space-y-1.5">
-            <span className="text-xs font-medium text-emerald-700">Received from {vendorLabel(card.vendor)}</span>
+            <span className="text-xs font-medium text-shipped">Received from {vendorLabel(card.vendor)}</span>
             <div className="flex flex-col gap-1">
               {card.vendor_files.map((src, i) => (
                 <a key={i} href={src} target="_blank" rel="noopener noreferrer"
- className="inline-flex items-center gap-1.5 truncate rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
+ className="inline-flex items-center gap-1.5 truncate rounded-lg border border-shipped/30 bg-shipped/12 px-2.5 py-1.5 text-xs font-medium text-shipped hover:bg-shipped/12">
                   <LinkSimple size={13} weight="bold" className="shrink-0" />
                   <span className="truncate">{src}</span>
                 </a>
@@ -1499,11 +1504,11 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {col === "review" && (
                 <>
                   <Button size="sm" onClick={() => move("approved")}>Accept</Button>
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" disabled={busy} onClick={requestFix}>Request changes</Button>
+                  <Button size="sm" variant="outline" className="text-alert hover:text-alert" disabled={busy} onClick={requestFix}>Request changes</Button>
                 </>
               )}
               {col === "fix" && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-alert/12 px-2.5 py-1.5 text-xs font-medium text-alert">
                   Sent back to {vendorLabel(card.vendor)} for changes
                 </span>
               )}
@@ -1521,7 +1526,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {col === "review" && (
                 <>
                   <Button size="sm" onClick={() => move("approved")}>Approve</Button>
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}>Fix</Button>
+                  <Button size="sm" variant="outline" className="text-alert hover:text-alert" onClick={() => move("fix")}>Fix</Button>
                 </>
               )}
               {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}>Back to work</Button>}
@@ -1532,7 +1537,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               )}
             </>
           )}
-          <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
+          <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-alert">Remove card</button>
         </div>
 
         {/* Full-size artwork lightbox — fixed to the viewport (escapes the dialog's scroll
@@ -1606,7 +1611,7 @@ function BoardHistory() {
         {/* The tab exists mainly to answer "what got deleted?" — so a one-click filter to
  exactly that, without hunting through moves and credits. */}
         <button onClick={() => setOnlyDeletes((v) => !v)}
- className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-red-300 bg-red-50 text-red-700" : "border-border text-muted-foreground hover:bg-accent")}>
+ className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-alert/30 bg-alert/12 text-alert" : "border-border text-muted-foreground hover:bg-accent")}>
           {onlyDeletes ? "Showing deletions only" : "Deletions only"}
         </button>
       </div>

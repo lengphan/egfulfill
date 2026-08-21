@@ -340,7 +340,7 @@ export function ProductsCatalog() {
                     {isStaff && (
                       <>
                         <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditing(p); setEditorOpen(true) }} title="Edit" className="flex size-7 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-accent"><PencilSimple size={13} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); deleteProduct(p.id) }} title="Delete" className="flex size-7 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-red-600"><Trash size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); deleteProduct(p.id) }} title="Delete" className="flex size-7 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-alert"><Trash size={13} /></button>
                       </>
                     )}
                   </div>

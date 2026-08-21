@@ -152,7 +152,7 @@ function BrowseTab() {
               <button key={it.key} onClick={() => setOpen(it)} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow">
                 <div className="relative aspect-square overflow-hidden bg-muted">
                   <Thumb src={it.thumb} alt={it.name} className="absolute inset-0 size-full object-cover" />
-                  {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-emerald-500 px-1.5 py-0.5 text-2xs font-semibold text-white">Generated</span>}
+                  {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-shipped px-1.5 py-0.5 text-2xs font-semibold text-white">Generated</span>}
                 </div>
                 <div className="p-2.5">
                   <div className="truncate text-sm font-medium">{it.name}</div>
@@ -860,7 +860,7 @@ function CreateTab() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.thumb} alt="" className="size-10 shrink-0 rounded-md border border-border object-contain" />
                 <span className="min-w-0 flex-1 truncate text-sm">{im.name}</span>
-                <button onClick={() => removeLayer(im.id)} title="Remove image" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={14} /></button>
+                <button onClick={() => removeLayer(im.id)} title="Remove image" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-alert"><X size={14} /></button>
               </div>
             ))}
             <label
@@ -961,7 +961,7 @@ function CreateTab() {
                       <button onClick={() => moveLayer(l.id, 1)} disabled={ai === layers.length - 1} title="Bring forward" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretUp size={13} weight="bold" /></button>
                       <button onClick={() => moveLayer(l.id, -1)} disabled={ai === 0} title="Send back" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretDown size={13} weight="bold" /></button>
                       <button onClick={() => setOpenLayer((o) => (o === l.id ? null : l.id))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === l.id ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
-                      <button onClick={() => removeLayer(l.id)} title="Remove layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-red-600"><X size={13} /></button>
+                      <button onClick={() => removeLayer(l.id)} title="Remove layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-alert"><X size={13} /></button>
                     </div>
                     {openLayer === l.id && (
                       <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-2xs text-muted-foreground">

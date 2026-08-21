@@ -214,7 +214,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
       <div className="grid grid-cols-2 gap-2">
         {([["in", "Stock In", ArrowDown], ["out", "Stock Out", ArrowUp]] as const).map(([m, label, Icon]) => {
  const on = mode === m
- const tone = m === "in" ? "border-emerald-500 bg-emerald-500 text-white" : "border-red-500 bg-red-500 text-white"
+ const tone = m === "in" ? "border-shipped/30 bg-shipped text-white" : "border-alert/30 bg-alert text-white"
  return (
             <button
  key={m}
@@ -253,11 +253,11 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
  placeholder="Scan or type a SKU…  (try SKU x5 for qty)"
  spellCheck={false}
  autoComplete="off"
- className={"h-16 text-center tabular-nums text-lg transition-colors " + (flash === "ok" ? "border-emerald-500 bg-emerald-50" : flash === "err" ? "border-red-500 bg-red-50" : "")}
+ className={"h-16 text-center tabular-nums text-lg transition-colors " + (flash === "ok" ? "border-shipped/30 bg-shipped/12" : flash === "err" ? "border-alert/30 bg-alert/12" : "")}
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{busy ? <span className="inline-flex items-center gap-1"><CircleNotch size={12} className="animate-spin" /> saving…</span> : "Ready — the input stays focused for the gun."}</span>
-            {log.length > 0 && <span>Session net <b className={netToday >= 0 ? "text-success" : "text-red-600"}>{netToday >= 0 ? "+" : ""}{netToday}</b> · {log.length} scan{log.length === 1 ? "" : "s"}</span>}
+            {log.length > 0 && <span>Session net <b className={netToday >= 0 ? "text-success" : "text-alert"}>{netToday >= 0 ? "+" : ""}{netToday}</b> · {log.length} scan{log.length === 1 ? "" : "s"}</span>}
           </div>
         </div>
       </SectionCard>
@@ -273,7 +273,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
           <div className="divide-y divide-border">
             {log.map((e) => (
               <div key={e.key} className="flex items-center gap-3 px-5 py-2.5">
-                <span className={"flex size-7 shrink-0 items-center justify-center rounded-lg " + (!e.ok ? "bg-red-100 text-red-600" : e.dir === "in" ? "bg-emerald-100 text-success" : "bg-hold/15 text-hold")}>
+                <span className={"flex size-7 shrink-0 items-center justify-center rounded-lg " + (!e.ok ? "bg-alert/12 text-alert" : e.dir === "in" ? "bg-shipped/12 text-success" : "bg-hold/15 text-hold")}>
                   {!e.ok ? <Warning size={13} weight="fill" /> : e.dir === "in" ? <ArrowDown size={13} weight="bold" /> : <ArrowUp size={13} weight="bold" />}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -307,9 +307,9 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
  that the code was too small to decode, or cropping it and decoding
  nothing. A square fits both: a barcode sits across the middle of it
  quite happily, a QR fills it. */}
-              <div className={"aspect-square w-56 max-w-[70%] rounded-2xl border-4 transition-colors " + (flash === "ok" ? "border-emerald-400" : flash === "err" ? "border-red-500" : "border-white/70")} />
+              <div className={"aspect-square w-56 max-w-[70%] rounded-2xl border-4 transition-colors " + (flash === "ok" ? "border-shipped/30" : flash === "err" ? "border-alert/30" : "border-white/70")} />
             </div>
-            {camErr && <div className="absolute inset-x-4 top-4 rounded-lg bg-red-600 px-3 py-2 text-sm text-white">{camErr}</div>}
+            {camErr && <div className="absolute inset-x-4 top-4 rounded-lg bg-alert px-3 py-2 text-sm text-white">{camErr}</div>}
             {/* Reading, and with what. Says nothing once a scan has landed — by then the
  log below is the feedback and this would just be noise. */}
             {!camErr && !sawScan && (
@@ -322,7 +322,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
               </div>
             )}
             {log[0] && (
-              <div className={"absolute inset-x-4 bottom-4 rounded-xl px-4 py-3 text-white " + (log[0].ok ? "bg-emerald-600" : "bg-red-600")}>
+              <div className={"absolute inset-x-4 bottom-4 rounded-xl px-4 py-3 text-white " + (log[0].ok ? "bg-shipped" : "bg-alert")}>
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   {log[0].ok ? <CheckCircle size={15} weight="fill" /> : <Warning size={15} weight="fill" />} {log[0].label}
                 </div>
@@ -332,7 +332,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
           </div>
           <div className="grid grid-cols-2 gap-2 p-3">
             {([["in", "Stock In"], ["out", "Stock Out"]] as const).map(([m, label]) => (
-              <button key={m} onClick={() => setMode(m)} className={"rounded-xl py-3 text-sm font-semibold " + (mode === m ? (m === "in" ? "bg-emerald-500 text-white" : "bg-red-500 text-white") : "bg-white/10 text-white/70")}>{label}</button>
+              <button key={m} onClick={() => setMode(m)} className={"rounded-xl py-3 text-sm font-semibold " + (mode === m ? (m === "in" ? "bg-shipped text-white" : "bg-alert text-white") : "bg-white/10 text-white/70")}>{label}</button>
             ))}
           </div>
         </div>

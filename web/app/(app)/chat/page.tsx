@@ -645,7 +645,7 @@ export default function ChatPage() {
           {isStaffUser && !isDesigner && (
             <button onClick={() => setHoursOpen(true)} title="Support hours"
  className={"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent " +
-                (office ? (office.open ? "border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-hold/30 text-hold") : "border-border text-muted-foreground")}>
+                (office ? (office.open ? "border-shipped/30 text-shipped" : "border-hold/30 text-hold") : "border-border text-muted-foreground")}>
               {/* NO DOT. The pill is already the colour the dot was — the border and the
  word both carry it — so a 6px disc of the same hue is the state said a
  third time, at the one size nobody can read it. */}

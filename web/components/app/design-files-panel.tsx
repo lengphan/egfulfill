@@ -250,9 +250,9 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
 }
 
 const KIND_META: Record<string, { label: string; hint: string; cls: string; icon: React.ReactNode }> = {
- pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-violet-100 text-violet-700", icon: <FileArrowDown size={12} weight="fill" /> },
+ pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-working/12 text-working", icon: <FileArrowDown size={12} weight="fill" /> },
  emb: { label: "EMB", hint: "factory working file", cls: "bg-hold/15 text-hold", icon: <FileZip size={12} weight="fill" /> },
- image: { label: "IMG", hint: "artwork / mockup", cls: "bg-sky-100 text-sky-700", icon: <ImageIcon size={12} weight="fill" /> },
+ image: { label: "IMG", hint: "artwork / mockup", cls: "bg-packed/12 text-packed", icon: <ImageIcon size={12} weight="fill" /> },
  other: { label: "FILE", hint: "", cls: "bg-muted text-muted-foreground", icon: <FileZip size={12} weight="fill" /> },
 }
 
@@ -434,7 +434,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-xs font-medium">{f.name}</span>
-                    {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-2xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+                    {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
                   </div>
                   <div className="truncate text-2xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
                 </div>
@@ -838,7 +838,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  showed four identical tiles and the only way to tell them apart was to read
  the names. This is the actual file. A machine file keeps a glyph because it
  genuinely has no preview, and the two must not be made to look alike. */}
-            <span className={"flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border " + (s.image ? "bg-muted" : "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300")}>
+            <span className={"flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border " + (s.image ? "bg-muted" : "bg-working/12 text-working")}>
               {s.preview
                 /* A blob: URL for a file already in this browser's memory — there is no
  request to optimise, and next/image cannot take one anyway. */
@@ -1048,7 +1048,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium">{f.name}</span>
-              {f.isLatest && <span className="shrink-0 rounded bg-emerald-100 px-1 py-0.5 text-2xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+              {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
             </div>
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}

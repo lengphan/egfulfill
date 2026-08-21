@@ -207,7 +207,7 @@ export function SiteContentPanel() {
         </a>
       }
     >
-      {err && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{err}</div>}
+      {err && <div className="mb-4 rounded-lg border border-alert/30 bg-alert/12 p-2.5 text-xs text-alert">{err}</div>}
 
       <Tabs value={sub} onValueChange={setSub}>
         <TabsList className="flex flex-wrap">
@@ -409,7 +409,7 @@ export function SiteContentPanel() {
       {/* ── Save bar (shared across every sub-tab) ── */}
       <div className="sticky bottom-0 -mx-5 -mb-5 mt-6 flex items-center justify-between gap-3 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
         <div className="text-xs text-muted-foreground">
-          {saved ? <span className="text-success dark:text-emerald-400">Saved — live within a minute.</span>
+          {saved ? <span className="text-success">Saved — live within a minute.</span>
  : updatedAt ? `Last edited ${new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
  : "Never edited — showing shipped defaults."}
         </div>

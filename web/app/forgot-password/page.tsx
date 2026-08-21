@@ -9,31 +9,31 @@ import { Input } from "@/components/ui/input"
 import { forgotPassword } from "@/lib/api"
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("")
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+ const [email, setEmail] = useState("")
+ const [sent, setSent] = useState(false)
+ const [error, setError] = useState<string | null>(null)
+ const [loading, setLoading] = useState(false)
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-    try {
-      const r = await forgotPassword(email.trim())
-      if (r.error) throw new Error(r.error)
-      setSent(true)
+ async function onSubmit(e: React.FormEvent) {
+ e.preventDefault()
+ setError(null)
+ setLoading(true)
+ try {
+ const r = await forgotPassword(email.trim())
+ if (r.error) throw new Error(r.error)
+ setSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't send the reset request.")
+ setError(err instanceof Error ? err.message : "Couldn't send the reset request.")
     } finally {
-      setLoading(false)
+ setLoading(false)
     }
   }
 
-  return (
+ return (
     <AuthShell subtitle="Reset your password">
       {sent ? (
         <div className="space-y-4 text-center">
-          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-success">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-shipped/12 text-success">
             <CheckCircle size={26} weight="fill" />
           </span>
           <div className="text-sm text-muted-foreground">

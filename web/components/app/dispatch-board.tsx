@@ -96,12 +96,12 @@ function disposition(o: OrderRow): { key: DispKey; label: string } {
 const DISP_MARK: Record<DispKey, { icon: Icon; cls: string; weight?: "fill" | "bold" }> = {
   // Barcode and Truck are STROKED: at 13px a filled barcode is a solid green block — the
   // gaps between the bars are the glyph. The round badges (XCircle, Warning) need the mass.
- scanned: { icon: Barcode, cls: "text-emerald-600 dark:text-emerald-400", weight: "bold" },
- shipped: { icon: Truck, cls: "text-emerald-600 dark:text-emerald-400", weight: "bold" },
+ scanned: { icon: Barcode, cls: "text-shipped", weight: "bold" },
+ shipped: { icon: Truck, cls: "text-shipped", weight: "bold" },
  awaiting: { icon: Clock, cls: "text-muted-foreground", weight: "bold" },
- production: { icon: Printer, cls: "text-violet-600 dark:text-violet-400", weight: "bold" },
+ production: { icon: Printer, cls: "text-working", weight: "bold" },
  removed: { icon: ArrowUUpLeft, cls: "text-hold", weight: "bold" },
- cancelled: { icon: XCircle, cls: "text-red-600 dark:text-red-400", weight: "fill" },
+ cancelled: { icon: XCircle, cls: "text-alert", weight: "fill" },
  attention: { icon: Warning, cls: "text-hold", weight: "fill" },
 }
 /**
@@ -893,7 +893,7 @@ export function DispatchBoard() {
             {stuck.length > 1 && (
               <button
  type="button" disabled={busy} onClick={() => void forceClear(stuck.map((o) => o.id))}
- className="eg-tap inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+ className="eg-tap inline-flex items-center gap-1 rounded-lg bg-hold px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-hold disabled:opacity-50"
               >
                 Force-clear all {stuck.length}
               </button>
@@ -1102,7 +1102,7 @@ export function DispatchBoard() {
           </div>
         )}
         {sent && (
-          <div className="mx-5 mt-3 flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+          <div className="mx-5 mt-3 flex items-start gap-2 text-xs text-shipped">
             <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" /> {sent}
           </div>
         )}
@@ -1179,7 +1179,7 @@ export function DispatchBoard() {
  const picked = (u.labels ?? []).find((l) => l.trackingNumber === t)?.status === "PICKED"
  return (
                               <div key={t} className="flex items-center gap-2 text-xs">
-                                <Barcode size={12} className={"shrink-0 " + (picked ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")} />
+                                <Barcode size={12} className={"shrink-0 " + (picked ? "text-shipped" : "text-muted-foreground")} />
                                 <span className="tabular-nums">{t}</span>
                                 <span className="text-muted-foreground">{picked ? "picked" : "waiting"}</span>
                               </div>

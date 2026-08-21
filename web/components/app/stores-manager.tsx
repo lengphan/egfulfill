@@ -403,8 +403,8 @@ export function StoresManager() {
  className={
             "flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium " +
             (notice.tone === "ok"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
- : "border-red-200 bg-red-50 text-red-700")
+              ? "border-shipped/30 bg-shipped/12 text-shipped"
+ : "border-alert/30 bg-alert/12 text-alert")
           }
         >
           {notice.tone === "ok" ? <CheckCircle size={15} weight="fill" /> : <Warning size={15} weight="fill" />}
@@ -488,7 +488,7 @@ export function StoresManager() {
                 <Button
  size="sm"
  variant="ghost"
- className="text-muted-foreground hover:text-red-600"
+ className="text-muted-foreground hover:text-alert"
  onClick={() => onDisconnect(c)}
  disabled={busy === c.shop_id}
                 >

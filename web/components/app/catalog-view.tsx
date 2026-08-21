@@ -226,7 +226,7 @@ export function CatalogView() {
           </div>
         )}
 
-        {note && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{note}</div>}
+        {note && <div className="rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-xs text-shipped">{note}</div>}
         {err && (
           <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" /> {err}

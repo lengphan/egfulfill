@@ -181,7 +181,7 @@ export function CashAccountsPanel() {
             {a.is_postage && <span className="ml-auto shrink-0 rounded bg-primary/10 px-1 text-2xs normal-case text-primary">postage</span>}
           </div>
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
-            <span className={"text-base font-bold tracking-tight tabular-nums " + (a.balance < 0 ? "text-red-600 dark:text-red-400" : "")}>
+            <span className={"text-base font-bold tracking-tight tabular-nums " + (a.balance < 0 ? "text-alert" : "")}>
               {usd(a.balance)}
             </span>
             <span className="flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/acct:opacity-100">

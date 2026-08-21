@@ -327,7 +327,7 @@ export function SubscriptionPanel() {
           </div>
           <div className="shrink-0 text-right">
             {includedFree ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-shipped/12 px-3 py-1 text-sm font-medium text-shipped">
                 <Sparkle size={14} weight="fill" /> Included with {current.shortName}
               </span>
             ) : spydeckAddon ? (
@@ -390,7 +390,7 @@ export function SubscriptionPanel() {
 
           {/* Returning to a tier this paid month already covers — no second charge. */}
           {!isDowngrade && pending?.plan && alreadyPaidFor(pending.plan) && (priceOf(pending) ?? 0) === 0 && billing?.renews_at && (
-            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+            <div className="rounded-lg border border-shipped/30 bg-shipped/12 p-3 text-sm text-shipped">
               <div className="font-medium">Already paid — nothing to charge.</div>
               <p className="mt-1">
                 Your {pendingTier?.shortName ?? "plan"} month runs through {fmtDate(billing.renews_at)}
