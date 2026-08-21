@@ -418,39 +418,38 @@ export function buildTemplate(title, lists = null) {
       // its fixed one. Both are skipped when there is no catalogue to build lists from,
       // rather than offering a dropdown that would resolve to nothing.
       /**
-       * ONE RULE PER ROW, because Google will not keep a relative reference.
+       * FLAT LISTS, BECAUSE SHEETS WILL NOT EVALUATE A DEPENDENT ONE.
        *
-       * A dependent dropdown has to ask about the product on ITS OWN row. Sent as `$K3` the
-       * API stored `Orders!$K$3`; sent as `K3` — no dollars at all — it stored `Orders!$K$3`
-       * again. Data-validation formulas written through the API are absolutised, full stop,
-       * so a rule set over K3:K500 asks every one of those rows what is on row 3. Row 3 is
-       * the empty sample row, MATCH returns #N/A, and all three columns render as an empty
-       * list with a pencil on it. Which is exactly what it looked like.
+       * This was three per-row rules of the form
        *
-       * The UI's own version of this trick works because the UI writes the rule per cell.
-       * So does this now: one request per row, each naming its own row, which Google then
-       * absolutises to the row it was already about.
+       *     =INDIRECT("PM_" & MATCH(K3, Lists!$A$2:$A, 0))
        *
-       * DEP_ROWS is what that costs — three requests per row, in one batchUpdate. 200 rows
-       * is 600, which Google takes without complaint; 500 would be 1,500 and is a payload
-       * worth not finding the limit of. A sheet with more than 200 lines on it is past what
-       * anyone hand-fills anyway, and the row still accepts a typed value: none of these
-       * rules is strict.
+       * which is the documented workaround for a dependent dropdown, and it is a dead end
+       * through the API. Verified against the live master, in this order: the named ranges
+       * exist and point at the right cells; MATCH resolves the product to its row; and the
+       * whole expression, typed into a CELL, returns the product's real colours. The same
+       * expression inside a validation rule is stored verbatim, reported back verbatim, and
+       * evaluates to an empty list — the pencil icon with nothing under it. Sheets does not
+       * run INDIRECT in ONE_OF_RANGE; the UI's version of this trick uses a helper column
+       * per row, which a template that has to survive being copied cannot rely on.
+       *
+       * So each column offers everything the catalogue has on that axis. It is a real list
+       * that really opens, and it is honest about what a spreadsheet can check: nothing here
+       * knows which row's product it belongs to. The narrowing moves to the IMPORTER, which
+       * is where it belonged anyway — a dropdown cannot stop a paste, and a sheet filled in
+       * three weeks ago cannot know what the catalogue holds today.
        */
-      if (c.dep && hasLists) {
-        const prefix = AXES.find(([a]) => a === c.dep)[1];
-        for (let r = 0; r < DEP_ROWS; r++) {
-          const row = 3 + r;                       // sheet row (1-based); data starts at 3
-          out.push({ setDataValidation: {
-            range: { sheetId: gid, startRowIndex: row - 1, endRowIndex: row, startColumnIndex: i, endColumnIndex: i + 1 },
-            rule: {
-              condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue:
-                `=INDIRECT("${prefix}_" & MATCH(${colLetter(prodIdx)}${row}, Lists!$A$2:$A, 0))` }] },
-              showCustomUi: true,
-              strict: false,
-            },
-          } });
-        }
+      const axis = c.dep && hasLists ? AXES.findIndex(([a]) => a === c.dep) : -1;
+      if (axis >= 0 && UNIONS[axis].length) {
+        const col = colLetter(1 + axis);              // Lists: A products, then one per axis
+        out.push({ setDataValidation: {
+          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
+          rule: {
+            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$${col}$2:$${col}$${UNIONS[axis].length + 1}` }] },
+            showCustomUi: true,
+            strict: false,
+          },
+        } });
       } else if (c.opts === 'products' && hasLists) {
         out.push({ setDataValidation: {
           range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },

@@ -136,10 +136,20 @@ async function downloadXlsxTemplate() {
       const validations = (ws as unknown as {
         dataValidations: { add: (range: string, rule: Record<string, unknown>) => void }
       }).dataValidations
+      /*
+       * A DEFINED NAME, not a raw cross-sheet range.
+       *
+       * `Lists!$A$2:$A$28` inside a validation formula is understood by current Excel and by
+       * very little else — Numbers drops it, and Google's importer discards validation on
+       * conversion whatever form it takes. A defined name is what Excel itself writes when
+       * you point a list at another sheet, and it is the form the other readers support.
+       */
+      const nameFor = `EG_${key.toUpperCase()}`
+      wb.definedNames.add(`Lists!$${col}$2:$${col}$${values.length + 1}`, nameFor)
       validations.add(`${letter}3:${letter}${DATA_ROWS}`, {
         type: "list",
         allowBlank: true,
-        formulae: [`Lists!$${col}$2:$${col}$${values.length + 1}`],
+        formulae: [nameFor],
         showErrorMessage: false,
       })
       return
@@ -637,33 +647,6 @@ export function ImportOrdersDialog({
                         <li>In the sheet: <span className="font-medium text-foreground">File → Download → .xlsx</span> (or .csv)</li>
                         <li>Drop that file on the <span className="font-medium text-foreground">File</span> tab here</li>
                       </ol>
-                      {/* THE TWO COLUMNS PEOPLE GET WRONG, said before they meet them.
-                          Template ID and Image ID are two ways of answering the same
-                          question — here is the design — and nothing on the sheet said which
-                          to use or that filling both is a contradiction. The help text on
-                          each column says it too, but a column's help is read after someone
-                          is already stuck in the column. */}
-                      <div className="space-y-1.5 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                        <div className="font-medium text-foreground">Two ways to say what goes on the garment</div>
-                        <p>
-                          <span className="font-medium text-foreground">Blank Product</span> picks the garment,
-                          and the <span className="font-medium text-foreground">Print Type</span>,{" "}
-                          <span className="font-medium text-foreground">Colour</span> and{" "}
-                          <span className="font-medium text-foreground">Size</span> dropdowns then narrow to
-                          what that product actually comes in.
-                        </p>
-                        <p>
-                          <span className="font-medium text-foreground">Image ID</span> — the artwork on its
-                          own. We place it at the product&apos;s default print area, because a spreadsheet
-                          cell has no way to carry a position.
-                        </p>
-                        <p>
-                          <span className="font-medium text-foreground">Template ID</span> — a shortcut. A
-                          saved template already holds the blank, the placement and the artwork, so a row
-                          with one needs nothing else and <span className="font-medium text-foreground">ignores Image ID</span>.
-                        </p>
-                        <p>One or the other, not both. Leave both blank and the line imports without artwork — you can attach it afterwards.</p>
-                      </div>
                     </>
                   ) : (
                     /* No master configured. Rather than a broken button, the seller gets the
