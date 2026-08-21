@@ -89,9 +89,23 @@ const T_COLUMNS = [
    * there, see COL_ALIASES in web/lib/order-import.ts.
    */
   { h: 'Blank Product', g: 'product', duty: '', sample: 'Gildan 5000 Heavy Cotton Tee', opts: 'products' },
-  // Renamed to match the import dialog. The importer aliases the old spelling, so a sheet
-  // downloaded before this keeps working — see COL_ALIASES in web/lib/order-import.ts.
-  { h: 'Template/Design ID', g: 'product', duty: '', sample: 'TPL-12' },
+  /**
+   * THE SHORTCUT, THEN THE RAW MATERIAL — and they sit together because they answer the
+   * same question two ways.
+   *
+   * A Template ID already carries the blank, the placement and the artwork, so a row with
+   * one needs nothing else. An Image ID is the artwork on its own, placed at the product's
+   * default print area — which is all a spreadsheet row can express, since there is no way
+   * to type a position into a cell.
+   *
+   * Image ID was four columns further right, past the variant fields, so the two ways of
+   * saying "here is the design" were separated by everything that is not the design. Both
+   * were also longer than they needed to be: "Template/Design ID" and "Image Link/ID" each
+   * spent a column's width on a slash. The importer aliases every old spelling, so a sheet
+   * downloaded before today still reads — see COL_ALIASES in web/lib/order-import.ts.
+   */
+  { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
+  { h: 'Image ID', g: 'product', duty: '', sample: '' },
   { h: 'Item Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
@@ -99,7 +113,6 @@ const T_COLUMNS = [
   { h: 'Item Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
   { h: 'Item Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
   { h: 'Item Price', g: 'product', duty: '', sample: '24.00' },
-  { h: 'Image Link/ID', g: 'product', duty: '', sample: '' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
   { h: 'Shipping Service', g: 'extras', duty: '', sample: 'USPS Priority Mail', opts: 'services' },
   { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
