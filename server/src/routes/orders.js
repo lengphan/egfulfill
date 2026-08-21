@@ -471,6 +471,108 @@ export async function missingArtwork(orderId) {
     .map((it) => it.name || it.sku || 'an item');
 }
 
+/**
+ * WHY THIS ORDER CANNOT BE APPROVED YET, or an empty list.
+ *
+ * APPROVED WAS A CLAIM NOBODY CHECKED. Two separate comments in this file describe it as
+ * "the stage where a human has confirmed the blank on every line" — it is the reason the
+ * stage exists, and the reason variant editing locks the moment it is reached. Nothing
+ * verified it. stageDenial gates WHO may move a stage and IN WHAT ORDER; it never asked
+ * whether the line being approved was finished.
+ *
+ * So an order with no blank, no colour, no size and no artwork walked Pending → Approved →
+ * Working without a word, and the first refusal came at shipBlockers — which runs only at
+ * SHIPPED. That is the worst possible arrangement of a guard: too late to stop the work
+ * being done, and after the point where the variant fields lock, so the correction it
+ * demands is already sealed off.
+ *
+ * What it refuses, and why each one is genuinely unmakeable rather than merely untidy:
+ *   · NO BLANK — there is no garment. This is the exact thing Approved claims to confirm.
+ *   · A COLOUR OR SIZE the blank offers and the line has not picked. Only when the catalog
+ *     actually lists that axis: plenty of blanks have neither, and demanding a size for a
+ *     patch would block work that is perfectly ready. Marketplace orders arrive with
+ *     variants UNSET by design (CLAUDE.md §5), which is precisely why an operator has to
+ *     set them, and precisely why nothing should move past Approved until they have.
+ *   · A PRINT METHOD WITH NO ARTWORK — reuses missingArtwork, the same rule the ship gate
+ *     already applies, just asked at the point where it can still be fixed cheaply.
+ *
+ * Not checked: a label, or anything about money. Those belong to shipping and are already
+ * shipBlockers' job — an order can be entirely ready to MAKE with no postage bought.
+ */
+/**
+ * THE DECISION, with the database taken out of it.
+ *
+ * Separated so it can be driven with real inputs and asserted. The alternative is mocking
+ * q(), and a mock that answers regardless of the query is exactly what once hid a SELECT
+ * naming a column that did not exist (CLAUDE.md §7). This half has no I/O, so a test of it
+ * is a test of the shipped code rather than of a stand-in.
+ *
+ * `axes` maps a blank's sku to whether the catalog offers colours/sizes for it at all.
+ */
+export function approvalBlockersFor(items, missing, axes) {
+  if (!items.length) return ['this order has no lines on it'];
+  const label = (it) => it.name || it.sku || 'a line';
+  const axisOf = (it) => axes.get(String(it.blank || '').trim());
+
+  const noBlank = items.filter((it) => !String(it.blank || '').trim()).map(label);
+  const noColour = items.filter((it) => {
+    const a = axisOf(it); return a && a.colors && !String(it.color || '').trim();
+  }).map(label);
+  const noSize = items.filter((it) => {
+    const a = axisOf(it); return a && a.sizes && !String(it.size || '').trim();
+  }).map(label);
+
+  const list = (xs) => xs.slice(0, 3).join(', ') + (xs.length > 3 ? '\u2026' : '');
+  const many = (xs, one, more) => (xs.length === 1 ? one : more);
+  const blockers = [];
+  if (noBlank.length) blockers.push(`no blank picked on ${noBlank.length} ${many(noBlank, 'line', 'lines')}: ${list(noBlank)}`);
+  if (noColour.length) blockers.push(`no colour picked on ${noColour.length} ${many(noColour, 'line', 'lines')}: ${list(noColour)}`);
+  if (noSize.length) blockers.push(`no size picked on ${noSize.length} ${many(noSize, 'line', 'lines')}: ${list(noSize)}`);
+  if (missing.length) blockers.push(`${missing.length} ${many(missing, 'item', 'items')} still ${many(missing, 'has', 'have')} no artwork: ${list(missing)}`);
+  return blockers;
+}
+
+/**
+ * WHY THIS ORDER CANNOT BE APPROVED YET, or an empty list.
+ *
+ * APPROVED WAS A CLAIM NOBODY CHECKED. Two separate comments in this file describe it as
+ * "the stage where a human has confirmed the blank on every line" — it is the reason the
+ * stage exists, and the reason variant editing locks the moment it is reached. Nothing
+ * verified it. stageDenial gates WHO may move a stage and IN WHAT ORDER; it never asked
+ * whether the line being approved was finished.
+ *
+ * So an order with no blank, no colour, no size and no artwork walked Pending -> Approved
+ * -> Working without a word, and the first refusal came at shipBlockers, which runs only at
+ * SHIPPED. That is the worst arrangement of a guard available: too late to stop the work,
+ * and after the point where the variant fields lock, so the correction it demands is
+ * already sealed off.
+ *
+ * A colour or size is only required where the CATALOG offers that axis — plenty of blanks
+ * have neither, and demanding a size for a patch would block work that is perfectly ready.
+ * Marketplace orders arrive with variants UNSET by design (CLAUDE.md §5), which is exactly
+ * why an operator has to set them and exactly why nothing should pass Approved until done.
+ *
+ * Not checked: a label, or anything about money. Those are shipping's business and already
+ * shipBlockers' job — an order can be entirely ready to MAKE with no postage bought.
+ */
+export async function approvalBlockers(orderId) {
+  const [items, missing] = await Promise.all([
+    q(`select sku, name, blank, color, size, print_type from order_items where order_id=$1`, [orderId])
+      .then((r) => r.rows).catch(() => []),
+    missingArtwork(orderId),
+  ]);
+  const blanks = [...new Set(items.map((it) => String(it.blank || '').trim()).filter(Boolean))];
+  const axes = new Map();
+  if (blanks.length) {
+    const rows = await q(
+      `select sku, colors, sizes from catalog_products where sku = any($1::text[])`, [blanks]
+    ).then((r) => r.rows).catch(() => []);
+    const arr = (v) => (Array.isArray(v) ? v : (() => { try { return JSON.parse(v || '[]'); } catch (e) { return []; } })());
+    for (const r of rows) axes.set(String(r.sku), { colors: arr(r.colors).length > 0, sizes: arr(r.sizes).length > 0 });
+  }
+  return approvalBlockersFor(items, missing, axes);
+}
+
 async function shipBlockers(orderId) {
   const [missing, order] = await Promise.all([
     missingArtwork(orderId),
@@ -1838,6 +1940,22 @@ export function ordersRoutes(app, requireAuth) {
         const blockers = await shipBlockers(req.params.id);
         if (blockers.length) { reply.code(409); return { error: `Can't mark shipped — ${blockers.join('; and ')}.`, blockers }; }
       }
+      /**
+       * APPROVED IS NOW A CHECK, NOT A CLAIM. Refused for EVERY role including admin, the
+       * same way a pipeline skip is: this is not a permission, it is whether the thing
+       * being approved exists yet. Asked HERE rather than at shipped because this is the
+       * last moment the variant fields are still editable — after Approved they lock.
+       *
+       * Only on the way IN. Coming back off a hold, or stepping backwards, must not be
+       * blocked by a line that was already incomplete when it went in; that would strand
+       * the order at a stage nobody can leave.
+       */
+      if (want === 'approved') {
+        const at = await q('select factory_status from orders where id=$1', [req.params.id])
+          .then((r) => normalizeStage(r.rows[0] && r.rows[0].factory_status)).catch(() => '');
+        const blockers = at === 'approved' ? [] : await approvalBlockers(req.params.id);
+        if (blockers.length) { reply.code(409); return { error: `Can't approve — ${blockers.join('; and ')}.`, blockers }; }
+      }
 
       // ── 'Refunded' is a CLAIM ABOUT MONEY, so it has to match the ledger ────────
       // Setting it from the dropdown moved nothing: the money loop only ever ran on the
@@ -2148,6 +2266,13 @@ export function ordersRoutes(app, requireAuth) {
     if (normalizeStage(status) === 'shipped') {
       const blockers = await shipBlockers(req.params.id);
       if (blockers.length) { reply.code(409); return { error: `Can't mark shipped — ${blockers.join('; and ')}.`, blockers }; }
+    }
+    /* Same check the order PATCH makes — an item route can walk a line to Approved just as
+       easily, and a gate present on one path and absent on the other is not a gate. Only
+       on the way in; see the note there. */
+    if (normalizeStage(status) === 'approved' && normalizeStage(pre.rows[0].factory_status) !== 'approved') {
+      const blockers = await approvalBlockers(req.params.id);
+      if (blockers.length) { reply.code(409); return { error: `Can't approve — ${blockers.join('; and ')}.`, blockers }; }
     }
     await q(`update order_items set factory_status=$1 where order_id=$2 and ${key}=$3`,
       [status || '', req.params.id, val]);
