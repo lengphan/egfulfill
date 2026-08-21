@@ -33,6 +33,7 @@ import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
 import { OrderedVariant } from "@/components/app/ordered-variant"
+import { EmptyState } from "@/components/app/empty-state"
 
 // PhotoStack moved to components/app/photo-stack.tsx so the factory boards render the
 // identical strip instead of growing a second copy (CLAUDE.md §5).
@@ -294,15 +295,17 @@ export function OrdersList() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <Package size={18} weight="regular" className="shrink-0 text-muted-foreground" />
-            {(orders?.length ?? 0) === 0 ? (
-              <>
-                <div className="font-medium">No orders yet</div>
-                <div className="max-w-xs text-sm text-muted-foreground">
-                  Orders will appear here once you create one or connect a store to sync.
-                </div>
-                <div className="mt-1 flex gap-2">
+          /* TWO DIFFERENT EMPTIES, and they must not read alike: "you have no orders" and
+             "your filter matched none of them" call for different next moves. The first
+             offers the two ways to get one; the second offers nothing, because the way out
+             is the filter you can already see. */
+          (orders?.length ?? 0) === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="No orders yet"
+              note="Orders appear here once you create one, or connect a store to sync."
+              action={
+                <div className="flex gap-2">
                   <Button size="sm" onClick={() => router.push("/orders/new")}>
                     <Plus size={14} weight="bold" /> New order
                   </Button>
@@ -310,14 +313,11 @@ export function OrdersList() {
                     Connect a store
                   </Button>
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="font-medium">No orders here</div>
-                <div className="text-sm text-muted-foreground">Nothing matches that filter or search.</div>
-              </>
-            )}
-          </div>
+              }
+            />
+          ) : (
+            <EmptyState icon={Package} title="No orders here" note="Nothing matches that filter or search." />
+          )
         ) : (
           <div className="overflow-x-auto">
           <Table className="table-fixed">

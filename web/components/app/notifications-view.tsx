@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Pagination } from "@/components/app/pagination"
 import { getNotifications, markNotificationsRead, type Notification } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { EmptyState } from "@/components/app/empty-state"
 
 const PER_PAGE = 25
 
@@ -117,15 +118,13 @@ export function NotificationsView() {
       {items === null ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-center">
-          <Bell size={18} weight="regular"  className="shrink-0 text-muted-foreground" />
-          <div className="font-medium">{unreadOnly ? "Nothing unread" : "No notifications yet"}</div>
-          <div className="max-w-sm text-sm text-muted-foreground">
-            {unreadOnly
-              ? "Everything here has been read."
-              : "Order updates, team invites and announcements for this account will appear here."}
-          </div>
-        </div>
+        <EmptyState
+          icon={Bell}
+          title={unreadOnly ? "Nothing unread" : "No notifications yet"}
+          note={unreadOnly
+            ? "Everything here has been read."
+            : "Order updates, team invites and announcements for this account appear here."}
+        />
       ) : (
         <div className="divide-y divide-border">
           {items.map((n) => (

@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card"
 import { DesignStudioDialog } from "@/components/app/design-studio"
 import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { getToken } from "@/lib/auth"
+import { EmptyState } from "@/components/app/empty-state"
 
 const fmtDate = (s?: string) => {
  if (!s) return ""
@@ -89,20 +90,16 @@ function DesignLab() {
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 animate-pulse rounded-xl bg-muted" />)}
             </div>
           ) : list.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                <PenNib size={22} weight="duotone" />
-              </span>
-              <div className="font-medium">{signedOut ? "Sign in to build your image library" : "No images yet"}</div>
-              <div className="max-w-xs text-sm text-muted-foreground">
-                {signedOut ? "Your saved artwork lives here." : "Add artwork — upload a picture and it is reusable on any order or design."}
-              </div>
-              {!signedOut && (
-                <Button size="sm" className="mt-1" onClick={() => setStudioOpen(true)}>
+            <EmptyState
+              icon={PenNib}
+              title={signedOut ? "Sign in to build your image library" : "No images yet"}
+              note={signedOut ? "Your saved artwork lives here." : "Add artwork — a picture you upload is reusable on any order or design."}
+              action={!signedOut && (
+                <Button size="sm" onClick={() => setStudioOpen(true)}>
                   <Plus size={14} weight="bold" /> Add artwork
                 </Button>
               )}
-            </div>
+            />
           ) : (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {list.map((d) => (

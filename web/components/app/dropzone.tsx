@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { CircleNotch, UploadSimple, type Icon } from "@phosphor-icons/react"
+import { RegionMark, REGION_LINE, REGION_NOTE } from "@/components/app/region"
 import { cn } from "@/lib/utils"
 
 /**
@@ -13,19 +14,13 @@ import { cn } from "@/lib/utils"
  * bg-primary/[0.02]). Same job, same page sometimes, no two alike — because the only way to
  * add one was to type a dashed border again.
  *
- * WHAT MAKES A DROP TARGET READ AS ONE, and what most of them were missing:
+ * THE PARTS ARE NOT THIS FILE'S — they are the four in components/app/region.tsx, shared
+ * with EmptyState so a drop target and an empty list cannot drift apart. This file adds only
+ * what is specific to accepting a file: the dashed edge, the drag state, and the input.
  *
- *   1. A FRAMED ICON, not a bare glyph. An 18px outline sitting on the page is decoration;
- *      the same glyph inside a small filled tile is an object, and the eye lands on it first.
- *      This is most of the difference between the good ones and the faint ones.
- *   2. TWO LINES, ranked. What to do, then what is allowed — the second line at the size of a
- *      caption rather than at the size of the first.
- *   3. A GROUND. A 1px dashed rule around nothing reads as an empty box that failed to load.
- *      A faint fill says the area is a target.
- *
- * The `action` slot is for a second way in — recording instead of uploading, pasting a URL —
- * and it sits under an "or", because two peer routes to the same end need a word between
- * them or the button looks like the thing you are supposed to press.
+ * A GROUND, though, is this file's. A 1px dashed rule around nothing reads as an empty box
+ * that failed to load; a visible fill says the area is a target. bg-muted/20 on a white card
+ * is not a fill.
  */
 export function Dropzone({
   onFiles, accept, multiple = false, icon, label, hint, action,
@@ -85,16 +80,12 @@ export function Dropzone({
             ? <CircleNotch size={14} className="animate-spin text-muted-foreground" />
             : <I size={14} weight="bold" className="text-muted-foreground" />
         ) : (
-          // THE TILE. A glyph on a filled square is an object you can aim at; the same glyph
-          // loose on the page is a decoration you read past.
-          <span className="grid size-10 place-items-center rounded-lg border border-border bg-background text-muted-foreground">
-            {busy ? <CircleNotch size={18} className="animate-spin" /> : <I size={18} />}
-          </span>
+          <RegionMark icon={I} busy={!!busy} size="sm" />
         )}
-        <span className={slim ? "text-xs font-medium text-muted-foreground" : "text-sm font-medium"}>
+        <span className={slim ? "text-xs font-medium text-muted-foreground" : REGION_LINE}>
           {busy ?? label}
         </span>
-        {hint && !slim && !busy && <span className="text-xs text-muted-foreground">{hint}</span>}
+        {hint && !slim && !busy && <span className={REGION_NOTE}>{hint}</span>}
       </button>
 
       {action && !slim && !busy && (

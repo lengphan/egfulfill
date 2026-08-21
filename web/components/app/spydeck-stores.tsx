@@ -11,6 +11,7 @@ import {
 import { ResultCard } from "@/components/app/spydeck-view"
 import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_ICON } from "@/lib/card-actions"
+import { EmptyState } from "@/components/app/empty-state"
 
 // Shared listing-level handlers, threaded from SpyDeckView so a competitor's product can be
 // saved or turned into a draft with the exact same flow as any other research card.
@@ -339,13 +340,19 @@ export function StoresTab(h: Handlers) {
       {error && <div className="px-5 pt-3 text-xs text-rose-600">{error}</div>}
 
       {tab === "search" && shops === null ? (
-        <div className="flex flex-col items-center gap-3 py-20 text-center">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground"><Storefront size={24} weight="duotone" /></span>
-          <div className="font-medium">Research a competitor</div>
-          <div className="max-w-xs text-sm text-muted-foreground">Search any Etsy shop by name to see its product count, sales, reviews — then open its full catalog.</div>
-        </div>
+        <EmptyState
+          icon={Storefront}
+          title="Research a competitor"
+          note="Search any Etsy shop by name to see its product count, sales and reviews — then open its full catalog."
+        />
       ) : list && list.length === 0 ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">{tab === "saved" ? "No saved stores yet — hit the heart on any store." : "No stores match that name."}</div>
+        /* This one had no mark at all — a line of grey text in the middle of a panel, which
+           is what an empty region looks like when nobody decided it was one. */
+        <EmptyState
+          icon={Storefront}
+          title={tab === "saved" ? "No saved stores yet" : "No stores match that name"}
+          note={tab === "saved" ? "Hit the heart on any store to keep it here." : undefined}
+        />
       ) : (
         <div className="space-y-3 p-5">
           {(() => {
