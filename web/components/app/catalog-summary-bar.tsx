@@ -7,9 +7,9 @@ import { getCatalogSummary, clearCatalog } from "@/lib/api"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
 type Summary = {
-  products: number; styles: number; total: number; unpriced: number
-  publicVisible?: number
-  publicHidden?: { unpriced: number }
+ products: number; styles: number; total: number; unpriced: number
+ publicVisible?: number
+ publicHidden?: { unpriced: number }
 }
 
 /**
@@ -23,32 +23,32 @@ type Summary = {
  * a published style with no price prints a blank where a number should be.
  */
 export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
-  const [s, setS] = useState<Summary | null>(null)
-  const [busy, setBusy] = useState(false)
-  const confirm = useConfirm()
+ const [s, setS] = useState<Summary | null>(null)
+ const [busy, setBusy] = useState(false)
+ const confirm = useConfirm()
 
-  const load = useCallback(() => {
-    getCatalogSummary().then(setS).catch(() => setS(null))
+ const load = useCallback(() => {
+ getCatalogSummary().then(setS).catch(() => setS(null))
   }, [])
-  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load, refresh])
+ useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load, refresh])
 
-  const clear = async () => {
-    if (!s?.total) return
+ const clear = async () => {
+ if (!s?.total) return
     // Naming the number, because "clear the catalogue" reads as tidying and this undoes
     // an afternoon of curation.
-    const ok = await confirm({
-      title: "Empty the catalogue?",
-      body: `This removes all ${s.total} published item${s.total === 1 ? "" : "s"}. Saved catalogues you have already sent are untouched — but you would have to pick these again.`,
-      confirmLabel: "Empty it",
+ const ok = await confirm({
+ title: "Empty the catalogue?",
+ body: `This removes all ${s.total} published item${s.total === 1 ? "" : "s"}. Saved catalogues you have already sent are untouched — but you would have to pick these again.`,
+ confirmLabel: "Empty it",
     })
-    if (!ok) return
-    setBusy(true)
-    try { await clearCatalog(); load() } finally { setBusy(false) }
+ if (!ok) return
+ setBusy(true)
+ try { await clearCatalog(); load() } finally { setBusy(false) }
   }
 
-  if (!s) return null
+ if (!s) return null
 
-  return (
+ return (
     <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-2.5 text-sm">
       <Storefront size={15} weight="duotone" className="text-muted-foreground" />
       {s.total === 0 ? (
@@ -62,15 +62,15 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
         </span>
       )}
       {s.unpriced > 0 && (
-        <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+        <span className="inline-flex items-center gap-1 rounded bg-hold/10 px-2 py-0.5 text-xs font-medium text-hold">
           <Warning size={12} weight="fill" /> {s.unpriced} with no price — they print blank
         </span>
       )}
       {/* THIS BAR IS THE LOOKBOOK, and the website is a different number.
           "4 in the catalogue" beside a site showing 1 was two true facts printed as one. What
-          is in here goes to partners and trade buyers; what is on the website is decided by a
-          product's status, over on Products. Naming the second number here stops this screen
-          from being read as a promise about the public site. */}
+ is in here goes to partners and trade buyers; what is on the website is decided by a
+ product's status, over on Products. Naming the second number here stops this screen
+ from being read as a promise about the public site. */}
       {typeof s.publicVisible === "number" && (
         <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           <Globe size={12} weight="duotone" />

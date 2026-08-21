@@ -39,22 +39,22 @@ import { readLabelPdf, PARSE_NOTE, PARSE_WHY, type LabelParse } from "@/lib/labe
 const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)
 
 const readAsDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const fr = new FileReader()
-    fr.onload = () => resolve(String(fr.result))
-    fr.onerror = () => reject(new Error("That file couldn't be read."))
-    fr.readAsDataURL(file)
+ new Promise<string>((resolve, reject) => {
+ const fr = new FileReader()
+ fr.onload = () => resolve(String(fr.result))
+ fr.onerror = () => reject(new Error("That file couldn't be read."))
+ fr.readAsDataURL(file)
   })
 
 /** A file that has been dropped but NOT sent. `key` is ours — the file has no id until
- *  byeastside gives it one, and identity has to survive re-renders before then.
+ * byeastside gives it one, and identity has to survive re-renders before then.
  *  `parse` is null while the PDF is still being read; see readStagedLabel below. */
 export type StagedLabel = {
-  key: string; name: string; file: File
-  parse: LabelParse | null
+ key: string; name: string; file: File
+ parse: LabelParse | null
   /** When it was dropped, epoch ms. The board sorts orders, staged files and sent labels
-   *  into one newest-first list, and this is the only time a staged file has. */
-  at: number
+   * into one newest-first list, and this is the only time a staged file has. */
+ at: number
 }
 
 /**
@@ -66,26 +66,26 @@ export type StagedLabel = {
  * is a normal row that says why (see PARSE_NOTE), not a failure the caller handles.
  */
 export function readStagedLabel(s: StagedLabel): Promise<LabelParse> {
-  return readLabelPdf(s.file)
+ return readLabelPdf(s.file)
 }
 
 /** Send one staged label. Lives here beside the drop zone, called by the board, because
- *  the button that triggers it sits in the board's header. Throws with the file's own
- *  words — a batch that half-fails must say WHICH file, since the fix is re-shooting that
- *  one page and "upload failed" makes you re-do all of them. */
+ * the button that triggers it sits in the board's header. Throws with the file's own
+ * words — a batch that half-fails must say WHICH file, since the fix is re-shooting that
+ * one page and "upload failed" makes you re-do all of them. */
 export async function sendStagedLabel(s: StagedLabel): Promise<DispatchUpload | undefined> {
-  const dataUrl = await readAsDataUrl(s.file)
+ const dataUrl = await readAsDataUrl(s.file)
   // What we read off the label travels WITH it. byeastside's extractor returns tracking
   // numbers and nothing else, so if this didn't cross the boundary the row would lose its
   // customer and ship-to at exactly the moment it stopped being a file on this machine.
-  const r = await uploadDispatchLabel({
-    fileName: s.name, dataUrl,
-    recipient: s.parse?.name || undefined,
-    shipTo: s.parse?.shipTo || undefined,
-    tracking: s.parse?.tracking || undefined,
+ const r = await uploadDispatchLabel({
+ fileName: s.name, dataUrl,
+ recipient: s.parse?.name || undefined,
+ shipTo: s.parse?.shipTo || undefined,
+ tracking: s.parse?.tracking || undefined,
   })
-  if (r.error) throw new Error(r.error)
-  return r.upload
+ if (r.error) throw new Error(r.error)
+ return r.upload
 }
 
 /** Ours to delete: a file that never left this machine. Nothing to recall, nothing logged. */
@@ -94,7 +94,7 @@ export const stagedKeyOf = (s: StagedLabel) => `s:${s.key}`
 export const uploadKeyOf = (u: DispatchUpload) => `u:${u.id}`
 
 const dt = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"
+ iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"
 
 /**
  * What a batch is doing, in our words rather than theirs.
@@ -111,18 +111,18 @@ const dt = (iso: string | null) =>
  * don't, so they moved to the row's hover title where they cost no one a reading.
  */
 function progressOf(u: DispatchUpload): { label: string; tone: "wait" | "warn" | "ok" | "part"; title?: string } {
-  if (u.total_labels == null) return { label: "Reading the file", tone: "wait" }
-  if (u.total_labels === 0) return { label: "No label found", tone: "warn" }
-  const many = u.total_labels > 1 ? `${u.scanned_labels} of ${u.total_labels} labels on this file picked` : undefined
-  if (u.scanned_labels >= u.total_labels) return { label: "Picked", tone: "ok", title: many }
-  return { label: "Waiting to be picked", tone: "part", title: many }
+ if (u.total_labels == null) return { label: "Reading the file", tone: "wait" }
+ if (u.total_labels === 0) return { label: "No label found", tone: "warn" }
+ const many = u.total_labels > 1 ? `${u.scanned_labels} of ${u.total_labels} labels on this file picked` : undefined
+ if (u.scanned_labels >= u.total_labels) return { label: "Picked", tone: "ok", title: many }
+ return { label: "Waiting to be picked", tone: "part", title: many }
 }
 
 const TONE: Record<"wait" | "warn" | "ok" | "part", string> = {
-  wait: "text-muted-foreground",
-  warn: "text-amber-700 dark:text-amber-400",
-  ok: "text-emerald-700 dark:text-emerald-400",
-  part: "text-sky-700 dark:text-sky-400",
+ wait: "text-muted-foreground",
+ warn: "text-hold",
+ ok: "text-emerald-700 dark:text-emerald-400",
+ part: "text-sky-700 dark:text-sky-400",
 }
 const TONE_ICON = { wait: Clock, warn: Warning, ok: CheckCircle, part: Barcode } as const
 
@@ -140,17 +140,17 @@ const DROP_CARD =
   "flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.02] px-6 py-8 text-center"
 
 function DropCardBody() {
-  return (
+ return (
     <>
       <UploadSimple size={28} weight="duotone" className="text-primary" />
       <span className="text-base font-semibold">Drop label PDFs here</span>
       {/* Two facts, and only two: anywhere works, and dropping is not sending. Everything
-          else this used to carry now lives in the row it creates. "or click to choose" went
-          with the resting panel — this card only exists mid-drag now, where there is
-          nothing to click; the picker is "Add label PDF" in the toolbar. */}
+ else this used to carry now lives in the row it creates. "or click to choose" went
+ with the resting panel — this card only exists mid-drag now, where there is
+ nothing to click; the picker is "Add label PDF" in the toolbar. */}
       <span className="max-w-md text-sm text-muted-foreground">
         Anywhere on this page works. They join the queue below and nothing is sent to
-        byeastside until you press Send.
+ byeastside until you press Send.
       </span>
     </>
   )
@@ -170,24 +170,24 @@ function DropCardBody() {
  * it exists when no file is being dragged.
  */
 export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) => void; onError?: (msg: string | null) => void }) {
-  return (
+ return (
     <label
-      title="Choose label PDFs — or just drop them anywhere on this page"
-      className="eg-tap eg-control cursor-pointer"
+ title="Choose label PDFs — or just drop them anywhere on this page"
+ className="eg-tap eg-control cursor-pointer"
     >
       Add label PDF
       <input
-        type="file" multiple className="sr-only" accept="application/pdf"
-        onChange={(e) => {
-          const list = Array.from(e.target.files ?? [])
-          e.target.value = ""
-          if (!list.length) return
+ type="file" multiple className="sr-only" accept="application/pdf"
+ onChange={(e) => {
+ const list = Array.from(e.target.files ?? [])
+ e.target.value = ""
+ if (!list.length) return
           // Caught before anything leaves, so picking a photo by accident answers instantly.
           // The server checks the bytes too — this one is about the wait, that one is truth.
-          const bad = list.filter((f) => !isPdf(f))
-          const good = list.filter(isPdf)
-          onError?.(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
-          if (good.length) onStage(good)
+ const bad = list.filter((f) => !isPdf(f))
+ const good = list.filter(isPdf)
+ onError?.(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
+ if (good.length) onStage(good)
         }}
       />
     </label>
@@ -210,50 +210,50 @@ export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) 
  * `types` includes "Files" only for a real file drag.
  */
 export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) {
-  const [depth, setDepth] = useState(0)
-  const [err, setErr] = useState<string | null>(null)
+ const [depth, setDepth] = useState(0)
+ const [err, setErr] = useState<string | null>(null)
 
   // Bound to the window, once, for the life of the screen. An effect is the right home for
   // this one: it subscribes to something outside React and unsubscribes on the way out,
   // which is the case effects exist for — no state is set synchronously in the body.
-  useEffect(() => {
-    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
-    const enter = (e: DragEvent) => { if (hasFiles(e)) { e.preventDefault(); setDepth((d) => d + 1) } }
-    const leave = (e: DragEvent) => { if (hasFiles(e)) setDepth((d) => Math.max(0, d - 1)) }
+ useEffect(() => {
+ const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
+ const enter = (e: DragEvent) => { if (hasFiles(e)) { e.preventDefault(); setDepth((d) => d + 1) } }
+ const leave = (e: DragEvent) => { if (hasFiles(e)) setDepth((d) => Math.max(0, d - 1)) }
     // Without a preventDefault on dragover the browser opens the file instead of dropping it.
-    const over = (e: DragEvent) => { if (hasFiles(e)) e.preventDefault() }
-    const drop = (e: DragEvent) => {
-      if (!hasFiles(e)) return
-      e.preventDefault()
-      setDepth(0)
-      const list = Array.from(e.dataTransfer?.files ?? [])
-      const bad = list.filter((f) => !isPdf(f))
-      const good = list.filter(isPdf)
-      setErr(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
-      if (good.length) onStage(good)
+ const over = (e: DragEvent) => { if (hasFiles(e)) e.preventDefault() }
+ const drop = (e: DragEvent) => {
+ if (!hasFiles(e)) return
+ e.preventDefault()
+ setDepth(0)
+ const list = Array.from(e.dataTransfer?.files ?? [])
+ const bad = list.filter((f) => !isPdf(f))
+ const good = list.filter(isPdf)
+ setErr(bad.length ? `${bad.map((f) => f.name).join(", ")} — only PDFs can be pre-scanned, that's what carriers issue.` : null)
+ if (good.length) onStage(good)
     }
-    window.addEventListener("dragenter", enter)
-    window.addEventListener("dragleave", leave)
-    window.addEventListener("dragover", over)
-    window.addEventListener("drop", drop)
-    return () => {
-      window.removeEventListener("dragenter", enter)
-      window.removeEventListener("dragleave", leave)
-      window.removeEventListener("dragover", over)
-      window.removeEventListener("drop", drop)
+ window.addEventListener("dragenter", enter)
+ window.addEventListener("dragleave", leave)
+ window.addEventListener("dragover", over)
+ window.addEventListener("drop", drop)
+ return () => {
+ window.removeEventListener("dragenter", enter)
+ window.removeEventListener("dragleave", leave)
+ window.removeEventListener("dragover", over)
+ window.removeEventListener("drop", drop)
     }
   }, [onStage])
 
-  if (!depth && !err) return null
-  if (!depth) {
-    return (
+ if (!depth && !err) return null
+ if (!depth) {
+ return (
       <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[90vw] rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 shadow-lg dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
         {err}
         <button onClick={() => setErr(null)} className="ml-2 font-semibold underline">Dismiss</button>
       </div>
     )
   }
-  return (
+ return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-8 backdrop-blur-sm">
       {/* The SAME card, scaled up and shadowed — the resting one lifting off the page. */}
       <div className={DROP_CARD + " w-full max-w-lg scale-105 border-primary bg-card/95 shadow-xl"}>
@@ -273,10 +273,10 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
  *
  * The columns turned out to be the same columns all along:
  *
- *   Source   → Channel    byeastside, or "On this machine" while it waits
- *   Pages    → Units      one parcel per page, which is what a unit is here
- *   Sent     → (moved)    under the file name, where the order number's own subtitle goes
- *   Progress → Status     the label's state, in the same column the queue reads it from
+ *   Source   → Channel byeastside, or "On this machine" while it waits
+ *   Pages    → Units one parcel per page, which is what a unit is here
+ *   Sent     → (moved) under the file name, where the order number's own subtitle goes
+ *   Progress → Status the label's state, in the same column the queue reads it from
  *
  * Customer and Ship-to were the only genuinely missing pair, and those are now read off the
  * label PDF itself (lib/label-pdf.ts) rather than left as dashes.
@@ -294,45 +294,45 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
 
 /** The pull-back, and the error it can produce, shared by every upload row on the board.
  *  Hoisted to one owner because the confirm dialog and the failure message belong to the
- *  list, not to whichever row happened to be clicked. */
+ * list, not to whichever row happened to be clicked. */
 export function useLabelPullBack(onChanged: () => void) {
-  const confirm = useConfirm()
-  const [err, setErr] = useState<string | null>(null)
-  const [pulling, setPulling] = useState(false)
+ const confirm = useConfirm()
+ const [err, setErr] = useState<string | null>(null)
+ const [pulling, setPulling] = useState(false)
 
-  const pullBack = async (u: DispatchUpload) => {
-    const okToGo = await confirm({
-      title: "Pull this label back?",
-      body: `${u.file_name || "This label"} would be removed from byeastside's queue. Once a label has been picked they refuse the recall — the parcel is committed by then.`,
-      confirmLabel: "Pull it back",
+ const pullBack = async (u: DispatchUpload) => {
+ const okToGo = await confirm({
+ title: "Pull this label back?",
+ body: `${u.file_name || "This label"} would be removed from byeastside's queue. Once a label has been picked they refuse the recall — the parcel is committed by then.`,
+ confirmLabel: "Pull it back",
     })
-    if (!okToGo) return
-    setPulling(true); setErr(null)
-    try {
-      const r = await deleteDispatchUpload(u.id)
-      if (r.error) throw new Error(r.error)
+ if (!okToGo) return
+ setPulling(true); setErr(null)
+ try {
+ const r = await deleteDispatchUpload(u.id)
+ if (r.error) throw new Error(r.error)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't pull that one back.")
+ setErr(e instanceof Error ? e.message : "Couldn't pull that one back.")
     } finally { setPulling(false); onChanged() }
   }
 
-  return { pullBack, pulling, err, clearErr: () => setErr(null) }
+ return { pullBack, pulling, err, clearErr: () => setErr(null) }
 }
 
 /** A file on this machine that has not been sent. */
 export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
-  s: StagedLabel
-  picked: boolean
-  onToggle: (key: string) => void
-  onDiscard: (key: string) => void
+ s: StagedLabel
+ picked: boolean
+ onToggle: (key: string) => void
+ onDiscard: (key: string) => void
 }) {
-  const k = stagedKeyOf(s)
-  const p = s.parse
-  return (
+ const k = stagedKeyOf(s)
+ const p = s.parse
+ return (
           <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
             <input
-              type="checkbox" checked={picked} onChange={() => onToggle(k)}
-              className="size-4 shrink-0 accent-primary" aria-label={`Select ${s.name}`}
+ type="checkbox" checked={picked} onChange={() => onToggle(k)}
+ className="size-4 shrink-0 accent-primary" aria-label={`Select ${s.name}`}
             />
             <span className="flex min-w-0 flex-col">
               <span className="flex min-w-0 items-center gap-1.5">
@@ -355,13 +355,13 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
             </span>
             <span className="flex justify-end">
               {/* Nothing to recall — it never left. So this is a plain discard, not a
-                  pull-back, and it says the difference by being a different word. */}
+ pull-back, and it says the difference by being a different word. */}
               <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDiscard(k) }}
-                className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                aria-label={`Discard ${s.name}`}
-                title="Discard — this file was never sent anywhere"
+ type="button"
+ onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDiscard(k) }}
+ className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+ aria-label={`Discard ${s.name}`}
+ title="Discard — this file was never sent anywhere"
               >
                 <X size={13} weight="bold" />
               </button>
@@ -372,25 +372,25 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
 
 /** A label that IS with byeastside. */
 export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack }: {
-  u: DispatchUpload
-  picked: boolean
-  onToggle: (key: string) => void
-  busy: boolean
-  pulling: boolean
-  onPullBack: (u: DispatchUpload) => void
+ u: DispatchUpload
+ picked: boolean
+ onToggle: (key: string) => void
+ busy: boolean
+ pulling: boolean
+ onPullBack: (u: DispatchUpload) => void
 }) {
-  const k = uploadKeyOf(u)
-  const p = progressOf(u)
-  const PI = TONE_ICON[p.tone]
+ const k = uploadKeyOf(u)
+ const p = progressOf(u)
+ const PI = TONE_ICON[p.tone]
   // Theirs first: an extractor that has READ the label beats what we parsed off it
   // before sending, because theirs is what their queue will actually scan.
-  const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
-  const trackText = tracked[0] || u.tracking || null
-  return (
+ const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
+ const trackText = tracked[0] || u.tracking || null
+ return (
           <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
             <input
-              type="checkbox" checked={picked} onChange={() => onToggle(k)}
-              className="size-4 shrink-0 accent-primary" aria-label={`Select ${u.file_name || "label"}`}
+ type="checkbox" checked={picked} onChange={() => onToggle(k)}
+ className="size-4 shrink-0 accent-primary" aria-label={`Select ${u.file_name || "label"}`}
             />
             <span className="flex min-w-0 flex-col">
               <span className="flex min-w-0 items-center gap-1.5">
@@ -398,9 +398,9 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
                 <span className="truncate text-sm" title={u.file_name || undefined}>{u.file_name || "label.pdf"}</span>
               </span>
               {/* WHEN IT WENT, where the order number's own subtitle sits. It had a column
-                  of its own; the queue has no such column and does not need one, because
+ of its own; the queue has no such column and does not need one, because
                   "sent" is a fact about this file rather than a fact about dispatch. Who
-                  sent it stays in the title — it settles arguments, it doesn't need a line. */}
+ sent it stays in the title — it settles arguments, it doesn't need a line. */}
               <span className="truncate text-2xs text-muted-foreground" title={u.created_by || undefined}>
                 Sent {dt(u.created_at)}
               </span>
@@ -408,9 +408,9 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
             <span className="min-w-0">
               {u.recipient
                 ? <span className="truncate text-sm">{u.recipient}</span>
-                : <span
-                    className="truncate text-xs italic text-muted-foreground"
-                    title="Either the label is a picture with no text in it, or it was sent before we started reading names off labels. Open the label to see who it's for."
+ : <span
+ className="truncate text-xs italic text-muted-foreground"
+ title="Either the label is a picture with no text in it, or it was sent before we started reading names off labels. Open the label to see who it's for."
                   >No name on file</span>}
             </span>
             <span className="truncate text-xs text-muted-foreground">byeastside</span>
@@ -422,7 +422,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
                 <span className="truncate">{p.label}</span>
               </span>
               {/* Their own word for the state, kept verbatim beside ours — it is what
-                  their dashboard shows, so the two can be matched up. */}
+ their dashboard shows, so the two can be matched up. */}
               {u.status && <span className="block truncate eg-label opacity-70">{u.status}</span>}
             </span>
             <span className="min-w-0 text-xs">
@@ -438,37 +438,37 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
             <span className="flex justify-end gap-1">
               {u.public_url && (
                 <a
-                  href={u.public_url} target="_blank" rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  title="Open the label as they received it"
-                  className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+ href={u.public_url} target="_blank" rel="noopener noreferrer"
+ onClick={(e) => e.stopPropagation()}
+ title="Open the label as they received it"
+ className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   <ArrowSquareOut size={13} weight="bold" />
                 </a>
               )}
               {/* Offered only while it can still work. Their DELETE refuses the whole
                   PDF once ANY label on it has been picked — not just once all of them
-                  have — because those parcels are already committed. So the test is
+ have — because those parcels are already committed. So the test is
                   `scanned_labels === 0`; gating on "fully picked" left a button on
-                  every part-scanned batch that could only ever return their 409. */}
+ every part-scanned batch that could only ever return their 409. */}
               {u.scanned_labels === 0 ? (
                 <button
-                  type="button" disabled={busy || pulling}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPullBack(u) }}
-                  className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                  aria-label={`Pull back ${u.file_name || "label"}`}
-                  title="Pull this label back out of byeastside's queue"
+ type="button" disabled={busy || pulling}
+ onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPullBack(u) }}
+ className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+ aria-label={`Pull back ${u.file_name || "label"}`}
+ title="Pull this label back out of byeastside's queue"
                 >
                   {/* The SAME X the staged row uses. Two icons for one gesture — discard
-                      here, bin there — read as two different powers, and the row above is
-                      the only place the eye has to compare them. The difference that
-                      matters is carried by the words and by the confirm, not by the glyph. */}
+ here, bin there — read as two different powers, and the row above is
+ the only place the eye has to compare them. The difference that
+ matters is carried by the words and by the confirm, not by the glyph. */}
                   <X size={13} weight="bold" />
                 </button>
               ) : (
                 <span
-                  title={`${u.scanned_labels} already picked — byeastside won't take this batch back`}
-                  className="inline-flex size-7 items-center justify-center text-muted-foreground"
+ title={`${u.scanned_labels} already picked — byeastside won't take this batch back`}
+ className="inline-flex size-7 items-center justify-center text-muted-foreground"
                 >
                   <Lock size={13} />
                 </span>
@@ -479,9 +479,9 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
 }
 
 /** The one thing a shared table must not blur: this row is not an order. Nothing is
- *  charged for it, no stage moves, and no seller is behind it. */
+ * charged for it, no stage moves, and no seller is behind it. */
 function ExternalTag() {
-  return (
+ return (
     <span className="mt-0.5 w-fit rounded border border-border bg-muted px-1 py-px eg-label text-muted-foreground">
       External
     </span>
@@ -489,19 +489,19 @@ function ExternalTag() {
 }
 
 /** The addressee we read off the PDF, or WHY there isn't one. Never a blank cell: "we
- *  couldn't read this label" and "this label has no customer" would look identical, and
- *  only one of them is worth someone typing the name in by hand. */
+ * couldn't read this label" and "this label has no customer" would look identical, and
+ * only one of them is worth someone typing the name in by hand. */
 function Recipient({ parse }: { parse: LabelParse | null }) {
-  if (!parse) {
-    return <span className="truncate text-xs text-muted-foreground">Reading the label…</span>
+ if (!parse) {
+ return <span className="truncate text-xs text-muted-foreground">Reading the label…</span>
   }
-  if (parse.reason === "ok" && parse.name) {
-    return <span className="truncate text-sm" title={parse.addressLines.join(", ")}>{parse.name}</span>
+ if (parse.reason === "ok" && parse.name) {
+ return <span className="truncate text-sm" title={parse.addressLines.join(", ")}>{parse.name}</span>
   }
   // "ok" with no name lands here too — the parse said it worked and produced nothing,
   // which is the no-ship-to case by another route.
-  const why = parse.reason === "ok" ? "no-ship-to" : parse.reason
-  return (
+ const why = parse.reason === "ok" ? "no-ship-to" : parse.reason
+ return (
     <span className="truncate text-xs italic text-muted-foreground" title={PARSE_WHY[why]}>
       {PARSE_NOTE[why]}
     </span>

@@ -28,21 +28,21 @@ import { isEmbroidery } from "@/lib/variant-resolve"
 const squash = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "")
 const ALL = "__all"
 function matchLine(fileName: string, items: OrderItem[]): string {
-  const base = squash(fileName.replace(/\.[a-z0-9]+$/i, ""))
-  if (!base) return ALL
-  let best = ""
-  let bestLen = 0
-  for (const it of items) {
-    const key = it.line_id || it.sku || ""
-    if (!key) continue
-    for (const cand of [it.name, it.sku]) {
-      const c = squash(cand ?? "")
+ const base = squash(fileName.replace(/\.[a-z0-9]+$/i, ""))
+ if (!base) return ALL
+ let best = ""
+ let bestLen = 0
+ for (const it of items) {
+ const key = it.line_id || it.sku || ""
+ if (!key) continue
+ for (const cand of [it.name, it.sku]) {
+ const c = squash(cand ?? "")
       // Long enough to mean something: "l" or "os" would otherwise match half the order.
-      if (c.length < 3) continue
-      if ((base.includes(c) || c.includes(base)) && c.length > bestLen) { best = key; bestLen = c.length }
+ if (c.length < 3) continue
+ if ((base.includes(c) || c.includes(base)) && c.length > bestLen) { best = key; bestLen = c.length }
     }
   }
-  return best || ALL
+ return best || ALL
 }
 
 // A file id that's stable per (order, sku, filename) so re-dropping the same file
@@ -63,15 +63,15 @@ const MACHINE_ACCEPT = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
 // so a single-file order doesn't get a redundant badge.
 type OrderedFile = DesignFileRow & { isLatest: boolean }
 function orderFiles(files: DesignFileRow[]): OrderedFile[] {
-  const sorted = [...files].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
-  const isMachine = (f: DesignFileRow) => f.kind === "emb" || f.kind === "pes"
-  const count: Record<string, number> = {}
-  for (const f of sorted) if (isMachine(f)) { const k = f.sku || "__order"; count[k] = (count[k] || 0) + 1 }
-  const seen: Record<string, boolean> = {}
-  return sorted.map((f) => {
-    let isLatest = false
-    if (isMachine(f)) { const k = f.sku || "__order"; if (!seen[k]) { seen[k] = true; isLatest = count[k] > 1 } }
-    return { ...f, isLatest }
+ const sorted = [...files].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+ const isMachine = (f: DesignFileRow) => f.kind === "emb" || f.kind === "pes"
+ const count: Record<string, number> = {}
+ for (const f of sorted) if (isMachine(f)) { const k = f.sku || "__order"; count[k] = (count[k] || 0) + 1 }
+ const seen: Record<string, boolean> = {}
+ return sorted.map((f) => {
+ let isLatest = false
+ if (isMachine(f)) { const k = f.sku || "__order"; if (!seen[k]) { seen[k] = true; isLatest = count[k] > 1 } }
+ return { ...f, isLatest }
   })
 }
 
@@ -90,10 +90,10 @@ function orderFiles(files: DesignFileRow[]): OrderedFile[] {
  */
 type PlacedRow = { key: string; name: string; src: string; no: number | null; item: string | null
   /** Which FACE this row is. One row per printed side — a line with a front and a back is
-   *  two jobs, two hoopings and two rows, not one. */
-  side: string
+   * two jobs, two hoopings and two rows, not one. */
+ side: string
   /** Which line to detach. Sent to DELETE /api/orders/:id/designs, which is line-first. */
-  lineId?: string | null; sku?: string | null }
+ lineId?: string | null; sku?: string | null }
 
 /**
  * `numbered` — whether the caller's `items` are THE ORDER, in order.
@@ -115,31 +115,31 @@ type PlacedRow = { key: string; name: string; src: string; no: number | null; it
  */
 const SIDE_ORDER = ["front", "back", "left", "right", "hood", "pocket"]
 function placedRows(bySide: Record<string, Record<string, OrderDesign>> | undefined, items: OrderItem[], numbered = true): PlacedRow[] {
-  if (!bySide) return []
-  const out: PlacedRow[] = []
-  items.forEach((it, i) => {
-    const faces = sidesForLine(bySide, { line_id: it.line_id, sku: it.sku })
-    const names = Object.keys(faces).sort((a, b) => {
-      const ia = SIDE_ORDER.indexOf(a), ib = SIDE_ORDER.indexOf(b)
-      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
+ if (!bySide) return []
+ const out: PlacedRow[] = []
+ items.forEach((it, i) => {
+ const faces = sidesForLine(bySide, { line_id: it.line_id, sku: it.sku })
+ const names = Object.keys(faces).sort((a, b) => {
+ const ia = SIDE_ORDER.indexOf(a), ib = SIDE_ORDER.indexOf(b)
+ return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
     })
-    for (const sd of names) {
-      const d = faces[sd]
-      if (!d?.data) continue
-      out.push({
-        key: `${it.line_id || it.sku || i}:${sd}`,
+ for (const sd of names) {
+ const d = faces[sd]
+ if (!d?.data) continue
+ out.push({
+ key: `${it.line_id || it.sku || i}:${sd}`,
         // The stored name is the FILE's now; older rows carry the item's name instead, and
         // that is still better than "Artwork" — it is what someone typed or picked.
-        name: d.name || it.name || it.sku || "Artwork",
-        src: designSrc(d.data),
-        no: numbered ? i + 1 : null,
-        item: it.name || it.sku || null,
-        side: sd,
-        lineId: it.line_id ?? null, sku: it.sku ?? null,
+ name: d.name || it.name || it.sku || "Artwork",
+ src: designSrc(d.data),
+ no: numbered ? i + 1 : null,
+ item: it.name || it.sku || null,
+ side: sd,
+ lineId: it.line_id ?? null, sku: it.sku ?? null,
       })
     }
   })
-  return out
+ return out
 }
 
 /**
@@ -154,10 +154,10 @@ function placedRows(bySide: Record<string, Record<string, OrderDesign>> | undefi
  * of borrowing a number, at a smaller size so three characters still fit the circle.
  */
 function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
-  return (
+ return (
     <span
-      className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-2xs" : "text-xs")}
-      title={title ?? (no == null ? "Applies to every item on this order" : `Item ${no}`)}
+ className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-2xs" : "text-xs")}
+ title={title ?? (no == null ? "Applies to every item on this order" : `Item ${no}`)}
     >
       {no ?? "All"}
     </span>
@@ -166,12 +166,12 @@ function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
 
 /** One row per placed artwork. Module-level: `react-hooks/static-components`. */
 function PlacedArtworkList({ rows, onRemove, busy }: {
-  rows: PlacedRow[]
+ rows: PlacedRow[]
   /** Absent ⇒ no ✕. A row that cannot be acted on must not offer a control that errors. */
-  onRemove?: (r: PlacedRow) => void
-  busy?: string | null
+ onRemove?: (r: PlacedRow) => void
+ busy?: string | null
 }) {
-  if (!rows.length) return null
+ if (!rows.length) return null
   /**
    * ONE ROW SHAPE FOR EVERY FILE ON AN ORDER — number, picture, name, where it goes, get it.
    *
@@ -184,18 +184,18 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
    * NO CARD OF ITS OWN. It drew a rounded border inside the panel's card — a box in a box,
    * around a list the panel had already framed.
    */
-  return (
+ return (
     <div className="divide-y divide-border">
       {rows.map((r) => (
         <div key={r.key} className="relative flex items-center gap-2.5 py-2">
           {r.no != null && <ItemNumberBadge no={r.no} title={`Item ${r.no}${r.item ? ` — ${r.item}` : ""}`} />}
           {/* The artwork itself, small. A name alone leaves "is that the right one?"
-              unanswered, and the picture is already loaded for the mockup above. */}
+ unanswered, and the picture is already loaded for the mockup above. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
           {/* NAME, then the face. The blank's title and "placed in the designer" are gone:
-              the first repeats the item row this badge already points at, and the second
-              describes every row in this list, so it distinguished nothing. */}
+ the first repeats the item row this badge already points at, and the second
+ describes every row in this list, so it distinguished nothing. */}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{r.name}</div>
           </div>
@@ -203,13 +203,13 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
             {r.side}
           </span>
           {/* DOWNLOAD, matching the machine-file row — WORD ALONE, and for the same reason
-              it is a word there: the glyph says nothing "Download" doesn't, and it made this
-              button visibly heavier than the one a row below it. That change was made on the
-              machine-file row only, so for a while the same action wore two faces in one
-              list. Placed artwork is already same-origin (it renders on the mockup), so the
-              link fetches the bytes it is showing rather than routing through the paywalled
-              deliverable endpoint — this is the seller's own artwork on their own order, not
-              a file we cut. */}
+ it is a word there: the glyph says nothing "Download" doesn't, and it made this
+ button visibly heavier than the one a row below it. That change was made on the
+ machine-file row only, so for a while the same action wore two faces in one
+ list. Placed artwork is already same-origin (it renders on the mockup), so the
+ link fetches the bytes it is showing rather than routing through the paywalled
+ deliverable endpoint — this is the seller's own artwork on their own order, not
+ a file we cut. */}
           {/**
             * THE ACTIONS, VISIBLE AND IN THE SAME PLACE ON EVERY ROW.
             *
@@ -221,24 +221,24 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
             * table rather than as two kinds of object.
             */}
           <Button
-            variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs"
-            onClick={() => {
+ variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs"
+ onClick={() => {
               // Same-origin already (it draws on the mockup above), so the bytes are fetched
               // straight rather than through the paywalled deliverable route — this is
               // artwork on the seller's own order, not a file we cut.
-              const a = document.createElement("a")
-              a.href = r.src; a.download = r.name || "artwork"; a.click()
+ const a = document.createElement("a")
+ a.href = r.src; a.download = r.name || "artwork"; a.click()
             }}
           >
             Download
           </Button>
           {onRemove && (
             <Button
-              variant="ghost" size="sm"
-              className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
-              disabled={busy === r.key}
-              onClick={() => onRemove(r)}
-              title={`Take the ${r.side} artwork off this item`}
+ variant="ghost" size="sm"
+ className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
+ disabled={busy === r.key}
+ onClick={() => onRemove(r)}
+ title={`Take the ${r.side} artwork off this item`}
             >
               Remove
             </Button>
@@ -250,10 +250,10 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
 }
 
 const KIND_META: Record<string, { label: string; hint: string; cls: string; icon: React.ReactNode }> = {
-  pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-violet-100 text-violet-700", icon: <FileArrowDown size={12} weight="fill" /> },
-  emb: { label: "EMB", hint: "factory working file", cls: "bg-amber-100 text-amber-700", icon: <FileZip size={12} weight="fill" /> },
-  image: { label: "IMG", hint: "artwork / mockup", cls: "bg-sky-100 text-sky-700", icon: <ImageIcon size={12} weight="fill" /> },
-  other: { label: "FILE", hint: "", cls: "bg-muted text-muted-foreground", icon: <FileZip size={12} weight="fill" /> },
+ pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-violet-100 text-violet-700", icon: <FileArrowDown size={12} weight="fill" /> },
+ emb: { label: "EMB", hint: "factory working file", cls: "bg-hold/15 text-hold", icon: <FileZip size={12} weight="fill" /> },
+ image: { label: "IMG", hint: "artwork / mockup", cls: "bg-sky-100 text-sky-700", icon: <ImageIcon size={12} weight="fill" /> },
+ other: { label: "FILE", hint: "", cls: "bg-muted text-muted-foreground", icon: <FileZip size={12} weight="fill" /> },
 }
 
 /**
@@ -261,7 +261,7 @@ const KIND_META: Record<string, { label: string; hint: string; cls: string; icon
  * them. Every type is stored; the SERVER decides who sees what by `kind`:
  *   .pes → the seller's deliverable, behind the wallet paywall
  *   .emb → factory working file (all factory boards)
- *   image/* → artwork + mockups (factory)
+ * image/* → artwork + mockups (factory)
  * Pricing is admin/warehouse only — enforced server-side too, not just hidden here.
  */
 /**
@@ -277,29 +277,29 @@ const KIND_META: Record<string, { label: string; hint: string; cls: string; icon
  * blank — "not chosen yet" is information; an empty chip reads as missing data.
  */
 function scopeLabel(f: DesignFileRow): string {
-  if (!f.lineId) return "All items · "
-  return f.sku ? `Item ${f.sku} · ` : "This item (variant not chosen yet) · "
+ if (!f.lineId) return "All items · "
+ return f.sku ? `Item ${f.sku} · ` : "This item (variant not chosen yet) · "
 }
 
 export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orderId: string; sku?: string; lineId?: string | null; compact?: boolean
   /** The line this panel is mounted for, so a placed artwork row can name it. */
-  item?: OrderItem }) {
-  const [files, setFiles] = useState<DesignFileRow[] | null>(null)
+ item?: OrderItem }) {
+ const [files, setFiles] = useState<DesignFileRow[] | null>(null)
   /**
    * The artwork ON the line, which lives in a DIFFERENT table to the files below — see
    * placedRows. Fetched here rather than passed in, because the boards that mount this panel
    * hold design CARDS, not order designs. One call, and only when a card is open: this panel
    * renders inside an expanded card, never in the list.
    */
-  const [placedMap, setPlacedMap] = useState<Record<string, Record<string, OrderDesign>> | null>(null)
-  const [over, setOver] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [role, setRole] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
-  const confirm = useConfirm()
+ const [placedMap, setPlacedMap] = useState<Record<string, Record<string, OrderDesign>> | null>(null)
+ const [over, setOver] = useState(false)
+ const [busy, setBusy] = useState<string | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [role, setRole] = useState("")
+ const inputRef = useRef<HTMLInputElement>(null)
+ const confirm = useConfirm()
 
-  const canPrice = role === "admin" || role === "warehouse"
+ const canPrice = role === "admin" || role === "warehouse"
   /**
    * Mounted for a LINE → that line's own files, plus the order-wide ones. Mounted for the
    * order → everything.
@@ -309,98 +309,98 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
    * sku "" — so an empty-sku file matched every empty-sku line on the order. A designer's
    * file for one item appeared on items it was never made for.
    */
-  const forLine = !!(lineId || sku)
-  const shown = forLine ? filesForLine(files ?? [], { line_id: lineId, sku }) : (files ?? [])
+ const forLine = !!(lineId || sku)
+ const shown = forLine ? filesForLine(files ?? [], { line_id: lineId, sku }) : (files ?? [])
 
-  const load = useCallback(() => {
-    getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
+ const load = useCallback(() => {
+ getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
     // Best-effort: the files list is the subject of this panel, and failing to learn what
     // artwork is placed must not empty it.
-    getOrderDesigns(orderId)
+ getOrderDesigns(orderId)
       .then((r) => setPlacedMap(designsBySide(Array.isArray(r) ? r : (r?.designs ?? []))))
       .catch(() => setPlacedMap({}))
   }, [orderId])
-  useEffect(() => {
-    const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0)
+ return () => clearTimeout(id)
   }, [load])
 
-  const upload = async (list: FileList | File[]) => {
-    const arr = Array.from(list)
-    if (!arr.length) return
-    setErr(null)
-    for (const f of arr) {
+ const upload = async (list: FileList | File[]) => {
+ const arr = Array.from(list)
+ if (!arr.length) return
+ setErr(null)
+ for (const f of arr) {
       // 50MB: the API body limit is 60MB and base64 inflates ~33%, so anything
       // bigger would be rejected by the server with a confusing error.
-      if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large (max 50 MB).`); continue }
-      setBusy(f.name)
-      try {
-        const data = await new Promise<string>((res, rej) => {
-          const fr = new FileReader()
-          fr.onload = () => res(String(fr.result))
-          fr.onerror = () => rej(new Error("Could not read the file"))
-          fr.readAsDataURL(f)
+ if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large (max 50 MB).`); continue }
+ setBusy(f.name)
+ try {
+ const data = await new Promise<string>((res, rej) => {
+ const fr = new FileReader()
+ fr.onload = () => res(String(fr.result))
+ fr.onerror = () => rej(new Error("Could not read the file"))
+ fr.readAsDataURL(f)
         })
         // The id is keyed on the LINE, not the sku: re-dropping the same filename on the
         // same line still replaces itself (which is the point of a stable id), but two lines
         // that share a SKU no longer overwrite each other's file.
-        await uploadDesignFile({
-          designId: idFor(orderId, lineId || sku, f.name),
-          orderId, sku, lineId: lineId ?? undefined,
-          name: f.name, mime: f.type || undefined, data,
+ await uploadDesignFile({
+ designId: idFor(orderId, lineId || sku, f.name),
+ orderId, sku, lineId: lineId ?? undefined,
+ name: f.name, mime: f.type || undefined, data,
         })
       } catch (e) {
-        setErr(e instanceof Error ? e.message : `Could not upload ${f.name}`)
+ setErr(e instanceof Error ? e.message : `Could not upload ${f.name}`)
       } finally {
-        setBusy(null)
+ setBusy(null)
       }
     }
-    load()
+ load()
   }
 
-  const price = async (f: DesignFileRow, v: string) => {
-    const n = Math.max(0, Number(v) || 0)
-    setFiles((prev) => (prev ?? []).map((x) => (x.designId === f.designId ? { ...x, price: n } : x)))
-    try { await setDesignFilePrice(f.designId, n) } catch { load() }
+ const price = async (f: DesignFileRow, v: string) => {
+ const n = Math.max(0, Number(v) || 0)
+ setFiles((prev) => (prev ?? []).map((x) => (x.designId === f.designId ? { ...x, price: n } : x)))
+ try { await setDesignFilePrice(f.designId, n) } catch { load() }
   }
 
-  const get = async (f: DesignFileRow) => {
-    setBusy(f.designId)
-    try {
-      const r = await downloadDesignFile(f.designId)
-      if (!r.data) throw new Error("File has no data")
-      const a = document.createElement("a")
-      a.href = r.data
-      a.download = r.name || f.name || "design"
-      a.click()
+ const get = async (f: DesignFileRow) => {
+ setBusy(f.designId)
+ try {
+ const r = await downloadDesignFile(f.designId)
+ if (!r.data) throw new Error("File has no data")
+ const a = document.createElement("a")
+ a.href = r.data
+ a.download = r.name || f.name || "design"
+ a.click()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not download the file")
+ setErr(e instanceof Error ? e.message : "Could not download the file")
     } finally { setBusy(null) }
   }
 
   // Remove a file. Drops it from the order and reverts the Design tag (the server records
   // it in the tag history and broadcasts, so the readiness pill flips back on its own).
-  const remove = async (f: DesignFileRow) => {
-    if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
-    setBusy(f.designId); setErr(null)
-    try {
-      const r = await deleteDesignFile(f.designId)
-      if (r?.error) throw new Error(r.error)
-      load()
+ const remove = async (f: DesignFileRow) => {
+ if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
+ setBusy(f.designId); setErr(null)
+ try {
+ const r = await deleteDesignFile(f.designId)
+ if (r?.error) throw new Error(r.error)
+ load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not remove the file")
+ setErr(e instanceof Error ? e.message : "Could not remove the file")
     } finally { setBusy(null) }
   }
 
-  return (
+ return (
     <div className="space-y-2">
       {/* Drop zone — the thing that didn't exist before. */}
       <div
-        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}
-        onClick={() => inputRef.current?.click()}
-        className={
+ onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+ onDragLeave={() => setOver(false)}
+ onDrop={(e) => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}
+ onClick={() => inputRef.current?.click()}
+ className={
           "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors " +
           (over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/40")
         }
@@ -414,10 +414,10 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
       {err && <div className="flex items-center gap-1.5 text-xs text-destructive"><Warning size={12} weight="fill" /> {err}</div>}
 
       {/* The artwork placed on this line, named — it is a file on this job whichever table
-          it happens to live in, and a panel that showed only one of the two reported "no
-          files" for a line that had a design on it. */}
+ it happens to live in, and a panel that showed only one of the two reported "no
+ files" for a line that had a design on it. */}
       {/* `false` — this panel is mounted for ONE line, so an index here would number every
-          card "1". No number is better than a confident wrong one. */}
+ card "1". No number is better than a confident wrong one. */}
       <PlacedArtworkList rows={placedRows(placedMap ?? undefined, item ? [item] : [], false)} />
 
       {files === null ? (
@@ -427,8 +427,8 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
       ) : (
         <div className="divide-y divide-border rounded-xl border border-border">
           {orderFiles(shown).map((f) => {
-            const k = KIND_META[f.kind || "other"] ?? KIND_META.other
-            return (
+ const k = KIND_META[f.kind || "other"] ?? KIND_META.other
+ return (
               <div key={f.designId} className="relative flex items-center gap-2 p-2">
                 <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-bold " + k.cls}>{k.icon} {k.label}</span>
                 <div className="min-w-0 flex-1">
@@ -440,17 +440,17 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                 </div>
 
                 {/* Only .pes is sold, so only .pes gets a price — and only admin/warehouse
-                    may set it (the server rejects anyone else regardless). */}
+ may set it (the server rejects anyone else regardless). */}
                 {f.kind === "pes" && (
-                  canPrice ? (
+ canPrice ? (
                     <label className="flex shrink-0 items-center gap-1" title="What the seller pays to download this">
                       <CurrencyDollar size={11} className="text-muted-foreground" />
                       <Input
-                        defaultValue={String(f.price ?? 0)}
-                        onBlur={(e) => price(f, e.target.value)}
-                        inputMode="decimal"
-                        aria-label={`Price for ${f.name}`}
-                        className="h-7 w-16 text-center text-xs"
+ defaultValue={String(f.price ?? 0)}
+ onBlur={(e) => price(f, e.target.value)}
+ inputMode="decimal"
+ aria-label={`Price for ${f.name}`}
+ className="h-7 w-16 text-center text-xs"
                       />
                     </label>
                   ) : (
@@ -463,11 +463,11 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                 </Button>
                 {/* Corner X, matching the seller card — see the note there. */}
                 <button
-                  onClick={() => remove(f)}
-                  disabled={busy === f.designId}
-                  title="Remove this file"
-                  aria-label={`Remove ${f.name}`}
-                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+ onClick={() => remove(f)}
+ disabled={busy === f.designId}
+ title="Remove this file"
+ aria-label={`Remove ${f.name}`}
+ className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
                 >
                   <X size={10} weight="bold" />
                 </button>
@@ -496,50 +496,50 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  * admin/warehouse can ever set a price. Verified against design_files.js, not assumed.
  */
 export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: {
-  orderId: string
+ orderId: string
   /** The order's lines, so a dropped file can be pointed at one. Empty ⇒ everything a
-   *  seller drops applies to the whole order, which is how this panel behaved before. */
-  items?: OrderItem[]
+   * seller drops applies to the whole order, which is how this panel behaved before. */
+ items?: OrderItem[]
   /** The artwork already on the lines, BY FACE — line key → side → design. Passed in rather
-   *  than fetched: the page has the rows, the bytes are large, and a second copy could
-   *  disagree with the picture on screen. Absent ⇒ this card simply shows files, as before. */
-  designs?: Record<string, Record<string, OrderDesign>>
+   * than fetched: the page has the rows, the bytes are large, and a second copy could
+   * disagree with the picture on screen. Absent ⇒ this card simply shows files, as before. */
+ designs?: Record<string, Record<string, OrderDesign>>
   /** Artwork went onto a line — the page reloads its designs so the canvas shows it. */
-  onAttached?: () => void
+ onAttached?: () => void
 }) {
-  const [files, setFiles] = useState<DesignFileRow[] | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [over, setOver] = useState(false)
-  const [role, setRole] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
-  const confirm = useConfirm()
+ const [files, setFiles] = useState<DesignFileRow[] | null>(null)
+ const [busy, setBusy] = useState<string | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [over, setOver] = useState(false)
+ const [role, setRole] = useState("")
+ const inputRef = useRef<HTMLInputElement>(null)
+ const confirm = useConfirm()
   // Only staff may remove a file — this card is also shown to sellers, who must never be
   // able to delete a factory working file.
-  const canRemove = !!role && role !== "seller"
+ const canRemove = !!role && role !== "seller"
   // The card is shown to the seller AND to every staff role on the same order page, so the
   // copy has to know which of them is reading it. Unknown role reads as the seller: that is
   // the cautious side — it never tells a seller that somebody else sent their own file.
-  const isSeller = !role || role === "seller"
+ const isSeller = !role || role === "seller"
 
-  const load = useCallback(() => {
-    getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
+ const load = useCallback(() => {
+ getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
   }, [orderId])
-  useEffect(() => { const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0); return () => clearTimeout(id) }, [load])
+ useEffect(() => { const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0); return () => clearTimeout(id) }, [load])
 
-  const remove = async (f: DesignFileRow) => {
-    if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
-    setBusy(f.designId); setErr(null)
-    try {
-      const r = await deleteDesignFile(f.designId)
-      if (r?.error) throw new Error(r.error)
-      load()
+ const remove = async (f: DesignFileRow) => {
+ if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
+ setBusy(f.designId); setErr(null)
+ try {
+ const r = await deleteDesignFile(f.designId)
+ if (r?.error) throw new Error(r.error)
+ load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not remove the file")
+ setErr(e instanceof Error ? e.message : "Could not remove the file")
     } finally { setBusy(null) }
   }
 
-  const isImg = (f: File) => /^image\//i.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|heic|avif)$/i.test(f.name)
+ const isImg = (f: File) => /^image\//i.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|heic|avif)$/i.test(f.name)
 
   /**
    * DROP FIRST, DECIDE SECOND.
@@ -554,10 +554,10 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * still free to fix.
    */
   /** `preview` is an object URL and only images have one — a .pes has no picture to show,
-   *  and inventing a placeholder that looks like artwork is worse than the glyph. It must
-   *  be revoked when the row goes; see the effect below. */
-  type Staged = { file: File; name: string; target: string; image: boolean; preview?: string }
-  const [staged, setStaged] = useState<Staged[]>([])
+   * and inventing a placeholder that looks like artwork is worse than the glyph. It must
+   * be revoked when the row goes; see the effect below. */
+ type Staged = { file: File; name: string; target: string; image: boolean; preview?: string }
+ const [staged, setStaged] = useState<Staged[]>([])
 
   /**
    * ONE OWNER FOR THE PREVIEW URLS, because there are four ways a row leaves.
@@ -568,16 +568,16 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * a 50MB artwork that is never released. So nothing revokes at the call site: this
    * reconciles what is alive against what was minted, whatever removed it.
    */
-  const previewUrls = useRef(new Set<string>())
-  useEffect(() => {
-    const live = new Set(staged.map((s) => s.preview).filter(Boolean) as string[])
-    for (const u of previewUrls.current) {
-      if (!live.has(u)) { URL.revokeObjectURL(u); previewUrls.current.delete(u) }
+ const previewUrls = useRef(new Set<string>())
+ useEffect(() => {
+ const live = new Set(staged.map((s) => s.preview).filter(Boolean) as string[])
+ for (const u of previewUrls.current) {
+ if (!live.has(u)) { URL.revokeObjectURL(u); previewUrls.current.delete(u) }
     }
   }, [staged])
-  useEffect(() => {
-    const held = previewUrls.current
-    return () => { for (const u of held) URL.revokeObjectURL(u); held.clear() }
+ useEffect(() => {
+ const held = previewUrls.current
+ return () => { for (const u of held) URL.revokeObjectURL(u); held.clear() }
   }, [])
   /**
    * A CEILING ON THE QUEUE, and it is about legibility rather than bytes.
@@ -591,21 +591,21 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * Twenty is comfortably above a real order (a nine-line order needs nine) and well below
    * "I selected my whole downloads folder".
    */
-  const MAX_STAGED = 20
-  const stage = (list: FileList | File[]) => {
-    const arr = Array.from(list)
-    if (!arr.length) return
-    setErr(null)
-    const wrong = arr.filter((f) => !MACHINE_RE.test(f.name) && !isImg(f))
-    if (wrong.length) {
-      setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file or an image, so there's nothing to do with it here.`)
+ const MAX_STAGED = 20
+ const stage = (list: FileList | File[]) => {
+ const arr = Array.from(list)
+ if (!arr.length) return
+ setErr(null)
+ const wrong = arr.filter((f) => !MACHINE_RE.test(f.name) && !isImg(f))
+ if (wrong.length) {
+ setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file or an image, so there's nothing to do with it here.`)
     }
     // 50MB: the body limit is 60MB and base64 inflates by about a third, so a bigger file
     // returns a server error that says nothing useful. Caught here, before it is queued,
     // so the row never appears rather than failing at the end of a batch.
-    const big = arr.filter((f) => f.size > 50 * 1024 * 1024)
-    if (big.length) setErr(`${big.map((f) => f.name).join(", ")} — over the 50 MB limit.`)
-    const ok = arr.filter((f) => (MACHINE_RE.test(f.name) || isImg(f)) && f.size <= 50 * 1024 * 1024)
+ const big = arr.filter((f) => f.size > 50 * 1024 * 1024)
+ if (big.length) setErr(`${big.map((f) => f.name).join(", ")} — over the 50 MB limit.`)
+ const ok = arr.filter((f) => (MACHINE_RE.test(f.name) || isImg(f)) && f.size <= 50 * 1024 * 1024)
     /**
      * DECIDED HERE, not inside the updater.
      *
@@ -614,92 +614,92 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
      * in a function that must be pure, and it throws. `staged` is in scope, so the updater
      * was buying nothing.
      */
-    const fresh = ok.filter((f) => !staged.some((x) => x.name === f.name))
-    const room = Math.max(0, MAX_STAGED - staged.length)
-    const dropped = fresh.length - Math.min(fresh.length, room)
-    if (dropped > 0) {
+ const fresh = ok.filter((f) => !staged.some((x) => x.name === f.name))
+ const room = Math.max(0, MAX_STAGED - staged.length)
+ const dropped = fresh.length - Math.min(fresh.length, room)
+ if (dropped > 0) {
       // Named, not silently truncated: a queue that quietly drops half a selection is a
       // queue you believe you attached.
-      setErr(`Too many files at once — ${MAX_STAGED} is the limit, so ${dropped} ${dropped === 1 ? "was" : "were"} left out. Attach these, then drop the rest.`)
+ setErr(`Too many files at once — ${MAX_STAGED} is the limit, so ${dropped} ${dropped === 1 ? "was" : "were"} left out. Attach these, then drop the rest.`)
     }
-    const rows = fresh.slice(0, room).map((f) => {
-      const image = isImg(f)
-      const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
+ const rows = fresh.slice(0, room).map((f) => {
+ const image = isImg(f)
+ const allowed = image ? items : items.filter((it) => isEmbroidery(it.print_type))
       // Registered as it is minted, so the effect below owns every URL from birth — a
       // preview created here and only revoked at one of the three removal paths is the
       // shape that leaks the ones taken out by the other two.
-      const preview = image ? URL.createObjectURL(f) : undefined
-      if (preview) previewUrls.current.add(preview)
-      return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image, preview }
+ const preview = image ? URL.createObjectURL(f) : undefined
+ if (preview) previewUrls.current.add(preview)
+ return { file: f, name: f.name, target: allowed.length ? matchLine(f.name, allowed) : ALL, image, preview }
     })
-    if (rows.length) setStaged((prev) => [...prev, ...rows])
+ if (rows.length) setStaged((prev) => [...prev, ...rows])
   }
 
-  const readDataUrl = (f: File) => new Promise<string>((res, rej) => {
-    const fr = new FileReader()
-    fr.onload = () => res(String(fr.result))
-    fr.onerror = () => rej(new Error("Could not read the file"))
-    fr.readAsDataURL(f)
+ const readDataUrl = (f: File) => new Promise<string>((res, rej) => {
+ const fr = new FileReader()
+ fr.onload = () => res(String(fr.result))
+ fr.onerror = () => rej(new Error("Could not read the file"))
+ fr.readAsDataURL(f)
   })
 
   /**
    * WHAT EACH KIND BECOMES, which is not the same thing.
    *
-   *   an image        → the LINE'S ARTWORK (order_designs), so it shows on the mockup and
-   *                     in the designer, exactly as if it had been placed there
-   *   a machine file  → a file on the line for us to check instead of digitising
+   * an image        → the LINE'S ARTWORK (order_designs), so it shows on the mockup and
+   * in the designer, exactly as if it had been placed there
+   * a machine file  → a file on the line for us to check instead of digitising
    *
    * "All items" writes to every line rather than to a null line: artwork is read per line,
    * and a single order-wide row cannot say "this one is placed and that one isn't".
    */
-  const attach = async () => {
-    if (!staged.length) return
-    setErr(null)
-    const failed: string[] = []
-    let images = 0, machines = 0
-    const skipped: string[] = []
-    for (const s of staged) {
+ const attach = async () => {
+ if (!staged.length) return
+ setErr(null)
+ const failed: string[] = []
+ let images = 0, machines = 0
+ const skipped: string[] = []
+ for (const s of staged) {
       // Nowhere legal to put it: a stitch file on an order with no embroidered line. Left
       // in the list rather than written to the order as a whole — attaching it anywhere
       // would be inventing a target, and it is what raised a check fee for a file no
       // machine can run.
-      if (!s.image && items.length > 0 && embItems.length === 0) { skipped.push(s.name); continue }
-      setBusy(s.name)
-      try {
-        const data = await readDataUrl(s.file)
-        const pool = targetsFor(s.image)
-        const targets = s.target === ALL
+ if (!s.image && items.length > 0 && embItems.length === 0) { skipped.push(s.name); continue }
+ setBusy(s.name)
+ try {
+ const data = await readDataUrl(s.file)
+ const pool = targetsFor(s.image)
+ const targets = s.target === ALL
           ? (pool.length ? pool : [{ line_id: undefined, sku: "" } as OrderItem])
-          : pool.filter((it) => (it.line_id || it.sku) === s.target)
-        for (const it of targets) {
-          if (s.image) {
-            const r = await postOrderDesign(orderId, { sku: it.sku ?? "", line_id: it.line_id ?? undefined, data, name: s.name })
-            if (r?.error) throw new Error(r.error)
+ : pool.filter((it) => (it.line_id || it.sku) === s.target)
+ for (const it of targets) {
+ if (s.image) {
+ const r = await postOrderDesign(orderId, { sku: it.sku ?? "", line_id: it.line_id ?? undefined, data, name: s.name })
+ if (r?.error) throw new Error(r.error)
           } else {
-            const scope = it.line_id || it.sku || undefined
-            const r = await uploadDesignFile({
-              designId: idFor(orderId, scope, s.name), orderId, sku: it.sku ?? undefined,
-              lineId: it.line_id ?? undefined, name: s.name, mime: s.file.type || undefined, data,
+ const scope = it.line_id || it.sku || undefined
+ const r = await uploadDesignFile({
+ designId: idFor(orderId, scope, s.name), orderId, sku: it.sku ?? undefined,
+ lineId: it.line_id ?? undefined, name: s.name, mime: s.file.type || undefined, data,
             })
-            if (r?.error) throw new Error(r.error)
+ if (r?.error) throw new Error(r.error)
           }
         }
-        if (s.image) images++; else machines++
+ if (s.image) images++; else machines++
       } catch (e) {
-        failed.push(`${s.name}${e instanceof Error ? ` (${e.message})` : ""}`)
+ failed.push(`${s.name}${e instanceof Error ? ` (${e.message})` : ""}`)
       } finally { setBusy(null) }
     }
-    const keep = new Set([...failed.map((f) => f.split(" (")[0]), ...skipped])
-    setStaged(keep.size ? staged.filter((s) => keep.has(s.name)) : [])
-    if (failed.length) setErr(`Couldn't attach: ${failed.join(", ")}`)
-    if (skipped.length) {
-      setErr((e) => [e, `${skipped.join(", ")} — a machine file needs an embroidered item, and this order has none.`].filter(Boolean).join(" "))
+ const keep = new Set([...failed.map((f) => f.split(" (")[0]), ...skipped])
+ setStaged(keep.size ? staged.filter((s) => keep.has(s.name)) : [])
+ if (failed.length) setErr(`Couldn't attach: ${failed.join(", ")}`)
+ if (skipped.length) {
+ setErr((e) => [e, `${skipped.join(", ")} — a machine file needs an embroidered item, and this order has none.`].filter(Boolean).join(" "))
     }
-    const parts: string[] = []
-    if (machines) parts.push(`${machines} machine file${machines === 1 ? "" : "s"} — we'll check ${machines === 1 ? "it" : "them"} before production`)
-    if (images) parts.push(`${images} design image${images === 1 ? "" : "s"} — placed on the items`)
-    load()
-    if (images) onAttached?.()
+ const parts: string[] = []
+ if (machines) parts.push(`${machines} machine file${machines === 1 ? "" : "s"} — we'll check ${machines === 1 ? "it" : "them"} before production`)
+ if (images) parts.push(`${images} design image${images === 1 ? "" : "s"} — placed on the items`)
+ load()
+ if (images) onAttached?.()
   }
 
   /**
@@ -710,13 +710,13 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * element on a card whose actual subject is the list — which is what made an order that
    * already had artwork look like one still waiting for it.
    */
-  const dropZone = (slim = false) => (
+ const dropZone = (slim = false) => (
     <div
-      onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
-      onClick={() => inputRef.current?.click()}
-      className={
+ onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+ onDragLeave={() => setOver(false)}
+ onDrop={(e) => { e.preventDefault(); setOver(false); stage(e.dataTransfer.files) }}
+ onClick={() => inputRef.current?.click()}
+ className={
         "flex cursor-pointer rounded-xl border border-dashed transition-colors " +
         (slim ? "items-center justify-center gap-2 px-3 py-2 " : "flex-col items-center justify-center gap-1 border-2 p-4 text-center ") +
         (over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/40")
@@ -728,7 +728,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       </span>
       {!slim && <span className="text-2xs text-muted-foreground">Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)</span>}
       <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT + ",image/*"} className="hidden"
-        onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = "" }} />
+ onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = "" }} />
     </div>
   )
 
@@ -743,8 +743,8 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * So the target list is filtered by what the FILE is, and when no line on the order is
    * embroidered the row says so instead of offering a choice that cannot be right.
    */
-  const embItems = items.filter((it) => isEmbroidery(it.print_type))
-  const targetsFor = (image: boolean) => (image ? items : embItems)
+ const embItems = items.filter((it) => isEmbroidery(it.print_type))
+ const targetsFor = (image: boolean) => (image ? items : embItems)
 
   /**
    * The order's lines as picker options, plus the whole-order default.
@@ -761,26 +761,26 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * on the file row and here, so picking 3 and finding 3 is one glance. That was already the
    * stated intent of numbering these — the name was belt and braces, and it cost the layout.
    */
-  const targetLabel = (it: OrderItem, i: number) => `Item ${i + 1}`
+ const targetLabel = (it: OrderItem, i: number) => `Item ${i + 1}`
   // The number a line shows is its position in the ORDER, not in the filtered list — the
   // badge on the row must be the one you read in the dropdown, or the number is a lie.
-  const numberOf = (it: OrderItem) => items.findIndex((x) => (x.line_id || x.sku) === (it.line_id || it.sku))
+ const numberOf = (it: OrderItem) => items.findIndex((x) => (x.line_id || x.sku) === (it.line_id || it.sku))
   // The whole-order choice. Kept short for the same reason the item labels are: a select is
   // as wide as its widest option, and "All embroidery items" was setting that on its own.
-  const allLabel = (image: boolean) => (image ? "All items" : "All embroidery")
-  const optionsFor = (image: boolean) => {
-    const pool = targetsFor(image)
-    return [allLabel(image), ...pool.map((it) => targetLabel(it, numberOf(it)))]
+ const allLabel = (image: boolean) => (image ? "All items" : "All embroidery")
+ const optionsFor = (image: boolean) => {
+ const pool = targetsFor(image)
+ return [allLabel(image), ...pool.map((it) => targetLabel(it, numberOf(it)))]
   }
-  const keyAt = (image: boolean, label: string) => {
-    const opts = optionsFor(image)
-    const i = opts.indexOf(label) - 1
-    const pool = targetsFor(image)
-    return i < 0 ? ALL : (pool[i]?.line_id || pool[i]?.sku || ALL)
+ const keyAt = (image: boolean, label: string) => {
+ const opts = optionsFor(image)
+ const i = opts.indexOf(label) - 1
+ const pool = targetsFor(image)
+ return i < 0 ? ALL : (pool[i]?.line_id || pool[i]?.sku || ALL)
   }
-  const labelFor = (image: boolean, key: string) => {
-    const it = items.find((x) => (x.line_id || x.sku) === key)
-    return it ? targetLabel(it, numberOf(it)) : allLabel(image)
+ const labelFor = (image: boolean, key: string) => {
+ const it = items.find((x) => (x.line_id || x.sku) === key)
+ return it ? targetLabel(it, numberOf(it)) : allLabel(image)
   }
 
   /**
@@ -794,10 +794,10 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * their variants unset, so this is routine, and an empty second line under a file name
    * reads as a lookup that failed.
    */
-  const targetFacts = (s: Staged) => {
-    if (s.target === ALL) return `every ${s.image ? "item" : "embroidery item"} on this order`
-    const it = items.find((x) => (x.line_id || x.sku) === s.target)
-    if (!it) return ""
+ const targetFacts = (s: Staged) => {
+ if (s.target === ALL) return `every ${s.image ? "item" : "embroidery item"} on this order`
+ const it = items.find((x) => (x.line_id || x.sku) === s.target)
+ if (!it) return ""
     /*
      * PRINT METHOD ALONE IS NOT AN ANSWER.
      *
@@ -807,9 +807,9 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
      * complete description of the item rather than the only field anyone has filled in.
      * The three that actually identify a garment decide whether this is a real answer.
      */
-    const identified = !!(it.blank || it.color || it.size)
-    const facts = lineFactsOf(it)
-    return identified ? facts : [facts, "variants not set up yet"].filter(Boolean).join(" · ")
+ const identified = !!(it.blank || it.color || it.size)
+ const facts = lineFactsOf(it)
+ return identified ? facts : [facts, "variants not set up yet"].filter(Boolean).join(" · ")
   }
 
   /**
@@ -822,7 +822,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * both"); the staging list never got the same treatment, so the two lists of files on
    * one order still did not look like the same kind of thing. Now they do.
    */
-  const queue = staged.length > 0 && (
+ const queue = staged.length > 0 && (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-muted-foreground">
@@ -834,55 +834,55 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
         {staged.map((s) => (
           <div key={s.name} className="flex flex-wrap items-center gap-3 border-t border-border py-2.5 first:border-t-0">
             {/* BIG ENOUGH TO RECOGNISE. It was a 28px tinted square holding a generic
-                picture glyph — the same mark for every image, so a queue of four files
-                showed four identical tiles and the only way to tell them apart was to read
-                the names. This is the actual file. A machine file keeps a glyph because it
-                genuinely has no preview, and the two must not be made to look alike. */}
+ picture glyph — the same mark for every image, so a queue of four files
+ showed four identical tiles and the only way to tell them apart was to read
+ the names. This is the actual file. A machine file keeps a glyph because it
+ genuinely has no preview, and the two must not be made to look alike. */}
             <span className={"flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border " + (s.image ? "bg-muted" : "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300")}>
               {s.preview
                 /* A blob: URL for a file already in this browser's memory — there is no
-                   request to optimise, and next/image cannot take one anyway. */
+ request to optimise, and next/image cannot take one anyway. */
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={s.preview} alt="" className="size-full object-contain" />
-                : s.image ? <ImageIcon size={22} weight="fill" className="text-muted-foreground" />
-                : <Sparkle size={22} weight="fill" />}
+ : s.image ? <ImageIcon size={22} weight="fill" className="text-muted-foreground" />
+ : <Sparkle size={22} weight="fill" />}
             </span>
             <div className="min-w-0 flex-1">
               {/* WRAPPED, NOT TRUNCATED. These names are how someone tells their own eight
-                  files apart, and they are long and end-loaded — "…-Crewneck-Sweat.png" cut
-                  to "…-Crewneck-Swea…" removes the extension too, so the row stops saying
-                  whether it is artwork or a stitch file. Clamped at two lines; break-WORDS,
-                  not break-all, so it wraps at the hyphens these names are full of instead
-                  of splitting "Sweat.png" across the break and hiding the extension again. */}
+ files apart, and they are long and end-loaded — "…-Crewneck-Sweat.png" cut
+ to "…-Crewneck-Swea…" removes the extension too, so the row stops saying
+ whether it is artwork or a stitch file. Clamped at two lines; break-WORDS,
+ not break-all, so it wraps at the hyphens these names are full of instead
+ of splitting "Sweat.png" across the break and hiding the extension again. */}
               <div className="line-clamp-2 break-words text-sm font-medium">{s.name}</div>
               {/* The item, not the file. "matched by name" stays: the picker beside this was
                   PRE-FILLED by a guess, and a suggestion that doesn't say it guessed is an
-                  auto-attach with extra steps. */}
+ auto-attach with extra steps. */}
               <div className="truncate text-xs text-muted-foreground">
                 {targetFacts(s)}
                 {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
               </div>
             </div>
             {/* text-xs, matching the file name beside it — the field was two steps smaller
-                than everything in its own row. clearable={false}: see the note on the prop;
+ than everything in its own row. clearable={false}: see the note on the prop;
                 "no line at all" is not a state a file can hold. */}
             {items.length > 0 && (targetsFor(s.image).length > 0 ? (
               <VariantField
-                label="Goes on" compact clearable={false} className="w-32 text-xs"
-                value={labelFor(s.image, s.target)} options={optionsFor(s.image)}
-                onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(s.image, v) } : x)))}
+ label="Goes on" compact clearable={false} className="w-32 text-xs"
+ value={labelFor(s.image, s.target)} options={optionsFor(s.image)}
+ onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(s.image, v) } : x)))}
               />
             ) : (
               // Not a disabled dropdown — there is no choice to grey out. It says why, and
               // Attach below leaves this row alone.
-              <span className="shrink-0 rounded-lg bg-amber-50 px-2 py-1 text-2xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+              <span className="shrink-0 rounded-lg bg-hold/10 px-2 py-1 text-2xs font-medium text-hold">
                 No embroidery item on this order
               </span>
             ))}
             <button
-              onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
-              title="Take this one out" aria-label={`Take ${s.name} out`}
-              className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
+ onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
+ title="Take this one out" aria-label={`Take ${s.name} out`}
+ className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
             >
               <X size={11} weight="bold" />
             </button>
@@ -897,13 +897,13 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     </div>
   )
 
-  const notices = (
+ const notices = (
     <>
       {err && <div className="flex items-start gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"><Warning size={12} weight="fill" className="mt-0.5 shrink-0" /> {err}</div>}
       {/* The green "Sent 1 design image" banner is gone. A success message that sits above the
-          list it just changed is telling you what the list is already showing — the new row is
-          right there, and it stays, which the banner does not. Failures still speak up: an
-          error is the one outcome you cannot see by looking. */}
+ list it just changed is telling you what the list is already showing — the new row is
+ right there, and it stays, which the banner does not. Failures still speak up: an
+ error is the one outcome you cannot see by looking. */}
     </>
   )
 
@@ -916,18 +916,18 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * downstream reads it as a line. Orders backfill line_id on read (orders.js), so the
    * fallback is the honest failure, not the normal path.
    */
-  const rescope = async (f: DesignFileRow, key: string) => {
-    const it = key === ALL ? null : items.find((x) => (x.line_id || x.sku) === key)
-    if (it && !it.line_id) { setErr(`${it.name || it.sku || "That item"} has no line id yet, so a file can't be filed against it on its own.`); return }
-    const lineId = it?.line_id ?? null
-    if ((f.lineId ?? null) === lineId) return
-    setBusy(f.designId); setErr(null)
-    try {
-      const r = await scopeDesignFile(f.designId, lineId)
-      if (r?.error) throw new Error(r.error)
-      load()
+ const rescope = async (f: DesignFileRow, key: string) => {
+ const it = key === ALL ? null : items.find((x) => (x.line_id || x.sku) === key)
+ if (it && !it.line_id) { setErr(`${it.name || it.sku || "That item"} has no line id yet, so a file can't be filed against it on its own.`); return }
+ const lineId = it?.line_id ?? null
+ if ((f.lineId ?? null) === lineId) return
+ setBusy(f.designId); setErr(null)
+ try {
+ const r = await scopeDesignFile(f.designId, lineId)
+ if (r?.error) throw new Error(r.error)
+ load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not move that file to another item.")
+ setErr(e instanceof Error ? e.message : "Could not move that file to another item.")
     } finally { setBusy(null) }
   }
 
@@ -939,59 +939,59 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
    * the same map), so the page re-reads and this list follows. Editing a copy here would
    * leave the row gone and the garment still wearing it.
    */
-  const detach = async (r: { key: string; name: string; side: string; lineId?: string | null; sku?: string | null }) => {
-    if (!(await confirm({
-      title: `Take ${r.name} off the ${r.side}?`,
-      body: "It comes off the line. Any design charge already made stays — ask an admin if it needs reversing.",
-      confirmLabel: "Remove artwork",
-      destructive: true,
+ const detach = async (r: { key: string; name: string; side: string; lineId?: string | null; sku?: string | null }) => {
+ if (!(await confirm({
+ title: `Take ${r.name} off the ${r.side}?`,
+ body: "It comes off the line. Any design charge already made stays — ask an admin if it needs reversing.",
+ confirmLabel: "Remove artwork",
+ destructive: true,
     }))) return
-    setBusy(r.key); setErr(null)
-    try {
-      const res = await deleteOrderDesign(orderId, { line_id: r.lineId ?? undefined, sku: r.sku ?? undefined, side: r.side })
-      if (res?.error) throw new Error(res.error)
-      onAttached?.()
+ setBusy(r.key); setErr(null)
+ try {
+ const res = await deleteOrderDesign(orderId, { line_id: r.lineId ?? undefined, sku: r.sku ?? undefined, side: r.side })
+ if (res?.error) throw new Error(res.error)
+ onAttached?.()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't take that artwork off.")
+ setErr(e instanceof Error ? e.message : "Couldn't take that artwork off.")
     } finally { setBusy(null) }
   }
 
   /** Optimistic, then reconciled — the same shape the designer board's panel uses. */
-  const priceIt = async (f: DesignFileRow, v: string) => {
-    const n = Math.max(0, Number(v) || 0)
-    setFiles((prev) => (prev ?? []).map((x) => (x.designId === f.designId ? { ...x, price: n } : x)))
-    try {
-      const r = await setDesignFilePrice(f.designId, n)
-      if (r?.error) throw new Error(r.error)
+ const priceIt = async (f: DesignFileRow, v: string) => {
+ const n = Math.max(0, Number(v) || 0)
+ setFiles((prev) => (prev ?? []).map((x) => (x.designId === f.designId ? { ...x, price: n } : x)))
+ try {
+ const r = await setDesignFilePrice(f.designId, n)
+ if (r?.error) throw new Error(r.error)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not set that price.")
-      load()
+ setErr(e instanceof Error ? e.message : "Could not set that price.")
+ load()
     }
   }
 
-  const buyAndGet = async (f: DesignFileRow) => {
-    setBusy(f.designId); setErr(null)
-    try {
-      if (!f.paid) {
-        const { purchaseDesignFile } = await import("@/lib/api")
-        const r = await purchaseDesignFile(f.designId)
-        if (r.error) throw new Error(r.error)
+ const buyAndGet = async (f: DesignFileRow) => {
+ setBusy(f.designId); setErr(null)
+ try {
+ if (!f.paid) {
+ const { purchaseDesignFile } = await import("@/lib/api")
+ const r = await purchaseDesignFile(f.designId)
+ if (r.error) throw new Error(r.error)
       }
-      const r = await downloadDesignFile(f.designId)
-      if (!r.data) throw new Error("File has no data")
-      const a = document.createElement("a")
-      a.href = r.data
-      a.download = r.name || f.name || "design"
-      a.click()
-      load()
+ const r = await downloadDesignFile(f.designId)
+ if (!r.data) throw new Error("File has no data")
+ const a = document.createElement("a")
+ a.href = r.data
+ a.download = r.name || f.name || "design"
+ a.click()
+ load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not get the file")
+ setErr(e instanceof Error ? e.message : "Could not get the file")
     } finally { setBusy(null) }
   }
 
-  if (files === null) return <div className="flex justify-center py-4 text-muted-foreground"><CircleNotch size={16} className="animate-spin" /></div>
+ if (files === null) return <div className="flex justify-center py-4 text-muted-foreground"><CircleNotch size={16} className="animate-spin" /></div>
 
-  const placed = placedRows(designs, items)
+ const placed = placedRows(designs, items)
 
   // NOTHING TO BUY is a real state and it now says so. Returning null here left the card
   // above it showing a title and blank space — a promise of files with no files and no
@@ -999,8 +999,8 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   //
   // "No files" now means no files AND no placed artwork. It used to mean only the first, so
   // an order whose every item was already designed announced that nothing had arrived.
-  if (!files.length && !placed.length) {
-    return (
+ if (!files.length && !placed.length) {
+ return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
           No files on this order yet. Machine files appear here once we&apos;ve cut them — or send us your own machine file or a design image.
@@ -1012,14 +1012,14 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
     )
   }
 
-  return (
+ return (
     <div className="space-y-2">
       {notices}
       <PlacedArtworkList rows={placed} onRemove={(r) => void detach(r)} busy={busy} />
       {/* SAME SHAPE AS THE ARTWORK ABOVE. These were bordered cards, one per file, stacked
-          inside the panel's own card — a box per row inside a box — while the placed
-          artwork above them was a plain divided list. Two lists of files on one order that
-          did not look like the same kind of thing. Rows and hairlines for both. */}
+ inside the panel's own card — a box per row inside a box — while the placed
+ artwork above them was a plain divided list. Two lists of files on one order that
+ did not look like the same kind of thing. Rows and hairlines for both. */}
       {orderFiles(files).map((f) => (
         <div key={f.designId} className="relative flex items-center gap-2.5 border-t border-border py-2 first:border-t-0">
           {/**
@@ -1036,14 +1036,14 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             * applies to everything says so rather than borrowing a line's number.
             */}
           {(() => {
-            const it = items.find((x) =>
+ const it = items.find((x) =>
               (f.lineId && x.line_id === f.lineId) || (!f.lineId && !!f.sku && x.sku === f.sku))
-            const n = it ? numberOf(it) + 1 : null
+ const n = it ? numberOf(it) + 1 : null
             // The SAME badge the item row carries — it was a tinted rounded square, which
             // reads as a category chip rather than as "this is item 3". Two shapes for one
             // fact is what made matching a file to its row a reading exercise. The kind is
             // still said, in words, on the line below.
-            return <ItemNumberBadge no={n} title={n ? `Item ${n}${it?.name ? ` — ${it.name}` : ""}` : undefined} />
+ return <ItemNumberBadge no={n} title={n ? `Item ${n}${it?.name ? ` — ${it.name}` : ""}` : undefined} />
           })()}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
@@ -1053,12 +1053,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}
               {/* WHO SENT IT, from the reader's side. "You sent this" is true for the seller
-                  and false for every operator, warehouse hand and admin looking at the same
-                  card — they are told who it was instead. */}
+ and false for every operator, warehouse hand and admin looking at the same
+ card — they are told who it was instead. */}
               {f.source === "seller"
                 ? `${isSeller ? "You sent this" : "Sent by the seller"}${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
-                : f.kind === "image" ? "Design image"
-                  : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
+ : f.kind === "image" ? "Design image"
+ : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
             </div>
           </div>
 
@@ -1077,16 +1077,16 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             */}
           {/* SIZED TO ITS NEIGHBOURS — text-xs, which is what Download and Remove are.
               It went to text-2xs, then to text-sm to match a Download button that was text-sm
-              at the time; that button has since come down to text-xs and this stayed, so the
-              pair drifted apart again in the other direction. It is the same size as the
-              staging list's copy of this field for the same reason. The file NAME above is
-              text-sm and stays there: a name is content, these are controls. */}
+ at the time; that button has since come down to text-xs and this stayed, so the
+ pair drifted apart again in the other direction. It is the same size as the
+ staging list's copy of this field for the same reason. The file NAME above is
+ text-sm and stays there: a name is content, these are controls. */}
           {items.length > 0 && (
             <VariantField
-              label="Goes on" compact clearable={false} className="w-32 shrink-0 text-xs"
-              value={labelFor(f.kind === "image", f.lineId || ALL)}
-              options={optionsFor(f.kind === "image")}
-              onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
+ label="Goes on" compact clearable={false} className="w-32 shrink-0 text-xs"
+ value={labelFor(f.kind === "image", f.lineId || ALL)}
+ options={optionsFor(f.kind === "image")}
+ onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
             />
           )}
           {/**
@@ -1102,11 +1102,11 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             <label className="flex shrink-0 items-center gap-1" title="What the seller pays to download this">
               <CurrencyDollar size={11} className="text-muted-foreground" />
               <Input
-                defaultValue={String(f.price ?? 0)}
-                onBlur={(e) => void priceIt(f, e.target.value)}
-                inputMode="decimal"
-                aria-label={`Price for ${f.name}`}
-                className="h-7 w-16 text-center text-xs"
+ defaultValue={String(f.price ?? 0)}
+ onBlur={(e) => void priceIt(f, e.target.value)}
+ inputMode="decimal"
+ aria-label={`Price for ${f.name}`}
+ className="h-7 w-16 text-center text-xs"
               />
             </label>
           )}
@@ -1128,12 +1128,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           {(
             <Button size="sm" variant={f.paid || !f.price ? "outline" : "default"} className="h-7 shrink-0 px-2 text-xs" disabled={busy === f.designId} onClick={() => buyAndGet(f)}>
               {/* Word alone. The glyph said nothing "Download" doesn't, and it made this
-                  button visibly heavier than the field beside it — the pair is a control
-                  and its action, so they should look like a pair. The spinner stays: that
-                  one carries information the word cannot. */}
+ button visibly heavier than the field beside it — the pair is a control
+ and its action, so they should look like a pair. The spinner stays: that
+ one carries information the word cannot. */}
               {busy === f.designId ? <CircleNotch size={13} className="animate-spin" />
-                : (f.paid || !f.price) ? "Download"
-                : <>Buy ${f.price} &amp; download</>}
+ : (f.paid || !f.price) ? "Download"
+ : <>Buy ${f.price} &amp; download</>}
             </Button>
           )}
           {/**
@@ -1149,11 +1149,11 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             */}
           {canRemove && (
             <Button
-              variant="ghost" size="sm"
-              className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
-              onClick={() => remove(f)}
-              disabled={busy === f.designId}
-              title="Remove this file from the order"
+ variant="ghost" size="sm"
+ className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
+ onClick={() => remove(f)}
+ disabled={busy === f.designId}
+ title="Remove this file from the order"
             >
               Remove
             </Button>
@@ -1161,7 +1161,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
         </div>
       ))}
       {/* Offered alongside existing files too, not only when the list is empty — a seller
-          may send a corrected file after we've already delivered one. */}
+ may send a corrected file after we've already delivered one. */}
       {dropZone(true)}
       {queue}
     </div>

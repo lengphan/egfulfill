@@ -22,52 +22,52 @@ const num = (v: unknown) => Number(v) || 0
  * Two things it's built to catch, because both are silent otherwise:
  *
  *  • A SHORT line. qtyShipped and qtyOrdered differ when S&S couldn't fill something, and
- *    a box received on trust makes that discoverable weeks later when the stock isn't
- *    there. Any short line is called out before anything is added.
+ * a box received on trust makes that discoverable weeks later when the stock isn't
+ * there. Any short line is called out before anything is added.
  *  • The wrong box. A barcode that doesn't resolve is refused rather than guessed at —
- *    receiving one carton's contents against another is worse than typing it by hand.
+ * receiving one carton's contents against another is worse than typing it by hand.
  */
 export function ReceiveScanDialog({
-  open, onOpenChange, onReceived,
+ open, onOpenChange, onReceived,
 }: { open: boolean; onOpenChange: (v: boolean) => void; onReceived?: () => void }) {
-  const [code, setCode] = useState("")
-  const [box, setBox] = useState<SsBox | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
-  const [cam, setCam] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+ const [code, setCode] = useState("")
+ const [box, setBox] = useState<SsBox | null>(null)
+ const [busy, setBusy] = useState(false)
+ const [saving, setSaving] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [done, setDone] = useState<string | null>(null)
+ const [cam, setCam] = useState(false)
+ const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const t = setTimeout(() => {
-      setCode(""); setBox(null); setErr(null); setDone(null)
+ useEffect(() => {
+ if (!open) return
+ const t = setTimeout(() => {
+ setCode(""); setBox(null); setErr(null); setDone(null)
       // Focus the field: a hardware scanner types and presses Enter, so the cursor being
       // anywhere else means the first scan goes nowhere.
-      inputRef.current?.focus()
+ inputRef.current?.focus()
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [open])
 
-  const lookup = async (raw?: string) => {
-    const barcode = (raw ?? code).trim()
-    if (!barcode) return
-    setBusy(true); setErr(null); setBox(null); setDone(null)
-    try {
-      const r = await getSsBox(barcode)
-      if (r.error) { setErr(r.error); return }
-      setBox(r)
+ const lookup = async (raw?: string) => {
+ const barcode = (raw ?? code).trim()
+ if (!barcode) return
+ setBusy(true); setErr(null); setBox(null); setDone(null)
+ try {
+ const r = await getSsBox(barcode)
+ if (r.error) { setErr(r.error); return }
+ setBox(r)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't look that barcode up.")
+ setErr(e instanceof Error ? e.message : "Couldn't look that barcode up.")
     } finally { setBusy(false) }
   }
 
   /** Add this box's SHIPPED quantities into inventory, merging by sku. */
-  const receive = async () => {
-    if (!box) return
-    setSaving(true); setErr(null)
-    try {
+ const receive = async () => {
+ if (!box) return
+ setSaving(true); setErr(null)
+ try {
       /**
        * PER LINE. This built the whole inventory array and POSTed it, and that endpoint
        * REPLACES the table — every sku missing from the payload is deleted and every count
@@ -75,33 +75,33 @@ export function ReceiveScanDialog({
        * touching stock at once: a box being scanned in here while a gun is scanning out on
        * the floor, and the whole-list write silently wins.
        */
-      const live = (await getInventory().catch(() => [])) ?? []
-      const bySku = new Map(live.map((i) => [String(i.sku).toUpperCase(), i]))
-      for (const l of box.lines) {
-        if (!l.qty) continue
-        const hit = bySku.get(String(l.sku).toUpperCase())
-        if (hit) await patchInventoryItem(hit.sku, { in_stock: num(hit.in_stock) + l.qty })
-        else await addInventoryItem({
-          sku: l.sku,
-          name: l.title || l.style || l.sku,
-          variant: [l.color, l.size].filter(Boolean).join(" / ") || undefined,
-          in_stock: l.qty, reorder_at: 25, supplier: "S&S Activewear", visibility: "factory",
+ const live = (await getInventory().catch(() => [])) ?? []
+ const bySku = new Map(live.map((i) => [String(i.sku).toUpperCase(), i]))
+ for (const l of box.lines) {
+ if (!l.qty) continue
+ const hit = bySku.get(String(l.sku).toUpperCase())
+ if (hit) await patchInventoryItem(hit.sku, { in_stock: num(hit.in_stock) + l.qty })
+ else await addInventoryItem({
+ sku: l.sku,
+ name: l.title || l.style || l.sku,
+ variant: [l.color, l.size].filter(Boolean).join(" / ") || undefined,
+ in_stock: l.qty, reorder_at: 25, supplier: "S&S Activewear", visibility: "factory",
         })
       }
-      setDone(`Box ${box.boxNumber} received — ${box.lines.reduce((s, l) => s + l.qty, 0)} units added to stock.`)
-      setBox(null); setCode("")
-      onReceived?.()
+ setDone(`Box ${box.boxNumber} received — ${box.lines.reduce((s, l) => s + l.qty, 0)} units added to stock.`)
+ setBox(null); setCode("")
+ onReceived?.()
       // Straight back to the field: receiving is a run of boxes, not one.
-      setTimeout(() => inputRef.current?.focus(), 0)
+ setTimeout(() => inputRef.current?.focus(), 0)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't add these to inventory.")
+ setErr(e instanceof Error ? e.message : "Couldn't add these to inventory.")
     } finally { setSaving(false) }
   }
 
-  const short = box?.lines.filter((l) => l.ordered > l.qty) ?? []
-  const units = box?.lines.reduce((s, l) => s + l.qty, 0) ?? 0
+ const short = box?.lines.filter((l) => l.ordered > l.qty) ?? []
+ const units = box?.lines.reduce((s, l) => s + l.qty, 0) ?? 0
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -115,18 +115,18 @@ export function ReceiveScanDialog({
           <div className="flex items-center gap-2">
             <Barcode size={18} className="shrink-0 text-muted-foreground" />
             <Input
-              ref={inputRef}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
+ ref={inputRef}
+ value={code}
+ onChange={(e) => setCode(e.target.value)}
               // A scanner types the code then sends Enter, so this is the whole interaction.
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup() } }}
-              placeholder="Scan or type — e.g. 42592959.0011"
-              className="h-10 tabular-nums"
-              disabled={busy || saving}
+ onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup() } }}
+ placeholder="Scan or type — e.g. 42592959.0011"
+ className="h-10 tabular-nums"
+ disabled={busy || saving}
             />
             {/* Phone camera, for a bench without a handheld scanner. */}
             <Button size="sm" variant="outline" onClick={() => setCam((v) => !v)} disabled={busy || saving}
-              title="Scan with the camera">
+ title="Scan with the camera">
               <Camera size={14} weight="bold" />
             </Button>
             <Button size="sm" onClick={() => lookup()} disabled={busy || saving || !code.trim()}>
@@ -136,10 +136,10 @@ export function ReceiveScanDialog({
 
           {cam && (
             <BarcodeCamera
-              onClose={() => setCam(false)}
+ onClose={() => setCam(false)}
               // Straight through to the lookup — a scan that stops to be confirmed is
               // slower than typing, which defeats the point of scanning.
-              onScan={(v) => { setCam(false); setCode(v); void lookup(v) }}
+ onScan={(v) => { setCam(false); setCode(v); void lookup(v) }}
             />
           )}
 
@@ -168,13 +168,13 @@ export function ReceiveScanDialog({
               </div>
 
               {/* A short line is the reason to look before putting away. Called out here
-                  rather than left for whoever counts the shelf next month. */}
+ rather than left for whoever counts the shelf next month. */}
               {short.length > 0 && (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
                   <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
                   <span>
                     {short.length} line{short.length === 1 ? " was" : "s were"} shipped short — only what actually arrived
-                    will be added to stock.
+ will be added to stock.
                   </span>
                 </div>
               )}
@@ -190,7 +190,7 @@ export function ReceiveScanDialog({
                       </div>
                     </div>
                     {l.ordered > l.qty ? (
-                      <span className="shrink-0 whitespace-nowrap text-xs font-medium text-amber-700">
+                      <span className="shrink-0 whitespace-nowrap text-xs font-medium text-hold">
                         {l.qty} of {l.ordered}
                       </span>
                     ) : (

@@ -26,8 +26,8 @@ import { PageTitle } from "@/components/app/page-title"
  * the card render (it swaps in asynchronously if it arrives).
  */
 function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: string | null; orderId?: string | null; sku?: string | null; cached?: boolean; children: ReactNode }) {
-  const [png, setPng] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+ const [png, setPng] = useState<string | null>(null)
+ const [busy, setBusy] = useState(false)
   /**
    * WHY IT DIDN'T WORK, said on the card.
    *
@@ -41,21 +41,21 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
    * renders TrueView from .emb only), or the render failing outright. The server says which;
    * this used to throw that away.
    */
-  const [why, setWhy] = useState<string | null>(null)
-  const fetchPng = useCallback(() => {
-    if (!designId && !orderId) return
-    setBusy(true); setWhy(null)
+ const [why, setWhy] = useState<string | null>(null)
+ const fetchPng = useCallback(() => {
+ if (!designId && !orderId) return
+ setBusy(true); setWhy(null)
     // design_id is the reliable key (the file's order_id can be null); order+sku is a fallback.
-    getEmbPreview(designId ? { designId } : { orderId, sku })
+ getEmbPreview(designId ? { designId } : { orderId, sku })
       .then((r) => {
-        if (r.ok && r.png) { setPng(r.png); return }
+ if (r.ok && r.png) { setPng(r.png); return }
         /* THE REASON IS A CODE, and each one needs a different person to act — so it is
-           turned into the sentence that says who. Anything unrecognised is quoted verbatim
-           rather than flattened: it came from EWA, and their words beat our paraphrase. */
-        setWhy(
-          r.reason === "not-stitch-file"
+ turned into the sentence that says who. Anything unrecognised is quoted verbatim
+ rather than flattened: it came from EWA, and their words beat our paraphrase. */
+ setWhy(
+ r.reason === "not-stitch-file"
             ? "Not a stitch file — TrueView renders native .emb, and this is a .pes/.dst."
-            : r.reason === "not-configured"
+ : r.reason === "not-configured"
               ? "Wilcom isn't connected — an admin can add the keys in Integrations."
               /**
                * ERROR_FILE_SECURITY_INVALID, in words.
@@ -67,11 +67,11 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
                * allowed to read. Saying "file-security" told a designer a code; this tells
                * them who to go back to.
                */
-              : r.reason === "file-security"
+ : r.reason === "file-security"
                 ? "Locked by Wilcom design security — the digitiser's licence owns it and ours can't open it. Ask them for an unprotected .emb."
-                : r.reason === "ewa-rejected"
+ : r.reason === "ewa-rejected"
                   ? "Wilcom refused the file without saying why."
-                  : r.error || (r.reason ? `Wilcom: ${r.reason}` : "The renderer returned no image."),
+ : r.error || (r.reason ? `Wilcom: ${r.reason}` : "The renderer returned no image."),
         )
       })
       .catch((e) => setWhy(e instanceof Error ? e.message : "Couldn't reach the renderer."))
@@ -80,10 +80,10 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
   // ONLY WHEN IT IS FREE. A rendered preview is cached server-side, so fetching it costs
   // nothing; rendering a new one is a Wilcom call, and a board of twenty EMB cards would
   // spend twenty on every load. Those wait to be asked.
-  useEffect(() => { if (cached) { const t = setTimeout(fetchPng, 0); return () => clearTimeout(t) } }, [cached, fetchPng])
+ useEffect(() => { if (cached) { const t = setTimeout(fetchPng, 0); return () => clearTimeout(t) } }, [cached, fetchPng])
   // eslint-disable-next-line @next/next/no-img-element
-  if (png) return <img src={`data:image/png;base64,${png}`} alt="" className="size-full object-cover" />
-  return (
+ if (png) return <img src={`data:image/png;base64,${png}`} alt="" className="size-full object-cover" />
+ return (
     <div className="relative size-full">
       {children}
       {!cached && (
@@ -100,25 +100,25 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
          * rather than to this component.)
          */
         <span
-          role="button"
-          tabIndex={busy ? -1 : 0}
-          aria-disabled={busy}
-          onClick={(e) => { e.stopPropagation(); if (!busy) fetchPng() }}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter" && e.key !== " ") return
-            e.preventDefault(); e.stopPropagation()   // Space would scroll the lane
-            if (!busy) fetchPng()
+ role="button"
+ tabIndex={busy ? -1 : 0}
+ aria-disabled={busy}
+ onClick={(e) => { e.stopPropagation(); if (!busy) fetchPng() }}
+ onKeyDown={(e) => {
+ if (e.key !== "Enter" && e.key !== " ") return
+ e.preventDefault(); e.stopPropagation()   // Space would scroll the lane
+ if (!busy) fetchPng()
           }}
-          className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
+ className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
         >
           {busy ? "Rendering…" : why ? "Couldn't render" : "Show stitches"}
         </span>
       )}
       {/* The reason, under the button that failed. Truncated to one line on the card — the
-          full sentence is in the title, because a card is not the place to read a stack of
-          apparatus. */}
+ full sentence is in the title, because a card is not the place to read a stack of
+ apparatus. */}
       {why && !busy && (
-        <span title={why} className="pointer-events-none absolute inset-x-2 bottom-9 truncate rounded bg-background/90 px-1.5 py-0.5 text-center text-2xs text-amber-700 backdrop-blur dark:text-amber-500">
+        <span title={why} className="pointer-events-none absolute inset-x-2 bottom-9 truncate rounded bg-background/90 px-1.5 py-0.5 text-center text-2xs text-hold backdrop-blur">
           {why}
         </span>
       )}
@@ -133,14 +133,14 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
 // placeholder) → the plain pen placeholder. Removing the Wilcom key changes nothing here
 // except that EMB cards show the placeholder instead of a stitch preview.
 function CardArt({ card, imgClass, iconSize }: { card: DesignCard; imgClass: string; iconSize: number }) {
-  const [broken, setBroken] = useState(false)
-  const placeholder = <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={iconSize} weight="duotone" /></div>
-  if (card.thumb && !broken) {
+ const [broken, setBroken] = useState(false)
+ const placeholder = <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={iconSize} weight="duotone" /></div>
+ if (card.thumb && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={String(card.thumb)} alt="" className={imgClass} onError={() => setBroken(true)} />
+ return <img src={String(card.thumb)} alt="" className={imgClass} onError={() => setBroken(true)} />
   }
-  if (isEmbCard(card)) return <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku} cached={card.has_preview}>{placeholder}</EmbPreview>
-  return placeholder
+ if (isEmbCard(card)) return <EmbPreview designId={card.design_id} orderId={card.order_id} sku={card.sku} cached={card.has_preview}>{placeholder}</EmbPreview>
+ return placeholder
 }
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
@@ -163,25 +163,25 @@ const canDeleteCard = () => { const r = getUser()?.role; return r === "admin" ||
 const DEFAULT_LANES: DesignLane[] = [
   { id: "incoming", label: "Incoming", accent: "bg-slate-400", sort: 0, system: true },
   { id: "inprogress", label: "In progress", accent: "bg-violet-500", sort: 1, system: false },
-  { id: "review", label: "In review", accent: "bg-amber-500", sort: 2, system: false },
+  { id: "review", label: "In review", accent: "bg-hold", sort: 2, system: false },
   { id: "fix", label: "Fix", accent: "bg-red-500", sort: 3, system: false },
   { id: "approved", label: "Approved", accent: "bg-emerald-500", sort: 4, system: true },
 ]
 // A card's lane, validated against the CURRENT lanes — an unknown col (a lane that was
 // deleted, say) falls back to the first lane rather than vanishing from the board.
 const laneOf = (c: DesignCard, lanes: DesignLane[]) => {
-  const v = String(c.col || "incoming").toLowerCase()
-  return lanes.some((l) => l.id === v) ? v : (lanes[0]?.id ?? "incoming")
+ const v = String(c.col || "incoming").toLowerCase()
+ return lanes.some((l) => l.id === v) ? v : (lanes[0]?.id ?? "incoming")
 }
 // Label + accent for a lane id, live lanes first, defaults as a fallback, and the raw id
 // last so a card in a lane we somehow don't know still shows *something* rather than blank.
 const laneMeta = (id: string, lanes: DesignLane[]) =>
-  lanes.find((l) => l.id === id) ?? DEFAULT_LANES.find((l) => l.id === id) ?? { id, label: id, accent: "bg-muted-foreground", sort: 99, system: false }
+ lanes.find((l) => l.id === id) ?? DEFAULT_LANES.find((l) => l.id === id) ?? { id, label: id, accent: "bg-muted-foreground", sort: 99, system: false }
 // A lane accent (a bg-*-500 swatch) → a solid tinted STATUS pill, no dot. Literal classes
 // so Tailwind keeps them; an unmapped custom accent falls back to neutral.
 const LANE_PILL: Record<string, string> = {
   "bg-slate-400": "bg-slate-100 text-slate-700", "bg-slate-500": "bg-slate-100 text-slate-700",
-  "bg-violet-500": "bg-violet-100 text-violet-700", "bg-amber-500": "bg-amber-100 text-amber-700",
+  "bg-violet-500": "bg-violet-100 text-violet-700", "bg-hold": "bg-hold/15 text-hold",
   "bg-red-500": "bg-red-100 text-red-700", "bg-emerald-500": "bg-emerald-100 text-emerald-700",
   "bg-blue-500": "bg-blue-100 text-blue-700", "bg-sky-500": "bg-sky-100 text-sky-700",
   "bg-green-500": "bg-green-100 text-green-700", "bg-orange-500": "bg-orange-100 text-orange-700",
@@ -201,66 +201,66 @@ const vendorLabel = (v?: string | null) => (v ? (VENDOR_NAMES[v] ?? v) : "")
 // kind, distinct from the "Embroidery" print METHOD that still needs cutting.
 type EmbLike = { is_emb?: boolean; type?: string | null; product?: string | null }
 const isEmbCard = (x: EmbLike): boolean => {
-  if (x.is_emb) return true
-  const t = String(x.type ?? "").trim().toLowerCase()
-  const p = String(x.product ?? "").trim().toLowerCase()
-  return t === "emb" || p === "emb"
+ if (x.is_emb) return true
+ const t = String(x.type ?? "").trim().toLowerCase()
+ const p = String(x.product ?? "").trim().toLowerCase()
+ return t === "emb" || p === "emb"
 }
 
 // The card's display name. EMB cards arrive titled "Seller file · Ambar.emb"; the seller
 // now shows as its own tag, so strip that prefix and show just the file — the "who" is the
 // tag, the "what" is the title.
 const cardLabel = (c: { title?: string | null } & EmbLike): string => {
-  const t = String(c.title ?? "").trim()
-  if (isEmbCard(c)) return t.replace(/^seller file\s*[·:–-]?\s*/i, "").trim() || t || "Embroidery file"
-  return t || "Design"
+ const t = String(c.title ?? "").trim()
+ if (isEmbCard(c)) return t.replace(/^seller file\s*[·:–-]?\s*/i, "").trim() || t || "Embroidery file"
+ return t || "Design"
 }
 
 const amt = (v: unknown) => Number(v) || 0
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function DesignerBoard() {
-  const confirm = useConfirm()
-  const [cards, setCards] = useState<DesignCard[] | null>(null)
+ const confirm = useConfirm()
+ const [cards, setCards] = useState<DesignCard[] | null>(null)
   /** Why the list is empty, when it is empty because the read failed rather than because
-   *  nothing has been sent. Null on a good read — including a legitimately empty one. */
-  const [loadErr, setLoadErr] = useState<string | null>(null)
-  const [dragId, setDragId] = useState<string | number | null>(null)
-  const [overCol, setOverCol] = useState<string | null>(null)
+   * nothing has been sent. Null on a good read — including a legitimately empty one. */
+ const [loadErr, setLoadErr] = useState<string | null>(null)
+ const [dragId, setDragId] = useState<string | number | null>(null)
+ const [overCol, setOverCol] = useState<string | null>(null)
   // Board-level, distinct from the card panel's own busy/err further down: an upload
   // failing has to be visible on the board, not inside a card that was never created.
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [assignCard, setAssignCard] = useState<DesignCard | null>(null)
-  const [openId, setOpenId] = useState<string | number | null>(null)
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [assignCard, setAssignCard] = useState<DesignCard | null>(null)
+ const [openId, setOpenId] = useState<string | number | null>(null)
   // Inline card rename — a single click on the card's NAME edits it in place (Enter/blur
   // saves, Esc cancels). Held at board level so only one name edits at a time, and so the
   // card being edited can suspend its own drag (below) while you select text.
-  const [editNameId, setEditNameId] = useState<string | number | null>(null)
-  const [nameDraft, setNameDraft] = useState("")
-  const [view, setView] = useState<"board" | "list" | "history">("board")
+ const [editNameId, setEditNameId] = useState<string | number | null>(null)
+ const [nameDraft, setNameDraft] = useState("")
+ const [view, setView] = useState<"board" | "list" | "history">("board")
   // The History tab is warehouse+admin, matching who may delete — it's the record of
   // deletions and moves, so the people who make those calls are the ones who see it. An
   // operator or designer gets no tab rather than one that 403s on load.
-  const canSeeHistory = canDeleteCard()
-  const [query, setQuery] = useState("")
-  const [designFee, setDesignFee] = useState(0) // platform default payout per design
-  const [partnerCost, setPartnerCost] = useState(0) // what an outsourced design partner costs per task
-  const [delErr, setDelErr] = useState<string | null>(null)
-  const me = getUser()?.name || "Designer"
+ const canSeeHistory = canDeleteCard()
+ const [query, setQuery] = useState("")
+ const [designFee, setDesignFee] = useState(0) // platform default payout per design
+ const [partnerCost, setPartnerCost] = useState(0) // what an outsourced design partner costs per task
+ const [delErr, setDelErr] = useState<string | null>(null)
+ const me = getUser()?.name || "Designer"
 
   // Lanes as data. Seeded with the defaults so the board paints immediately, then replaced
   // by the server's set (which may add/rename/remove). canManageLanes matches card
   // deletion — a lane holds work, so re-homing or removing it is the same custody call.
-  const [lanes, setLanes] = useState<DesignLane[]>(DEFAULT_LANES)
+ const [lanes, setLanes] = useState<DesignLane[]>(DEFAULT_LANES)
   // A just-added column: its title input auto-focuses and selects so you type the real name
   // straight over the placeholder, no dialog. Cleared once that input has taken focus.
-  const [newLaneId, setNewLaneId] = useState<string | null>(null)
-  const canManageLanes = canDeleteCard()
-  const loadLanes = useCallback(() => {
-    getDesignLanes().then((r) => { if (Array.isArray(r) && r.length) setLanes(r) }).catch(() => {})
+ const [newLaneId, setNewLaneId] = useState<string | null>(null)
+ const canManageLanes = canDeleteCard()
+ const loadLanes = useCallback(() => {
+ getDesignLanes().then((r) => { if (Array.isArray(r) && r.length) setLanes(r) }).catch(() => {})
   }, [])
-  useEffect(() => { const t = setTimeout(loadLanes, 0); return () => clearTimeout(t) }, [loadLanes])
+ useEffect(() => { const t = setTimeout(loadLanes, 0); return () => clearTimeout(t) }, [loadLanes])
 
   // Reload the board from the server. Named because a partner push writes the card on the
   // SERVER (vendor badge + their task ref), so the local list has to be re-read rather
@@ -274,19 +274,19 @@ export function DesignerBoard() {
    * whole time. An empty state that cannot be told from a broken feature is the one thing
    * this app's UI rules forbid outright.
    */
-  const load = useCallback(() => {
-    if (!getToken()) { setCards([]); return }
-    getDesignCards()
+ const load = useCallback(() => {
+ if (!getToken()) { setCards([]); return }
+ getDesignCards()
       .then((r) => { setLoadErr(null); setCards(r ?? []) })
       .catch((e: Error) => { setLoadErr(e?.message || "The design board couldn't be loaded."); setCards([]) })
   }, [])
 
-  useEffect(() => {
-    const id = setTimeout(() => {
-      load()
-      getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
+ useEffect(() => {
+ const id = setTimeout(() => {
+ load()
+ getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [load])
 
   // The payout rates (designer payout + Pink partner cost) are edited elsewhere — Settings ›
@@ -294,14 +294,14 @@ export function DesignerBoard() {
   // change didn't show on the cards until a hard reload. Re-pull them whenever the board
   // regains focus, so editing the rate in another tab and coming back updates the vendor-card
   // payouts live. (In-house cards keep showing the designer payout — that split is by design.)
-  useEffect(() => {
-    const refresh = () => {
-      if (typeof document !== "undefined" && document.hidden) return
-      getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
+ useEffect(() => {
+ const refresh = () => {
+ if (typeof document !== "undefined" && document.hidden) return
+ getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
     }
-    window.addEventListener("focus", refresh)
-    document.addEventListener("visibilitychange", refresh)
-    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh) }
+ window.addEventListener("focus", refresh)
+ document.addEventListener("visibilitychange", refresh)
+ return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh) }
   }, [])
 
   // persist() is gone: its only remaining callers were the two delete paths, and
@@ -321,14 +321,14 @@ export function DesignerBoard() {
    * Optimistic, but a failure now RELOADS and says why, rather than leaving the board
    * showing a card that is still on the server.
    */
-  const removeCard = useCallback(async (id: string | number) => {
-    setCards((prev) => (prev ?? []).filter((c) => c.id !== id))
-    try {
-      const r = await deleteDesignCard(id)
-      if (r?.error) throw new Error(r.error)
+ const removeCard = useCallback(async (id: string | number) => {
+ setCards((prev) => (prev ?? []).filter((c) => c.id !== id))
+ try {
+ const r = await deleteDesignCard(id)
+ if (r?.error) throw new Error(r.error)
     } catch (e) {
-      setDelErr(e instanceof Error ? e.message : "Couldn't delete that card.")
-      load()
+ setDelErr(e instanceof Error ? e.message : "Couldn't delete that card.")
+ load()
     }
   }, [load])
 
@@ -336,42 +336,42 @@ export function DesignerBoard() {
   // Add a column with NO prompt: create it with a placeholder name, then the board focuses
   // and selects its title input (see newLaneId below) so the name is typed in place. Delete
   // still confirms via removeLane — adding is cheap and reversible, deleting re-homes cards.
-  const addLane = useCallback(async () => {
-    const r = await createDesignLane({ label: "New column" })
-    if (r?.error) { setDelErr(r.error); return }
-    if (r?.id) setNewLaneId(String(r.id))
-    loadLanes()
+ const addLane = useCallback(async () => {
+ const r = await createDesignLane({ label: "New column" })
+ if (r?.error) { setDelErr(r.error); return }
+ if (r?.id) setNewLaneId(String(r.id))
+ loadLanes()
   }, [loadLanes])
 
-  const renameLane = useCallback(async (lane: DesignLane, label: string) => {
-    const next = label.trim()
-    if (!next || next === lane.label) return
-    setLanes((prev) => prev.map((l) => (l.id === lane.id ? { ...l, label: next } : l)))
-    const r = await renameDesignLane(lane.id, { label: next })
-    if (r?.error) { setDelErr(r.error); loadLanes() }
+ const renameLane = useCallback(async (lane: DesignLane, label: string) => {
+ const next = label.trim()
+ if (!next || next === lane.label) return
+ setLanes((prev) => prev.map((l) => (l.id === lane.id ? { ...l, label: next } : l)))
+ const r = await renameDesignLane(lane.id, { label: next })
+ if (r?.error) { setDelErr(r.error); loadLanes() }
   }, [loadLanes])
 
-  const removeLane = useCallback(async (lane: DesignLane) => {
-    const n = (cards ?? []).filter((c) => laneOf(c, lanes) === lane.id).length
-    const ok = await confirm({
-      title: `Delete the “${lane.label}” lane?`,
-      body: n > 0
+ const removeLane = useCallback(async (lane: DesignLane) => {
+ const n = (cards ?? []).filter((c) => laneOf(c, lanes) === lane.id).length
+ const ok = await confirm({
+ title: `Delete the “${lane.label}” lane?`,
+ body: n > 0
         ? `${n} card${n === 1 ? "" : "s"} in this lane will move to “${lanes[0]?.label ?? "Incoming"}”. The lane itself is removed for everyone.`
-        : `This lane is empty. It's removed for everyone.`,
-      confirmLabel: "Delete lane",
-      cancelLabel: "Keep it",
+ : `This lane is empty. It's removed for everyone.`,
+ confirmLabel: "Delete lane",
+ cancelLabel: "Keep it",
     })
-    if (!ok) return
-    const r = await deleteDesignLane(lane.id)
-    if (r?.error) { setDelErr(r.error); return }
-    loadLanes(); load()   // cards may have been re-homed to the fallback
+ if (!ok) return
+ const r = await deleteDesignLane(lane.id)
+ if (r?.error) { setDelErr(r.error); return }
+ loadLanes(); load()   // cards may have been re-homed to the fallback
   }, [cards, lanes, confirm, loadLanes, load])
 
-  const patch = useCallback((id: string | number, p: Partial<DesignCard>) => {
-    setCards((prev) => {
-      const next = (prev ?? []).map((c) => (c.id === id ? { ...c, ...p } : c))
-      saveDesignCards(next).catch(() => {})
-      return next
+ const patch = useCallback((id: string | number, p: Partial<DesignCard>) => {
+ setCards((prev) => {
+ const next = (prev ?? []).map((c) => (c.id === id ? { ...c, ...p } : c))
+ saveDesignCards(next).catch(() => {})
+ return next
     })
   }, [])
 
@@ -381,16 +381,16 @@ export function DesignerBoard() {
   // WHO sees outsourced (Pink Design, etc.) cards is a ROLE decision, not a blanket one.
   //
   //  • DESIGNER — the internal design portal. A partner card is someone else's work, made
-  //    outside and paid by invoice; a designer can't claim, drag or be credited for it, so
-  //    it's hidden entirely. Their board is internal work, full stop.
+  // outside and paid by invoice; a designer can't claim, drag or be credited for it, so
+  // it's hidden entirely. Their board is internal work, full stop.
   //  • FACTORY (operator / warehouse / admin) — sees BOTH. The factory tracks the whole
-  //    pipeline, internal and outsourced, so a partner card stays on their board, badged
-  //    and non-draggable (the partner drives its status, so it can't be dragged through
-  //    our lanes).
+  // pipeline, internal and outsourced, so a partner card stays on their board, badged
+  // and non-draggable (the partner drives its status, so it can't be dragged through
+  // our lanes).
   //
   // This is the gate the designer portal needs: the same /designer route serves both, and
   // the viewer's role — not the card — decides whether outsourced work is visible.
-  const isDesigner = getUser()?.role === "designer"
+ const isDesigner = getUser()?.role === "designer"
   /**
    * AN ADMIN MOVES PARTNER CARDS; NOBODY ELSE DOES.
    *
@@ -403,8 +403,8 @@ export function DesignerBoard() {
    * Everyone else keeps the old behaviour — the partner drives the status, and an operator
    * dragging their card through our lanes says something we have no business claiming.
    */
-  const isAdmin = getUser()?.role === "admin"
-  const boardCards = useMemo(
+ const isAdmin = getUser()?.role === "admin"
+ const boardCards = useMemo(
     /**
      * Designers see design WORK, not files-to-check. A card that already carries a stitch
      * file is a verification job, not digitising, so it stays factory-internal. Vendor
@@ -421,85 +421,85 @@ export function DesignerBoard() {
      * file to check. An EMB *image* with no file yet is design work and stays.
      */
     () => (isDesigner ? (cards ?? []).filter((c) => !c.vendor && !isEmbCard(c)) : (cards ?? [])),
-    [cards, isDesigner],
+ [cards, isDesigner],
   )
   // Only meaningful on the designer portal, where partner cards are the ones being hidden;
   // the factory sees them, so nothing is withheld there.
-  const outsourced = isDesigner ? (cards?.length ?? 0) - boardCards.length : 0
+ const outsourced = isDesigner ? (cards?.length ?? 0) - boardCards.length : 0
 
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase()
-    if (!term) return boardCards
-    return boardCards.filter((c) =>
-      [c.id, c.title, c.product, c.type, c.sku, c.order_id, c.vendor_ref, c.vendor_task_id]
+ const filtered = useMemo(() => {
+ const term = query.trim().toLowerCase()
+ if (!term) return boardCards
+ return boardCards.filter((c) =>
+ [c.id, c.title, c.product, c.type, c.sku, c.order_id, c.vendor_ref, c.vendor_task_id]
         .some((f) => String(f ?? "").toLowerCase().includes(term)))
   }, [boardCards, query])
 
-  const grouped = useMemo(() => {
-    const g: Record<string, DesignCard[]> = Object.fromEntries(lanes.map((l) => [l.id, []]))
-    for (const c of filtered) (g[laneOf(c, lanes)] ??= []).push(c)
+ const grouped = useMemo(() => {
+ const g: Record<string, DesignCard[]> = Object.fromEntries(lanes.map((l) => [l.id, []]))
+ for (const c of filtered) (g[laneOf(c, lanes)] ??= []).push(c)
     // Newest first in every lane, so a freshly pushed card lands at the FRONT of its column.
-    for (const k of Object.keys(g)) g[k].sort((a, b) => Number(b.id) - Number(a.id))
-    return g
+ for (const k of Object.keys(g)) g[k].sort((a, b) => Number(b.id) - Number(a.id))
+ return g
   }, [filtered, lanes])
 
-  const stats = useMemo(() => {
-    const list = boardCards
-    const approved = list.filter((c) => laneOf(c, lanes) === "approved").length
-    const credited = list.filter((c) => c.credited).reduce((s, c) => s + amt(c.payment), 0)
+ const stats = useMemo(() => {
+ const list = boardCards
+ const approved = list.filter((c) => laneOf(c, lanes) === "approved").length
+ const credited = list.filter((c) => c.credited).reduce((s, c) => s + amt(c.payment), 0)
     // "In progress" = anything past the fallback and short of approved — computed from the
     // lanes rather than a hardcoded id list, so a custom lane counts too.
-    const active = list.filter((c) => { const l = laneOf(c, lanes); return l !== (lanes[0]?.id ?? "incoming") && l !== "approved" }).length
-    return { total: list.length, active, approved, credited }
+ const active = list.filter((c) => { const l = laneOf(c, lanes); return l !== (lanes[0]?.id ?? "incoming") && l !== "approved" }).length
+ return { total: list.length, active, approved, credited }
   }, [boardCards, lanes])
 
   // Move a card. Moving it OUT of Incoming claims it for whoever moved it (if still
   // unclaimed) — an in-progress card that was nobody's job was the bug here. Entering
   // "approved" credits the designer ONCE (idempotent by DSN-<id> + the card's `credited`
   // flag), so re-dragging never double-pays; the payout follows the claimer.
-  const moveCard = useCallback(async (card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
+ const moveCard = useCallback(async (card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
     // A drop onto the card's OWN lane is a reposition, which the board doesn't support — do
     // NOTHING rather than re-run the claim/credit side effects. This is what stops dragging a
     // card onto another card in the same column from ever touching either card's owner.
-    if (laneOf(card, lanes) === to && !extra) return
-    const role = getUser()?.role
-    const fromApproved = laneOf(card, lanes) === "approved"
+ if (laneOf(card, lanes) === to && !extra) return
+ const role = getUser()?.role
+ const fromApproved = laneOf(card, lanes) === "approved"
     // Admin-only into Approved — that lane releases the designer's payout, so a stray drag by
     // a designer/operator/warehouse shouldn't reach it. The server enforces this too (reverts
     // the lane + refuses the credit); this just explains it instead of a silent snap-back.
-    if (to === "approved" && role !== "admin") {
-      await confirm({ title: "Only an admin can approve", body: "Moving a card to Approved releases the designer's payout, so it's limited to admins. Ask an admin to approve it.", confirmLabel: "OK" })
-      return
+ if (to === "approved" && role !== "admin") {
+ await confirm({ title: "Only an admin can approve", body: "Moving a card to Approved releases the designer's payout, so it's limited to admins. Ask an admin to approve it.", confirmLabel: "OK" })
+ return
     }
     // Confirm pulling a card back OUT of Approved — it reopens signed-off work. (The payout was
     // already made and is idempotent, so it won't be paid twice.)
-    if (fromApproved && to !== "approved") {
-      const ok = await confirm({ title: "Move out of Approved?", body: "This reopens a card that was already signed off. The designer's payout has already been made and won't be paid again.", confirmLabel: "Move it", cancelLabel: "Keep approved" })
-      if (!ok) return
+ if (fromApproved && to !== "approved") {
+ const ok = await confirm({ title: "Move out of Approved?", body: "This reopens a card that was already signed off. The designer's payout has already been made and won't be paid again.", confirmLabel: "Move it", cancelLabel: "Keep approved" })
+ if (!ok) return
     }
     // Ownership tag. Moving a card into a working lane tags it to whoever moved it (ANY
     // role) if it's still unclaimed; moving it back to Incoming/New RELEASES it; deleting
     // the card removes it too. Partner (Pink) cards are never tagged — the partner owns
     // them. This is only a WHO-HAS-IT tag: credit is separate and stays designer-only (the
     // server refuses to pay a non-designer claimer).
-    const fallback = lanes[0]?.id ?? "incoming"
-    const u = getUser()
-    let own: Partial<DesignCard> | null = null
-    if (!card.vendor && u?.name) {
-      if (to === fallback) { if (card.claimed_by) own = { claimed_by: null, claimed_role: null } }
-      else if (!card.claimed_by) { own = { claimed_by: u.name, claimed_role: u.role ?? null } }
+ const fallback = lanes[0]?.id ?? "incoming"
+ const u = getUser()
+ let own: Partial<DesignCard> | null = null
+ if (!card.vendor && u?.name) {
+ if (to === fallback) { if (card.claimed_by) own = { claimed_by: null, claimed_role: null } }
+ else if (!card.claimed_by) { own = { claimed_by: u.name, claimed_role: u.role ?? null } }
     }
-    patch(card.id, { col: to, ...(own || {}), ...extra })
+ patch(card.id, { col: to, ...(own || {}), ...extra })
     // Credit on approval — use the card's payout, or the platform Design fee as the default.
-    const amount = amt(card.payment) || designFee
-    if (to === "approved" && !card.credited && amount > 0) {
+ const amount = amt(card.payment) || designFee
+ if (to === "approved" && !card.credited && amount > 0) {
       // The SERVER decides who gets paid: only a designer earns a payout (staff upload
       // files too, and that isn't billable design work), and on a shared board the credit
       // follows whoever claimed the card rather than a common pool.
-      creditDesignCard(card.id, amount)
+ creditDesignCard(card.id, amount)
         .then((r) => {
-          if (r?.error) return
-          if (r?.credited) patch(card.id, { credited: true, pay_status: "paid", payment: amount })
+ if (r?.error) return
+ if (r?.credited) patch(card.id, { credited: true, pay_status: "paid", payment: amount })
         })
         .catch(() => {})
     }
@@ -516,89 +516,89 @@ export function DesignerBoard() {
    * Images only: the card's whole purpose is showing the design, and a .zip renders as a
    * blank tile that looks like a failed upload forever.
    */
-  const dropFiles = async (files: File[], col: string) => {
-    const images = files.filter((f) => f.type.startsWith("image/"))
-    if (!images.length) {
-      setErr(files.length ? "Only image files become cards — drop a PNG, JPG or WEBP." : null)
-      return
+ const dropFiles = async (files: File[], col: string) => {
+ const images = files.filter((f) => f.type.startsWith("image/"))
+ if (!images.length) {
+ setErr(files.length ? "Only image files become cards — drop a PNG, JPG or WEBP." : null)
+ return
     }
-    setBusy(true); setErr(null)
-    const failed: string[] = []
-    for (const f of images) {
-      try {
-        const data = await new Promise<string>((res, rej) => {
-          const r = new FileReader()
-          r.onload = () => res(String(r.result))
-          r.onerror = () => rej(new Error("unreadable"))
-          r.readAsDataURL(f)
+ setBusy(true); setErr(null)
+ const failed: string[] = []
+ for (const f of images) {
+ try {
+ const data = await new Promise<string>((res, rej) => {
+ const r = new FileReader()
+ r.onload = () => res(String(r.result))
+ r.onerror = () => rej(new Error("unreadable"))
+ r.readAsDataURL(f)
         })
         // Use the filename as the name ONLY when a person actually typed it. An
         // auto-generated name — a screenshot, a random export hash, an IMG_1234 — is noise,
         // so those become a plain "New design" (and a push later sets the real title). This
         // is why a card wasn't titled after a design: its file was a screenshot/hash.
-        const base = f.name.replace(/\.[^.]+$/, "").trim()
-        const looksAuto = !base || /screenshot/i.test(base) || /^IMG[-_]?\d/i.test(base) || /^[A-Z0-9]{6,}$/.test(base)
-        const title = looksAuto ? "New design" : base
-        const r = await createDesignCard({ title, data })
-        if (r?.error) throw new Error(r.error)
+ const base = f.name.replace(/\.[^.]+$/, "").trim()
+ const looksAuto = !base || /screenshot/i.test(base) || /^IMG[-_]?\d/i.test(base) || /^[A-Z0-9]{6,}$/.test(base)
+ const title = looksAuto ? "New design" : base
+ const r = await createDesignCard({ title, data })
+ if (r?.error) throw new Error(r.error)
         // Cards land in Incoming regardless of which lane took the drop: a brand-new design
         // has not been started, and letting a drop declare it in-progress would make the
         // lane a lie the moment someone drops onto the wrong column.
-        void col
+ void col
       } catch { failed.push(f.name) }
     }
-    setBusy(false)
-    if (failed.length) setErr(`Couldn't add ${failed.length} file${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}`)
-    load()
+ setBusy(false)
+ if (failed.length) setErr(`Couldn't add ${failed.length} file${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}`)
+ load()
   }
 
-  const drop = (col: string) => {
-    setOverCol(null)
-    if (dragId == null) return
-    const card = (cards ?? []).find((c) => c.id === dragId)
-    setDragId(null)
-    if (!card) return
-    moveCard(card, col)
+ const drop = (col: string) => {
+ setOverCol(null)
+ if (dragId == null) return
+ const card = (cards ?? []).find((c) => c.id === dragId)
+ setDragId(null)
+ if (!card) return
+ moveCard(card, col)
   }
 
   // Whether the viewer may send to a design partner. The send form now lives INLINE inside
   // the card window (see CardDialog), so there's no separate push dialog to open here.
-  const showPartner = canOutsource()
+ const showPartner = canOutsource()
 
-  const openCard = (cards ?? []).find((c) => c.id === openId) ?? null
+ const openCard = (cards ?? []).find((c) => c.id === openId) ?? null
 
-  return (
+ return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         {/* Icon+title hidden on desktop (top bar names the page); the board/list toggle
-            on the right stays. On mobile the hero is the title. */}
-        <PenNib size={18} weight="regular"  className="shrink-0 text-primary md:hidden" />
+ on the right stays. On mobile the hero is the title. */}
+        <PenNib size={18} weight="regular" className="shrink-0 text-primary md:hidden" />
         <div className="min-w-0 md:hidden">
           <PageTitle>Designer</PageTitle>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
         {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only
-            works in Board view, which left List view with no way to bring artwork in.
+ works in Board view, which left List view with no way to bring artwork in.
             Files land in Incoming regardless (see dropFiles), so no lane choice is needed. */}
         {/* One search box for BOTH views — id, title, product, order #, partner ids. */}
         <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search designs…"
-          className="ml-auto h-9 w-36 sm:w-56"
-          aria-label="Search designs"
+ value={query}
+ onChange={(e) => setQuery(e.target.value)}
+ placeholder="Search designs…"
+ className="ml-auto h-9 w-36 sm:w-56"
+ aria-label="Search designs"
         />
         <label className="eg-tap inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
           <Plus size={14} weight="bold" /> Add design
           <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? [])
-              e.currentTarget.value = "" // let the same file be picked again after a failure
-              if (files.length) void dropFiles(files, "incoming")
+ type="file"
+ accept="image/*"
+ multiple
+ className="sr-only"
+ onChange={(e) => {
+ const files = Array.from(e.target.files ?? [])
+ e.currentTarget.value = "" // let the same file be picked again after a failure
+ if (files.length) void dropFiles(files, "incoming")
             }}
           />
         </label>
@@ -618,7 +618,7 @@ export function DesignerBoard() {
       </StatGrid>
 
       {/* Outsourced work is off the board, but not hidden: it's named so nobody wonders
-          where a card went. Its status lives on the order and the partner's board. */}
+ where a card went. Its status lives on the order and the partner's board. */}
       {outsourced > 0 && (
         <p className="text-xs text-muted-foreground">
           {outsourced} card{outsourced === 1 ? "" : "s"} outsourced to a design partner — tracked on the order, not on this board.
@@ -626,25 +626,25 @@ export function DesignerBoard() {
       )}
 
       {/* Assigning writes the artwork into the order's designs server-side, so the order's
-          design tag lights in the same action — see assign-card-dialog. */}
+ design tag lights in the same action — see assign-card-dialog. */}
       <AssignCardDialog
-        card={assignCard}
-        open={!!assignCard}
-        onOpenChange={(v) => { if (!v) setAssignCard(null) }}
-        onDone={() => { setAssignCard(null); load() }}
+ card={assignCard}
+ open={!!assignCard}
+ onOpenChange={(v) => { if (!v) setAssignCard(null) }}
+ onDone={() => { setAssignCard(null); load() }}
       />
 
       {(err || busy) && (
         <div className={"flex items-center gap-2 rounded-lg border px-3 py-2 text-xs " +
-          (err ? "border-amber-300 bg-amber-50 text-amber-800" : "border-border text-muted-foreground")}>
+          (err ? "border-hold/30 bg-hold/10 text-hold" : "border-border text-muted-foreground")}>
           {busy && <CircleNotch size={13} className="animate-spin" />}
           {err ?? "Adding artwork to the board…"}
         </div>
       )}
 
       {/* SAY WHICH: a board that could not be READ is not a board with nothing on it, and
-          for anyone who has just pressed "Send to board" those two states give opposite
-          instructions — send it again, or go and find out why. */}
+ for anyone who has just pressed "Send to board" those two states give opposite
+ instructions — send it again, or go and find out why. */}
       {loadErr && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           <Warning size={15} weight="fill" className="shrink-0" />
@@ -667,74 +667,74 @@ export function DesignerBoard() {
         // shrinking — minmax is the one rule that does both.
         // A trailing auto track holds the "Add lane" affordance for warehouse/admin.
         <div className="grid gap-2 overflow-x-auto pb-2"
-             style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(17rem, 1fr))${canManageLanes ? " auto" : ""}` }}>
+ style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(17rem, 1fr))${canManageLanes ? " auto" : ""}` }}>
           {lanes.map((col) => {
-            const list = grouped[col.id] ?? []
-            return (
+ const list = grouped[col.id] ?? []
+ return (
               <div
-                key={col.id}
-                onDragOver={(e) => { e.preventDefault(); setOverCol(col.id) }}
-                onDragLeave={() => setOverCol((c) => (c === col.id ? null : c))}
-                onDrop={(e) => {
+ key={col.id}
+ onDragOver={(e) => { e.preventDefault(); setOverCol(col.id) }}
+ onDragLeave={() => setOverCol((c) => (c === col.id ? null : c))}
+ onDrop={(e) => {
                   // A card being dragged (dragId set) always MOVES. It must NOT fall through to
                   // the file path: a card carries its image in dataTransfer.files, so treating
                   // that as a "file drop" created a duplicate card instead of moving it. Only a
                   // genuine OS file drop (no card in flight) becomes a new card. dragId is cleared
                   // on dragend, so it can't be stale here.
-                  if (dragId != null) { e.preventDefault(); drop(col.id); return }
-                  const files = Array.from(e.dataTransfer?.files ?? [])
-                  if (files.length) { e.preventDefault(); setOverCol(null); void dropFiles(files, col.id); return }
-                  setOverCol(null)
+ if (dragId != null) { e.preventDefault(); drop(col.id); return }
+ const files = Array.from(e.dataTransfer?.files ?? [])
+ if (files.length) { e.preventDefault(); setOverCol(null); void dropFiles(files, col.id); return }
+ setOverCol(null)
                 }}
-                className={"flex h-[calc(100vh-14rem)] min-h-[22rem] min-w-0 flex-col rounded-2xl border bg-card transition-colors " + (overCol === col.id ? "border-primary bg-primary/5" : "border-border")}
+ className={"flex h-[calc(100vh-14rem)] min-h-[22rem] min-w-0 flex-col rounded-2xl border bg-card transition-colors " + (overCol === col.id ? "border-primary bg-primary/5" : "border-border")}
               >
                 <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
                   <span className={"size-2 shrink-0 rounded-full " + col.accent} />
                   {/* Rename in place (warehouse+admin) — click the name, edit, Enter/blur
-                      saves. A system lane renames too; only its DELETION is blocked. */}
+ saves. A system lane renames too; only its DELETION is blocked. */}
                   {canManageLanes ? (
                     <input
-                      ref={(el) => { if (el && col.id === newLaneId) { el.focus(); el.select(); setTimeout(() => setNewLaneId(null), 0) } }}
-                      defaultValue={col.label}
-                      onClick={(e) => e.stopPropagation()}
-                      onBlur={(e) => void renameLane(col, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); else if (e.key === "Escape") { e.currentTarget.value = col.label; e.currentTarget.blur() } }}
-                      aria-label={`Rename ${col.label} lane`}
-                      className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-sm font-semibold outline-none hover:bg-accent focus:bg-background focus:ring-2 focus:ring-ring/40"
+ ref={(el) => { if (el && col.id === newLaneId) { el.focus(); el.select(); setTimeout(() => setNewLaneId(null), 0) } }}
+ defaultValue={col.label}
+ onClick={(e) => e.stopPropagation()}
+ onBlur={(e) => void renameLane(col, e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); else if (e.key === "Escape") { e.currentTarget.value = col.label; e.currentTarget.blur() } }}
+ aria-label={`Rename ${col.label} lane`}
+ className="min-w-0 flex-1 truncate rounded bg-transparent px-1 text-sm font-semibold outline-none hover:bg-accent focus:bg-background focus:ring-2 focus:ring-ring/40"
                     />
                   ) : (
                     <span className="truncate text-sm font-semibold">{col.label}</span>
                   )}
                   <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
                   {/* Delete — non-system lanes only. Its cards move to the fallback, so this
-                      never strands work; system lanes (fallback + payout) carry no button. */}
+ never strands work; system lanes (fallback + payout) carry no button. */}
                   {canManageLanes && !col.system && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); void removeLane(col) }}
-                      title={`Delete the ${col.label} lane`}
-                      aria-label={`Delete ${col.label} lane`}
-                      className="eg-tap shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:bg-red-50 hover:text-red-600"
+ onClick={(e) => { e.stopPropagation(); void removeLane(col) }}
+ title={`Delete the ${col.label} lane`}
+ aria-label={`Delete ${col.label} lane`}
+ className="eg-tap shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:bg-red-50 hover:text-red-600"
                     >
                       <X size={13} weight="bold" />
                     </button>
                   )}
                 </div>
                 {/* Scroll INSIDE the column (min-h-0 lets a flex child scroll) — the page
-                    itself stays put instead of growing down as a lane fills. */}
+ itself stays put instead of growing down as a lane fills. */}
                 <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
                   {list.length === 0 ? (
                     <div className="py-6 text-center text-xs text-muted-foreground/60">Drop cards or artwork here</div>
                   ) : (
-                    list.map((c) => (
+ list.map((c) => (
                       <div
-                        key={String(c.id)}
+ key={String(c.id)}
                         // A vendor card is driven by the partner's board, so it can't be
                         // dragged through our lanes — the same gate the card dialog applies,
                         // enforced on the tile so a drag can't route around it. Renaming also
                         // suspends drag so text selection in the name works.
-                        draggable={(!c.vendor || isAdmin) && editNameId !== c.id}
-                        onDragStart={() => { if (!c.vendor || isAdmin) setDragId(c.id) }}
-                        onDragEnd={() => setDragId(null)}
+ draggable={(!c.vendor || isAdmin) && editNameId !== c.id}
+ onDragStart={() => { if (!c.vendor || isAdmin) setDragId(c.id) }}
+ onDragEnd={() => setDragId(null)}
                         // shrink-0 is load-bearing: the card area is a flex column, and without
                         // it flexbox COMPRESSES every card to fit the fixed-height lane instead
                         // of overflowing — so cards shrank as you added them and the column never
@@ -743,31 +743,31 @@ export function DesignerBoard() {
                         // the image (a button can't be nested inside the image button).
                         // EMB-check cards get a distinct amber frame so the floor spots "already
                         // digitised — verify only", set apart from normal and pink vendor cards.
-                        className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (isEmbCard(c) ? "border-amber-400 bg-amber-50/60 " : "border-border bg-background ") + (c.vendor && !isAdmin ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
+ className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (isEmbCard(c) ? "border-hold/40 bg-hold/10/60 " : "border-border bg-background ") + (c.vendor && !isAdmin ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* IMAGE = open full details on a single click. FIXED-height cover (h-48)
-                            so every card is the same height; object-cover fills the frame at any
-                            aspect. (The name below has its own click — to rename in place.) */}
+ so every card is the same height; object-cover fills the frame at any
+ aspect. (The name below has its own click — to rename in place.) */}
                         <button
-                          type="button"
-                          onClick={() => setOpenId(c.id)}
-                          title="Open card details"
-                          aria-label={`Open ${c.title || "card"} details`}
-                          className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
+ type="button"
+ onClick={() => setOpenId(c.id)}
+ title="Open card details"
+ aria-label={`Open ${c.title || "card"} details`}
+ className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
                         >
                           <CardArt key={String(c.thumb ?? c.id)} card={c} imgClass="size-full object-cover" iconSize={26} />
                           {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-2xs font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
                           {/* Top-right tag = WHO owns this card's queue. A partner card shows the
-                              partner (pink). Otherwise, if someone on OUR side has claimed it, their
+ partner (pink). Otherwise, if someone on OUR side has claimed it, their
                               NAME shows here — VIOLET when a designer claimed it (e.g. Abdul), SLATE
                               (secondary) when it's factory (operator/warehouse/admin, e.g. Linh) —
-                              so at a glance you see who's on the job. */}
+ so at a glance you see who's on the job. */}
                           {c.vendor ? (
                             <span className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-2xs font-medium text-white">{vendorLabel(c.vendor)}</span>
                           ) : c.claimed_by ? (
                             <span
-                              title={`Claimed by ${c.claimed_by}${c.claimed_role ? ` (${c.claimed_role})` : ""}`}
-                              className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-2xs font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
+ title={`Claimed by ${c.claimed_by}${c.claimed_role ? ` (${c.claimed_role})` : ""}`}
+ className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-2xs font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-slate-600/90")}
                             >
                               <span className="truncate">{String(c.claimed_by)}</span>
                             </span>
@@ -775,12 +775,12 @@ export function DesignerBoard() {
                             /* Unclaimed: show WHOSE order this is.
                                ─────────────────────────────────────
                                WITH A SHOPFRONT MARK, because without one this was the same
-                               slate badge carrying the same bare name as a factory claim —
-                               so a card sent by Linh for Hai Anh's order showed "Hai Anh"
-                               in the exact slot that means "this person is on the job", and
-                               only the tooltip said otherwise. Two different facts cannot
-                               share one appearance; the icon is the cheapest way to say
-                               which of the two you are looking at. */
+ slate badge carrying the same bare name as a factory claim —
+ so a card sent by Linh for Hai Anh's order showed "Hai Anh"
+ in the exact slot that means "this person is on the job", and
+ only the tooltip said otherwise. Two different facts cannot
+ share one appearance; the icon is the cheapest way to say
+ which of the two you are looking at. */
                             <span title={`Seller · ${c.seller_name}${c.created_by_name ? ` · sent by ${c.created_by_name}` : ""}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-slate-600/90 px-1.5 py-0.5 text-2xs font-medium text-white">
                               <Storefront size={9} weight="fill" className="shrink-0 opacity-80" />
                               <span className="truncate">{String(c.seller_name)}</span>
@@ -788,24 +788,24 @@ export function DesignerBoard() {
                           ) : null}
                         </button>
                         {/* Cancel the card — hover-revealed, a SIBLING of the image button (a
-                            button can't nest inside another), positioned over the cover.
+ button can't nest inside another), positioned over the cover.
                             Warehouse/admin only, matching the server. */}
                         {canDeleteCard() && <button
-                          aria-label={`Cancel ${c.title || "card"}`}
-                          title="Cancel this card"
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            const ok = await confirm({
-                              title: c.vendor ? `Remove this ${vendorLabel(c.vendor)} card?` : "Cancel this card?",
-                              body: c.vendor
+ aria-label={`Cancel ${c.title || "card"}`}
+ title="Cancel this card"
+ onClick={async (e) => {
+ e.stopPropagation()
+ const ok = await confirm({
+ title: c.vendor ? `Remove this ${vendorLabel(c.vendor)} card?` : "Cancel this card?",
+ body: c.vendor
                                 ? `This was sent to ${vendorLabel(c.vendor)}. Removing it here does NOT cancel it on their board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first, then remove this.`
-                                : `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
-                              confirmLabel: c.vendor ? "Remove anyway" : "Cancel card",
-                              cancelLabel: "Keep it",
+ : `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
+ confirmLabel: c.vendor ? "Remove anyway" : "Cancel card",
+ cancelLabel: "Keep it",
                             })
-                            if (ok) void removeCard(c.id)
+ if (ok) void removeCard(c.id)
                           }}
-                          className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+ className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <X size={11} weight="bold" />
                         </button>}
@@ -816,38 +816,38 @@ export function DesignerBoard() {
                           {/* NAME — a single click edits it in place. Enter/blur saves, Esc cancels. */}
                           {editNameId === c.id ? (
                             <input
-                              autoFocus
-                              value={nameDraft}
-                              onChange={(e) => setNameDraft(e.target.value)}
-                              onBlur={() => { const t = nameDraft.trim(); setEditNameId(null); if (t && t !== (c.title || "")) patch(c.id, { title: t }) }}
-                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() } else if (e.key === "Escape") setEditNameId(null) }}
-                              className="w-full rounded border border-input bg-background px-1 py-0.5 text-sm font-medium leading-tight outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+ autoFocus
+ value={nameDraft}
+ onChange={(e) => setNameDraft(e.target.value)}
+ onBlur={() => { const t = nameDraft.trim(); setEditNameId(null); if (t && t !== (c.title || "")) patch(c.id, { title: t }) }}
+ onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() } else if (e.key === "Escape") setEditNameId(null) }}
+ className="w-full rounded border border-input bg-background px-1 py-0.5 text-sm font-medium leading-tight outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                             />
                           ) : (
                             <button
-                              type="button"
-                              onClick={() => { setEditNameId(c.id); setNameDraft(c.title || "") }}
+ type="button"
+ onClick={() => { setEditNameId(c.id); setNameDraft(c.title || "") }}
                               // min-h reserves BOTH lines even for a one-line title, so a short
                               // title no longer makes the whole card shorter than its neighbours —
                               // everything below stays docked at the same place. line-clamp-2 caps
                               // it at two lines; the full title is on hover and in the rename input.
-                              title={c.title || "Design"}
-                              className="line-clamp-2 min-h-[2.25rem] rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
+ title={c.title || "Design"}
+ className="line-clamp-2 min-h-[2.25rem] rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
                             >
                               {cardLabel(c)}
                             </button>
                           )}
                           {/* Order ID + file number ALWAYS show so a card is readable at a glance —
-                              a card with no order says "No order" rather than going blank, and the
-                              file count shows even at 0. Method/product sits between them when set. */}
+ a card with no order says "No order" rather than going blank, and the
+ file count shows even at 0. Method/product sits between them when set. */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-2xs text-muted-foreground">
                             <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
                               {/* shortOrderRef, not slice(0,14). Truncating at a character
-                                  count cut `etsy-4149084185` to `etsy-414908418` — a number
-                                  with its last digit removed, which still LOOKS like an
-                                  order number and matches nothing. The shared formatter
-                                  takes the routing prefix off a marketplace id and shortens
-                                  one of ours to the segment that distinguishes it. */}
+ count cut `etsy-4149084185` to `etsy-414908418` — a number
+ with its last digit removed, which still LOOKS like an
+ order number and matches nothing. The shared formatter
+ takes the routing prefix off a marketplace id and shortens
+ one of ours to the segment that distinguishes it. */}
                               {c.order_id ? shortOrderRef(String(c.order_id)) : "No order"}
                             </span>
                             {(c.product || c.type) && (
@@ -859,28 +859,28 @@ export function DesignerBoard() {
                           </div>
                           {/* Docked to the bottom: DSN id (left) + what the design pays (right).
                               The amount is FACTORY-ONLY — a designer never sees it (their earnings
-                              live in their wallet), on internal AND partner cards. Internal = the
-                              designer payout (the card's own, or the platform default); partner =
-                              what the outsourced task costs us. Neutral text, NO colour — " · paid"
-                              once actually credited, " · partner" for an outsourced card, else the
-                              plain rate. */}
+ live in their wallet), on internal AND partner cards. Internal = the
+ designer payout (the card's own, or the platform default); partner =
+ what the outsourced task costs us. Neutral text, NO colour — " · paid"
+ once actually credited, " · partner" for an outsourced card, else the
+ plain rate. */}
                           <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5 text-xs text-muted-foreground">
                             <span className="shrink-0 tabular-nums">DSN-{c.id}</span>
                             {/* EMB-check cards carry no payout (factory check, not designer
-                                work), so the footer figure is suppressed for them. */}
+ work), so the footer figure is suppressed for them. */}
                             {!isDesigner && !isEmbCard(c) && (() => {
                               // Only show a figure once the card has a DESTINATION — sent to a partner
                               // (partner cost), claimed by a designer, or given an explicit payout. Until
                               // then the number is just the platform-default guess, which reads as more
                               // settled than it is, so the price stays blank (only correct once routed).
-                              const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by
-                              if (!determined) return null
-                              const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
-                              const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
-                              return (
+ const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by
+ if (!determined) return null
+ const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
+ const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
+ return (
                                 <span
-                                  className="shrink-0 font-medium tabular-nums text-foreground"
-                                  title={c.vendor ? "Outsourced — partner cost" : c.credited ? "Credited to the designer" : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : "Designer payout on approval")}
+ className="shrink-0 font-medium tabular-nums text-foreground"
+ title={c.vendor ? "Outsourced — partner cost" : c.credited ? "Credited to the designer" : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : "Designer payout on approval")}
                                 >
                                   {money(payout)}{suffix}
                                 </span>
@@ -896,12 +896,12 @@ export function DesignerBoard() {
             )
           })}
           {/* Add a lane — a slim column so it never competes with a real lane for width,
-              only offered to warehouse/admin. */}
+ only offered to warehouse/admin. */}
           {canManageLanes && (
             <button
-              onClick={() => void addLane()}
-              className="flex h-[calc(100vh-14rem)] min-h-[22rem] w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-              title="Add a column"
+ onClick={() => void addLane()}
+ className="flex h-[calc(100vh-14rem)] min-h-[22rem] w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+ title="Add a column"
             >
               <Plus size={18} weight="bold" />
               <span className="[writing-mode:vertical-rl] text-xs font-medium">Add Column</span>
@@ -917,8 +917,8 @@ export function DesignerBoard() {
         </div>
       )}
       {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)}
-        onAssign={() => { setAssignCard(openCard); setOpenId(null) }}
-        onPushed={() => { setOpenId(null); load() }} canPush={showPartner} lanes={lanes} />}
+ onAssign={() => { setAssignCard(openCard); setOpenId(null) }}
+ onPushed={() => { setOpenId(null); load() }} canPush={showPartner} lanes={lanes} />}
     </div>
   )
 }
@@ -949,10 +949,10 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   // else is genuinely unclaimed — said plainly rather than a bare dash.
   { id: "claimed", label: "Assigned to", cell: (c) => c.vendor
     ? <span className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">{vendorLabel(c.vendor)}</span>
-    : c.claimed_by
+ : c.claimed_by
       ? <span className="text-foreground">{String(c.claimed_by)}</span>
-      : <span className="text-muted-foreground">Unclaimed</span> },
-  { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="whitespace-nowrap text-xs font-medium text-amber-700">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
+ : <span className="text-muted-foreground">Unclaimed</span> },
+  { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="whitespace-nowrap text-xs font-medium text-hold">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
   { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
   // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
   // said Credited/—, which the Payout column already implies — removed.)
@@ -963,61 +963,61 @@ const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "la
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
 function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (id: string | number) => void; lanes: DesignLane[] }) {
-  const LIST_COLS = makeListCols(lanes)
-  const order: string[] = lanes.map((l) => l.id)
-  const rows = [...cards].sort((a, b) => order.indexOf(laneOf(a, lanes)) - order.indexOf(laneOf(b, lanes)))
-  const canEdit = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" })()
+ const LIST_COLS = makeListCols(lanes)
+ const order: string[] = lanes.map((l) => l.id)
+ const rows = [...cards].sort((a, b) => order.indexOf(laneOf(a, lanes)) - order.indexOf(laneOf(b, lanes)))
+ const canEdit = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" })()
 
-  const [visible, setVisible] = useState<string[]>(DEFAULT_LIST_COLS)
-  const [labels, setLabels] = useState<Record<string, string>>({})
-  const [menuOpen, setMenuOpen] = useState(false)
-  useEffect(() => {
-    const id = setTimeout(() => {
-      try {
-        let v = JSON.parse(localStorage.getItem("eg_dsn_cols") || "null")
-        if (Array.isArray(v) && v.length) {
+ const [visible, setVisible] = useState<string[]>(DEFAULT_LIST_COLS)
+ const [labels, setLabels] = useState<Record<string, string>>({})
+ const [menuOpen, setMenuOpen] = useState(false)
+ useEffect(() => {
+ const id = setTimeout(() => {
+ try {
+ let v = JSON.parse(localStorage.getItem("eg_dsn_cols") || "null")
+ if (Array.isArray(v) && v.length) {
           // One-time: surface the new "Assigned to" column for anyone whose SAVED layout
           // predates it (a saved list overrides the default, so a default change alone
           // wouldn't reach them). Inserted just before "lane" and only once, so it never
           // fights a deliberate hide later.
-          if (!v.includes("claimed") && !localStorage.getItem("eg_dsn_cols_assigned")) {
-            const at = v.indexOf("lane")
-            v = at >= 0 ? [...v.slice(0, at), "claimed", ...v.slice(at)] : [...v, "claimed"]
-            localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
+ if (!v.includes("claimed") && !localStorage.getItem("eg_dsn_cols_assigned")) {
+ const at = v.indexOf("lane")
+ v = at >= 0 ? [...v.slice(0, at), "claimed", ...v.slice(at)] : [...v, "claimed"]
+ localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
           }
-          localStorage.setItem("eg_dsn_cols_assigned", "1")
+ localStorage.setItem("eg_dsn_cols_assigned", "1")
           // Same one-time surfacing for the new "Files" column.
-          if (!v.includes("files") && !localStorage.getItem("eg_dsn_cols_files")) {
-            const at = v.indexOf("lane")
-            v = at >= 0 ? [...v.slice(0, at), "files", ...v.slice(at)] : [...v, "files"]
-            localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
+ if (!v.includes("files") && !localStorage.getItem("eg_dsn_cols_files")) {
+ const at = v.indexOf("lane")
+ v = at >= 0 ? [...v.slice(0, at), "files", ...v.slice(at)] : [...v, "files"]
+ localStorage.setItem("eg_dsn_cols", JSON.stringify(v))
           }
-          localStorage.setItem("eg_dsn_cols_files", "1")
-          setVisible(v)
+ localStorage.setItem("eg_dsn_cols_files", "1")
+ setVisible(v)
         }
       } catch { /* default */ }
-      try { const l = JSON.parse(localStorage.getItem("eg_dsn_labels") || "null"); if (l && typeof l === "object") setLabels(l) } catch { /* default */ }
+ try { const l = JSON.parse(localStorage.getItem("eg_dsn_labels") || "null"); if (l && typeof l === "object") setLabels(l) } catch { /* default */ }
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
-  const save = (v: string[], l: Record<string, string>) => { try { localStorage.setItem("eg_dsn_cols", JSON.stringify(v)); localStorage.setItem("eg_dsn_labels", JSON.stringify(l)) } catch { /* ignore */ } }
-  const toggle = (id: string) => { const next = visible.includes(id) ? visible.filter((x) => x !== id) : [...visible, id]; setVisible(next); save(next, labels) }
-  const rename = (id: string, label: string) => { const next = { ...labels, [id]: label }; setLabels(next); save(visible, next) }
-  const reset = () => { setVisible(DEFAULT_LIST_COLS); setLabels({}); save(DEFAULT_LIST_COLS, {}) }
-  const labelOf = (col: ListCol) => labels[col.id] || col.label
+ const save = (v: string[], l: Record<string, string>) => { try { localStorage.setItem("eg_dsn_cols", JSON.stringify(v)); localStorage.setItem("eg_dsn_labels", JSON.stringify(l)) } catch { /* ignore */ } }
+ const toggle = (id: string) => { const next = visible.includes(id) ? visible.filter((x) => x !== id) : [...visible, id]; setVisible(next); save(next, labels) }
+ const rename = (id: string, label: string) => { const next = { ...labels, [id]: label }; setLabels(next); save(visible, next) }
+ const reset = () => { setVisible(DEFAULT_LIST_COLS); setLabels({}); save(DEFAULT_LIST_COLS, {}) }
+ const labelOf = (col: ListCol) => labels[col.id] || col.label
   // Display follows the SAVED order (visible is an ordered list), so drag-reordering it in
   // the menu reorders the table — persisted per board in localStorage like the others.
-  const shown = visible.map((id) => LIST_COLS.find((c) => c.id === id)).filter(Boolean) as ListCol[]
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
-  const moveCol = (from: number, to: number) => {
-    if (from === to || from < 0 || to < 0 || from >= visible.length || to >= visible.length) return
-    const next = [...visible]; const [m] = next.splice(from, 1); next.splice(to, 0, m)
-    setVisible(next); save(next, labels)
+ const shown = visible.map((id) => LIST_COLS.find((c) => c.id === id)).filter(Boolean) as ListCol[]
+ const [dragIdx, setDragIdx] = useState<number | null>(null)
+ const moveCol = (from: number, to: number) => {
+ if (from === to || from < 0 || to < 0 || from >= visible.length || to >= visible.length) return
+ const next = [...visible]; const [m] = next.splice(from, 1); next.splice(to, 0, m)
+ setVisible(next); save(next, labels)
   }
 
-  if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — use <span className="font-medium text-foreground">Add design</span> above, or send one from the Operator board.</div>
+ if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — use <span className="font-medium text-foreground">Add design</span> above, or send one from the Operator board.</div>
 
-  return (
+ return (
     <div className="space-y-2">
       {canEdit && (
         <div className="flex justify-end">
@@ -1031,13 +1031,13 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
                   {/* Shown columns, in display order — drag the handle to reorder. */}
                   {shown.map((col, idx) => (
                     <div
-                      key={col.id}
-                      draggable
-                      onDragStart={() => setDragIdx(idx)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => { if (dragIdx !== null) moveCol(dragIdx, idx); setDragIdx(null) }}
-                      onDragEnd={() => setDragIdx(null)}
-                      className={"flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent " + (dragIdx === idx ? "opacity-50" : "")}
+ key={col.id}
+ draggable
+ onDragStart={() => setDragIdx(idx)}
+ onDragOver={(e) => e.preventDefault()}
+ onDrop={() => { if (dragIdx !== null) moveCol(dragIdx, idx); setDragIdx(null) }}
+ onDragEnd={() => setDragIdx(null)}
+ className={"flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent " + (dragIdx === idx ? "opacity-50" : "")}
                     >
                       <DotsSixVertical size={14} weight="bold" className="shrink-0 cursor-grab text-muted-foreground" />
                       <button onClick={() => !col.locked && toggle(col.id)} disabled={col.locked} title={col.locked ? "Always shown" : "Hide"} className="flex size-5 shrink-0 items-center justify-center disabled:opacity-40">
@@ -1089,105 +1089,105 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
 function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPushed, canPush, lanes }: { card: DesignCard; me: string; designFee: number; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPushed: () => void; canPush: boolean }) {
   // Default the payout to the platform Design fee when the card hasn't set one.
-  const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const prompt = usePrompt()
-  const confirm = useConfirm()
-  const col = laneOf(card, lanes)
+ const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const prompt = usePrompt()
+ const confirm = useConfirm()
+ const col = laneOf(card, lanes)
 
   // Click-to-rename the card. Saves only on a real change, so opening and closing the editor
   // by accident doesn't rewrite the title. A vendor card is renameable here too, but note the
   // change stays on OUR side — it doesn't push back to the partner's board.
-  const [editTitle, setEditTitle] = useState(false)
-  const [titleDraft, setTitleDraft] = useState(card.title || "")
-  const saveTitle = () => {
-    const t = titleDraft.trim()
-    setEditTitle(false)
-    if (t && t !== card.title) patch(card.id, { title: t })
+ const [editTitle, setEditTitle] = useState(false)
+ const [titleDraft, setTitleDraft] = useState(card.title || "")
+ const saveTitle = () => {
+ const t = titleDraft.trim()
+ setEditTitle(false)
+ if (t && t !== card.title) patch(card.id, { title: t })
   }
 
   // Card DESCRIPTION / notes — free text for customised-design instructions. Persisted in the
   // card's `specs` blob (specs.description), which already round-trips through the whole-list
   // save, so no schema change. This is the single place notes live; the partner push reads
   // the same text, so there aren't two separate windows to keep in sync.
-  const cardSpecs = (card.specs && typeof card.specs === "object" ? card.specs : {}) as Record<string, unknown>
-  const [desc, setDesc] = useState(String(cardSpecs.description ?? ""))
-  const saveDesc = () => {
-    const next = desc.trim()
-    if (next === String(cardSpecs.description ?? "")) return
-    patch(card.id, { specs: { ...cardSpecs, description: next } })
+ const cardSpecs = (card.specs && typeof card.specs === "object" ? card.specs : {}) as Record<string, unknown>
+ const [desc, setDesc] = useState(String(cardSpecs.description ?? ""))
+ const saveDesc = () => {
+ const next = desc.trim()
+ if (next === String(cardSpecs.description ?? "")) return
+ patch(card.id, { specs: { ...cardSpecs, description: next } })
   }
 
   // The partner-send form is revealed INLINE in this same window (no second dialog). The
   // card supplies the artwork, title and description; only the partner-specific fields show.
-  const [showPush, setShowPush] = useState(false)
+ const [showPush, setShowPush] = useState(false)
   // Click the artwork to view it full size (a lightbox, not a new tab — a data-URL thumb
   // can't be opened as a top-level navigation in Chrome).
-  const [zoom, setZoom] = useState(false)
+ const [zoom, setZoom] = useState(false)
 
   // Reference files kept ON the card (mockups, spec sheets — custom designs often need
   // several). Persisted in specs.reference_files, so they stay with the card, and reused as
   // the attachments on a Pink Design push. Upload goes through the same object-storage
   // endpoint the push uses, so each returns a real URL.
-  type RefFile = { url: string; name?: string }
-  const refFiles: RefFile[] = Array.isArray(cardSpecs.reference_files) ? (cardSpecs.reference_files as RefFile[]) : []
-  const [refBusy, setRefBusy] = useState(false)
-  const [refErr, setRefErr] = useState<string | null>(null)
-  const addRefFiles = async (files: FileList | null) => {
-    if (!files?.length) return
-    setRefBusy(true); setRefErr(null)
-    const added: RefFile[] = []
-    try {
-      for (const f of Array.from(files)) {
-        const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error("unreadable")); r.readAsDataURL(f) })
-        const r = await uploadPinkAttachment({ data, name: f.name })
-        if (r.url) added.push({ url: r.url, name: f.name })
-        else setRefErr(r.error || `Couldn't upload ${f.name}.`)
+ type RefFile = { url: string; name?: string }
+ const refFiles: RefFile[] = Array.isArray(cardSpecs.reference_files) ? (cardSpecs.reference_files as RefFile[]) : []
+ const [refBusy, setRefBusy] = useState(false)
+ const [refErr, setRefErr] = useState<string | null>(null)
+ const addRefFiles = async (files: FileList | null) => {
+ if (!files?.length) return
+ setRefBusy(true); setRefErr(null)
+ const added: RefFile[] = []
+ try {
+ for (const f of Array.from(files)) {
+ const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error("unreadable")); r.readAsDataURL(f) })
+ const r = await uploadPinkAttachment({ data, name: f.name })
+ if (r.url) added.push({ url: r.url, name: f.name })
+ else setRefErr(r.error || `Couldn't upload ${f.name}.`)
       }
-      if (added.length) patch(card.id, { specs: { ...cardSpecs, reference_files: [...refFiles, ...added] } })
+ if (added.length) patch(card.id, { specs: { ...cardSpecs, reference_files: [...refFiles, ...added] } })
     } catch (e) { setRefErr(e instanceof Error ? e.message : "Couldn't upload that file.") } finally { setRefBusy(false) }
   }
-  const removeRefFile = (i: number) => patch(card.id, { specs: { ...cardSpecs, reference_files: refFiles.filter((_, j) => j !== i) } })
+ const removeRefFile = (i: number) => patch(card.id, { specs: { ...cardSpecs, reference_files: refFiles.filter((_, j) => j !== i) } })
 
-  const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
+ const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
   // Only warehouse + admin set the design fee / credit; operators & designers can't.
-  const canFee = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" })()
+ const canFee = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" })()
 
   // Fallback credit for a card approved before a payout was set (auto-credit needs an
   // amount at approval time). Idempotent by DSN-<id> so it can never double-pay.
-  const creditNow = async () => {
-    const amount = Number(pay) || 0
-    if (amount <= 0) { setErr("Set a payout amount first."); return }
-    setBusy(true); setErr(null)
-    try {
-      const r = await walletTransfer({ fromAccount: "factory", toAccount: "designer", amount, ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
-      if (r.error) throw new Error(r.error)
-      patch(card.id, { credited: true, pay_status: "paid", payment: amount })
+ const creditNow = async () => {
+ const amount = Number(pay) || 0
+ if (amount <= 0) { setErr("Set a payout amount first."); return }
+ setBusy(true); setErr(null)
+ try {
+ const r = await walletTransfer({ fromAccount: "factory", toAccount: "designer", amount, ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
+ if (r.error) throw new Error(r.error)
+ patch(card.id, { credited: true, pay_status: "paid", payment: amount })
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't credit the designer.")
+ setErr(e instanceof Error ? e.message : "Couldn't credit the designer.")
     } finally { setBusy(false) }
   }
 
   // Send a returned proof BACK to the partner for changes — the one outbound action on a
   // vendor card that's ours to take. It goes through THEIR API (a note + a status flip on
   // their board), not a local lane move, so their board and ours stay in step.
-  const requestFix = async () => {
-    const message = (await prompt({
-      title: "What needs changing?",
-      body: `This note is sent to ${vendorLabel(card.vendor)}.`,
-      placeholder: "e.g. move the logo up, match Pantone 185…",
-      multiline: true,
-      confirmLabel: `Send to ${vendorLabel(card.vendor)}`,
+ const requestFix = async () => {
+ const message = (await prompt({
+ title: "What needs changing?",
+ body: `This note is sent to ${vendorLabel(card.vendor)}.`,
+ placeholder: "e.g. move the logo up, match Pantone 185…",
+ multiline: true,
+ confirmLabel: `Send to ${vendorLabel(card.vendor)}`,
     }))?.trim()
-    if (!message) return
-    setBusy(true); setErr(null)
-    try {
-      const r = await pinkRequestFix({ cardId: card.id, message })
-      if (r?.error) throw new Error(r.error)
-      patch(card.id, { col: "fix" })
+ if (!message) return
+ setBusy(true); setErr(null)
+ try {
+ const r = await pinkRequestFix({ cardId: card.id, message })
+ if (r?.error) throw new Error(r.error)
+ patch(card.id, { col: "fix" })
     } catch (e) {
-      setErr(e instanceof Error ? e.message : `Couldn't send that back to ${vendorLabel(card.vendor)}.`)
+ setErr(e instanceof Error ? e.message : `Couldn't send that back to ${vendorLabel(card.vendor)}.`)
     } finally { setBusy(false) }
   }
 
@@ -1195,16 +1195,16 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   // lives on — they don't offer a cancel API, so it may still be designed AND invoiced, and
   // we've dropped the vendor_ref their finished-work webhook needs (so the file would land
   // as an unknown ref and be ignored). Say all of that before letting it go.
-  const removeThis = async () => {
-    if (card.vendor && !(await confirm({
-      title: `Remove this ${vendorLabel(card.vendor)} card?`,
-      body: `Removing it here does NOT cancel it on ${vendorLabel(card.vendor)}'s board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first.`,
-      confirmLabel: "Remove anyway",
+ const removeThis = async () => {
+ if (card.vendor && !(await confirm({
+ title: `Remove this ${vendorLabel(card.vendor)} card?`,
+ body: `Removing it here does NOT cancel it on ${vendorLabel(card.vendor)}'s board — they have no cancel API, so they may still design and invoice it, and their finished file can no longer reach us. Cancel it on their board first.`,
+ confirmLabel: "Remove anyway",
     }))) return
-    remove(card.id)
+ remove(card.id)
   }
 
-  return (
+ return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
@@ -1214,23 +1214,23 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             <DialogTitle className="min-w-0 flex-1 text-base leading-snug">
               {editTitle ? (
                 <input
-                  autoFocus
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  onBlur={saveTitle}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); saveTitle() }
-                    else if (e.key === "Escape") { setTitleDraft(card.title || ""); setEditTitle(false) }
+ autoFocus
+ value={titleDraft}
+ onChange={(e) => setTitleDraft(e.target.value)}
+ onBlur={saveTitle}
+ onKeyDown={(e) => {
+ if (e.key === "Enter") { e.preventDefault(); saveTitle() }
+ else if (e.key === "Escape") { setTitleDraft(card.title || ""); setEditTitle(false) }
                   }}
-                  placeholder="Card title"
-                  className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+ placeholder="Card title"
+ className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               ) : (
                 <button
-                  type="button"
-                  onClick={() => { setTitleDraft(card.title || ""); setEditTitle(true) }}
-                  title="Click to rename"
-                  className="group -ml-1 inline-flex max-w-full items-start gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
+ type="button"
+ onClick={() => { setTitleDraft(card.title || ""); setEditTitle(true) }}
+ title="Click to rename"
+ className="group -ml-1 inline-flex max-w-full items-start gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
                 >
                   <span className="line-clamp-2">{cardLabel(card)}</span>
                   <PencilSimple size={13} weight="bold" className="mt-1 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
@@ -1247,11 +1247,11 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             RIGHT — the notes area is the whole point of this window for a custom design. */}
         <div className="flex gap-4">
           <button
-            type="button"
-            onClick={() => { if (card.thumb) setZoom(true) }}
-            disabled={!card.thumb}
-            title={card.thumb ? "Click to view full size" : undefined}
-            className="group relative size-52 shrink-0 overflow-hidden rounded-xl border border-border bg-muted disabled:cursor-default"
+ type="button"
+ onClick={() => { if (card.thumb) setZoom(true) }}
+ disabled={!card.thumb}
+ title={card.thumb ? "Click to view full size" : undefined}
+ className="group relative size-52 shrink-0 overflow-hidden rounded-xl border border-border bg-muted disabled:cursor-default"
           >
             <CardArt key={String(card.thumb ?? card.id)} card={card} imgClass="size-full object-contain" iconSize={40} />
             {card.thumb && (
@@ -1263,14 +1263,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           <div className="flex min-w-0 flex-1 flex-col">
             <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">{isEmbCard(card) ? "Check notes" : "Description / notes"}</label>
             <textarea
-              id={`card-desc-${card.id}`}
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              onBlur={saveDesc}
-              placeholder={isEmbCard(card)
+ id={`card-desc-${card.id}`}
+ value={desc}
+ onChange={(e) => setDesc(e.target.value)}
+ onBlur={saveDesc}
+ placeholder={isEmbCard(card)
                 ? "Notes for the factory check — thread colours, placement, anything to verify before stitching. Saved to the card."
-                : "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."}
-              className="min-h-[9rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+ : "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."}
+ className="min-h-[9rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
             />
           </div>
         </div>
@@ -1279,18 +1279,18 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             Status moved up to the header, so it isn't repeated here. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-indigo-700"><Needle size={10} weight="bold" /> Embroidery</span>}
-          {card.priority && card.priority !== "normal" && <span className="whitespace-nowrap text-xs font-medium text-amber-700">{String(card.priority)}</span>}
+          {card.priority && card.priority !== "normal" && <span className="whitespace-nowrap text-xs font-medium text-hold">{String(card.priority)}</span>}
           <span>{card.product || card.type || "No product / type set"}</span>
           <span aria-hidden>·</span>
           {card.order_id
             ? <span>Order <span className="tabular-nums text-foreground" title={String(card.order_id)}>{shortOrderRef(String(card.order_id))}</span></span>
-            : <span>Not attached to an order yet</span>}
+ : <span>Not attached to an order yet</span>}
           {card.customer && <><span aria-hidden>·</span><span>{String(card.customer)}</span></>}
           {card.claimed_by && <><span aria-hidden>·</span><span>Claimed by {String(card.claimed_by)}</span></>}
         </div>
 
         {/* Routes out of the card — assign to an order, or send to the design partner (the
-            send form opens inline below). */}
+ send form opens inline below). */}
         <div className="flex flex-wrap gap-2">
           {!card.order_id && (
             <Button size="sm" variant="outline" onClick={onAssign}>
@@ -1298,7 +1298,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             </Button>
           )}
           {/* EMB-check cards are already digitised — Pink Design DIGITISES raw art, so it's
-              not an option here. They only get a factory check before stitching. */}
+ not an option here. They only get a factory check before stitching. */}
           {canPush && !card.vendor && !isEmbCard(card) && (
             <Button size="sm" variant={showPush ? "secondary" : "outline"} onClick={() => setShowPush((v) => !v)}>
               Send to Pink Design
@@ -1307,9 +1307,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         </div>
 
         {/* Reference files kept ON OUR card — mockups, spec sheets, the several refs a custom
-            design usually needs. Persisted (specs.reference_files) so they stay with the card,
-            and reused as the attachments when it's sent to Pink Design. Hidden on EMB-check
-            cards: they never go to Pink Design, so there's nothing to attach — the actual
+ design usually needs. Persisted (specs.reference_files) so they stay with the card,
+ and reused as the attachments when it's sent to Pink Design. Hidden on EMB-check
+ cards: they never go to Pink Design, so there's nothing to attach — the actual
             .emb lives in the Files drop zone below. */}
         {!isEmbCard(card) && (
         <div className="space-y-2">
@@ -1339,30 +1339,30 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         )}
 
         {/* Partner send, inline in THIS window — revealed by the "Send to Pink Design" button
-            above, no separate popup. The card supplies the artwork, title and notes; only the
-            partner-specific fields (product type, board, reference files) show here. On a
-            successful send the parent closes and reloads, and the card returns as a Pink card. */}
+ above, no separate popup. The card supplies the artwork, title and notes; only the
+ partner-specific fields (product type, board, reference files) show here. On a
+ successful send the parent closes and reloads, and the card returns as a Pink card. */}
         {showPush && canPush && !card.vendor && (
           <div className="rounded-xl border border-border bg-muted/30 p-3">
             <PushToPartnerInline
-              cardId={String(card.id)}
-              orderId={card.order_id ? String(card.order_id) : undefined}
-              sku={card.sku ? String(card.sku) : undefined}
-              itemName={card.title}
-              printType={card.type}
-              artworkUrl={card.thumb ? String(card.thumb) : null}
-              initialDescription={desc}
+ cardId={String(card.id)}
+ orderId={card.order_id ? String(card.order_id) : undefined}
+ sku={card.sku ? String(card.sku) : undefined}
+ itemName={card.title}
+ printType={card.type}
+ artworkUrl={card.thumb ? String(card.thumb) : null}
+ initialDescription={desc}
               // The card's own reference files ARE the attachments — no separate uploader here.
-              presetExtras={refFiles.map((f) => ({ url: f.url, name: f.name || "reference" }))}
-              onPushed={() => onPushed()}
-              onCancel={() => setShowPush(false)}
+ presetExtras={refFiles.map((f) => ({ url: f.url, name: f.name || "reference" }))}
+ onPushed={() => onPushed()}
+ onCancel={() => setShowPush(false)}
             />
           </div>
         )}
 
         {/* Their task ref (= our vendor_ref). Shown so it can be cross-referenced on Pink's
-            board and pasted into their test-webhook form to verify the sync. select-all makes
-            it one click to copy. */}
+ board and pasted into their test-webhook form to verify the sync. select-all makes
+ it one click to copy. */}
         {card.vendor && ((card.vendor_ref || card.vendor_task_id) ? (
           // Ref ID + Task ID side by side, big enough to read and copy — labelled to match
           // Pink's test-webhook form. Either one is enough for our webhook to match.
@@ -1388,21 +1388,21 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             )}
           </div>
         ) : (
-          <div className="text-2xs text-amber-600">
+          <div className="text-2xs text-hold">
             No Ref/Task ID was recorded for this card, so status sync is off for it. Re-push to capture it.
           </div>
         ))}
 
         {/* What we actually SENT them — small previews so it's obvious which files already
-            went, no filenames needed. Click one to open it full size. */}
+ went, no filenames needed. Click one to open it full size. */}
         {card.vendor && Array.isArray(card.pushed_images) && card.pushed_images.length > 0 && (
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Sent to {vendorLabel(card.vendor)}</span>
             <div className="flex flex-wrap gap-2">
               {card.pushed_images.map((src, i) => (
                 <a key={i} href={src} target="_blank" rel="noopener noreferrer"
-                   className="block size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
-                   title="Open full size">
+ className="block size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
+ title="Open full size">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt="" loading="lazy" className="size-full object-cover" />
                 </a>
@@ -1419,7 +1419,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             <div className="flex flex-col gap-1">
               {card.vendor_files.map((src, i) => (
                 <a key={i} href={src} target="_blank" rel="noopener noreferrer"
-                   className="inline-flex items-center gap-1.5 truncate rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
+ className="inline-flex items-center gap-1.5 truncate rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
                   <LinkSimple size={13} weight="bold" className="shrink-0" />
                   <span className="truncate">{src}</span>
                 </a>
@@ -1429,23 +1429,23 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         )}
 
         {/* Payout is a DESIGNER's earning. A vendor card is paid by invoice (field hidden),
-            and only a designer is actually credited on approval — so if the claimer is an
-            operator/warehouse/admin, don't show an amount that implies a credit the server
-            will refuse. Say plainly it won't pay out instead. */}
+ and only a designer is actually credited on approval — so if the claimer is an
+ operator/warehouse/admin, don't show an amount that implies a credit the server
+ will refuse. Say plainly it won't pay out instead. */}
         {(() => {
           // No payout on a vendor card (invoiced) or an EMB-check card (a factory check, not
           // designer work — nobody is credited for it).
-          if (card.vendor || isEmbCard(card)) return null
-          const claimedRole = String(card.claimed_role || "").toLowerCase()
-          const wontPay = !!card.claimed_by && !!claimedRole && claimedRole !== "designer"
-          if (wontPay) {
-            return (
+ if (card.vendor || isEmbCard(card)) return null
+ const claimedRole = String(card.claimed_role || "").toLowerCase()
+ const wontPay = !!card.claimed_by && !!claimedRole && claimedRole !== "designer"
+ if (wontPay) {
+ return (
               <div className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground">
                 No payout — claimed by {claimedRole}
               </div>
             )
           }
-          return canFee ? (
+ return canFee ? (
             <label className="flex items-center gap-2">
               <span className="text-sm font-medium">Payout</span>
               <div className="relative w-32">
@@ -1454,26 +1454,26 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               </div>
             </label>
           ) : (
-            amt(card.payment) > 0 ? <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div> : null
+ amt(card.payment) > 0 ? <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div> : null
           )
         })()}
 
         {/* Files for this card's order — drop the .emb/.pes/mockup right here. The
-            card already knows its order_id + sku, so a dropped file is LINKED to the
-            order item with no extra step. */}
+ card already knows its order_id + sku, so a dropped file is LINKED to the
+ order item with no extra step. */}
         {card.order_id && (
           <div className="space-y-1.5">
             <span className="text-sm font-medium">Files</span>
             {/* The card already knows its LINE (design_cards.line_id) — pass it, or a file a
-                designer uploads here lands on every sibling of the same SKU. */}
+ designer uploads here lands on every sibling of the same SKU. */}
             {/* `item` is what lets the panel NAME the artwork already placed on this line —
-                the card knows the line, the panel fetches the design. Without it the panel
-                still lists files; it just can't say which item a placed design is on. */}
+ the card knows the line, the panel fetches the design. Without it the panel
+ still lists files; it just can't say which item a placed design is on. */}
             <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} lineId={card.line_id || undefined}
-              item={{ line_id: card.line_id || undefined, sku: card.sku || undefined, name: card.title || undefined }} />
+ item={{ line_id: card.line_id || undefined, sku: card.sku || undefined, name: card.title || undefined }} />
             {/* Who touched this design and when. A designer is gated to the design story
-                server-side; operator/warehouse/admin see the order's full history here
-                too, including which team member uploaded or removed a file. */}
+ server-side; operator/warehouse/admin see the order's full history here
+ too, including which team member uploaded or removed a file. */}
             <OrderHistory orderId={String(card.order_id)} />
           </div>
         )}
@@ -1484,15 +1484,15 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         <div className="flex flex-wrap gap-2">
           {card.vendor ? (
             /* This portal is OURS; the partner never sees it — they work the task on their
-               own board and their webhook advances OUR lane (In progress → In review →
+ own board and their webhook advances OUR lane (In progress → In review →
                Approved). So the internal designer actions (Claim, Send for review, Back to
-               work, Credit) are GATED off a vendor card: a hand-move here would silently
-               disagree with their board. What's left is a read-only mirror of where it is,
-               plus the two calls that are genuinely ours — accepting a returned proof, and
-               sending one back for changes (which goes through THEIR API, not a local move). */
+ work, Credit) are GATED off a vendor card: a hand-move here would silently
+ disagree with their board. What's left is a read-only mirror of where it is,
+ plus the two calls that are genuinely ours — accepting a returned proof, and
+ sending one back for changes (which goes through THEIR API, not a local move). */
             <>
               {(col === "incoming" || col === "inprogress") && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-hold/10 px-2.5 py-1.5 text-xs font-medium text-hold">
                   Being designed by {vendorLabel(card.vendor)}
                 </span>
               )}
@@ -1514,8 +1514,8 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           ) : (
             <>
               {/* Sending out lives on the ORDER's item row, not here: the decision is made
-                  while looking at the line and its artwork, and a designer opening a card to
-                  claim it is not the person deciding to outsource it. */}
+ while looking at the line and its artwork, and a designer opening a card to
+ claim it is not the person deciding to outsource it. */}
               {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}>Claim</Button>}
               {col === "inprogress" && <Button size="sm" onClick={() => move("review")}>Send for review</Button>}
               {col === "review" && (
@@ -1526,9 +1526,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               )}
               {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}>Back to work</Button>}
               {col === "approved" && (
-                card.credited
+ card.credited
                   ? <span className="inline-flex items-center gap-1 text-sm font-medium text-success"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
-                  : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
+ : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
               )}
             </>
           )}
@@ -1536,15 +1536,15 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         </div>
 
         {/* Full-size artwork lightbox — fixed to the viewport (escapes the dialog's scroll
-            box), click anywhere to close. Works for a remote URL or a base64 data-URL thumb. */}
+ box), click anywhere to close. Works for a remote URL or a base64 data-URL thumb. */}
         {zoom && card.thumb && (
           <div
-            role="button"
-            tabIndex={0}
-            aria-label="Close full-size view"
-            onClick={() => setZoom(false)}
-            onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(false) }}
-            className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6"
+ role="button"
+ tabIndex={0}
+ aria-label="Close full-size view"
+ onClick={() => setZoom(false)}
+ onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(false) }}
+ className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={String(card.thumb)} alt={card.title || "Design"} className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
@@ -1563,11 +1563,11 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
 // other history feed; only the per-row SUBJECT (card title, lane move, lost payout) is
 // board-specific and lives here.
 function boardSubject(r: AuditRow) {
-  const b = (r.before ?? {}) as Record<string, unknown>
-  const title = String(b.title || "") || (r.entity_id ? `Card ${r.entity_id}` : "a card")
-  const from = String(((r.before ?? {}) as Record<string, unknown>).col ?? "")
-  const to = String(((r.after ?? {}) as Record<string, unknown>).col ?? "")
-  return (
+ const b = (r.before ?? {}) as Record<string, unknown>
+ const title = String(b.title || "") || (r.entity_id ? `Card ${r.entity_id}` : "a card")
+ const from = String(((r.before ?? {}) as Record<string, unknown>).col ?? "")
+ const to = String(((r.after ?? {}) as Record<string, unknown>).col ?? "")
+ return (
     <>
       <span className="text-foreground">{title}</span>
       {r.action === "design.lane" && (from || to) && (
@@ -1581,42 +1581,42 @@ function boardSubject(r: AuditRow) {
 }
 
 function BoardHistory() {
-  const [rows, setRows] = useState<AuditRow[] | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [onlyDeletes, setOnlyDeletes] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      getDesignBoardHistory()
+ const [rows, setRows] = useState<AuditRow[] | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [onlyDeletes, setOnlyDeletes] = useState(false)
+ useEffect(() => {
+ const t = setTimeout(() => {
+ getDesignBoardHistory()
         .then((r) => setRows(Array.isArray(r) ? r : []))
         .catch(() => setErr("Couldn't load the board history."))
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [])
 
-  if (err) return <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{err}</div>
-  if (rows === null) return <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
+ if (err) return <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{err}</div>
+ if (rows === null) return <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
 
-  const shown = onlyDeletes ? rows.filter((r) => r.action === "design_card.deleted") : rows
-  const deletes = rows.filter((r) => r.action === "design_card.deleted").length
+ const shown = onlyDeletes ? rows.filter((r) => r.action === "design_card.deleted") : rows
+ const deletes = rows.filter((r) => r.action === "design_card.deleted").length
 
-  return (
+ return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">{rows.length} action{rows.length === 1 ? "" : "s"} recorded · {deletes} deletion{deletes === 1 ? "" : "s"}</span>
         {/* The tab exists mainly to answer "what got deleted?" — so a one-click filter to
-            exactly that, without hunting through moves and credits. */}
+ exactly that, without hunting through moves and credits. */}
         <button onClick={() => setOnlyDeletes((v) => !v)}
-          className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-red-300 bg-red-50 text-red-700" : "border-border text-muted-foreground hover:bg-accent")}>
+ className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-red-300 bg-red-50 text-red-700" : "border-border text-muted-foreground hover:bg-accent")}>
           {onlyDeletes ? "Showing deletions only" : "Deletions only"}
         </button>
       </div>
 
       <ActivityFeed
-        rows={shown}
-        variant="card"
-        note={false}
-        subject={boardSubject}
-        empty={onlyDeletes ? "No cards have been deleted." : "Nothing recorded yet."}
+ rows={shown}
+ variant="card"
+ note={false}
+ subject={boardSubject}
+ empty={onlyDeletes ? "No cards have been deleted." : "Nothing recorded yet."}
       />
     </div>
   )

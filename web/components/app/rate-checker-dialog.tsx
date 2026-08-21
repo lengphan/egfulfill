@@ -16,34 +16,34 @@ const CARRIERS = ["usps", "ups"]
  * on the ZIP, so a placeholder street is enough to price them.
  */
 export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const [fromZip, setFromZip] = useState("")
-  const [toZip, setToZip] = useState("")
-  const [pkg, setPkg] = useState({ lb: 0, oz: 8, length: 10, width: 8, height: 2 })
-  const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
-  const [rates, setRates] = useState<ShippingRate[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+ const [fromZip, setFromZip] = useState("")
+ const [toZip, setToZip] = useState("")
+ const [pkg, setPkg] = useState({ lb: 0, oz: 8, length: 10, width: 8, height: 2 })
+ const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)
+ const [rates, setRates] = useState<ShippingRate[] | null>(null)
+ const [loading, setLoading] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
 
-  const check = async () => {
-    setErr(null)
-    if (!/^\d{5}$/.test(fromZip) || !/^\d{5}$/.test(toZip)) { setErr("Enter a 5-digit From and To ZIP."); return }
-    setLoading(true); setRates(null)
-    try {
-      const r = await getShippingRates({
-        from: { street: "1 Main St", city: "", state: "", zip: fromZip },
-        to: { street: "1 Main St", city: "", state: "", zip: toZip },
-        parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height },
+ const check = async () => {
+ setErr(null)
+ if (!/^\d{5}$/.test(fromZip) || !/^\d{5}$/.test(toZip)) { setErr("Enter a 5-digit From and To ZIP."); return }
+ setLoading(true); setRates(null)
+ try {
+ const r = await getShippingRates({
+ from: { street: "1 Main St", city: "", state: "", zip: fromZip },
+ to: { street: "1 Main St", city: "", state: "", zip: toZip },
+ parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height },
       })
-      if (r.error) { setErr(r.error); return }
-      const shown = (r.rates || []).filter((rt) => CARRIERS.some((c) => (rt.carrier || "").toLowerCase().includes(c))).sort((a, b) => a.amount - b.amount)
-      setRates(shown)
-      if (!shown.length) setErr(r.errors?.join(" · ") || "No USPS or UPS rates for this parcel.")
+ if (r.error) { setErr(r.error); return }
+ const shown = (r.rates || []).filter((rt) => CARRIERS.some((c) => (rt.carrier || "").toLowerCase().includes(c))).sort((a, b) => a.amount - b.amount)
+ setRates(shown)
+ if (!shown.length) setErr(r.errors?.join(" · ") || "No USPS or UPS rates for this parcel.")
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't fetch rates.")
+ setErr(e instanceof Error ? e.message : "Couldn't fetch rates.")
     } finally { setLoading(false) }
   }
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Rate checker</DialogTitle></DialogHeader>
@@ -61,9 +61,9 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
             <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" /></label>
           </div>
           <Button className="w-full" onClick={check} disabled={loading}>{loading ? <><CircleNotch size={14} className="animate-spin" /> Checking…</> : <><Truck size={14} weight="bold" /> Check rates</>}</Button>
-          {err && <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">{err}</div>}
+          {err && <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">{err}</div>}
           {/* USPS is on by default in Shippo; UPS only shows once a UPS carrier account is
-              connected there. If nothing UPS came back, say why rather than leave a gap. */}
+ connected there. If nothing UPS came back, say why rather than leave a gap. */}
           {rates && rates.length > 0 && !rates.some((r) => (r.carrier || "").toLowerCase().includes("ups") && !(r.carrier || "").toLowerCase().includes("usps")) && (
             <div className="rounded-lg border border-border px-3 py-2 text-2xs text-muted-foreground">
               No UPS rates came back. Connect a UPS account in your Shippo dashboard (Settings → Carriers → UPS) and they’ll appear here automatically.

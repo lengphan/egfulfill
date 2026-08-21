@@ -17,57 +17,57 @@ const int = (n: number) => (n ?? 0).toLocaleString("en-US")
 const DAYS = [7, 14, 30, 90]
 
 const CHANNEL: Record<string, { label: string; cls: string }> = {
-  meta: { label: "Meta", cls: "bg-sky-100 text-sky-700" },
-  google: { label: "Google", cls: "bg-amber-100 text-amber-700" },
+ meta: { label: "Meta", cls: "bg-sky-100 text-sky-700" },
+ google: { label: "Google", cls: "bg-hold/15 text-hold" },
 }
 
 // Meta + Google campaign performance for the team. Read is the point; create makes
 // the campaign shell (paused) — targeting/creative stay in the providers' tools.
 export function CampaignsView() {
-  const [cfg, setCfg] = useState<AdsConfig | null>(null)
-  const [conns, setConns] = useState<AdConnection[]>([])
-  const [data, setData] = useState<AdsResponse | null>(null)
-  const [days, setDays] = useState(7)
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
-  const [newOpen, setNewOpen] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [role, setRole] = useState("")
+ const [cfg, setCfg] = useState<AdsConfig | null>(null)
+ const [conns, setConns] = useState<AdConnection[]>([])
+ const [data, setData] = useState<AdsResponse | null>(null)
+ const [days, setDays] = useState(7)
+ const [loading, setLoading] = useState(true)
+ const [err, setErr] = useState<string | null>(null)
+ const [newOpen, setNewOpen] = useState(false)
+ const [busy, setBusy] = useState<string | null>(null)
+ const [role, setRole] = useState("")
 
-  const load = useCallback((d: number) => {
-    if (!getToken()) { setLoading(false); return }
-    setLoading(true); setErr(null)
+ const load = useCallback((d: number) => {
+ if (!getToken()) { setLoading(false); return }
+ setLoading(true); setErr(null)
     Promise.all([
-      getAdsConfig().catch(() => null),
-      getAdConnections().catch(() => []),
-      getAdCampaigns(d).catch((e) => { setErr(e instanceof Error ? e.message : "Could not load campaigns"); return null }),
+ getAdsConfig().catch(() => null),
+ getAdConnections().catch(() => []),
+ getAdCampaigns(d).catch((e) => { setErr(e instanceof Error ? e.message : "Could not load campaigns"); return null }),
     ])
       .then(([c, cn, camp]) => { setCfg(c); setConns(cn ?? []); setData(camp) })
       .finally(() => setLoading(false))
   }, [])
-  useEffect(() => {
-    const id = setTimeout(() => { setRole(getUser()?.role || ""); load(days) }, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ const id = setTimeout(() => { setRole(getUser()?.role || ""); load(days) }, 0)
+ return () => clearTimeout(id)
   }, [days, load])
 
-  const toggle = async (channel: string, id: string, status: string) => {
-    const next = status === "active" ? "PAUSED" : "ACTIVE"
-    setBusy(id)
-    try { await setAdCampaignStatus(channel, id, next); load(days) }
-    catch (e) { setErr(e instanceof Error ? e.message : "Could not update the campaign") }
-    finally { setBusy(null) }
+ const toggle = async (channel: string, id: string, status: string) => {
+ const next = status === "active" ? "PAUSED" : "ACTIVE"
+ setBusy(id)
+ try { await setAdCampaignStatus(channel, id, next); load(days) }
+ catch (e) { setErr(e instanceof Error ? e.message : "Could not update the campaign") }
+ finally { setBusy(null) }
   }
 
-  const connected = conns.length > 0
+ const connected = conns.length > 0
   // Optional-chain the NESTED keys too: `cfg?.meta.enabled` only guards cfg, so a config
   // response without a `meta` block took the whole page down.
-  const anyEnabled = !!(cfg?.meta?.enabled || cfg?.google?.enabled)
+ const anyEnabled = !!(cfg?.meta?.enabled || cfg?.google?.enabled)
 
-  return (
+ return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 md:hidden">
-          <Megaphone size={18} weight="regular"  className="shrink-0 text-primary" />
+          <Megaphone size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
             <PageTitle>Campaigns</PageTitle>
             <p className="text-sm text-muted-foreground">Facebook &amp; Google ad performance{data ? ` · ${data.since} → ${data.until}` : ""}</p>
@@ -116,12 +116,12 @@ export function CampaignsView() {
 
       {/* Only surface a fetch error once ads are actually configured — otherwise the
           "not configured" card above already explains it, and a raw error next to it
-          reads as a second, unrelated fault. */}
+ reads as a second, unrelated fault. */}
       {err && anyEnabled && <div className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"><Warning size={14} weight="fill" /> {err}</div>}
 
       {/* Per-channel failures — one channel down must not look like zero spend. */}
       {data?.errors?.map((e, i) => (
-        <div key={i} className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+        <div key={i} className="flex items-center gap-1.5 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-xs text-hold">
           <Warning size={13} weight="fill" /> <b className="capitalize">{e.channel}</b> ({e.account}): {e.error}
         </div>
       ))}
@@ -191,27 +191,27 @@ export function CampaignsView() {
 }
 
 function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; cfg: AdsConfig | null; onCreated: () => void }) {
-  const [channel, setChannel] = useState<"meta" | "google">("meta")
-  const [name, setName] = useState("")
-  const [budget, setBudget] = useState("25")
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
+ const [channel, setChannel] = useState<"meta" | "google">("meta")
+ const [name, setName] = useState("")
+ const [budget, setBudget] = useState("25")
+ const [saving, setSaving] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [done, setDone] = useState<string | null>(null)
 
-  const submit = async () => {
-    setErr(null); setSaving(true); setDone(null)
-    try {
-      const r = await createAdCampaign({ channel, name: name.trim(), dailyBudget: Number(budget) })
-      if (r.error) throw new Error(r.error)
-      setDone(r.id ? `Created (paused) · id ${r.id}` : "Created (paused)")
-      setName("")
-      onCreated()
+ const submit = async () => {
+ setErr(null); setSaving(true); setDone(null)
+ try {
+ const r = await createAdCampaign({ channel, name: name.trim(), dailyBudget: Number(budget) })
+ if (r.error) throw new Error(r.error)
+ setDone(r.id ? `Created (paused) · id ${r.id}` : "Created (paused)")
+ setName("")
+ onCreated()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not create the campaign")
+ setErr(e instanceof Error ? e.message : "Could not create the campaign")
     } finally { setSaving(false) }
   }
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>New campaign</DialogTitle></DialogHeader>
@@ -219,7 +219,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
           <div className="flex rounded-lg border border-border p-0.5">
             {(["meta", "google"] as const).map((c) => (
               <button key={c} onClick={() => setChannel(c)} disabled={c === "meta" ? !cfg?.meta?.enabled : !cfg?.google?.enabled}
-                className={"flex-1 rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors disabled:opacity-40 " + (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+ className={"flex-1 rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors disabled:opacity-40 " + (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
                 {CHANNEL[c].label}
               </button>
             ))}
@@ -233,7 +233,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
             <Input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="max-w-[120px]" />
           </label>
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-xs text-hold">
             Creates the campaign <b>paused</b>. Add targeting and creative in {CHANNEL[channel].label} Ads Manager, then resume it here or there — nothing spends until you do.
           </div>
 

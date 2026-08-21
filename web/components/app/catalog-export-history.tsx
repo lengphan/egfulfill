@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { getCatalogExports, type CatalogExport } from "@/lib/api"
 
 const when = (s: string) =>
-  new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+ new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
 
 /**
  * Catalogues that were sent, and a way back to them.
@@ -17,19 +17,19 @@ const when = (s: string) =>
  * which is the only thing that makes it evidence rather than a guess.
  */
 export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void }) {
-  const [rows, setRows] = useState<CatalogExport[] | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+ const [rows, setRows] = useState<CatalogExport[] | null>(null)
+ const [err, setErr] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    getCatalogExports()
+ const load = useCallback(() => {
+ getCatalogExports()
       .then((r) => { setRows(r.exports ?? []); setErr(null) })
       .catch((e: Error) => { setErr(e.message); setRows([]) })
   }, [])
-  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+ useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
 
-  return (
+ return (
     <div className="space-y-3 px-5 py-4">
-      {err && <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">{err}</div>}
+      {err && <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">{err}</div>}
 
       {rows === null ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
@@ -43,8 +43,8 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
           <p className="text-sm">No catalogues saved yet.</p>
           <p className="max-w-md text-xs">
             Open <strong>Create lookbook</strong> and press <strong>Save this version</strong> before you
-            send one. It records the styles and prices as they were, so you can reopen exactly
-            what the buyer saw.
+ send one. It records the styles and prices as they were, so you can reopen exactly
+ what the buyer saw.
           </p>
         </div>
       ) : (

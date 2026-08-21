@@ -25,63 +25,63 @@ const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).to
  * amount gets paid back.
  */
 export function DesignQuoteBanner({ order, item, onAnswered }: {
-  order: OrderRow
-  item: OrderItem
-  onAnswered?: () => void
+ order: OrderRow
+ item: OrderItem
+ onAnswered?: () => void
 }) {
-  const [busy, setBusy] = useState<"accept" | "decline" | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
+ const [busy, setBusy] = useState<"accept" | "decline" | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [done, setDone] = useState<string | null>(null)
 
-  if (item.design_quote_status !== "pending" && !done) return null
+ if (item.design_quote_status !== "pending" && !done) return null
 
-  const answer = async (decision: "accept" | "decline") => {
-    setBusy(decision); setErr(null)
-    try {
-      const r = await answerDesignQuote(order.id, {
-        decision, line_id: item.line_id, sku: item.line_id ? undefined : item.sku,
+ const answer = async (decision: "accept" | "decline") => {
+ setBusy(decision); setErr(null)
+ try {
+ const r = await answerDesignQuote(order.id, {
+ decision, line_id: item.line_id, sku: item.line_id ? undefined : item.sku,
       })
-      if (r?.error) {
+ if (r?.error) {
         // A balance shortfall is not a failure of the request — it's an answerable
         // condition, and saying "error" would suggest trying the same thing again.
-        setErr(r.needsTopup ? `${r.error}` : r.error)
-        return
+ setErr(r.needsTopup ? `${r.error}` : r.error)
+ return
       }
-      setDone(decision === "accept"
+ setDone(decision === "accept"
         ? `Accepted — ${money(r.charged)} charged. We'll start on it.`
         // Says what did NOT happen. "We'll be in touch about cancelling" reads as though
         // cancellation is already in motion, and it isn't — declining the digitising is not
         // declining the order, and only the seller gets to make that second call.
-        : "Declined — we won't digitise this one. Your order is untouched. Send us your own machine file if you have one, or cancel the order yourself if you'd rather not go ahead.")
-      onAnswered?.()
+ : "Declined — we won't digitise this one. Your order is untouched. Send us your own machine file if you have one, or cancel the order yourself if you'd rather not go ahead.")
+ onAnswered?.()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(null) }
   }
 
-  if (done) {
-    return (
+ if (done) {
+ return (
       <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
         <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" /><span>{done}</span>
       </div>
     )
   }
 
-  return (
-    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+ return (
+    <div className="rounded-xl border border-hold/30 bg-hold/10 p-3">
       <div className="flex items-start gap-2">
-        <Sparkle size={16} weight="fill" className="mt-0.5 shrink-0 text-amber-700" />
+        <Sparkle size={16} weight="fill" className="mt-0.5 shrink-0 text-hold" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-amber-900">
+          <p className="text-sm font-medium text-hold">
             This design is intricate — {item.name || item.sku}
           </p>
-          <p className="mt-0.5 text-xs text-amber-800">
+          <p className="mt-0.5 text-xs text-hold">
             We&apos;ve looked at your artwork and it needs more work than a standard digitise.
             It&apos;s <strong>{money(item.design_quote_make)}</strong> to make the machine file
             {Number(item.design_quote_download) > 0 && <>, and <strong>{money(item.design_quote_download)}</strong> if you later want to download it</>}.
           </p>
-          <p className="mt-1 text-2xs text-amber-700">
+          <p className="mt-1 text-2xs text-hold">
             Nothing has been charged. Declining turns down <strong>the design work only</strong> —
-            your order stays exactly as it is. If you&apos;d rather cancel it, that&apos;s yours
-            to do, and we won&apos;t do it for you.
+ your order stays exactly as it is. If you&apos;d rather cancel it, that&apos;s yours
+ to do, and we won&apos;t do it for you.
           </p>
 
           <div className="mt-2 flex flex-wrap gap-2">

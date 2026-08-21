@@ -27,25 +27,25 @@ type Supplier = "ss" | "otto" | "sanmar"
 
 /** The common shape the three detail endpoints collapse to. */
 type Detail = {
-  name: string
+ name: string
   /** The style code a person uses — "5000", "PC61". NOT the key this window fetches by:
    *  S&S's is an internal row id, so the two differ for exactly one of the three suppliers. */
-  styleNo?: string | null
-  brand?: string | null
-  category?: string | null
-  description?: string | null
-  image?: string | null
-  colors: string[]
-  sizes: string[]
-  colorImages: Record<string, string>
+ styleNo?: string | null
+ brand?: string | null
+ category?: string | null
+ description?: string | null
+ image?: string | null
+ colors: string[]
+ sizes: string[]
+ colorImages: Record<string, string>
   /** The OTHER angles of each colourway — back, side, on-model — keyed by colour. */
-  colorExtras?: Record<string, string[]>
+ colorExtras?: Record<string, string[]>
   /** Style-level gallery, for when no colour is chosen yet. */
-  extraImages?: string[]
-  skus: number
+ extraImages?: string[]
+ skus: number
   /** null = we never asked (Otto / SanMar). {} = asked and the style has none. */
-  stockByColor?: Record<string, number> | null
-  stockByVariant?: Record<string, Record<string, number>> | null
+ stockByColor?: Record<string, number> | null
+ stockByVariant?: Record<string, Record<string, number>> | null
 }
 
 const SUPPLIER_NAME: Record<Supplier, string> = { ss: "S&S Activewear", otto: "Otto Cap", sanmar: "SanMar" }
@@ -70,26 +70,26 @@ const SUPPLIER_NAME: Record<Supplier, string> = { ss: "S&S Activewear", otto: "O
 const specLines = descriptionLines
 
 export function SupplierDetailDialog({
-  open, onOpenChange, supplier, styleId, seed, onOrder, onAddToCatalog, added, onAddToCart,
+ open, onOpenChange, supplier, styleId, seed, onOrder, onAddToCatalog, added, onAddToCart,
 }: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  supplier: Supplier | null
-  styleId: string | null
+ open: boolean
+ onOpenChange: (o: boolean) => void
+ supplier: Supplier | null
+ styleId: string | null
   /** What the card already knows, shown immediately so the window has content before the
-   *  fetch lands — opening onto a spinner for a style you can already see is a step
-   *  backwards from the tile you clicked. */
-  seed?: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null; styleNo?: string | null }
-  onOrder?: () => void
-  onAddToCatalog?: () => void
-  added?: boolean
+   * fetch lands — opening onto a spinner for a style you can already see is a step
+   * backwards from the tile you clicked. */
+ seed?: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null; styleNo?: string | null }
+ onOrder?: () => void
+ onAddToCatalog?: () => void
+ added?: boolean
   /** Put THIS variant in the purchasing cart. Given the choices made in this window, so
-   *  nothing has to be re-picked on the way out. */
-  onAddToCart?: (sel: { colour: string | null; size: string | null; qty: number }) => void
+   * nothing has to be re-picked on the way out. */
+ onAddToCart?: (sel: { colour: string | null; size: string | null; qty: number }) => void
 }) {
-  const [d, setD] = useState<Detail | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [colour, setColour] = useState<string | null>(null)
+ const [d, setD] = useState<Detail | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [colour, setColour] = useState<string | null>(null)
   /**
    * THE VARIANT AND HOW MANY, decided here rather than back on the grid.
    *
@@ -97,59 +97,59 @@ export function SupplierDetailDialog({
    * the fabric. Sending you back to a tile to press Order, and re-choosing the colour you
    * just chose here, is the pointless half of that journey.
    */
-  const [size, setSize] = useState<string | null>(null)
-  const [qty, setQty] = useState(1)
+ const [size, setSize] = useState<string | null>(null)
+ const [qty, setQty] = useState(1)
   /** Which angle of the current colourway is on screen. Cleared with the colour. */
-  const [frame, setFrame] = useState<string | null>(null)
+ const [frame, setFrame] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open || !supplier || !styleId) return
-    let alive = true
-    const t = setTimeout(() => {
-      setD(null); setErr(null); setColour(null); setSize(null); setQty(1); setFrame(null)
-      const fetcher =
-        supplier === "ss" ? getSsStyle(styleId)
-          : supplier === "otto" ? getOttoStyle(styleId)
-            : getSanmarCatalogStyle(styleId)
-      fetcher
+ useEffect(() => {
+ if (!open || !supplier || !styleId) return
+ let alive = true
+ const t = setTimeout(() => {
+ setD(null); setErr(null); setColour(null); setSize(null); setQty(1); setFrame(null)
+ const fetcher =
+ supplier === "ss" ? getSsStyle(styleId)
+ : supplier === "otto" ? getOttoStyle(styleId)
+ : getSanmarCatalogStyle(styleId)
+ fetcher
         .then((r) => {
-          if (!alive) return
-          const raw = r as Record<string, unknown>
-          if (raw?.error) { setErr(String(raw.error)); return }
-          setD({
-            name: String(raw.name ?? raw.title ?? seed?.name ?? styleId),
+ if (!alive) return
+ const raw = r as Record<string, unknown>
+ if (raw?.error) { setErr(String(raw.error)); return }
+ setD({
+ name: String(raw.name ?? raw.title ?? seed?.name ?? styleId),
             // S&S answers with styleName/partNumber; Otto and SanMar are already keyed by
             // their real style code, so for them the fetch key IS the number.
-            styleNo: (raw.styleName as string) || (raw.partNumber as string) || (supplier === "ss" ? null : styleId),
-            brand: (raw.brand as string) ?? seed?.brand ?? null,
-            category: (raw.category as string) ?? null,
-            description: (raw.description as string) ?? null,
-            image: (raw.image as string) ?? seed?.image ?? null,
-            colors: Array.isArray(raw.colors) ? (raw.colors as string[]) : [],
-            sizes: Array.isArray(raw.sizes) ? (raw.sizes as string[]) : [],
-            colorImages: (raw.colorImages as Record<string, string>) ?? {},
-            colorExtras: (raw.colorExtras as Record<string, string[]>) ?? undefined,
-            extraImages: Array.isArray(raw.extraImages) ? (raw.extraImages as string[]) : undefined,
-            skus: Array.isArray(raw.skus) ? (raw.skus as string[]).length : 0,
+ styleNo: (raw.styleName as string) || (raw.partNumber as string) || (supplier === "ss" ? null : styleId),
+ brand: (raw.brand as string) ?? seed?.brand ?? null,
+ category: (raw.category as string) ?? null,
+ description: (raw.description as string) ?? null,
+ image: (raw.image as string) ?? seed?.image ?? null,
+ colors: Array.isArray(raw.colors) ? (raw.colors as string[]) : [],
+ sizes: Array.isArray(raw.sizes) ? (raw.sizes as string[]) : [],
+ colorImages: (raw.colorImages as Record<string, string>) ?? {},
+ colorExtras: (raw.colorExtras as Record<string, string[]>) ?? undefined,
+ extraImages: Array.isArray(raw.extraImages) ? (raw.extraImages as string[]) : undefined,
+ skus: Array.isArray(raw.skus) ? (raw.skus as string[]).length : 0,
             // ABSENT MEANS UNKNOWN, NOT ZERO. Only S&S returns these — Otto and SanMar keep
             // no quantity in our data, and asking them costs a live call per sku / per style.
             // Defaulting the missing case to 0 would print "Out of stock" over two suppliers
             // we never asked, which is the one thing worse than not showing a number.
-            stockByColor: (raw.stockByColor as Record<string, number>) ?? null,
-            stockByVariant: (raw.stockByVariant as Record<string, Record<string, number>>) ?? null,
+ stockByColor: (raw.stockByColor as Record<string, number>) ?? null,
+ stockByVariant: (raw.stockByVariant as Record<string, Record<string, number>>) ?? null,
           })
         })
         .catch((e) => { if (alive) setErr(e instanceof Error ? e.message : "Couldn't load this blank.") })
     }, 0)
-    return () => { alive = false; clearTimeout(t) }
+ return () => { alive = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, supplier, styleId])
 
-  if (!open || !supplier || !styleId) return null
+ if (!open || !supplier || !styleId) return null
 
   // The card already knows the number for S&S, so the header doesn't have to wait on the
   // fetch to stop being wrong — and once the detail lands, its own value wins.
-  const styleNo = d?.styleNo || seed?.styleNo || (supplier === "ss" ? null : styleId)
+ const styleNo = d?.styleNo || seed?.styleNo || (supplier === "ss" ? null : styleId)
 
   /**
    * EVERY ANGLE OF WHAT YOU ARE LOOKING AT.
@@ -162,17 +162,17 @@ export function SupplierDetailDialog({
    * mixing them would put a black back-view under a red cap. Before a colour is chosen it
    * falls back to the style's own gallery.
    */
-  const frames = (() => {
-    const front = (colour && (d?.colorImages ?? {})[colour]) || d?.image || seed?.image || null
-    const extras = colour ? (d?.colorExtras ?? {})[colour] ?? [] : (d?.extraImages ?? [])
-    return Array.from(new Set([front, ...extras].filter((x): x is string => !!x)))
+ const frames = (() => {
+ const front = (colour && (d?.colorImages ?? {})[colour]) || d?.image || seed?.image || null
+ const extras = colour ? (d?.colorExtras ?? {})[colour] ?? [] : (d?.extraImages ?? [])
+ return Array.from(new Set([front, ...extras].filter((x): x is string => !!x)))
   })()
   // The frame you clicked, else the first — which is the colour's front, or the style photo.
   // `frame` is cleared whenever the colour changes, so it can never show the previous
   // colourway's back panel next to the new colour's name.
-  const shown = (frame && frames.includes(frame) ? frame : frames[0]) ?? null
+ const shown = (frame && frames.includes(frame) ? frame : frames[0]) ?? null
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/**
         * WIDTH SET BY WHAT IS IN IT, which is not much: a size run, a palette, one number.
@@ -249,18 +249,18 @@ export function SupplierDetailDialog({
               )}
             </div>
             {/* The other angles of THIS colourway. A cap head-on says nothing about the back,
-                which on a trucker or a snapback is half the product. Only shown when there is
-                more than one — a single thumbnail under a photo of the same thing is furniture. */}
+ which on a trucker or a snapback is half the product. Only shown when there is
+ more than one — a single thumbnail under a photo of the same thing is furniture. */}
             {frames.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 {frames.map((u) => (
                   <button
-                    key={u}
-                    type="button"
-                    onClick={() => setFrame(u)}
-                    aria-label="Show this angle"
-                    aria-pressed={u === shown}
-                    className={"relative size-14 shrink-0 overflow-hidden rounded-md border bg-white transition-colors "
+ key={u}
+ type="button"
+ onClick={() => setFrame(u)}
+ aria-label="Show this angle"
+ aria-pressed={u === shown}
+ className={"relative size-14 shrink-0 overflow-hidden rounded-md border bg-white transition-colors "
                       + (u === shown ? "border-primary ring-1 ring-primary/40" : "border-border hover:border-foreground/25")}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -275,7 +275,7 @@ export function SupplierDetailDialog({
             {err && <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
 
             {/* Brand, name, supplier and price all live in the header now — this column is
-                the description and the variant choice, and nothing else. */}
+ the description and the variant choice, and nothing else. */}
             {!d && !err && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <CircleNotch size={13} className="animate-spin" /> Loading the rest…
@@ -295,21 +295,21 @@ export function SupplierDetailDialog({
                   </ul>
                 )}
                 {/* Sizes as a LIST, not a count. "12 sizes" doesn't tell you whether it goes
-                    to 4XL, which is the question actually being asked. */}
+ to 4XL, which is the question actually being asked. */}
                 {/* Sizes are PICKABLE, for the same reason the colours are: this is where
-                    the choice is being made. Still a full list, so "does it reach 4XL" is
-                    answered by looking rather than by counting. */}
+ the choice is being made. Still a full list, so "does it reach 4XL" is
+ answered by looking rather than by counting. */}
                 <Section label={`Sizes${d.sizes.length ? ` (${d.sizes.length})` : ""}`}>
                   {d.sizes.length ? (
                     <span className="flex flex-wrap gap-1.5">
                       {d.sizes.map((z) => (
                         <button
-                          key={z}
-                          type="button"
-                          onClick={() => setSize(z === size ? null : z)}
+ key={z}
+ type="button"
+ onClick={() => setSize(z === size ? null : z)}
                           // Sized to be HIT as well as read. These were 10px text in a 2px
                           // pad — a target you aim at, on the control you are here to use.
-                          className={"min-w-9 rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors "
+ className={"min-w-9 rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors "
                             + (z === size ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
                         >
                           {z}
@@ -321,17 +321,17 @@ export function SupplierDetailDialog({
                 {/* Names ran together into an unreadable line — "016 - White · 017 - Dk.
                     Green · 021 - Green · 030 - Sky Blue…" is fourteen facts in one sentence.
                     They are chips now: the ones with a photo show it, the rest show their
-                    colour, and every one of them changes the picture. The name is on hover
-                    and on the selected chip, which is the only moment it matters. */}
+ colour, and every one of them changes the picture. The name is on hover
+ and on the selected chip, which is the only moment it matters. */}
                 <Section label={`Colours${d.colors.length ? ` (${d.colors.length})` : ""}`}>
                   {d.colors.length ? (
                     <span className="flex flex-wrap gap-x-2 gap-y-2">
                       {d.colors.map((c) => (
                         <span key={c} className="flex w-[4.5rem] flex-col items-center gap-1">
                         <button
-                          type="button"
-                          title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
-                          onClick={() => { setColour(c === colour ? null : c); setFrame(null) }}
+ type="button"
+ title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
+ onClick={() => { setColour(c === colour ? null : c); setFrame(null) }}
                           // NOT dimmed by stock. Fading the unavailable ones washed out the
                           // whole palette — seventeen pale blobs that read as "this widget is
                           // broken" rather than "these colours are short", and it hid the very
@@ -347,26 +347,26 @@ export function SupplierDetailDialog({
                            * to the body of the garment. Same treatment the product card
                            * already uses (260% at center 42%).
                            */
-                          className={"relative size-9 shrink-0 overflow-hidden rounded-full border-2 bg-muted transition-transform hover:scale-110 "
+ className={"relative size-9 shrink-0 overflow-hidden rounded-full border-2 bg-muted transition-transform hover:scale-110 "
                             + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
-                          style={d.colorImages[c]
+ style={d.colorImages[c]
                             ? { backgroundImage: `url("${d.colorImages[c]}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
-                            : { background: colorHex(c) }}
+ : { background: colorHex(c) }}
                         />
                         {/* THE NAME UNDER THE SWATCH. It was on hover and on the selected chip
-                            only, so reading the palette meant pointing at each circle in turn
+ only, so reading the palette meant pointing at each circle in turn
                             — and a zoomed crop of a garment is not always enough to tell
                             Charcoal from Black. Supplier codes are prettified ("031753A -
                             Blk/Dk.Grn" → the readable half) and truncated; the full string
-                            stays on the button's title. */}
+ stays on the button's title. */}
                         {/* TWO LINES, NOT AN ELLIPSIS. Otto names are compound — "Navy/White",
                             "Black/Dark Green", "Khaki/Navy" — and a single truncated line
-                            turned three different colourways into "Navy/W…", "Navy/Da…" and
+ turned three different colourways into "Navy/W…", "Navy/Da…" and
                             "Navy/Kh…", which distinguishes nothing. Wrapping keeps the part
-                            that actually differs visible. */}
+ that actually differs visible. */}
                         <span
-                          className={"line-clamp-2 w-full break-words text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
-                          title={c}
+ className={"line-clamp-2 w-full break-words text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
+ title={c}
                         >
                           {prettyColorName(c)}
                         </span>
@@ -376,8 +376,8 @@ export function SupplierDetailDialog({
                   ) : "—"}
                 </Section>
                 {/* "Orderable skus 24" is colours × sizes — a number already implied by the
-                    two rows above it, and not one anybody acts on. Removed rather than kept
-                    for completeness. */}
+ two rows above it, and not one anybody acts on. Removed rather than kept
+ for completeness. */}
                 {/**
                   * SUPPLIER STOCK, from the rows this dialog already fetched.
                   *
@@ -410,26 +410,26 @@ export function SupplierDetailDialog({
                 {d.stockByColor && colour && (
                   <Section label="Stock">
                     {(() => {
-                      const bySize = d.stockByVariant?.[colour] ?? {}
-                      const entries = Object.entries(bySize)
-                      if (!entries.length) return <span className="text-muted-foreground">No figures for this colourway.</span>
+ const bySize = d.stockByVariant?.[colour] ?? {}
+ const entries = Object.entries(bySize)
+ if (!entries.length) return <span className="text-muted-foreground">No figures for this colourway.</span>
                       // A size chosen as well: one number, no labels. Nothing else is in
                       // question, and the colour and size are both lit up above.
-                      if (size) {
-                        const n = bySize[size]
+ if (size) {
+ const n = bySize[size]
                         // NO STRIKETHROUGH ON A ZERO. A struck-out number reads as "this
                         // figure is void", when the figure is the answer: there are none.
                         // Colour carries it instead — the number stays legible.
-                        return n == null
+ return n == null
                           ? <span className="text-muted-foreground">Not offered in {size}.</span>
-                          : <span className={"text-lg font-semibold tabular-nums " + (n > 0 ? "" : "text-amber-700")}>{n.toLocaleString()}</span>
+ : <span className={"text-lg font-semibold tabular-nums " + (n > 0 ? "" : "text-hold")}>{n.toLocaleString()}</span>
                       }
-                      return (
+ return (
                         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                           {entries.map(([z, n]) => (
                             <span key={z} className="tabular-nums">
                               <span className="text-muted-foreground">{z} </span>
-                              <span className={"font-medium " + (n > 0 ? "" : "text-amber-700")}>{n.toLocaleString()}</span>
+                              <span className={"font-medium " + (n > 0 ? "" : "text-hold")}>{n.toLocaleString()}</span>
                             </span>
                           ))}
                         </span>
@@ -461,10 +461,10 @@ export function SupplierDetailDialog({
               {onAddToCart && (
                 <div className="flex items-center gap-2">
                   <input
-                    type="number" min={1} value={qty}
-                    onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    aria-label="Quantity"
-                    className="h-9 w-16 rounded-lg border border-border bg-card px-2.5 text-sm tabular-nums"
+ type="number" min={1} value={qty}
+ onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+ aria-label="Quantity"
+ className="h-9 w-16 rounded-lg border border-border bg-card px-2.5 text-sm tabular-nums"
                   />
                   <Button size="sm" className="h-9" onClick={() => onAddToCart({ colour, size, qty })}>
                     Add to cart
@@ -505,7 +505,7 @@ export function SupplierDetailDialog({
  * rules that were drawing double lines against the action row.
  */
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
+ return (
     <div className="space-y-1.5">
       <div className="eg-label text-muted-foreground">{label}</div>
       <div className="text-sm">{children}</div>

@@ -19,16 +19,16 @@ import { Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   DEFAULT_MOTION, LIMITS, PRESET_NAMES, clampField, entrance,
-  type MotionPreset, type MotionSettings, type PresetName,
+ type MotionPreset, type MotionSettings, type PresetName,
 } from "@/lib/motion"
 
 /** What each preset is FOR. Shown in the editor, because "drift" alone doesn't say when. */
 const ABOUT: Record<PresetName, { title: string; use: string }> = {
-  rise: { title: "Rise", use: "The default. Anything without a reason to be different." },
-  settle: { title: "Settle", use: "Big single blocks — a closing CTA band, a product hero." },
-  drift: { title: "Drift", use: "Numbered steps and alternating rows, where sliding up makes every item look like the last." },
-  bloom: { title: "Bloom", use: "Card grids. Twelve cards sliding up is a wave; twelve blooming in place is a grid appearing." },
-  cut: { title: "Cut", use: "Dense text, tables, size charts — where a big slide is just the page moving while someone reads." },
+ rise: { title: "Rise", use: "The default. Anything without a reason to be different." },
+ settle: { title: "Settle", use: "Big single blocks — a closing CTA band, a product hero." },
+ drift: { title: "Drift", use: "Numbered steps and alternating rows, where sliding up makes every item look like the last." },
+ bloom: { title: "Bloom", use: "Card grids. Twelve cards sliding up is a wave; twelve blooming in place is a grid appearing." },
+ cut: { title: "Cut", use: "Dense text, tables, size charts — where a big slide is just the page moving while someone reads." },
 }
 
 /**
@@ -61,12 +61,12 @@ const RANGE =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
 
 /** One labelled slider with a live numeric readout. Defined at module scope — a component
- *  declared inside render remounts every keystroke (react-hooks/static-components). */
+ * declared inside render remounts every keystroke (react-hooks/static-components). */
 function Slider({ label, unit, value, min, max, step, onChange }: {
-  label: string; unit: string; value: number
-  min: number; max: number; step: number; onChange: (n: number) => void
+ label: string; unit: string; value: number
+ min: number; max: number; step: number; onChange: (n: number) => void
 }) {
-  return (
+ return (
     <label className="block">
       <span className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
@@ -75,9 +75,9 @@ function Slider({ label, unit, value, min, max, step, onChange }: {
         </span>
       </span>
       <input
-        type="range" className={`${RANGE} mt-1.5`} value={value}
-        min={min} max={max} step={step}
-        onChange={(e) => onChange(Number(e.target.value))}
+ type="range" className={`${RANGE} mt-1.5`} value={value}
+ min={min} max={max} step={step}
+ onChange={(e) => onChange(Number(e.target.value))}
       />
     </label>
   )
@@ -87,12 +87,12 @@ function Slider({ label, unit, value, min, max, step, onChange }: {
 const TILES = [0, 1, 2, 3, 4, 5]
 
 export function MotionEditor({ value, onChange }: {
-  value: MotionSettings
-  onChange: (next: MotionSettings) => void
+ value: MotionSettings
+ onChange: (next: MotionSettings) => void
 }) {
-  const [name, setName] = useState<PresetName>("rise")
-  const reduce = useReducedMotion()
-  const preset = value[name] ?? DEFAULT_MOTION[name]
+ const [name, setName] = useState<PresetName>("rise")
+ const reduce = useReducedMotion()
+ const preset = value[name] ?? DEFAULT_MOTION[name]
 
   /**
    * REPLAY IS DEBOUNCED, AND ALSO MANUAL.
@@ -104,33 +104,33 @@ export function MotionEditor({ value, onChange }: {
    * it exactly when the hand stops. The button is for playing it again without touching a
    * value, which is most of what tuning actually consists of.
    */
-  const [replay, setReplay] = useState(0)
-  const stamp = useMemo(() => JSON.stringify(preset), [preset])
-  useEffect(() => {
-    const t = setTimeout(() => setReplay((n) => n + 1), 320)
-    return () => clearTimeout(t)
+ const [replay, setReplay] = useState(0)
+ const stamp = useMemo(() => JSON.stringify(preset), [preset])
+ useEffect(() => {
+ const t = setTimeout(() => setReplay((n) => n + 1), 320)
+ return () => clearTimeout(t)
   }, [stamp])
 
-  const set = useCallback((k: keyof MotionPreset, v: MotionPreset[keyof MotionPreset]) => {
-    onChange({ ...value, [name]: { ...preset, [k]: v } })
+ const set = useCallback((k: keyof MotionPreset, v: MotionPreset[keyof MotionPreset]) => {
+ onChange({ ...value, [name]: { ...preset, [k]: v } })
   }, [onChange, value, name, preset])
 
-  const isDefault = stamp === JSON.stringify(DEFAULT_MOTION[name])
+ const isDefault = stamp === JSON.stringify(DEFAULT_MOTION[name])
   // The stage replays as a unit, so the key covers the preset AND the counter — switching
   // preset must restart it too, or you read the new numbers over the old animation.
-  const stageKey = `${name}:${replay}`
+ const stageKey = `${name}:${replay}`
 
-  return (
+ return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-1.5">
         {PRESET_NAMES.map((p) => (
           <button
-            key={p} type="button" onClick={() => setName(p)}
-            className={
+ key={p} type="button" onClick={() => setName(p)}
+ className={
               "rounded-full px-3 py-1.5 text-xs font-medium transition-colors " +
               (p === name
                 ? "bg-primary text-primary-foreground"
-                : "border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
+ : "border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
             }
           >
             {ABOUT[p].title}
@@ -144,12 +144,12 @@ export function MotionEditor({ value, onChange }: {
       </p>
 
       {reduce && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
           <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
           <span>
             Your system is set to reduce motion, so the preview below fades instead of moving —
-            and so does the live site, for anyone with that setting. The travel and easing you
-            set here are real, they are just not what you personally will see.
+ and so does the live site, for anyone with that setting. The travel and easing you
+ set here are real, they are just not what you personally will see.
           </span>
         </div>
       )}
@@ -159,32 +159,32 @@ export function MotionEditor({ value, onChange }: {
         <div className="space-y-4">
           {FIELDS.map((f) => (
             <Slider
-              key={f.key} label={f.label} unit={f.unit}
-              value={preset[f.key]}
-              min={LIMITS[f.key].min} max={LIMITS[f.key].max} step={LIMITS[f.key].step}
-              onChange={(n) => set(f.key, clampField(f.key, n))}
+ key={f.key} label={f.label} unit={f.unit}
+ value={preset[f.key]}
+ min={LIMITS[f.key].min} max={LIMITS[f.key].max} step={LIMITS[f.key].step}
+ onChange={(n) => set(f.key, clampField(f.key, n))}
             />
           ))}
 
           <label className="block">
             <span className="text-xs font-medium">Curve</span>
             <select
-              className="mt-1.5 h-9 w-full rounded-lg border border-border bg-card px-2 text-sm"
-              value={CURVES.some((c) => curveKey(c.value) === curveKey(preset.ease)) ? curveKey(preset.ease) : "custom"}
-              onChange={(e) => {
-                const found = CURVES.find((c) => curveKey(c.value) === e.target.value)
-                if (found) set("ease", [...found.value])
+ className="mt-1.5 h-9 w-full rounded-lg border border-border bg-card px-2 text-sm"
+ value={CURVES.some((c) => curveKey(c.value) === curveKey(preset.ease)) ? curveKey(preset.ease) : "custom"}
+ onChange={(e) => {
+ const found = CURVES.find((c) => curveKey(c.value) === e.target.value)
+ if (found) set("ease", [...found.value])
               }}
             >
               {CURVES.map((c) => <option key={c.label} value={curveKey(c.value)}>{c.label}</option>)}
               {/* A stored curve that matches no entry stays selectable and stays saved rather
-                  than being silently snapped to the nearest preset on load. */}
+ than being silently snapped to the nearest preset on load. */}
               {!CURVES.some((c) => curveKey(c.value) === curveKey(preset.ease)) && (
                 <option value="custom">Custom — {curveKey(preset.ease)}</option>
               )}
             </select>
             <span className="mt-1 block tabular-nums text-2xs text-muted-foreground">
-              cubic-bezier({preset.ease.join(", ")})
+ cubic-bezier({preset.ease.join(", ")})
             </span>
           </label>
 
@@ -193,9 +193,9 @@ export function MotionEditor({ value, onChange }: {
               Replay
             </Button>
             <Button
-              size="sm" variant="ghost" disabled={isDefault}
-              onClick={() => onChange({ ...value, [name]: { ...DEFAULT_MOTION[name] } })}
-              className="text-muted-foreground"
+ size="sm" variant="ghost" disabled={isDefault}
+ onClick={() => onChange({ ...value, [name]: { ...DEFAULT_MOTION[name] } })}
+ className="text-muted-foreground"
             >
               {isDefault ? "Is the default" : "Reset to default"}
             </Button>
@@ -204,11 +204,11 @@ export function MotionEditor({ value, onChange }: {
 
         {/* ── The stage ──
             Paper, not card — the marketing pages are cream, and judging a 22px rise against a
-            different background than the one it ships on is how you end up re-tuning it twice. */}
+ different background than the one it ships on is how you end up re-tuning it twice. */}
         <div
-          key={stageKey}
-          className="overflow-hidden rounded-xl border border-border p-6"
-          style={{ background: "#F2F1EC", color: "#0B0B0C", minHeight: 300 }}
+ key={stageKey}
+ className="overflow-hidden rounded-xl border border-border p-6"
+ style={{ background: "#F2F1EC", color: "#0B0B0C", minHeight: 300 }}
         >
           <motion.div {...entrance(preset, { reduce: !!reduce })}>
             <div className="h-7 w-2/3 rounded bg-black/[0.82]" />
@@ -218,11 +218,11 @@ export function MotionEditor({ value, onChange }: {
           <div className="mt-7 grid grid-cols-3 gap-3">
             {TILES.map((i) => (
               <motion.div
-                key={i}
+ key={i}
                 // index is what makes the stagger visible — six tiles arriving together tell
                 // you nothing about the one control most worth getting right.
                 {...entrance(preset, { index: i + 1, reduce: !!reduce })}
-                className="rounded-lg border border-black/[0.09] bg-white p-3"
+ className="rounded-lg border border-black/[0.09] bg-white p-3"
               >
                 <div className="h-10 rounded bg-black/[0.06]" />
                 <div className="mt-2 h-2 w-3/4 rounded bg-black/[0.18]" />
@@ -234,9 +234,9 @@ export function MotionEditor({ value, onChange }: {
           <div className="mt-6 space-y-2">
             {[0, 1].map((i) => (
               <motion.div
-                key={i}
+ key={i}
                 {...entrance(preset, { index: i + 7, reduce: !!reduce })}
-                className="flex items-center gap-3 rounded-lg border border-black/[0.09] bg-white px-4 py-3"
+ className="flex items-center gap-3 rounded-lg border border-black/[0.09] bg-white px-4 py-3"
               >
                 <span className="h-5 w-16 shrink-0 rounded-full bg-black/[0.08]" />
                 <span className="h-2 w-full rounded bg-black/[0.12]" />

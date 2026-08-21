@@ -13,25 +13,25 @@ import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type Desk
  * and no separate send button — pressing Enter generates, exactly as it posts a message.
  */
 export type GenSettings = {
-  mode: "image" | "video"
-  model: string
-  ratio: string
+ mode: "image" | "video"
+ model: string
+ ratio: string
   /** image only */
-  size?: string
+ size?: string
   /** video only */
-  resolution?: string
-  seconds?: number
+ resolution?: string
+ seconds?: number
   /** video only — animate this stored still as the first frame */
-  imageName?: string
+ imageName?: string
   /** …and its URL, so the composer can SHOW which picture is being animated. Without it,
    *  "Video" armed from the panel and "Animate" pressed on a photo looked identical. */
-  imageUrl?: string
+ imageUrl?: string
   /** Cost of one generation with these settings, shown on the pill before anything runs. */
-  usd: number
+ usd: number
   /** Short human label. */
-  label: string
+ label: string
   /** The compact form for the trigger chip — just the settings, no noun: "2K · 1:1". */
-  short: string
+ short: string
 }
 
 type Mode = "image" | "video"
@@ -40,54 +40,54 @@ type Mode = "image" | "video"
  * The settings panel. It does NOT generate anything — it arms the composer and closes.
  */
 export function GenerateButton({ disabled, armed, onArm, allowVideo = true, priceNote, autoArm = false }: {
-  disabled?: boolean
-  armed: GenSettings | null
-  onArm: (g: GenSettings | null) => void
+ disabled?: boolean
+ armed: GenSettings | null
+ onArm: (g: GenSettings | null) => void
   /** Arm with the default model as soon as the composer mounts, so a channel that exists
    *  ONLY for generating does not make someone open a settings panel to confirm defaults
-   *  the panel would have filled in anyway. Typing and pressing Enter becomes the whole
-   *  interaction; the panel stays there for changing a setting, not for starting. */
-  autoArm?: boolean
+   * the panel would have filled in anyway. Typing and pressing Enter becomes the whole
+   * interaction; the panel stays there for changing a setting, not for starting. */
+ autoArm?: boolean
   /** Sellers buy images only — video stays a factory tool, so the choice is not offered. */
-  allowVideo?: boolean
+ allowVideo?: boolean
   /** What this caller pays, e.g. "$0.50 each" or "3 free left this month". Shown so the
-   *  price is visible BEFORE the button is pressed, not discovered on the wallet after. */
-  priceNote?: string | null
+   * price is visible BEFORE the button is pressed, not discovered on the wallet after. */
+ priceNote?: string | null
 }) {
-  const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<Mode>("image")
-  const [img, setImg] = useState<DeskImageConfig | null>(null)
-  const [vid, setVid] = useState<DeskVideoConfig | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+ const [open, setOpen] = useState(false)
+ const [mode, setMode] = useState<Mode>("image")
+ const [img, setImg] = useState<DeskImageConfig | null>(null)
+ const [vid, setVid] = useState<DeskVideoConfig | null>(null)
+ const [loading, setLoading] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
 
-  const [imgModel, setImgModel] = useState("")
-  const [imgSize, setImgSize] = useState("")
-  const [imgRatio, setImgRatio] = useState("1:1")
-  const [vidModel, setVidModel] = useState("")
-  const [vidRes, setVidRes] = useState("")
-  const [vidRatio, setVidRatio] = useState("9:16")
-  const [secs, setSecs] = useState(8)
+ const [imgModel, setImgModel] = useState("")
+ const [imgSize, setImgSize] = useState("")
+ const [imgRatio, setImgRatio] = useState("1:1")
+ const [vidModel, setVidModel] = useState("")
+ const [vidRes, setVidRes] = useState("")
+ const [vidRatio, setVidRatio] = useState("9:16")
+ const [secs, setSecs] = useState(8)
 
   // Belt as well as braces: hiding the selector stops the choice being MADE, but the mode
   // is state and this is what stops a seller ever arming a video the server would refuse.
-  const isVideo = mode === "video" && allowVideo
-  const imgSpec = img?.models.find((m) => m.id === imgModel) || null
-  const vidSpec = vid?.models.find((m) => m.id === vidModel) || null
+ const isVideo = mode === "video" && allowVideo
+ const imgSpec = img?.models.find((m) => m.id === imgModel) || null
+ const vidSpec = vid?.models.find((m) => m.id === vidModel) || null
   // A size one variant offers may not exist on another (Lite has no 4K), so switching models
   // can strand an impossible pick — fall through the variant's own default.
-  const effImgSize = imgSpec ? (imgSpec.sizes.includes(imgSize) ? imgSize : imgSpec.defaultSize) : imgSize
-  const effVidRes = vidSpec ? (vidSpec.resolutions.includes(vidRes) ? vidRes : vidSpec.defaultResolution) : vidRes
+ const effImgSize = imgSpec ? (imgSpec.sizes.includes(imgSize) ? imgSize : imgSpec.defaultSize) : imgSize
+ const effVidRes = vidSpec ? (vidSpec.resolutions.includes(vidRes) ? vidRes : vidSpec.defaultResolution) : vidRes
 
-  const cfg = isVideo ? vid : img
-  const ratios = isVideo ? (vid?.ratios ?? []) : (img?.ratios ?? [])
-  const hints = isVideo ? (vid?.ratioHints ?? {}) : (img?.ratioHints ?? {})
+ const cfg = isVideo ? vid : img
+ const ratios = isVideo ? (vid?.ratios ?? []) : (img?.ratios ?? [])
+ const hints = isVideo ? (vid?.ratioHints ?? {}) : (img?.ratioHints ?? {})
 
   // Config is fetched on OPEN — an event — never from an effect watching state the fetch
   // would itself rewrite.
-  const loadConfig = useCallback(async () => {
-    setLoading(true)
-    try {
+ const loadConfig = useCallback(async () => {
+ setLoading(true)
+ try {
       /*
        * VIDEO IS FETCHED SEPARATELY, AND ITS FAILURE IS NOT FATAL.
        *
@@ -96,8 +96,8 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
        * "Staff only" on a feature the seller is entitled to and paying for. Video is asked
        * for only when it is on offer, and a refusal there leaves images working.
        */
-      const i = await getDeskImageConfig()
-      setImg(i)
+ const i = await getDeskImageConfig()
+ setImg(i)
       /*
        * OPEN ON THE CHEAPEST, at the owner's instruction — for images and for video alike.
        *
@@ -109,54 +109,54 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
        * Chosen by PRICE, never by position. The catalogue is ordered best-first and gains
        * rows, so `[length - 1]` would silently follow whatever was added last.
        */
-      const cheapImg = i.models.reduce<{ id: string; size: string; usd: number } | null>((best, m) => {
-        for (const sz of m.sizes) {
-          const usd = m.usd[sz]
-          if (typeof usd !== "number") continue
-          if (!best || usd < best.usd) best = { id: m.id, size: sz, usd }
+ const cheapImg = i.models.reduce<{ id: string; size: string; usd: number } | null>((best, m) => {
+ for (const sz of m.sizes) {
+ const usd = m.usd[sz]
+ if (typeof usd !== "number") continue
+ if (!best || usd < best.usd) best = { id: m.id, size: sz, usd }
         }
-        return best
+ return best
       }, null)
-      const imgId = cheapImg?.id || i.model
-      const imgSz = cheapImg?.size || i.models.find((m) => m.id === i.model)?.defaultSize || "1K"
-      setImgModel(imgId); setImgSize(imgSz)
+ const imgId = cheapImg?.id || i.model
+ const imgSz = cheapImg?.size || i.models.find((m) => m.id === i.model)?.defaultSize || "1K"
+ setImgModel(imgId); setImgSize(imgSz)
 
-      const v = allowVideo ? await getDeskVideoConfig().catch(() => null) : null
-      if (v) {
-        setVid(v)
+ const v = allowVideo ? await getDeskVideoConfig().catch(() => null) : null
+ if (v) {
+ setVid(v)
         // Same rule for clips, priced per SECOND — the cheapest resolution on the cheapest model.
-        const cheapVid = v.models.reduce<{ id: string; res: string; usd: number } | null>((best, m) => {
-          for (const r of m.resolutions) {
-            const usd = m.usdPerSec[r]
-            if (typeof usd !== "number") continue
-            if (!best || usd < best.usd) best = { id: m.id, res: r, usd }
+ const cheapVid = v.models.reduce<{ id: string; res: string; usd: number } | null>((best, m) => {
+ for (const r of m.resolutions) {
+ const usd = m.usdPerSec[r]
+ if (typeof usd !== "number") continue
+ if (!best || usd < best.usd) best = { id: m.id, res: r, usd }
           }
-          return best
+ return best
         }, null)
-        setVidModel(cheapVid?.id || v.model)
-        setVidRes(cheapVid?.res || v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
+ setVidModel(cheapVid?.id || v.model)
+ setVidRes(cheapVid?.res || v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
       }
-      const iM = i.models.find((m) => m.id === imgId)
-      if (i.enabled && iM) {
-        onArm({
-          mode: "image", model: imgId, ratio: "1:1", size: imgSz,
-          usd: iM.usd[imgSz] ?? 0, label: `Image · ${imgSz} · 1:1`, short: `${imgSz} · 1:1`,
+ const iM = i.models.find((m) => m.id === imgId)
+ if (i.enabled && iM) {
+ onArm({
+ mode: "image", model: imgId, ratio: "1:1", size: imgSz,
+ usd: iM.usd[imgSz] ?? 0, label: `Image · ${imgSz} · 1:1`, short: `${imgSz} · 1:1`,
         })
       }
     } catch (e) {
       // Keep the REAL reason (a 403, a 502, a network failure) — "couldn't load" alone sends
       // the reader looking in entirely the wrong place.
-      setErr(e instanceof Error ? `Couldn't load the generation settings — ${e.message}` : "Couldn't load the generation settings.")
+ setErr(e instanceof Error ? `Couldn't load the generation settings — ${e.message}` : "Couldn't load the generation settings.")
     } finally {
-      setLoading(false)
+ setLoading(false)
     }
   }, [onArm, allowVideo])
 
-  const openMenu = useCallback(async () => {
-    const next = !open
-    setOpen(next)
-    if (!next || img || loading) return
-    await loadConfig()
+ const openMenu = useCallback(async () => {
+ const next = !open
+ setOpen(next)
+ if (!next || img || loading) return
+ await loadConfig()
   }, [open, img, loading, loadConfig])
 
   /*
@@ -164,12 +164,12 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
    * condition like `!armed` would be re-satisfied by every failure and ask forever. One
    * attempt per mount, success or not.
    */
-  const armedOnce = useRef(false)
-  useEffect(() => {
-    if (!autoArm || armedOnce.current || disabled) return
-    armedOnce.current = true
-    const t = setTimeout(() => { loadConfig() }, 0)
-    return () => clearTimeout(t)
+ const armedOnce = useRef(false)
+ useEffect(() => {
+ if (!autoArm || armedOnce.current || disabled) return
+ armedOnce.current = true
+ const t = setTimeout(() => { loadConfig() }, 0)
+ return () => clearTimeout(t)
   }, [autoArm, disabled, loadConfig])
 
   /*
@@ -177,40 +177,40 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
    * right now (state setters are async, so reading them back here would arm the PREVIOUS
    * choice — the bug that makes a picker feel one step behind).
    */
-  const armWith = (o: Partial<{ mode: Mode; imgModel: string; imgSize: string; imgRatio: string; vidModel: string; vidRes: string; vidRatio: string; secs: number }> = {}) => {
-    const m = o.mode ?? mode
-    const video = m === "video"
-    const iM = o.imgModel ?? imgModel, vM = o.vidModel ?? vidModel
-    const iSpec = img?.models.find((x) => x.id === iM) || null
-    const vSpec = vid?.models.find((x) => x.id === vM) || null
-    const iSize = iSpec ? (iSpec.sizes.includes(o.imgSize ?? imgSize) ? (o.imgSize ?? imgSize) : iSpec.defaultSize) : (o.imgSize ?? imgSize)
-    const vRes = vSpec ? (vSpec.resolutions.includes(o.vidRes ?? vidRes) ? (o.vidRes ?? vidRes) : vSpec.defaultResolution) : (o.vidRes ?? vidRes)
-    const sc = o.secs ?? secs
-    const iRatio = o.imgRatio ?? imgRatio, vRatio = o.vidRatio ?? vidRatio
+ const armWith = (o: Partial<{ mode: Mode; imgModel: string; imgSize: string; imgRatio: string; vidModel: string; vidRes: string; vidRatio: string; secs: number }> = {}) => {
+ const m = o.mode ?? mode
+ const video = m === "video"
+ const iM = o.imgModel ?? imgModel, vM = o.vidModel ?? vidModel
+ const iSpec = img?.models.find((x) => x.id === iM) || null
+ const vSpec = vid?.models.find((x) => x.id === vM) || null
+ const iSize = iSpec ? (iSpec.sizes.includes(o.imgSize ?? imgSize) ? (o.imgSize ?? imgSize) : iSpec.defaultSize) : (o.imgSize ?? imgSize)
+ const vRes = vSpec ? (vSpec.resolutions.includes(o.vidRes ?? vidRes) ? (o.vidRes ?? vidRes) : vSpec.defaultResolution) : (o.vidRes ?? vidRes)
+ const sc = o.secs ?? secs
+ const iRatio = o.imgRatio ?? imgRatio, vRatio = o.vidRatio ?? vidRatio
 
-    onArm(video
+ onArm(video
       ? {
-        mode: "video", model: vM, ratio: vRatio, resolution: vRes, seconds: sc,
-        usd: (vSpec?.usdPerSec[vRes] ?? 0) * sc,
-        label: `Video · ${vRes} · ${sc}s`, short: `${vRes} · ${vRatio} · ${sc}s`,
+ mode: "video", model: vM, ratio: vRatio, resolution: vRes, seconds: sc,
+ usd: (vSpec?.usdPerSec[vRes] ?? 0) * sc,
+ label: `Video · ${vRes} · ${sc}s`, short: `${vRes} · ${vRatio} · ${sc}s`,
       }
-      : {
-        mode: "image", model: iM, ratio: iRatio, size: iSize,
-        usd: iSpec?.usd[iSize] ?? 0,
-        label: `Image · ${iSize} · ${iRatio}`, short: `${iSize} · ${iRatio}`,
+ : {
+ mode: "image", model: iM, ratio: iRatio, size: iSize,
+ usd: iSpec?.usd[iSize] ?? 0,
+ label: `Image · ${iSize} · ${iRatio}`, short: `${iSize} · ${iRatio}`,
       })
   }
 
-  const selectCls = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+ const selectCls = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
 
-  return (
+ return (
     <div className="relative shrink-0">
       {armed ? (
         <Button
-          variant="secondary" size="sm"
-          className="h-9 shrink-0 gap-1.5 rounded-full pl-2.5 pr-2 text-xs font-medium"
-          onClick={openMenu} disabled={disabled}
-          aria-label={`Generating ${armed.mode}: ${armed.short}. Change settings`}
+ variant="secondary" size="sm"
+ className="h-9 shrink-0 gap-1.5 rounded-full pl-2.5 pr-2 text-xs font-medium"
+ onClick={openMenu} disabled={disabled}
+ aria-label={`Generating ${armed.mode}: ${armed.short}. Change settings`}
         >
           {armed.mode === "image" ? <ImageSquare size={13} weight="fill" /> : <FilmSlate size={13} weight="fill" />}
           <span className="tabular-nums">{armed.short}</span>
@@ -218,8 +218,8 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
         </Button>
       ) : (
         <Button
-          variant="ghost" size="icon" className="size-9"
-          onClick={openMenu} disabled={disabled} aria-label="Choose what to generate"
+ variant="ghost" size="icon" className="size-9"
+ onClick={openMenu} disabled={disabled} aria-label="Choose what to generate"
         >
           <Sparkle size={18} />
         </Button>
@@ -242,18 +242,18 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                   <span>{err || "Couldn't load the generation settings."}</span>
                 </div>
                 <Button size="sm" variant="outline" className="h-8 w-full"
-                  onClick={() => { setErr(null); setOpen(false); setTimeout(openMenu, 0) }}>
+ onClick={() => { setErr(null); setOpen(false); setTimeout(openMenu, 0) }}>
                   Try again
                 </Button>
               </div>
             )}
 
             {cfg && !cfg.enabled && (
-              <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="flex items-start gap-2 rounded-md bg-hold/10 p-2 text-xs text-hold">
                 <Warning size={14} className="mt-0.5 shrink-0" />
                 <span>{!cfg.keySet
                   ? "No Google AI key is set. An admin can add one in Settings › Integrations."
-                  : "File storage isn't configured, so what's generated couldn't be kept."}</span>
+ : "File storage isn't configured, so what's generated couldn't be kept."}</span>
               </div>
             )}
 
@@ -274,23 +274,23 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                   <div className="mb-1 text-2xs text-muted-foreground">Model</div>
                   {isVideo ? (
                     <select value={vidModel} className={selectCls}
-                      onChange={(e) => {
-                        const id = e.target.value; setVidModel(id)
-                        const m = vid?.models.find((x) => x.id === id)
-                        const r = m && !m.resolutions.includes(vidRes) ? m.defaultResolution : vidRes
-                        if (m && r !== vidRes) setVidRes(r)
-                        armWith({ vidModel: id, vidRes: r })
+ onChange={(e) => {
+ const id = e.target.value; setVidModel(id)
+ const m = vid?.models.find((x) => x.id === id)
+ const r = m && !m.resolutions.includes(vidRes) ? m.defaultResolution : vidRes
+ if (m && r !== vidRes) setVidRes(r)
+ armWith({ vidModel: id, vidRes: r })
                       }}>
                       {vid?.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
                   ) : (
                     <select value={imgModel} className={selectCls}
-                      onChange={(e) => {
-                        const id = e.target.value; setImgModel(id)
-                        const m = img?.models.find((x) => x.id === id)
-                        const sz = m && !m.sizes.includes(imgSize) ? m.defaultSize : imgSize
-                        if (m && sz !== imgSize) setImgSize(sz)
-                        armWith({ imgModel: id, imgSize: sz })
+ onChange={(e) => {
+ const id = e.target.value; setImgModel(id)
+ const m = img?.models.find((x) => x.id === id)
+ const sz = m && !m.sizes.includes(imgSize) ? m.defaultSize : imgSize
+ if (m && sz !== imgSize) setImgSize(sz)
+ armWith({ imgModel: id, imgSize: sz })
                       }}>
                       {img?.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
@@ -304,9 +304,9 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                   <div>
                     <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
                     <select value={isVideo ? vidRatio : imgRatio} className={selectCls}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        if (isVideo) { setVidRatio(v); armWith({ vidRatio: v }) } else { setImgRatio(v); armWith({ imgRatio: v }) }
+ onChange={(e) => {
+ const v = e.target.value
+ if (isVideo) { setVidRatio(v); armWith({ vidRatio: v }) } else { setImgRatio(v); armWith({ imgRatio: v }) }
                       }}>
                       {ratios.map((r) => <option key={r} value={r}>{hints[r] ? `${r} — ${hints[r]}` : r}</option>)}
                     </select>
@@ -334,15 +334,15 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                 </div>
 
                 {/* Arms the composer; it does not spend anything yet. The price rides onto the
-                    pill so it stays visible while you type, not only at the moment of choosing. */}
+ pill so it stays visible while you type, not only at the moment of choosing. */}
                 <div className="flex gap-2">
                   <Button variant="outline" className="h-9 flex-1" onClick={() => setOpen(false)}>Done</Button>
                   {/* The pill above the composer used to carry the ✕ that turned this off.
                       With the pill gone (it repeated what the Send button already says), the
-                      way back to a plain chat box has to live here instead. */}
+ way back to a plain chat box has to live here instead. */}
                   {armed && (
                     <Button variant="ghost" className="h-9 flex-1 text-muted-foreground"
-                      onClick={() => { onArm(null); setOpen(false) }}>
+ onClick={() => { onArm(null); setOpen(false) }}>
                       Back to chat
                     </Button>
                   )}
@@ -367,19 +367,19 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
  * were already typing in.
  */
 export function AnimateImageButton({ imageName, imageUrl, onArm }: {
-  imageName: string
-  imageUrl: string
-  onArm: (g: GenSettings) => void
+ imageName: string
+ imageUrl: string
+ onArm: (g: GenSettings) => void
 }) {
-  const [busy, setBusy] = useState(false)
+ const [busy, setBusy] = useState(false)
 
-  const arm = async (e: React.MouseEvent) => {
+ const arm = async (e: React.MouseEvent) => {
     // The image sits inside a link to the full-size file; arming must not navigate away.
-    e.preventDefault(); e.stopPropagation()
-    if (busy) return
-    setBusy(true)
-    try {
-      const c = await getDeskVideoConfig()
+ e.preventDefault(); e.stopPropagation()
+ if (busy) return
+ setBusy(true)
+ try {
+ const c = await getDeskVideoConfig()
       /*
        * CHEAPEST settings, not the configured default. Animating is the exploratory move —
        * you already have the picture and you're finding out whether it moves well — so it
@@ -389,26 +389,26 @@ export function AnimateImageButton({ imageName, imageUrl, onArm }: {
        * Derived rather than hardcoded: the catalogue owns the prices, and a hardcoded
        * "veo-lite" would quietly become wrong the day a cheaper tier appears.
        */
-      const priced = c.models
+ const priced = c.models
         .flatMap((m) => m.resolutions.map((res) => ({ m, res, rate: m.usdPerSec[res] ?? Infinity })))
         .sort((a, b) => a.rate - b.rate)
-      const pick = priced[0]
-      if (!pick) return
-      const secs = Math.min(...(c.durations?.length ? c.durations : [8]))
-      onArm({
-        mode: "video", model: pick.m.id, ratio: "9:16", resolution: pick.res, seconds: secs,
-        imageName, imageUrl, usd: pick.rate * secs,
-        label: `Animate · ${pick.res} · ${secs}s`, short: `Animate · ${pick.res} · ${secs}s`,
+ const pick = priced[0]
+ if (!pick) return
+ const secs = Math.min(...(c.durations?.length ? c.durations : [8]))
+ onArm({
+ mode: "video", model: pick.m.id, ratio: "9:16", resolution: pick.res, seconds: secs,
+ imageName, imageUrl, usd: pick.rate * secs,
+ label: `Animate · ${pick.res} · ${secs}s`, short: `Animate · ${pick.res} · ${secs}s`,
       })
     } catch { /* the pill is the feedback; a failed arm simply doesn't arm */ } finally {
-      setBusy(false)
+ setBusy(false)
     }
   }
 
-  return (
+ return (
     <button
-      type="button" onClick={arm} aria-label="Animate this image"
-      className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
+ type="button" onClick={arm} aria-label="Animate this image"
+ className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
     >
       {busy ? <CircleNotch size={12} className="animate-spin" /> : null}
       Animate

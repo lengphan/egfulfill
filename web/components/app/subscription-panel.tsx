@@ -17,19 +17,19 @@ import { ApiError, getBillingPlan, subscribePlan, setAutoRenew, type BillingPlan
 import { updateUser } from "@/lib/auth"
 import {
   PLAN_TIERS,
-  getPlan,
-  planMeta,
-  getSpydeckConfig,
-  getSpydeckAddon,
-  spydeckIncluded,
-  type PlanId,
+ getPlan,
+ planMeta,
+ getSpydeckConfig,
+ getSpydeckAddon,
+ spydeckIncluded,
+ type PlanId,
 } from "@/lib/plans"
 
 const usd = (n: number) => (n === 0 ? "Free" : `$${n}`)
 const fmtDate = (s?: string | null) => {
-  if (!s) return "—"
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+ if (!s) return "—"
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 // Plans are SERVER state (users.plan). This panel used to WRITE localStorage, which
@@ -38,130 +38,130 @@ const fmtDate = (s?: string | null) => {
 // the client can't name its own amount.
 export function SubscriptionPanel() {
   // Session-backed; read after mount to avoid hydration mismatch.
-  const [plan, setPlanState] = useState<PlanId>("starter")
-  const [spydeckAddon, setAddonState] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [billing, setBilling] = useState<BillingPlan | null>(null)
-  const [pending, setPending] = useState<{ plan?: PlanId; addon?: boolean; label: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [renewBusy, setRenewBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [short, setShort] = useState<{ amount: number; balance: number; shortfall: number } | null>(null)
-  const router = useRouter()
+ const [plan, setPlanState] = useState<PlanId>("starter")
+ const [spydeckAddon, setAddonState] = useState(false)
+ const [mounted, setMounted] = useState(false)
+ const [billing, setBilling] = useState<BillingPlan | null>(null)
+ const [pending, setPending] = useState<{ plan?: PlanId; addon?: boolean; label: string } | null>(null)
+ const [busy, setBusy] = useState(false)
+ const [renewBusy, setRenewBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [short, setShort] = useState<{ amount: number; balance: number; shortfall: number } | null>(null)
+ const router = useRouter()
 
-  const refresh = () =>
-    getBillingPlan()
+ const refresh = () =>
+ getBillingPlan()
       .then((b) => {
-        setBilling(b)
-        setPlanState((b.plan as PlanId) ?? "starter")
-        setAddonState(b.spydeck_addon === true)
+ setBilling(b)
+ setPlanState((b.plan as PlanId) ?? "starter")
+ setAddonState(b.spydeck_addon === true)
       })
       .catch(() => {})
 
-  useEffect(() => {
-    const id = setTimeout(() => {
+ useEffect(() => {
+ const id = setTimeout(() => {
       // Fall back to the session copy if the billing endpoint isn't reachable, so the
       // panel still renders the right current plan.
-      setPlanState(getPlan())
-      setAddonState(getSpydeckAddon())
-      setMounted(true)
-      refresh()
+ setPlanState(getPlan())
+ setAddonState(getSpydeckAddon())
+ setMounted(true)
+ refresh()
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
 
-  const currentTier = PLAN_TIERS.find((t) => t.id === plan)
-  const pendingTier = PLAN_TIERS.find((t) => t.id === pending?.plan)
+ const currentTier = PLAN_TIERS.find((t) => t.id === plan)
+ const pendingTier = PLAN_TIERS.find((t) => t.id === pending?.plan)
   // Stamped once after mount rather than read during render: Date.now() during render is
   // impure and would give a different answer on every re-render.
-  const [now, setNow] = useState<number | null>(null)
-  useEffect(() => { const t = setTimeout(() => setNow(Date.now()), 0); return () => clearTimeout(t) }, [])
-  const daysLeft = billing?.renews_at && now
+ const [now, setNow] = useState<number | null>(null)
+ useEffect(() => { const t = setTimeout(() => setNow(Date.now()), 0); return () => clearTimeout(t) }, [])
+ const daysLeft = billing?.renews_at && now
     ? Math.max(0, Math.ceil((new Date(billing.renews_at).getTime() - now) / 86400000))
-    : 0
+ : 0
   // Same shape as daysLeft, and for the same reason: `now` is set in an effect rather than
   // read during render, so the countdown can't shift between renders.
-  const trialDaysLeft = billing?.trial_ends_at && now
+ const trialDaysLeft = billing?.trial_ends_at && now
     ? Math.max(0, Math.ceil((new Date(billing.trial_ends_at).getTime() - now) / 86400000))
-    : 0
+ : 0
 
   // A downgrade is a move to a CHEAPER monthly total, measured exactly as the server does
   // (billing.js), while a paid month is still running. This is the case that is now
   // SCHEDULED: nothing is charged, you keep the tier + SpyDeck you paid for until
   // renews_at, then drop to Starter. Upgrades still apply — and charge — immediately.
-  const monthlyOf = (p?: string, a?: boolean) =>
+ const monthlyOf = (p?: string, a?: boolean) =>
     (billing?.prices.plans[p ?? plan] ?? 0) + ((a ?? spydeckAddon) ? (billing?.prices.spydeck_addon ?? 0) : 0)
-  const isDowngrade =
+ const isDowngrade =
     !!pending && daysLeft > 0 && monthlyOf(pending.plan, pending.addon) < monthlyOf(plan, spydeckAddon)
   // The paid plan you're on is set to lapse to Starter at period end (auto-renew is off).
-  const downgradeScheduled =
-    mounted && !!billing && billing.auto_renew === false && (currentTier?.monthlyPrice ?? 0) > 0 && !!billing.renews_at && daysLeft > 0
+ const downgradeScheduled =
+ mounted && !!billing && billing.auto_renew === false && (currentTier?.monthlyPrice ?? 0) > 0 && !!billing.renews_at && daysLeft > 0
 
   // Price the pending change the same way the server does, so the confirm dialog can
   // state the real amount before anything is charged.
   // Mirrors the SERVER's rule exactly (billing.js): price against the best tier this paid
   // month already covers, not merely the tier in use. Dropping to Starter and back to Pro
   // inside one paid month is $0 the second time — that month's Pro is already bought.
-  const priceOf = (target: { plan?: PlanId; addon?: boolean }) => {
-    const p = billing?.prices
-    if (!p) return null
-    const nextPlan = target.plan ?? (plan as PlanId)
-    const nextAddon = target.addon ?? spydeckAddon
-    const paidPlan = billing?.paid_plan ?? plan
-    const baseline = (p.plans[paidPlan] ?? 0) >= (p.plans[plan] ?? 0) ? paidPlan : plan
-    const planDelta = (p.plans[nextPlan] ?? 0) > (p.plans[baseline] ?? 0) ? (p.plans[nextPlan] ?? 0) - (p.plans[baseline] ?? 0) : 0
-    const addonDelta = nextAddon && !(spydeckAddon || billing?.paid_addon) ? p.spydeck_addon : 0
-    return planDelta + addonDelta
+ const priceOf = (target: { plan?: PlanId; addon?: boolean }) => {
+ const p = billing?.prices
+ if (!p) return null
+ const nextPlan = target.plan ?? (plan as PlanId)
+ const nextAddon = target.addon ?? spydeckAddon
+ const paidPlan = billing?.paid_plan ?? plan
+ const baseline = (p.plans[paidPlan] ?? 0) >= (p.plans[plan] ?? 0) ? paidPlan : plan
+ const planDelta = (p.plans[nextPlan] ?? 0) > (p.plans[baseline] ?? 0) ? (p.plans[nextPlan] ?? 0) - (p.plans[baseline] ?? 0) : 0
+ const addonDelta = nextAddon && !(spydeckAddon || billing?.paid_addon) ? p.spydeck_addon : 0
+ return planDelta + addonDelta
   }
   // True when the target tier is already covered by the running paid month, so the change
   // costs nothing and the days already bought carry over.
-  const alreadyPaidFor = (target?: PlanId) => {
-    const p = billing?.prices
-    if (!p || !billing?.paid_plan || !target || daysLeft <= 0) return false
-    return (p.plans[target] ?? 0) <= (p.plans[billing.paid_plan] ?? 0)
+ const alreadyPaidFor = (target?: PlanId) => {
+ const p = billing?.prices
+ if (!p || !billing?.paid_plan || !target || daysLeft <= 0) return false
+ return (p.plans[target] ?? 0) <= (p.plans[billing.paid_plan] ?? 0)
   }
 
-  const toggleRenew = async (on: boolean) => {
-    setRenewBusy(true)
-    try { await setAutoRenew(on); await refresh() }
-    catch (e) { setErr(e instanceof Error ? e.message : "Could not change auto-renew") }
-    finally { setRenewBusy(false) }
+ const toggleRenew = async (on: boolean) => {
+ setRenewBusy(true)
+ try { await setAutoRenew(on); await refresh() }
+ catch (e) { setErr(e instanceof Error ? e.message : "Could not change auto-renew") }
+ finally { setRenewBusy(false) }
   }
 
-  const commit = async () => {
-    if (!pending) return
-    setBusy(true); setErr(null); setShort(null)
-    try {
-      const r = await subscribePlan({ plan: pending.plan, spydeckAddon: pending.addon })
+ const commit = async () => {
+ if (!pending) return
+ setBusy(true); setErr(null); setShort(null)
+ try {
+ const r = await subscribePlan({ plan: pending.plan, spydeckAddon: pending.addon })
       // The paywall reads the CACHED SESSION (getPlan/getSpydeckAddon -> getUser()), not
       // the server, so without this the plan stayed locked until the next login even
       // though it was paid for. Update the session, then tell the app: "eg-plan-changed"
       // unlocks the nav + SpyDeck, "eg-wallet-changed" refreshes the header balance.
-      updateUser({ plan: r.plan ?? pending.plan, spydeck_addon: r.spydeck_addon ?? pending.addon })
-      window.dispatchEvent(new CustomEvent("eg-plan-changed", { detail: { plan: r.plan } }))
-      window.dispatchEvent(new CustomEvent("eg-user-changed"))
-      window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
-      setPending(null)
-      await refresh()
+ updateUser({ plan: r.plan ?? pending.plan, spydeck_addon: r.spydeck_addon ?? pending.addon })
+ window.dispatchEvent(new CustomEvent("eg-plan-changed", { detail: { plan: r.plan } }))
+ window.dispatchEvent(new CustomEvent("eg-user-changed"))
+ window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
+ setPending(null)
+ await refresh()
     } catch (e) {
       // 402 = the wallet can't cover it. Not a dead end — offer the top-up.
-      if (e instanceof ApiError && e.status === 402) {
-        const m = /balance is \$([0-9.]+) — this costs \$([0-9.]+)/.exec(e.message)
-        const balance = m ? Number(m[1]) : (billing?.balance ?? 0)
-        const amount = m ? Number(m[2]) : (priceOf(pending) ?? 0)
-        setShort({ amount, balance, shortfall: Number((amount - balance).toFixed(2)) })
+ if (e instanceof ApiError && e.status === 402) {
+ const m = /balance is \$([0-9.]+) — this costs \$([0-9.]+)/.exec(e.message)
+ const balance = m ? Number(m[1]) : (billing?.balance ?? 0)
+ const amount = m ? Number(m[2]) : (priceOf(pending) ?? 0)
+ setShort({ amount, balance, shortfall: Number((amount - balance).toFixed(2)) })
       }
-      setErr(e instanceof Error ? e.message : "Could not change your plan")
+ setErr(e instanceof Error ? e.message : "Could not change your plan")
     } finally { setBusy(false) }
   }
 
 
 
-  const current = planMeta(plan)
-  const cfg = getSpydeckConfig()
-  const includedFree = mounted && spydeckIncluded(plan)
+ const current = planMeta(plan)
+ const cfg = getSpydeckConfig()
+ const includedFree = mounted && spydeckIncluded(plan)
 
-  return (
+ return (
     <div className="space-y-4">
       {/* Current plan */}
       <SectionCard title="Your plan">
@@ -183,12 +183,12 @@ export function SubscriptionPanel() {
           {/* A TRIAL, which is not a subscription and must not be dressed as one.
 
               A trial carries auto_renew=false and a renews_at, so the renewal block below
-              would otherwise render "keep <plan>" — a button that cannot do what it says,
-              because the trial branch in runRenewals fires before anything can renew. It is
-              shown instead of that block, not alongside it.
+ would otherwise render "keep <plan>" — a button that cannot do what it says,
+ because the trial branch in runRenewals fires before anything can renew. It is
+ shown instead of that block, not alongside it.
 
               The promise made here is the one the server actually keeps: at the end you are
-              moved to Starter and NOTHING is charged. */}
+ moved to Starter and NOTHING is charged. */}
           {billing?.on_trial && billing.trial_ends_at && (
             <div className="mt-3 rounded-lg border border-primary/30 bg-primary/[0.06] p-2.5 text-xs">
               <span className="font-semibold text-foreground">
@@ -196,14 +196,14 @@ export function SubscriptionPanel() {
               </span>
               <span className="text-muted-foreground">
                 {" "}· ends {fmtDate(billing.trial_ends_at)}. You won&apos;t be charged: at the end you
-                move back to Starter, and nothing you&apos;ve created is removed. Upgrade any time to
-                keep these features.
+ move back to Starter, and nothing you&apos;ve created is removed. Upgrade any time to
+ keep these features.
               </span>
             </div>
           )}
 
           {/* Renewal state + the opt-out. Only meaningful on a paid plan — Starter has
-              nothing to renew, and a trial is handled above. */}
+ nothing to renew, and a trial is handled above. */}
           {billing?.renews_at && current.monthlyPrice > 0 && !billing?.on_trial && (
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               {billing.auto_renew ? (
@@ -224,7 +224,7 @@ export function SubscriptionPanel() {
             </div>
           )}
           {billing?.past_due_since && (
-            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <div className="mt-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
               We couldn&apos;t renew your plan — your wallet is short. Top up within {billing.grace_days} days of{" "}
               {fmtDate(billing.past_due_since)} to keep it.
             </div>
@@ -235,12 +235,12 @@ export function SubscriptionPanel() {
       {/* Plan tiers */}
       <div className="grid gap-4 sm:grid-cols-3">
         {PLAN_TIERS.map((t) => {
-          const isCurrent = mounted && t.id === plan
-          const isUpgrade = t.monthlyPrice > current.monthlyPrice
-          return (
+ const isCurrent = mounted && t.id === plan
+ const isUpgrade = t.monthlyPrice > current.monthlyPrice
+ return (
             <div
-              key={t.id}
-              className={
+ key={t.id}
+ className={
                 "flex flex-col rounded-xl border p-5 " +
                 (isCurrent ? "border-primary ring-1 ring-primary/30" : "border-border")
               }
@@ -258,7 +258,7 @@ export function SubscriptionPanel() {
                 {t.monthlyPrice > 0 && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
               </div>
               {/* What choosing THIS plan means for the month already paid for: how many
-                  days are left, and whether picking it costs anything right now. */}
+ days are left, and whether picking it costs anything right now. */}
               {mounted && daysLeft > 0 && billing?.renews_at && (
                 <div className="mt-1 text-xs text-muted-foreground">
                   {isCurrent ? (
@@ -296,10 +296,10 @@ export function SubscriptionPanel() {
                   </Button>
                 ) : (
                   <Button
-                    className="w-full"
-                    variant={isUpgrade ? "default" : "outline"}
-                    disabled={!mounted}
-                    onClick={() => { setErr(null); setShort(null); setPending({ plan: t.id as PlanId, label: `${isUpgrade ? "Upgrade" : "Switch"} to ${t.shortName}` }) }}
+ className="w-full"
+ variant={isUpgrade ? "default" : "outline"}
+ disabled={!mounted}
+ onClick={() => { setErr(null); setShort(null); setPending({ plan: t.id as PlanId, label: `${isUpgrade ? "Upgrade" : "Switch"} to ${t.shortName}` }) }}
                   >
                     {isUpgrade ? `Upgrade to ${t.shortName}` : `Switch to ${t.shortName}`}
                   </Button>
@@ -315,7 +315,7 @@ export function SubscriptionPanel() {
         <div className="flex flex-wrap items-start justify-between gap-4 p-5">
           <div className="min-w-0 max-w-lg">
             <div className="flex items-center gap-2">
-              <MagnifyingGlass size={18} weight="bold"  className="shrink-0 text-primary" />
+              <MagnifyingGlass size={18} weight="bold" className="shrink-0 text-primary" />
               <div className="font-semibold">SpyDeck research</div>
               <span className="rounded-full bg-primary/10 px-2 py-0.5 eg-label text-primary">
                 Research
@@ -336,7 +336,7 @@ export function SubscriptionPanel() {
                   ${cfg.price}/mo · <span className="font-semibold text-success">Active</span>
                 </div>
                 <Button variant="outline" size="sm" disabled={!mounted}
-                  onClick={() => { setErr(null); setShort(null); setPending({ addon: false, label: "Remove SpyDeck" }) }}>
+ onClick={() => { setErr(null); setShort(null); setPending({ addon: false, label: "Remove SpyDeck" }) }}>
                   Remove
                 </Button>
               </div>
@@ -347,7 +347,7 @@ export function SubscriptionPanel() {
                   <span className="text-xs font-normal text-muted-foreground">/mo</span>
                 </div>
                 <Button size="sm" disabled={!mounted}
-                  onClick={() => { setErr(null); setShort(null); setPending({ addon: true, label: "Add SpyDeck" }) }}>
+ onClick={() => { setErr(null); setShort(null); setPending({ addon: true, label: "Add SpyDeck" }) }}>
                   Add SpyDeck
                 </Button>
               </div>
@@ -357,7 +357,7 @@ export function SubscriptionPanel() {
       </SectionCard>
 
       {/* Confirm + charge. The amount shown is computed from the SERVER's price list, so
-          it matches what actually gets debited. */}
+ it matches what actually gets debited. */}
       <Dialog open={!!pending} onOpenChange={(v) => { if (busy) return; if (!v) { setPending(null); setErr(null); setShort(null) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -365,25 +365,25 @@ export function SubscriptionPanel() {
             <DialogDescription>
               {(priceOf(pending ?? {}) ?? 0) > 0
                 ? "This charges your wallet now and bills monthly from today."
-                : isDowngrade
+ : isDowngrade
                 ? "This is scheduled — it takes effect when your paid period ends. Nothing is charged now."
-                : "This takes effect now. Nothing is charged."}
+ : "This takes effect now. Nothing is charged."}
             </DialogDescription>
           </DialogHeader>
 
 
           {/* Downgrading mid-cycle forfeits time already paid for. The old copy said only
               "isn't refunded", which reads as "no money back" — not "you lose the 29 days
-              of Pro you already bought". Spell out the date and the days so the choice is
-              made with the facts, and offer the obvious alternative: wait it out. */}
+ of Pro you already bought". Spell out the date and the days so the choice is
+ made with the facts, and offer the obvious alternative: wait it out. */}
           {isDowngrade && billing?.renews_at && daysLeft > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
               <div className="font-medium">You keep {currentTier?.shortName ?? "your current plan"} until {fmtDate(billing.renews_at)}.</div>
               <p className="mt-1">
                 Nothing is charged now. You&apos;ll keep {currentTier?.shortName ?? "your plan"}
                 {includedFree || spydeckAddon ? " and SpyDeck" : ""} for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left,
-                then move to {pendingTier?.shortName ?? "Starter"} on {fmtDate(billing.renews_at)}. Change your mind before
-                then and it&apos;s cancelled at no charge.
+ then move to {pendingTier?.shortName ?? "Starter"} on {fmtDate(billing.renews_at)}. Change your mind before
+ then and it&apos;s cancelled at no charge.
               </p>
             </div>
           )}
@@ -395,7 +395,7 @@ export function SubscriptionPanel() {
               <p className="mt-1">
                 Your {pendingTier?.shortName ?? "plan"} month runs through {fmtDate(billing.renews_at)}
                 {daysLeft > 0 ? ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}. Switching back now costs $0,
-                and renewal continues as normal.
+ and renewal continues as normal.
               </p>
             </div>
           )}
@@ -414,7 +414,7 @@ export function SubscriptionPanel() {
           )}
 
           {short && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
               You need {usd(short.shortfall)} more. Top up your wallet, then come back and finish.
             </div>
           )}

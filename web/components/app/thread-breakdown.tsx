@@ -18,42 +18,42 @@ import { loadThreadPalette } from "@/lib/thread-palette-load"
  * duplicate data we can regenerate in a few milliseconds.
  */
 export function ThreadBreakdown({
-  artwork, children,
+ artwork, children,
 }: {
   /** The line's design URL (data URL or remote — remote goes via the img proxy). */
-  artwork: string
+ artwork: string
   /** The trigger — usually the existing cone chip. */
-  children: React.ReactNode
+ children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(false)
-  const [regions, setRegions] = useState<ThreadRegion[] | null>(null)
+ const [open, setOpen] = useState(false)
+ const [regions, setRegions] = useState<ThreadRegion[] | null>(null)
 
-  useEffect(() => {
-    if (!open || !artwork) return
-    let alive = true
+ useEffect(() => {
+ if (!open || !artwork) return
+ let alive = true
     // Deferred so the click that opens the popover paints first — the canvas work
     // is short but it is synchronous once it starts.
-    const id = setTimeout(() => {
-      setRegions(null)
+ const id = setTimeout(() => {
+ setRegions(null)
       // Palette first — matching against the starter set and then re-matching would
       // flash cones the factory doesn't stock.
-      loadThreadPalette()
+ loadThreadPalette()
         .then(() => matchThreadRegions(artwork))
         .then((r) => { if (alive) setRegions(r) })
         .catch(() => { if (alive) setRegions([]) })
     }, 0)
-    return () => { alive = false; clearTimeout(id) }
+ return () => { alive = false; clearTimeout(id) }
   }, [open, artwork])
 
   // "No artwork" is a fact about the props, not something to store — deriving it
   // keeps the effect off the no-design path entirely.
-  const shown = artwork ? regions : []
+ const shown = artwork ? regions : []
 
-  return (
+ return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        title="See which cone covers which part of the design"
-        className="eg-tap cursor-pointer rounded transition-opacity hover:opacity-80"
+ title="See which cone covers which part of the design"
+ className="eg-tap cursor-pointer rounded transition-opacity hover:opacity-80"
       >
         {children}
       </PopoverTrigger>
@@ -73,7 +73,7 @@ export function ThreadBreakdown({
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
             {artwork
               ? "Couldn't read this artwork — it may be hosted somewhere we can't sample."
-              : "No design on this line yet."}
+ : "No design on this line yet."}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -83,9 +83,9 @@ export function ThreadBreakdown({
                 {r.swatch ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={r.swatch}
-                    alt={`Design detail using ${r.thread.name}`}
-                    className="size-12 shrink-0 rounded-md border border-border object-cover"
+ src={r.swatch}
+ alt={`Design detail using ${r.thread.name}`}
+ className="size-12 shrink-0 rounded-md border border-border object-cover"
                   />
                 ) : (
                   <span className="size-12 shrink-0 rounded-md border border-border" style={{ background: r.srcHex }} />
@@ -96,13 +96,13 @@ export function ThreadBreakdown({
                     <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: r.thread.hex }} />
                     <span className="truncate text-sm font-medium">{r.thread.name}</span>
                     {/* Selectable: a code gets typed into a machine or read down a phone, and a
-                        span you cannot select is one somebody transcribes by eye. */}
+ span you cannot select is one somebody transcribes by eye. */}
                     <span className="shrink-0 select-all tabular-nums text-2xs text-muted-foreground">{r.thread.code}</span>
                   </div>
                   {/* Artwork colour AND cone colour: they are not the same, and a
-                      digitiser needs to see how far the match had to travel. */}
+ digitiser needs to see how far the match had to travel. */}
                   {r.poor && (
-                    <div className="mt-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-700">
+                    <div className="mt-0.5 rounded bg-hold/10 px-1.5 py-0.5 text-2xs font-medium text-hold">
                       No close match in stock
                     </div>
                   )}
@@ -117,8 +117,8 @@ export function ThreadBreakdown({
                 {/* Locator: where this colour sits within the whole design. */}
                 <div className="relative size-9 shrink-0 rounded border border-border bg-muted" title="Position in the design">
                   <span
-                    className="absolute rounded-[2px] bg-primary/70"
-                    style={{ left: `${r.box.x}%`, top: `${r.box.y}%`, width: `${r.box.w}%`, height: `${r.box.h}%` }}
+ className="absolute rounded-[2px] bg-primary/70"
+ style={{ left: `${r.box.x}%`, top: `${r.box.y}%`, width: `${r.box.w}%`, height: `${r.box.h}%` }}
                   />
                 </div>
               </div>

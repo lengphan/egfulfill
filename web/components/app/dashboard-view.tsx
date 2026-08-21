@@ -35,15 +35,15 @@ const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLo
 const OPEN_GROUPS = new Set(["draft", "pending", "production", "attention"])
 
 const itemsLabel = (o: OrderRow, fallback: string) => {
-  const items = o.items ?? []
-  if (!items.length) return "—"
-  const first = items[0]?.name || items[0]?.sku || fallback
-  return items.length > 1 ? `${first} +${items.length - 1}` : first
+ const items = o.items ?? []
+ if (!items.length) return "—"
+ const first = items[0]?.name || items[0]?.sku || fallback
+ return items.length > 1 ? `${first} +${items.length - 1}` : first
 }
 const fmtDate = (s?: string | null) => {
-  if (!s) return "—"
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+ if (!s) return "—"
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 const DEMO: OrderRow[] = [
@@ -55,79 +55,79 @@ const DEMO: OrderRow[] = [
 ]
 
 export function DashboardView() {
-  const router = useRouter()
-  const t = useT()
-  const cl = useLabelT()
-  const [orders, setOrders] = useState<OrderRow[] | null>(null)
-  const [balance, setBalance] = useState<number | null>(null)
-  const [isDemo, setIsDemo] = useState(false)
+ const router = useRouter()
+ const t = useT()
+ const cl = useLabelT()
+ const [orders, setOrders] = useState<OrderRow[] | null>(null)
+ const [balance, setBalance] = useState<number | null>(null)
+ const [isDemo, setIsDemo] = useState(false)
   // "Couldn't read your orders" is not the same fact as "you have no orders", and every
   // tile below already renders "—" while orders is null. The catch used to move state out
   // of null into [], which defeated that guard and turned a 502 into a confident
   // "Revenue (30d) $0 · Open orders 0" for a seller with a full pipeline.
-  const [loadErr, setLoadErr] = useState<string | null>(null)
-  const [now, setNow] = useState(0)
+ const [loadErr, setLoadErr] = useState<string | null>(null)
+ const [now, setNow] = useState(0)
 
-  const load = useCallback(() => {
+ const load = useCallback(() => {
     // Signed in → always show real data (empty state if none). Demo is only the
     // signed-out marketing preview, never shown to a real account with 0 orders.
-    const signedIn = !!getToken()
-    getOrders()
+ const signedIn = !!getToken()
+ getOrders()
       .then((rows) => {
-        setLoadErr(null)
-        if (rows && rows.length) {
-          setOrders(rows)
-          setIsDemo(false)
+ setLoadErr(null)
+ if (rows && rows.length) {
+ setOrders(rows)
+ setIsDemo(false)
         } else {
-          setOrders(signedIn ? [] : DEMO)
-          setIsDemo(!signedIn)
+ setOrders(signedIn ? [] : DEMO)
+ setIsDemo(!signedIn)
         }
       })
       .catch((e) => {
         // Signed out, the demo preview is still the right thing to show. Signed in, leave
         // orders null so the tiles stay "—" and say why.
-        if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
-        setLoadErr(e instanceof Error ? e.message : t("dash.errServer"))
+ if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
+ setLoadErr(e instanceof Error ? e.message : t("dash.errServer"))
       })
-    getWallet()
+ getWallet()
       .then((w) => setBalance(w.balance))
       .catch(() => setBalance(null))
   }, [t])
-  useEffect(() => {
-    const id = setTimeout(() => {
-      setNow(Date.now())
-      load()
+ useEffect(() => {
+ const id = setTimeout(() => {
+ setNow(Date.now())
+ load()
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [load])
 
-  const stats = useMemo(() => {
-    const list = orders ?? []
-    const in30 = list.filter((o) => !isNaN(tsOf(o)) && now - tsOf(o) < 30 * DAY)
-    const rev30 = in30.reduce((s, o) => s + totalOf(o), 0)
-    const open = list.filter((o) => OPEN_GROUPS.has(sellerStatus(o).group)).length
-    const startOfToday = new Date(new Date().toDateString()).getTime()
-    const newToday = list.filter((o) => tsOf(o) >= startOfToday).length
-    return { count30: in30.length, rev30, open, newToday }
+ const stats = useMemo(() => {
+ const list = orders ?? []
+ const in30 = list.filter((o) => !isNaN(tsOf(o)) && now - tsOf(o) < 30 * DAY)
+ const rev30 = in30.reduce((s, o) => s + totalOf(o), 0)
+ const open = list.filter((o) => OPEN_GROUPS.has(sellerStatus(o).group)).length
+ const startOfToday = new Date(new Date().toDateString()).getTime()
+ const newToday = list.filter((o) => tsOf(o) >= startOfToday).length
+ return { count30: in30.length, rev30, open, newToday }
   }, [orders, now])
 
   // Time-of-day greeting — client component, so this is the seller's own local clock.
-  const greetDate = new Date()
-  const greeting = t(greetDate.getHours() < 12 ? "dash.goodMorning" : greetDate.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
-  const todayLabel = greetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
-  const name = getUser()?.name || t("dash.there")
+ const greetDate = new Date()
+ const greeting = t(greetDate.getHours() < 12 ? "dash.goodMorning" : greetDate.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
+ const todayLabel = greetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+ const name = getUser()?.name || t("dash.there")
 
-  const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])
+ const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])
 
-  const recent = useMemo(
+ const recent = useMemo(
     () => [...(orders ?? [])].sort((a, b) => (tsOf(b) || 0) - (tsOf(a) || 0)).slice(0, 6),
-    [orders]
+ [orders]
   )
 
-  return (
+ return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <House size={18} weight="regular"  className="shrink-0 text-primary" />
+        <House size={18} weight="regular" className="shrink-0 text-primary" />
         <div>
           <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
           <p className="text-sm text-muted-foreground">
@@ -146,13 +146,13 @@ export function DashboardView() {
       </StatGrid>
 
       {isDemo && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+        <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Sparkle size={13} weight="fill" /> {t("dash.demo")}
         </div>
       )}
 
       {loadErr && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+        <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
           {/* The server's own message is appended untranslated — the API is English-only. */}
           <span>{t("dash.errFigures")} {loadErr}</span>
@@ -160,7 +160,7 @@ export function DashboardView() {
       )}
 
       {/* A chart of zeros is a claim about revenue. When the read failed we have no
-          series to draw, so say that instead of rendering a flat line at the axis. */}
+ series to draw, so say that instead of rendering a flat line at the axis. */}
       {orders === null && loadErr ? (
         <SectionCard title={t("dash.revenue")}>
           <div className="px-5 py-10 text-center text-sm text-muted-foreground">
@@ -172,8 +172,8 @@ export function DashboardView() {
       )}
 
       <SectionCard
-        title={t("dash.recentOrders")}
-        actions={
+ title={t("dash.recentOrders")}
+ actions={
           <Button variant="outline" size="sm" onClick={() => router.push("/orders")}>
             {t("dash.viewAll")}
           </Button>
@@ -206,9 +206,9 @@ export function DashboardView() {
             <TableBody>
               {recent.map((o) => (
                 <TableRow
-                  key={o.id}
+ key={o.id}
                   {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), t("dash.openOrder", { num: numOf(o) }))}
-                  className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
+ className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
                   <TableCell className="truncate tabular-nums text-xs font-semibold">{numOf(o)}</TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
