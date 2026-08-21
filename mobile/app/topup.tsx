@@ -248,7 +248,7 @@ export default function TopUp() {
 
         {phase === "paid" ? (
           <View style={{ alignItems: "center", marginTop: 48 }}>
-            <Ionicons name="checkmark-circle" size={64} color="#0a7c42" />
+            <Ionicons name="checkmark-circle" size={64} color={C.success} />
             <Text style={{ fontSize: 22, fontFamily: F.bold, color: C.fg, marginTop: 14 }}>Payment received</Text>
             <Text style={{ fontSize: 15, color: C.muted, marginTop: 6, textAlign: "center" }}>
               {payment?.amountUsd ? `${usd0(payment.amountUsd)} is on its way to your balance.` : "Your balance is being updated."}
@@ -266,7 +266,7 @@ export default function TopUp() {
           </View>
         ) : phase === "qr" && payment ? (
           <View style={{ alignItems: "center", marginTop: 20 }}>
-            <View style={{ padding: 16, borderRadius: 20, backgroundColor: "#ffffff", borderWidth: 1, borderColor: C.border }}>
+            <View style={{ padding: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border }}>
               {payment.qrCode
                 ? <QRCode value={payment.qrCode} size={qrSize} getRef={(c) => { qrRef.current = c }} />
                 : <Text style={{ color: C.muted }}>No scannable code</Text>}
@@ -452,9 +452,9 @@ export default function TopUp() {
                         </View>
                         <View style={{
                           paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-                          backgroundColor: e.paid ? "#e7f6ef" : "#fdf3e3",
+                          backgroundColor: e.paid ? C.successTint : C.warnTint,
                         }}>
-                          <Text style={{ fontSize: 12, fontFamily: F.bold, color: e.paid ? "#0a7c42" : C.warn }}>
+                          <Text style={{ fontSize: 12, fontFamily: F.bold, color: e.paid ? C.success : C.warn }}>
                             {e.paid ? "Paid" : "Awaiting payment"}
                           </Text>
                         </View>

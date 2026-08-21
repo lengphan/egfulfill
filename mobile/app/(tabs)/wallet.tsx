@@ -103,7 +103,7 @@ export default function Wallet() {
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>BALANCE</Text>
             {w?.low && (
-              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: "center", backgroundColor: "#fff4e5" }}>
+              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: "center", backgroundColor: C.warnTint }}>
                 <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.warn }}>
                   LOW{w.lowBelow != null ? ` · UNDER ${money(w.lowBelow)}` : ""}
                 </Text>
@@ -176,7 +176,7 @@ export default function Wallet() {
                   {new Date(item.created_at).toLocaleDateString()}
                 </Text>
               </View>
-              <Text style={{ fontSize: 15, fontFamily: F.bold, color: d < 0 ? C.fg : "#0a7c42" }}>
+              <Text style={{ fontSize: 15, fontFamily: F.bold, color: d < 0 ? C.fg : C.success }}>
                 {d < 0 ? "−" : "+"}{money(Math.abs(d))}
               </Text>
             </View>

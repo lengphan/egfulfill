@@ -6,62 +6,84 @@
  * a colour typed inline in a screen is how two surfaces start disagreeing about what
  * "overdue" looks like.
  *
- * THE LOOK: ink and violet, with lime as the shock. The pair (--primary / its foreground)
- * is the brand's, not invented here — lime on violet is the one combination the web already
- * commits to, and it is what stops this reading as a default template.
+ * THE LOOK: INK AND ONE SIGNAL (2026-08-21). This used to say "ink and violet, with lime as
+ * the shock", and that pair is gone on both front-ends. The chrome now carries NO HUE —
+ * every neutral below is a true grey — which is the whole mechanism that lets a single
+ * accent read as a DECISION rather than as one colour among several. The previous palette
+ * pulled three ways at once: warm paper and a warm border at hue ~91, a cool periwinkle
+ * accent, and an acid lime on top of both.
  *
- * PAPER, NOT CARDS (changed 2026-08-19). This used to say the warm page existed so white
- * cards would lift off it. They did lift — and that was the problem: two near-identical
- * surfaces, one warm and one not, held apart by a border, which reads as stuck-on rather
- * than seamless. Cards also nest, and the queue ended up with four different left margins in
- * one screen. Sections are divided by a hairline rule (SECTION) on one continuous paper
- * surface now. Depth at arm's length comes from type contrast, which is stronger than a
- * 1px border was.
+ * The signal is CORAL. One token, `pop`. It is ALWAYS a fill carrying dark text — ink on it
+ * measures 8.74:1, white on it 2.18:1 — so it is never a text colour and never a hairline.
+ * Its shape is only 2.10:1 against the page, which means it cannot be a borderless button
+ * on paper; it earns its keep on the dark blocks and as a small badge, where the fill has
+ * real separation and the ink label carries the reading.
+ *
+ * PAPER, NOT CARDS (2026-08-19, unchanged). Sections are divided by a hairline rule
+ * (SECTION) on one continuous surface — never a white card floating on the page. That rule
+ * is STRUCTURAL and survives the palette change intact. What changed is only the hue: the
+ * paper reads as paper now because nothing is drawn around anything, not because it is
+ * tinted beige.
+ *
+ * Every value below is converted from the web's `web/app/globals.css` light block. Contrast
+ * figures in these comments are MEASURED (CLAUDE.md §4), not estimated.
  */
 export const C = {
-  /** The page. Near-white, with just enough warmth left to read as paper rather than as a
-   *  screen — the marketing SURFACE (#FAF8F3) was still too heavy behind a full queue, where
-   *  a warm ground compounds down 800 rows in a way it never does behind a hero. */
-  bg: "#FCFBF8",
-  fg: "#0B0B0C",
-  muted: "#78736B",
-  border: "#ECE7DE",
+  /** The page. A true near-white — the warm #FCFBF8 it replaced disagreed with a chroma-0
+   *  accent system and, next to the coral, read as a slightly dirty white rather than as
+   *  paper. Depth comes from the hairline rules, not from a tint. */
+  bg: "#FBFBFB",
+  fg: "#0A0A0A",
+  /** Secondary type. 4.79:1 on the page — clears the 4.5:1 body floor, which the old
+   *  #78736B did not everywhere it was used. */
+  muted: "#707070",
+  border: "#DFDFDF",
   /** Still real, but only for surfaces that ARE surfaces: the login panel, the tab bar,
    *  an image well. Never a content card — see the note above. */
-  card: "#ffffff",
-  accent: "#EEF1FF",
+  card: "#FFFFFF",
+  /** A flat neutral fill: a chip ground, a pressed row, an inactive segment. */
+  accent: "#F2F2F2",
   /** A WELL IN THE PAPER, not a card on it — a slightly deeper tone of the same paper reads
    *  as recessed and needs no line around it. */
-  accentPaper: "#F2EFE8",
+  accentPaper: "#F1F1F1",
   /**
-   * PERIWINKLE IS A FILL AND CAN NEVER BE TYPE.
+   * THE ACTION. Near-black, and it does BOTH of --primary's jobs on the web: it fills the
+   * buttons and it inks the type. One value, 18.39:1 as text on the page and 19.03:1 with
+   * white on it as a fill — so unlike the periwinkle pair it replaced, it cannot be used
+   * the wrong way round. `brand` is deliberately the SAME value: the web collapsed the two
+   * when the chrome went monotone, and keeping them apart here would re-introduce the split
+   * this change exists to remove.
+   */
+  primary: "#101010",
+  onPrimary: "#FFFFFF",
+  brand: "#101010",
+  onBrand: "#FFFFFF",
+  /** The near-black of the hero blocks. Same family as `primary`; named separately because
+   *  it is a SURFACE, and a screen reads better when it says which it meant. */
+  ink: "#101010",
+  onInk: "#FBFBFB",
+  /**
+   * CORAL — the one signal. #FF927A.
    *
-   * §4 measures it: #A5B7FF is 1.83:1 on paper — a ghost. So the accent is split by JOB,
-   * exactly as the web splits --brand from --primary:
-   *   brand   #A5B7FF  large fills only, and whatever sits on it must be INK (10.13:1)
-   *   primary #4259D6  the deep step — the only one that may carry WORDS (5.45:1)
-   * Getting this backwards is the single easiest way to ship an unreadable screen, and it
-   * is why the app palette's vivid violet is not simply re-tinted here.
+   * ONE LINE TO CHANGE: every use reads this token, so swapping the pop is a single edit.
+   * Roughly twice the chroma of the pale tints tried first, which is the whole difference
+   * between a tint and a colour. Warm against an entirely neutral system, which is what
+   * makes it read as a decision.
+   *
+   * ALWAYS A FILL, ALWAYS WITH `onPop` ON IT. Never type, never a border, never a hairline.
    */
-  primary: "#4259D6",
-  onPrimary: "#FAF8F3",
-  brand: "#A5B7FF",
-  onBrand: "#0B0B0C",
-  /** The near-black of the hero blocks and the primary action. Ink and paper carry this app
-   *  now; the accent is the one note on top, not the thing doing the work. */
-  ink: "#0B0B0C",
-  onInk: "#FAF8F3",
-  /**
-   * RETIRED as a brand colour (2026-08-19). Acid lime on violet is a FLOOR-TOOL pair — built
-   * to be read across a warehouse — and it fought Playfair on every screen. It survives only
-   * as the highlight on the dark action bar, where lime on near-black is a classic
-   * editorial pairing rather than a clash. Never on paper.
-   */
-  lime: "#DCF56B",
-  /** Reserved status colours. These carry meaning on the floor; nothing else may use them. */
-  alert: "#C0303F",
-  warn: "#B87503",
-  success: "#0F7A55",
+  pop: "#FF927A",
+  onPop: "#101010",
+  /** Reserved status colours. These carry meaning on the floor; nothing else may use them.
+   *  Converted from the web's --status-* / --success tokens, all AA on the page. */
+  alert: "#B02A2D",
+  warn: "#8F5D00",
+  success: "#006B3D",
+  /** The pale grounds that go under the three above. Derived from the same hues so a chip
+   *  and its text are one family; each carries its own ink at 4.9:1 or better. */
+  alertTint: "#FFE8E5",
+  warnTint: "#FCEEDB",
+  successTint: "#E0F7E8",
 } as const
 
 /**
@@ -113,7 +135,7 @@ export const R = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const
  */
 export const SECTION = {
   borderTopWidth: 1,
-  borderTopColor: "#ECE7DE",
+  borderTopColor: C.border,
   paddingTop: 20,
   marginTop: 20,
 } as const
@@ -125,43 +147,58 @@ export const SECTION = {
  * emerald shipped · amber hold · violet working · indigo in review · sky approved ·
  * slate untouched · red cancelled. A brand hue must never crowd these: on the floor the
  * colour IS the reading, and someone glancing at a phone across a table is reading the
- * dot, not the word.
+ * dot, not the word. The coral is not in this table and must never enter it.
+ *
+ * Rebuilt 2026-08-21 from the web's --status-* tokens rather than from hand-picked Tailwind
+ * shades. The eight now sit at ONE lightness and chroma per family, so they read as a set;
+ * the tints are the same hue at L 0.955, so a chip and its text belong together. Every pair
+ * measures 4.84:1 or better, which the shades they replaced did not.
  */
 export const STAGE_TONE: Record<string, { fg: string; bg: string }> = {
-  "":          { fg: "#64748b", bg: "#f1f5f9" },
-  in_review:   { fg: "#4f46e5", bg: "#eef2ff" },
-  approved:    { fg: "#0284c7", bg: "#e0f2fe" },
-  working:     { fg: "#5b2fe8", bg: "#F1EEFD" },
-  shipped:     { fg: "#0f8a5f", bg: "#e7f6ef" },
-  on_hold:     { fg: "#c77700", bg: "#fdf3e3" },
-  cancelled:   { fg: "#d4183d", bg: "#fdeaee" },
-  refunded:    { fg: "#d4183d", bg: "#fdeaee" },
+  "":          { fg: "#65696F", bg: "#EFF0F2" },  // 4.84:1
+  in_review:   { fg: "#475FA5", bg: "#E7F0FF" },  // 5.31:1
+  approved:    { fg: "#006A9E", bg: "#DFF3FF" },  // 5.18:1
+  working:     { fg: "#5E58A1", bg: "#EDEEFF" },  // 5.40:1
+  shipped:     { fg: "#006B3D", bg: "#E0F7E8" },  // 5.88:1
+  on_hold:     { fg: "#8F5D00", bg: "#FCEEDB" },  // 4.93:1
+  cancelled:   { fg: "#B02A2D", bg: "#FFE8E5" },  // 5.58:1
+  refunded:    { fg: "#B02A2D", bg: "#FFE8E5" },  // 5.58:1
 }
 
 /**
  * THE SAME STAGES, ON THE INK BLOCK.
  *
- * STAGE_TONE above is a pale tint carrying saturated text, which is right on a WHITE card
- * and wrong on the near-black header: there the tint is a near-white blob, the hue drains
- * out of it, and violet-on-lavender in particular reads as a mistake rather than a status.
+ * STAGE_TONE above is a pale tint carrying saturated text, which is right on paper and wrong
+ * on the near-black header: there the tint is a near-white blob, the hue drains out of it,
+ * and violet-on-lavender in particular reads as a mistake rather than a status.
  *
- * So on ink the stage hue becomes the FILL — the colour is the reading, and it should be
- * the loud part — and the text is whichever of ink or paper measures higher against it.
- * MEASURED, not eyeballed (CLAUDE.md §4): cream wins on the dark hues, ink wins on sky,
- * emerald and amber, and picking by eye would have put cream on all seven.
+ * So on ink the stage hue becomes the FILL and the label is ink.
  *
- *   New 4.33 · Pending 5.72 · Working 6.33 · Cancelled 4.78   (cream)
- *   Approved 4.59 · Shipped 4.31 · On hold 5.43               (ink)
+ * THESE ARE THE WEB'S DARK-MODE STATUS STEPS, not the light ones (2026-08-21). Deriving them
+ * from the light tokens was tried first and FAILED measurement: at L 0.46-0.52 the shipped,
+ * cancelled and refunded fills came to 2.87-2.91:1 against the block behind them. The label
+ * on them was legible, but a chip whose own EDGE is under 3:1 has no shape — it reads as
+ * text floating on the header rather than as a pill. The ink block is a dark surface, so it
+ * takes the dark surface's steps; that is what the web already does, and mirroring it is
+ * cheaper than maintaining a third ladder.
+ *
+ * Because the fill is light and the label is ink, ONE measurement covers both jobs here:
+ * the label's contrast against the fill and the fill's separation from the block are the
+ * same number. All eight land between 6.66:1 and 9.41:1.
+ *
+ * CONSTRAINT: `cancelled` sits 0.077 from `pop` in OKLab — close enough to be confused. They
+ * are safe today only because they never share a screen (toneOnInk is the order-detail
+ * header; C.pop is the orders-list batch bar). Do not put a coral control on the ink header.
  */
 export const STAGE_TONE_INK: Record<string, { fg: string; bg: string }> = {
-  "":          { fg: "#F6F4EF", bg: "#64748b" },
-  in_review:   { fg: "#F6F4EF", bg: "#4f46e5" },
-  approved:    { fg: "#141019", bg: "#0284c7" },
-  working:     { fg: "#F6F4EF", bg: "#5b2fe8" },
-  shipped:     { fg: "#141019", bg: "#0f8a5f" },
-  on_hold:     { fg: "#141019", bg: "#c77700" },
-  cancelled:   { fg: "#F6F4EF", bg: "#d4183d" },
-  refunded:    { fg: "#F6F4EF", bg: "#d4183d" },
+  "":          { fg: "#101010", bg: "#A6ABB1" },  // 8.23:1
+  in_review:   { fg: "#101010", bg: "#8CA8F4" },  // 8.18:1
+  approved:    { fg: "#101010", bg: "#5AAEE5" },  // 7.81:1
+  working:     { fg: "#101010", bg: "#A3A0F1" },  // 8.02:1
+  shipped:     { fg: "#101010", bg: "#5ACB90" },  // 9.41:1
+  on_hold:     { fg: "#101010", bg: "#DFA54D" },  // 8.72:1
+  cancelled:   { fg: "#101010", bg: "#F2716A" },  // 6.66:1
+  refunded:    { fg: "#101010", bg: "#F2716A" },  // 6.66:1
 }
 
 export const toneOf = (stage: string) => STAGE_TONE[stage] ?? STAGE_TONE[""]
@@ -169,9 +206,11 @@ export const toneOf = (stage: string) => STAGE_TONE[stage] ?? STAGE_TONE[""]
 export const toneOnInk = (stage: string) => STAGE_TONE_INK[stage] ?? STAGE_TONE_INK[""]
 
 /** Card lift. iOS takes the shadow, Android takes elevation; passing both is how one
- *  style object covers the pair without a Platform.select at every call site. */
+ *  style object covers the pair without a Platform.select at every call site.
+ *  The shadow is NEUTRAL — it used to be #2b2338, a violet, which tinted every edge in the
+ *  app with the hue the palette just removed. */
 export const LIFT = {
-  shadowColor: "#2b2338",
+  shadowColor: "#0A0A0A",
   shadowOpacity: 0.06,
   shadowRadius: 14,
   shadowOffset: { width: 0, height: 6 },

@@ -401,14 +401,14 @@ export default function Orders() {
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: 8,
               paddingHorizontal: 16, height: 44, borderRadius: R.md,
-              backgroundColor: movable.length ? C.lime : "#3a3446",
+              backgroundColor: movable.length ? C.pop : "#2E2E2E",
               opacity: pressed || moving ? 0.7 : 1,
             })}
           >
             {moving
               ? <ActivityIndicator color={C.ink} />
-              : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.ink : C.muted} />}
-            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? C.ink : C.muted }}>
+              : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.onPop : C.muted} />}
+            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? C.onPop : C.muted }}>
               {batchLabel}
             </Text>
           </Pressable>
