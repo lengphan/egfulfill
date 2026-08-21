@@ -5,7 +5,7 @@ import { Package } from "@phosphor-icons/react"
 import { InventoryView } from "@/components/app/inventory-view"
 import { ScanStation } from "@/components/app/scan-station"
 import { PageTitle } from "@/components/app/page-title"
-import { TabLabel } from "@/components/app/tab-label"
+import { TabBar } from "@/components/app/tab-bar"
 
 // One flat row instead of Stock/Scan stacked over Our-stock/Seller-stock: the two stock
 // pools and the scan station are siblings here. `stock` is kept as a legacy ?tab= alias.
@@ -51,17 +51,12 @@ export function InventorySection() {
           <p className="truncate text-sm text-muted-foreground">Stock levels on hand and the scan station.</p>
         </div>
       </div>
-      <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }, { id: "scan", label: "Scan" }] as const).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => pick(t.id)}
-            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-          >
-            <TabLabel>{t.label}</TabLabel>
-          </button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Inventory views"
+        items={[{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }, { id: "scan", label: "Scan" }]}
+        value={tab}
+        onChange={pick}
+      />
 
       {tab === "scan" ? <ScanStation embedded /> : <InventoryView embedded pool={tab} />}
     </div>

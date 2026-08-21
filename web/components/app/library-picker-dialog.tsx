@@ -5,6 +5,7 @@ import { PenNib, CircleNotch, MagnifyingGlass, Stack } from "@phosphor-icons/rea
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getDesignLibrary, getDesignLibraryItem, getTemplates, type LibraryDesign, type ProductTemplate } from "@/lib/api"
+import { TabBar } from "@/components/app/tab-bar"
 
 type Source = "designs" | "templates"
 
@@ -111,18 +112,20 @@ export function LibraryPickerDialog({
         <DialogHeader><DialogTitle>Choose from your library</DialogTitle></DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-full border border-border p-0.5 text-xs">
-            {([["designs", "Designs", designs?.length], ["templates", "Templates", templates?.length]] as const).map(([id, label, n]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setSource(id)}
-                className={"eg-tap rounded-full px-3 py-1 font-medium transition-colors " + (source === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-              >
-                {label}{n != null ? ` ${n}` : ""}
-              </button>
-            ))}
-          </div>
+          {/* The count was loose text after the label — "Designs 12" reads as a name with a
+              number stuck on. It is a badge now, which is one of the two things rounded-full
+              is actually for. */}
+          <TabBar
+            size="sm"
+            ariaLabel="Library source"
+            className="border-b-0"
+            items={[
+              { id: "designs" as const, label: "Designs", count: designs?.length },
+              { id: "templates" as const, label: "Templates", count: templates?.length },
+            ]}
+            value={source}
+            onChange={setSource}
+          />
           <div className="relative min-w-[10rem] flex-1">
             <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name…" className="h-9 pl-8" aria-label="Search your library" />

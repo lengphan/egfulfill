@@ -23,7 +23,7 @@ import { variantSku, variantLabel, productSizes, productColors } from "@/lib/var
 import { prettyColorName } from "@/lib/color-name"
 import { bySize, isOneSize } from "@/lib/size-order"
 import { PageTitle } from "@/components/app/page-title"
-import { TabLabel } from "@/components/app/tab-label"
+import { TabBar } from "@/components/app/tab-bar"
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -331,17 +331,12 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           When embedded in the Inventory shell, these are two of its top tabs instead — no
  second stacked pill row. */}
       {!pool && (
-        <div className="flex w-fit rounded-full border border-border p-0.5">
-          {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }] as const).map((t) => (
-            <button
- key={t.id}
- onClick={() => setOwnTab(t.id)}
- className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <TabLabel>{t.label}</TabLabel>
-            </button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Stock pools"
+          items={[{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }]}
+          value={tab}
+          onChange={setOwnTab}
+        />
       )}
 
       {tab === "consigned" ? (
@@ -390,9 +385,16 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           {/* The clean-up filter. Off by default: this table's job is what we HOLD, and a
  blank we can no longer buy is still stock on a shelf until someone decides
  otherwise. */}
-          <label className="flex eg-control cursor-pointer">
+          {/* A CHECKBOX LOOKS LIKE A CHECKBOX. This wore .eg-control — the field chrome — so a
+              tick-box sat inside a bordered lozenge the same height and radius as the select
+              beside it and the button at the end of the row. Three different KINDS of control
+              in one shape, which is the thing that makes a toolbar unreadable: nothing about
+              any of them said what it did until you read the words. CLAUDE.md is explicit —
+              never give a checkbox a button's chrome; if it toggles, it looks like a toggle.
+              The box goes, the tick stays. */}
+          <label className="inline-flex h-8 cursor-pointer items-center gap-2 whitespace-nowrap px-1 text-sm">
             <input type="checkbox" checked={onlyUnavailable} onChange={(e) => setOnlyUnavailable(e.target.checked)} className="size-3.5 accent-[var(--primary)]" />
-            No longer stocked
+            <span className={onlyUnavailable ? "text-foreground" : "text-muted-foreground"}>No longer stocked</span>
           </label>
           <select
  value={vis}
@@ -418,7 +420,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
  header; there are no column headers spanning the page any more, so it lives
  with the actions it feeds. Still this PAGE only — ticking a box must never
  quietly select hundreds of rows nobody can see. */}
-            <label className="flex eg-control cursor-pointer">
+            <label className="inline-flex h-8 cursor-pointer items-center gap-2 whitespace-nowrap px-1 text-sm">
               <input
  type="checkbox"
  aria-label="Select every variant on this page"
@@ -430,7 +432,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                 }}
  className="size-3.5 accent-[var(--primary)]"
               />
-              Select page
+              <span className={sel.size > 0 ? "text-foreground" : "text-muted-foreground"}>Select page</span>
             </label>
             {sel.size > 0 && (
               <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
@@ -1354,18 +1356,13 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
         <DialogHeader><DialogTitle>Add inventory item</DialogTitle></DialogHeader>
         <div className="space-y-3">
           {catalog.length > 0 && (
-            <div className="flex w-fit rounded-full border border-border p-0.5">
-              {([{ id: "catalog", label: "From catalogue" }, { id: "manual", label: "By hand" }] as const).map((t) => (
-                <button
- key={t.id}
- type="button"
- onClick={() => { setMode(t.id); setErr(null) }}
- className={"eg-tap rounded-full px-3 py-1 text-xs font-medium transition-colors " + (mode === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <TabBar
+              size="sm"
+              ariaLabel="How to add this item"
+              items={[{ id: "catalog", label: "From catalogue" }, { id: "manual", label: "By hand" }]}
+              value={mode}
+              onChange={(id) => { setMode(id); setErr(null) }}
+            />
           )}
 
           {mode === "catalog" ? (

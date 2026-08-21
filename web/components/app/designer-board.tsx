@@ -16,6 +16,7 @@ import { PushToPartnerInline } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
 import { PageTitle } from "@/components/app/page-title"
+import { TabBar } from "@/components/app/tab-bar"
 
 /**
  * Renders a Wilcom TrueView PNG for an EMB card's raw .emb, falling back to `children` (the
@@ -607,12 +608,13 @@ export function DesignerBoard() {
             }}
           />
         </label>
-        {/* rounded-full to match the pill buttons inside — see suppliers-view. */}
-        <div className="flex rounded-full border border-border p-0.5">
-          {([{ id: "board", label: "Board" }, { id: "list", label: "List" }, ...(canSeeHistory ? [{ id: "history", label: "History" }] as const : [])] as const).map((v) => (
-            <button key={v.id} onClick={() => setView(v.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Board views"
+          items={[{ id: "board", label: "Board" }, { id: "list", label: "List" }, ...(canSeeHistory ? [{ id: "history" as const, label: "History" }] : [])]}
+          value={view}
+          onChange={setView}
+          className="border-b-0"
+        />
       </div>
 
       <StatGrid>

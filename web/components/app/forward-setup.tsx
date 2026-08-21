@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { EnvelopeSimple, Copy, Check, CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { getIngestAddress } from "@/lib/api"
+import { TabBar } from "@/components/app/tab-bar"
 
 /**
  * One-time forwarding setup, per seller.
@@ -147,17 +148,14 @@ export function ForwardSetup() {
 
             <div>
               <div className="mb-1.5 text-sm font-medium">2. Forward Etsy&apos;s sale emails to it</div>
-              <div className="mb-2 flex w-fit rounded-full border border-border p-0.5">
-                {PROVIDERS.map((p) => (
-                  <button
- key={p.id}
- onClick={() => setProvider(p.id)}
- className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (provider === p.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              <TabBar
+                size="sm"
+                ariaLabel="Email provider"
+                className="mb-2"
+                items={PROVIDERS.map((p) => ({ id: p.id, label: p.label }))}
+                value={provider}
+                onChange={setProvider}
+              />
               {active.deepLink && (
                 <button
  onClick={openProvider}
