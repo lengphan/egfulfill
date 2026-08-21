@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/app/sidebar"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { TopBar } from "@/components/app/topbar"
 import { PageTransition } from "@/components/motion/page-transition"
+import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { getUser, getToken } from "@/lib/auth"
 import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
@@ -17,6 +18,8 @@ import { LowBalanceBanner } from "@/components/app/low-balance-banner"
 // (per their role — admin all, operator/warehouse a curated set, designer none) see the
 // StaffSidebar instead; staff on a page their role can't use are bounced to their board.
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // Before any branch: AppShell has three, and one of them silently missed this.
+  useAccent()
   const router = useRouter()
   const pathname = usePathname()
   const [mode, setMode] = useState<"loading" | "seller" | "staff">("loading")

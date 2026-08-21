@@ -157,9 +157,28 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                 <div className="space-y-1.5">
                   <span className="text-sm font-medium">Tags ({tags.length}/13)</span>
                   <div className="flex flex-wrap gap-1">
-                    {(listing.tags ?? []).slice(0, 13).map((t) => (
-                      <button key={t} onClick={() => toggleTag(t)} className={"rounded-full px-2 py-0.5 text-xs font-medium transition-colors " + (tags.includes(t) ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground")}>{t}</button>
-                    ))}
+                    {/* TOGGLES, so they look like toggles. These were rounded-full capsules
+                        that filled solid black when on — and CLAUDE.md names this case
+                        outright: a pill must carry MEANING (an order stage, an HTTP method,
+                        RUSH/LATE), never a role, a count, a tag or a toggle. It was two of
+                        those at once. The shape is a field's now, the state is a tick, and
+                        the fill is gone: nothing here is the primary action of this dialog. */}
+                    {(listing.tags ?? []).slice(0, 13).map((t) => {
+                      const on = tags.includes(t)
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => toggleTag(t)}
+                          aria-pressed={on}
+                          className={"inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition-colors " +
+                            (on ? "border-foreground text-foreground" : "border-input text-muted-foreground hover:text-foreground")}
+                        >
+                          {on ? <CheckSquare size={12} weight="fill" /> : <Square size={12} />}
+                          {t}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               </div>

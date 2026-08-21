@@ -5,7 +5,7 @@ import { Package } from "@phosphor-icons/react"
 import { AllSuppliers } from "@/components/app/all-suppliers"
 import { FavoritesView } from "@/components/app/favorites-view"
 import { PageTitle } from "@/components/app/page-title"
-import { TabLabel } from "@/components/app/tab-label"
+import { TabBar } from "@/components/app/tab-bar"
 
 // Suppliers page — one combined browse across S&S + Otto, plus saved favorites.
 // `embedded` hides the mobile hero when this sits inside the Purchasing tab shell, which
@@ -24,13 +24,12 @@ export function SuppliersView({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      {/* rounded-full, not rounded-lg — the active tab inside is a pill, so a
-          rectangular border around it left visible corner gaps. */}
-      <div className="flex w-fit rounded-full border border-border p-0.5">
-        {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }] as const).map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}><TabLabel>{t.label}</TabLabel></button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Supplier list"
+        items={[{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === "favorites" ? <FavoritesView /> : <AllSuppliers />}
     </div>

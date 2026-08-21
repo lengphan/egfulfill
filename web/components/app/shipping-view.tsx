@@ -6,7 +6,7 @@ import { DispatchBoard } from "@/components/app/dispatch-board"
 import { ShipmentsView } from "@/components/app/shipments-view"
 import { RateCalculatorView } from "@/components/app/rate-calculator-view"
 import { PageTitle } from "@/components/app/page-title"
-import { TabLabel } from "@/components/app/tab-label"
+import { TabBar } from "@/components/app/tab-bar"
 
 type Tab = "dispatch" | "shipments" | "rates"
 
@@ -49,19 +49,14 @@ export function ShippingView() {
           <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue, the shipment archive, and what a parcel costs.</p>
         </div>
       </div>
-      <div className="flex w-fit rounded-full border border-border p-0.5">
-        {/* Rates is a THIRD tab rather than a dialog: pricing a parcel is work you do
-            repeatedly while quoting, and the sweeps below fill a page rather than a popup. */}
-        {([{ id: "dispatch", label: "Dispatch" }, { id: "shipments", label: "Shipments" }, { id: "rates", label: "Rates" }] as const).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => pick(t.id)}
-            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-          >
-            <TabLabel>{t.label}</TabLabel>
-          </button>
-        ))}
-      </div>
+      {/* Rates is a THIRD tab rather than a dialog: pricing a parcel is work you do
+          repeatedly while quoting, and the sweeps below fill a page rather than a popup. */}
+      <TabBar
+        ariaLabel="Shipping views"
+        items={[{ id: "dispatch", label: "Dispatch" }, { id: "shipments", label: "Shipments" }, { id: "rates", label: "Rates" }]}
+        value={tab}
+        onChange={pick}
+      />
 
       {tab === "dispatch" ? <DispatchBoard /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
     </div>

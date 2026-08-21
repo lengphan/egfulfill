@@ -9,7 +9,7 @@ import { FavoritesView } from "@/components/app/favorites-view"
 import { PurchaseView } from "@/components/app/purchase-view"
 import { AlibabaOrders } from "@/components/app/alibaba-orders"
 import { PageTitle } from "@/components/app/page-title"
-import { TabLabel } from "@/components/app/tab-label"
+import { TabBar } from "@/components/app/tab-bar"
 
 type Tab = "all" | "favorites" | "purchase" | "alibaba"
 
@@ -131,29 +131,25 @@ export function PurchasingView() {
           <p className="truncate text-sm text-muted-foreground">Browse suppliers, build a cart, and track orders.</p>
         </div>
       </div>
-      <div className="flex w-fit rounded-full border border-border p-0.5">
-        {/* Alibaba sits beside Orders rather than inside it: those are OUR purchase orders
-            to S&S/Otto/SanMar, placed from here and received into stock, while Alibaba's
-            are placed and paid on their site and only ever read back. Same page, different
-            things — folding them together would put rows with no Receive action into a
-            table whose whole point is receiving. */}
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => pick(t.id)}
-            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-          >
-            <TabLabel>{t.label}</TabLabel>
-            {/* Only on the tab it belongs to, and only when there IS something. A zero
-                beside every tab is a row of noughts pretending to be information. */}
-            {t.id === "purchase" && cartCount > 0 && (
-              <span className={"ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums " + (tab === t.id ? "bg-primary-foreground/20" : "bg-primary/10 text-primary")}>
-                {cartCount > 99 ? "99+" : cartCount}
-              </span>
-            )}
-          </button>
+      {/* Alibaba sits beside Orders rather than inside it: those are OUR purchase orders
+          to S&S/Otto/SanMar, placed from here and received into stock, while Alibaba's are
+          placed and paid on their site and only ever read back. Same page, different things —
+          folding them together would put rows with no Receive action into a table whose whole
+          point is receiving. */}
+      {/* The cart count rides on the tab it belongs to, and ONLY when there is one: a zero
+          beside every tab is a row of noughts pretending to be information. It keeps its
+          rounded-full, because a count badge is one of the two things that are genuinely
+          round. */}
+      <TabBar
+        ariaLabel="Purchasing views"
+        items={tabs.map((t) => (
+          t.id === "purchase" && cartCount > 0
+            ? { id: t.id, label: t.label, count: cartCount > 99 ? 99 : cartCount }
+            : { id: t.id, label: t.label }
         ))}
-      </div>
+        value={tab}
+        onChange={pick}
+      />
 
       {/* Mounted on first visit, hidden thereafter — never unmounted. `hidden` and not a
           zero-height wrapper: the inactive views must take no space and, more to the point,

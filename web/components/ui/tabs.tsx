@@ -45,7 +45,16 @@ const tabsListVariants = cva(
 
 function TabsList({
   className,
-  variant = "default",
+  // "line", NOT "default".
+  //
+  // tabsListVariants sets `defaultVariants: { variant: "line" }` and carries a comment
+  // saying the filled tray was retired across the app — but a default in the DESTRUCTURE
+  // always wins, because cva only fills in a variant that is `undefined` and this passed it
+  // "default" every time. So the cva default had never once applied: all eight tab bars
+  // rendered the grey tray the comment says nothing uses, and the two hand-rolled link bars
+  // (design-lab-tabs, api-playground) were matching a house style that existed only in
+  // writing. Two defaults for one decision is the bug; this is the one that fires.
+  variant = "line",
   ...props
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
   return (

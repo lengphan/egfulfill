@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { FilePdf, ArrowSquareOut, UploadSimple, Barcode, Lock, X, Clock, CheckCircle, Warning } from "@phosphor-icons/react"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { DISPATCH_GRID } from "@/components/app/dispatch-grid"
 import { uploadDispatchLabel, deleteDispatchUpload, type DispatchUpload } from "@/lib/api"
@@ -171,9 +173,13 @@ function DropCardBody() {
  */
 export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) => void; onError?: (msg: string | null) => void }) {
  return (
+    /* AN ACTION, so it wears a button — not .eg-control, which is FIELD chrome: same radius
+       and border as an Input, normal weight, "something you set". This does something to the
+       world. It has to be a <label> because it wraps a hidden file input and Base UI has no
+       asChild, so it borrows buttonVariants rather than a hand-copied class list. */
     <label
  title="Choose label PDFs — or just drop them anywhere on this page"
- className="eg-tap eg-control cursor-pointer"
+ className={cn(buttonVariants({ variant: "outline", size: "default" }), "eg-tap cursor-pointer")}
     >
       Add label PDF
       <input

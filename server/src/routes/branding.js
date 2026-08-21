@@ -1,11 +1,18 @@
 // branding.js — the marks and names an admin can change without a deploy.
 //
-// Scope is deliberate: FAVICON, LOGO and APP NAME. Not the palette. --primary inks ~247
-// pieces of TEXT as well as filling buttons (see CLAUDE.md §4), the status colours carry
-// meaning on the floor, and contrast here is measured rather than eyeballed — so a free
-// colour picker in an admin panel is a way to make a quarter of the app unreadable in four
-// seconds, with nobody noticing until a seller cannot read their own order status. Colours
-// come later as vetted presets with a contrast gate.
+// Scope is deliberate: FAVICON, LOGO, APP NAME and THE ACCENT. Still not the palette.
+// --primary inks ~247 pieces of TEXT as well as filling buttons (see CLAUDE.md §4), the
+// status colours carry meaning on the floor, and contrast here is measured rather than
+// eyeballed — so a free colour picker in an admin panel is a way to make a quarter of the
+// app unreadable in four seconds, with nobody noticing until a seller cannot read their own
+// order status.
+//
+// THE ACCENT IS THE VETTED-PRESET VERSION THIS FILE PROMISED. What is stored is a KEY, never
+// a colour: the values live in web/app/globals.css and every one of them has been through
+// tools/check-pop-presets.mjs, which measures ink contrast on the fill and OKLab distance to
+// every reserved status colour, in BOTH themes. A stored hex would put the next preset in a
+// text field, which is the free picker by another name. ACCENTS below is the whole surface —
+// anything else is rejected, so the worst an admin can do is pick the other one.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -14,6 +21,20 @@ import { q } from '../db.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
 
 const KEY = 'branding';
+
+/**
+ * The accents that have passed the gate. Deliberately short, and short for a REASON rather
+ * than for lack of effort: an accent must be a light enough FILL to carry dark text, and
+ * that is exactly the lightness band dark mode packs every status colour into. A full sweep
+ * of the hue circle leaves two homes — rose and lime. Coral, which this started as, is the
+ * single worst hue on the circle: boxed in by `alert` (25) and `backorder` (50), with no
+ * lightness or chroma that clears the floor in dark mode.
+ *
+ * Adding one means adding it to globals.css AND here, then running the gate. The key is the
+ * contract; the colour is not this file's business.
+ */
+const ACCENTS = ['rose', 'lime'];
+const DEFAULT_ACCENT = 'rose';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_FAVICON = path.join(HERE, '..', 'assets', 'default-favicon.png');
 
@@ -40,12 +61,17 @@ async function read() {
       logoUrl: typeof o.logoUrl === 'string' ? o.logoUrl : '',
       faviconUrl: typeof o.faviconUrl === 'string' ? o.faviconUrl : '',
       faviconKey: typeof o.faviconKey === 'string' ? o.faviconKey : '',
+      // An unknown key — a preset removed after being chosen, a hand-edited row — falls back
+      // rather than being passed through. The client sets data-pop from this, and an
+      // attribute matching no rule leaves the app on whatever :root says, which is the same
+      // colour by a longer route; returning the default makes the panel agree with the page.
+      accent: ACCENTS.includes(o.accent) ? o.accent : DEFAULT_ACCENT,
     };
   } catch {
     // A settings read that FAILS is not the same as branding that was never set — but for
     // reading marks, defaults are the right answer either way. The admin PUT is where a
     // database problem must surface.
-    return { appName: '', logoUrl: '', faviconUrl: '', faviconKey: '' };
+    return { appName: '', logoUrl: '', faviconUrl: '', faviconKey: '', accent: DEFAULT_ACCENT };
   }
 }
 
@@ -77,7 +103,7 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
   /** What the marks are. Any signed-in surface renders them, so this is auth, not admin. */
   app.get('/api/branding', { preHandler: requireAuth }, async () => {
     const b = await read();
-    return { appName: b.appName, logoUrl: b.logoUrl, faviconUrl: b.faviconUrl };
+    return { appName: b.appName, logoUrl: b.logoUrl, faviconUrl: b.faviconUrl, accent: b.accent, accents: ACCENTS };
   });
 
   app.put('/api/admin/branding', { preHandler: requireAdmin }, async (req, reply) => {
@@ -87,6 +113,9 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
       ...cur,
       ...(typeof body.appName === 'string' ? { appName: body.appName.slice(0, 60) } : {}),
       ...(typeof body.logoUrl === 'string' ? { logoUrl: body.logoUrl.slice(0, 500) } : {}),
+      // ALLOW-LIST, not a sanitiser. Nothing outside ACCENTS is stored, so the set of
+      // colours the app can wear is the set that has been measured.
+      ...(ACCENTS.includes(body.accent) ? { accent: body.accent } : {}),
     };
     try {
       await ensure();
@@ -98,7 +127,7 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
       reply.code(502);
       return { error: 'Could not save: ' + ((e && e.message) || 'database error') };
     }
-    return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl };
+    return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl, accent: next.accent, accents: ACCENTS };
   });
 
   /** Upload a mark. Stored PRIVATE and re-served through our own origin, like chat art. */

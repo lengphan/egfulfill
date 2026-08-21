@@ -91,13 +91,21 @@ export function NotificationsView() {
       title="Notifications"
       actions={
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setUnreadOnly((v) => !v); setPage(1) }}
-            className={"rounded-full px-3 py-1 text-xs font-medium transition-colors " +
-              (unreadOnly ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
+          {/* A FILTER, so it looks like a field — .eg-control, same edge and radius as an
+              Input, normal weight, no fill. It was a rounded-full capsule that went solid
+              black when on, which is a primary BUTTON's shape and a primary button's fill:
+              two controls side by side, one saying "set this" and one saying "do this", and
+              nothing about either told you which. rounded-full is reserved for things that
+              are genuinely round — the count badge two elements away is one. */}
+          <select
+            value={unreadOnly ? "unread" : "all"}
+            onChange={(e) => { setUnreadOnly(e.target.value === "unread"); setPage(1) }}
+            aria-label="Which notifications to show"
+            className="eg-control h-8 text-xs"
           >
-            {unreadOnly ? "Showing unread" : "All"}
-          </button>
+            <option value="all">All</option>
+            <option value="unread">Unread only</option>
+          </select>
           {unread > 0 && (
             <Button size="sm" variant="outline" onClick={readAll} disabled={busy}>
               Mark all read ({unread})
@@ -125,11 +133,14 @@ export function NotificationsView() {
               key={String(n.id)}
               onClick={() => openOne(n)}
               className={"flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/50 " +
-                (n.read_at ? "" : "bg-primary/5")}
+                (n.read_at ? "" : "bg-pop/10")}
             >
               {/* Unread dot rather than bold-everything: the eye finds one mark faster
-                  than it compares two weights down a column. */}
-              <span className={"mt-1.5 size-2 shrink-0 rounded-full " + (n.read_at ? "bg-transparent" : "bg-primary")} />
+                  than it compares two weights down a column.
+                  THE ACCENT. --pop is the only colour in a chroma-0 grey system and it holds
+                  exactly one meaning — this is new, and it is for you. Nothing else takes
+                  it. It was ink, which is what everything else on the page already is. */}
+              <span className={"mt-1.5 size-2 shrink-0 rounded-full " + (n.read_at ? "bg-transparent" : "bg-pop")} />
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-sm font-medium">{n.title}</span>

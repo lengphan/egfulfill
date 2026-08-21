@@ -22,6 +22,7 @@ import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { printPackingSlips as printSlips } from "@/lib/packing-slip"
 import { canSetStage, canWalk, stagePath, normalizeStage, isException, orderStage, isFactoryOrder } from "@/lib/factory-status"
+import { TabBar } from "@/components/app/tab-bar"
 
 /**
  * DISPATCH — every label that needs scanning.
@@ -1030,22 +1031,22 @@ export function DispatchBoard() {
         )}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-          {/* Waiting-to-scan vs. history. Kept as a segmented toggle rather than a
- second page so the search box and stat cards above stay put. */}
-          <div className="inline-flex shrink-0 rounded-lg border border-border p-0.5 text-sm">
-            <button
- onClick={() => setView("queue")}
- className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "queue" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              To scan
-            </button>
-            <button
- onClick={() => setView("history")}
- className={"rounded-md px-3 py-1 font-medium transition-colors " + (view === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              History{history.length ? ` · ${history.length}` : ""}
-            </button>
-          </div>
+          {/* Waiting-to-scan vs. history: two VIEWS of this card, kept here rather than on a
+              second page so the search box and stat cards above stay put. It was a boxed
+              segmented control whose active half went solid `bg-primary` — the same fill as
+              the Finish All button four inches to its right, so the row had two black
+              rectangles meaning completely different things. A rule under the live word. */}
+          <TabBar
+            size="sm"
+            ariaLabel="Dispatch view"
+            className="shrink-0 border-b-0"
+            items={[
+              { id: "queue" as const, label: "To scan" },
+              { id: "history" as const, label: "History", count: history.length || undefined },
+            ]}
+            value={view}
+            onChange={setView}
+          />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search order, customer or tracking…" className="h-9 max-w-xs" />
           {view === "history" && (
             <div className="flex flex-wrap items-center gap-1">

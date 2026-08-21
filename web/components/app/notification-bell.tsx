@@ -127,7 +127,7 @@ export function NotificationBell() {
       >
         <Bell size={18} />
         {unread > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex min-w-4 items-center justify-center rounded-full border-2 border-card bg-primary px-1 text-xs font-bold leading-none text-primary-foreground">
+          <span className="absolute right-1.5 top-1.5 flex min-w-4 items-center justify-center rounded-full border-2 border-card bg-pop px-1 text-xs font-bold leading-none text-pop-foreground">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -148,7 +148,7 @@ export function NotificationBell() {
               <button
                 key={n.id}
                 onClick={() => open(n)}
-                className={"flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent " + (n.read_at ? "" : "bg-primary/[0.04]")}
+                className={"flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent " + (n.read_at ? "" : "bg-pop/10")}
               >
                 <span className={"mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md " + (n.read_at ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary")}>
                   {ICON[n.type] ?? <Warning size={13} weight="fill" />}

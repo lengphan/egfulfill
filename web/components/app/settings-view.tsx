@@ -2347,33 +2347,36 @@ function UsersPanel() {
             <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input value={qStr} onChange={(e) => setQStr(e.target.value)} placeholder="Search name, email or store…" className="h-9 pl-8" />
           </div>
-          <div className="flex flex-wrap items-center gap-1">
-            {[["all", "All"], ["staff", "Staff"], ["seller", "Sellers"], ["operator", "Operator"], ["warehouse", "Warehouse"], ["designer", "Designer"], ["admin", "Admin"]].map(([id, label]) => {
- const n = roleCount(id)
- return (
-              <button
- key={id}
- onClick={() => setRoleFilter(id)}
- className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (roleFilter === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
-              >
-                {label}
-                <span className={"ml-1 tabular-nums " + (roleFilter === id ? "opacity-80" : "opacity-50")}>{n}</span>
-              </button>
-            )})}
-          </div>
+          {/* A FIELD, not seven capsules. This was a run of seven pills with a filled black
+              one — a primary button's shape and fill, seven times over, wrapping to a second
+              line in a toolbar that already holds a search box and a sort. Tabs would be no
+              better at seven: a rule under the live word works when the options are a handful
+              of VIEWS, not when they are a long list you narrow by. One control that says
+              what it is set to. The counts survive, in the options. */}
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            aria-label="Filter by role"
+            className="eg-control h-9 text-xs"
+          >
+            {[["all", "All"], ["staff", "Staff"], ["seller", "Sellers"], ["operator", "Operator"], ["warehouse", "Warehouse"], ["designer", "Designer"], ["admin", "Admin"]].map(([id, label]) => (
+              <option key={id} value={id}>{label} ({roleCount(id)})</option>
+            ))}
+          </select>
           {/* Sort: newest account first (default) vs busiest by recent volume — so after
  suggesting limits, the heavy hitters are at the top to review. */}
-          <div className="flex rounded-full border border-border p-0.5 text-xs">
-            {([["recent", "Newest"], ["busy", "Busiest"]] as const).map(([id, label]) => (
-              <button
- key={id}
- onClick={() => setSortBy(id)}
- className={"eg-tap rounded-full px-2.5 py-1 font-medium transition-colors " + (sortBy === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Sorting is something you SET, so it looks like a field. Same reason as the
+              role filter above, and it says what it is doing now rather than leaving you to
+              work it out from which of two capsules is filled. */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "recent" | "busy")}
+            aria-label="Sort users"
+            className="eg-control h-9 text-xs"
+          >
+            <option value="recent">Newest first</option>
+            <option value="busy">Busiest first</option>
+          </select>
           {/* Head-room: how much of the factory cap the seller limits claim. The cap is the
  master knob (raise it in Platform to take more overall); editing a seller here
  only moves that one row. Amber when the sum runs past the cap. */}

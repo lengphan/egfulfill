@@ -10,6 +10,7 @@ import { Pagination, usePaged } from "@/components/app/pagination"
 import { getOrders, type OrderRow } from "@/lib/api"
 import { numOf, platformOf, itemsLabel, unitsOf, customerOf, totalOf, usd, trackUrl } from "@/lib/order-format"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
+import { TabBar } from "@/components/app/tab-bar"
 
 // A seller's record of what THEY uploaded, newest first — so they can track their own
 // orders without pinging us. Shows ONLY the seller-facing status (Pending / In Production /
@@ -56,17 +57,18 @@ export function SellerUploadHistory() {
       title="Upload history"
     >
       <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {SELLER_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        {/* A FILTER ROW, which CLAUDE.md puts under the same rule as tabs: the underline is
+            the only active treatment. It was a run of capsules with a filled black one, which
+            is a primary button's shape and fill — on a row where nothing is a primary
+            button. */}
+        <TabBar
+          size="sm"
+          ariaLabel="Filter uploads"
+          items={SELLER_FILTERS.map((f) => ({ id: f, label: f }))}
+          value={filter}
+          onChange={setFilter}
+          className="border-b-0"
+        />
         <div className="flex items-center gap-3">
           <span className="hidden text-xs text-muted-foreground sm:inline"><span className="font-semibold text-foreground tabular-nums">{today}</span> today · <span className="font-semibold text-foreground tabular-nums">{orders?.length ?? 0}</span> total</span>
           <div className="relative w-full sm:w-56">
