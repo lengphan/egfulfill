@@ -367,6 +367,23 @@ export function buildTemplate(title, lists = null) {
     // The lists themselves, rewritten every time — this is the whole point of formatting an
     // existing master: yesterday's catalogue is replaced by today's in place.
     if (hasLists) {
+      /**
+       * GROW THE GRID FIRST. updateCells cannot extend a sheet — it answers "attempting to
+       * write column 82, beyond the last requested column" and the whole batch fails.
+       *
+       * The Lists tab was sized when it was CREATED, to exactly the catalogue of that day.
+       * Adding a product, or adding the three union columns, needs more room than it has,
+       * so the refresh has to widen it before writing into it. Never narrows: a smaller
+       * catalogue leaves empty columns, which cost nothing on a hidden tab and are cheaper
+       * than a delete that could take a named range with it.
+       */
+      out.push({ updateSheetProperties: {
+        properties: { sheetId: listsGid, gridProperties: {
+          columnCount: Math.max(listCols.length, 4),
+          rowCount: Math.max(listRowCount, 100),
+        } },
+        fields: 'gridProperties.columnCount,gridProperties.rowCount',
+      } });
       out.push({ updateCells: {
         rows: listRows, fields: 'userEnteredValue',
         start: { sheetId: listsGid, rowIndex: 0, columnIndex: 0 },
