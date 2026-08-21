@@ -23,20 +23,19 @@
     --text-2xs: 0.6875rem;   /* 11px — the smallest step */
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
-    /* TWO heading tokens, because marketing and the app want opposite things.
+    /* ONE FACE. Both heading tokens resolve to the body stack.
      *
-     * --font-display  Playfair Display. MARKETING + auth only. A high-contrast serif is the
-     *                 voice of the brand — the dramatic thick/thin is the "sophisticated"
-     *                 quality no geometric sans can produce at any weight.
-     * --font-title    the app's page titles. Deliberately the SAME stack as body — a
-     *                 high-contrast display serif over a 700-row production queue reads
-     *                 dated, and the operational UI wants to be quiet. It exists as its own
-     *                 token so app titles can be moved later without touching marketing.
+     * These were two faces on purpose — Playfair Display for marketing and auth, the body
+     * sans for app titles — on the argument that a high-contrast serif is the voice of the
+     * brand. It is being dropped: the ask is simple and modern, and a display serif is the
+     * single loudest signal of the opposite.
      *
-     * (Space Grotesk and Outfit were both tried as a single face for both jobs and rejected —
-     * see web/app/layout.tsx for why. The lesson was that one token could not serve both.)
+     * The tokens STAY, both of them, and every `font-display` / `font-title` call site is
+     * untouched — around 100 of them. That is the whole point of resolving a face through a
+     * token: the typeface changes here, once, and nothing else has to be edited or
+     * remembered. If a display face is ever wanted again it is one line, not a sweep.
      */
-    --font-display: var(--font-display-face);
+    --font-display: var(--font-sans);
     --font-title: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -88,7 +87,30 @@
      * every row and strained to look at. The colour moves to the SIDEBAR instead: one bounded
      * block that's pleasant in the corner of your eye and never underneath the data. Cards
      * keep their separation from a slightly firmer border rather than from a tinted backdrop. */
-    --background: oklch(1 0 0);
+  /* ── INK AND ONE SIGNAL ─────────────────────────────────────────────────────
+   * The chrome carries NO hue. Every neutral below is chroma 0 — background, card,
+   * muted, secondary, border, input — which is what lets a single accent read as a
+   * decision rather than as one colour among several.
+   *
+   * It replaces a palette that pulled three ways at once: surfaces at chroma 0, muted
+   * and secondary warm at hue 91 (yellow), accent cool at hue 285. A grey fill, a tinted
+   * fill and the page behind them disagreeing is what read as "off" beside the violet.
+   *
+   * The signal is COBALT, oklch(0.50 0.115 255). It replaces oklch(0.5305 0.2723 283.5)
+   * — an electric violet sitting essentially at the edge of the sRGB gamut, which is a
+   * colour built to win a tap in a consumer app rather than to be stared at for eight
+   * hours while counting garments.
+   *
+   * Cobalt was chosen by MEASUREMENT, not taste. A teal candidate sat 0.092 from the
+   * shipped green in OKLab — closer than the two nearest colours already in the app (hold
+   * and alert, 0.106 apart), so it would have been harder to tell from "shipped" than two
+   * different statuses are from each other. Cobalt sits 0.182 away and cannot be confused
+   * with any status.
+   *
+   * White on it measures 6.02:1 and it measures 5.82:1 as text on the page, so both of
+   * --primary's jobs — 210 fills and 281 pieces of text — clear AA on the same value.
+   * ── */
+    --background: oklch(0.988 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
@@ -109,8 +131,11 @@
    * Status colours are untouched: emerald still means shipped, amber still means warning.
    * Those carry meaning on the floor and must not be crowded by a brand hue.
    */
-    --primary: oklch(0.5305 0.2723 283.5);
-    --primary-foreground: oklch(0.9320 0.1290 125.0);
+    --primary: oklch(0.50 0.115 255);
+  /* WHITE, NOT LIME. Every filled button in the product read as lime on electric violet —
+   * 5.08:1, the weakest pair in the app, on the most-pressed control. White on cobalt is
+   * 6.02:1: more contrast and one less colour. */
+    --primary-foreground: oklch(1 0 0);
   /* THE ACTION PAIR — violet fill, lime label. Inverted per mode, like the sidebar.
    *
    * A borderless button is only findable if its FILL clears 3:1 against what's behind it,
@@ -122,8 +147,8 @@
    * 4.5:1. The lime fill has no such problem on a dark ground — 16.56:1 both ways — so dark
    * runs lime fill + ink label. Same two colours, opposite jobs, exactly the rule the
    * selected nav item already follows in each mode. */
-    --brand: oklch(0.5305 0.2723 283.5);
-    --brand-foreground: oklch(0.9320 0.1290 125.0);
+    --brand: oklch(0.50 0.115 255);
+    --brand-foreground: oklch(1 0 0);
   /* THE NEUTRALS ARE BEIGE, not grey. This is what lets the beige actually spread.
    *
    * Every secondary surface in the app was chroma 0 — --secondary, --input and
@@ -135,12 +160,12 @@
    * The CANVAS stays white on purpose. A tinted page behind a 700-row queue is a sheet you
    * read THROUGH all day; the warmth belongs to the bounded surfaces, not underneath the
    * data. */
-    --secondary: oklch(0.955 0.012 91);
-    --secondary-foreground: oklch(0.205 0.006 91);
-    --muted: oklch(0.962 0.011 91);
-    --muted-foreground: oklch(0.525 0.014 91);
-    --accent: oklch(0.966 0.022 285);
-    --accent-foreground: oklch(0.45 0.24 283.5);
+    --secondary: oklch(0.965 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.965 0 0);
+    --muted-foreground: oklch(0.545 0 0);
+    --accent: oklch(0.962 0.012 255);
+    --accent-foreground: oklch(0.44 0.115 255);
   /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-emerald-600` was used in 56 places
    * as the "positive" signal — and being a hardcoded shade it had no dark variant, so it
    * measured 3.77:1 on the light card and 4.06:1 on the dark one. It failed the 4.5:1 body
@@ -172,8 +197,8 @@
        problem. Dark mode is left alone — its border shares hue 285 with its own surface,
        which is the same rule, already satisfied. */
     --border: oklch(0.905 0 0);
-    --input: oklch(0.932 0 0);
-    --ring: oklch(0.5305 0.2723 283.5);
+    --input: oklch(0.928 0 0);
+    --ring: oklch(0.50 0.115 255);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
    * every one clears 3:1 against the chart surface. Amber and green are deliberately not
@@ -203,14 +228,14 @@
    *
    * Selected = the violet block with the cream green on it, 5.07:1. Same pair as the hero,
    * so "you are here" in the app is the same gesture as the accent phrase on the site. */
-    --sidebar: oklch(0.955 0.006 91);
+    --sidebar: oklch(0.968 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.5305 0.2723 283.5);
-    --sidebar-primary-foreground: oklch(0.9320 0.1290 125.0);
-    --sidebar-accent: oklch(0.925 0.008 91);
+    --sidebar-primary: oklch(0.50 0.115 255);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.925 0 0);
     --sidebar-accent-foreground: oklch(0.145 0 0);
-    --sidebar-border: oklch(0.890 0.006 91);
-    --sidebar-ring: oklch(0.5305 0.2723 283.5);
+    --sidebar-border: oklch(0.895 0 0);
+    --sidebar-ring: oklch(0.50 0.115 255);
 }
 
 .dark {
@@ -250,29 +275,29 @@
    * The fills below (secondary/muted/accent/input) came down with the card — they were
    * pitched to read against a 0.265 slab, and left where they were they would have become
    * the brightest thing on a chip-covered page. */
-    --background: oklch(0.148 0.020 285);
+    --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.148 0.020 285);
+    --card: oklch(0.175 0 0);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.196 0.024 285);
+    --popover: oklch(0.175 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.68 0.175 285.0);
-    --primary-foreground: oklch(0.175 0.008 277);
-    --brand: oklch(0.9320 0.1290 125.0);
-    --brand-foreground: oklch(0.175 0.008 277);
-    --secondary: oklch(0.232 0.026 285);
+    --primary: oklch(0.655 0.125 255);
+    --primary-foreground: oklch(0.145 0 0);
+    --brand: oklch(0.655 0.125 255);
+    --brand-foreground: oklch(0.145 0 0);
+    --secondary: oklch(0.215 0 0);
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.232 0.026 285);
-    --muted-foreground: oklch(0.715 0.012 285);
-    --accent: oklch(0.243 0.050 285);
+    --muted: oklch(0.215 0 0);
+    --muted-foreground: oklch(0.715 0 0);
+    --accent: oklch(0.245 0.030 255);
     --accent-foreground: oklch(0.92 0.08 285);
     --success: oklch(0.80 0.155 158);
     --studio-bed: oklch(0.245 0.008 255);
     --destructive: oklch(0.704 0.191 22.216);
     /* The ONLY thing separating a card from the canvas now, so it stays strong. */
-    --border: oklch(0.370 0.030 285);
-    --input: oklch(0.210 0.024 285);
-    --ring: oklch(0.68 0.175 285.0);
+    --border: oklch(0.315 0 0);
+    --input: oklch(0.265 0 0);
+    --ring: oklch(0.655 0.125 255);
   /* Dark mode is SELECTED, not flipped: its own steps measured against the dark surface,
    * in the SAME hue order as light so series 3 is teal on both. */
     --chart-1: oklch(0.6458 0.1946 289.6); /* violet  #8F72FA */
@@ -284,7 +309,7 @@
    * ink on it. On a near-black page the loud colour has to be the fill rather than the label
    * — an acid *label* on near-black is legible but quiet, while the filled block reads across
    * the room, which is what a "you are here" marker is for. */
-    --sidebar: oklch(0.148 0.020 285);
+    --sidebar: oklch(0.175 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
     /* THE SWAP THE COMMENT ABOVE ALREADY DESCRIBED. These two carried the LIGHT arrangement
      * verbatim — violet block, acid label — so the paragraph promising "the acid block with
@@ -292,12 +317,12 @@
      * reserved use of lime never appeared. The nav was violet on violet-tinted panel on
      * violet-tinted canvas, which is why the dark app reads as having no accent at all.
      * Ink on this lime is 16.56:1; the violet block it replaces was 4.9:1 against the panel. */
-    --sidebar-primary: oklch(0.9320 0.1290 125.0);
-    --sidebar-primary-foreground: oklch(0.175 0.008 277);
-    --sidebar-accent: oklch(0.222 0.026 285);
+    --sidebar-primary: oklch(0.655 0.125 255);
+    --sidebar-primary-foreground: oklch(0.145 0 0);
+    --sidebar-accent: oklch(0.235 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.370 0.030 285);
-    --sidebar-ring: oklch(0.68 0.175 285.0);
+    --sidebar-border: oklch(0.315 0 0);
+    --sidebar-ring: oklch(0.655 0.125 255);
 }
 
 @layer base {
@@ -314,15 +339,13 @@
     scrollbar-gutter: stable;
     }
 
-  /* Playfair Display is a HIGH-CONTRAST serif: the thin strokes are genuinely thin, and that
-     modulation is the whole reason it reads as sophisticated. Two consequences worth pinning:
-
-     - Never let it below ~1.25rem. At small sizes the thins disappear into the background on
-       a coloured plate and the word starts to shimmer. Small headings take `font-title`.
-     - It needs slightly tighter tracking than a sans at display size, which the call sites
-       already apply (-0.035em on the hero). */
+  /* `.font-display` now resolves to the body sans like everything else. It keeps its own
+     rule rather than being deleted, because ~100 call sites name it and a class that exists
+     is cheaper than a sweep — and because display type still wants tighter tracking than
+     body, which is a property of SIZE, not of the typeface that was dropped. */
   .font-display {
     font-optical-sizing: auto;
+    letter-spacing: -0.022em;
     }
 }
 
