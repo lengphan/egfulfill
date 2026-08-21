@@ -205,7 +205,7 @@ export function SupplierProductCard({
             title={synced ? "Synced" : "Re-sync this style from the supplier"}
             aria-label="Re-sync this product"
             className={"absolute bottom-2 left-2 flex size-7 items-center justify-center rounded-full border transition-colors " +
-              (synced ? "border-emerald-200 bg-emerald-50 text-success"
+              (synced ? "border-transparent text-shipped"
                 : "border-border bg-background/80 text-muted-foreground hover:text-primary disabled:opacity-60")}>
             {syncing ? <CircleNotch size={14} className="animate-spin" />
               : synced ? <CheckCircle size={14} weight="fill" />
@@ -310,11 +310,15 @@ export function SupplierProductCard({
             </button>
           )}
           <button onClick={onAdd} disabled={added || adding}
+            /* ADDED IS A STATE, NOT A BUTTON. It rendered as a pale green outlined control
+               sitting beside a real one — so a thing you cannot press looked exactly like a
+               thing you can, and green was spent on "nothing to do here". Done is quiet:
+               muted text, no fill, no border. The tick carries it. */
             className={cn(
               added
-                ? CARD_ACTION_SECONDARY + " border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                : CARD_ACTION_PRIMARY,
-              "w-full", !onQuickOrder && "col-span-2",
+                ? "inline-flex w-full items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground"
+                : CARD_ACTION_PRIMARY + " w-full",
+              !onQuickOrder && "col-span-2",
             )}>
             {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to Products</>}
           </button>
