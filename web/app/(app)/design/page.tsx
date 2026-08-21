@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react"
 import { Plus, PenNib, Trash } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TemplatesPanel } from "@/components/app/templates-panel"
+import { MachineFilesPanel } from "@/components/app/machine-files-panel"
 import { DesignLabTabs, useDesignLabTab } from "@/components/app/design-lab-tabs"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -175,6 +176,8 @@ function DesignLab() {
             </div>
           )}
         </SectionCard>
+      ) : tab === "machine" ? (
+        <MachineFilesPanel />
       ) : (
         <TemplatesPanel />
       )}

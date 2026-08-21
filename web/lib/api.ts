@@ -2159,7 +2159,7 @@ export type Overview = {
  *  Served rather than bundled so it can never drift from the column names the template
  *  writes — see APPS_SCRIPT in server/src/routes/sheets.js. Admin only. */
 export function getSheetsAppsScript() {
-  return api<{ script: string; tab: string; listsTab: string }>(`/api/sheets/apps-script`)
+  return api<{ script: string; tab: string; listsTab: string; manifest: string }>(`/api/sheets/apps-script`)
 }
 
 export function getOverview(days = 30, windowLine = false) {
@@ -2253,6 +2253,19 @@ export function updateOrder(id: string, patch: { status?: string; factoryStatus?
 }
 
 export type NewOrderItem = {
+  /**
+   * THE LINE'S IDENTITY, when the caller has a reason to know it before the order exists.
+   *
+   * The server mints one for every line and honours a supplied one ("marketplace importers
+   * carry their own, and they must stay stable across a re-sync"). It was never declared
+   * here, so the one caller that genuinely needs it — the sheet importer, which has to
+   * attach a machine file to the unit row that asked for it — had no way to say so in types.
+   *
+   * `createOrder` answers `{ ok, id }` and no line ids, and a SKU is not identity: two lines
+   * of the same SKU are different jobs (§5). Minting is the only way to hold a handle on a
+   * specific line across the create.
+   */
+  lineId?: string
   name?: string
   sku?: string
   /** The catalog blank to produce on — what pricing and the stock barcode key on. */
@@ -3130,6 +3143,71 @@ export function saveDesignLibrary(body: { name?: string; data: string; thumb?: s
 }
 export function renameDesignLibrary(id: number | string, name: string) {
   return api<LibraryDesign & { error?: string }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "PATCH", body: JSON.stringify({ name }) })
+}
+
+/**
+ * ── THE MACHINE-FILE LIBRARY ─────────────────────────────────────────────────
+ *
+ * A seller's own stitch files, held ONCE and referenced by `MF-<seq>`. Distinct from
+ * `design_files`, which is the file ATTACHED to an order line: that store is order-scoped
+ * (its endpoint refuses a request without an orderId) and its primary key is caller-supplied,
+ * which is exactly the shape a library must not have.
+ *
+ * The bytes never travel twice. `attachMachineFile` sends an id and a LINE; the server writes
+ * a design_files row carrying the same storage key. A 40-line import re-posting an 8MB .EMB
+ * per line would be 320MB against a 60MB body limit.
+ */
+export type MachineFile = {
+  id: string
+  /** What a person types into a sheet — `MF-12`. */
+  ref: string
+  seq: number | null
+  name: string
+  fileName: string | null
+  bytes: number | null
+  kind: string
+  createdAt?: string
+  /** Set when an upload matched bytes already in the library — the same id came back. */
+  duplicate?: boolean
+  error?: string
+}
+export function getMachineFiles() {
+  return api<MachineFile[]>(`/api/machine_files`)
+}
+/** `data` is a base64 data URL. `fileName` decides the format, so it is not optional: the
+ *  server refuses anything that is not a stitch extension. */
+export function uploadMachineFile(body: { data: string; fileName: string; name?: string }) {
+  return api<MachineFile>(`/api/machine_files`, { method: "POST", body: JSON.stringify(body) })
+}
+export function renameMachineFile(id: string, name: string) {
+  return api<MachineFile & { ok?: boolean }>(`/api/machine_files/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) })
+}
+export function deleteMachineFile(id: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/machine_files/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+/** The bytes, as a data URL. NOT a plain link: every route here is behind a Bearer JWT that
+ *  only this module attaches, and an <a href> or window.open() carries no Authorization
+ *  header — it lands on 401. Same shape `downloadDesignFile` returns, so one client helper
+ *  saves both. */
+export function downloadMachineFile(id: string) {
+  return api<{ id?: string; name?: string; mime?: string; data?: string; error?: string }>(
+    `/api/machine_files/${encodeURIComponent(id)}/download`)
+}
+/**
+ * What a sheet's Machine File ID column points at, per reference.
+ *
+ * `null` for a reference that does not resolve — which covers "no such file" AND "not
+ * yours", deliberately and identically. Two different answers to "does MF-91 exist" is how
+ * one seller learns another seller has it.
+ */
+export function resolveMachineFiles(refs: string[]) {
+  return api<Record<string, MachineFile | null>>(`/api/machine_files/resolve`, { method: "POST", body: JSON.stringify({ refs }) })
+}
+/** Put one library file on ONE order line. The server mints the design id and always writes
+ *  `line_id` — a null line means "every line on the order", which is the bug this replaces. */
+export function attachMachineFile(id: string, body: { orderId: string; lineId: string }) {
+  return api<{ ok?: boolean; designId?: string; ref?: string; fileName?: string; error?: string }>(
+    `/api/machine_files/${encodeURIComponent(id)}/attach`, { method: "POST", body: JSON.stringify(body) })
 }
 
 // ── Wilcom EWA (embroidery) ──────────────────────────────────────────────────
