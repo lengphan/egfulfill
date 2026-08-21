@@ -16,6 +16,7 @@ import {
   type TemplatePos,
   CSV_COLUMNS,
   COLUMN_OPTIONS,
+  TEMPLATE_HEADERS,
   GROUP_LABEL,
   DUTY_LABEL,
   DUTY_MARK,
@@ -25,6 +26,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
+import { OrderGrid } from "@/components/app/order-grid"
 import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getSheetsAppsScript, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
@@ -709,12 +711,28 @@ export function ImportOrdersDialog({
             </details>
 
             <Tabs defaultValue="file">
-              <TabsList className={sheetsEnabled || configErr ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
+              <TabsList className={sheetsEnabled || configErr ? "grid w-full grid-cols-4" : "grid w-full grid-cols-3"}>
+                <TabsTrigger value="grid">Grid</TabsTrigger>
                 <TabsTrigger value="file">File</TabsTrigger>
                 <TabsTrigger value="paste">Paste</TabsTrigger>
                 {(sheetsEnabled || configErr) && <TabsTrigger value="sheet">Sheet</TabsTrigger>}
               </TabsList>
 
+              <TabsContent value="grid" className="mt-3">
+                {/* The grid owns editing only. Rows come back as strings in CSV_COLUMNS order,
+                    which is exactly what the File tab already hands to rowsToRecords — so
+                    Complete walks the same path a dropped .xlsx does. */}
+                <OrderGrid
+                  busy={saving}
+                  onComplete={(gridRows) => {
+                    /* The preview renders below </Tabs>, so it appears without switching
+                       tabs — Complete populates it and the seller reads the result in
+                       place. Same records, same errors, same Import button as a dropped
+                       .xlsx: the grid adds a way IN, not a second way through. */
+                    ingest([TEMPLATE_HEADERS as unknown as string[], ...gridRows])
+                  }}
+                />
+              </TabsContent>
               <TabsContent value="file" className="mt-3">
                 <label
                   onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
