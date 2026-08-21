@@ -478,22 +478,35 @@ td[align="right"] {
  * Deliberately NOT applied to a control inside a form field, where a full pill around a
  * text input is a lozenge you cannot see the start of. This is for toolbars.
  */
+/* ── A FILTER IS NOT A BUTTON ────────────────────────────────────────────────────
+   This was `border-radius: 9999px` — so a category select, a "no longer stocked" toggle
+   and a "Print labels" ACTION all rendered as the same outlined lozenge. Shape is the only
+   thing that tells you what a control DOES before you read it, and spending it on all three
+   equally is why a toolbar reads as a row of interchangeable chips.
+
+   So: SHAPE SAYS KIND. A filter or a toggle is a FIELD — same rounded-lg as an Input,
+   because that is what it is, something you set. A Button keeps rounded-lg too but carries
+   a FILL when it matters, and weight is what separates them. Fully-round stays reserved for
+   things that are genuinely round: count badges and avatars.
+
+   Height matches the Button's default so a mixed row still sits on one line.
+   ── */
 .eg-control {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  height: 2rem;                 /* the Button's default size */
-  padding-inline: 0.75rem;
-  border-radius: 9999px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  height: 2rem;
+  padding-inline: 0.625rem;
+  border-radius: var(--radius-lg, 0.5rem);
+  border: 1px solid var(--input);
+  background: var(--background);
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 400;          /* a field is not emphasised; an action is */
   line-height: 1;
   white-space: nowrap;
-  transition: border-color .15s ease, color .15s ease;
+  color: var(--foreground);
 }
-.eg-control:hover { border-color: color-mix(in oklch, var(--primary) 40%, transparent); }
+.eg-control:hover { background: var(--muted); }
 .eg-control:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent); }
 /* THE GUTTER, WIDENED. Content used to start 32px from the sidebar on a laptop and 48px on
    a large monitor — close enough to the chrome that the page read as one continuous slab,
