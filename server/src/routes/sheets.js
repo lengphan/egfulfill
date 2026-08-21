@@ -14,7 +14,7 @@
 import crypto from 'crypto';
 import { q } from '../db.js';
 import { productSizes, productColors } from '../variant-sku.js';
-import { methodCode } from '../print-route.js';
+import { methodCode, methodLabel } from '../print-route.js';
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY || '';
 const TEMPLATE_URL = process.env.SHEETS_TEMPLATE_URL || '';
@@ -89,33 +89,59 @@ const T_COLUMNS = [
    * there, see COL_ALIASES in web/lib/order-import.ts.
    */
   { h: 'Blank Product', g: 'product', duty: '', sample: 'Gildan 5000 Heavy Cotton Tee', opts: 'products' },
-  // Renamed to match the import dialog. The importer aliases the old spelling, so a sheet
-  // downloaded before this keeps working — see COL_ALIASES in web/lib/order-import.ts.
-  { h: 'Template/Design ID', g: 'product', duty: '', sample: 'TPL-12' },
-  { h: 'Item Quantity', g: 'product', duty: '', sample: '1' },
+  /**
+   * THE SHORTCUT, THEN THE RAW MATERIAL — and they sit together because they answer the
+   * same question two ways.
+   *
+   * A Template ID already carries the blank, the placement and the artwork, so a row with
+   * one needs nothing else. An Image ID is the artwork on its own, placed at the product's
+   * default print area — which is all a spreadsheet row can express, since there is no way
+   * to type a position into a cell.
+   *
+   * Image ID was four columns further right, past the variant fields, so the two ways of
+   * saying "here is the design" were separated by everything that is not the design. Both
+   * were also longer than they needed to be: "Template/Design ID" and "Image Link/ID" each
+   * spent a column's width on a slash. The importer aliases every old spelling, so a sheet
+   * downloaded before today still reads — see COL_ALIASES in web/lib/order-import.ts.
+   */
+  { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
+  { h: 'Image ID', g: 'product', duty: '', sample: '' },
+  /**
+   * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
+   * only one that is not artwork.
+   *
+   * Template ID and Image ID hand us a PICTURE we cut a machine file from. This hands us the
+   * machine file, which is what actually arrives: sellers send .EMB. It rides beside the
+   * other two because it answers the same question, and this list is a HAND-KEPT MIRROR of
+   * web/lib/order-import.ts's CSV_COLUMNS — change one and change the other, or the sheet we
+   * hand out stops importing itself.
+   */
+  { h: 'Machine File ID', g: 'product', duty: '', sample: '' },
+  { h: 'Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
-  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods', dep: 'methods' },
-  { h: 'Item Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
-  { h: 'Item Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
-  { h: 'Item Price', g: 'product', duty: '', sample: '24.00' },
-  { h: 'Image Link/ID', g: 'product', duty: '', sample: '' },
+  { h: 'Print Type', g: 'product', duty: '', sample: 'DTG printing', opts: 'methods', dep: 'methods' },
+  { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
+  { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
+  { h: 'Price', g: 'product', duty: '', sample: '24.00' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
-  { h: 'Shipping Service', g: 'extras', duty: '', sample: 'USPS Priority Mail', opts: 'services' },
   { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
 ];
 
 // Dropdown value lists. Mirrors COLUMN_OPTIONS in web/lib/order-import.ts; `methods` mirrors
 // PRODUCT_METHODS in web/lib/print-method.ts.
 const T_OPTS = {
-  methods: ['DTG', 'DTF', 'EMB', 'APL', 'LSR', 'SCR', 'SUB', 'VNL'],
+  // THE WORDS, NOT OUR SHORTHAND. This was the eight codes, because the importer normalises
+  // against codes — but "APL" in a seller's dropdown is a guess rather than a choice.
+  // methodCode() matches these back by regex (/APPLIQ/, /EMB/, /DIRECT/ …), so a sheet
+  // already in someone's Drive that still says "APL" imports exactly as it did.
+  // Mirrors METHOD_LABELS in server/src/print-route.js — change both.
+  methods: ['DTG printing', 'DTF printing', 'Embroidery', 'Appliqué', 'Laser', 'Screen print', 'Sublimation', 'Vinyl'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'One Size'],
-  // ONLY what the label screen can buy — three USPS mail classes. UPS and FedEx were
-  // listed here and could not be honoured: the picker offers USPS and nothing else, so
-  // "FedEx 2Day" in the sheet quietly became USPS Ground Advantage at the label. Checked
-  // against the live Shippo account 2026-08-10: usps + ups connected, no FedEx account.
-  // Mirrors SHIPPING_SERVICES in web/lib/order-import.ts — change both.
-  services: ['USPS Ground Advantage', 'USPS Priority Mail', 'USPS Priority Mail Express'],
+  // `services` was here and went with the Shipping Service column (2026-08-21). The label
+  // screen picks the class at buy time against the live Shippo account, so a value typed
+  // into a spreadsheet days earlier was never consulted — SHIPPING_SERVICES in
+  // web/lib/order-import.ts survives for the sheets already in sellers' Drives.
   states: ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'],
 };
 
@@ -204,7 +230,7 @@ export async function catalogLists() {
     const methods = clean([
       ...(Array.isArray(d.methods) ? d.methods : []),
       ...String(d.method || '').split(/[,/|+&]|\band\b/i),
-    ]).map((m) => methodCode(m)).filter((m) => T_OPTS.methods.includes(m));
+    ]).map((m) => methodLabel(methodCode(m))).filter((m) => T_OPTS.methods.includes(m));
     /**
      * COLOURS ARE THE KEYS OF `colorImages`, NOT A `colors` FIELD.
      *
@@ -367,12 +393,43 @@ export function buildTemplate(title, lists = null) {
     // The lists themselves, rewritten every time — this is the whole point of formatting an
     // existing master: yesterday's catalogue is replaced by today's in place.
     if (hasLists) {
+      /**
+       * GROW THE GRID FIRST. updateCells cannot extend a sheet — it answers "attempting to
+       * write column 82, beyond the last requested column" and the whole batch fails.
+       *
+       * The Lists tab was sized when it was CREATED, to exactly the catalogue of that day.
+       * Adding a product, or adding the three union columns, needs more room than it has,
+       * so the refresh has to widen it before writing into it. Never narrows: a smaller
+       * catalogue leaves empty columns, which cost nothing on a hidden tab and are cheaper
+       * than a delete that could take a named range with it.
+       */
+      out.push({ updateSheetProperties: {
+        properties: { sheetId: listsGid, gridProperties: {
+          columnCount: Math.max(listCols.length, 4),
+          rowCount: Math.max(listRowCount, 100),
+        } },
+        fields: 'gridProperties.columnCount,gridProperties.rowCount',
+      } });
       out.push({ updateCells: {
         rows: listRows, fields: 'userEnteredValue',
         start: { sheetId: listsGid, rowIndex: 0, columnIndex: 0 },
       } });
     }
     for (const id of opts.dropNamedRanges || []) out.push({ deleteNamedRange: { namedRangeId: id } });
+    /**
+     * WIPE THE OLD RULES BEFORE WRITING THE NEW ONES.
+     *
+     * Formatting only ever SET validation, so a rule outlived the column it was written for.
+     * Inserting Image ID pushed Print Type one column right, and the dependent rule that used
+     * to live there stayed behind on Item Quantity — a quantity cell offering a broken list of
+     * print methods, which is worse than no dropdown because it looks deliberate.
+     *
+     * A setDataValidation with no `rule` clears the range. It runs first, so everything below
+     * writes onto a clean grid and a column that no longer has a list ends up with none.
+     */
+    out.push({ setDataValidation: {
+      range: { sheetId: gid, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: NCOL },
+    } });
     for (const b of BANDS) {
       if (b.count > 1) out.push({ mergeCells: { mergeType: 'MERGE_ALL', range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: b.start, endColumnIndex: b.start + b.count } } });
     }
@@ -388,44 +445,43 @@ export function buildTemplate(title, lists = null) {
       // its fixed one. Both are skipped when there is no catalogue to build lists from,
       // rather than offering a dropdown that would resolve to nothing.
       /**
-       * ONE RULE PER ROW, because Google will not keep a relative reference.
+       * FLAT LISTS, BECAUSE SHEETS WILL NOT EVALUATE A DEPENDENT ONE.
        *
-       * A dependent dropdown has to ask about the product on ITS OWN row. Sent as `$K3` the
-       * API stored `Orders!$K$3`; sent as `K3` — no dollars at all — it stored `Orders!$K$3`
-       * again. Data-validation formulas written through the API are absolutised, full stop,
-       * so a rule set over K3:K500 asks every one of those rows what is on row 3. Row 3 is
-       * the empty sample row, MATCH returns #N/A, and all three columns render as an empty
-       * list with a pencil on it. Which is exactly what it looked like.
+       * This was three per-row rules of the form
        *
-       * The UI's own version of this trick works because the UI writes the rule per cell.
-       * So does this now: one request per row, each naming its own row, which Google then
-       * absolutises to the row it was already about.
+       *     =INDIRECT("PM_" & MATCH(K3, Lists!$A$2:$A, 0))
        *
-       * DEP_ROWS is what that costs — three requests per row, in one batchUpdate. 200 rows
-       * is 600, which Google takes without complaint; 500 would be 1,500 and is a payload
-       * worth not finding the limit of. A sheet with more than 200 lines on it is past what
-       * anyone hand-fills anyway, and the row still accepts a typed value: none of these
-       * rules is strict.
+       * which is the documented workaround for a dependent dropdown, and it is a dead end
+       * through the API. Verified against the live master, in this order: the named ranges
+       * exist and point at the right cells; MATCH resolves the product to its row; and the
+       * whole expression, typed into a CELL, returns the product's real colours. The same
+       * expression inside a validation rule is stored verbatim, reported back verbatim, and
+       * evaluates to an empty list — the pencil icon with nothing under it. Sheets does not
+       * run INDIRECT in ONE_OF_RANGE; the UI's version of this trick uses a helper column
+       * per row, which a template that has to survive being copied cannot rely on.
+       *
+       * So each column offers everything the catalogue has on that axis. It is a real list
+       * that really opens, and it is honest about what a spreadsheet can check: nothing here
+       * knows which row's product it belongs to. The narrowing moves to the IMPORTER, which
+       * is where it belonged anyway — a dropdown cannot stop a paste, and a sheet filled in
+       * three weeks ago cannot know what the catalogue holds today.
        */
-      if (c.dep && hasLists) {
-        const prefix = AXES.find(([a]) => a === c.dep)[1];
-        for (let r = 0; r < DEP_ROWS; r++) {
-          const row = 3 + r;                       // sheet row (1-based); data starts at 3
-          out.push({ setDataValidation: {
-            range: { sheetId: gid, startRowIndex: row - 1, endRowIndex: row, startColumnIndex: i, endColumnIndex: i + 1 },
-            rule: {
-              condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue:
-                `=INDIRECT("${prefix}_" & MATCH(${colLetter(prodIdx)}${row}, Lists!$A$2:$A, 0))` }] },
-              showCustomUi: true,
-              strict: false,
-            },
-          } });
-        }
+      const axis = c.dep && hasLists ? AXES.findIndex(([a]) => a === c.dep) : -1;
+      if (axis >= 0 && UNIONS[axis].length) {
+        const col = colLetter(1 + axis);              // Lists: A products, then one per axis
+        out.push({ setDataValidation: {
+          range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
+          rule: {
+            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$${col}$2:$${col}$${UNIONS[axis].length + 1}` }] },
+            showCustomUi: true,
+            strict: false,
+          },
+        } });
       } else if (c.opts === 'products' && hasLists) {
         out.push({ setDataValidation: {
           range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
           rule: {
-            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$A$2:$A${listRowCount}` }] },
+            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$A$2:$A${P.length + 1}` }] },
             showCustomUi: true, strict: false,
           },
         } });
@@ -600,6 +656,111 @@ function toCopyUrl(url) {
   return id ? `https://docs.google.com/spreadsheets/d/${id}/copy` : '';
 }
 
+/**
+ * THE ONE THING DATA VALIDATION CANNOT DO — a dropdown that depends on another cell.
+ *
+ * Sheets will not evaluate INDIRECT inside a validation rule (verified against the live
+ * master: the rule is stored verbatim, read back verbatim, and resolves to an empty list),
+ * so a per-row list cannot be expressed as a rule at all. An onEdit trigger can: it rewrites
+ * that ROW's validation the moment a product is chosen, which is how every working dependent
+ * dropdown in Sheets is actually built.
+ *
+ * It reads the hidden Lists tab by NAME rather than by position — each product's three
+ * columns carry the product's own name in row 1 — so adding products, reordering columns or
+ * renaming a header on the Orders tab cannot break it. The catalogue itself is refreshed by
+ * the server on every template format, and this simply reads whatever is there.
+ *
+ * WHY IT IS PASTED RATHER THAN INSTALLED: creating a bound script needs Drive, and this
+ * deployment's service account has none — the same 403 that stops it creating a spreadsheet
+ * at all. A bound script IS carried into every copy someone makes, so it is a one-time paste
+ * on the master and then it travels.
+ */
+/**
+ * THE MANIFEST, which is the half that decides how frightening this looks.
+ *
+ * Left to itself Apps Script infers a BROAD scope (all of your spreadsheets), which is a
+ * sensitive scope — so an unpublished project triggers the unverified-app interstitial, and
+ * the seller's first contact with our template is "Advanced -> Go to (unsafe)". People
+ * abandon there, and they are right to.
+ *
+ * The script only ever reaches the sheet it is bound to: it uses SpreadsheetApp alone and
+ * never openById/openByUrl/DriveApp, so `spreadsheets.currentonly` is not a compromise, it
+ * is what the code actually does. That scope is NON-sensitive, so the interstitial goes and
+ * consent reads "only the specific spreadsheet you use this with".
+ *
+ * It does NOT remove the copy-dialog banner ("the attached Apps Script file ... will also be
+ * copied"). That fires because a bound script exists at all, and no scope changes it.
+ *
+ * timeZone/runtime/exceptionLogging mirror the project defaults so pasting this cannot
+ * silently undo a setting someone chose in Project Settings.
+ */
+const APPS_MANIFEST = JSON.stringify({
+  timeZone: 'Asia/Ho_Chi_Minh',
+  dependencies: {},
+  exceptionLogging: 'STACKDRIVER',
+  runtimeVersion: 'V8',
+  oauthScopes: ['https://www.googleapis.com/auth/spreadsheets.currentonly'],
+}, null, 2);
+
+const APPS_SCRIPT = `/**
+ * EGFULFILL order-import helper.
+ *
+ * Pick a Blank Product and this narrows that row's Print Type, Color and Size to what the
+ * product actually comes in. Clear the product and they go back to offering everything.
+ *
+ * Reads the hidden "Lists" tab, which the EGFULFILL server rewrites from the live catalogue
+ * every time the master template is formatted. Nothing here needs editing when products
+ * change.
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var sh = e.range.getSheet();
+    if (sh.getName() !== 'Orders') return;
+    var row = e.range.getRow();
+    if (row < 3) return;                      // rows 1-2 are the banner and the headers
+
+    var head = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
+    var col = function (name) { return head.indexOf(name) + 1; };  // 0 when absent
+    var productCol = col('Blank Product');
+    if (!productCol || e.range.getColumn() !== productCol) return;
+
+    var lists = e.source.getSheetByName('Lists');
+    if (!lists) return;
+    var listHead = lists.getRange(1, 1, 1, lists.getLastColumn()).getValues()[0];
+    var product = String(e.value == null ? '' : e.value).trim();
+
+    // A product's three columns are headed with its own name, in colour/size/method order.
+    // Falling back to the union columns is what makes clearing the cell put everything back.
+    var at = product ? listHead.indexOf(product) : -1;
+    var cols = at >= 0
+      ? { Color: at + 1, Size: at + 2, 'Print Type': at + 3 }
+      : { Color: listHead.indexOf('All colors') + 1, Size: listHead.indexOf('All sizes') + 1, 'Print Type': listHead.indexOf('All methods') + 1 };
+
+    Object.keys(cols).forEach(function (header) {
+      var target = col(header);
+      var source = cols[header];
+      if (!target || !source) return;
+      var values = lists.getRange(2, source, Math.max(1, lists.getLastRow() - 1), 1)
+        .getValues().map(function (r) { return String(r[0] || '').trim(); })
+        .filter(function (v) { return v; });
+      var cell = sh.getRange(row, target);
+      if (!values.length) { cell.clearDataValidations(); return; }
+      // setAllowInvalid(true) on purpose: a rejected paste is worse than an odd value, and
+      // the importer normalises and checks the combination server-side anyway.
+      cell.setDataValidation(
+        SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(true).build()
+      );
+      // A value that the new product does not offer is not silently kept.
+      var current = String(cell.getValue() || '').trim();
+      if (current && values.indexOf(current) === -1) cell.clearContent();
+    });
+  } catch (err) {
+    // A helper must never block someone typing. Swallowed on purpose.
+  }
+}
+`;
+
 export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // Public config: is import enabled, the template link, and whether the server
   // can auto-create a filled sheet (service account present).
@@ -612,6 +773,17 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // address is meant to be handed out, but our Cloud project id needn't be broadcast. The
   // onRequest hook in index.js has already attached req.user, so no preHandler is needed
   // and the public shape is unchanged for anyone without a token.
+  /**
+   * The helper script, served rather than stored in the bundle, so it can never drift from
+   * the column names this file writes. Admin-only: it is a setup step, not a seller's.
+   */
+  app.get('/api/sheets/apps-script', { preHandler: requireAdmin }, async () => ({
+    script: APPS_SCRIPT,
+    // Named here so the instructions and the template can't disagree about which tab.
+    tab: 'Orders', listsTab: 'Lists',
+    manifest: APPS_MANIFEST,
+  }));
+
   app.get('/api/sheets/config', async (req) => {
     const sa = loadSA();
     const templateUrl = await readTemplateUrl();
