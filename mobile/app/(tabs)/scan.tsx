@@ -127,7 +127,7 @@ export default function Scan() {
   }
 
   const inMode = dir === "in"
-  const tone = inMode ? "#0a7c42" : C.alert
+  const tone = inMode ? C.success : C.alert
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
@@ -144,7 +144,7 @@ export default function Scan() {
         <View style={{ flexDirection: "row", gap: 26, marginTop: 16 }}>
           {(["in", "out"] as Dir[]).map((d) => {
             const on = d === dir
-            const c = d === "in" ? "#0a7c42" : C.alert
+            const c = d === "in" ? C.success : C.alert
             return (
               <Pressable key={d} onPress={() => setDir(d)} hitSlop={10} style={{ paddingBottom: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
@@ -225,7 +225,7 @@ export default function Scan() {
               <Ionicons
                 name={e.ok ? "checkmark-circle" : "alert-circle"}
                 size={22}
-                color={e.ok ? (e.dir === "in" ? "#0a7c42" : C.alert) : C.warn}
+                color={e.ok ? (e.dir === "in" ? C.success : C.alert) : C.warn}
               />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>

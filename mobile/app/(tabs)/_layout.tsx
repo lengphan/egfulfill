@@ -85,7 +85,7 @@ export default function TabsLayout() {
           paddingBottom: 0,
           ...Platform.select({
             ios: {
-              shadowColor: "#0B0B0C",
+              shadowColor: "#0A0A0A",
               shadowOpacity: 0.09,
               shadowRadius: 20,
               shadowOffset: { width: 0, height: 8 },

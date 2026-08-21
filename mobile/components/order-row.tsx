@@ -115,7 +115,7 @@ function RowMenu({ open, onClose, title, actions }: {
               // With no scrim behind it the sheet carries its own separation, or its top
               // edge dissolves into paper of exactly the same colour.
               borderTopWidth: 1, borderColor: C.border,
-              shadowColor: "#0B0B0C", shadowOpacity: 0.13, shadowRadius: 22,
+              shadowColor: "#0A0A0A", shadowOpacity: 0.13, shadowRadius: 22,
               shadowOffset: { width: 0, height: -6 }, elevation: 16,
             }}
           >
