@@ -303,8 +303,24 @@ export function buildTemplate(title, lists = null) {
   })) };
 
   // The Lists grid, built column-first then transposed into rowData.
+  /**
+   * A UNION COLUMN PER AXIS, and it is not decoration.
+   *
+   * Three products in the live catalogue carry no colours at all, and one carries no print
+   * method — so no named range was created for that axis, INDIRECT resolved to nothing, and
+   * the cell showed an empty dropdown with a pencil on it. Which is indistinguishable from
+   * the tool being broken, on a product where the honest answer is "we never recorded this".
+   *
+   * So a product missing an axis points at the union of every value on that axis instead:
+   * the dropdown offers everything rather than nothing, and someone filling the sheet can
+   * still get on with it. Better data upstream narrows it later without touching this.
+   */
+  const union = (axis) => [...new Set(P.flatMap((p) => p[axis] || []))];
+  const UNIONS = AXES.map(([axis]) => union(axis));
+
   const listCols = [];
   listCols.push(['Product', ...P.map((p) => p.name)]);
+  AXES.forEach(([axis], a) => listCols.push([`All ${axis}`, ...UNIONS[a]]));
   for (let i = 0; i < P.length; i++) {
     for (const [axis] of AXES) listCols.push([P[i].name, ...(P[i][axis] || [])]);
   }
@@ -430,11 +446,16 @@ export function buildTemplate(title, lists = null) {
     // One named range per axis per product, addressed by the product's ROW — see the note
     // on the Lists tab above. Column 0 is the product list, so product i starts at 1 + i*3.
     if (hasLists) {
+      // Columns: 0 = the product list, 1..3 = the union per axis, then three per product.
+      const PRODUCT_COL0 = 1 + AXES.length;
       for (let i = 0; i < P.length; i++) {
         AXES.forEach(([axis, prefix], a) => {
-          const n = (P[i][axis] || []).length;
-          if (!n) return;                      // no values → no range → an empty dropdown
-          const col = 1 + i * 3 + a;
+          const own = (P[i][axis] || []).length;
+          // Its own values when it has any; the union when it has none — see the note on
+          // UNIONS. A range still has to point somewhere, or INDIRECT resolves to nothing.
+          const col = own ? PRODUCT_COL0 + i * 3 + a : 1 + a;
+          const n = own || UNIONS[a].length;
+          if (!n) return;                      // the whole catalogue has none of this axis
           out.push({ addNamedRange: { namedRange: {
             name: `${prefix}_${i + 1}`,
             range: { sheetId: listsGid, startRowIndex: 1, endRowIndex: 1 + n, startColumnIndex: col, endColumnIndex: col + 1 },
