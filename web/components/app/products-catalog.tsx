@@ -32,8 +32,8 @@ const priceOf = (p: CatalogProduct) =>
  * exists to let the page SAY so rather than leave it invisible and unexplained.
  */
 const publicPriceOf = (p: CatalogProduct) => {
-  const v = Number(p.price ?? p.basePrice ?? p.base_price ?? NaN)
-  return Number.isFinite(v) && v > 0 ? v : null
+ const v = Number(p.price ?? p.basePrice ?? p.base_price ?? NaN)
+ return Number.isFinite(v) && v > 0 ? v : null
 }
 
 /**
@@ -49,24 +49,24 @@ const publicPriceOf = (p: CatalogProduct) => {
  */
 type PublicState = { live: boolean; label: string; why: string | null }
 const publicStateOf = (p: CatalogProduct): PublicState => {
-  const status = (p.status ?? "Active").trim().toLowerCase()
-  if (status !== "active") {
-    return {
-      live: false,
-      label: status === "sellers only" ? "Sellers only" : status === "staff only" ? "Staff only" : "Not on the site",
-      why: status === "sellers only"
+ const status = (p.status ?? "Active").trim().toLowerCase()
+ if (status !== "active") {
+ return {
+ live: false,
+ label: status === "sellers only" ? "Sellers only" : status === "staff only" ? "Staff only" : "Not on the site",
+ why: status === "sellers only"
         ? "Orderable by sellers in the app. Set it Active to put it on the marketing site."
-        : "Not on the public site. Set it Active to publish it.",
+ : "Not on the public site. Set it Active to publish it.",
     }
   }
-  if (publicPriceOf(p) === null) {
-    return {
-      live: false,
-      label: "No price",
-      why: "Active, but the site skips it until it has a price. Set a base price on the product.",
+ if (publicPriceOf(p) === null) {
+ return {
+ live: false,
+ label: "No price",
+ why: "Active, but the site skips it until it has a price. Set a base price on the product.",
     }
   }
-  return { live: true, label: "On the site", why: null }
+ return { live: true, label: "On the site", why: null }
 }
 
 import { sizesOf } from "@/lib/variant-resolve"
@@ -75,16 +75,16 @@ import { framingStyle } from "@/lib/product-framing"
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const imageOf = (p: CatalogProduct) =>
-  p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages)[0] : "") || ""
+ p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages)[0] : "") || ""
 
 export const colorsOf = (p: CatalogProduct) => (p.colorImages ? Object.keys(p.colorImages) : [])
 
 // Common garment/thread colour names → a swatch hex (best-effort; unknown = neutral).
 const SWATCH: Record<string, string> = {
-  black: "#191918", white: "#f4f2ef", navy: "#25314d", "sport grey": "#b7b7b3",
-  grey: "#9ca3af", gray: "#9ca3af", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf",
-  maroon: "#6d2233", red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e",
-  forest: "#2f5540", pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
+ black: "#191918", white: "#f4f2ef", navy: "#25314d", "sport grey": "#b7b7b3",
+ grey: "#9ca3af", gray: "#9ca3af", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf",
+ maroon: "#6d2233", red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e",
+ forest: "#2f5540", pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
 }
 export const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
 
@@ -106,95 +106,95 @@ const DEMO: CatalogProduct[] = [
 ]
 
 export function ProductsCatalog() {
-  const router = useRouter()
-  const reduce = useReducedMotion()
-  const [products, setProducts] = useState<CatalogProduct[] | null>(null)
-  const [isDemo, setIsDemo] = useState(false)
-  const [query, setQuery] = useState("")
-  const [cat, setCat] = useState<string>("All")
-  const [isStaff, setIsStaff] = useState(false)
-  const [editing, setEditing] = useState<CatalogProduct | null>(null)
-  const [editorOpen, setEditorOpen] = useState(false)
+ const router = useRouter()
+ const reduce = useReducedMotion()
+ const [products, setProducts] = useState<CatalogProduct[] | null>(null)
+ const [isDemo, setIsDemo] = useState(false)
+ const [query, setQuery] = useState("")
+ const [cat, setCat] = useState<string>("All")
+ const [isStaff, setIsStaff] = useState(false)
+ const [editing, setEditing] = useState<CatalogProduct | null>(null)
+ const [editorOpen, setEditorOpen] = useState(false)
   // The shipping-fee fetch went with the table it fed. It was a request on every visit to
   // this page for a block that is no longer rendered — the detail page loads its own.
 
-  useEffect(() => {
-    const id = setTimeout(() => { const r = getUser()?.role; setIsStaff(!!r && r !== "seller") }, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ const id = setTimeout(() => { const r = getUser()?.role; setIsStaff(!!r && r !== "seller") }, 0)
+ return () => clearTimeout(id)
   }, [])
 
   // Whole-catalog persist on any staff add/edit/delete.
-  const persist = (next: CatalogProduct[]) => { setProducts(next); saveCatalogProducts(next).catch(() => {}) }
-  const saveProduct = (p: CatalogProduct) => {
-    const list = products ?? []
-    persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
+ const persist = (next: CatalogProduct[]) => { setProducts(next); saveCatalogProducts(next).catch(() => {}) }
+ const saveProduct = (p: CatalogProduct) => {
+ const list = products ?? []
+ persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
   }
-  const deleteProduct = (id: CatalogProduct["id"]) => persist((products ?? []).filter((x) => x.id !== id))
+ const deleteProduct = (id: CatalogProduct["id"]) => persist((products ?? []).filter((x) => x.id !== id))
 
-  useEffect(() => {
-    let alive = true
-    getCatalogProducts()
+ useEffect(() => {
+ let alive = true
+ getCatalogProducts()
       .then((rows) => {
-        if (!alive) return
-        if (rows && rows.length) {
-          setProducts(rows)
+ if (!alive) return
+ if (rows && rows.length) {
+ setProducts(rows)
         } else {
-          setProducts(DEMO)
-          setIsDemo(true)
+ setProducts(DEMO)
+ setIsDemo(true)
         }
       })
       .catch(() => {
-        if (!alive) return
-        setProducts(DEMO)
-        setIsDemo(true)
+ if (!alive) return
+ setProducts(DEMO)
+ setIsDemo(true)
       })
-    return () => {
-      alive = false
+ return () => {
+ alive = false
     }
   }, [])
 
-  const categories = useMemo(() => {
-    const set = new Set<string>()
+ const categories = useMemo(() => {
+ const set = new Set<string>()
     ;(products ?? []).forEach((p) => p.type && set.add(p.type))
-    return ["All", ...Array.from(set)]
+ return ["All", ...Array.from(set)]
   }, [products])
 
-  const filtered = useMemo(() => {
-    return (products ?? []).filter((p) => {
-      if (cat !== "All" && p.type !== cat) return false
-      if (!query) return true
+ const filtered = useMemo(() => {
+ return (products ?? []).filter((p) => {
+ if (cat !== "All" && p.type !== cat) return false
+ if (!query) return true
       // The supplier's code is searchable too — it is how a blank is referred to on a spec
       // sheet or a purchase order, and it is the only identifier a product has until ours is
       // assigned. Only ever PRESENT for staff: sellerSafe strips supplierSku server-side, so
       // a seller's copy has nothing here to match on.
-      const hay = `${p.name ?? ""} ${p.sku ?? ""} ${p.supplierSku ?? ""} ${p.type ?? ""}`.toLowerCase()
-      return hay.includes(query.toLowerCase())
+ const hay = `${p.name ?? ""} ${p.sku ?? ""} ${p.supplierSku ?? ""} ${p.type ?? ""}`.toLowerCase()
+ return hay.includes(query.toLowerCase())
     })
   }, [products, cat, query])
 
-  const paged = usePaged(filtered, 24)
+ const paged = usePaged(filtered, 24)
 
-  const stats = useMemo(() => {
-    const list = products ?? []
+ const stats = useMemo(() => {
+ const list = products ?? []
     // Active IS "on the marketing site" now — one flag, so this tile and the public route
     // cannot drift apart. What can still differ is a product Active with no price: the public
     // route drops it, so counting Active alone would again report items the site isn't showing.
-    const active = list.filter((p) => (p.status ?? "Active") === "Active").length
-    const stranded = list.filter((p) => (p.status ?? "Active") === "Active" && publicPriceOf(p) === null).length
-    const internal = list.filter((p) => {
-      const s = (p.status ?? "Active").trim().toLowerCase()
-      return s === "sellers only" || s === "staff only"
+ const active = list.filter((p) => (p.status ?? "Active") === "Active").length
+ const stranded = list.filter((p) => (p.status ?? "Active") === "Active" && publicPriceOf(p) === null).length
+ const internal = list.filter((p) => {
+ const s = (p.status ?? "Active").trim().toLowerCase()
+ return s === "sellers only" || s === "staff only"
     }).length
-    return {
-      total: list.length,
-      cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size),
-      active, live: active - stranded, stranded, internal,
+ return {
+ total: list.length,
+ cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size),
+ active, live: active - stranded, stranded, internal,
     }
   }, [products])
 
   // ── loading skeleton ──
-  if (products === null) {
-    return (
+ if (products === null) {
+ return (
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -210,39 +210,39 @@ export function ProductsCatalog() {
     )
   }
 
-  return (
+ return (
     <div className="space-y-5">
       <StatGrid>
         <StatCard label="Products" value={String(stats.total)} sub="in your catalog" />
         <StatCard label="Categories" value={String(stats.cats)} sub="product types" />
         <StatCard label="Internal" value={String(stats.internal)} sub="sellers or staff only" />
         {/* Counts what the site actually SHOWS, not how many are Active. The two differ only
-            when a product has no price, and when they do this tile says so rather than
-            quietly reporting the larger, friendlier number. */}
+ when a product has no price, and when they do this tile says so rather than
+ quietly reporting the larger, friendlier number. */}
         <StatCard
-          label="On the public site"
-          value={String(stats.live)}
-          sub={stats.stranded > 0
+ label="On the public site"
+ value={String(stats.live)}
+ sub={stats.stranded > 0
             ? `${stats.stranded} Active but held back`
-            : stats.live === stats.total ? "all products" : `of ${stats.total} products`}
-          tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
+ : stats.live === stats.total ? "all products" : `of ${stats.total} products`}
+ tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
         />
       </StatGrid>
 
       {/* The shipping-band table used to sit here, between the stats and the grid. It is
-          still on the product DETAIL page, where you are looking at one garment and its band
-          is the one that applies — on the all-products page it was a block of four rates
-          above every product, answering a question nobody had asked yet. */}
+ still on the product DETAIL page, where you are looking at one garment and its band
+ is the one that applies — on the all-products page it was a block of four rates
+ above every product, answering a question nobody had asked yet. */}
 
       {/* The explanation, where the problem is — not in a tooltip on one card. Active but
-          priceless is invisible AND silent, which is how the same field gets set twice. */}
+ priceless is invisible AND silent, which is how the same field gets set twice. */}
       {isStaff && stats.stranded > 0 && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="flex items-start gap-2.5 rounded-xl border border-hold/30/60 bg-hold/10 px-4 py-3 text-sm text-hold">
           <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
           <div>
             <strong>{stats.stranded} Active product{stats.stranded === 1 ? " is" : "s are"} not showing on the site.</strong>{" "}
             {stats.stranded === 1 ? "It has" : "They have"} no price, and the public catalogue
-            skips anything without one. Set a base price on the product and it appears.
+ skips anything without one. Set a base price on the product and it appears.
           </div>
         </div>
       )}
@@ -252,17 +252,17 @@ export function ProductsCatalog() {
         <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => (
             <button
-              key={c}
-              onClick={() => setCat(c)}
-              className={
+ key={c}
+ onClick={() => setCat(c)}
+ className={
                 /* ONE CHIP CARRIES COLOUR, the rest are text. Every category was a bordered
-                   pill, so a row of eight met the eye as eight buttons and the selected one
-                   had to shout over them. The unselected ones sit on the canvas now — the
-                   selection is the only thing drawn. */
+ pill, so a row of eight met the eye as eight buttons and the selected one
+ had to shout over them. The unselected ones sit on the canvas now — the
+ selection is the only thing drawn. */
                 "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
                 (cat === c
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground")
+ : "text-muted-foreground hover:bg-accent hover:text-foreground")
               }
             >
               {c}
@@ -273,10 +273,10 @@ export function ProductsCatalog() {
           <div className="relative">
             <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search products…"
-              className="w-52 pl-9"
+ value={query}
+ onChange={(e) => setQuery(e.target.value)}
+ placeholder="Search products…"
+ className="w-52 pl-9"
             />
           </div>
           {isStaff && (
@@ -288,7 +288,7 @@ export function ProductsCatalog() {
       </div>
 
       {isDemo && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+        <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Sparkle size={14} weight="fill" />
           Showing sample products — sign in to load your live catalog.
         </div>
@@ -306,34 +306,34 @@ export function ProductsCatalog() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paged.pageItems.map((p, i) => {
-            const img = imageOf(p)
-            const colors = colorsOf(p)
-            const sizes = sizesOf(p)
-            return (
+ const img = imageOf(p)
+ const colors = colorsOf(p)
+ const sizes = sizesOf(p)
+ return (
               <motion.div
-                key={String(p.id ?? p.sku ?? i)}
+ key={String(p.id ?? p.sku ?? i)}
                 {...clickableProps(
                   () => router.push(`/products/${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`),
                   `View ${p.name ?? "product"}`
                 )}
-                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.04, ease: [0.21, 0.5, 0.28, 1] }}
-                whileHover={reduce ? undefined : { y: -4 }}
+ initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+ animate={{ opacity: 1, y: 0 }}
+ transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.04, ease: [0.21, 0.5, 0.28, 1] }}
+ whileHover={reduce ? undefined : { y: -4 }}
                 /* NO SHADOW. A drop shadow under a white card on a white canvas is a grey
-                   smudge doing the job a hairline already does — twelve of them in a grid
-                   read as haze. The border separates; hover raises the CARD, not a blur
-                   under it. */
-                className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+ smudge doing the job a hairline already does — twelve of them in a grid
+ read as haze. The border separates; hover raises the CARD, not a blur
+ under it. */
+ className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 {/* image / placeholder */}
                 <div className="relative aspect-square overflow-hidden bg-white">
                   {/* Card actions — Design (everyone) + Edit/Delete (staff). */}
                   <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
-                      title="Design this product"
-                      className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow hover:bg-primary/90"
+ onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
+ title="Design this product"
+ className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow hover:bg-primary/90"
                     >
                       <PenNib size={13} weight="bold" />
                     </button>
@@ -359,11 +359,11 @@ export function ProductsCatalog() {
                      */
                     <div className="absolute inset-0" style={framingStyle(p)}>
                       <Image
-                        src={img}
-                        alt={p.name ?? "Product"}
-                        fill
-                        unoptimized
-                        className="object-contain transition-transform duration-300 group-hover:scale-[1.04]"
+ src={img}
+ alt={p.name ?? "Product"}
+ fill
+ unoptimized
+ className="object-contain transition-transform duration-300 group-hover:scale-[1.04]"
                       />
                     </div>
                   ) : (
@@ -374,12 +374,12 @@ export function ProductsCatalog() {
                     </div>
                   )}
                   {/* NO PILL OVER THE PHOTO. A label pinned to the corner of every tile put a
-                      coloured chip on the one part of the card that is meant to be the
-                      product — and the grid's whole job is comparing pictures.
+ coloured chip on the one part of the card that is meant to be the
+ product — and the grid's whole job is comparing pictures.
 
                       Nothing is lost: the "On the public site" tile above counts what is
-                      live and names how many are held back, the editor states the status
-                      outright, and the card's title still carries the full reason. */}
+ live and names how many are held back, the editor states the status
+ outright, and the card's title still carries the full reason. */}
                 </div>
 
                 {/* body */}
@@ -388,9 +388,9 @@ export function ProductsCatalog() {
                     <div className="min-w-0">
                       <div className="truncate font-semibold">{p.name ?? "Untitled"}</div>
                       {/* Ours, else theirs. A product should always have ours — but the ones
-                          that don't are exactly the ones you need to find, and a row reading
+ that don't are exactly the ones you need to find, and a row reading
                           "—" tells you nothing about which blank it is. sellerSafe strips
-                          supplierSku, so a seller sees "—" here, never a supplier's code. */}
+ supplierSku, so a seller sees "—" here, never a supplier's code. */}
                       <div className="mt-0.5 truncate tabular-nums text-xs text-muted-foreground">{p.sku || p.supplierSku || "—"}</div>
                     </div>
                     <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
@@ -398,20 +398,20 @@ export function ProductsCatalog() {
 
                   {/* Colours + type share one fixed-height row. Both slots always render
                       (with a muted placeholder when empty) so cards line up instead of
-                      each being as tall as whatever data it happens to carry. */}
+ each being as tall as whatever data it happens to carry. */}
                   <div className="mt-3 flex min-h-6 items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       {colors.slice(0, 8).map((c) => {
-                        const img = p.colorImages?.[c]
-                        return (
+ const img = p.colorImages?.[c]
+ return (
                           <span
-                            key={c}
-                            title={c}
-                            className="size-4 shrink-0 rounded-full border border-black/10 bg-muted"
-                            style={
-                              img
+ key={c}
+ title={c}
+ className="size-4 shrink-0 rounded-full border border-black/10 bg-muted"
+ style={
+ img
                                 ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
-                                : { background: swatchHex(c) }
+ : { background: swatchHex(c) }
                             }
                           />
                         )
@@ -422,19 +422,19 @@ export function ProductsCatalog() {
                       {colors.length === 0 && <span className="text-2xs text-muted-foreground">No colours set</span>}
                     </div>
                     {/* TEXT, NOT A PILL. Every card carried a beige type chip and three
-                        beige size chips — four boxes per tile, forty-eight in a grid of
-                        twelve, and not one of them was a control. The words say the same
-                        thing; the boxes were the "lots of shaded beige". */}
+ beige size chips — four boxes per tile, forty-eight in a grid of
+ twelve, and not one of them was a control. The words say the same
+ thing; the boxes were the "lots of shaded beige". */}
                     <span className="shrink-0 text-2xs font-medium text-muted-foreground">
                       {p.type || "Uncategorised"}
                     </span>
                   </div>
 
                   {/* Sizes — ALWAYS rendered, on one non-wrapping line. Two bugs lived
-                      here: the row was conditional, so a product without sizes was a
-                      shorter card than its neighbours; and it read p.sizes directly,
-                      which is empty on the many catalog rows that carry sizes only as
-                      per-size price tiers (sizesOf unions both). */}
+ here: the row was conditional, so a product without sizes was a
+ shorter card than its neighbours; and it read p.sizes directly,
+ which is empty on the many catalog rows that carry sizes only as
+ per-size price tiers (sizesOf unions both). */}
                   <div className="mt-3 flex min-h-6 items-center gap-2 overflow-hidden">
                     {sizes.length === 0 ? (
                       <span className="text-2xs text-muted-foreground">No sizes set</span>
@@ -442,11 +442,11 @@ export function ProductsCatalog() {
                       <>
                         {sizes.slice(0, 7).map((s) => (
                           <span
-                            key={s}
+ key={s}
                             /* One line of sizes, not seven outlined boxes. They are a
-                               reading, not seven controls — the border made each one look
-                               pressable and turned a run of sizes into a keyboard. */
-                            className="shrink-0 text-2xs font-medium tabular-nums text-muted-foreground"
+ reading, not seven controls — the border made each one look
+ pressable and turned a run of sizes into a keyboard. */
+ className="shrink-0 text-2xs font-medium tabular-nums text-muted-foreground"
                           >
                             {s}
                           </span>

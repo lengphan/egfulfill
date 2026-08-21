@@ -18,9 +18,9 @@ const AREA_CLS =
   "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 
 function Field({ label, hint, value, onChange, mono }: {
-  label: string; hint?: string; value: string; onChange: (v: string) => void; mono?: boolean
+ label: string; hint?: string; value: string; onChange: (v: string) => void; mono?: boolean
 }) {
-  return (
+ return (
     <label className="block">
       {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       <Input value={value} onChange={(e) => onChange(e.target.value)} className={mono ? "tabular-nums" : ""} />
@@ -29,9 +29,9 @@ function Field({ label, hint, value, onChange, mono }: {
 }
 
 function Area({ label, hint, value, onChange }: {
-  label: string; hint?: string; value: string; onChange: (v: string) => void
+ label: string; hint?: string; value: string; onChange: (v: string) => void
 }) {
-  return (
+ return (
     <label className="block">
       {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       <textarea className={AREA_CLS} value={value} onChange={(e) => onChange(e.target.value)} />
@@ -41,7 +41,7 @@ function Area({ label, hint, value, onChange }: {
 
 // A tab's intro line, so each section still explains itself without the old long-scroll headings.
 function Intro({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs text-muted-foreground">{children}</p>
+ return <p className="text-xs text-muted-foreground">{children}</p>
 }
 
 /**
@@ -54,33 +54,33 @@ function Intro({ children }: { children: React.ReactNode }) {
  * URL. Falls back to the original bytes if the canvas isn't available.
  */
 async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<string> {
-  const read = () => new Promise<string>((res, rej) => {
-    const fr = new FileReader()
-    fr.onload = () => res(String(fr.result))
-    fr.onerror = () => rej(new Error("Couldn't read the file"))
-    fr.readAsDataURL(file)
+ const read = () => new Promise<string>((res, rej) => {
+ const fr = new FileReader()
+ fr.onload = () => res(String(fr.result))
+ fr.onerror = () => rej(new Error("Couldn't read the file"))
+ fr.readAsDataURL(file)
   })
-  const original = await read()
-  try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => {
-      const i = new Image()
-      i.onload = () => res(i)
-      i.onerror = () => rej(new Error("decode failed"))
-      i.src = original
+ const original = await read()
+ try {
+ const img = await new Promise<HTMLImageElement>((res, rej) => {
+ const i = new Image()
+ i.onload = () => res(i)
+ i.onerror = () => rej(new Error("decode failed"))
+ i.src = original
     })
-    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
+ const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
     // Already small in both bytes and dimensions — send as-is (keeps PNG transparency etc.).
-    if (scale === 1 && file.size < 1_200_000) return original
-    const w = Math.max(1, Math.round(img.width * scale))
-    const h = Math.max(1, Math.round(img.height * scale))
-    const canvas = document.createElement("canvas")
-    canvas.width = w; canvas.height = h
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return original
-    ctx.drawImage(img, 0, 0, w, h)
-    return canvas.toDataURL("image/jpeg", quality)
+ if (scale === 1 && file.size < 1_200_000) return original
+ const w = Math.max(1, Math.round(img.width * scale))
+ const h = Math.max(1, Math.round(img.height * scale))
+ const canvas = document.createElement("canvas")
+ canvas.width = w; canvas.height = h
+ const ctx = canvas.getContext("2d")
+ if (!ctx) return original
+ ctx.drawImage(img, 0, 0, w, h)
+ return canvas.toDataURL("image/jpeg", quality)
   } catch {
-    return original
+ return original
   }
 }
 
@@ -109,99 +109,99 @@ const SUBTABS: { id: string; label: string }[] = [
  * Save writes them.
  */
 export function SiteContentPanel() {
-  const [content, setContent] = useState<SiteContent | null>(null)
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
-  const [sub, setSub] = useState("hero")
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
+ const [content, setContent] = useState<SiteContent | null>(null)
+ const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+ const [sub, setSub] = useState("hero")
+ const [saving, setSaving] = useState(false)
+ const [saved, setSaved] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [uploading, setUploading] = useState(false)
   // A LOCAL preview of the just-picked image, shown instantly so the banner isn't blank
   // while the upload runs — and stays visible even if the stored URL later fails to load.
-  const [localPreview, setLocalPreview] = useState<string | null>(null)
+ const [localPreview, setLocalPreview] = useState<string | null>(null)
   // The stored URL didn't load in the <img>: almost always a storage/CDN that isn't public,
   // not a broken editor. Say so instead of showing a broken-image glyph.
-  const [imgBroken, setImgBroken] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+ const [imgBroken, setImgBroken] = useState(false)
+ const [dragging, setDragging] = useState(false)
+ const fileRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(() => {
-    getSiteContentAdmin()
+ const load = useCallback(() => {
+ getSiteContentAdmin()
       .then((r) => { setContent(r.content); setUpdatedAt(r.updatedAt) })
       .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't load site content"))
   }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+ useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
   // structuredClone + mutate keeps the deep-nested updates readable without a patch library.
-  const edit = (fn: (c: SiteContent) => void) =>
-    setContent((prev) => { if (!prev) return prev; const next = structuredClone(prev); fn(next); return next })
+ const edit = (fn: (c: SiteContent) => void) =>
+ setContent((prev) => { if (!prev) return prev; const next = structuredClone(prev); fn(next); return next })
 
   // `override` lets an action persist the exact content it just produced (e.g. Remove banner)
   // instead of the async `content` state, which wouldn't have updated yet on the same click.
-  const save = async (override?: SiteContent) => {
-    const payload = override ?? content
-    if (!payload) return
-    setSaving(true); setErr(null); setSaved(false)
-    try {
-      const r = await setSiteContent(payload)
-      if (r.error) throw new Error(r.error)
-      setSaved(true); setTimeout(() => setSaved(false), 2500)
-      load()
+ const save = async (override?: SiteContent) => {
+ const payload = override ?? content
+ if (!payload) return
+ setSaving(true); setErr(null); setSaved(false)
+ try {
+ const r = await setSiteContent(payload)
+ if (r.error) throw new Error(r.error)
+ setSaved(true); setTimeout(() => setSaved(false), 2500)
+ load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save — admin only.")
+ setErr(e instanceof Error ? e.message : "Couldn't save — admin only.")
     } finally { setSaving(false) }
   }
 
   // Remove the banner AND persist it right away — "Remove" that only clears the form and
   // silently comes back on refresh isn't a removal. Saves the current content minus the image,
   // exactly as pressing Save after Remove would.
-  const removeBanner = () => {
-    if (!content) return
-    const next = structuredClone(content)
-    next.hero.image = ""
-    setLocalPreview(null); setImgBroken(false); setContent(next)
-    void save(next)
+ const removeBanner = () => {
+ if (!content) return
+ const next = structuredClone(content)
+ next.hero.image = ""
+ setLocalPreview(null); setImgBroken(false); setContent(next)
+ void save(next)
   }
 
-  const onPickImage = async (file: File | undefined) => {
-    if (!file) return
-    if (!file.type.startsWith("image/")) { setErr("That file isn't an image — pick a JPEG, PNG, WebP or AVIF."); return }
+ const onPickImage = async (file: File | undefined) => {
+ if (!file) return
+ if (!file.type.startsWith("image/")) { setErr("That file isn't an image — pick a JPEG, PNG, WebP or AVIF."); return }
     // Generous ceiling only as a sanity check — anything reasonable is downscaled below the
     // proxy limit before it's sent, so a big camera photo is fine.
-    if (file.size > 40 * 1024 * 1024) { setErr("That image is over 40MB — pick a smaller one."); return }
-    setUploading(true); setErr(null); setImgBroken(false)
-    try {
+ if (file.size > 40 * 1024 * 1024) { setErr("That image is over 40MB — pick a smaller one."); return }
+ setUploading(true); setErr(null); setImgBroken(false)
+ try {
       // Resize + re-encode in the browser FIRST. A raw photo base64's past Vercel's ~4.5MB
       // proxy body limit and the upload fails; the downscaled data URL comfortably fits.
-      const dataUrl = await downscaleImage(file)
+ const dataUrl = await downscaleImage(file)
       // Instant local preview, so the banner shows immediately and stays visible even if the
       // stored URL later can't load.
-      setLocalPreview(dataUrl)
-      const r = await uploadHeroImage(dataUrl)
-      if (r.error || !r.url) throw new Error(r.error || "Upload failed")
-      const url = r.url
-      edit((x) => { x.hero.image = url })
+ setLocalPreview(dataUrl)
+ const r = await uploadHeroImage(dataUrl)
+ if (r.error || !r.url) throw new Error(r.error || "Upload failed")
+ const url = r.url
+ edit((x) => { x.hero.image = url })
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Upload failed")
+ setErr(e instanceof Error ? e.message : "Upload failed")
     } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ""
+ setUploading(false)
+ if (fileRef.current) fileRef.current.value = ""
     }
   }
 
-  const confirm = useConfirm()
-  const resetToDefaults = async () => { if (await confirm({ title: "Reset to default copy?", body: "This only fills the editor — nothing saves until you press Save.", confirmLabel: "Reset", destructive: false })) setContent(structuredClone(DEFAULT_SITE_CONTENT)) }
+ const confirm = useConfirm()
+ const resetToDefaults = async () => { if (await confirm({ title: "Reset to default copy?", body: "This only fills the editor — nothing saves until you press Save.", confirmLabel: "Reset", destructive: false })) setContent(structuredClone(DEFAULT_SITE_CONTENT)) }
 
-  if (!content) {
-    return <SectionCard title="Site content"><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
+ if (!content) {
+ return <SectionCard title="Site content"><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
   }
 
-  const c = content
-  return (
+ const c = content
+ return (
     <SectionCard
-      title="Site content"
-      bodyClassName="p-5"
-      actions={
+ title="Site content"
+ bodyClassName="p-5"
+ actions={
         <a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           View homepage <ArrowSquareOut size={13} />
         </a>
@@ -237,7 +237,7 @@ export function SiteContentPanel() {
                 {imgBroken && !localPreview ? (
                   // The stored URL couldn't load. Almost always the object storage / CDN isn't
                   // serving it publicly — say that plainly instead of a broken-image glyph.
-                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-8 text-center text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-hold/30 bg-hold/10 px-4 py-8 text-center text-xs text-hold">
                     <Warning size={20} weight="fill" />
                     <span className="font-medium">The saved banner isn&apos;t loading.</span>
                     <span className="max-w-sm">Its URL was saved, but the browser can&apos;t open it — usually the storage bucket / CDN isn&apos;t public. Re-upload, or check <code>SPACES_CDN</code> and public-read on the server.</span>
@@ -245,7 +245,7 @@ export function SiteContentPanel() {
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={localPreview || c.hero.image} alt="Hero banner preview" onError={() => setImgBroken(true)}
-                    className="max-h-44 w-full rounded-lg border border-border object-cover" />
+ className="max-h-44 w-full rounded-lg border border-border object-cover" />
                 )}
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
@@ -256,14 +256,14 @@ export function SiteContentPanel() {
               </div>
             ) : (
               <div
-                role="button"
-                tabIndex={0}
-                onClick={() => fileRef.current?.click()}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileRef.current?.click() } }}
-                onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => { e.preventDefault(); setDragging(false); onPickImage(e.dataTransfer.files?.[0]) }}
-                className={"flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-10 text-sm transition-colors " +
+ role="button"
+ tabIndex={0}
+ onClick={() => fileRef.current?.click()}
+ onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileRef.current?.click() } }}
+ onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+ onDragLeave={() => setDragging(false)}
+ onDrop={(e) => { e.preventDefault(); setDragging(false); onPickImage(e.dataTransfer.files?.[0]) }}
+ className={"flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-10 text-sm transition-colors " +
                   (dragging ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground") +
                   (uploading ? " pointer-events-none opacity-60" : "")}
               >
@@ -312,8 +312,8 @@ export function SiteContentPanel() {
             <Field label="Section subhead" value={c.features.subhead} onChange={(v) => edit((x) => { x.features.subhead = v })} />
           </div>
           {[0, 1, 2, 3].map((i) => {
-            const card = c.features.cards[i] ?? DEFAULT_SITE_CONTENT.features.cards[i]
-            return (
+ const card = c.features.cards[i] ?? DEFAULT_SITE_CONTENT.features.cards[i]
+ return (
               <div key={i} className="rounded-lg border border-border p-3">
                 <div className="mb-2 text-xs font-medium text-muted-foreground">Card {i + 1}</div>
                 <div className="space-y-2">
@@ -391,14 +391,14 @@ export function SiteContentPanel() {
 
         {/* ── Motion ──
             Shares this panel's single content object and single Save, exactly like every copy
-            tab: switching away keeps unsaved changes and only Save writes them. The editor is
-            handed the whole MotionSettings and returns a whole one, so it never has to know
-            about `edit`'s structuredClone. */}
+ tab: switching away keeps unsaved changes and only Save writes them. The editor is
+ handed the whole MotionSettings and returns a whole one, so it never has to know
+ about `edit`'s structuredClone. */}
         <TabsContent value="motion" className="mt-4">
           <Intro>
             How sections arrive on the public pages. Which animation each section uses is set in
-            the page code; the feel of each one is set here, and takes effect within a minute of
-            saving.
+ the page code; the feel of each one is set here, and takes effect within a minute of
+ saving.
           </Intro>
           <div className="mt-3">
             <MotionEditor value={c.motion} onChange={(next) => edit((x) => { x.motion = next })} />
@@ -410,8 +410,8 @@ export function SiteContentPanel() {
       <div className="sticky bottom-0 -mx-5 -mb-5 mt-6 flex items-center justify-between gap-3 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
         <div className="text-xs text-muted-foreground">
           {saved ? <span className="text-success dark:text-emerald-400">Saved — live within a minute.</span>
-            : updatedAt ? `Last edited ${new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
-            : "Never edited — showing shipped defaults."}
+ : updatedAt ? `Last edited ${new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+ : "Never edited — showing shipped defaults."}
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={resetToDefaults}>Reset to defaults</Button>

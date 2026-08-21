@@ -7,19 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import {
-  getEtsyConnections,
-  getEtsyConfig,
-  syncEtsy,
-  disconnectEtsy,
-  getShopifyConfig,
-  getShopifyConnections,
-  disconnectShopify,
-  syncShopify,
-  getTiktokConfig,
-  getTiktokConnections,
-  disconnectTiktok,
-  syncTiktok,
-  type EtsyConnection,
+ getEtsyConnections,
+ getEtsyConfig,
+ syncEtsy,
+ disconnectEtsy,
+ getShopifyConfig,
+ getShopifyConnections,
+ disconnectShopify,
+ syncShopify,
+ getTiktokConfig,
+ getTiktokConnections,
+ disconnectTiktok,
+ syncTiktok,
+ type EtsyConnection,
 } from "@/lib/api"
 import { startEtsyConnect } from "@/lib/etsy-oauth"
 import { startShopifyConnect } from "@/lib/shopify-oauth"
@@ -27,9 +27,9 @@ import { startTikTokConnect } from "@/lib/tiktok-oauth"
 import { getUser } from "@/lib/auth"
 
 const fmtDate = (s: string | null) => {
-  if (!s) return "never"
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+ if (!s) return "never"
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 // Channels shown even when unconnected. (Etsy + Shopify also import orders; TikTok is
@@ -51,8 +51,8 @@ const fmtDate = (s: string | null) => {
 // different for every one. A single height across all six looked wrong because these files
 // are not comparable: measuring the visible ink inside each asset gives
 //
-//   woocommerce  98% of its canvas is ink      amazon   52% — half the file is padding
-//   tiktok      100%, and it is a STACKED lockup (icon over "TikTok Shop"), not a wordmark
+// woocommerce  98% of its canvas is ink amazon   52% — half the file is padding
+// tiktok      100%, and it is a STACKED lockup (icon over "TikTok Shop"), not a wordmark
 //
 // so at a shared 48px, Woo showed 47px of ink and Amazon showed 25px. These heights
 // normalise the INK instead of the file: ~28-30px of mark for the single-line wordmarks,
@@ -82,8 +82,8 @@ const CHANNELS: { key: string; name: string; live: boolean; soon?: string; markH
 function ChannelMark({ channelKey, name, markH }: { channelKey: string; name: string; markH: number }) {
   // svg → png → icon. Brand press kits give one or the other and it's not worth caring
   // which; public/suppliers already stores PNGs (otto.png, ss.png), so both must work.
-  const [step, setStep] = useState(0)
-  const src = step === 0 ? `/channels/${channelKey}.svg` : `/channels/${channelKey}.png`
+ const [step, setStep] = useState(0)
+ const src = step === 0 ? `/channels/${channelKey}.svg` : `/channels/${channelKey}.png`
   // CONSTRAINED BY HEIGHT, NOT BOXED. These are wordmarks — WooCommerce's is 3.8:1 and
   // Amazon's 2.3:1 — so a square plate shrinks them to a 24×6 smear. Height with free width
   // is the only arrangement in which marks of different aspect ratios read alike, and it's
@@ -97,7 +97,7 @@ function ChannelMark({ channelKey, name, markH }: { channelKey: string; name: st
   //
   // No tinted plate behind them either: each mark carries its own colour and several ship
   // with a white background baked in, so a coloured plate frames them badly.
-  return (
+ return (
     <span className="flex h-[60px] items-center">
       {step > 1 ? (
         <Storefront size={18} weight="regular" className="shrink-0 text-muted-foreground" />
@@ -108,11 +108,11 @@ function ChannelMark({ channelKey, name, markH }: { channelKey: string; name: st
         // so the disable did nothing and the rule fired anyway.)
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
-          alt={`${name} logo`}
-          style={{ height: markH }}
-          className="w-auto max-w-[180px] object-contain object-left"
-          onError={() => setStep((s) => s + 1)}
+ src={src}
+ alt={`${name} logo`}
+ style={{ height: markH }}
+ className="w-auto max-w-[180px] object-contain object-left"
+ onError={() => setStep((s) => s + 1)}
         />
       )}
     </span>
@@ -125,134 +125,134 @@ const liveChannels = CHANNELS.filter((c) => c.live)
 const soonChannels = CHANNELS.filter((c) => !c.live)
 
 export function StoresManager() {
-  const reduce = useReducedMotion()
-  const [conns, setConns] = useState<EtsyConnection[] | null>(null)
-  const [isDemo, setIsDemo] = useState(false)
-  const [busy, setBusy] = useState<string | null>(null) // shop_id or "connect"
-  const [notice, setNotice] = useState<{ tone: "ok" | "err"; msg: string } | null>(null)
+ const reduce = useReducedMotion()
+ const [conns, setConns] = useState<EtsyConnection[] | null>(null)
+ const [isDemo, setIsDemo] = useState(false)
+ const [busy, setBusy] = useState<string | null>(null) // shop_id or "connect"
+ const [notice, setNotice] = useState<{ tone: "ok" | "err"; msg: string } | null>(null)
   // Admins get the full scope list per shop (the exact grants that shop authorised),
   // not just the count — useful for diagnosing "why can't we read X". Expanded per shop.
-  const isAdmin = getUser()?.role === "admin"
-  const [openScopes, setOpenScopes] = useState<Set<string>>(new Set())
+ const isAdmin = getUser()?.role === "admin"
+ const [openScopes, setOpenScopes] = useState<Set<string>>(new Set())
 
-  const [shopDomain, setShopDomain] = useState("")
+ const [shopDomain, setShopDomain] = useState("")
   // Which channel is awaiting a "how far back to import" choice (pre-connect modal), if any.
-  const [pending, setPending] = useState<"etsy" | "shopify" | "tiktok" | null>(null)
+ const [pending, setPending] = useState<"etsy" | "shopify" | "tiktok" | null>(null)
   // Which TikTok region the server's authorize URL targets ("us" | "global"). Shown in the
   // connect modal so a US seller can catch a wrong-region login BEFORE hitting "account not
   // found" — that error means the popup opened the other region's separate account system.
-  const [tiktokRegion, setTiktokRegion] = useState<string | null>(null)
+ const [tiktokRegion, setTiktokRegion] = useState<string | null>(null)
 
-  const load = useCallback(() => {
+ const load = useCallback(() => {
     Promise.all([
-      getEtsyConnections().catch(() => [] as EtsyConnection[]),
-      getShopifyConnections().catch(() => [] as EtsyConnection[]),
-      getTiktokConnections().catch(() => [] as EtsyConnection[]),
+ getEtsyConnections().catch(() => [] as EtsyConnection[]),
+ getShopifyConnections().catch(() => [] as EtsyConnection[]),
+ getTiktokConnections().catch(() => [] as EtsyConnection[]),
     ]).then(([e, s, t]) => { setConns([...(e ?? []), ...(s ?? []), ...(t ?? [])]); setIsDemo(false) })
       .catch(() => { setConns([]); setIsDemo(true) })
   }, [])
 
   // The TikTok authorize page is region-split (US vs global); fetch which one this server
   // opens so the connect modal can show it. Best-effort — a failure just hides the hint.
-  useEffect(() => {
-    getTiktokConfig().then((c) => setTiktokRegion(c.region || "global")).catch(() => {})
+ useEffect(() => {
+ getTiktokConfig().then((c) => setTiktokRegion(c.region || "global")).catch(() => {})
   }, [])
 
-  useEffect(() => {
-    load()
+ useEffect(() => {
+ load()
     // Surface the post-OAuth redirect result (deferred so it isn't a synchronous mount render).
-    const params = new URLSearchParams(window.location.search)
-    if (!params.get("connected")) return
-    window.history.replaceState({}, "", "/stores")
-    const id = setTimeout(() => setNotice({ tone: "ok", msg: "Shop connected. Your orders will start syncing." }), 0)
-    return () => clearTimeout(id)
+ const params = new URLSearchParams(window.location.search)
+ if (!params.get("connected")) return
+ window.history.replaceState({}, "", "/stores")
+ const id = setTimeout(() => setNotice({ tone: "ok", msg: "Shop connected. Your orders will start syncing." }), 0)
+ return () => clearTimeout(id)
   }, [load])
 
   // A connect opens a popup; the /oauth-callback posts back a result (handled by the effect
   // below). Keep the button busy until then — and clear it if the popup is closed unfinished.
-  const watch = useCallback((popup: Window | null) => {
-    if (!popup) return // redirect fallback took over
-    const iv = setInterval(() => { if (popup.closed) { clearInterval(iv); setBusy(null) } }, 600)
-    setTimeout(() => clearInterval(iv), 300000)
+ const watch = useCallback((popup: Window | null) => {
+ if (!popup) return // redirect fallback took over
+ const iv = setInterval(() => { if (popup.closed) { clearInterval(iv); setBusy(null) } }, 600)
+ setTimeout(() => clearInterval(iv), 300000)
   }, [])
 
-  useEffect(() => {
-    type OAuthResult = { source?: string; ok?: boolean; shop?: string; message?: string; note?: string }
-    const handle = (d: OAuthResult | null) => {
-      if (!d || d.source !== "eg-oauth") return
-      setBusy(null)
-      if (!d.ok) { setNotice({ tone: "err", msg: d.message || "Couldn't connect." }); return }
+ useEffect(() => {
+ type OAuthResult = { source?: string; ok?: boolean; shop?: string; message?: string; note?: string }
+ const handle = (d: OAuthResult | null) => {
+ if (!d || d.source !== "eg-oauth") return
+ setBusy(null)
+ if (!d.ok) { setNotice({ tone: "err", msg: d.message || "Couldn't connect." }); return }
       // `note` is the FIRST IMPORT's outcome, which is not the same event as connecting.
       // A backfill that failed reports as an error even though the shop is connected —
       // "your orders will start syncing" over a sync that already failed is exactly how a
       // store sat connected and empty with nothing on screen admitting it.
-      const failed = !!d.note && d.note.includes("import failed")
-      setNotice({
-        tone: failed ? "err" : "ok",
-        msg: d.note || `Connected ${d.shop || "your shop"}.`,
+ const failed = !!d.note && d.note.includes("import failed")
+ setNotice({
+ tone: failed ? "err" : "ok",
+ msg: d.note || `Connected ${d.shop || "your shop"}.`,
       })
-      load()
+ load()
     }
-    const onMsg = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return
-      handle(e.data as OAuthResult)
+ const onMsg = (e: MessageEvent) => {
+ if (e.origin !== window.location.origin) return
+ handle(e.data as OAuthResult)
     }
-    window.addEventListener("message", onMsg)
+ window.addEventListener("message", onMsg)
     // Same-origin fallback for when the provider's COOP severed window.opener, which is why
     // the popup used to strand itself on /stores instead of closing.
-    let ch: BroadcastChannel | null = null
-    try {
-      ch = new BroadcastChannel("eg-oauth")
-      ch.onmessage = (e) => handle(e.data as OAuthResult)
+ let ch: BroadcastChannel | null = null
+ try {
+ ch = new BroadcastChannel("eg-oauth")
+ ch.onmessage = (e) => handle(e.data as OAuthResult)
     } catch { /* not supported — postMessage still covers the normal path */ }
-    return () => {
-      window.removeEventListener("message", onMsg)
-      try { ch?.close() } catch { /* ignore */ }
+ return () => {
+ window.removeEventListener("message", onMsg)
+ try { ch?.close() } catch { /* ignore */ }
     }
   }, [load])
 
-  const onConnect = async () => {
-    setBusy("connect")
-    setNotice(null)
-    try {
-      const cfg = await getEtsyConfig()
-      if (!cfg.configured || !cfg.keystring) {
-        setNotice({ tone: "err", msg: "Etsy isn't configured on the server yet (ETSY_KEYSTRING)." })
-        setBusy(null)
-        return
+ const onConnect = async () => {
+ setBusy("connect")
+ setNotice(null)
+ try {
+ const cfg = await getEtsyConfig()
+ if (!cfg.configured || !cfg.keystring) {
+ setNotice({ tone: "err", msg: "Etsy isn't configured on the server yet (ETSY_KEYSTRING)." })
+ setBusy(null)
+ return
       }
-      watch(await startEtsyConnect(cfg))
+ watch(await startEtsyConnect(cfg))
     } catch (e) {
-      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't start the Etsy connection." })
-      setBusy(null)
+ setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't start the Etsy connection." })
+ setBusy(null)
     }
   }
 
-  const onConnectShopify = async () => {
-    setBusy("connect-shopify"); setNotice(null)
-    try {
-      const cfg = await getShopifyConfig()
-      if (!cfg.configured || !cfg.api_key) {
-        setNotice({ tone: "err", msg: "Shopify isn't configured on the server yet (SHOPIFY_API_KEY / SECRET)." }); setBusy(null); return
+ const onConnectShopify = async () => {
+ setBusy("connect-shopify"); setNotice(null)
+ try {
+ const cfg = await getShopifyConfig()
+ if (!cfg.configured || !cfg.api_key) {
+ setNotice({ tone: "err", msg: "Shopify isn't configured on the server yet (SHOPIFY_API_KEY / SECRET)." }); setBusy(null); return
       }
-      watch(startShopifyConnect(cfg, shopDomain))
+ watch(startShopifyConnect(cfg, shopDomain))
     } catch (e) {
-      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Enter your store as mystore.myshopify.com" })
-      setBusy(null)
+ setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Enter your store as mystore.myshopify.com" })
+ setBusy(null)
     }
   }
 
-  const onConnectTiktok = async () => {
-    setBusy("connect-tiktok"); setNotice(null)
-    try {
-      const cfg = await getTiktokConfig()
-      if (!cfg.configured || !cfg.service_id) {
-        setNotice({ tone: "err", msg: "TikTok isn't configured on the server yet (TIKTOK_APP_KEY / SECRET / SERVICE_ID)." }); setBusy(null); return
+ const onConnectTiktok = async () => {
+ setBusy("connect-tiktok"); setNotice(null)
+ try {
+ const cfg = await getTiktokConfig()
+ if (!cfg.configured || !cfg.service_id) {
+ setNotice({ tone: "err", msg: "TikTok isn't configured on the server yet (TIKTOK_APP_KEY / SECRET / SERVICE_ID)." }); setBusy(null); return
       }
-      watch(startTikTokConnect(cfg))
+ watch(startTikTokConnect(cfg))
     } catch (e) {
-      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't start the TikTok connection." })
-      setBusy(null)
+ setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't start the TikTok connection." })
+ setBusy(null)
     }
   }
 
@@ -261,7 +261,7 @@ export function StoresManager() {
   // present and never surface a "no shop connected" error for a channel the user doesn't use.
   // Pre-connect scope options — how much order history the FIRST import reaches back for.
   // New orders always sync automatically afterward, so this only bounds the initial backfill.
-  const SCOPE_OPTIONS: { days: number; label: string; sub: string; rec?: boolean }[] = [
+ const SCOPE_OPTIONS: { days: number; label: string; sub: string; rec?: boolean }[] = [
     // "Today", not "New orders only": the server now reads 0 as midnight UTC rather than the
     // instant you connect, so a shop linked at 4pm still gets that morning's sales. The old
     // label described the old behaviour and would now be wrong.
@@ -275,21 +275,21 @@ export function StoresManager() {
    *
    *  Two sources, because either can be missing:
    *   · `backfill_days`, the window the seller picked. Null on every shop connected before
-   *     the chooser existed — which is why an already-connected Etsy shop was still being
-   *     offered "Today".
+   * the chooser existed — which is why an already-connected Etsy shop was still being
+   * offered "Today".
    *   · `oldest_order_at`, the age of the earliest order actually held. Evidence rather than
-   *     a record: if orders reach back 60 days, the shop has imported 60 days regardless of
-   *     what was or wasn't written down.
+   * a record: if orders reach back 60 days, the shop has imported 60 days regardless of
+   * what was or wasn't written down.
    *
    *  The WIDER of the two wins, and it's rounded UP to the nearest offered option — an option
-   *  narrower than what's already here can't describe the screen, and nothing is ever deleted
-   *  to make it true. */
-  const syncedWindowFor = (ch: string): number | null => {
-    const mine = (conns ?? []).filter((c) => (c.platform || "etsy").toLowerCase() === ch)
-    if (!mine.length) return null
-    const recorded = mine.map((c) => c.backfill_days).filter((d): d is number => typeof d === "number")
+   * narrower than what's already here can't describe the screen, and nothing is ever deleted
+   * to make it true. */
+ const syncedWindowFor = (ch: string): number | null => {
+ const mine = (conns ?? []).filter((c) => (c.platform || "etsy").toLowerCase() === ch)
+ if (!mine.length) return null
+ const recorded = mine.map((c) => c.backfill_days).filter((d): d is number => typeof d === "number")
 
-    const ages = mine
+ const ages = mine
       .map((c) => c.oldest_order_at)
       .filter((s): s is string => !!s)
       .map((s) => (Date.now() - new Date(s).getTime()) / 86400000)
@@ -301,110 +301,110 @@ export function StoresManager() {
     //  · under a day → 0, so a shop holding only today's orders can still pick "Today". A raw
     //    0.2 would otherwise round up to 7 and grey out the very window it's already on.
     //  · otherwise ceil, so 7.9 days of history needs 30 rather than squeaking into "Past 7",
-    //    which wouldn't actually cover the oldest order.
-    const widest = SCOPE_OPTIONS[SCOPE_OPTIONS.length - 1].days
-    const oldest = ages.length ? Math.max(...ages) : null
-    const needed = oldest === null ? null : (oldest < 1 ? 0 : Math.ceil(oldest))
-    const implied = needed === null
+    // which wouldn't actually cover the oldest order.
+ const widest = SCOPE_OPTIONS[SCOPE_OPTIONS.length - 1].days
+ const oldest = ages.length ? Math.max(...ages) : null
+ const needed = oldest === null ? null : (oldest < 1 ? 0 : Math.ceil(oldest))
+ const implied = needed === null
       ? null
-      : (SCOPE_OPTIONS.find((o) => o.days >= needed)?.days ?? widest)
+ : (SCOPE_OPTIONS.find((o) => o.days >= needed)?.days ?? widest)
 
-    const floors = [...recorded, ...(implied === null ? [] : [implied])]
-    return floors.length ? Math.max(...floors) : null
+ const floors = [...recorded, ...(implied === null ? [] : [implied])]
+ return floors.length ? Math.max(...floors) : null
   }
-  const channelName = (k: string) => CHANNELS.find((c) => c.key === k)?.name || "shop"
+ const channelName = (k: string) => CHANNELS.find((c) => c.key === k)?.name || "shop"
 
   // A channel's Connect button opens this chooser first; picking a window stashes it for the
   // OAuth callback to persist on the connection, then starts the real connect flow.
-  const chooseScope = (days: number) => {
-    try { localStorage.setItem("eg_connect_backfill_days", String(days)) } catch { /* ignore */ }
-    const ch = pending
-    setPending(null)
-    if (ch === "etsy") onConnect()
-    else if (ch === "shopify") onConnectShopify()
-    else if (ch === "tiktok") onConnectTiktok()
+ const chooseScope = (days: number) => {
+ try { localStorage.setItem("eg_connect_backfill_days", String(days)) } catch { /* ignore */ }
+ const ch = pending
+ setPending(null)
+ if (ch === "etsy") onConnect()
+ else if (ch === "shopify") onConnectShopify()
+ else if (ch === "tiktok") onConnectTiktok()
   }
 
-  const onSync = async () => {
-    setBusy("sync")
-    setNotice(null)
-    const platforms = new Set((conns ?? []).map((c) => (c.platform || "etsy").toLowerCase()))
-    const jobs: Promise<{ imported?: number; error?: string }>[] = []
-    if (platforms.has("etsy")) jobs.push(syncEtsy())
-    if (platforms.has("tiktok")) jobs.push(syncTiktok())
-    if (platforms.has("shopify")) jobs.push(syncShopify())
-    try {
-      const results = await Promise.allSettled(jobs)
-      const imported = results.reduce(
+ const onSync = async () => {
+ setBusy("sync")
+ setNotice(null)
+ const platforms = new Set((conns ?? []).map((c) => (c.platform || "etsy").toLowerCase()))
+ const jobs: Promise<{ imported?: number; error?: string }>[] = []
+ if (platforms.has("etsy")) jobs.push(syncEtsy())
+ if (platforms.has("tiktok")) jobs.push(syncTiktok())
+ if (platforms.has("shopify")) jobs.push(syncShopify())
+ try {
+ const results = await Promise.allSettled(jobs)
+ const imported = results.reduce(
         (n, r) => n + (r.status === "fulfilled" ? r.value.imported || 0 : 0), 0)
       // A per-channel failure shouldn't hide the others' success; only report an error when
       // every channel failed (or one did with nothing imported anywhere).
-      const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && r.value.error))
-      if (failed.length === results.length && results.length > 0) {
-        const first = failed[0]
-        const msg = first.status === "rejected"
+ const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && r.value.error))
+ if (failed.length === results.length && results.length > 0) {
+ const first = failed[0]
+ const msg = first.status === "rejected"
           ? (first.reason instanceof Error ? first.reason.message : "Sync failed.")
-          : (first.value.error || "Sync failed.")
-        throw new Error(msg)
+ : (first.value.error || "Sync failed.")
+ throw new Error(msg)
       }
-      setNotice({ tone: "ok", msg: `Synced — ${imported} order(s) imported.` })
-      load()
+ setNotice({ tone: "ok", msg: `Synced — ${imported} order(s) imported.` })
+ load()
     } catch (e) {
-      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Sync failed." })
+ setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Sync failed." })
     } finally {
-      setBusy(null)
+ setBusy(null)
     }
   }
 
-  const onDisconnect = async (c: EtsyConnection) => {
-    setBusy(c.shop_id)
-    setNotice(null)
-    try {
-      const plat = (c.platform || "").toLowerCase()
-      if (plat === "shopify") await disconnectShopify(c.shop_id)
-      else if (plat === "tiktok") await disconnectTiktok(c.shop_id)
-      else await disconnectEtsy(c.shop_id)
-      setNotice({ tone: "ok", msg: `Disconnected ${c.shop_name || "shop"}.` })
-      setConns((prev) => (prev ?? []).filter((x) => x.shop_id !== c.shop_id))
+ const onDisconnect = async (c: EtsyConnection) => {
+ setBusy(c.shop_id)
+ setNotice(null)
+ try {
+ const plat = (c.platform || "").toLowerCase()
+ if (plat === "shopify") await disconnectShopify(c.shop_id)
+ else if (plat === "tiktok") await disconnectTiktok(c.shop_id)
+ else await disconnectEtsy(c.shop_id)
+ setNotice({ tone: "ok", msg: `Disconnected ${c.shop_name || "shop"}.` })
+ setConns((prev) => (prev ?? []).filter((x) => x.shop_id !== c.shop_id))
     } catch (e) {
-      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't disconnect." })
+ setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Couldn't disconnect." })
     } finally {
-      setBusy(null)
+ setBusy(null)
     }
   }
 
-  const connected = conns ?? []
-  const scopeCount = (s: string | null) => (s ? s.split(/[\s,]+/).filter(Boolean).length : 0)
+ const connected = conns ?? []
+ const scopeCount = (s: string | null) => (s ? s.split(/[\s,]+/).filter(Boolean).length : 0)
 
-  return (
+ return (
     <div className="space-y-5">
       <StatGrid>
         <StatCard label="Connected shops" value={String(connected.length)} sub="syncing orders" />
         <StatCard
-          label="Channels live"
-          value={String(liveChannels.length)}
-          sub={liveChannels.map((c) => c.name.replace(" Shop", "")).join(" · ")}
-          tone="pos"
+ label="Channels live"
+ value={String(liveChannels.length)}
+ sub={liveChannels.map((c) => c.name.replace(" Shop", "")).join(" · ")}
+ tone="pos"
         />
         <StatCard
-          label="Coming soon"
-          value={String(soonChannels.length)}
-          sub={soonChannels.map((c) => c.name).join(" · ")}
+ label="Coming soon"
+ value={String(soonChannels.length)}
+ sub={soonChannels.map((c) => c.name).join(" · ")}
         />
         <StatCard
-          label="Last sync"
-          value={connected.length ? fmtDate(connected[0].last_sync_at).split(",")[0] : "—"}
-          sub="most recent shop"
+ label="Last sync"
+ value={connected.length ? fmtDate(connected[0].last_sync_at).split(",")[0] : "—"}
+ sub="most recent shop"
         />
       </StatGrid>
 
       {notice && (
         <div
-          className={
+ className={
             "flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium " +
             (notice.tone === "ok"
               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-red-200 bg-red-50 text-red-700")
+ : "border-red-200 bg-red-50 text-red-700")
           }
         >
           {notice.tone === "ok" ? <CheckCircle size={15} weight="fill" /> : <Warning size={15} weight="fill" />}
@@ -413,7 +413,7 @@ export function StoresManager() {
       )}
 
       {isDemo && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+        <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Warning size={14} weight="fill" />
           Sign in to load and manage your connected shops.
         </div>
@@ -465,9 +465,9 @@ export function StoresManager() {
                     <div className="mt-0.5 text-xs text-muted-foreground">
                       {isAdmin && c.scopes ? (
                         <button
-                          type="button"
-                          className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-                          onClick={() => setOpenScopes((prev) => { const n = new Set(prev); n.has(c.shop_id) ? n.delete(c.shop_id) : n.add(c.shop_id); return n })}
+ type="button"
+ className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+ onClick={() => setOpenScopes((prev) => { const n = new Set(prev); n.has(c.shop_id) ? n.delete(c.shop_id) : n.add(c.shop_id); return n })}
                         >
                           {scopeCount(c.scopes)} scopes
                         </button>
@@ -486,11 +486,11 @@ export function StoresManager() {
                   </div>
                 </div>
                 <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-red-600"
-                  onClick={() => onDisconnect(c)}
-                  disabled={busy === c.shop_id}
+ size="sm"
+ variant="ghost"
+ className="text-muted-foreground hover:text-red-600"
+ onClick={() => onDisconnect(c)}
+ disabled={busy === c.shop_id}
                 >
                   <Trash size={14} weight="bold" />
                   {busy === c.shop_id ? "Removing…" : "Disconnect"}
@@ -507,11 +507,11 @@ export function StoresManager() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CHANNELS.map((ch, i) => (
             <motion.div
-              key={ch.key}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: i * 0.05 }}
-              className="flex flex-col rounded-2xl border border-border bg-card p-5"
+ key={ch.key}
+ initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ transition={{ duration: 0.35, delay: i * 0.05 }}
+ className="flex flex-col rounded-2xl border border-border bg-card p-5"
             >
               <ChannelMark channelKey={ch.key} name={ch.name} markH={ch.markH} />
               <div className="flex-1" />
@@ -519,16 +519,16 @@ export function StoresManager() {
                 <div className="mt-4 space-y-2">
                   <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />
                   {/* NOT disabled on an empty domain. A greyed Connect is how this channel
-                      reads as unavailable — indistinguishable from Walmart's "Coming soon"
-                      to a seller who hasn't worked out that the box above it is a
-                      precondition. It stays lit and says what's missing when clicked. */}
+ reads as unavailable — indistinguishable from Walmart's "Coming soon"
+ to a seller who hasn't worked out that the box above it is a
+ precondition. It stays lit and says what's missing when clicked. */}
                   <Button size="sm" className="w-full" disabled={busy === "connect-shopify"}
-                    onClick={() => {
-                      if (!shopDomain.trim()) {
-                        setNotice({ tone: "err", msg: "Enter your store above as mystore.myshopify.com, then Connect." })
-                        return
+ onClick={() => {
+ if (!shopDomain.trim()) {
+ setNotice({ tone: "err", msg: "Enter your store above as mystore.myshopify.com, then Connect." })
+ return
                       }
-                      setPending("shopify")
+ setPending("shopify")
                     }}>
                     <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Connecting…" : "Connect"}
                   </Button>
@@ -549,33 +549,33 @@ export function StoresManager() {
       </div>
 
       {/* Pre-connect scope chooser — appears for every channel, both seller and staff. Bounds
-          how far back the FIRST import reaches so connecting a busy shop can't pull thousands
-          of historical orders. New orders always sync automatically after connect. */}
+ how far back the FIRST import reaches so connecting a busy shop can't pull thousands
+ of historical orders. New orders always sync automatically after connect. */}
       {pending && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setPending(null)}
+ className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+ role="dialog"
+ aria-modal="true"
+ onClick={() => setPending(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+ className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+ onClick={(e) => e.stopPropagation()}
           >
             <div className="text-base font-semibold">Import orders from {channelName(pending)}</div>
             <p className="mt-1 text-sm text-muted-foreground">
               How far back should we pull existing orders? This only affects the first import —
-              new orders always sync automatically afterward.
+ new orders always sync automatically afterward.
             </p>
             {pending === "tiktok" && tiktokRegion && (
               <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
-                login. If your shop is {tiktokRegion === "us" ? "not US" : "US"} and it can&apos;t find your account, the
-                server&apos;s <code className="tabular-nums">TIKTOK_REGION</code> is set to the wrong region.
+ login. If your shop is {tiktokRegion === "us" ? "not US" : "US"} and it can&apos;t find your account, the
+ server&apos;s <code className="tabular-nums">TIKTOK_REGION</code> is set to the wrong region.
               </div>
             )}
             {/* Already-synced shops: say the rule ONCE, up here, rather than repeating it on
-                every greyed row. */}
+ every greyed row. */}
             {syncedWindowFor(pending) !== null && (
               <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 This shop already imported{" "}
@@ -589,21 +589,21 @@ export function StoresManager() {
               {SCOPE_OPTIONS.map((o) => {
                 // Greyed, not hidden: a missing option reads as a bug, while a disabled one
                 // with a reason says what happened and what to do instead.
-                const synced = syncedWindowFor(pending)
-                const off = synced !== null && o.days < synced
-                return (
+ const synced = syncedWindowFor(pending)
+ const off = synced !== null && o.days < synced
+ return (
                 <button
-                  key={o.days}
-                  type="button"
-                  disabled={off}
-                  aria-disabled={off}
-                  title={off ? "Already imported a longer period — the window can only widen" : undefined}
-                  onClick={() => !off && chooseScope(o.days)}
-                  className={
+ key={o.days}
+ type="button"
+ disabled={off}
+ aria-disabled={off}
+ title={off ? "Already imported a longer period — the window can only widen" : undefined}
+ onClick={() => !off && chooseScope(o.days)}
+ className={
                     "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors " +
                     (off
                       ? "cursor-not-allowed border-border/60 bg-muted/30 opacity-55"
-                      : "border-border bg-background hover:border-primary hover:bg-primary/5")
+ : "border-border bg-background hover:border-primary hover:bg-primary/5")
                   }
                 >
                   <span className="min-w-0">
@@ -626,15 +626,15 @@ export function StoresManager() {
                   </span>
                   {off
                     ? <Prohibit size={15} weight="bold" className="shrink-0 text-muted-foreground/70" />
-                    : <Plus size={15} weight="bold" className="shrink-0 text-muted-foreground" />}
+ : <Plus size={15} weight="bold" className="shrink-0 text-muted-foreground" />}
                 </button>
                 )
               })}
             </div>
             <button
-              type="button"
-              onClick={() => setPending(null)}
-              className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+ type="button"
+ onClick={() => setPending(null)}
+ className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Cancel
             </button>

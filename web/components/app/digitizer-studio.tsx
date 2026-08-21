@@ -6,10 +6,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerE
 import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown, TShirt } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import {
-  getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
-  wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
-  getWilcomAlphabets, wilcomCombine, wilcomLetteringPreview,
-  type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration, type WilcomTransform,
+ getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
+ wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
+ getWilcomAlphabets, wilcomCombine, wilcomLetteringPreview,
+ type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration, type WilcomTransform,
 } from "@/lib/api"
 import { PageTitle } from "@/components/app/page-title"
 import { TabLabel } from "@/components/app/tab-label"
@@ -20,47 +20,47 @@ type Source = "order" | "library"
 // Load an image (remote → same-origin proxy so the canvas isn't tainted; data URL → direct),
 // downscale it, and return a data URL under EWA's 2MB auto-digitize cap.
 function toDataUrl(src: string, maxEdge = 1200, quality = 0.82): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!src) { reject(new Error("No image")); return }
-    const img = new Image()
-    img.crossOrigin = "anonymous"
-    img.onload = () => {
-      const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
-      const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale))
-      const c = document.createElement("canvas"); c.width = w; c.height = h
-      const ctx = c.getContext("2d")
-      if (!ctx) { reject(new Error("Canvas unavailable")); return }
-      ctx.drawImage(img, 0, 0, w, h)
-      try { resolve(c.toDataURL("image/jpeg", quality)) } catch { reject(new Error("Couldn't read the artwork (cross-origin)")) }
+ return new Promise((resolve, reject) => {
+ if (!src) { reject(new Error("No image")); return }
+ const img = new Image()
+ img.crossOrigin = "anonymous"
+ img.onload = () => {
+ const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
+ const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale))
+ const c = document.createElement("canvas"); c.width = w; c.height = h
+ const ctx = c.getContext("2d")
+ if (!ctx) { reject(new Error("Canvas unavailable")); return }
+ ctx.drawImage(img, 0, 0, w, h)
+ try { resolve(c.toDataURL("image/jpeg", quality)) } catch { reject(new Error("Couldn't read the artwork (cross-origin)")) }
     }
-    img.onerror = () => reject(new Error("Couldn't load the artwork"))
-    img.src = src.startsWith("data:") ? src : canvasReadableSrc(src)
+ img.onerror = () => reject(new Error("Couldn't load the artwork"))
+ img.src = src.startsWith("data:") ? src : canvasReadableSrc(src)
   })
 }
 
 function download(name: string, dataUrl: string) {
-  const a = document.createElement("a"); a.href = dataUrl; a.download = name
-  document.body.appendChild(a); a.click(); a.remove()
+ const a = document.createElement("a"); a.href = dataUrl; a.download = name
+ document.body.appendChild(a); a.click(); a.remove()
 }
 function readFile(file: File): Promise<string> {
-  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("read failed")); fr.readAsDataURL(file) })
+ return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("read failed")); fr.readAsDataURL(file) })
 }
 const fmtDate = (s?: string) => { if (!s) return ""; const d = new Date(s); return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
 
 // Uniform square thumbnail with a graceful fallback — a failed load must not resize the card.
 function Thumb({ src, alt, className }: { src: string; alt?: string; className?: string }) {
-  const [bad, setBad] = useState(false)
-  if (bad || !src) return <div className={"flex items-center justify-center bg-muted text-muted-foreground/30 " + (className ?? "")}><Needle size={24} weight="duotone" /></div>
+ const [bad, setBad] = useState(false)
+ if (bad || !src) return <div className={"flex items-center justify-center bg-muted text-muted-foreground/30 " + (className ?? "")}><Needle size={24} weight="duotone" /></div>
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt ?? ""} className={className} onError={() => setBad(true)} />
+ return <img src={src} alt={alt ?? ""} className={className} onError={() => setBad(true)} />
 }
 
 // A unifying shape over the three artwork sources.
 type ArtItem = { key: string; name: string; ref?: string; source: Source | "upload"; thumb: string; getImage: () => Promise<string> }
 const orderItem = (u: OrderUpload): ArtItem => ({ key: u.url, name: u.name || "Untitled", ref: u.orderRef, source: "order", thumb: canvasReadableSrc(u.url), getImage: () => toDataUrl(u.url) })
 const libItem = (d: LibraryDesign): ArtItem => ({
-  key: `L${d.id}`, name: d.name || "Untitled", ref: `DSN-${d.id}`, source: "library", thumb: d.thumb || "",
-  getImage: async () => { try { const full = await getDesignLibraryItem(d.id); return await toDataUrl(full.data || d.thumb || "") } catch { return toDataUrl(d.thumb || "") } },
+ key: `L${d.id}`, name: d.name || "Untitled", ref: `DSN-${d.id}`, source: "library", thumb: d.thumb || "",
+ getImage: async () => { try { const full = await getDesignLibraryItem(d.id); return await toDataUrl(full.data || d.thumb || "") } catch { return toDataUrl(d.thumb || "") } },
 })
 
 // Confidence gate — after a Preview, decide whether auto-digitize is likely to disappoint, so
@@ -68,24 +68,24 @@ const libItem = (d: LibraryDesign): ArtItem => ({
 // colours (photographic/detailed art muddles), a very high stitch count (too dense/complex), or
 // most colours not matching the thread library. Returns a reason string, or null when it looks fine.
 function complexityFlag(res: WilcomResult, pal?: ThreadColor[]): string | null {
-  const colours = res.colours ?? 0
-  const stitches = res.stitches ?? 0
-  const threads = res.threads ?? []
-  let poor = 0
-  for (const t of threads) { const m = nearestThread(t.r, t.g, t.b, pal); if (!m || matchQuality(t.r, t.g, t.b, m).poor) poor++ }
-  const poorRatio = threads.length ? poor / threads.length : 0
-  if (colours >= 8) return "lots of colours — auto-digitize tends to muddy detailed, multi-colour art"
-  if (stitches >= 30000) return "very high stitch count — likely too dense or complex for a clean auto result"
-  if (poorRatio >= 0.4) return "several colours don't map well to your thread library"
-  return null
+ const colours = res.colours ?? 0
+ const stitches = res.stitches ?? 0
+ const threads = res.threads ?? []
+ let poor = 0
+ for (const t of threads) { const m = nearestThread(t.r, t.g, t.b, pal); if (!m || matchQuality(t.r, t.g, t.b, m).poor) poor++ }
+ const poorRatio = threads.length ? poor / threads.length : 0
+ if (colours >= 8) return "lots of colours — auto-digitize tends to muddy detailed, multi-colour art"
+ if (stitches >= 30000) return "very high stitch count — likely too dense or complex for a clean auto result"
+ if (poorRatio >= 0.4) return "several colours don't map well to your thread library"
+ return null
 }
 
 export function DigitizerStudio() {
-  const [tab, setTab] = useState<Tab>("create")
-  return (
+ const [tab, setTab] = useState<Tab>("create")
+ return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Needle size={18} weight="regular"  className="shrink-0 text-primary" />
+        <Needle size={18} weight="regular" className="shrink-0 text-primary" />
         <div>
           <PageTitle>Digitizer</PageTitle>
           <p className="text-sm text-muted-foreground">Turn artwork into an embroidery preview and a machine file — or build one from scratch.</p>
@@ -94,8 +94,8 @@ export function DigitizerStudio() {
 
       <div className="flex w-fit rounded-full border border-border p-0.5">
         {([{ id: "create", label: "Create", icon: PencilSimple }, { id: "library", label: "Library", icon: ImageSquare }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
-          const Icon = t.icon
-          return (
+ const Icon = t.icon
+ return (
             <button key={t.id} onClick={() => setTab(t.id)} className={"eg-tap inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
               <Icon size={15} weight={tab === t.id ? "fill" : "regular"} /> <TabLabel>{t.label}</TabLabel>
             </button>
@@ -110,28 +110,28 @@ export function DigitizerStudio() {
 
 // ── Browse: order artwork + library + direct upload ─────────────────────────────
 function BrowseTab() {
-  const [orders, setOrders] = useState<OrderUpload[] | null>(null)
-  const [lib, setLib] = useState<LibraryDesign[] | null>(null)
-  const [palette, setPalette] = useState<ThreadColor[]>([])
-  const [q, setQ] = useState("")
-  const [open, setOpen] = useState<ArtItem | null>(null)
-  const [done, setDone] = useState<Set<string>>(new Set())
+ const [orders, setOrders] = useState<OrderUpload[] | null>(null)
+ const [lib, setLib] = useState<LibraryDesign[] | null>(null)
+ const [palette, setPalette] = useState<ThreadColor[]>([])
+ const [q, setQ] = useState("")
+ const [open, setOpen] = useState<ArtItem | null>(null)
+ const [done, setDone] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    const id = setTimeout(() => {
-      getThreadPalette().then((p) => setPalette(Array.isArray(p) ? p : [])).catch(() => {})
-      getOrderUploads().then((r) => setOrders(r.images ?? [])).catch(() => setOrders([]))
-      getDesignLibrary().then((r) => setLib(r ?? [])).catch(() => setLib([]))
+ useEffect(() => {
+ const id = setTimeout(() => {
+ getThreadPalette().then((p) => setPalette(Array.isArray(p) ? p : [])).catch(() => {})
+ getOrderUploads().then((r) => setOrders(r.images ?? [])).catch(() => setOrders([]))
+ getDesignLibrary().then((r) => setLib(r ?? [])).catch(() => setLib([]))
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
 
   // Order artwork + design library shown TOGETHER (no source toggle).
-  const items: ArtItem[] = [...(orders ?? []).map(orderItem), ...(lib ?? []).map(libItem)]
-  const loading = orders === null || lib === null
-  const list = items.filter((i) => !q || `${i.name} ${i.ref ?? ""}`.toLowerCase().includes(q.toLowerCase()))
+ const items: ArtItem[] = [...(orders ?? []).map(orderItem), ...(lib ?? []).map(libItem)]
+ const loading = orders === null || lib === null
+ const list = items.filter((i) => !q || `${i.name} ${i.ref ?? ""}`.toLowerCase().includes(q.toLowerCase()))
 
-  return (
+ return (
     <>
       {/* Search only, top-right — order artwork and the design library live in one grid below. */}
       <div className="flex justify-end">
@@ -200,93 +200,93 @@ const fmtIn = (mm: number) => `${mmToIn(mm).toFixed(1)}"`
  */
 const inOf = (mm: number) => mmToIn(mm).toFixed(2).replace(/\.?0+$/, "")
 /** What the user typed, back to the mm every size path below is expressed in. NaN when the
- *  field is mid-edit or nonsense, and every caller guards on `> 0`. */
+ * field is mid-edit or nonsense, and every caller guards on `> 0`. */
 const inToMm = (v: string) => Number(v) * 25.4
 
 // ── The detail modal: original ↔ big embroidery preview + thread matching ────────
 function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem; palette: ThreadColor[]; onClose: () => void; onGenerated: () => void }) {
-  const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
-  const [res, setRes] = useState<WilcomResult | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [routing, setRouting] = useState(false)
-  const [routed, setRouted] = useState(false)
+ const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
+ const [res, setRes] = useState<WilcomResult | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [routing, setRouting] = useState(false)
+ const [routed, setRouted] = useState(false)
   /** Target finished size in INCHES, as typed. Empty = let Wilcom choose, which is the old
-   *  behaviour. mm is derived at the edge (wMm/hMm) because that is what EWA is given — the
-   *  floor states placements in inches, so that is what the field holds. */
-  const [size, setSize] = useState<{ w: string; h: string }>({ w: "", h: "" })
+   * behaviour. mm is derived at the edge (wMm/hMm) because that is what EWA is given — the
+   * floor states placements in inches, so that is what the field holds. */
+ const [size, setSize] = useState<{ w: string; h: string }>({ w: "", h: "" })
   /** Keep the artwork's proportions: typing one dimension derives the other. Off by default
-   *  would let someone silently distort a logo, which is not recoverable from the output. */
-  const [lockRatio, setLockRatio] = useState(true)
-  const [aspect, setAspect] = useState<number | null>(null)
+   * would let someone silently distort a logo, which is not recoverable from the output. */
+ const [lockRatio, setLockRatio] = useState(true)
+ const [aspect, setAspect] = useState<number | null>(null)
 
   // The source artwork's proportions, read once, so the ratio lock has something to work from.
-  useEffect(() => {
-    let live = true
-    item.getImage()
+ useEffect(() => {
+ let live = true
+ item.getImage()
       .then((src) => new Promise<HTMLImageElement>((res, rej) => {
-        const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src
+ const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src
       }))
       .then((im) => { if (live && im.width && im.height) setAspect(im.width / im.height) })
       .catch(() => {})
-    return () => { live = false }
+ return () => { live = false }
   }, [item])
 
   // Inches as typed; mm as sent. Wilcom's area ceiling is stated in mm², so the check has to
   // happen on the converted values, not the typed ones.
-  const wIn = Number(size.w) || 0
-  const hIn = Number(size.h) || 0
-  const wNum = wIn > 0 ? Math.round(wIn * 25.4) : 0
-  const hNum = hIn > 0 ? Math.round(hIn * 25.4) : 0
-  const areaOver = wNum > 0 && hNum > 0 && wNum * hNum > MAX_AREA_MM2
+ const wIn = Number(size.w) || 0
+ const hIn = Number(size.h) || 0
+ const wNum = wIn > 0 ? Math.round(wIn * 25.4) : 0
+ const hNum = hIn > 0 ? Math.round(hIn * 25.4) : 0
+ const areaOver = wNum > 0 && hNum > 0 && wNum * hNum > MAX_AREA_MM2
   // One decimal, in inches — rounding to whole units here would quantise a 2.5" chest logo
   // to 2" or 3", which mm never did.
-  const setW = (v: string) => {
-    const n = Number(v)
-    setSize(lockRatio && aspect && n > 0 ? { w: v, h: (n / aspect).toFixed(1) } : (p) => ({ ...p, w: v }))
+ const setW = (v: string) => {
+ const n = Number(v)
+ setSize(lockRatio && aspect && n > 0 ? { w: v, h: (n / aspect).toFixed(1) } : (p) => ({ ...p, w: v }))
   }
-  const setH = (v: string) => {
-    const n = Number(v)
-    setSize(lockRatio && aspect && n > 0 ? { w: (n * aspect).toFixed(1), h: v } : (p) => ({ ...p, h: v }))
+ const setH = (v: string) => {
+ const n = Number(v)
+ setSize(lockRatio && aspect && n > 0 ? { w: (n * aspect).toFixed(1), h: v } : (p) => ({ ...p, h: v }))
   }
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+ useEffect(() => {
+ const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+ window.addEventListener("keydown", onKey)
+ return () => window.removeEventListener("keydown", onKey)
   }, [onClose])
 
-  const run = async (design: boolean) => {
-    setStatus(design ? "generating" : "previewing"); setErr(null)
-    try {
-      const image = await item.getImage()
+ const run = async (design: boolean) => {
+ setStatus(design ? "generating" : "previewing"); setErr(null)
+ try {
+ const image = await item.getImage()
       // Only send a size when one was actually chosen — an unset field must stay "Wilcom
       // decides", not silently become 0mm.
-      const dims = wNum > 0 && hNum > 0 ? { width: wNum, height: hNum } : {}
-      const r = design
+ const dims = wNum > 0 && hNum > 0 ? { width: wNum, height: hNum } : {}
+ const r = design
         ? await wilcomDigitize({ image, filename: item.name, name: item.name, orderRef: item.ref, source: item.source, ...dims })
-        : await wilcomPreview({ image, filename: item.name, ...dims })
-      if (!r.ok) throw new Error(r.error || "EWA rejected the request")
-      setRes(r); if (design && r.machineFile) onGenerated()
+ : await wilcomPreview({ image, filename: item.name, ...dims })
+ if (!r.ok) throw new Error(r.error || "EWA rejected the request")
+ setRes(r); if (design && r.machineFile) onGenerated()
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed") } finally { setStatus("idle") }
   }
   // EXTRA, isolated route: hand the ORIGINAL artwork (never the auto-preview) to the Designer
   // board for a human to digitize when auto-digitize won't cut it. Uses the SAME createDesignCard
   // endpoint the board's own drag-drop uses — additive only, so it never touches the main
   // order→board flow and deleting the Digitizer removes it cleanly.
-  const sendToBoard = async () => {
-    setRouting(true); setErr(null)
-    try {
-      const image = await item.getImage()
-      const r = await createDesignCard({ title: item.name || "Design", data: image })
-      if (r.error) throw new Error(r.error)
-      setRouted(true)
+ const sendToBoard = async () => {
+ setRouting(true); setErr(null)
+ try {
+ const image = await item.getImage()
+ const r = await createDesignCard({ title: item.name || "Design", data: image })
+ if (r.error) throw new Error(r.error)
+ setRouted(true)
     } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't send to the board.") } finally { setRouting(false) }
   }
-  const busy = status !== "idle"
-  const pal = palette.length ? palette : undefined
-  const flag = res ? complexityFlag(res, pal) : null
+ const busy = status !== "idle"
+ const pal = palette.length ? palette : undefined
+ const flag = res ? complexityFlag(res, pal) : null
 
-  return (
+ return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <button className="absolute inset-0 bg-foreground/50" aria-label="Close" onClick={onClose} />
       <div className="relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
@@ -314,9 +314,9 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
             </div>
 
             {/* TARGET SIZE — the thing that was missing. Embroidery is digitised FOR a
-                placement: density and pull compensation follow the finished size, so the same
-                art at 90mm and 280mm are two different files, not one scaled. Left blank,
-                behaviour is unchanged and Wilcom picks. */}
+ placement: density and pull compensation follow the finished size, so the same
+ art at 90mm and 280mm are two different files, not one scaled. Left blank,
+ behaviour is unchanged and Wilcom picks. */}
             <div className="rounded-lg border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="eg-label text-muted-foreground">Finished size</span>
@@ -332,16 +332,16 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                   // PLACEMENTS are stated in mm (that's how a placement is specified), so the
                   // comparison and the fill both happen in mm and only the stored value is
                   // inches.
-                  const on = wNum === pl.w || (aspect ? Math.round(Math.min(pl.w, pl.h * aspect)) === wNum : false)
-                  return (
+ const on = wNum === pl.w || (aspect ? Math.round(Math.min(pl.w, pl.h * aspect)) === wNum : false)
+ return (
                     <button
-                      key={pl.label}
-                      onClick={() => {
-                        if (!aspect) { setSize({ w: inOf(pl.w), h: inOf(pl.h) }); return }
-                        const w = Math.min(pl.w, pl.h * aspect)
-                        setSize({ w: inOf(w), h: inOf(w / aspect) })
+ key={pl.label}
+ onClick={() => {
+ if (!aspect) { setSize({ w: inOf(pl.w), h: inOf(pl.h) }); return }
+ const w = Math.min(pl.w, pl.h * aspect)
+ setSize({ w: inOf(w), h: inOf(w / aspect) })
                       }}
-                      className={"eg-tap rounded-md border px-2 py-1 text-2xs font-medium transition-colors " +
+ className={"eg-tap rounded-md border px-2 py-1 text-2xs font-medium transition-colors " +
                         (on ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
                     >
                       {pl.label}
@@ -353,13 +353,13 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 <label className="flex flex-1 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">W</span>
                   <input inputMode="decimal" value={size.w} onChange={(e) => setW(e.target.value)} placeholder="auto"
-                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished width in inches" />
+ className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished width in inches" />
                 </label>
                 <span className="text-xs text-muted-foreground">×</span>
                 <label className="flex flex-1 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">H</span>
                   <input inputMode="decimal" value={size.h} onChange={(e) => setH(e.target.value)} placeholder="auto"
-                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished height in inches" />
+ className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished height in inches" />
                 </label>
                 <span className="shrink-0 text-xs text-muted-foreground">in</span>
                 {(wNum > 0 || hNum > 0) && (
@@ -367,16 +367,16 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 )}
               </div>
               {/* The fields ARE inches now, so this no longer repeats them. What is left is
-                  the mm² area, which is the only reason mm still appears on this screen:
+ the mm² area, which is the only reason mm still appears on this screen:
                   Wilcom's auto-digitize ceiling is stated in mm² and refusing to show it
-                  would make the warning below arrive from nowhere. */}
+ would make the warning below arrive from nowhere. */}
               {wNum > 0 && hNum > 0 && (
                 <div className="mt-1.5 text-2xs tabular-nums text-muted-foreground">
                   {Math.round(wNum * hNum).toLocaleString()} mm² of Wilcom&apos;s {MAX_AREA_MM2.toLocaleString()} limit
                 </div>
               )}
               {areaOver && (
-                <div className="mt-1.5 flex items-start gap-1.5 text-2xs text-amber-700 dark:text-amber-400">
+                <div className="mt-1.5 flex items-start gap-1.5 text-2xs text-hold">
                   <Warning size={12} weight="fill" className="mt-0.5 shrink-0" />
                   Over Wilcom&apos;s {MAX_AREA_MM2.toLocaleString()} mm² auto-digitize limit — it will refuse this. Reduce the size, or send the original to a digitizer below.
                 </div>
@@ -407,11 +407,11 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
               )}
             </div>
 
-            {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
+            {err && <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
 
             {/* Confidence gate — when auto-digitize is likely poor, say so and nudge the handoff. */}
             {flag && !routed && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
                 <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
                 <span><b>This may need a human.</b> {flag} — send the original to a digitizer for a cleaner file.</span>
               </div>
@@ -419,14 +419,14 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
             {/* Extra route — hand the ORIGINAL off to a human digitizer when auto won't do. */}
             <button
-              onClick={sendToBoard}
-              disabled={routing || routed}
-              className={"inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-70 " +
+ onClick={sendToBoard}
+ disabled={routing || routed}
+ className={"inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-70 " +
                 (routed
                   ? "border-border text-muted-foreground"
-                  : flag
-                    ? "border-amber-400 bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
-                    : "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
+ : flag
+                    ? "border-hold/40 bg-hold/10 text-hold hover:bg-hold/20"
+ : "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
             >
               {routing ? <CircleNotch size={14} className="animate-spin" /> : routed ? <Check size={14} weight="bold" className="text-success" /> : <PaperPlaneTilt size={14} />}
               {routed ? "Sent to Designer board" : "Send original to Designer board"}
@@ -456,14 +456,14 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 {res.threads && res.threads.length > 0 ? (
                   <>
                     {/* Fixed columns so every row lines up: design swatch → cone swatch, name +
-                        code (flex, truncates), then the quality flag. The raw RGB text is gone
+ code (flex, truncates), then the quality flag. The raw RGB text is gone
                         (it wrapped and broke alignment) — it's in the swatch's tooltip instead. */}
                     <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
                       {res.threads.map((t, i) => {
-                        const m = nearestThread(t.r, t.g, t.b, pal)
-                        const poor = m ? matchQuality(t.r, t.g, t.b, m).poor : true
-                        const srcHex = "#" + [t.r, t.g, t.b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0")).join("")
-                        return (
+ const m = nearestThread(t.r, t.g, t.b, pal)
+ const poor = m ? matchQuality(t.r, t.g, t.b, m).poor : true
+ const srcHex = "#" + [t.r, t.g, t.b].map((x) => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0")).join("")
+ return (
                           <div key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
                             <span className="size-5 shrink-0 rounded border border-border" style={{ background: `rgb(${t.r},${t.g},${t.b})` }} title={t.name ? `${t.name} · ${srcHex}` : srcHex} />
                             <ArrowRight size={13} weight="bold" className="shrink-0 text-muted-foreground/50" />
@@ -478,7 +478,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                             ) : (
                               <span className="min-w-0 flex-1 text-muted-foreground">No close match in your library</span>
                             )}
-                            {m && poor && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 eg-label text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">poor</span>}
+                            {m && poor && <span className="shrink-0 rounded-full bg-hold/15 px-2 py-0.5 eg-label text-hold">poor</span>}
                           </div>
                         )
                       })}
@@ -536,57 +536,57 @@ const clampScale = (s: number) => Math.min(4, Math.max(0.25, Number.isFinite(s) 
 // EWA measures mm from the location's TOP-LEFT (+y down) from the element's top-left, while the
 // canvas is centre-origin / +y-up, so convert using the element's EFFECTIVE stitched size (mm).
 function toEwaTransform(tf: WilcomTransform, effWmm: number, effHmm: number) {
-  const cx = BOX_SPAN_MM / 2 + tf.x   // element centre, mm from the left edge
-  const cy = BOX_SPAN_MM / 2 - tf.y   // element centre, mm from the top edge (+y flips to down)
-  return { dx: +(cx - effWmm / 2).toFixed(2), dy: +(cy - effHmm / 2).toFixed(2), rotation: tf.angle, scale: 1, mirror: "none" as const }
+ const cx = BOX_SPAN_MM / 2 + tf.x   // element centre, mm from the left edge
+ const cy = BOX_SPAN_MM / 2 - tf.y   // element centre, mm from the top edge (+y flips to down)
+ return { dx: +(cx - effWmm / 2).toFixed(2), dy: +(cy - effHmm / 2).toFixed(2), rotation: tf.angle, scale: 1, mirror: "none" as const }
 }
 type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
 function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void; wmm: number; hmm: number; z: number }) {
-  const drag = useRef<DragState | null>(null)
+ const drag = useRef<DragState | null>(null)
 
   // Single handlers, no ref-in-render: the host rect is read off the DOM via closest() at
   // pointer-down time, and `data-mode` on the grabbed element says what to do. Grabbing a box
   // also SELECTS its layer, so one gesture = click-to-select + drag. No EWA call happens here —
   // it's pure client-side manipulation; the transform only reaches EWA on Generate.
-  const down = (e: RPointerEvent<HTMLElement>) => {
-    e.preventDefault(); e.stopPropagation()
-    onSelect()
-    const el = e.currentTarget
-    const host = el.closest("[data-boxhost]") as HTMLElement | null
-    const r = host?.getBoundingClientRect(); if (!r) return
-    const cx = r.left + r.width / 2 + (tf.x / BOX_SPAN_MM) * r.width
-    const cy = r.top + r.height / 2 - (tf.y / BOX_SPAN_MM) * r.height
-    drag.current = { mode: (el.dataset.mode as DragState["mode"]) || "move", sx: e.clientX, sy: e.clientY, start: { ...tf }, cx, cy, d0: Math.hypot(e.clientX - cx, e.clientY - cy) || 1, a0: Math.atan2(e.clientY - cy, e.clientX - cx), rw: r.width, rh: r.height }
-    try { el.setPointerCapture(e.pointerId) } catch { /* ignore */ }
+ const down = (e: RPointerEvent<HTMLElement>) => {
+ e.preventDefault(); e.stopPropagation()
+ onSelect()
+ const el = e.currentTarget
+ const host = el.closest("[data-boxhost]") as HTMLElement | null
+ const r = host?.getBoundingClientRect(); if (!r) return
+ const cx = r.left + r.width / 2 + (tf.x / BOX_SPAN_MM) * r.width
+ const cy = r.top + r.height / 2 - (tf.y / BOX_SPAN_MM) * r.height
+ drag.current = { mode: (el.dataset.mode as DragState["mode"]) || "move", sx: e.clientX, sy: e.clientY, start: { ...tf }, cx, cy, d0: Math.hypot(e.clientX - cx, e.clientY - cy) || 1, a0: Math.atan2(e.clientY - cy, e.clientX - cx), rw: r.width, rh: r.height }
+ try { el.setPointerCapture(e.pointerId) } catch { /* ignore */ }
   }
-  const move = (e: RPointerEvent<HTMLElement>) => {
-    const d = drag.current; if (!d) return
-    e.preventDefault()
-    if (d.mode === "move") {
-      const dx = ((e.clientX - d.sx) / d.rw) * BOX_SPAN_MM
-      const dy = ((e.clientY - d.sy) / d.rh) * BOX_SPAN_MM
-      onChange({ ...d.start, x: Math.round(d.start.x + dx), y: Math.round(d.start.y - dy) })
+ const move = (e: RPointerEvent<HTMLElement>) => {
+ const d = drag.current; if (!d) return
+ e.preventDefault()
+ if (d.mode === "move") {
+ const dx = ((e.clientX - d.sx) / d.rw) * BOX_SPAN_MM
+ const dy = ((e.clientY - d.sy) / d.rh) * BOX_SPAN_MM
+ onChange({ ...d.start, x: Math.round(d.start.x + dx), y: Math.round(d.start.y - dy) })
     } else if (d.mode === "resize") {
-      const dist = Math.hypot(e.clientX - d.cx, e.clientY - d.cy)
-      onChange({ ...d.start, scale: clampScale(Math.round((dist / d.d0) * d.start.scale * 100) / 100) })
+ const dist = Math.hypot(e.clientX - d.cx, e.clientY - d.cy)
+ onChange({ ...d.start, scale: clampScale(Math.round((dist / d.d0) * d.start.scale * 100) / 100) })
     } else {
-      const a = Math.atan2(e.clientY - d.cy, e.clientX - d.cx)
-      let deg = d.start.angle + ((a - d.a0) * 180) / Math.PI
-      deg = Math.round((((deg + 180) % 360) + 360) % 360 - 180)
-      onChange({ ...d.start, angle: deg })
+ const a = Math.atan2(e.clientY - d.cy, e.clientX - d.cx)
+ let deg = d.start.angle + ((a - d.a0) * 180) / Math.PI
+ deg = Math.round((((deg + 180) % 360) + 360) % 360 - 180)
+ onChange({ ...d.start, angle: deg })
     }
   }
-  const up = (e: RPointerEvent<HTMLElement>) => { drag.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ } }
+ const up = (e: RPointerEvent<HTMLElement>) => { drag.current = null; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ } }
 
-  const nub = "pointer-events-auto absolute size-4 touch-none rounded-full border-2 border-primary bg-background shadow"
+ const nub = "pointer-events-auto absolute size-4 touch-none rounded-full border-2 border-primary bg-background shadow"
   // z-index follows STACK ORDER ONLY (never selection) so the reorder carets visibly change which
   // layer sits on top even while it's selected. Selection is shown by the border + handles alone.
-  return (
+ return (
     <div data-boxhost className="pointer-events-none absolute inset-0" style={{ zIndex: z }}>
       <div
-        data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
-        className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-transparent")}
-        style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${(wmm / BOX_SPAN_MM) * 100}%`, height: `${(hmm / BOX_SPAN_MM) * 100}%`, transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
+ data-mode="move" onPointerDown={down} onPointerMove={move} onPointerUp={up}
+ className={"pointer-events-auto absolute flex touch-none items-center justify-center rounded border-2 " + (selected ? "cursor-move border-primary/80" : "cursor-pointer border-transparent")}
+ style={{ left: `${50 + (tf.x / BOX_SPAN_MM) * 100}%`, top: `${50 - (tf.y / BOX_SPAN_MM) * 100}%`, width: `${(wmm / BOX_SPAN_MM) * 100}%`, height: `${(hmm / BOX_SPAN_MM) * 100}%`, transform: `translate(-50%,-50%) rotate(${tf.angle}deg)` }}
       >
         {/* Full opacity — the ghost is the REAL stitched TrueView, so it must not look faded.
             Selection is shown by the border + handles, not by dimming the embroidery. */}
@@ -594,7 +594,7 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }
         {selected && (
           <>
             {/* All four corners resize (scale from the centre); the top nub rotates. Works for
-                images (re-digitize width) and text (letter height) alike. */}
+ images (re-digitize width) and text (letter height) alike. */}
             <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -left-2 cursor-nwse-resize"} />
             <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -right-2 cursor-nesw-resize"} />
             <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -left-2 cursor-nesw-resize"} />
@@ -610,148 +610,148 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }
 // ── Create — ONE workspace: drop an image AND/OR type text, combined into a single live
 // embroidery preview + machine file via the EWA combine endpoint (prototype). ──────────
 function CreateTab() {
-  const [text, setText] = useState("")
-  const [alphabet, setAlphabet] = useState("")
-  const [height, setHeight] = useState(20)
-  const [color, setColor] = useState("")
-  const [alphabets, setAlphabets] = useState<string[]>([])
-  const [palette, setPalette] = useState<ThreadColor[]>([])
-  const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
-  const [res, setRes] = useState<WilcomResult | null>(null)   // the GENERATED combined .emb (download + readout)
-  const [resById, setResById] = useState<Record<string, WilcomResult>>({}) // each layer's OWN stitched preview
-  const [err, setErr] = useState<string | null>(null)
+ const [text, setText] = useState("")
+ const [alphabet, setAlphabet] = useState("")
+ const [height, setHeight] = useState(20)
+ const [color, setColor] = useState("")
+ const [alphabets, setAlphabets] = useState<string[]>([])
+ const [palette, setPalette] = useState<ThreadColor[]>([])
+ const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
+ const [res, setRes] = useState<WilcomResult | null>(null)   // the GENERATED combined .emb (download + readout)
+ const [resById, setResById] = useState<Record<string, WilcomResult>>({}) // each layer's OWN stitched preview
+ const [err, setErr] = useState<string | null>(null)
   // LAYERS — ordered (list order = stitch order; a later layer stitches on top). Text is one
   // layer (id "text"); the rest are images. Each carries its own move/resize/rotate transform.
-  const [layers, setLayers] = useState<Layer[]>([])
-  const [openLayer, setOpenLayer] = useState<string | null>(null) // active layer id
-  const [over, setOver] = useState(false)
-  const [compare, setCompare] = useState(true) // show the generated result beside the arrangement
-  const [dragId, setDragId] = useState<string | null>(null) // layer card being drag-reordered
-  const [garment, setGarment] = useState("#f4f4f5") // preview backdrop (garment colour) — cosmetic
+ const [layers, setLayers] = useState<Layer[]>([])
+ const [openLayer, setOpenLayer] = useState<string | null>(null) // active layer id
+ const [over, setOver] = useState(false)
+ const [compare, setCompare] = useState(true) // show the generated result beside the arrangement
+ const [dragId, setDragId] = useState<string | null>(null) // layer card being drag-reordered
+ const [garment, setGarment] = useState("#f4f4f5") // preview backdrop (garment colour) — cosmetic
   // Width box draft. The box is CONTROLLED by a derived, rounded footprint, so resizing on
   // every keystroke fed a half-typed number ("9" of "90") back through the scale clamp and the
   // rounding — typing 90 actually landed on 110. Hold the keystrokes, commit on blur/Enter.
-  const [wDraft, setWDraft] = useState<string | null>(null)
+ const [wDraft, setWDraft] = useState<string | null>(null)
   /** Same, for the height box — either dimension can be the one you type. */
-  const [hDraft, setHDraft] = useState<string | null>(null)
+ const [hDraft, setHDraft] = useState<string | null>(null)
   // Drop `dragId` onto `targetId`: dragId takes the target's slot in the stack.
-  const reorderTo = (dragId: string, targetId: string) => setLayers((prev) => {
-    if (dragId === targetId) return prev
-    const from = prev.findIndex((l) => l.id === dragId), to = prev.findIndex((l) => l.id === targetId)
-    if (from < 0 || to < 0) return prev
-    const n = [...prev]; const [m] = n.splice(from, 1); n.splice(to, 0, m); return n
+ const reorderTo = (dragId: string, targetId: string) => setLayers((prev) => {
+ if (dragId === targetId) return prev
+ const from = prev.findIndex((l) => l.id === dragId), to = prev.findIndex((l) => l.id === targetId)
+ if (from < 0 || to < 0) return prev
+ const n = [...prev]; const [m] = n.splice(from, 1); n.splice(to, 0, m); return n
   })
-  const addImages = async (files: Iterable<File> | null | undefined) => {
-    for (const f of Array.from(files ?? []).filter((x) => x.type.startsWith("image/"))) {
-      const thumb = await readFile(f)
-      let dataUrl = thumb; try { dataUrl = await toDataUrl(thumb) } catch { /* keep raw on downscale failure */ }
-      const layer: ImgLayer = { id: newLayerId(), kind: "image", dataUrl, thumb, name: f.name.replace(/\.[^.]+$/, ""), tf: IDENTITY_TF }
-      setLayers((prev) => [...prev, layer])
-      setOpenLayer(layer.id)
+ const addImages = async (files: Iterable<File> | null | undefined) => {
+ for (const f of Array.from(files ?? []).filter((x) => x.type.startsWith("image/"))) {
+ const thumb = await readFile(f)
+ let dataUrl = thumb; try { dataUrl = await toDataUrl(thumb) } catch { /* keep raw on downscale failure */ }
+ const layer: ImgLayer = { id: newLayerId(), kind: "image", dataUrl, thumb, name: f.name.replace(/\.[^.]+$/, ""), tf: IDENTITY_TF }
+ setLayers((prev) => [...prev, layer])
+ setOpenLayer(layer.id)
       // Preview this image on its own (once — an image doesn't change after it's dropped).
-      wilcomPreview({ image: dataUrl, filename: layer.name }).then((r) => { if (r.ok) setResById((m) => ({ ...m, [layer.id]: r })) }).catch(() => {})
+ wilcomPreview({ image: dataUrl, filename: layer.name }).then((r) => { if (r.ok) setResById((m) => ({ ...m, [layer.id]: r })) }).catch(() => {})
     }
   }
-  const setLayerTf = (id: string, tf: WilcomTransform) => setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, tf } : l)))
-  const moveLayer = (id: string, dir: -1 | 1) => setLayers((prev) => {
-    const i = prev.findIndex((l) => l.id === id); if (i < 0) return prev
-    const j = i + dir; if (j < 0 || j >= prev.length) return prev
-    const n = [...prev]; const [m] = n.splice(i, 1); n.splice(j, 0, m); return n
+ const setLayerTf = (id: string, tf: WilcomTransform) => setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, tf } : l)))
+ const moveLayer = (id: string, dir: -1 | 1) => setLayers((prev) => {
+ const i = prev.findIndex((l) => l.id === id); if (i < 0) return prev
+ const j = i + dir; if (j < 0 || j >= prev.length) return prev
+ const n = [...prev]; const [m] = n.splice(i, 1); n.splice(j, 0, m); return n
   })
-  const removeLayer = (id: string) => {
-    setLayers((prev) => prev.filter((l) => l.id !== id))
-    setResById((m) => { const n = { ...m }; delete n[id]; return n })
-    setOpenLayer((o) => (o === id ? null : o))
-    if (id === "text") setText("")
+ const removeLayer = (id: string) => {
+ setLayers((prev) => prev.filter((l) => l.id !== id))
+ setResById((m) => { const n = { ...m }; delete n[id]; return n })
+ setOpenLayer((o) => (o === id ? null : o))
+ if (id === "text") setText("")
   }
   // Keep exactly one text layer while there's text; drop it when the text is cleared.
-  const ensureTextLayer = (present: boolean) => setLayers((prev) => {
-    const has = prev.some((l) => l.id === "text")
-    if (present && !has) return [...prev, { id: "text" as const, kind: "text" as const, tf: IDENTITY_TF }]
-    if (!present && has) return prev.filter((l) => l.id !== "text")
-    return prev
+ const ensureTextLayer = (present: boolean) => setLayers((prev) => {
+ const has = prev.some((l) => l.id === "text")
+ if (present && !has) return [...prev, { id: "text" as const, kind: "text" as const, tf: IDENTITY_TF }]
+ if (!present && has) return prev.filter((l) => l.id !== "text")
+ return prev
   })
-  const onTextChange = (v: string) => { setText(v); ensureTextLayer(!!v.trim()) }
-  const imgLayers = layers.filter(isImg)
+ const onTextChange = (v: string) => { setText(v); ensureTextLayer(!!v.trim()) }
+ const imgLayers = layers.filter(isImg)
   // Colour-change mode — the palette grid is tucked away until "Change colour", so the
   // controls stay short until you want to recolour.
-  const [showPalette, setShowPalette] = useState(false)
-  const [pQuery, setPQuery] = useState("")
+ const [showPalette, setShowPalette] = useState(false)
+ const [pQuery, setPQuery] = useState("")
 
-  useEffect(() => {
-    const id = setTimeout(() => {
-      getWilcomAlphabets().then((r) => { const a = r.alphabets ?? []; setAlphabets(a); setAlphabet((p) => p || a[0] || "") }).catch(() => {})
-      getThreadPalette().then((p) => { const pal = Array.isArray(p) ? p : []; setPalette(pal); setColor((c) => c || pal[0]?.hex || "#111827") }).catch(() => setColor("#111827"))
+ useEffect(() => {
+ const id = setTimeout(() => {
+ getWilcomAlphabets().then((r) => { const a = r.alphabets ?? []; setAlphabets(a); setAlphabet((p) => p || a[0] || "") }).catch(() => {})
+ getThreadPalette().then((p) => { const pal = Array.isArray(p) ? p : []; setPalette(pal); setColor((c) => c || pal[0]?.hex || "#111827") }).catch(() => setColor("#111827"))
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
 
   // Persist the work-in-progress design so it survives switching tabs OR navigating away — the
   // Create tab unmounts in both cases, which was wiping everything. sessionStorage (this
   // browser session), restored once on mount, saved debounced on change.
-  useEffect(() => {
-    const id = setTimeout(() => {
-      try {
-        const s = JSON.parse(sessionStorage.getItem("eg_digitizer_create") || "null")
-        if (!s) return
-        if (Array.isArray(s.layers)) {
-          setLayers(s.layers)
+ useEffect(() => {
+ const id = setTimeout(() => {
+ try {
+ const s = JSON.parse(sessionStorage.getItem("eg_digitizer_create") || "null")
+ if (!s) return
+ if (Array.isArray(s.layers)) {
+ setLayers(s.layers)
           // Previews aren't persisted — re-fetch each restored image layer's own preview.
-          for (const l of s.layers) if (l?.kind === "image" && l.dataUrl) {
-            wilcomPreview({ image: l.dataUrl, filename: l.name }).then((r) => { if (r.ok) setResById((m) => ({ ...m, [l.id]: r })) }).catch(() => {})
+ for (const l of s.layers) if (l?.kind === "image" && l.dataUrl) {
+ wilcomPreview({ image: l.dataUrl, filename: l.name }).then((r) => { if (r.ok) setResById((m) => ({ ...m, [l.id]: r })) }).catch(() => {})
           }
         }
-        if (typeof s.text === "string") setText(s.text)
-        if (s.alphabet) setAlphabet(s.alphabet)
-        if (typeof s.height === "number") setHeight(s.height)
-        if (s.color) setColor(s.color)
-        if (s.garment) setGarment(s.garment)
+ if (typeof s.text === "string") setText(s.text)
+ if (s.alphabet) setAlphabet(s.alphabet)
+ if (typeof s.height === "number") setHeight(s.height)
+ if (s.color) setColor(s.color)
+ if (s.garment) setGarment(s.garment)
       } catch { /* ignore corrupt/absent */ }
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
-  useEffect(() => {
-    const id = setTimeout(() => {
-      try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ layers, text, alphabet, height, color, garment })) } catch { /* quota/serialise */ }
+ useEffect(() => {
+ const id = setTimeout(() => {
+ try { sessionStorage.setItem("eg_digitizer_create", JSON.stringify({ layers, text, alphabet, height, color, garment })) } catch { /* quota/serialise */ }
     }, 500)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [layers, text, alphabet, height, color, garment])
 
-  const busy = status !== "idle"
-  const hasText = !!text.trim()
+ const busy = status !== "idle"
+ const hasText = !!text.trim()
   // Ready when there's SOMETHING to stitch: an image layer, or text with an alphabet.
-  const ready = imgLayers.length > 0 || (hasText && !!alphabet)
+ const ready = imgLayers.length > 0 || (hasText && !!alphabet)
   // GENERATE — the real single .emb: EWA combines the layers with their transforms. Runs only
   // on the button, never live, so arranging on the canvas costs nothing.
-  const generate = async (): Promise<WilcomResult | null> => {
-    if (!ready) return null
-    setStatus("generating"); setErr(null)
-    try {
+ const generate = async (): Promise<WilcomResult | null> => {
+ if (!ready) return null
+ setStatus("generating"); setErr(null)
+ try {
       // Ordered layer payload — each image (auto-digitized server-side) and the text, with its
       // transform, in stitch order. Text content rides alongside for the text layer(s).
-      const payload = layers.map((l) => {
-        const r = resById[l.id]                          // this layer's own stitched preview (mm size)
-        if (l.kind === "image") {
-          const s = l.tf.scale || 1
-          const natW = r?.width ?? 0, natH = r?.height ?? 0
-          const effW = (natW || NOMINAL_MM) * s, effH = (natH || NOMINAL_MM) * s
+ const payload = layers.map((l) => {
+ const r = resById[l.id]                          // this layer's own stitched preview (mm size)
+ if (l.kind === "image") {
+ const s = l.tf.scale || 1
+ const natW = r?.width ?? 0, natH = r?.height ?? 0
+ const effW = (natW || NOMINAL_MM) * s, effH = (natH || NOMINAL_MM) * s
           // Size baked by RE-DIGITIZING at this width (past EWA's ±20% transform cap); position via dx/dy.
-          const targetWidthMm = natW ? +(natW * s).toFixed(1) : undefined
-          return { kind: "image" as const, image: l.dataUrl, name: l.name, targetWidthMm, transform: toEwaTransform(l.tf, effW, effH) }
+ const targetWidthMm = natW ? +(natW * s).toFixed(1) : undefined
+ return { kind: "image" as const, image: l.dataUrl, name: l.name, targetWidthMm, transform: toEwaTransform(l.tf, effW, effH) }
         }
         // Text: resizing scales the LETTER HEIGHT (baked below); footprint scales with it too.
-        const s = l.tf.scale || 1
-        const effW = (r?.width || NOMINAL_MM) * s, effH = (r?.height || NOMINAL_MM) * s
-        return { kind: "text" as const, transform: toEwaTransform(l.tf, effW, effH) }
+ const s = l.tf.scale || 1
+ const effW = (r?.width || NOMINAL_MM) * s, effH = (r?.height || NOMINAL_MM) * s
+ return { kind: "text" as const, transform: toEwaTransform(l.tf, effW, effH) }
       })
       // The text box's scale multiplies the letter height (clamped to EWA's 5–50mm range).
-      const txtScale = layers.find((l) => l.id === "text")?.tf.scale || 1
-      const effHeight = Math.min(50, Math.max(5, Math.round(height * txtScale)))
-      const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height: effHeight, color,
-        name: imgLayers[0]?.name || (hasText ? text.trim() : undefined) }
-      const r = await wilcomCombine(body)
-      if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null); return null }
-      setRes(r); return r
+ const txtScale = layers.find((l) => l.id === "text")?.tf.scale || 1
+ const effHeight = Math.min(50, Math.max(5, Math.round(height * txtScale)))
+ const body = { layers: payload, text: hasText ? text.trim() : undefined, alphabet, height: effHeight, color,
+ name: imgLayers[0]?.name || (hasText ? text.trim() : undefined) }
+ const r = await wilcomCombine(body)
+ if (!r.ok) { setErr(r.error || "EWA rejected the request"); setRes(null); return null }
+ setRes(r); return r
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed"); return null } finally { setStatus("idle") }
   }
   /**
@@ -764,18 +764,18 @@ function CreateTab() {
    * Rotation is ignored deliberately: a rotated box's true AABB is larger, but the boxes are
    * what the user is dragging, and a footprint that grows when you spin a layer reads as a bug.
    */
-  const footprint = (() => {
-    if (!layers.length) return null
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
-    for (const l of layers) {
-      const r = resById[l.id]
-      const sc = l.tf.scale || 1
-      const w = (r?.width || NOMINAL_MM) * sc, h = (r?.height || NOMINAL_MM) * sc
-      x0 = Math.min(x0, l.tf.x - w / 2); x1 = Math.max(x1, l.tf.x + w / 2)
-      y0 = Math.min(y0, l.tf.y - h / 2); y1 = Math.max(y1, l.tf.y + h / 2)
+ const footprint = (() => {
+ if (!layers.length) return null
+ let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+ for (const l of layers) {
+ const r = resById[l.id]
+ const sc = l.tf.scale || 1
+ const w = (r?.width || NOMINAL_MM) * sc, h = (r?.height || NOMINAL_MM) * sc
+ x0 = Math.min(x0, l.tf.x - w / 2); x1 = Math.max(x1, l.tf.x + w / 2)
+ y0 = Math.min(y0, l.tf.y - h / 2); y1 = Math.max(y1, l.tf.y + h / 2)
     }
-    const w = x1 - x0, h = y1 - y0
-    return Number.isFinite(w) && w > 0 && h > 0 ? { w, h } : null
+ const w = x1 - x0, h = y1 - y0
+ return Number.isFinite(w) && w > 0 && h > 0 ? { w, h } : null
   })()
 
   /**
@@ -785,9 +785,9 @@ function CreateTab() {
    * leave the pieces at their old spacing and pull the composition apart. clampScale still caps
    * each layer at 0.25–4, so an extreme target lands short rather than distorting the layout.
    */
-  const resizeTo = (targetW: number) => {
-    if (!footprint || !(targetW > 0)) return
-    applyFactor(targetW / footprint.w)
+ const resizeTo = (targetW: number) => {
+ if (!footprint || !(targetW > 0)) return
+ applyFactor(targetW / footprint.w)
   }
 
   /**
@@ -800,54 +800,54 @@ function CreateTab() {
    * carries ONE scale and there is no honest way to stretch one axis (see the note on the
    * inputs).
    */
-  const resizeToHeight = (targetH: number) => {
-    if (!footprint || !(targetH > 0)) return
-    applyFactor(targetH / footprint.h)
+ const resizeToHeight = (targetH: number) => {
+ if (!footprint || !(targetH > 0)) return
+ applyFactor(targetH / footprint.h)
   }
 
-  const applyFactor = (f: number) => {
-    if (!Number.isFinite(f) || f <= 0) return
-    setLayers((prev) => prev.map((l) => ({
+ const applyFactor = (f: number) => {
+ if (!Number.isFinite(f) || f <= 0) return
+ setLayers((prev) => prev.map((l) => ({
       ...l,
-      tf: { ...l.tf, scale: clampScale((l.tf.scale || 1) * f), x: +(l.tf.x * f).toFixed(2), y: +(l.tf.y * f).toFixed(2) },
+ tf: { ...l.tf, scale: clampScale((l.tf.scale || 1) * f), x: +(l.tf.x * f).toFixed(2), y: +(l.tf.y * f).toFixed(2) },
     })))
   }
 
   // Generate then download ONE format. The .emb is the MACHINE FILE (stitches only). The PNG
   // is the rendered image. Each click regenerates so it always reflects the current arrangement.
-  const generateAnd = async (kind: "emb" | "png") => {
-    const r = await generate()
-    if (!r) return
-    const stem = (r.machineFile?.filename || (hasText ? text.trim() : imgLayers[0]?.name) || "design").replace(/\.[^.]+$/, "")
-    if (kind === "emb" && r.machineFile) download(r.machineFile.filename, `data:application/octet-stream;base64,${r.machineFile.base64}`)
-    if (kind === "png" && r.trueview) download(`${stem}.png`, `data:image/png;base64,${r.trueview}`)
+ const generateAnd = async (kind: "emb" | "png") => {
+ const r = await generate()
+ if (!r) return
+ const stem = (r.machineFile?.filename || (hasText ? text.trim() : imgLayers[0]?.name) || "design").replace(/\.[^.]+$/, "")
+ if (kind === "emb" && r.machineFile) download(r.machineFile.filename, `data:application/octet-stream;base64,${r.machineFile.base64}`)
+ if (kind === "png" && r.trueview) download(`${stem}.png`, `data:image/png;base64,${r.trueview}`)
   }
 
   // Each layer previews on its OWN (a stitched TrueView) and you arrange THAT directly on the
   // canvas. Image layers are previewed on drop (see addImages); the TEXT layer re-fetches here
   // as the text/font/size/colour changes. Neither re-fires on move/resize — that's client-side.
-  useEffect(() => {
-    const active = hasText && !!alphabet
-    let live = true
-    const id = setTimeout(() => {
-      if (!live) return
-      if (!active) { setResById((m) => { if (!m["text"]) return m; const n = { ...m }; delete n["text"]; return n }); return }
-      void wilcomLetteringPreview({ text: text.trim(), alphabet, height, color }).then((r) => { if (live && r.ok) setResById((m) => ({ ...m, text: r })) }).catch(() => {})
+ useEffect(() => {
+ const active = hasText && !!alphabet
+ let live = true
+ const id = setTimeout(() => {
+ if (!live) return
+ if (!active) { setResById((m) => { if (!m["text"]) return m; const n = { ...m }; delete n["text"]; return n }); return }
+ void wilcomLetteringPreview({ text: text.trim(), alphabet, height, color }).then((r) => { if (live && r.ok) setResById((m) => ({ ...m, text: r })) }).catch(() => {})
     }, active ? 550 : 0)
-    return () => { live = false; clearTimeout(id) }
+ return () => { live = false; clearTimeout(id) }
   }, [text, alphabet, height, color, hasText])
 
-  const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
-  const labelCls = "mb-1 block eg-label text-muted-foreground"
-  const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
+ const inputCls = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
+ const labelCls = "mb-1 block eg-label text-muted-foreground"
+ const ext = res?.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : null
   // Live stitch estimate while arranging = sum of the layers' own previews (the generated
   // combine gives the exact figure once you Generate).
-  const shownStitches = res?.stitches ?? (Object.values(resById).reduce((s, r) => s + (r.stitches ?? 0), 0) || null)
+ const shownStitches = res?.stitches ?? (Object.values(resById).reduce((s, r) => s + (r.stitches ?? 0), 0) || null)
   // The cone currently selected, so the colour control can name it rather than show a bare hex.
-  const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
-  const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
+ const selCone = palette.find((c) => c.hex.toLowerCase() === color.toLowerCase())
+ const cones = pQuery ? palette.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(pQuery.toLowerCase())) : palette
 
-  return (
+ return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(340px,400px)_1fr]">
       {/* LEFT — image, text, colour, sequence, readout, actions */}
       <div className="space-y-4">
@@ -864,10 +864,10 @@ function CreateTab() {
               </div>
             ))}
             <label
-              onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-              onDragLeave={() => setOver(false)}
-              onDrop={(e) => { e.preventDefault(); setOver(false); void addImages(e.dataTransfer.files) }}
-              className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-4 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
+ onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+ onDragLeave={() => setOver(false)}
+ onDrop={(e) => { e.preventDefault(); setOver(false); void addImages(e.dataTransfer.files) }}
+ className={"flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-4 text-center transition-colors " + (over ? "border-primary bg-primary/5" : "border-border bg-muted/20 hover:border-primary/50")}
             >
               <ImageSquare size={18} className="text-muted-foreground" />
               <span className="text-xs font-medium">{imgLayers.length ? "Add another image" : "Drop an image to embroider"}</span>
@@ -927,23 +927,23 @@ function CreateTab() {
         </div>
 
         {/* Layers — the elements in this design, TOP of the list = stitched on top. Each opens a
-            move / resize / rotate panel feeding its <transform>; the carets reorder the stack. */}
+ move / resize / rotate panel feeding its <transform>; the carets reorder the stack. */}
         {layers.length > 0 && (
           <div>
             <span className={labelCls}>Layers <span className="font-normal opacity-60">· top of the list stitches on top</span></span>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {/* Reversed so the on-top (last-stitched) layer sits at the top of the list. */}
               {layers.slice().reverse().map((l) => {
-                const ai = layers.findIndex((x) => x.id === l.id)
-                return (
+ const ai = layers.findIndex((x) => x.id === l.id)
+ return (
                   <div
-                    key={l.id}
-                    draggable
-                    onDragStart={() => setDragId(l.id)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => { if (dragId) reorderTo(dragId, l.id); setDragId(null) }}
-                    onDragEnd={() => setDragId(null)}
-                    className={"transition-colors " + (dragId === l.id ? "opacity-40" : dragId ? "hover:bg-primary/5" : "")}
+ key={l.id}
+ draggable
+ onDragStart={() => setDragId(l.id)}
+ onDragOver={(e) => e.preventDefault()}
+ onDrop={() => { if (dragId) reorderTo(dragId, l.id); setDragId(null) }}
+ onDragEnd={() => setDragId(null)}
+ className={"transition-colors " + (dragId === l.id ? "opacity-40" : dragId ? "hover:bg-primary/5" : "")}
                   >
                     <div className="flex items-center gap-2 px-3 py-2 text-sm">
                       {isImg(l) ? (
@@ -986,20 +986,20 @@ function CreateTab() {
             PNG
           </button>
         </div>
-        {err && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
+        {err && <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" />{err}</div>}
       </div>
 
       {/* RIGHT — the big preview, the hero of the tab; sticks while you scroll the controls. */}
       <div className="space-y-2 lg:sticky lg:top-4">
         {/* Garment colour — the preview backdrop, so you can judge the stitching on the blank you'll
-            actually embroider. Cosmetic (doesn't touch the .emb). */}
+ actually embroider. Cosmetic (doesn't touch the .emb). */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"><TShirt size={14} /> Garment</span>
             {GARMENTS.map((g) => (
               <button key={g.color} title={g.name} onClick={() => setGarment(g.color)}
-                className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "border border-black/15")}
-                style={{ background: g.color }} />
+ className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "border border-black/15")}
+ style={{ background: g.color }} />
             ))}
             <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-2xs text-muted-foreground" title="Custom colour">
               +<input type="color" value={garment} onChange={(e) => setGarment(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
@@ -1013,8 +1013,8 @@ function CreateTab() {
         </div>
         {/* SIZE TABLE — above the preview, where the arrangement it describes actually is.
             It used to sit at the bottom of the left column, under the layer list, so the two
-            numbers that decide whether a design fits a placement were the furthest thing on
-            screen from the design. */}
+ numbers that decide whether a design fits a placement were the furthest thing on
+ screen from the design. */}
         <div className="mb-2 flex flex-wrap items-end gap-x-5 gap-y-2 rounded-xl border border-border bg-muted/30 px-3 py-2">
           <div>
             <div className="text-2xs text-muted-foreground">Stitches</div>
@@ -1022,58 +1022,58 @@ function CreateTab() {
           </div>
 
           {/* Editable, and LIVE — driven by the layer boxes, so it reads a real size while you
-              are still arranging instead of "—" until the first generate. */}
+ are still arranging instead of "—" until the first generate. */}
           {/* INCHES, and only inches. This bar carried the size in mm with a separate inches
-              readout beside it — the same two numbers twice, in a strip whose whole job is to
-              answer "does this fit the placement". The floor sizes placements in inches, so
-              that is the unit; mm survives underneath, because it is what EWA is given. */}
+ readout beside it — the same two numbers twice, in a strip whose whole job is to
+ answer "does this fit the placement". The floor sizes placements in inches, so
+ that is the unit; mm survives underneath, because it is what EWA is given. */}
           <div>
             <div className="text-2xs text-muted-foreground">Width × height (in)</div>
             {/* Empty until there is something to measure. An enabled-looking input with no
-                value reads as a field that failed to load, not as "nothing here yet". */}
+ value reads as a field that failed to load, not as "nothing here yet". */}
             {!footprint ? (
               <div className="text-base font-semibold">—</div>
             ) : (
               <div className="flex items-center gap-1.5">
                 <input
-                  inputMode="decimal"
-                  value={wDraft ?? inOf(footprint.w)}
-                  onChange={(e) => setWDraft(e.target.value)}
+ inputMode="decimal"
+ value={wDraft ?? inOf(footprint.w)}
+ onChange={(e) => setWDraft(e.target.value)}
                   // Commit, then drop the draft so the box snaps back to the size actually
                   // achieved — clampScale can land short of the target, and showing the number
                   // you asked for instead of the one you got would hide that.
-                  onBlur={() => { if (wDraft != null) { resizeTo(inToMm(wDraft)); setWDraft(null) } }}
-                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
-                  aria-label="Design width in inches"
-                  className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+ onBlur={() => { if (wDraft != null) { resizeTo(inToMm(wDraft)); setWDraft(null) } }}
+ onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
+ aria-label="Design width in inches"
+ className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
                 <span className="text-sm text-muted-foreground">×</span>
                 {/* EITHER dimension can be typed now. Both drive the SAME uniform resize —
-                    a layer carries one scale, so there is no way to stretch one axis without
-                    lying about what was actually produced. Pin the one the placement is
-                    stated in and the other follows. */}
+ a layer carries one scale, so there is no way to stretch one axis without
+ lying about what was actually produced. Pin the one the placement is
+ stated in and the other follows. */}
                 <input
-                  inputMode="decimal"
-                  value={hDraft ?? inOf(footprint.h)}
-                  onChange={(e) => setHDraft(e.target.value)}
-                  onBlur={() => { if (hDraft != null) { resizeToHeight(inToMm(hDraft)); setHDraft(null) } }}
-                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setHDraft(null) }}
-                  aria-label="Design height in inches"
-                  className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+ inputMode="decimal"
+ value={hDraft ?? inOf(footprint.h)}
+ onChange={(e) => setHDraft(e.target.value)}
+ onBlur={() => { if (hDraft != null) { resizeToHeight(inToMm(hDraft)); setHDraft(null) } }}
+ onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setHDraft(null) }}
+ aria-label="Design height in inches"
+ className="h-7 w-16 rounded-md border border-input bg-background px-1.5 text-base font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
               </div>
             )}
           </div>
 
           {/* Same placements as the digitize modal, so a size learned in one is the same
-              button in the other. */}
+ button in the other. */}
           {footprint && (
             <div className="flex flex-wrap items-center gap-1.5">
               {PLACEMENTS.map((pl) => (
                 <button
-                  key={pl.label}
-                  onClick={() => { setWDraft(null); resizeTo(Math.min(pl.w, pl.h * (footprint.w / footprint.h))) }}
-                  className="eg-tap rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+ key={pl.label}
+ onClick={() => { setWDraft(null); resizeTo(Math.min(pl.w, pl.h * (footprint.w / footprint.h))) }}
+ className="eg-tap rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   {pl.label}
                 </button>
@@ -1090,37 +1090,37 @@ function CreateTab() {
         <div className={"grid gap-2 " + (res?.trueview && compare ? "xl:grid-cols-2" : "grid-cols-1")}>
           <div className="space-y-1">
             {/* Clicking the empty canvas deselects — the layer boxes stopPropagation, so only a
-                background click reaches here, dropping the selection (hides border/handles). */}
+ background click reaches here, dropping the selection (hides border/handles). */}
             <div onPointerDown={() => setOpenLayer(null)} style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[600px]">
               {!ready && (
                 <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image or type text — then arrange it here.</div>
               )}
               {ready && err && (
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-amber-50/95 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/70 dark:text-amber-300"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-hold/10/95 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
               )}
               {/* Layers arranged DIRECTLY — each shows its own stitched TrueView (or a placeholder
-                  while it renders) and you drag / resize / rotate it in place. This IS the design;
+ while it renders) and you drag / resize / rotate it in place. This IS the design;
                   Generate merges the layers into one .emb. No divergent combined render underneath. */}
               {/* Array order = stack order: later layers render last (on top), matching the panel.
                   Each box is sized in REAL mm (its stitched preview × the image scale), so the box
                   IS the true footprint and resizing an image scales it for real. */}
               {layers.map((l, i) => {
-                const r = resById[l.id]
-                const s = l.tf.scale || 1  // scale sizes BOTH: image → digitize width, text → letter height
-                const effW = (r?.width || NOMINAL_MM) * s
-                const effH = (r?.height || NOMINAL_MM) * s
-                return (
+ const r = resById[l.id]
+ const s = l.tf.scale || 1  // scale sizes BOTH: image → digitize width, text → letter height
+ const effW = (r?.width || NOMINAL_MM) * s
+ const effH = (r?.height || NOMINAL_MM) * s
+ return (
                 <LayerBoxEditor key={l.id} z={i + 1} wmm={effW} hmm={effH} tf={l.tf} onChange={(tf) => setLayerTf(l.id, tf)} selected={openLayer === l.id} onSelect={() => setOpenLayer(l.id)} ghost={
-                  isImg(l)
+ isImg(l)
                     ? (resById[l.id]?.trueview
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={`data:image/png;base64,${resById[l.id]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
                         // eslint-disable-next-line @next/next/no-img-element
-                        : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
-                    : (resById["text"]?.trueview
+ : <img src={l.thumb} alt="" className="max-h-full max-w-full object-contain opacity-60" />)
+ : (resById["text"]?.trueview
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={`data:image/png;base64,${resById["text"]?.trueview}`} alt="" className="max-h-full max-w-full object-contain" />
-                        : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
+ : <span className="truncate px-1 text-center font-bold leading-none text-foreground" style={{ fontSize: "clamp(0.75rem, 4vw, 2.75rem)" }}>{text}</span>)
                 } />
                 )
               })}
@@ -1144,14 +1144,14 @@ function CreateTab() {
 
 // ── History ──────────────────────────────────────────────────────────────────────
 function HistoryTab() {
-  const [rows, setRows] = useState<WilcomGeneration[] | null>(null)
-  const [q, setQ] = useState("")
-  const [zoom, setZoom] = useState<string | null>(null) // lightbox image src
-  const load = useCallback(() => { getWilcomGenerations().then((r) => setRows(r.generations ?? [])).catch(() => setRows([])) }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
-  const list = (rows ?? []).filter((g) => !q || `${g.name} ${g.order_ref} ${g.type}`.toLowerCase().includes(q.toLowerCase()))
+ const [rows, setRows] = useState<WilcomGeneration[] | null>(null)
+ const [q, setQ] = useState("")
+ const [zoom, setZoom] = useState<string | null>(null) // lightbox image src
+ const load = useCallback(() => { getWilcomGenerations().then((r) => setRows(r.generations ?? [])).catch(() => setRows([])) }, [])
+ useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+ const list = (rows ?? []).filter((g) => !q || `${g.name} ${g.order_ref} ${g.type}`.toLowerCase().includes(q.toLowerCase()))
 
-  return (
+ return (
     <>
       <div className="mb-4 flex items-center gap-3">
         <div className="relative max-w-sm flex-1">

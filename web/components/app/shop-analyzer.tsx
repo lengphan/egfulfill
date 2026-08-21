@@ -11,51 +11,51 @@ import { getShopAnalysis, analyzeShop, type ShopAnalysis } from "@/lib/api"
 
 const usd = (n: number | string | null | undefined) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
 const when = (s?: string) => {
-  if (!s) return ""
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+ if (!s) return ""
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
 /** Account Analyzer — reads the seller's connected Etsy shop and advises on it.
  *  Opening the tab only reads the CACHED run (free); the AI call happens when the
- *  seller explicitly asks, and the result is reused for 24h. */
+ * seller explicitly asks, and the result is reused for 24h. */
 export function ShopAnalyzer() {
-  const [data, setData] = useState<ShopAnalysis | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [running, setRunning] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+ const [data, setData] = useState<ShopAnalysis | null>(null)
+ const [loading, setLoading] = useState(true)
+ const [running, setRunning] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
 
-  const loadCached = useCallback(() => {
-    getShopAnalysis()
+ const loadCached = useCallback(() => {
+ getShopAnalysis()
       .then((r) => setData(r?.cached ? r : null))
       .catch(() => setData(null))
       .finally(() => setLoading(false))
   }, [])
-  useEffect(() => {
-    const id = setTimeout(loadCached, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ const id = setTimeout(loadCached, 0)
+ return () => clearTimeout(id)
   }, [loadCached])
 
-  const run = async (refresh: boolean) => {
-    setRunning(true); setErr(null)
-    try {
-      const r = await analyzeShop(refresh)
-      if (r.error) { setErr(r.error); if (r.needsConnect) setData({ needsConnect: true }) }
-      else setData(r)
+ const run = async (refresh: boolean) => {
+ setRunning(true); setErr(null)
+ try {
+ const r = await analyzeShop(refresh)
+ if (r.error) { setErr(r.error); if (r.needsConnect) setData({ needsConnect: true }) }
+ else setData(r)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not analyze your shop.")
+ setErr(e instanceof Error ? e.message : "Could not analyze your shop.")
     } finally {
-      setRunning(false)
+ setRunning(false)
     }
   }
 
-  if (loading) {
-    return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+ if (loading) {
+ return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
   }
 
   // Not connected → point at Stores. Nothing to analyze without a shop.
-  if (data?.needsConnect || err?.toLowerCase().includes("no etsy shop")) {
-    return (
+ if (data?.needsConnect || err?.toLowerCase().includes("no etsy shop")) {
+ return (
       <div className="flex flex-col items-center gap-3 py-20 text-center">
         <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground"><Storefront size={24} weight="duotone" /></span>
         <div className="font-medium">No Etsy shop connected</div>
@@ -65,10 +65,10 @@ export function ShopAnalyzer() {
     )
   }
 
-  const s = data?.stats
-  const sales = data?.sales
+ const s = data?.stats
+ const sales = data?.sales
 
-  return (
+ return (
     <div className="space-y-4 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -134,7 +134,7 @@ export function ShopAnalyzer() {
                 { label: "One image", n: s.issues.singleImage, hint: "fewer than 2" },
               ].map((it) => (
                 <div key={it.label} className="bg-card p-4">
-                  <div className={"text-xl font-bold tabular-nums " + (it.n ? "text-amber-600" : "text-success")}>{it.n}</div>
+                  <div className={"text-xl font-bold tabular-nums " + (it.n ? "text-hold" : "text-success")}>{it.n}</div>
                   <div className="text-xs font-medium">{it.label}</div>
                   <div className="text-2xs text-muted-foreground">{it.hint}</div>
                 </div>
@@ -169,7 +169,7 @@ export function ShopAnalyzer() {
           )}
 
           {data?.aiError && (
-            <div className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            <div className="flex items-center gap-1.5 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
               <Warning size={14} weight="fill" /> {data.aiError}
             </div>
           )}

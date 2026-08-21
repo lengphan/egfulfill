@@ -17,22 +17,22 @@ import { getIngestAddress } from "@/lib/api"
  */
 
 type Provider = {
-  id: string; label: string
+ id: string; label: string
   /** Deep link to the exact settings page. We can't create the rule for them — that needs
-   *  mailbox access — but we can land them on the right screen with the address already
-   *  copied, which is the difference between "go find it" and "paste this here". */
-  deepLink?: string
-  steps: string[]
+   * mailbox access — but we can land them on the right screen with the address already
+   * copied, which is the difference between "go find it" and "paste this here". */
+ deepLink?: string
+ steps: string[]
 }
 
 // Written as click-paths rather than prose: someone doing this once, quickly, needs the
 // menu names, not an explanation.
 const PROVIDERS: Provider[] = [
   {
-    id: "gmail",
-    label: "Gmail",
-    deepLink: "https://mail.google.com/mail/u/0/#settings/fwdandpop",
-    steps: [
+ id: "gmail",
+ label: "Gmail",
+ deepLink: "https://mail.google.com/mail/u/0/#settings/fwdandpop",
+ steps: [
       "Forwarding and POP/IMAP → Add a forwarding address → paste → Next → Proceed",
       "Gmail sends a confirmation link to that address — we confirm it automatically, so just wait a few seconds and reload",
       "Leave the radio on “Disable forwarding” — do NOT turn on forward-a-copy, or Gmail sends us every email you receive",
@@ -42,10 +42,10 @@ const PROVIDERS: Provider[] = [
     ],
   },
   {
-    id: "outlook",
-    label: "Outlook / Hotmail",
-    deepLink: "https://outlook.live.com/mail/0/options/mail/rules",
-    steps: [
+ id: "outlook",
+ label: "Outlook / Hotmail",
+ deepLink: "https://outlook.live.com/mail/0/options/mail/rules",
+ steps: [
       "Settings (gear) → Mail → Rules → Add new rule",
       "Name it “Etsy sales”",
       "Condition: From → contains → etsy.com",
@@ -54,10 +54,10 @@ const PROVIDERS: Provider[] = [
     ],
   },
   {
-    id: "yahoo",
-    label: "Yahoo Mail",
-    deepLink: "https://mail.yahoo.com/d/settings/1",
-    steps: [
+ id: "yahoo",
+ label: "Yahoo Mail",
+ deepLink: "https://mail.yahoo.com/d/settings/1",
+ steps: [
       "Settings → More Settings → Filters → Add new filters",
       "Name it “Etsy sales”",
       "Set From contains → etsy.com",
@@ -66,9 +66,9 @@ const PROVIDERS: Provider[] = [
     ],
   },
   {
-    id: "other",
-    label: "Other",
-    steps: [
+ id: "other",
+ label: "Other",
+ steps: [
       "Find Forwarding, Filters or Rules in your mail settings",
       "Create a rule: when the sender contains etsy.com, forward to the address above",
       "If asked to verify the forwarding address, we auto-confirm it",
@@ -77,43 +77,43 @@ const PROVIDERS: Provider[] = [
 ]
 
 export function ForwardSetup() {
-  const [address, setAddress] = useState<string | null>(null)
-  const [configured, setConfigured] = useState(true)
-  const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
-  const [provider, setProvider] = useState<string>("gmail")
+ const [address, setAddress] = useState<string | null>(null)
+ const [configured, setConfigured] = useState(true)
+ const [loading, setLoading] = useState(true)
+ const [copied, setCopied] = useState(false)
+ const [provider, setProvider] = useState<string>("gmail")
 
-  useEffect(() => {
-    const id = setTimeout(() => {
-      getIngestAddress()
+ useEffect(() => {
+ const id = setTimeout(() => {
+ getIngestAddress()
         .then((r) => { setAddress(r.address); setConfigured(r.configured); setLoading(false) })
         .catch(() => setLoading(false))
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
 
-  const copy = () => {
-    if (!address) return
-    navigator.clipboard?.writeText(address).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
+ const copy = () => {
+ if (!address) return
+ navigator.clipboard?.writeText(address).then(() => {
+ setCopied(true)
+ setTimeout(() => setCopied(false), 1800)
     }).catch(() => {})
   }
 
-  const active = PROVIDERS.find((p) => p.id === provider) ?? PROVIDERS[0]
+ const active = PROVIDERS.find((p) => p.id === provider) ?? PROVIDERS[0]
 
   /** Copy the address, THEN open their mail settings — so the address is on the clipboard
-   *  by the time the page loads and the whole thing is paste-and-save. */
-  const openProvider = () => {
-    if (address) navigator.clipboard?.writeText(address).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2500)
-    if (active.deepLink) window.open(active.deepLink, "_blank", "noopener,noreferrer")
+   * by the time the page loads and the whole thing is paste-and-save. */
+ const openProvider = () => {
+ if (address) navigator.clipboard?.writeText(address).catch(() => {})
+ setCopied(true)
+ setTimeout(() => setCopied(false), 2500)
+ if (active.deepLink) window.open(active.deepLink, "_blank", "noopener,noreferrer")
   }
 
-  return (
+ return (
     <SectionCard
-      title="Get buyer addresses automatically"
+ title="Get buyer addresses automatically"
     >
       <div className="space-y-4 p-5">
         {loading ? (
@@ -121,7 +121,7 @@ export function ForwardSetup() {
             <CircleNotch size={15} className="animate-spin" /> Loading…
           </div>
         ) : !configured ? (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
             <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
             Email forwarding isn&apos;t set up on this server yet. Ask an admin to set MAIL_INGEST_DOMAIN.
           </div>
@@ -134,8 +134,8 @@ export function ForwardSetup() {
                   {address}
                 </code>
                 <button
-                  onClick={copy}
-                  className="eg-tap inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-accent"
+ onClick={copy}
+ className="eg-tap inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-accent"
                 >
                   {copied ? <><Check size={14} weight="bold" className="text-success" /> Copied</> : <><Copy size={14} weight="bold" /> Copy</>}
                 </button>
@@ -150,9 +150,9 @@ export function ForwardSetup() {
               <div className="mb-2 flex w-fit rounded-full border border-border p-0.5">
                 {PROVIDERS.map((p) => (
                   <button
-                    key={p.id}
-                    onClick={() => setProvider(p.id)}
-                    className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (provider === p.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+ key={p.id}
+ onClick={() => setProvider(p.id)}
+ className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (provider === p.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
                   >
                     {p.label}
                   </button>
@@ -160,8 +160,8 @@ export function ForwardSetup() {
               </div>
               {active.deepLink && (
                 <button
-                  onClick={openProvider}
-                  className="eg-tap mb-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+ onClick={openProvider}
+ className="eg-tap mb-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   Copy address &amp; open {active.label} settings
                 </button>
@@ -180,9 +180,9 @@ export function ForwardSetup() {
               <EnvelopeSimple size={15} className="mt-0.5 shrink-0" />
               <span>
                 One rule, once — then every sale email fills its order&apos;s address automatically, with nothing
-                to export or upload. Use a <strong className="font-medium text-foreground">filter</strong>, not
-                blanket forwarding: a filter sends us only Etsy&apos;s emails, and we never see anything else in
-                your inbox.
+ to export or upload. Use a <strong className="font-medium text-foreground">filter</strong>, not
+ blanket forwarding: a filter sends us only Etsy&apos;s emails, and we never see anything else in
+ your inbox.
               </span>
             </div>
           </>

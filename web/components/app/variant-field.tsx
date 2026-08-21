@@ -40,33 +40,33 @@ const swatchHex = (name: string) => swatchBg(name) ?? NEUTRAL_CHIP
  * trigger styled like our inputs, so it matches every other control on the page.
  */
 export function VariantField({
-  label,
-  value,
-  options,
-  onChange,
-  placeholder,
-  emptyLabel,
-  disabled,
-  required,
-  swatches,
-  compact,
-  className,
-  clearable = true,
+ label,
+ value,
+ options,
+ onChange,
+ placeholder,
+ emptyLabel,
+ disabled,
+ required,
+ swatches,
+ compact,
+ className,
+ clearable = true,
 }: {
-  label: string
-  value: string
-  options: string[]
-  onChange: (v: string) => void
-  placeholder?: string
-  emptyLabel?: string
-  disabled?: boolean
-  required?: boolean
+ label: string
+ value: string
+ options: string[]
+ onChange: (v: string) => void
+ placeholder?: string
+ emptyLabel?: string
+ disabled?: boolean
+ required?: boolean
   /** Render a colour dot beside each option (Colour field). */
-  swatches?: boolean
+ swatches?: boolean
   /** Row variant: no label above, smaller — used inline on order item rows. */
-  compact?: boolean
+ compact?: boolean
   /** Extra classes merged into the trigger (e.g. a height override for a form row). */
-  className?: string
+ className?: string
   /**
    * Can this field go back to having no value?
    *
@@ -77,15 +77,15 @@ export function VariantField({
    * exception, never by default: silently losing the clear on a field that needs it is the
    * worse failure.
    */
-  clearable?: boolean
+ clearable?: boolean
 }) {
   // A product that declares no options for this attribute is a free choice, not a bug —
   // the field says "Any" and there's nothing to open.
-  const hasOptions = options.length > 0
+ const hasOptions = options.length > 0
   // Colour values are supplier codes ("031753A - Blk/Dk.Grn/Dk.Kha"). Store the code,
   // show the name — nobody should have to decode a warehouse SKU to pick a colour.
-  const tl = useLabelT()
-  const pretty = (v: string) => (swatches ? prettyColorName(v) : v)
+ const tl = useLabelT()
+ const pretty = (v: string) => (swatches ? prettyColorName(v) : v)
   /**
    * THE LABEL LIVES IN THE FIELD, not on a row above it.
    *
@@ -98,7 +98,7 @@ export function VariantField({
    * accessible name once a value replaces the placeholder text, and to the dropdown's own
    * clear row — picking it returns the field to the state where the label is visible again.
    */
-  const ph = tl("field", placeholder ?? label)
+ const ph = tl("field", placeholder ?? label)
   /**
    * AN EMPTY FIELD MUST SAY WHICH FIELD IT IS — and nothing more than that.
    *
@@ -112,31 +112,31 @@ export function VariantField({
    * information the label cannot — orders/new says "None on this blank", a real fact about
    * the chosen product rather than a synonym for empty. The default is now no note at all.
    */
-  const note = emptyLabel ? tl("field", emptyLabel) : ""
-  const shown = value
+ const note = emptyLabel ? tl("field", emptyLabel) : ""
+ const shown = value
     ? pretty(value)
-    : hasOptions || !note ? ph : `${ph} · ${note}`
-  const unset = !value
+ : hasOptions || !note ? ph : `${ph} · ${note}`
+ const unset = !value
 
-  const trigger = (
+ const trigger = (
     <DropdownMenuTrigger
-      disabled={disabled || !hasOptions}
+ disabled={disabled || !hasOptions}
       // The visible text becomes the VALUE once one is picked, and "Navy" does not say which
       // field it belongs to. The caption that used to sit above survives here.
-      aria-label={tl("field", label)}
-      className={cn(
+ aria-label={tl("field", label)}
+ className={cn(
         "flex w-full min-w-0 items-center gap-1.5 rounded-2xl border bg-card text-left font-medium transition-colors",
         "hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border",
-        compact ? "h-7 px-2 text-2xs" : "h-9 px-2.5 text-xs",
+ compact ? "h-7 px-2 text-2xs" : "h-9 px-2.5 text-xs",
         // Only the required-but-empty field draws attention; the rest stay quiet.
         // --primary, NOT amber. Amber is a RESERVED floor status (warning / on hold), and
         // borrowing it for form validation put "this field is blank" in the same colour as
         // "this order is held" — on the order boards those sit inches apart. The app's own
         // accent is the right way to say "look here", and it measures 6.03:1 on white
         // against amber-600's 3.13:1, which was below AA for the label below anyway.
-        required && unset ? "border-primary/60" : "border-border",
-        className
+ required && unset ? "border-primary/60" : "border-border",
+ className
       )}
     >
       {swatches && value && (
@@ -144,8 +144,8 @@ export function VariantField({
       )}
       <span className={cn("min-w-0 flex-1 truncate", unset && "text-muted-foreground")}>{shown}</span>
       {/* The required flag came off the caption row with everything else. It sits in the
-          control now, so the one field that blocks the line still says so — the tinted
-          border alone reads as decoration next to three untinted neighbours. */}
+ control now, so the one field that blocks the line still says so — the tinted
+ border alone reads as decoration next to three untinted neighbours. */}
       {required && unset && (
         <span className="shrink-0 text-2xs font-medium text-primary">{tl("field", "Required")}</span>
       )}
@@ -153,12 +153,12 @@ export function VariantField({
     </DropdownMenuTrigger>
   )
 
-  const control = (
+ const control = (
     <DropdownMenu>
       {trigger}
       <DropdownMenuContent align="start" className="max-h-64 w-[--anchor-width] min-w-44 overflow-y-auto">
         {/* Clearing is a real choice — a line can legitimately go back to unset. Not for
-            every field though: see `clearable`. */}
+ every field though: see `clearable`. */}
         {clearable && (
           <DropdownMenuItem onClick={() => onChange("")} className="text-muted-foreground">
             {ph}
@@ -178,7 +178,7 @@ export function VariantField({
   // Compact and full are the same control now — the caption row was the only thing that
   // separated them, and it lives inside the trigger. `compact` still differs in height and
   // type size, which is the part that was ever about density.
-  return control
+ return control
 }
 
 /**
@@ -188,41 +188,41 @@ export function VariantField({
  * dot-joined string in one place and labelled controls in another.
  */
 export function VariantStrip({
-  color, size, method, blank, sku, className, locked, marketplace,
+ color, size, method, blank, sku, className, locked, marketplace,
 }: {
-  color?: string | null
-  size?: string | null
-  method?: string | null
-  blank?: string | null
+ color?: string | null
+ size?: string | null
+ method?: string | null
+ blank?: string | null
   /** The BLANK / inventory SKU stock is held against (resolveProduct(it)?.sku || it.blank),
    *  NOT the marketplace listing SKU — the id the floor picks against and inventory tracks.
    *  Shown as a leading mono chip so it reads as an id, not a variant word. */
-  sku?: string | null
-  className?: string
+ sku?: string | null
+ className?: string
   /** Submitted order — variants are frozen (the server rejects changes once the cost is
-   *  locked). Shown greyed with a lock so it reads as "settled", not "broken". */
-  locked?: boolean
+   * locked). Shown greyed with a lock so it reads as "settled", not "broken". */
+ locked?: boolean
   /** The marketplace's own variant text, verbatim. What the BUYER chose and what support
-   *  will quote back — a different thing from the production spec beside it, which is
-   *  what the floor makes. Shown when it exists and differs. */
-  marketplace?: string | null
+   * will quote back — a different thing from the production spec beside it, which is
+   * what the floor makes. Shown when it exists and differs. */
+ marketplace?: string | null
 }) {
-  const tl = useLabelT()
-  const chips = [
-    sku ? { key: "sku", label: sku, mono: true } : null,
-    blank ? { key: "blank", label: blank } : null,
-    color ? { key: "color", label: color, swatch: true } : null,
-    size ? { key: "size", label: size } : null,
-    method ? { key: "method", label: method } : null,
+ const tl = useLabelT()
+ const chips = [
+ sku ? { key: "sku", label: sku, mono: true } : null,
+ blank ? { key: "blank", label: blank } : null,
+ color ? { key: "color", label: color, swatch: true } : null,
+ size ? { key: "size", label: size } : null,
+ method ? { key: "method", label: method } : null,
   ].filter(Boolean) as { key: string; label: string; swatch?: boolean; mono?: boolean }[]
 
   // Nothing chosen yet is worth saying plainly — a blank row reads as a rendering bug.
-  const buyerText = (marketplace || "").trim()
+ const buyerText = (marketplace || "").trim()
   // Only worth showing when it adds something the chips don't already say.
-  const showBuyer = !!buyerText && !chips.some((c) => c.label.toLowerCase() === buyerText.toLowerCase())
+ const showBuyer = !!buyerText && !chips.some((c) => c.label.toLowerCase() === buyerText.toLowerCase())
 
-  if (!chips.length) {
-    return (
+ if (!chips.length) {
+ return (
       <div className={cn("flex flex-wrap items-center gap-1", className)}>
         <span className="text-xs text-muted-foreground">{showBuyer ? tl("field", "Not set up for production yet") : tl("field", "No variant set")}</span>
       </div>
@@ -231,8 +231,8 @@ export function VariantStrip({
 
   // LOCKED reads as the same four fields, greyed — not as five small chips. A settled line
   // and an editable one describe the same thing, so they should hold the same shape.
-  if (locked) {
-    return (
+ if (locked) {
+ return (
       <div className={cn("space-y-1", className)}>
         <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]">
           <VariantField label="Blank" value={blank || ""} options={[]} disabled onChange={() => {}} />
@@ -244,21 +244,21 @@ export function VariantStrip({
     )
   }
 
-  return (
+ return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {chips.map((c) => (
         <span
-          key={c.key}
-          className={cn(
+ key={c.key}
+ className={cn(
             "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-medium",
-            c.mono && "tabular-nums",
+ c.mono && "tabular-nums",
             "border-border bg-muted/50 text-foreground/80"
           )}
         >
           {c.swatch && (
             <span
-              className="size-2.5 shrink-0 rounded-full border border-black/10"
-              style={{ background: swatchHex(c.label) }}
+ className="size-2.5 shrink-0 rounded-full border border-black/10"
+ style={{ background: swatchHex(c.label) }}
             />
           )}
           <span className="truncate">{c.label}</span>

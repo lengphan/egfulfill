@@ -36,51 +36,51 @@ const KEY = "eg_support_convo"
  */
 const FAQ: { q: string; a: string; href: string; hrefLabel: string }[] = [
   {
-    q: "How do I order?",
-    a: "Connect Etsy, Shopify or TikTok Shop and your orders arrive in one queue. Pick the blank, place the artwork, submit — we print, pack and ship it, and push tracking back to the marketplace. Nothing is charged until you submit an order.",
-    href: "/how-it-works", hrefLabel: "See how it works",
+ q: "How do I order?",
+ a: "Connect Etsy, Shopify or TikTok Shop and your orders arrive in one queue. Pick the blank, place the artwork, submit — we print, pack and ship it, and push tracking back to the marketplace. Nothing is charged until you submit an order.",
+ href: "/how-it-works", hrefLabel: "See how it works",
   },
   {
-    q: "What does it cost?",
-    a: "You pay the blank's base cost plus one parcel fee per order — the price on each product page is what you pay to make it. No subscription, no per-listing fee, and postage is quoted when the order goes to production.",
-    href: "/pricing", hrefLabel: "See pricing",
+ q: "What does it cost?",
+ a: "You pay the blank's base cost plus one parcel fee per order — the price on each product page is what you pay to make it. No subscription, no per-listing fee, and postage is quoted when the order goes to production.",
+ href: "/pricing", hrefLabel: "See pricing",
   },
   {
-    q: "Do you have an API?",
-    a: "Yes — REST, key-authed, with a sandbox that prices and validates exactly as live so you can build against a test key and change one character to go live. Orders, products, stock, billing and webhooks.",
-    href: "/docs", hrefLabel: "API documentation",
+ q: "Do you have an API?",
+ a: "Yes — REST, key-authed, with a sandbox that prices and validates exactly as live so you can build against a test key and change one character to go live. Orders, products, stock, billing and webhooks.",
+ href: "/docs", hrefLabel: "API documentation",
   },
 ]
 
 export function SupportBubble() {
-  const [open, setOpen] = useState(false)
-  const [msgs, setMsgs] = useState<Msg[]>([])
-  const [draft, setDraft] = useState("")
-  const [convo, setConvo] = useState<string | null>(null)
-  const [needIdentity, setNeedIdentity] = useState(false)
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+ const [open, setOpen] = useState(false)
+ const [msgs, setMsgs] = useState<Msg[]>([])
+ const [draft, setDraft] = useState("")
+ const [convo, setConvo] = useState<string | null>(null)
+ const [needIdentity, setNeedIdentity] = useState(false)
+ const [name, setName] = useState("")
+ const [email, setEmail] = useState("")
+ const [busy, setBusy] = useState(false)
+ const [notice, setNotice] = useState<string | null>(null)
+ const [done, setDone] = useState(false)
   /** Someone asked for a person before there was a conversation to hand over — see escalate. */
-  const [pendingEscalate, setPendingEscalate] = useState(false)
+ const [pendingEscalate, setPendingEscalate] = useState(false)
   /** When the team is around, from the server (staff configure the hours). Null until a
-   *  send answers — the widget never claims availability it hasn't been told. */
-  const [office, setOffice] = useState<{ open?: boolean; hoursLabel?: string; resumesLabel?: string } | null>(null)
+   * send answers — the widget never claims availability it hasn't been told. */
+ const [office, setOffice] = useState<{ open?: boolean; hoursLabel?: string; resumesLabel?: string } | null>(null)
   /** A person is on this conversation. Set by the handover and by every read, so it survives
-   *  a reload — and it is what takes the "talk to support" offer away once it is answered. */
-  const [withPerson, setWithPerson] = useState(false)
+   * a reload — and it is what takes the "talk to support" offer away once it is answered. */
+ const [withPerson, setWithPerson] = useState(false)
   /** The scrolling panel itself. Scrolled directly — see the effect below. */
-  const listRef = useRef<HTMLDivElement>(null)
+ const listRef = useRef<HTMLDivElement>(null)
   /** What the thread looked like last time we scrolled for it. */
-  const lastSig = useRef("")
+ const lastSig = useRef("")
 
   // Resume on this device. Deferred — localStorage doesn't exist during the prerender, and
   // reading it at useState-init time would make server and client markup disagree.
-  useEffect(() => {
-    const t = setTimeout(() => { try { setConvo(localStorage.getItem(KEY)) } catch {} }, 0)
-    return () => clearTimeout(t)
+ useEffect(() => {
+ const t = setTimeout(() => { try { setConvo(localStorage.getItem(KEY)) } catch {} }, 0)
+ return () => clearTimeout(t)
   }, [])
   /**
    * STAY AT THE BOTTOM — WITHOUT SCROLLING THE PAGE, AND WITHOUT DOING IT EVERY 8 SECONDS.
@@ -90,25 +90,25 @@ export function SupportBubble() {
    * and the poll made both visible:
    *
    *   1. scrollIntoView walks UP the tree and scrolls every ancestor that can move — so a
-   *      widget pinned to the corner was dragging the whole PAGE, which is the "it scrolls
-   *      from the top down" you see. Setting scrollTop on the panel moves the panel and
-   *      nothing else.
+   * widget pinned to the corner was dragging the whole PAGE, which is the "it scrolls
+   * from the top down" you see. Setting scrollTop on the panel moves the panel and
+   * nothing else.
    *   2. the poll replaces `msgs` with a fresh array every 8s, so the identity changed even
-   *      when the words didn't and the panel re-animated a scroll on a conversation nobody
-   *      had added to. It scrolls on a real CHANGE now — the count and the last line — not
-   *      on a new array.
+   * when the words didn't and the panel re-animated a scroll on a conversation nobody
+   * had added to. It scrolls on a real CHANGE now — the count and the last line — not
+   * on a new array.
    *
    * The first paint jumps rather than animates: a panel that opens by gliding from the top
    * to the bottom is the same complaint in miniature.
    */
-  useEffect(() => {
-    const el = listRef.current
-    if (!el) return
-    const sig = `${msgs.length}:${msgs[msgs.length - 1]?.text ?? ""}:${needIdentity}`
-    if (sig === lastSig.current) return
-    const first = lastSig.current === ""
-    lastSig.current = sig
-    el.scrollTo({ top: el.scrollHeight, behavior: first ? "auto" : "smooth" })
+ useEffect(() => {
+ const el = listRef.current
+ if (!el) return
+ const sig = `${msgs.length}:${msgs[msgs.length - 1]?.text ?? ""}:${needIdentity}`
+ if (sig === lastSig.current) return
+ const first = lastSig.current === ""
+ lastSig.current = sig
+ el.scrollTo({ top: el.scrollHeight, behavior: first ? "auto" : "smooth" })
   }, [msgs, needIdentity])
 
   /**
@@ -127,68 +127,68 @@ export function SupportBubble() {
    * The server's copy REPLACES the local thread, so a reply cannot be duplicated by a poll
    * that overlaps a send. The canned answers are the exception and are re-appended below.
    */
-  useEffect(() => {
-    if (!open || !convo) return
-    let live = true
-    const read = async () => {
-      try {
-        const r = await fetch(`/api/public/support/${encodeURIComponent(convo)}`)
-        if (!r.ok) return
-        const d = await r.json()
-        if (!live) return
+ useEffect(() => {
+ if (!open || !convo) return
+ let live = true
+ const read = async () => {
+ try {
+ const r = await fetch(`/api/public/support/${encodeURIComponent(convo)}`)
+ if (!r.ok) return
+ const d = await r.json()
+ if (!live) return
         // Identical thread, new array: replacing it re-renders every bubble and re-fires
         // anything watching `msgs`, eight times a minute, for no change at all.
-        if (Array.isArray(d.messages)) {
-          setMsgs((prev) => (JSON.stringify(prev) === JSON.stringify(d.messages) ? prev : d.messages))
+ if (Array.isArray(d.messages)) {
+ setMsgs((prev) => (JSON.stringify(prev) === JSON.stringify(d.messages) ? prev : d.messages))
         }
-        if (d.escalated) setWithPerson(true)
+ if (d.escalated) setWithPerson(true)
       } catch { /* a failed poll is not worth a notice — the next one is 8s away */ }
     }
-    const t = setInterval(read, 8000)
-    const first = setTimeout(read, 500)
-    return () => { live = false; clearInterval(t); clearTimeout(first) }
+ const t = setInterval(read, 8000)
+ const first = setTimeout(read, 500)
+ return () => { live = false; clearInterval(t); clearTimeout(first) }
   }, [open, convo])
 
   /** Returns the conversation id, so a caller that created one can act on it immediately —
    *  `convo` is state and is not set yet on the line after this resolves. */
-  const send = async (text: string): Promise<string | null> => {
-    setBusy(true); setNotice(null)
-    try {
-      const r = await fetch("/api/public/support", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: convo, message: text, name, email }),
+ const send = async (text: string): Promise<string | null> => {
+ setBusy(true); setNotice(null)
+ try {
+ const r = await fetch("/api/public/support", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ conversationId: convo, message: text, name, email }),
       })
-      const d = await r.json()
-      if (d.conversationId) {
-        setConvo(d.conversationId)
-        try { localStorage.setItem(KEY, d.conversationId) } catch {}
+ const d = await r.json()
+ if (d.conversationId) {
+ setConvo(d.conversationId)
+ try { localStorage.setItem(KEY, d.conversationId) } catch {}
       }
-      if (Array.isArray(d.messages)) setMsgs(d.messages)
-      setNeedIdentity(!!d.needsIdentity)
-      if (d.notice) setNotice(d.notice)
+ if (Array.isArray(d.messages)) setMsgs(d.messages)
+ setNeedIdentity(!!d.needsIdentity)
+ if (d.notice) setNotice(d.notice)
       // A refusal (rate limit, or a conversation that has run long) still carries a message
       // the visitor should see rather than a silent dead input.
-      if (d.error) setNotice(d.error)
-      if (d.escalated || d.withPerson) setWithPerson(true)
-      if (d.office) setOffice(d.office)
-      return d.conversationId ?? convo
+ if (d.error) setNotice(d.error)
+ if (d.escalated || d.withPerson) setWithPerson(true)
+ if (d.office) setOffice(d.office)
+ return d.conversationId ?? convo
     } catch {
-      setNotice("We couldn't reach support just now — please try again shortly.")
-      return null
+ setNotice("We couldn't reach support just now — please try again shortly.")
+ return null
     } finally { setBusy(false) }
   }
 
   /** Hand a conversation to a person. Split from `escalate` so both the "already talking"
-   *  path and the "clicked a question, now wants a human" path end in the same call. */
-  const handOver = async (id: string) => {
-    try {
-      await fetch("/api/public/support/escalate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: id }),
+   * path and the "clicked a question, now wants a human" path end in the same call. */
+ const handOver = async (id: string) => {
+ try {
+ await fetch("/api/public/support/escalate", {
+ method: "POST", headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ conversationId: id }),
       })
-      setDone(true)
-      setWithPerson(true)
+ setDone(true)
+ setWithPerson(true)
     } catch { setNotice("Couldn't hand that over — email orders@egful.store and we'll pick it up.") }
   }
 
@@ -199,34 +199,34 @@ export function SupportBubble() {
    * our answer in the same place a real exchange would appear, so "talk to a person" after
    * it is a continuation rather than a fresh start.
    */
-  const askFaq = (f: (typeof FAQ)[number]) => {
-    setNotice(null)
-    setMsgs((m) => [...m, { role: "user", text: f.q }, { role: "assistant", text: f.a }])
+ const askFaq = (f: (typeof FAQ)[number]) => {
+ setNotice(null)
+ setMsgs((m) => [...m, { role: "user", text: f.q }, { role: "assistant", text: f.a }])
   }
 
-  const onSend = async () => {
-    const t = draft.trim()
-    if (!t || busy) return
-    setDraft("")
-    setMsgs((m) => [...m, { role: "user", text: t }])   // optimistic, replaced by the server's copy
-    await send(t)
+ const onSend = async () => {
+ const t = draft.trim()
+ if (!t || busy) return
+ setDraft("")
+ setMsgs((m) => [...m, { role: "user", text: t }])   // optimistic, replaced by the server's copy
+ await send(t)
   }
 
-  const onIdentity = async () => {
-    if (!name.trim() || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email.trim())) {
-      setNotice("A name and a real email, so we can reply if you close this."); return
+ const onIdentity = async () => {
+ if (!name.trim() || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email.trim())) {
+ setNotice("A name and a real email, so we can reply if you close this."); return
     }
     // Re-send the LAST question now that we can be answered — the server has it stored, but
     // it needs a turn to reply to.
-    const last = [...msgs].reverse().find((m) => m.role === "user")?.text || "Hello"
-    const id = await send(last)
+ const last = [...msgs].reverse().find((m) => m.role === "user")?.text || "Hello"
+ const id = await send(last)
     // They asked for a person BEFORE there was a conversation — the identity form was the
     // only thing standing in the way, so finish the handover rather than making them press
     // it a second time.
-    if (pendingEscalate && id) { setPendingEscalate(false); await handOver(id) }
+ if (pendingEscalate && id) { setPendingEscalate(false); await handOver(id) }
   }
 
-  const escalate = async () => {
+ const escalate = async () => {
     /**
      * NO CONVERSATION YET — which is the normal case after clicking a question, since those
      * are answered here and never reach the server. This used to `return` on that, so the
@@ -235,26 +235,26 @@ export function SupportBubble() {
      * Ask who they are; onIdentity creates the conversation with their question and hands it
      * over in the same step.
      */
-    if (!convo) { setPendingEscalate(true); setNeedIdentity(true); setNotice(null); return }
-    setBusy(true)
-    await handOver(convo)
-    setBusy(false)
+ if (!convo) { setPendingEscalate(true); setNeedIdentity(true); setNotice(null); return }
+ setBusy(true)
+ await handOver(convo)
+ setBusy(false)
   }
 
-  if (!open) {
-    return (
+ if (!open) {
+ return (
       <button
-        onClick={() => setOpen(true)}
-        aria-label="Ask us a question"
-        className="fixed bottom-5 right-5 z-50 flex size-14 items-center justify-center rounded-full text-[#FAF8F3] shadow-lg transition-transform hover:scale-105"
-        style={{ background: ACCENT }}
+ onClick={() => setOpen(true)}
+ aria-label="Ask us a question"
+ className="fixed bottom-5 right-5 z-50 flex size-14 items-center justify-center rounded-full text-[#FAF8F3] shadow-lg transition-transform hover:scale-105"
+ style={{ background: ACCENT }}
       >
         <ChatCircleDots size={26} weight="fill" />
       </button>
     )
   }
 
-  return (
+ return (
     <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl">
       <div className="flex items-center justify-between px-4 py-3 text-[#FAF8F3]" style={{ background: ACCENT }}>
         <span className="text-sm font-bold">Ask EGFUL</span>
@@ -263,28 +263,28 @@ export function SupportBubble() {
 
       <div ref={listRef} className="flex-1 overflow-y-auto p-4">
         {/* THE FIRST THING SAID IS A GREETING, in the same bubble a reply would arrive in —
-            so the panel opens as a conversation someone has started rather than as a form
-            with instructions above it. The old grey paragraph explained the widget; this
-            asks the question the widget exists for. */}
+ so the panel opens as a conversation someone has started rather than as a form
+ with instructions above it. The old grey paragraph explained the widget; this
+ asks the question the widget exists for. */}
         {msgs.length === 0 && (
           <div className="mb-3">
             <span className="inline-block max-w-[85%] rounded-2xl bg-black/[0.05] px-3 py-2 text-sm leading-relaxed text-[#0B0B0C]">
               Hi — how can we help? Ask us anything about products, pricing or how fulfilment
-              works, and a person can pick it up whenever you&apos;d rather have one.
+ works, and a person can pick it up whenever you&apos;d rather have one.
             </span>
           </div>
         )}
         {/* MOST ASKED, in the bubble. Shown while the thread is short — they are a way IN,
-            and a row of suggested questions under a conversation that is already going is
-            the widget talking over the person using it. */}
+ and a row of suggested questions under a conversation that is already going is
+ the widget talking over the person using it. */}
         {msgs.length < 4 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {FAQ.filter((f) => !msgs.some((m) => m.text === f.q)).map((f) => (
               <button
-                key={f.q}
-                type="button"
-                onClick={() => askFaq(f)}
-                className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 transition-colors hover:border-black/45 hover:text-[#0B0B0C]"
+ key={f.q}
+ type="button"
+ onClick={() => askFaq(f)}
+ className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 transition-colors hover:border-black/45 hover:text-[#0B0B0C]"
               >
                 {f.q}
               </button>
@@ -306,26 +306,26 @@ export function SupportBubble() {
           * air around it; only the repeated label goes.
           */}
         {msgs.map((m, i) => {
-          const startsRun = i === 0 || msgs[i - 1].role !== m.role
-          return (
+ const startsRun = i === 0 || msgs[i - 1].role !== m.role
+ return (
           <div key={i} className={(m.role === "user" ? "flex flex-col items-end " : "") + "mt-3 first:mt-0"}>
             {/* whitespace-pre-wrap, or the line breaks the server just put between numbered
-                steps collapse back into one run-on sentence in the bubble. */}
+ steps collapse back into one run-on sentence in the bubble. */}
             {/* A PERSON'S REPLY SAYS SO — once per run. It arrives in the same column as the
-                assistant's, and a visitor who asked for a human needs to be able to tell
-                that they got one, or the escalation looks unanswered while its answer is on
-                screen. */}
+ assistant's, and a visitor who asked for a human needs to be able to tell
+ that they got one, or the escalation looks unanswered while its answer is on
+ screen. */}
             {m.role === "staff" && startsRun && (
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">EGFUL support</span>
             )}
             <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
               (m.role === "user" ? INK_ON_ACID
-                : m.role === "staff" ? "border border-black/10 bg-white text-[#0B0B0C]"
-                : "bg-black/[0.05] text-[#0B0B0C]")}>
+ : m.role === "staff" ? "border border-black/10 bg-white text-[#0B0B0C]"
+ : "bg-black/[0.05] text-[#0B0B0C]")}>
               {m.text}
               {/* The page that answers it properly. On the canned replies only — a model
-                  answer has no fixed destination, and inventing one would send people to a
-                  page that may not say what the sentence above it just did. */}
+ answer has no fixed destination, and inventing one would send people to a
+ page that may not say what the sentence above it just did. */}
               {m.role === "assistant" && FAQ.filter((f) => f.a === m.text).map((f) => (
                 <a key={f.href} href={f.href} className="mt-1.5 block font-semibold underline underline-offset-4">
                   {f.hrefLabel} →
@@ -351,10 +351,10 @@ export function SupportBubble() {
           <p className="mt-3 text-xs leading-relaxed text-black/45">
             {office && office.open === false
               ? `Sent. The team is out of office right now${office.resumesLabel ? ` — back ${office.resumesLabel}` : ""}. Your message is with them; they'll reply right here${email ? `, and email ${email}` : ""}.`
-              : `Sent. A person will reply right here${office?.hoursLabel ? ` — usually within ${office.hoursLabel}` : ""}${email ? `, and you'll get it at ${email} if you close this` : ""}.`}
+ : `Sent. A person will reply right here${office?.hoursLabel ? ` — usually within ${office.hoursLabel}` : ""}${email ? `, and you'll get it at ${email} if you close this` : ""}.`}
           </p>
         )}
-        {notice && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{notice}</p>}
+        {notice && <p className="mt-3 rounded-lg bg-hold/10 px-3 py-2 text-xs leading-relaxed text-hold">{notice}</p>}
         {/**
           * BEING TRANSFERRED — but only while that is TRUE.
           *
@@ -383,19 +383,19 @@ export function SupportBubble() {
 
       {needIdentity ? (
         /* The question is already saved server-side, which is why this can be asked calmly
-           rather than as a gate the visitor must pass to be heard. */
+ rather than as a gate the visitor must pass to be heard. */
         <div className="space-y-2 border-t border-black/10 p-3">
           <p className="text-xs leading-relaxed text-black/55">
             {pendingEscalate
               ? "Who are we passing this to a person for? We'll reply by email — you can close this."
-              : "Who should we reply to? We'll email you if you close this."}
+ : "Who should we reply to? We'll email you if you close this."}
           </p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name"
-                 className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
+ className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" type="email"
-                 className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
+ className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
           <button onClick={onIdentity} disabled={busy}
-                  className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${INK_ON_ACID}`}>
+ className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${INK_ON_ACID}`}>
             {pendingEscalate ? "Send to support" : "Continue"}
           </button>
         </div>
@@ -403,31 +403,31 @@ export function SupportBubble() {
         <div className="border-t border-black/10 p-3">
           <div className="flex items-end gap-2">
             <textarea
-              value={draft} onChange={(e) => setDraft(e.target.value)} rows={1}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() } }}
-              placeholder="Type your question…"
-              className="max-h-24 flex-1 resize-none rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50"
+ value={draft} onChange={(e) => setDraft(e.target.value)} rows={1}
+ onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() } }}
+ placeholder="Type your question…"
+ className="max-h-24 flex-1 resize-none rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50"
             />
             <button onClick={onSend} disabled={busy || !draft.trim()} aria-label="Send"
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${INK_ON_ACID}`}>
+ className={`flex size-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${INK_ON_ACID}`}>
               <PaperPlaneRight size={15} weight="fill" />
             </button>
           </div>
           {/* OFFERED UNTIL IT IS TAKEN, then gone.
               It stayed on screen after support had joined and answered — offering to fetch
-              the person who was already typing, under their reply. `withPerson` is set by the
-              handover AND by every read, so it is right after a reload too.
+ the person who was already typing, under their reply. `withPerson` is set by the
+ handover AND by every read, so it is right after a reload too.
               "Talk to support", not "talk to a person instead": the visitor is not choosing
-              between two colleagues, and "instead" reads as a rejection of the answer they
-              were just given. */}
+ between two colleagues, and "instead" reads as a rejection of the answer they
+ were just given. */}
           {msgs.length > 0 && !done && !withPerson && (
             <button onClick={escalate} disabled={busy}
-                    className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[#0B0B0C]">
+ className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[#0B0B0C]">
               Talk to support
             </button>
           )}
           {/* Says who is answering now, in the place the offer used to be — so the space
-              does not simply go blank the moment a person arrives. */}
+ does not simply go blank the moment a person arrives. */}
           {withPerson && !done && (
             <p className="mt-2 text-xs text-black/45">You&apos;re talking to EGFUL support.</p>
           )}

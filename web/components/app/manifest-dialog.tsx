@@ -25,55 +25,55 @@ type Made = { id: string; status: string; pdf: string | null; count: number }
  * it" is a question to answer before the click, not after.
  */
 export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
-  orderIds: string[]
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  onDone?: () => void
+ orderIds: string[]
+ open: boolean
+ onOpenChange: (v: boolean) => void
+ onDone?: () => void
 }) {
-  const today = new Date().toISOString().slice(0, 10)
-  const [shipDate, setShipDate] = useState(today)
-  const [groups, setGroups] = useState<ManifestGroup[] | null>(null)
-  const [skipped, setSkipped] = useState<ManifestSkip[]>([])
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [made, setMade] = useState<Made[] | null>(null)
+ const today = new Date().toISOString().slice(0, 10)
+ const [shipDate, setShipDate] = useState(today)
+ const [groups, setGroups] = useState<ManifestGroup[] | null>(null)
+ const [skipped, setSkipped] = useState<ManifestSkip[]>([])
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [made, setMade] = useState<Made[] | null>(null)
 
-  const eligible = (groups ?? []).reduce((n, g) => n + g.count, 0)
+ const eligible = (groups ?? []).reduce((n, g) => n + g.count, 0)
 
-  const preview = useCallback(() => {
-    if (!orderIds.length) return
-    setBusy(true); setErr(null)
-    previewManifest(orderIds)
+ const preview = useCallback(() => {
+ if (!orderIds.length) return
+ setBusy(true); setErr(null)
+ previewManifest(orderIds)
       .then((r) => { setGroups(r.groups ?? []); setSkipped(r.skipped ?? []) })
       .catch((e: Error) => setErr(e.message))
       .finally(() => setBusy(false))
   }, [orderIds])
 
-  useEffect(() => {
-    if (!open) return
+ useEffect(() => {
+ if (!open) return
     // Deferred, like every other setState-from-effect here — a synchronous one cascades a
     // second render.
-    const t = setTimeout(() => { setMade(null); setErr(null); preview() }, 0)
-    return () => clearTimeout(t)
+ const t = setTimeout(() => { setMade(null); setErr(null); preview() }, 0)
+ return () => clearTimeout(t)
   }, [open, preview])
 
-  const create = async () => {
-    setBusy(true); setErr(null)
-    try {
-      const r = await createManifest(orderIds, shipDate)
-      if (r.error && !(r.manifests ?? []).length) { setErr(r.error); return }
-      setMade(r.manifests ?? [])
+ const create = async () => {
+ setBusy(true); setErr(null)
+ try {
+ const r = await createManifest(orderIds, shipDate)
+ if (r.error && !(r.manifests ?? []).length) { setErr(r.error); return }
+ setMade(r.manifests ?? [])
       // Partial failure is reported alongside what DID work rather than replacing it —
       // one carrier account failing doesn't make the other's form less real, and someone
       // still has to go print it.
-      if (r.failed?.length) {
-        setErr(`${r.failed.length === 1 ? "One group" : `${r.failed.length} groups`} couldn't be manifested: ${r.failed.map((f) => f.error).join(" · ")}`)
+ if (r.failed?.length) {
+ setErr(`${r.failed.length === 1 ? "One group" : `${r.failed.length} groups`} couldn't be manifested: ${r.failed.map((f) => f.error).join(" · ")}`)
       }
-      onDone?.()
+ onDone?.()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -82,7 +82,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
           </DialogTitle>
           <DialogDescription>
             One barcode covering every label below. The carrier scans it once when they take
-            the parcels, instead of scanning each one.
+ the parcels, instead of scanning each one.
           </DialogDescription>
         </DialogHeader>
 
@@ -92,8 +92,8 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
               <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
               <span>
                 {made.length === 1 ? "Form created" : `${made.length} forms created`}. Print it and hand
-                it over with the parcels — <strong>they don&apos;t count as accepted until USPS scans
-                it</strong>, and the Scan tags stay amber until they do.
+ it over with the parcels — <strong>they don&apos;t count as accepted until USPS scans
+ it</strong>, and the Scan tags stay amber until they do.
               </span>
             </div>
             {made.map((m) => (
@@ -104,7 +104,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                 </div>
                 {m.pdf ? (
                   <Button size="sm" variant="outline"
-                    onClick={() => window.open(m.pdf as string, "_blank", "noopener,noreferrer")}>
+ onClick={() => window.open(m.pdf as string, "_blank", "noopener,noreferrer")}>
                     Print
                   </Button>
                 ) : (
@@ -134,12 +134,12 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                 {groups && groups.length > 1 && (
                   <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                     These labels span {groups.length} carrier accounts, so they need {groups.length} separate
-                    forms — USPS requires one account per form. All {groups.length} are created together.
+ forms — USPS requires one account per form. All {groups.length} are created together.
                   </p>
                 )}
                 {/* NOTHING ELIGIBLE IS A SENTENCE, not an empty panel reading "0 labels go
-                    on 0 forms". Every order in the selection is listed below with its own
-                    reason, so this says which situation it is rather than looking broken. */}
+ on 0 forms". Every order in the selection is listed below with its own
+ reason, so this says which situation it is rather than looking broken. */}
                 {eligible === 0 ? (
                   <div className="text-sm text-muted-foreground">
                     None of the {skipped.length} selected {skipped.length === 1 ? "order" : "orders"} can go on a SCAN form
@@ -151,12 +151,12 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                 </div>
                 )}
                 {skipped.length > 0 && (
-                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50 p-2.5">
-                    <div className="text-xs font-medium text-amber-900">
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-hold/20 bg-hold/10 p-2.5">
+                    <div className="text-xs font-medium text-hold">
                       {skipped.length} left off:
                     </div>
                     {skipped.map((s) => (
-                      <div key={s.id} className="text-2xs text-amber-800">
+                      <div key={s.id} className="text-2xs text-hold">
                         <span className="tabular-nums">{s.num}</span> — {s.reason}
                       </div>
                     ))}
@@ -168,7 +168,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
         )}
 
         {err && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" /> {err}
           </div>
         )}

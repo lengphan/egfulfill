@@ -23,95 +23,95 @@ const FROM_STORE = "eg_ship_from"
  * Buy a REAL shipping label through the aggregator (Shippo → USPS), shared by two callers:
  *
  *  - Shipments page — no `order`: creates a minimal staff-owned manual FF-order (re-ship,
- *    sample, replacement…) so the label is RECORDED in Shipments.
+ * sample, replacement…) so the label is RECORDED in Shipments.
  *  - Order detail — with `order`: buys against that existing order, ship-to pre-filled from
- *    its address; nothing new is created.
+ * its address; nothing new is created.
  *
  * Ship-to is a single paste box (validated live); ship-from is the saved warehouse address
  * (Settings › Platform). Optional add-ons (signature, insurance) ride the same buy.
  */
 export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
-  open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void
+ open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void
   /** `items` lets the parcel be worked out from what's actually being shipped rather than
-   *  guessed — see parcel-from-order.ts. Optional: a standalone label has no order and
-   *  falls back to the stock mailer. */
-  order?: { id: string; num?: string; to?: ShipAddress; items?: OrderItem[] }
+   * guessed — see parcel-from-order.ts. Optional: a standalone label has no order and
+   * falls back to the stock mailer. */
+ order?: { id: string; num?: string; to?: ShipAddress; items?: OrderItem[] }
 }) {
-  const [pasteText, setPasteText] = useState("")
-  const [to, setTo] = useState<ShipAddress>({ ...BLANK })
-  const confirm = useConfirm()
-  const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
+ const [pasteText, setPasteText] = useState("")
+ const [to, setTo] = useState<ShipAddress>({ ...BLANK })
+ const confirm = useConfirm()
+ const [from, setFrom] = useState<ShipAddress>({ ...BLANK })
   // Opens on the mailer this factory reaches for most, not on a placeholder nobody stocks.
-  const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: DEFAULT_SIZE.length, width: DEFAULT_SIZE.width, height: DEFAULT_SIZE.height })
+ const [pkg, setPkg] = useState({ lb: 0, oz: 6, length: DEFAULT_SIZE.length, width: DEFAULT_SIZE.width, height: DEFAULT_SIZE.height })
   // Stock sizes plus anything this person saved. Read after mount, because localStorage
   // doesn't exist during the server render and a mismatch there is a hydration error.
   /** "Custom size…" is a MODE, not a size: it keeps the boxes open even if the numbers
-   *  land back on a stock size, so choosing it doesn't snap the label to a mailer. */
-  const [customSize, setCustomSize] = useState(false)
+   * land back on a stock size, so choosing it doesn't snap the label to a mailer. */
+ const [customSize, setCustomSize] = useState(false)
   /** The empty packaging's weight, in ounces. Kept apart from `pkg.oz` so the contents and
-   *  the container stay separately editable — re-picking a size replaces one and not the
-   *  other, and a person who weighs the full parcel can leave this at 0. */
-  const [tareOz, setTareOz] = useState(0)
-  const [sizes, setSizes] = useState<ParcelSize[]>(STOCK_SIZES)
-  useEffect(() => {
-    const t = setTimeout(() => setSizes([...STOCK_SIZES, ...customSizes()]), 0)
-    return () => clearTimeout(t)
+   * the container stay separately editable — re-picking a size replaces one and not the
+   * other, and a person who weighs the full parcel can leave this at 0. */
+ const [tareOz, setTareOz] = useState(0)
+ const [sizes, setSizes] = useState<ParcelSize[]>(STOCK_SIZES)
+ useEffect(() => {
+ const t = setTimeout(() => setSizes([...STOCK_SIZES, ...customSizes()]), 0)
+ return () => clearTimeout(t)
   }, [])
 
-  const [basis, setBasis] = useState<{ text: string; tone: "warn" | "info" } | null>(null)
+ const [basis, setBasis] = useState<{ text: string; tone: "warn" | "info" } | null>(null)
   /* CONTENTS + CONTAINER. The box's own weight was never in this sum, so every boxed parcel
-     was declared light by 8–12oz — a full price band on Ground Advantage. */
-  const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0) + (Number(tareOz) || 0)
+ was declared light by 8–12oz — a full price band on Ground Advantage. */
+ const weightOz = (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0) + (Number(tareOz) || 0)
   // Add-ons the carrier prices into the rate: signature on delivery, declared insurance.
-  const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [result, setResult] = useState<UspsLabelResult | null>(null)
+ const [svc, setSvc] = useState<{ signature: boolean; insurance: number }>({ signature: false, insurance: 0 })
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [result, setResult] = useState<UspsLabelResult | null>(null)
   // Multi-carrier rate shop: fetch quotes across the enabled carriers, pick one, buy it.
-  const [rates, setRates] = useState<ShippingRate[] | null>(null)   // null = not fetched
-  const [ratesLoading, setRatesLoading] = useState(false)
-  const [pickedToken, setPickedToken] = useState<string | null>(null)
-  const [carriers, setCarriers] = useState<string[]>(DEFAULT_CARRIERS)
+ const [rates, setRates] = useState<ShippingRate[] | null>(null)   // null = not fetched
+ const [ratesLoading, setRatesLoading] = useState(false)
+ const [pickedToken, setPickedToken] = useState<string | null>(null)
+ const [carriers, setCarriers] = useState<string[]>(DEFAULT_CARRIERS)
   /** Services this warehouse doesn't ship (Settings › Platform → hidden_services), matched
-   *  as lowercase substrings against the rate's service name. */
-  const [hiddenServices, setHiddenServices] = useState<string[]>([])
+   * as lowercase substrings against the rate's service name. */
+ const [hiddenServices, setHiddenServices] = useState<string[]>([])
 
   // Load the saved warehouse 'from' when the dialog opens (deferred so no sync setState).
   // With an `order`, also seed ship-to from its address so the label is one click away.
-  useEffect(() => {
-    if (!open) return
-    const t = setTimeout(() => {
-      try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK, ...JSON.parse(raw) }) } catch {}
-      getFactorySettings().then((s) => {
-        const sf = s?.ship_from as ShipAddress | undefined
-        if (sf && sf.street) { const a = { ...BLANK, ...sf }; setFrom(a); try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {} }
-        const ec = String(s?.enabled_carriers || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean)
-        setCarriers(ec.length ? ec : DEFAULT_CARRIERS)
-        setHiddenServices(String(s?.hidden_services || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean))
+ useEffect(() => {
+ if (!open) return
+ const t = setTimeout(() => {
+ try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK, ...JSON.parse(raw) }) } catch {}
+ getFactorySettings().then((s) => {
+ const sf = s?.ship_from as ShipAddress | undefined
+ if (sf && sf.street) { const a = { ...BLANK, ...sf }; setFrom(a); try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {} }
+ const ec = String(s?.enabled_carriers || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean)
+ setCarriers(ec.length ? ec : DEFAULT_CARRIERS)
+ setHiddenServices(String(s?.hidden_services || "").split(",").map((c) => c.trim().toLowerCase()).filter(Boolean))
       }).catch(() => {})
-      if (order?.to && order.to.street) {
-        const a = { ...BLANK, ...order.to }
-        setTo(a)
-        setPasteText([a.name, a.street, a.street2, [a.city, a.state].filter(Boolean).join(", ") + (a.zip ? " " + a.zip : "")].filter((l) => l && l.trim()).join("\n"))
+ if (order?.to && order.to.street) {
+ const a = { ...BLANK, ...order.to }
+ setTo(a)
+ setPasteText([a.name, a.street, a.street2, [a.city, a.state].filter(Boolean).join(", ") + (a.zip ? " " + a.zip : "")].filter((l) => l && l.trim()).join("\n"))
       }
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [open, order?.id])
 
   // Live recipient validation — visible ✓/⚠ before spending. Debounced, warn-not-block.
-  const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
-  useEffect(() => {
-    const complete = addrComplete(to)
-    let alive = true
-    const t = setTimeout(() => {
-      if (!alive) return
-      if (!complete) { setAddrCheck({ status: "idle" }); return }
-      setAddrCheck({ status: "checking" })
-      validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
+ const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
+ useEffect(() => {
+ const complete = addrComplete(to)
+ let alive = true
+ const t = setTimeout(() => {
+ if (!alive) return
+ if (!complete) { setAddrCheck({ status: "idle" }); return }
+ setAddrCheck({ status: "checking" })
+ validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
         .then((v) => { if (alive) setAddrCheck(v && v.ok ? { status: "valid" } : { status: "invalid", msg: v?.error }) })
         .catch(() => { if (alive) setAddrCheck({ status: "idle" }) })
     }, 600)
-    return () => { alive = false; clearTimeout(t) }
+ return () => { alive = false; clearTimeout(t) }
   }, [to.street, to.street2, to.city, to.state, to.zip])
 
   /**
@@ -128,7 +128,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * standalone label's id is not returned by the buy. That case keeps "Open label", which
    * is what it had before — no worse, and honestly labelled.
    */
-  const [labelSrc, setLabelSrc] = useState<string | null>(null)
+ const [labelSrc, setLabelSrc] = useState<string | null>(null)
   /**
    * WHERE THE PRINT GOT TO — shown, not logged.
    *
@@ -138,15 +138,15 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * its place permanently: "Preparing the label…" is the honest thing to show in the second
    * where nothing has happened yet.
    */
-  const [printStage, setPrintStage] = useState<
+ const [printStage, setPrintStage] = useState<
     { at: "idle" | "fetching" | "rendering" | "printing" | "done"; why?: string }>({ at: "idle" })
-  const frameRef = useRef<HTMLIFrameElement>(null)
-  const printedRef = useRef<string | null>(null)
-  const printLabel = () => {
-    const w = frameRef.current?.contentWindow
-    if (!w) return
-    w.focus()
-    w.print()
+ const frameRef = useRef<HTMLIFrameElement>(null)
+ const printedRef = useRef<string | null>(null)
+ const printLabel = () => {
+ const w = frameRef.current?.contentWindow
+ if (!w) return
+ w.focus()
+ w.print()
   }
 
   /**
@@ -172,45 +172,45 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * Still rendered through pdf.js rather than printed as a PDF frame: Chrome will not print
    * a PDF through contentWindow.print(), which is what made the original attempt silent.
    */
-  const printPacket = async () => {
-    if (!labelSrc) { setPrintStage({ at: "idle", why: "no label bytes" }); return }
-    setPrintStage({ at: "rendering" })
-    try {
-      const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: null }])
-      if (skipped.length) {
+ const printPacket = async () => {
+ if (!labelSrc) { setPrintStage({ at: "idle", why: "no label bytes" }); return }
+ setPrintStage({ at: "rendering" })
+ try {
+ const { html, skipped } = await packetHtml([{ labelBlobUrl: labelSrc, order: null }])
+ if (skipped.length) {
         // pdf.js couldn't read the label. Say so — the old code fell back to printing the
         // PDF frame, which is the thing Chrome refuses to do, so the fallback was silence.
-        setPrintStage({ at: "idle", why: "couldn't render the label to print — use Print label below" })
-        return
+ setPrintStage({ at: "idle", why: "couldn't render the label to print — use Print label below" })
+ return
       }
-      setPrintStage({ at: "printing" })
-      await printHtmlViaIframe(html)
-      setPrintStage({ at: "done" })
+ setPrintStage({ at: "printing" })
+ await printHtmlViaIframe(html)
+ setPrintStage({ at: "done" })
     } catch (e) {
-      setPrintStage({ at: "idle", why: e instanceof Error ? e.message : "printing failed" })
+ setPrintStage({ at: "idle", why: e instanceof Error ? e.message : "printing failed" })
     }
   }
 
-  useEffect(() => {
-    let url: string | null = null
-    let alive = true
-    const t = setTimeout(() => {
-      if (!alive) return
-      setLabelSrc(null)
+ useEffect(() => {
+ let url: string | null = null
+ let alive = true
+ const t = setTimeout(() => {
+ if (!alive) return
+ setLabelSrc(null)
       // An order label is addressed by the ORDER id; a standalone one by the shipment the
       // buy created. /api/shipments/:id/label resolves either, so both can print — which is
       // the whole point: the next step after buying a label is always the printer.
-      const labelId = order?.id ?? result?.shipmentId
-      if (!result?.labelUrl || !labelId) {
-        if (result?.trackingNumber) setPrintStage({ at: "idle", why: "no label file to print — use Open label" })
-        return
+ const labelId = order?.id ?? result?.shipmentId
+ if (!result?.labelUrl || !labelId) {
+ if (result?.trackingNumber) setPrintStage({ at: "idle", why: "no label file to print — use Open label" })
+ return
       }
-      setPrintStage({ at: "fetching" })
-      fetchShipmentLabel(String(labelId))
+ setPrintStage({ at: "fetching" })
+ fetchShipmentLabel(String(labelId))
         .then((blob) => { if (!alive) return; url = URL.createObjectURL(blob); setLabelSrc(url) })
         .catch((e) => { if (alive) setPrintStage({ at: "idle", why: `couldn't fetch the label (${e instanceof Error ? e.message : "failed"})` }) })
     }, 0)
-    return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
+ return () => { alive = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
   }, [result?.labelUrl, result?.trackingNumber, result?.shipmentId, order?.id])
 
   /**
@@ -226,102 +226,102 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * buying a second label with "Another" prints that one too, while a re-render of the same
    * label does not fire the dialog again.
    */
-  useEffect(() => {
-    if (!labelSrc) return
-    const key = result?.trackingNumber ?? labelSrc
-    if (printedRef.current === key) return
-    printedRef.current = key
-    const t = setTimeout(() => { void printPacket() }, 0)
-    return () => clearTimeout(t)
+ useEffect(() => {
+ if (!labelSrc) return
+ const key = result?.trackingNumber ?? labelSrc
+ if (printedRef.current === key) return
+ printedRef.current = key
+ const t = setTimeout(() => { void printPacket() }, 0)
+ return () => clearTimeout(t)
     // printPacket reads the latest labelSrc/order via closure on each render; keying on the
     // tracking number is what makes this fire once per label rather than once per render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labelSrc, result?.trackingNumber])
 
-  const reset = () => { setPasteText(""); setTo({ ...BLANK }); setSvc({ signature: false, insurance: 0 }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }); setRates(null); setPickedToken(null) }
+ const reset = () => { setPasteText(""); setTo({ ...BLANK }); setSvc({ signature: false, insurance: 0 }); setResult(null); setErr(null); setAddrCheck({ status: "idle" }); setRates(null); setPickedToken(null) }
   // Any change to the parcel or add-ons invalidates the quoted rates — you can't buy a rate
   // that was priced for a different box. Re-fetch after editing.
-  const invalidateRates = () => { setRates(null); setPickedToken(null) }
+ const invalidateRates = () => { setRates(null); setPickedToken(null) }
 
   // PREFILL FROM THE PRODUCTS, when there are any. Over-declaring is the expensive
   // direction — the carrier bills the greater of actual and dimensional weight — so a
   // parcel typed larger than it is gets charged for the difference on every label. The
   // catalog already holds each blank's weight and box; this reads them rather than guessing.
-  useEffect(() => {
-    if (!open || !order?.items?.length) return
-    let alive = true
-    getCatalogProducts()
+ useEffect(() => {
+ if (!open || !order?.items?.length) return
+ let alive = true
+ getCatalogProducts()
       .then((r) => {
-        if (!alive) return
-        const g = parcelFromOrder(order.items, r)
+ if (!alive) return
+ const g = parcelFromOrder(order.items, r)
         /* NO EARLY RETURN when nothing is known. That left the stock mailer on screen with
-           no note at all — the one state that costs money, presented as if it had been
-           checked. The guess stands; what changes is that it now says it is one. */
-        if (!g) { setBasis(parcelBasisNote(null, order.items?.length ?? 0)); return }
-        setPkg((p) => ({
-          lb: Math.floor(g.weightOz / 16) || 0,
-          oz: g.weightOz ? Math.round(g.weightOz % 16) : p.oz,
+ no note at all — the one state that costs money, presented as if it had been
+ checked. The guess stands; what changes is that it now says it is one. */
+ if (!g) { setBasis(parcelBasisNote(null, order.items?.length ?? 0)); return }
+ setPkg((p) => ({
+ lb: Math.floor(g.weightOz / 16) || 0,
+ oz: g.weightOz ? Math.round(g.weightOz % 16) : p.oz,
           // Only override a dimension the catalog actually knows; a product with a weight
           // but no box keeps the stock mailer rather than collapsing to zero.
-          length: g.length || p.length,
-          width: g.width || p.width,
-          height: g.height || p.height,
+ length: g.length || p.length,
+ width: g.width || p.width,
+ height: g.height || p.height,
         }))
-        setBasis(parcelBasisNote(g, order.items?.length ?? 0))
-        invalidateRates()
+ setBasis(parcelBasisNote(g, order.items?.length ?? 0))
+ invalidateRates()
       })
       .catch(() => { /* no catalog — the stock mailer stands */ })
-    return () => { alive = false }
+ return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order?.id])
 
-  const getRates = async () => {
-    setErr(null)
-    if (!addrComplete(to)) { setErr("Enter the recipient (street, city, state, ZIP) before pricing."); return }
-    if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
-    setRatesLoading(true); setPickedToken(null)
-    try {
-      const r = await getShippingRates({ to, from, parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height }, extra: (svc.signature || svc.insurance) ? { signature: svc.signature, insurance: svc.insurance } : undefined })
-      if (r.error) { setErr(r.error); setRates([]); return }
+ const getRates = async () => {
+ setErr(null)
+ if (!addrComplete(to)) { setErr("Enter the recipient (street, city, state, ZIP) before pricing."); return }
+ if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
+ setRatesLoading(true); setPickedToken(null)
+ try {
+ const r = await getShippingRates({ to, from, parcel: { weightOz, length: pkg.length, width: pkg.width, height: pkg.height }, extra: (svc.signature || svc.insurance) ? { signature: svc.signature, insurance: svc.insurance } : undefined })
+ if (r.error) { setErr(r.error); setRates([]); return }
       // Only the carriers this warehouse offers (admin-set; defaults to USPS + UPS), cheapest first.
-      const filtered = (r.rates || []).filter((rt) => carriers.some((c) => (rt.carrier || "").toLowerCase().includes(c)))
+ const filtered = (r.rates || []).filter((rt) => carriers.some((c) => (rt.carrier || "").toLowerCase().includes(c)))
       // Then drop the services it doesn't ship — Ground Saver and the like. Applied AFTER
       // the carrier filter and never as a fallback: if hiding leaves nothing, that is the
       // honest answer for this parcel, and quietly showing a service the floor refuses to
       // use would be worse than an empty list.
-      const offered = hiddenServices.length
+ const offered = hiddenServices.length
         ? filtered.filter((rt) => !hiddenServices.some((h) => (rt.service || "").toLowerCase().includes(h)))
-        : filtered
-      const shown = (offered.length ? offered : (filtered.length ? filtered : (r.rates || [])).filter((rt) => !hiddenServices.some((h) => (rt.service || "").toLowerCase().includes(h))))
+ : filtered
+ const shown = (offered.length ? offered : (filtered.length ? filtered : (r.rates || [])).filter((rt) => !hiddenServices.some((h) => (rt.service || "").toLowerCase().includes(h))))
         .slice().sort((a, b) => a.amount - b.amount)
-      setRates(shown)
-      if (shown.length) setPickedToken(shown[0].token)
-      if (!shown.length && r.errors?.length) setErr(r.errors.join(" · "))
+ setRates(shown)
+ if (shown.length) setPickedToken(shown[0].token)
+ if (!shown.length && r.errors?.length) setErr(r.errors.join(" · "))
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't fetch rates.")
+ setErr(e instanceof Error ? e.message : "Couldn't fetch rates.")
     } finally { setRatesLoading(false) }
   }
 
   // Auto-quote once the address + parcel are ready — no "Get rates" click needed. Debounced
   // so editing the box or dimensions doesn't fire a request per keystroke; the button below
   // stays as a manual refresh.
-  useEffect(() => {
-    if (result || rates || ratesLoading) return
-    if (!addrComplete(to) || !addrComplete(from)) return
-    let alive = true
-    const t = setTimeout(() => { if (alive) getRates() }, 900)
-    return () => { alive = false; clearTimeout(t) }
+ useEffect(() => {
+ if (result || rates || ratesLoading) return
+ if (!addrComplete(to) || !addrComplete(from)) return
+ let alive = true
+ const t = setTimeout(() => { if (alive) getRates() }, 900)
+ return () => { alive = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [to.street, to.street2, to.city, to.state, to.zip, from.street, from.zip, pkg.lb, pkg.oz, pkg.length, pkg.width, pkg.height, svc.signature, svc.insurance, result, rates, ratesLoading])
 
-  const buy = async () => {
-    setErr(null)
-    if (!addrComplete(to)) { setErr("Recipient needs a street, city, state and ZIP."); return }
-    if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
-    const picked = rates?.find((r) => r.token === pickedToken)
-    if (!picked) { setErr("Get rates and pick a carrier & service first."); return }
-    setBusy(true)
-    try {
+ const buy = async () => {
+ setErr(null)
+ if (!addrComplete(to)) { setErr("Recipient needs a street, city, state and ZIP."); return }
+ if (!addrComplete(from)) { setErr("No warehouse ‘From’ address saved — set it in Settings › Platform first."); return }
+ const picked = rates?.find((r) => r.token === pickedToken)
+ if (!picked) { setErr("Get rates and pick a carrier & service first."); return }
+ setBusy(true)
+ try {
       // Existing order → buy against it. No order → mint a manual FF-order so the label is
       // recorded in Shipments the same way marketplace labels are.
       // NO ORDER IS CREATED. A standalone label is a SHIPMENT — a re-ship, a sample,
@@ -330,48 +330,48 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
       // `shipments` instead and it shows up in this list, which is where it belongs.
       // ShipStation draws exactly this line: a label without an order creates a shipment
       // record and no order.
-      const orderId = order?.id
-      setFactorySettings({ ship_from: from }).catch(() => {})
-      try {
-        const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
-        if (v && !v.ok && v.error && !(await confirm({ title: "Address couldn't be verified", body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
+ const orderId = order?.id
+ setFactorySettings({ ship_from: from }).catch(() => {})
+ try {
+ const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
+ if (v && !v.ok && v.error && !(await confirm({ title: "Address couldn't be verified", body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
       } catch { /* validation unavailable — proceed */ }
-      const r = await buyUspsLabel({ to, from, orderId, weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service, carrierAccount: picked.carrierAccount } })
-      if (!r.ok) {
-        setErr(r.error || "Couldn't buy the label.")
+ const r = await buyUspsLabel({ to, from, orderId, weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service, carrierAccount: picked.carrierAccount } })
+ if (!r.ok) {
+ setErr(r.error || "Couldn't buy the label.")
         // Nothing to clean up: a failed buy created nothing. That is the whole point of
         // not minting an order up front.
-        return
+ return
       }
-      setResult(r)
-      onCreated()
+ setResult(r)
+ onCreated()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to create the label.")
+ setErr(e instanceof Error ? e.message : "Failed to create the label.")
     } finally { setBusy(false) }
   }
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset() }}>
       {/* Two columns: what you are sending on the left, what it costs on the right.
           One column meant the rates — the thing you came to choose — sat below the fold
-          under the parcel fields, so buying a label always began with a scroll. */}
+ under the parcel fields, so buying a label always began with a scroll. */}
       {/* sm:max-w-3xl, NOT max-w-3xl. DialogContent's own class list ends with
           `sm:max-w-md`, and tailwind-merge keeps a bare utility and a `sm:` one side by
-          side — they are different variants, so nothing is dropped. Above 640px the
-          responsive rule then wins on source order and the window was capped at 448px,
-          three-quarters narrower than asked for. Worse, `md:grid-cols-2` keys off the
+ side — they are different variants, so nothing is dropped. Above 640px the
+ responsive rule then wins on source order and the window was capped at 448px,
+ three-quarters narrower than asked for. Worse, `md:grid-cols-2` keys off the
           VIEWPORT, so on any normal screen the two columns still split — a 448px popup
-          divided into two ~190px tracks, which is why every field sat alone on its own
-          line and the Buy button was pushed off the bottom. Matching the modifier is what
-          actually raises the cap.
+ divided into two ~190px tracks, which is why every field sat alone on its own
+ line and the Buy button was pushed off the bottom. Matching the modifier is what
+ actually raises the cap.
 
           3xl (768px) was still not enough for two real columns. Split in half it left
           ~360px a side: the ship-to helper wrapped to four lines, the parcel fields each
-          took their own row, and the rates column — the wider half by nature, since a rate
-          row is carrier + service + transit + price — sat empty beside a tall stack. The
-          result read as one long form with a blank margin. 5xl gives each side ~480px,
-          which is where the helper text settles onto two lines and a rate row fits without
-          truncating the service name. */}
+ took their own row, and the rates column — the wider half by nature, since a rate
+ row is carrier + service + transit + price — sat empty beside a tall stack. The
+ result read as one long form with a blank margin. 5xl gives each side ~480px,
+ which is where the helper text settles onto two lines and a rate row fits without
+ truncating the service name. */}
       <DialogContent className="sm:max-w-5xl">
         <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : "New label"}</DialogTitle></DialogHeader>
 
@@ -382,48 +382,48 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               {result.service ? ` · ${result.service}` : ""}{result.cost != null ? ` · $${result.cost.toFixed(2)}` : ""}
             </div>
             {/* Offscreen, not display:none — a hidden frame is not laid out, and a frame that
-                was never laid out has nothing to print. */}
+ was never laid out has nothing to print. */}
             {labelSrc && (
               <iframe
-                ref={frameRef}
-                src={labelSrc}
-                title="Shipping label"
-                aria-hidden
-                className="pointer-events-none fixed left-[-9999px] top-0 size-[1px] opacity-0"
+ ref={frameRef}
+ src={labelSrc}
+ title="Shipping label"
+ aria-hidden
+ className="pointer-events-none fixed left-[-9999px] top-0 size-[1px] opacity-0"
               />
             )}
             {/* Says where the print got to, because four silent failures in a row is what
-                made this so hard to place. "Preparing…" is also simply the truth in the
-                second before anything can happen. */}
+ made this so hard to place. "Preparing…" is also simply the truth in the
+ second before anything can happen. */}
             <div className="text-xs text-muted-foreground">
               {printStage.at === "fetching" && "Fetching the label…"}
               {printStage.at === "rendering" && "Preparing the label…"}
               {printStage.at === "printing" && "Opening the print dialog…"}
               {printStage.at === "done" && "Sent to the printer."}
               {printStage.at === "idle" && printStage.why && (
-                <span className="text-amber-700 dark:text-amber-400">Didn&apos;t print automatically — {printStage.why}</span>
+                <span className="text-hold">Didn&apos;t print automatically — {printStage.why}</span>
               )}
             </div>
             <div className="flex flex-wrap gap-2">
               {/* It has already gone to the printer — this is the retry, for the jam, the
-                  wrong tray, or the second copy. */}
+ wrong tray, or the second copy. */}
               {labelSrc && (
                 <Button onClick={() => void printPacket()}>
                   <Printer size={14} weight="bold" /> {printStage.at === "done" ? "Print again" : "Print label"}
                 </Button>
               )}
               {/* THE OTHER DOCUMENT A PACKER NEEDS, one click away from the label that was
-                  just bought — the same 4×6 slip the dispatch board prints, from the same
-                  module, so the two can never drift apart.
+ just bought — the same 4×6 slip the dispatch board prints, from the same
+ module, so the two can never drift apart.
 
                   Deliberately a button and not automatic: the label has already opened the
-                  browser's print dialog, and firing a second window at it immediately is
-                  what a popup blocker stops and what leaves two dialogs fighting. One click,
-                  right where you already are. */}
+ browser's print dialog, and firing a second window at it immediately is
+ what a popup blocker stops and what leaves two dialogs fighting. One click,
+ right where you already are. */}
               {order?.id && (
                 <Button variant="outline" onClick={() => {
-                  const msg = printPackingSlips([{ id: order.id, num: order.num, items: order.items, address: order.to } as never])
-                  if (msg) setErr(msg)
+ const msg = printPackingSlips([{ id: order.id, num: order.num, items: order.items, address: order.to } as never])
+ if (msg) setErr(msg)
                 }}>
                   Packing slip
                 </Button>
@@ -443,23 +443,23 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <div className="space-y-3 md:col-span-1">
               <div className="eg-label text-muted-foreground">Ship to</div>
               {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
-                  keeps the last address line clear of it. */}
+ keeps the last address line clear of it. */}
               <div className="relative">
                 <textarea
-                  value={pasteText}
-                  onChange={(e) => {
-                    setPasteText(e.target.value)
-                    const { name, addr } = parseBlock(e.target.value)
-                    setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
+ value={pasteText}
+ onChange={(e) => {
+ setPasteText(e.target.value)
+ const { name, addr } = parseBlock(e.target.value)
+ setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
                   }}
-                  rows={4}
-                  placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
-                  className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+ rows={4}
+ placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
+ className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <div className="pointer-events-none absolute bottom-2 right-2.5">
                   {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
                   {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> Validated</span>}
-                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-amber-700" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
+                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
                 </div>
               </div>
               <p className="text-2xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
@@ -467,24 +467,24 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <div className="pt-1 eg-label text-muted-foreground">Parcel</div>
 
               {/* THE PACKAGE FIRST. It is the choice that fills three of the five numbers
-                  below, so asking for it last meant typing dimensions and then overwriting
-                  them. Same control and same "Custom size…" escape hatch as the rate
-                  calculator, so the two screens ask the question identically. */}
+ below, so asking for it last meant typing dimensions and then overwriting
+ them. Same control and same "Custom size…" escape hatch as the rate
+ calculator, so the two screens ask the question identically. */}
               <label className="flex flex-col gap-1">
                 <span className="text-2xs text-muted-foreground">Package</span>
                 <select
-                  value={customSize ? "custom" : (sizes.find((z) => sizeKey(z) === sizeKey(pkg)) ? sizeKey(pkg) : "custom")}
-                  onChange={(e) => {
-                    const hit = sizes.find((z) => sizeKey(z) === e.target.value)
-                    if (!hit) { setCustomSize(true); return }
-                    setCustomSize(false)
-                    setPkg({ ...pkg, length: hit.length, width: hit.width, height: hit.height })
+ value={customSize ? "custom" : (sizes.find((z) => sizeKey(z) === sizeKey(pkg)) ? sizeKey(pkg) : "custom")}
+ onChange={(e) => {
+ const hit = sizes.find((z) => sizeKey(z) === e.target.value)
+ if (!hit) { setCustomSize(true); return }
+ setCustomSize(false)
+ setPkg({ ...pkg, length: hit.length, width: hit.width, height: hit.height })
                     /* The box brings its own weight back with it — that is the point of
-                       saving it as a size rather than as three numbers. */
-                    setTareOz(Number(hit.tareOz) > 0 ? Number(hit.tareOz) : 0)
-                    invalidateRates()
+ saving it as a size rather than as three numbers. */
+ setTareOz(Number(hit.tareOz) > 0 ? Number(hit.tareOz) : 0)
+ invalidateRates()
                   }}
-                  className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+ className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
                 >
                   {sizes.map((z) => (
                     <option key={sizeKey(z)} value={sizeKey(z)}>{z.label || sizeLabel(z)}</option>
@@ -498,7 +498,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                 <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => { setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 {/* The mailer's own size, stated rather than sitting in three boxes nobody
-                    needs to touch — five cramped inputs in a row was the "weird" part. */}
+ needs to touch — five cramped inputs in a row was the "weird" part. */}
                 {!customSize && sizes.some((z) => sizeKey(z) === sizeKey(pkg)) && (
                   <span className="pb-2 text-2xs text-muted-foreground">{pkg.length} × {pkg.width} × {pkg.height} in</span>
                 )}
@@ -512,24 +512,24 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   {/* THE EMPTY PACKAGING'S OWN WEIGHT.
                       ────────────────────────────────
                       A poly mailer is a fraction of an ounce and rounds to nothing. A rigid
-                      box does not: a 12 × 12 × 6 carton is 8–12oz empty, which on Ground
+ box does not: a 12 × 12 × 6 carton is 8–12oz empty, which on Ground
                       Advantage is a whole price band before anything goes in it. A parcel
-                      costed from its CONTENTS alone is therefore under-declared by the
-                      weight of the thing carrying them — every time, and the carrier bills
-                      the difference days later.
+ costed from its CONTENTS alone is therefore under-declared by the
+ weight of the thing carrying them — every time, and the carrier bills
+ the difference days later.
                       Asked here rather than beside the stock mailers, because this is the
-                      row where somebody is describing a box. */}
+ row where somebody is describing a box. */}
                   <label className="flex w-20 flex-col gap-1">
                     <span className="text-2xs text-muted-foreground" title="What the empty box or mailer weighs — added to the contents">Box oz</span>
                     <Input type="number" min={0} value={tareOz} onChange={(e) => { setTareOz(Math.max(0, Number(e.target.value) || 0)); invalidateRates() }} className="h-9" />
                   </label>
                   {/* Only offered when the dimensions are genuinely new — a button that saves
-                      a size you already have does nothing and says nothing. */}
+ a size you already have does nothing and says nothing. */}
                   {!sizes.some((z) => sizeKey(z) === sizeKey(pkg)) && pkg.length > 0 && pkg.width > 0 && (
                     <button
-                      type="button"
-                      onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height, tareOz: tareOz > 0 ? tareOz : undefined })])}
-                      className="pb-2 text-xs font-medium text-primary hover:underline"
+ type="button"
+ onClick={() => setSizes([...STOCK_SIZES, ...addCustomSize({ label: "", length: pkg.length, width: pkg.width, height: pkg.height, tareOz: tareOz > 0 ? tareOz : undefined })])}
+ className="pb-2 text-xs font-medium text-primary hover:underline"
                     >
                       Save {sizeLabel(pkg)} as a size
                     </button>
@@ -538,13 +538,13 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               )}
 
               {/* AN ASSUMPTION LOOKS DIFFERENT FROM A MEASUREMENT. Both used to be the same
-                  grey line, on the control that spends the money. */}
+ grey line, on the control that spends the money. */}
               {basis && (
                 <p className={"flex items-start gap-1.5 text-2xs " +
-                  (basis.tone === "warn" ? "font-medium text-amber-700 dark:text-amber-500" : "text-muted-foreground")}>
+                  (basis.tone === "warn" ? "font-medium text-hold" : "text-muted-foreground")}>
                   {basis.tone === "warn"
                     ? <Warning size={12} weight="fill" className="mt-0.5 shrink-0" />
-                    : <Package size={12} weight="fill" className="mt-0.5 shrink-0" />}
+ : <Package size={12} weight="fill" className="mt-0.5 shrink-0" />}
                   {basis.text}
                 </p>
               )}
@@ -564,8 +564,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
 
               {/* ── RATES, beside the form rather than under it ─────────────────
                   This is what the window is for; it was the one thing you had to scroll
-                  to reach. Its own column, its own scroll, so a long list of services
-                  never pushes the Buy button off screen. */}
+ to reach. Its own column, its own scroll, so a long list of services
+ never pushes the Buy button off screen. */}
               <div className="space-y-3 md:col-span-1">
               <div className="eg-label text-muted-foreground">Rates</div>
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
@@ -573,20 +573,20 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               </Button>
               {/* WHICH ENVIRONMENT BOUGHT THIS.
                   USPS's TEM host returns a real-looking PDF with a real-looking tracking
-                  number that is NOT postage — a parcel sent with one does not move. The
-                  only difference visible anywhere is the host that answered, so it is said
-                  here, above the button that spends money, rather than left to be inferred. */}
+ number that is NOT postage — a parcel sent with one does not move. The
+ only difference visible anywhere is the host that answered, so it is said
+ here, above the button that spends money, rather than left to be inferred. */}
               {rates && rates.length > 0 && rates.some((r) => r.test) && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
                   <span className="font-semibold">Test environment.</span> Buying here produces a
-                  sample label — it is not valid postage and nothing is charged. Switch USPS to
+ sample label — it is not valid postage and nothing is charged. Switch USPS to
                   Live in Settings › API keys when you are ready to ship for real.
                 </div>
               )}
               {rates && (rates.length === 0 ? (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
                   No rates for this parcel. Check the address and weight, and that a shipping
-                  provider is set up — Shippo, or USPS under Settings › API keys.
+ provider is set up — Shippo, or USPS under Settings › API keys.
                 </div>
               ) : (
                 <div className="max-h-[26rem] space-y-1.5 overflow-y-auto pr-1">
@@ -606,7 +606,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               ))}
 
               {!addrComplete(from) && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
                   No warehouse ‘From’ address saved — set it in Settings › Platform before buying.
                 </div>
               )}
@@ -617,8 +617,8 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button onClick={buy} disabled={busy || !pickedToken}>
                 {busy ? <><CircleNotch size={14} className="animate-spin" /> Buying…</>
-                  : pickedToken ? `Buy label · ${usd(rates?.find((r) => r.token === pickedToken)?.amount || 0)}`
-                    : "Buy label"}
+ : pickedToken ? `Buy label · ${usd(rates?.find((r) => r.token === pickedToken)?.amount || 0)}`
+ : "Buy label"}
               </Button>
             </DialogFooter>
           </>

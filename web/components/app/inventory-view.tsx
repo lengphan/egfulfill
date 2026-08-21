@@ -39,16 +39,16 @@ const num = (v: unknown) => Number(v) || 0
  * photo, because a black tee and a white tee are the difference the picker is checking.
  */
 const imageFor = (p: CatalogProduct | null, variant?: string | null): string => {
-  if (!p) return ""
-  const ci = p.colorImages ?? {}
-  const v = (variant || "").toLowerCase()
-  if (v) {
-    for (const [c, url] of Object.entries(ci)) {
-      if (!c || !url) continue
-      if (v.includes(c.toLowerCase()) || v.includes(prettyColorName(c).toLowerCase())) return url
+ if (!p) return ""
+ const ci = p.colorImages ?? {}
+ const v = (variant || "").toLowerCase()
+ if (v) {
+ for (const [c, url] of Object.entries(ci)) {
+ if (!c || !url) continue
+ if (v.includes(c.toLowerCase()) || v.includes(prettyColorName(c).toLowerCase())) return url
     }
   }
-  return p.img || p.image || p.hero || p.images?.[0] || Object.values(ci).find(Boolean) || ""
+ return p.img || p.image || p.hero || p.images?.[0] || Object.values(ci).find(Boolean) || ""
 }
 
 /**
@@ -68,42 +68,42 @@ const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reord
 
 // `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
 export function InventoryView({ embedded = false, pool }: { embedded?: boolean; pool?: "own" | "consigned" }) {
-  const [items, setItems] = useState<InventoryItem[] | null>(null)
-  const [search, setSearch] = useState("")
+ const [items, setItems] = useState<InventoryItem[] | null>(null)
+ const [search, setSearch] = useState("")
   /** Restocking asks one question — what is short — so the Low and Out counts are a filter,
-   *  not a readout. Null is "everything", which is what you want when receiving. */
-  const [needs, setNeeds] = useState<null | "low" | "out">(null)
-  const [queuing, setQueuing] = useState(false)
+   * not a readout. Null is "everything", which is what you want when receiving. */
+ const [needs, setNeeds] = useState<null | "low" | "out">(null)
+ const [queuing, setQueuing] = useState(false)
   /** What the last bulk action did. This view had no message channel of its own — the one
    *  `err` in this file belongs to another component — and an action that quietly moves rows
-   *  to a different screen has to say so. */
-  const [notice, setNotice] = useState<string | null>(null)
+   * to a different screen has to say so. */
+ const [notice, setNotice] = useState<string | null>(null)
 
-  const [cat, setCat] = useState("")
-  const [vis, setVis] = useState<"" | SkuVisibility>("")
+ const [cat, setCat] = useState("")
+ const [vis, setVis] = useState<"" | SkuVisibility>("")
   /** Show only the rows no supplier catalogue still lists — the ones to review and clear. */
-  const [onlyUnavailable, setOnlyUnavailable] = useState(false)
+ const [onlyUnavailable, setOnlyUnavailable] = useState(false)
   /** Supplier/variant resolved per sku — see the effect below. Declared here because
-   *  the filter reads it, and the filter is computed before that effect is defined. */
-  const [meta, setMeta] = useState<Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>>({})
-  const [saving, setSaving] = useState(false)
+   * the filter reads it, and the filter is computed before that effect is defined. */
+ const [meta, setMeta] = useState<Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>>({})
+ const [saving, setSaving] = useState(false)
   // When the Inventory shell drives the pool (its single Our stock · Incoming stock · Scan
   // nav), follow it and hide the in-view toggle; standalone, keep our own.
-  const [ownTab, setOwnTab] = useState<"own" | "consigned">("own")
-  const tab = pool ?? ownTab
-  const [saved, setSaved] = useState(false)
-  const [addOpen, setAddOpen] = useState(false)
-  const [printOpen, setPrintOpen] = useState(false)
+ const [ownTab, setOwnTab] = useState<"own" | "consigned">("own")
+ const tab = pool ?? ownTab
+ const [saved, setSaved] = useState(false)
+ const [addOpen, setAddOpen] = useState(false)
+ const [printOpen, setPrintOpen] = useState(false)
   // WHOSE HISTORY — one variant from a row menu, or a whole product from its grid.
-  const [hist, setHist] = useState<{ label: string; skus: string[] } | null>(null)
+ const [hist, setHist] = useState<{ label: string; skus: string[] } | null>(null)
   // Label printing: pick the variants you actually need, and how many of each.
   // Printing the whole filtered list one-each wasted a roll every time.
-  const [sel, setSel] = useState<Set<string>>(new Set())
-  const [zoomSku, setZoomSku] = useState<string | null>(null)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+ const [sel, setSel] = useState<Set<string>>(new Set())
+ const [zoomSku, setZoomSku] = useState<string | null>(null)
+ const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** The catalogue, for the row photo and for "Add from catalogue". Read once; a product's
-   *  picture doesn't change while a stock count is being typed. */
-  const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+   * picture doesn't change while a stock count is being typed. */
+ const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   /**
    * UNITS ON A PLACED PO, per sku.
    *
@@ -112,42 +112,42 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    * once, joined by sku; no new column, because the answer belongs beside the word that
    * would otherwise send somebody shopping.
    */
-  const [onOrder, setOnOrder] = useState<Record<string, number>>({})
-  const load = useCallback(() => {
-    if (!getToken()) { setItems([]); return }
-    getInventory().then((r) => setItems(r ?? [])).catch(() => setItems([]))
+ const [onOrder, setOnOrder] = useState<Record<string, number>>({})
+ const load = useCallback(() => {
+ if (!getToken()) { setItems([]); return }
+ getInventory().then((r) => setItems(r ?? [])).catch(() => setItems([]))
   }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
-  useEffect(() => {
-    const id = setTimeout(() => {
-      if (!getToken()) return
-      getCatalogProducts().then((r) => setCatalog(r ?? [])).catch(() => {})
+ useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+ useEffect(() => {
+ const id = setTimeout(() => {
+ if (!getToken()) return
+ getCatalogProducts().then((r) => setCatalog(r ?? [])).catch(() => {})
       // PLACED only. A draft has not been sent to anyone, so nothing is coming; received is
       // already counted in in_stock and would be promised twice.
-      getPurchaseOrders().then((rows) => {
-        const by: Record<string, number> = {}
-        for (const po of rows ?? []) {
-          if (String(po.status || "") !== "placed") continue
-          for (const l of po.items ?? []) {
-            const k = String(l.sku || "").trim().toUpperCase()
-            if (k) by[k] = (by[k] ?? 0) + (Number(l.qty) || 0)
+ getPurchaseOrders().then((rows) => {
+ const by: Record<string, number> = {}
+ for (const po of rows ?? []) {
+ if (String(po.status || "") !== "placed") continue
+ for (const l of po.items ?? []) {
+ const k = String(l.sku || "").trim().toUpperCase()
+ if (k) by[k] = (by[k] ?? 0) + (Number(l.qty) || 0)
           }
         }
-        setOnOrder(by)
+ setOnOrder(by)
       }).catch(() => {})
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [])
 
   // Edits are optimistic locally, then flushed as PER-FIELD PATCHes (debounced).
   // Never save the whole array: that would re-send this page's snapshot of every
   // row and wipe out stock the warehouse scanned in while the page sat open.
-  const pending = useRef<Map<string, Partial<InventoryItem>>>(new Map())
-  const flush = useCallback(() => {
-    const batch = Array.from(pending.current.entries())
-    pending.current.clear()
-    if (!batch.length) return
-    setSaving(true)
+ const pending = useRef<Map<string, Partial<InventoryItem>>>(new Map())
+ const flush = useCallback(() => {
+ const batch = Array.from(pending.current.entries())
+ pending.current.clear()
+ if (!batch.length) return
+ setSaving(true)
     Promise.all(batch.map(([sku, fields]) => patchInventoryItem(sku, fields).catch(() => {})))
       .then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500) })
       .finally(() => setSaving(false))
@@ -160,83 +160,83 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    * lines are not this page's to discard. A sku already parked is left alone rather than
    * duplicated: two rows for one blank is how a PO ends up ordering it twice.
    */
-  const queueForPurchase = async () => {
-    const picked = (items ?? []).filter((it) => sel.has(it.sku))
-    if (!picked.length) return
-    setQueuing(true)
-    try {
-      const pool = (await getFactoryList<SavedPOLine[]>("po_saved").catch(() => null)) ?? []
-      const have = new Set(pool.map((l) => String(l.sku).toUpperCase()))
-      const add: SavedPOLine[] = picked
+ const queueForPurchase = async () => {
+ const picked = (items ?? []).filter((it) => sel.has(it.sku))
+ if (!picked.length) return
+ setQueuing(true)
+ try {
+ const pool = (await getFactoryList<SavedPOLine[]>("po_saved").catch(() => null)) ?? []
+ const have = new Set(pool.map((l) => String(l.sku).toUpperCase()))
+ const add: SavedPOLine[] = picked
         .filter((it) => !have.has(String(it.sku).toUpperCase()))
         .map((it) => ({
-          sku: it.sku, name: it.name ?? undefined, variant: it.variant ?? undefined,
+ sku: it.sku, name: it.name ?? undefined, variant: it.variant ?? undefined,
           // One is a placeholder, not a guess at how many to buy — the quantity is decided
           // on the purchase order, where the supplier's price breaks are visible.
-          qty: 1, supplier: meta[it.sku]?.supplier ?? null, savedAt: new Date().toISOString(),
+ qty: 1, supplier: meta[it.sku]?.supplier ?? null, savedAt: new Date().toISOString(),
         }))
-      if (add.length) await saveFactoryList("po_saved", [...pool, ...add])
-      setSel(new Set())
-      setNotice(add.length
+ if (add.length) await saveFactoryList("po_saved", [...pool, ...add])
+ setSel(new Set())
+ setNotice(add.length
         ? `${add.length} added to Purchasing — parked, ready to put on an order.`
-        : "Those are already parked in Purchasing.")
+ : "Those are already parked in Purchasing.")
     } catch {
-      setNotice("Couldn't add those to Purchasing.")
+ setNotice("Couldn't add those to Purchasing.")
     } finally { setQueuing(false) }
   }
 
-  const edit = (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => {
-    setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, [field]: value } : it)))
-    pending.current.set(sku, { ...(pending.current.get(sku) ?? {}), [field]: value })
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(flush, 600)
+ const edit = (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => {
+ setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, [field]: value } : it)))
+ pending.current.set(sku, { ...(pending.current.get(sku) ?? {}), [field]: value })
+ if (saveTimer.current) clearTimeout(saveTimer.current)
+ saveTimer.current = setTimeout(flush, 600)
   }
   // Sent immediately rather than through the 600ms debounce the number cells use: this is
   // a deliberate choice about who can see stock, not a value being typed, and a dropped
   // debounce on THIS field is the one that publishes something by accident.
-  const setVisibility = (sku: string, next: SkuVisibility) => {
-    const before = (items ?? []).find((i) => i.sku === sku)
-    setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, visibility: next } : it)))
-    patchInventoryItem(sku, { visibility: next }).catch(() => {
+ const setVisibility = (sku: string, next: SkuVisibility) => {
+ const before = (items ?? []).find((i) => i.sku === sku)
+ setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, visibility: next } : it)))
+ patchInventoryItem(sku, { visibility: next }).catch(() => {
       // Put the row back rather than leaving the table claiming a change that never
       // landed — a visibility that only looks applied is worse than one that failed.
-      setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, visibility: before?.visibility } : it)))
+ setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, visibility: before?.visibility } : it)))
     })
   }
-  const remove = (sku: string) => {
-    setItems((prev) => (prev ?? []).filter((it) => it.sku !== sku))
-    pending.current.delete(sku)
-    deleteInventoryItem(sku).catch(() => load())
+ const remove = (sku: string) => {
+ setItems((prev) => (prev ?? []).filter((it) => it.sku !== sku))
+ pending.current.delete(sku)
+ deleteInventoryItem(sku).catch(() => load())
   }
   /** One row or a product's whole size run — the catalogue path adds several at once, and
-   *  they go in as individual POSTs so a failure loses one row rather than the batch. */
-  const add = (batch: InventoryItem[]) => {
-    const skus = new Set(batch.map((b) => b.sku))
-    setItems((prev) => [...batch, ...(prev ?? []).filter((x) => !skus.has(x.sku))])
-    setAddOpen(false)
+   * they go in as individual POSTs so a failure loses one row rather than the batch. */
+ const add = (batch: InventoryItem[]) => {
+ const skus = new Set(batch.map((b) => b.sku))
+ setItems((prev) => [...batch, ...(prev ?? []).filter((x) => !skus.has(x.sku))])
+ setAddOpen(false)
     Promise.all(batch.map((it) => addInventoryItem(it).catch(() => null))).then((r) => {
       // Re-read if any POST failed, rather than leaving the table showing a row the
       // server never took.
-      if (r.some((x) => x === null)) load()
+ if (r.some((x) => x === null)) load()
     })
   }
 
-  const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category).filter(Boolean))).sort() as string[], [items])
-  const filtered = useMemo(() => (items ?? []).filter((it) => {
-    if (needs === "low" && !isLow(it)) return false
-    if (needs === "out" && !isOut(it)) return false
-    if (cat && it.category !== cat) return false
-    if (vis && visOf(it) !== vis) return false
+ const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category).filter(Boolean))).sort() as string[], [items])
+ const filtered = useMemo(() => (items ?? []).filter((it) => {
+ if (needs === "low" && !isLow(it)) return false
+ if (needs === "out" && !isOut(it)) return false
+ if (cat && it.category !== cat) return false
+ if (vis && visOf(it) !== vis) return false
     // Only rows we have ASKED about and been told nothing for. A row still resolving is
     // unknown, not unavailable, and must not be swept into a list headed "remove these".
-    if (onlyUnavailable && !(meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier)) return false
-    if (!search) return true
-    return `${it.sku} ${it.name ?? ""} ${it.variant ?? ""}`.toLowerCase().includes(search.toLowerCase())
+ if (onlyUnavailable && !(meta[it.sku] !== undefined && !meta[it.sku]?.supplier && !it.supplier)) return false
+ if (!search) return true
+ return `${it.sku} ${it.name ?? ""} ${it.variant ?? ""}`.toLowerCase().includes(search.toLowerCase())
   }), [items, cat, vis, search, onlyUnavailable, meta, needs])
 
-  const stats = useMemo(() => {
-    const list = items ?? []
-    return { total: list.length, low: list.filter(isLow).length, out: list.filter(isOut).length, reserved: list.reduce((s, i) => s + num(i.reserved), 0) }
+ const stats = useMemo(() => {
+ const list = items ?? []
+ return { total: list.length, low: list.filter(isLow).length, out: list.filter(isOut).length, reserved: list.reduce((s, i) => s + num(i.reserved), 0) }
   }, [items])
 
   /**
@@ -252,28 +252,28 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    * product it will actually be picked for. Unresolved rows fall back to their name, and
    * anything left is its own group of one, which renders exactly as it always did.
    */
-  const groups = useMemo(() => {
-    const out: { key: string; name: string; product: CatalogProduct | null; image: string; rows: InventoryItem[] }[] = []
-    const by = new Map<string, number>()
-    for (const it of filtered) {
-      const p = catalog.length ? resolveProduct({ sku: it.sku } as OrderItem, catalog) : null
-      const key = p ? "p:" + String(p.id ?? p.sku ?? p.name) : it.name?.trim() ? "n:" + it.name.trim().toLowerCase() : "s:" + it.sku
-      const at = by.get(key)
-      if (at === undefined) {
-        by.set(key, out.length)
-        out.push({ key, name: p?.name || it.name || it.sku, product: p, image: imageFor(p, it.variant), rows: [it] })
+ const groups = useMemo(() => {
+ const out: { key: string; name: string; product: CatalogProduct | null; image: string; rows: InventoryItem[] }[] = []
+ const by = new Map<string, number>()
+ for (const it of filtered) {
+ const p = catalog.length ? resolveProduct({ sku: it.sku } as OrderItem, catalog) : null
+ const key = p ? "p:" + String(p.id ?? p.sku ?? p.name) : it.name?.trim() ? "n:" + it.name.trim().toLowerCase() : "s:" + it.sku
+ const at = by.get(key)
+ if (at === undefined) {
+ by.set(key, out.length)
+ out.push({ key, name: p?.name || it.name || it.sku, product: p, image: imageFor(p, it.variant), rows: [it] })
       } else {
-        out[at].rows.push(it)
+ out[at].rows.push(it)
       }
     }
-    return out
+ return out
   }, [filtered, catalog])
 
-  const paged = usePaged(groups, 25)
+ const paged = usePaged(groups, 25)
   /** Every sku on the page, open or not — what "select all" and the supplier resolver mean
-   *  by "this page". A collapsed group still selects its variants: the checkbox is on the
-   *  product, and the labels are printed per variant. */
-  const pageSkus = useMemo(() => paged.pageItems.flatMap((g) => g.rows.map((r) => r.sku)), [paged.pageItems])
+   * by "this page". A collapsed group still selects its variants: the checkbox is on the
+   * product, and the labels are printed per variant. */
+ const pageSkus = useMemo(() => paged.pageItems.flatMap((g) => g.rows.map((r) => r.sku)), [paged.pageItems])
 
   /**
    * WHO SELLS THIS, AND CAN WE STILL GET IT.
@@ -290,33 +290,33 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
    * stock we physically hold is real whether or not the supplier still lists it. It is
    * flagged, and removing it stays a decision someone makes per row.
    */
-  useEffect(() => {
-    const missing = pageSkus.filter(Boolean).filter((k) => meta[k] === undefined)
-    if (!missing.length) return
-    let alive = true
-    const t = setTimeout(() => {
-      resolveSuppliers(missing)
+ useEffect(() => {
+ const missing = pageSkus.filter(Boolean).filter((k) => meta[k] === undefined)
+ if (!missing.length) return
+ let alive = true
+ const t = setTimeout(() => {
+ resolveSuppliers(missing)
         .then((r) => {
-          if (!alive) return
+ if (!alive) return
           // Cache a key for every sku ASKED, including the ones with no answer — otherwise
           // the effect re-fires forever on exactly the rows we most want to flag.
-          const add: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }> = {}
-          for (const k of missing) add[k] = (r?.bySku ?? {})[k] ?? {}
-          setMeta((m) => ({ ...m, ...add }))
+ const add: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }> = {}
+ for (const k of missing) add[k] = (r?.bySku ?? {})[k] ?? {}
+ setMeta((m) => ({ ...m, ...add }))
         })
         .catch(() => { /* leave them unknown — unknown is not the same as unavailable */ })
     }, 0)
-    return () => { alive = false; clearTimeout(t) }
+ return () => { alive = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageSkus])
 
-  return (
+ return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         {/* Icon+title hidden on desktop (the top bar names the page); the Saving
-            indicator on the right stays. On mobile the hero is the title. */}
+ indicator on the right stays. On mobile the hero is the title. */}
         {!embedded && (<>
-          <Package size={18} weight="regular"  className="shrink-0 text-primary md:hidden" />
+          <Package size={18} weight="regular" className="shrink-0 text-primary md:hidden" />
           <div className="min-w-0 md:hidden">
             <PageTitle>Inventory</PageTitle>
             <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
@@ -329,14 +329,14 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
 
       {/* Standalone only: the two pools (stock WE own vs stock sellers consigned to us).
           When embedded in the Inventory shell, these are two of its top tabs instead — no
-          second stacked pill row. */}
+ second stacked pill row. */}
       {!pool && (
         <div className="flex w-fit rounded-full border border-border p-0.5">
           {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }] as const).map((t) => (
             <button
-              key={t.id}
-              onClick={() => setOwnTab(t.id)}
-              className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+ key={t.id}
+ onClick={() => setOwnTab(t.id)}
+ className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
               <TabLabel>{t.label}</TabLabel>
             </button>
@@ -346,8 +346,8 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
 
       {tab === "consigned" ? (
         /* Two things are inbound and neither was visible from this screen: stock we BOUGHT
-           and have not received (placed POs, Alibaba included), and stock a SELLER sent us
-           to hold. Both end with someone opening a carton at this desk. */
+ and have not received (placed POs, Alibaba included), and stock a SELLER sent us
+ to hold. Both end with someone opening a carton at this desk. */
         <div className="space-y-4">
           <InboundPanel />
           <ConsignmentPanel />
@@ -366,11 +366,11 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           */}
         <button type="button" onClick={() => setNeeds(needs === "low" ? null : "low")} className="text-left">
           <StatCard label="Low stock" value={String(stats.low)} sub={needs === "low" ? "showing these" : "at/below reorder"}
-            tone={stats.low ? "neg" : undefined} />
+ tone={stats.low ? "neg" : undefined} />
         </button>
         <button type="button" onClick={() => setNeeds(needs === "out" ? null : "out")} className="text-left">
           <StatCard label="Out of stock" value={String(stats.out)} sub={needs === "out" ? "showing these" : "need reorder"}
-            tone={stats.out ? "neg" : undefined} />
+ tone={stats.out ? "neg" : undefined} />
         </button>
         <StatCard label="Reserved" value={String(stats.reserved)} sub="on open orders" />
       </StatGrid>
@@ -388,25 +388,25 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             </select>
           )}
           {/* The clean-up filter. Off by default: this table's job is what we HOLD, and a
-              blank we can no longer buy is still stock on a shelf until someone decides
-              otherwise. */}
+ blank we can no longer buy is still stock on a shelf until someone decides
+ otherwise. */}
           <label className="flex eg-control cursor-pointer">
             <input type="checkbox" checked={onlyUnavailable} onChange={(e) => setOnlyUnavailable(e.target.checked)} className="size-3.5 accent-[var(--primary)]" />
             No longer stocked
           </label>
           <select
-            value={vis}
-            onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
-            aria-label="Filter by visibility"
-            className="eg-select eg-control pr-8"
+ value={vis}
+ onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
+ aria-label="Filter by visibility"
+ className="eg-select eg-control pr-8"
           >
             <option value="">All visibility</option>
             {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
           </select>
           {/* FILTERS LEFT, ACTIONS RIGHT. They were one undifferentiated run, so "Add item"
-              sat in the middle of the things that narrow the list — and the eye has no way
-              to know which half of a row it is in. ml-auto is the whole separation: a gap
-              says "these do something to the list, those do something to the world". */}
+ sat in the middle of the things that narrow the list — and the eye has no way
+ to know which half of a row it is in. ml-auto is the whole separation: a gap
+ says "these do something to the list, those do something to the world". */}
           {notice && (
             <span className="text-xs text-muted-foreground">
               {notice}{" "}
@@ -415,20 +415,20 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           )}
           <div className="ml-auto flex items-center gap-2">
             {/* SELECT-ALL CAME OFF THE TABLE HEAD WITH THE TABLE HEAD. It lived in a column
-                header; there are no column headers spanning the page any more, so it lives
-                with the actions it feeds. Still this PAGE only — ticking a box must never
-                quietly select hundreds of rows nobody can see. */}
+ header; there are no column headers spanning the page any more, so it lives
+ with the actions it feeds. Still this PAGE only — ticking a box must never
+ quietly select hundreds of rows nobody can see. */}
             <label className="flex eg-control cursor-pointer">
               <input
-                type="checkbox"
-                aria-label="Select every variant on this page"
-                checked={pageSkus.length > 0 && pageSkus.every((k) => sel.has(k))}
-                onChange={(e) => {
-                  const next = new Set(sel)
-                  pageSkus.forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
-                  setSel(next)
+ type="checkbox"
+ aria-label="Select every variant on this page"
+ checked={pageSkus.length > 0 && pageSkus.every((k) => sel.has(k))}
+ onChange={(e) => {
+ const next = new Set(sel)
+ pageSkus.forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
+ setSel(next)
                 }}
-                className="size-3.5 accent-[var(--primary)]"
+ className="size-3.5 accent-[var(--primary)]"
               />
               Select page
             </label>
@@ -458,10 +458,10 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         </div>
 
         {/* THE PARAGRAPH IS GONE. Four sentences with three words bolded inside them, above
-            a table — five type weights in a strip whose job was to define a dropdown that
-            has three options in it. The definitions live on the control: each option's
-            meaning is one line under the select in the Add-item dialog, which is where
-            somebody is actually choosing. */}
+ a table — five type weights in a strip whose job was to define a dropdown that
+ has three options in it. The definitions live on the control: each option's
+ meaning is one line under the select in the Add-item dialog, which is where
+ somebody is actually choosing. */}
 
         {items === null ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
@@ -470,28 +470,28 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         ) : (
           <>
             {/* NO TABLE HEAD, because there is no longer one table. Each product carries
-                its own column headings over its own numbers, which is the only place they
-                mean anything: "S, M, L, XL" belongs to a tee and "One size" to a cap, and a
-                single header row above both could only ever be right for one of them. */}
+ its own column headings over its own numbers, which is the only place they
+ mean anything: "S, M, L, XL" belongs to a tee and "One size" to a cap, and a
+ single header row above both could only ever be right for one of them. */}
             <div className="divide-y divide-border">
               {paged.pageItems.map((g) => {
-                const allSel = g.rows.every((r) => sel.has(r.sku))
-                return (
+ const allSel = g.rows.every((r) => sel.has(r.sku))
+ return (
                   <ProductSheet
-                    key={g.key}
-                    group={g}
-                    selected={allSel}
-                    onSelect={(on: boolean) => {
-                      const next = new Set(sel)
-                      for (const r of g.rows) { if (on) next.add(r.sku); else next.delete(r.sku) }
-                      setSel(next)
+ key={g.key}
+ group={g}
+ selected={allSel}
+ onSelect={(on: boolean) => {
+ const next = new Set(sel)
+ for (const r of g.rows) { if (on) next.add(r.sku); else next.delete(r.sku) }
+ setSel(next)
                     }}
-                    meta={meta}
-                    sel={sel} setSel={setSel}
-                    edit={edit} setVisibility={setVisibility} remove={remove}
-                    onProductHistory={(name: string, skus: string[]) => setHist({ label: name, skus })}
-                    onZoom={setZoomSku}
-                    onOrder={onOrder}
+ meta={meta}
+ sel={sel} setSel={setSel}
+ edit={edit} setVisibility={setVisibility} remove={remove}
+ onProductHistory={(name: string, skus: string[]) => setHist({ label: name, skus })}
+ onZoom={setZoomSku}
+ onOrder={onOrder}
                   />
                 )
               })}
@@ -508,13 +508,13 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       <ScanHistoryDialog target={hist} onClose={() => setHist(null)} />
 
       {/* Selected variants only — or the whole filtered list if nothing is ticked,
-          which keeps the old one-click behaviour for "print everything". */}
+ which keeps the old one-click behaviour for "print everything". */}
       <LabelSheet
-        key={printOpen ? "print-open" : "print-closed"}
-        open={printOpen}
-        onClose={() => setPrintOpen(false)}
-        labels={(sel.size ? filtered.filter((i) => sel.has(i.sku)) : filtered).map((i) => ({
-          sku: i.sku, name: i.name, variant: i.variant,
+ key={printOpen ? "print-open" : "print-closed"}
+ open={printOpen}
+ onClose={() => setPrintOpen(false)}
+ labels={(sel.size ? filtered.filter((i) => sel.has(i.sku)) : filtered).map((i) => ({
+ sku: i.sku, name: i.name, variant: i.variant,
         }))}
       />
       <BarcodeZoom sku={zoomSku} onClose={() => setZoomSku(null)} />
@@ -525,23 +525,23 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
 type Group = { key: string; name: string; product: CatalogProduct | null; image: string; rows: InventoryItem[] }
 
 /** The photo, or the letter — never an empty tile, and never a stock photo of something
- *  else. A blank square with an initial says "no picture"; a placeholder garment would say
+ * else. A blank square with an initial says "no picture"; a placeholder garment would say
  *  "this is the garment", which is a lie the picker acts on. */
 function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: number }) {
-  return src ? (
+ return src ? (
     <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-muted/40" style={{ width: size, height: size }}>
       <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
     </span>
   ) : (
     /* NOT THE FIRST LETTER. Half these names begin with a digit — "47 Brand Trawler Cap"
-       drew a big "4" in the picture column, which reads as a COUNT sitting where a photo
-       should be, and looks like a sync that went wrong rather than a product with no image.
+ drew a big "4" in the picture column, which reads as a COUNT sitting where a photo
+ should be, and looks like a sync that went wrong rather than a product with no image.
        A glyph can only mean "no picture". */
     <span
-      className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-muted-foreground/50"
-      style={{ width: size, height: size }}
-      title={name ? `No picture for ${name}` : "No picture"}
-      aria-hidden
+ className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-muted-foreground/50"
+ style={{ width: size, height: size }}
+ title={name ? `No picture for ${name}` : "No picture"}
+ aria-hidden
     >
       <Package size={Math.round(size / 2.6)} weight="light" />
     </span>
@@ -564,45 +564,45 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
  * that cost width all day.
  */
 function ProductSheet({
-  group, selected, onSelect, meta, sel, setSel, edit, setVisibility, remove,
-  onProductHistory, onZoom, onOrder,
+ group, selected, onSelect, meta, sel, setSel, edit, setVisibility, remove,
+ onProductHistory, onZoom, onOrder,
 }: {
-  group: Group
-  selected: boolean
-  onSelect: (on: boolean) => void
-  meta: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>
-  sel: Set<string>
-  setSel: (s: Set<string>) => void
-  edit: (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => void
-  setVisibility: (sku: string, v: SkuVisibility) => void
-  remove: (sku: string) => void
-  onProductHistory: (name: string, skus: string[]) => void
-  onZoom: (sku: string) => void
-  onOrder: Record<string, number>
+ group: Group
+ selected: boolean
+ onSelect: (on: boolean) => void
+ meta: Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>
+ sel: Set<string>
+ setSel: (s: Set<string>) => void
+ edit: (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => void
+ setVisibility: (sku: string, v: SkuVisibility) => void
+ remove: (sku: string) => void
+ onProductHistory: (name: string, skus: string[]) => void
+ onZoom: (sku: string) => void
+ onOrder: Record<string, number>
 }) {
   // Second press arms the removal — the count is the warning, so it is in the label.
-  const [killing, setKilling] = useState(false)
-  const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
-  const reserved = group.rows.reduce((n, r) => n + num(r.reserved), 0)
-  const out = group.rows.filter(isOut).length
-  const one = group.rows.length === 1
-  const sku = group.product?.sku || (one ? group.rows[0].sku : null)
-  const supplier = group.rows.map((r) => r.supplier || meta[r.sku]?.supplier).find(Boolean)
+ const [killing, setKilling] = useState(false)
+ const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
+ const reserved = group.rows.reduce((n, r) => n + num(r.reserved), 0)
+ const out = group.rows.filter(isOut).length
+ const one = group.rows.length === 1
+ const sku = group.product?.sku || (one ? group.rows[0].sku : null)
+ const supplier = group.rows.map((r) => r.supplier || meta[r.sku]?.supplier).find(Boolean)
   // Reorder point and visibility are stored per sku and are, in practice, a decision about
   // the PRODUCT — nobody stocks Navy to 25 and Black to 40. They were on each variant row's
   // menu; there are no variant rows now, so they act on every variant at once and say so.
-  const reorderAt = group.rows[0]?.reorder_at ?? 25
-  const visSame = group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
+ const reorderAt = group.rows[0]?.reorder_at ?? 25
+ const visSame = group.rows.every((r) => visOf(r) === visOf(group.rows[0]))
 
-  return (
+ return (
     <section className="border-b border-border last:border-b-0">
       <header className="flex items-center gap-3 px-4 py-2.5">
         <input
-          type="checkbox"
-          aria-label={`Select ${group.name}`}
-          checked={selected}
-          onChange={(e) => onSelect(e.target.checked)}
-          className="size-3.5 shrink-0"
+ type="checkbox"
+ aria-label={`Select ${group.name}`}
+ checked={selected}
+ onChange={(e) => onSelect(e.target.checked)}
+ className="size-3.5 shrink-0"
         />
         <Thumb src={group.image} name={group.name} size={34} />
         <div className="min-w-0 flex-1">
@@ -614,11 +614,11 @@ function ProductSheet({
           </div>
         </div>
         {/* THE TOTAL IS A CAPTION, NOT A COLUMN. It used to sit in the Stock column beside
-            editable variant counts, which made a figure nobody can type into look like one
-            they should. Held is in the title, where it was already. */}
+ editable variant counts, which made a figure nobody can type into look like one
+ they should. Held is in the title, where it was already. */}
         <div
-          className="shrink-0 text-right"
-          title={reserved > 0 ? `${stock} on the shelf · ${reserved} held for orders · ${stock - reserved} free` : `${stock} on the shelf`}
+ className="shrink-0 text-right"
+ title={reserved > 0 ? `${stock} on the shelf · ${reserved} held for orders · ${stock - reserved} free` : `${stock} on the shelf`}
         >
           <div className="text-sm font-semibold tabular-nums leading-none">{stock}</div>
           <div className="mt-0.5 text-2xs text-muted-foreground">
@@ -627,9 +627,9 @@ function ProductSheet({
         </div>
         <Popover>
           <PopoverTrigger
-            aria-label={`Actions for ${group.name}`}
-            title="Reorder point, visibility, history, remove"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+ aria-label={`Actions for ${group.name}`}
+ title="Reorder point, visibility, history, remove"
+ className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <DotsThree size={18} weight="bold" />
           </PopoverTrigger>
@@ -640,54 +640,54 @@ function ProductSheet({
             <label className="flex items-center justify-between gap-3">
               <span className="text-xs font-medium">Reorder at</span>
               <Input
-                value={String(reorderAt)}
-                onChange={(e) => {
-                  const v = Number(e.target.value.replace(/[^0-9]/g, "")) || 0
-                  group.rows.forEach((r) => edit(r.sku, "reorder_at", v))
+ value={String(reorderAt)}
+ onChange={(e) => {
+ const v = Number(e.target.value.replace(/[^0-9]/g, "")) || 0
+ group.rows.forEach((r) => edit(r.sku, "reorder_at", v))
                 }}
-                inputMode="numeric"
-                aria-label={`Reorder point for ${group.name}`}
-                className="h-8 w-16 text-center"
+ inputMode="numeric"
+ aria-label={`Reorder point for ${group.name}`}
+ className="h-8 w-16 text-center"
               />
             </label>
             <label className="block space-y-1">
               <span className="text-xs font-medium">Visibility</span>
               <select
-                value={visSame ? visOf(group.rows[0]) : ""}
-                onChange={(e) => { const v = e.target.value as SkuVisibility; group.rows.forEach((r) => setVisibility(r.sku, v)) }}
-                aria-label={`Visibility for ${group.name}`}
-                className="eg-select h-8 w-full rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+ value={visSame ? visOf(group.rows[0]) : ""}
+ onChange={(e) => { const v = e.target.value as SkuVisibility; group.rows.forEach((r) => setVisibility(r.sku, v)) }}
+ aria-label={`Visibility for ${group.name}`}
+ className="eg-select h-8 w-full rounded-md border border-border bg-transparent py-0 pl-2 pr-6 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
                 {/* A product whose variants disagree shows that rather than the first one's
-                    setting — picking any option then makes them agree, which is the fix. */}
+ setting — picking any option then makes them agree, which is the fix. */}
                 {!visSame && <option value="">Mixed — pick one to settle it</option>}
                 {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             </label>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2">
               <button
-                type="button"
-                onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+ type="button"
+ onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
+ className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ClockCounterClockwise size={14} /> Stock history
               </button>
               {/* Barcode is a fact about ONE sku — you hold a gun to the screen and scan it.
                   Offered only when the product IS one sku; otherwise the label printer is
-                  the right door, and it takes the whole selection. */}
+ the right door, and it takes the whole selection. */}
               {one && (
                 <button
-                  type="button"
-                  onClick={() => onZoom(group.rows[0].sku)}
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+ type="button"
+ onClick={() => onZoom(group.rows[0].sku)}
+ className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <QrCodeIcon size={14} /> Barcode
                 </button>
               )}
               <button
-                type="button"
-                onClick={() => { if (!killing) { setKilling(true); return } group.rows.forEach((r) => remove(r.sku)); setKilling(false) }}
-                className={"inline-flex items-center gap-1.5 text-xs transition-colors hover:text-red-600 "
+ type="button"
+ onClick={() => { if (!killing) { setKilling(true); return } group.rows.forEach((r) => remove(r.sku)); setKilling(false) }}
+ className={"inline-flex items-center gap-1.5 text-xs transition-colors hover:text-red-600 "
                   + (killing ? "font-medium text-red-600" : "text-muted-foreground")}
               >
                 <Trash size={14} /> {killing ? (one ? "Remove?" : `Remove all ${group.rows.length}?`) : "Remove"}
@@ -697,12 +697,12 @@ function ProductSheet({
         </Popover>
       </header>
       <StockMatrix
-        group={group}
-        sel={sel}
-        setSel={setSel}
-        onOrder={onOrder}
-        edit={(s, _f, v) => edit(s, "in_stock", v)}
-        lowAt={(it) => Number(it.reorder_at ?? 25)}
+ group={group}
+ sel={sel}
+ setSel={setSel}
+ onOrder={onOrder}
+ edit={(s, _f, v) => edit(s, "in_stock", v)}
+ lowAt={(it) => Number(it.reorder_at ?? 25)}
       />
     </section>
   )
@@ -735,18 +735,18 @@ function ProductSheet({
  * The number carries the colour and the border marks it; the fill is gone.
  */
 function cellTone(it: InventoryItem, lowAt: (x: InventoryItem) => number) {
-  const stock = Number(it.in_stock) || 0
-  if (stock <= 0) return "border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300"
-  if (stock <= lowAt(it)) return "border-amber-200 text-amber-800 dark:border-amber-900/40 dark:text-amber-300"
-  return "border-border"
+ const stock = Number(it.in_stock) || 0
+ if (stock <= 0) return "border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300"
+ if (stock <= lowAt(it)) return "border-hold/20 text-hold"
+ return "border-border"
 }
 
 /** The variants a grid could not place — named, never dropped. */
 function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
-  return (
+ return (
     <p className="text-2xs text-muted-foreground">
       {rows.length} variant{rows.length === 1 ? "" : "s"}{" "}not on this grid — the sku doesn&apos;t match the
-      product&apos;s sizes and colours: <span className="tabular-nums">{rows.map((r) => r.sku).join(", ")}</span>
+ product&apos;s sizes and colours: <span className="tabular-nums">{rows.map((r) => r.sku).join(", ")}</span>
     </p>
   )
 }
@@ -761,14 +761,14 @@ function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
  * header, with its numbers at the same x as every other product's.
  */
 function PlainStock({ rows, edit, lowAt, sel, setSel, onOrder }: {
-  rows: InventoryItem[]
-  edit: (sku: string, field: "in_stock", value: number) => void
-  lowAt: (it: InventoryItem) => number
-  sel: Set<string>
-  setSel: (s: Set<string>) => void
-  onOrder: Record<string, number>
+ rows: InventoryItem[]
+ edit: (sku: string, field: "in_stock", value: number) => void
+ lowAt: (it: InventoryItem) => number
+ sel: Set<string>
+ setSel: (s: Set<string>) => void
+ onOrder: Record<string, number>
 }) {
-  return (
+ return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
@@ -783,29 +783,29 @@ function PlainStock({ rows, edit, lowAt, sel, setSel, onOrder }: {
             <tr key={it.sku} className="border-t border-border">
               <td className={`${LABEL_W} ${GUTTER} relative truncate whitespace-nowrap py-1 pe-2 font-medium`}>
                 <input
-                  type="checkbox"
-                  aria-label={`Select ${it.sku}`}
-                  checked={sel.has(it.sku)}
-                  onChange={(e) => {
-                    const next = new Set(sel)
-                    if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
-                    setSel(next)
+ type="checkbox"
+ aria-label={`Select ${it.sku}`}
+ checked={sel.has(it.sku)}
+ onChange={(e) => {
+ const next = new Set(sel)
+ if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
+ setSel(next)
                   }}
-                  className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
+ className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
                 />
                 <span className="tabular-nums">{it.sku}</span>
                 {it.variant && <span className="ms-2 font-normal text-muted-foreground">{it.variant}</span>}
               </td>
               <td className={`${SIZE_W} px-1 py-1 text-center`}>
                 <Input
-                  value={String(Number(it.in_stock) || 0)}
-                  onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                  inputMode="numeric"
-                  aria-label={`In stock for ${it.sku}`}
-                  title={[`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`,
+ value={String(Number(it.in_stock) || 0)}
+ onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+ inputMode="numeric"
+ aria-label={`In stock for ${it.sku}`}
+ title={[`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`,
                           (onOrder[String(it.sku).toUpperCase()] ?? 0) > 0
                             ? `${onOrder[String(it.sku).toUpperCase()]} on order` : null].filter(Boolean).join(" · ")}
-                  className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
+ className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
                 />
               </td>
               <td className="w-auto pe-4" />
@@ -843,18 +843,18 @@ const LABEL_W = "w-[13rem]"
 const SIZE_W = "w-[4.5rem]"
 
 function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
-  group: { product: CatalogProduct | null; rows: InventoryItem[] }
-  edit: (sku: string, field: "in_stock", value: number) => void
-  lowAt: (it: InventoryItem) => number
-  sel: Set<string>
-  setSel: (s: Set<string>) => void
+ group: { product: CatalogProduct | null; rows: InventoryItem[] }
+ edit: (sku: string, field: "in_stock", value: number) => void
+ lowAt: (it: InventoryItem) => number
+ sel: Set<string>
+ setSel: (s: Set<string>) => void
   /** How many of each sku a purchase order already covers — see the cell's title. */
-  onOrder: Record<string, number>
+ onOrder: Record<string, number>
 }) {
-  const p = group.product
+ const p = group.product
   // No catalogue product = no declared sizes or colours to build axes from. Same panel,
   // one column. See PlainStock.
-  if (!p) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} sel={sel} setSel={setSel} onOrder={onOrder} />
+ if (!p) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} sel={sel} setSel={setSel} onOrder={onOrder} />
 
   /**
    * THE AXES COME FROM THE SHELF, NOT THE CATALOGUE.
@@ -869,31 +869,31 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
    * colour alone. Only the sizes and colours that actually appear become axes, which makes
    * the grid exactly as big as the shelf and never bigger.
    */
-  const declaredSizes = productSizes(p)
-  const declaredColors = productColors(p)
-  const norm = (v: string) => String(v || "").trim().toUpperCase()
+ const declaredSizes = productSizes(p)
+ const declaredColors = productColors(p)
+ const norm = (v: string) => String(v || "").trim().toUpperCase()
 
-  const placed = new Map<string, { size: string; color: string; it: InventoryItem }>()
-  for (const it of group.rows) {
-    const sku = norm(it.sku)
-    let hit: { size: string; color: string } | null = null
-    for (const z of declaredSizes) {
-      for (const c of declaredColors) {
-        if (norm(variantSku(p.sku, z, c) || "") === sku) { hit = { size: z, color: c }; break }
+ const placed = new Map<string, { size: string; color: string; it: InventoryItem }>()
+ for (const it of group.rows) {
+ const sku = norm(it.sku)
+ let hit: { size: string; color: string } | null = null
+ for (const z of declaredSizes) {
+ for (const c of declaredColors) {
+ if (norm(variantSku(p.sku, z, c) || "") === sku) { hit = { size: z, color: c }; break }
       }
-      if (hit) break
-      if (norm(variantSku(p.sku, z, null) || "") === sku) { hit = { size: z, color: "" }; break }
+ if (hit) break
+ if (norm(variantSku(p.sku, z, null) || "") === sku) { hit = { size: z, color: "" }; break }
     }
-    if (!hit) {
-      for (const c of declaredColors) {
-        if (norm(variantSku(p.sku, null, c) || "") === sku) { hit = { size: "", color: c }; break }
+ if (!hit) {
+ for (const c of declaredColors) {
+ if (norm(variantSku(p.sku, null, c) || "") === sku) { hit = { size: "", color: c }; break }
       }
     }
-    if (hit) placed.set(sku, { ...hit, it })
+ if (hit) placed.set(sku, { ...hit, it })
   }
   // Nothing resolves — the skus don't decompose against this product's sizes and colours.
   // Still a table, still under a header; the list stays honest by naming each sku.
-  if (!placed.size) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} sel={sel} setSel={setSel} onOrder={onOrder} />
+ if (!placed.size) return <PlainStock rows={group.rows} edit={edit} lowAt={lowAt} sel={sel} setSel={setSel} onOrder={onOrder} />
 
   /**
    * WHAT IS ON THE SHELF, NOT WHAT THE CATALOGUE COULD HOLD.
@@ -905,33 +905,33 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
    * count on a line that has never had one is exactly the job people open this to do.
    * Hiding it put an extra click in front of the only edit that matters.
    */
-  const shown = [...placed.values()]
+ const shown = [...placed.values()]
 
-  const sizes = [...new Set(shown.map((x) => x.size).filter(Boolean))].sort(bySize)
-  const colors = [...new Set(shown.map((x) => x.color).filter(Boolean))]
-  const leftover = group.rows.filter((r) => !placed.has(norm(r.sku)))
-  const at = (size: string, color: string) =>
-    shown.find((x) => x.size === size && x.color === color)?.it ?? null
+ const sizes = [...new Set(shown.map((x) => x.size).filter(Boolean))].sort(bySize)
+ const colors = [...new Set(shown.map((x) => x.color).filter(Boolean))]
+ const leftover = group.rows.filter((r) => !placed.has(norm(r.sku)))
+ const at = (size: string, color: string) =>
+ shown.find((x) => x.size === size && x.color === color)?.it ?? null
 
-  const cell = (it: InventoryItem | null, key: string) => {
-    if (!it) return <span key={key} className="inline-block w-12 text-center text-muted-foreground/30">·</span>
+ const cell = (it: InventoryItem | null, key: string) => {
+ if (!it) return <span key={key} className="inline-block w-12 text-center text-muted-foreground/30">·</span>
     // WHAT IS ALREADY COMING. A cell reading 0 with a PO against it is a different
     // situation from a cell reading 0 with nothing coming, and the second is the one that
     // needs someone. It rode on the old variant row as a chip; here it is in the title,
     // because a grid of forty cells cannot carry forty chips and stay a grid.
-    const due = onOrder[String(it.sku).toUpperCase()] ?? 0
-    const held = Number(it.reserved) || 0
-    return (
+ const due = onOrder[String(it.sku).toUpperCase()] ?? 0
+ const held = Number(it.reserved) || 0
+ return (
       <Input
-        key={key}
-        value={String(Number(it.in_stock) || 0)}
-        onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-        inputMode="numeric"
-        aria-label={`In stock for ${it.sku}`}
-        title={[`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`,
-                held > 0 ? `${held} held for orders` : null,
-                due > 0 ? `${due} on order` : null].filter(Boolean).join(" · ")}
-        className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
+ key={key}
+ value={String(Number(it.in_stock) || 0)}
+ onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+ inputMode="numeric"
+ aria-label={`In stock for ${it.sku}`}
+ title={[`${it.sku} · ${Number(it.in_stock) || 0} on the shelf`,
+ held > 0 ? `${held} held for orders` : null,
+ due > 0 ? `${due} on order` : null].filter(Boolean).join(" · ")}
+ className={"h-7 w-12 text-center tabular-nums " + cellTone(it, lowAt)}
       />
     )
   }
@@ -950,9 +950,9 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
    * as every other product's. A column that is boring is still a column.
    */
   // An axis with no values still needs one slot, or there is nothing to draw the cell in.
-  const sizeCols = sizes.length ? sizes : [""]
-  const colorRows = colors.length ? colors : [""]
-  const hasColorAxis = colors.length > 0
+ const sizeCols = sizes.length ? sizes : [""]
+ const colorRows = colors.length ? colors : [""]
+ const hasColorAxis = colors.length > 0
   /**
    * WHAT A SIZELESS COLUMN IS CALLED — and the suppliers already answered this.
    *
@@ -965,26 +965,26 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
    * A real single size keeps its own name: a cap sku carrying `ADJUSTABLE` is not
    * one-size-fits-all, it is a size called Adjustable, and saying so is more useful.
    */
-  const sizeHeader = (z: string) => (!z || isOneSize(z) ? "One size" : z)
+ const sizeHeader = (z: string) => (!z || isOneSize(z) ? "One size" : z)
   /** Every sku on one colour's row — what its checkbox selects. */
-  const rowSkus = (c: string) => shown.filter((x) => x.color === c).map((x) => x.it.sku)
+ const rowSkus = (c: string) => shown.filter((x) => x.color === c).map((x) => x.it.sku)
 
-  return (
+ return (
     <div className="space-y-2">
       <div className="overflow-x-auto">
         {/* FULL WIDTH, so the rules are rules.
             The grid sized itself to its contents, which left it occupying the first third
-            of a very wide row: the size columns bunched against the colour names, and every
-            separator stopped dead under 3XL with two-thirds of the row unruled — a line
-            that ends in the middle of a panel reads as a rendering fault rather than a
-            divider. At w-full the columns take the space evenly and each rule crosses the
-            whole panel, which is the only way a row of six numbers is read across. */}
+ of a very wide row: the size columns bunched against the colour names, and every
+ separator stopped dead under 3XL with two-thirds of the row unruled — a line
+ that ends in the middle of a panel reads as a rendering fault rather than a
+ divider. At w-full the columns take the space evenly and each rule crosses the
+ whole panel, which is the only way a row of six numbers is read across. */}
         <table className="w-full text-xs">
           <thead>
             <tr className="text-muted-foreground">
               {/* "Colour" only when there IS one. A product whose skus carry sizes and no
-                  colour was heading its own name column "Colour" and printing a size under
-                  it. */}
+ colour was heading its own name column "Colour" and printing a size under
+ it. */}
               <th className={`${LABEL_W} ${GUTTER} whitespace-nowrap py-1 pe-2 text-left font-medium`}>
                 {hasColorAxis ? "Colour" : "Variant"}
               </th>
@@ -992,7 +992,7 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
                 <th key={z || "one"} className={`${SIZE_W} px-1 py-1 text-center font-medium`}>{sizeHeader(z)}</th>
               ))}
               {/* The spacer takes the slack, so the real columns keep their width instead of
-                  stretching to fill a wide screen. */}
+ stretching to fill a wide screen. */}
               <th className="w-auto pe-4" />
             </tr>
           </thead>
@@ -1000,22 +1000,22 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
             {colorRows.map((c) => (
               <tr key={c || "one"} className="border-t border-border">
                 {/* SELECTION SURVIVED THE ROWS. Ticking a product used to be one checkbox
-                    per VARIANT, and those rows are gone — so a restock of "Black, every
-                    size" would have meant ticking the whole product or nothing. One box per
-                    colour, at the same x as the product's above it, takes that colour's
-                    sizes. Per-size selection is genuinely lost; the search box narrows to a
-                    single variant when that is what you need. */}
+ per VARIANT, and those rows are gone — so a restock of "Black, every
+ size" would have meant ticking the whole product or nothing. One box per
+ colour, at the same x as the product's above it, takes that colour's
+ sizes. Per-size selection is genuinely lost; the search box narrows to a
+ single variant when that is what you need. */}
                 <td className={`${LABEL_W} ${GUTTER} relative truncate whitespace-nowrap py-1 pe-2 font-medium`}>
                   <input
-                    type="checkbox"
-                    aria-label={`Select ${c ? prettyColorName(c) : "this variant"}`}
-                    checked={rowSkus(c).length > 0 && rowSkus(c).every((k) => sel.has(k))}
-                    onChange={(e) => {
-                      const next = new Set(sel)
-                      rowSkus(c).forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
-                      setSel(next)
+ type="checkbox"
+ aria-label={`Select ${c ? prettyColorName(c) : "this variant"}`}
+ checked={rowSkus(c).length > 0 && rowSkus(c).every((k) => sel.has(k))}
+ onChange={(e) => {
+ const next = new Set(sel)
+ rowSkus(c).forEach((k) => (e.target.checked ? next.add(k) : next.delete(k)))
+ setSel(next)
                     }}
-                    className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
+ className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
                   />
                   {c ? prettyColorName(c) : (p.name || group.rows[0]?.name || "Stock")}
                 </td>
@@ -1029,7 +1029,7 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
         </table>
       </div>
       {/* Under the table's own first column, not the panel's edge — it is a footnote to the
-          grid, and a footnote that starts somewhere the grid never does reads as a stray. */}
+ grid, and a footnote that starts somewhere the grid never does reads as a stray. */}
       {leftover.length > 0 && <div className={`${GUTTER} pe-4`}><LeftoverNote rows={leftover} /></div>}
     </div>
   )
@@ -1051,30 +1051,30 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
  * black void.
  */
 function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void }) {
-  return (
+ return (
     <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="border-none bg-[oklch(0.19_0.05_280)] sm:max-w-xl">
         <DialogHeader><DialogTitle className="text-white">Scan this code</DialogTitle></DialogHeader>
         {sku && (
           <div className="space-y-3 pb-2">
             {/* Generous white padding IS the quiet zone — Code-128 needs a clear margin
-                either side or the scanner can't find the start/stop guards. */}
+ either side or the scanner can't find the start/stop guards. */}
             {/* QR, not Code-128 — this is a SCREEN.
                 A 25-character SKU is 310 Code-128 modules, which in this box is 0.8px per
-                bar against the ~2px a camera needs. It was never scannable, whatever the
-                decoder did. The same SKU as a QR is 29 modules, about 8.5px each. The
+ bar against the ~2px a camera needs. It was never scannable, whatever the
+ decoder did. The same SKU as a QR is 29 modules, about 8.5px each. The
                 1D code is still what goes on a PRINTED label, where the physical width
-                is there to spend. */}
+ is there to spend. */}
             <div className="flex flex-col items-center gap-4 rounded-xl bg-white px-6 py-8">
               <ScanQr value={sku} size={260} />
               {/* Kept underneath for a handheld gun, which reads 1D off a screen far
-                  better than a phone camera does. */}
+ better than a phone camera does. */}
               <Barcode value={sku} height={70} width={2} fontSize={0} displayValue={false} fit />
             </div>
             <p className="text-center tabular-nums text-sm text-white/70">{sku}</p>
             <p className="text-center text-xs text-white/50">
               Phone camera: use the square code. Handheld gun: either. Hold 15–25cm away and
-              turn screen brightness up if it won&apos;t read.
+ turn screen brightness up if it won&apos;t read.
             </p>
           </div>
         )}
@@ -1108,35 +1108,35 @@ const MOVE_WORD: Record<string, string> = {
 }
 
 function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus: string[] } | null; onClose: () => void }) {
-  const [data, setData] = useState<StockHistory | null>(null)
-  const [failed, setFailed] = useState(false)
+ const [data, setData] = useState<StockHistory | null>(null)
+ const [failed, setFailed] = useState(false)
   // The set, as a stable string — an array literal is a new object every render, so
   // depending on it directly would re-fetch the dialog forever.
-  const key = target ? target.skus.join(",") : ""
-  const many = (target?.skus.length ?? 0) > 1
+ const key = target ? target.skus.join(",") : ""
+ const many = (target?.skus.length ?? 0) > 1
 
-  useEffect(() => {
-    let live = true
-    const id = setTimeout(() => {
-      const skus = key ? key.split(",") : []
-      if (!skus.length) { setData(null); setFailed(false); return }
-      const p = skus.length > 1 ? getStockMovementsForSkus(skus, 200) : getStockMovements(skus[0], 100)
-      p.then((r) => { if (live) { setData(r ?? null); setFailed(!r) } })
+ useEffect(() => {
+ let live = true
+ const id = setTimeout(() => {
+ const skus = key ? key.split(",") : []
+ if (!skus.length) { setData(null); setFailed(false); return }
+ const p = skus.length > 1 ? getStockMovementsForSkus(skus, 200) : getStockMovements(skus[0], 100)
+ p.then((r) => { if (live) { setData(r ?? null); setFailed(!r) } })
         .catch(() => { if (live) { setData(null); setFailed(true) } })
     }, 0)
-    return () => { live = false; clearTimeout(id) }
+ return () => { live = false; clearTimeout(id) }
   }, [key])
 
-  const rows = data?.movements ?? null
-  const when = (s?: string) => {
-    if (!s) return "—"
-    const d = new Date(s)
-    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+ const rows = data?.movements ?? null
+ const when = (s?: string) => {
+ if (!s) return "—"
+ const d = new Date(s)
+ return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
   }
   // The shelf and its journal, and the gap between them named rather than hidden.
-  const gap = data && data.inStock != null ? data.inStock - data.journal : 0
+ const gap = data && data.inStock != null ? data.inStock - data.journal : 0
 
-  return (
+ return (
     <Dialog open={!!target} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -1155,8 +1155,8 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
           )}
         </div>
         {/* A DIFFERENCE IS A FACT, NOT AN ERROR — every row that existed before this journal
-            did starts with one, and it is exactly the size of whatever was on the shelf that
-            day. Said plainly so nobody chases it as a bug. */}
+ did starts with one, and it is exactly the size of whatever was on the shelf that
+ day. Said plainly so nobody chases it as a bug. */}
         {data && gap !== 0 && (
           <p className="text-2xs text-muted-foreground">
             {gap > 0 ? gap : -gap} {gap > 0 ? "more" : "fewer"} on the shelf than this history accounts for
@@ -1172,10 +1172,10 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
         ) : (
           <div className="max-h-80 divide-y divide-border overflow-auto">
             {rows.map((r) => {
-              const up = r.delta > 0
-              return (
+ const up = r.delta > 0
+ return (
                 <div key={r.id} className="flex items-center gap-3 py-2">
-                  <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (up ? "bg-emerald-100 text-success" : "bg-amber-100 text-amber-700")}>
+                  <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (up ? "bg-emerald-100 text-success" : "bg-hold/15 text-hold")}>
                     {up ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
                   </span>
                   <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (up ? "text-success" : "text-red-600")}>
@@ -1185,13 +1185,13 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
                     <div className="truncate text-sm">
                       {MOVE_WORD[r.reason] ?? r.reason}
                       {/* WHICH variant, but only when the list holds more than one — on a
-                          single sku's history it would be the same string on every line. */}
+ single sku's history it would be the same string on every line. */}
                       {many && r.sku && <span className="ms-1.5 tabular-nums text-xs text-muted-foreground">{r.sku}</span>}
                     </div>
                     {(r.orderId || r.ref || r.note) && (
                       <div className="truncate text-xs text-muted-foreground">
                         {r.orderId ? <span className="tabular-nums">order {r.orderId}</span>
-                          : r.ref ? <span className="tabular-nums">{r.ref}</span> : null}
+ : r.ref ? <span className="tabular-nums">{r.ref}</span> : null}
                         {(r.orderId || r.ref) && r.note ? " · " : null}
                         {r.note}
                       </div>
@@ -1232,42 +1232,42 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
  * nothing must not silently add the wrong blank.
  */
 export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, seedQuery }: { open: boolean; onOpenChange: (v: boolean) => void; onAdd: (items: InventoryItem[]) => void; existing: string[]; catalog: CatalogProduct[]; seedQuery?: string }) {
-  const [mode, setMode] = useState<"catalog" | "manual">("catalog")
-  const [sku, setSku] = useState("")
-  const [name, setName] = useState("")
-  const [variant, setVariant] = useState("")
-  const [stock, setStock] = useState("")
-  const [reorder, setReorder] = useState("25")
-  const [category, setCategory] = useState("")
-  const [supplier, setSupplier] = useState("")
+ const [mode, setMode] = useState<"catalog" | "manual">("catalog")
+ const [sku, setSku] = useState("")
+ const [name, setName] = useState("")
+ const [variant, setVariant] = useState("")
+ const [stock, setStock] = useState("")
+ const [reorder, setReorder] = useState("25")
+ const [category, setCategory] = useState("")
+ const [supplier, setSupplier] = useState("")
   // Starts closed. Adding a row by hand is still not a decision to publish it, and the
   // dialog should not be the place that quietly differs from receiving.
-  const [visibility, setVisibility] = useState<SkuVisibility>("factory")
-  const [err, setErr] = useState<string | null>(null)
+ const [visibility, setVisibility] = useState<SkuVisibility>("factory")
+ const [err, setErr] = useState<string | null>(null)
   // Catalogue path
-  const [q, setQ] = useState("")
-  const [pickedId, setPickedId] = useState<string | null>(null)
-  const [chosen, setChosen] = useState<Set<string>>(new Set())
+ const [q, setQ] = useState("")
+ const [pickedId, setPickedId] = useState<string | null>(null)
+ const [chosen, setChosen] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    if (!open) return
-    const id = setTimeout(() => {
-      setMode(catalog.length ? "catalog" : "manual")
-      setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setVisibility("factory"); setErr(null)
-      setQ(seedQuery ?? ""); setPickedId(null); setChosen(new Set())
+ useEffect(() => {
+ if (!open) return
+ const id = setTimeout(() => {
+ setMode(catalog.length ? "catalog" : "manual")
+ setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setVisibility("factory"); setErr(null)
+ setQ(seedQuery ?? ""); setPickedId(null); setChosen(new Set())
     }, 0)
-    return () => clearTimeout(id)
+ return () => clearTimeout(id)
   }, [open, catalog.length, seedQuery])
 
-  const withSku = useMemo(() => catalog.filter((p) => String(p.sku || "").trim()), [catalog])
-  const matches = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    const list = t ? withSku.filter((p) => `${p.name ?? ""} ${p.sku ?? ""}`.toLowerCase().includes(t)) : withSku
-    return list.slice(0, 40)
+ const withSku = useMemo(() => catalog.filter((p) => String(p.sku || "").trim()), [catalog])
+ const matches = useMemo(() => {
+ const t = q.trim().toLowerCase()
+ const list = t ? withSku.filter((p) => `${p.name ?? ""} ${p.sku ?? ""}`.toLowerCase().includes(t)) : withSku
+ return list.slice(0, 40)
   }, [withSku, q])
-  const picked = useMemo(() => withSku.find((p) => String(p.id ?? p.sku) === pickedId) ?? null, [withSku, pickedId])
-  const pickedSizes = useMemo(() => (picked ? productSizes(picked) : []), [picked])
-  const pickedColors = useMemo(() => (picked ? productColors(picked) : []), [picked])
+ const picked = useMemo(() => withSku.find((p) => String(p.id ?? p.sku) === pickedId) ?? null, [withSku, pickedId])
+ const pickedSizes = useMemo(() => (picked ? productSizes(picked) : []), [picked])
+ const pickedColors = useMemo(() => (picked ? productColors(picked) : []), [picked])
 
   /**
    * ONE ROW PER VARIANT — colour AND size, because that is what the shelf holds and what an
@@ -1277,21 +1277,21 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
    * `chosen` holds the sku itself rather than a size, since the grid is now two dimensions
    * and a size string can no longer name a row on its own.
    */
-  const rows = useMemo(() => {
-    if (!picked) return []
-    const base = String(picked.sku || "").trim()
-    const szs = pickedSizes.length ? pickedSizes : [""]
-    const cls = pickedColors.length ? pickedColors : [""]
-    const out: { size: string; color: string; sku: string; exists: boolean }[] = []
-    for (const c of cls) for (const sz of szs) {
-      const k = variantSku(base, sz || null, c || null)
-      out.push({ size: sz, color: c, sku: k, exists: existing.some((e) => e.toUpperCase() === k.toUpperCase()) })
+ const rows = useMemo(() => {
+ if (!picked) return []
+ const base = String(picked.sku || "").trim()
+ const szs = pickedSizes.length ? pickedSizes : [""]
+ const cls = pickedColors.length ? pickedColors : [""]
+ const out: { size: string; color: string; sku: string; exists: boolean }[] = []
+ for (const c of cls) for (const sz of szs) {
+ const k = variantSku(base, sz || null, c || null)
+ out.push({ size: sz, color: c, sku: k, exists: existing.some((e) => e.toUpperCase() === k.toUpperCase()) })
     }
-    return out
+ return out
   }, [picked, pickedSizes, pickedColors, existing])
 
-  const pick = (p: CatalogProduct) => {
-    setPickedId(String(p.id ?? p.sku))
+ const pick = (p: CatalogProduct) => {
+ setPickedId(String(p.id ?? p.sku))
     /**
      * EVERY VARIANT, TICKED. A product's whole colour × size run is what "add this product
      * to inventory" means — the shelf should be able to say "none of that one" as a FACT,
@@ -1301,38 +1301,38 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
      *
      * Ones already stocked stay out: re-adding them would rewrite a real count with a zero.
      */
-    const base = String(p.sku || "").trim()
+ const base = String(p.sku || "").trim()
     // The product's OWN variants, as the editor saved them — the supplier's full run is
     // not what we hold.
-    const szs = productSizes(p)
-    const cls = productColors(p)
-    const next = new Set<string>()
-    for (const c of (cls.length ? cls : [""])) for (const sz of (szs.length ? szs : [""])) {
-      const k = variantSku(base, sz || null, c || null)
-      if (k && !existing.some((e) => e.toUpperCase() === k.toUpperCase())) next.add(k)
+ const szs = productSizes(p)
+ const cls = productColors(p)
+ const next = new Set<string>()
+ for (const c of (cls.length ? cls : [""])) for (const sz of (szs.length ? szs : [""])) {
+ const k = variantSku(base, sz || null, c || null)
+ if (k && !existing.some((e) => e.toUpperCase() === k.toUpperCase())) next.add(k)
     }
-    setChosen(next)
-    setErr(null)
+ setChosen(next)
+ setErr(null)
   }
 
-  const saveManual = () => {
-    const s = sku.trim()
-    if (!s) { setErr("A SKU is required."); return }
-    if (existing.includes(s)) { setErr("That SKU already exists."); return }
-    onAdd([{ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined, visibility }])
+ const saveManual = () => {
+ const s = sku.trim()
+ if (!s) { setErr("A SKU is required."); return }
+ if (existing.includes(s)) { setErr("That SKU already exists."); return }
+ onAdd([{ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined, visibility }])
   }
 
-  const saveCatalog = () => {
-    if (!picked) { setErr("Pick a product first."); return }
-    const take = rows.filter((r) => chosen.has(r.sku) && !r.exists)
-    if (!take.length) { setErr("Nothing to add — every ticked variant is already on the shelf."); return }
-    onAdd(take.map((r) => ({
-      sku: r.sku,
-      name: picked.name || undefined,
-      variant: (r.size || r.color) ? variantLabel(r.size || null, r.color || null) : undefined,
-      in_stock: Number(stock) || 0,
-      reorder_at: Number(reorder) || 25,
-      category: picked.type || category.trim() || undefined,
+ const saveCatalog = () => {
+ if (!picked) { setErr("Pick a product first."); return }
+ const take = rows.filter((r) => chosen.has(r.sku) && !r.exists)
+ if (!take.length) { setErr("Nothing to add — every ticked variant is already on the shelf."); return }
+ onAdd(take.map((r) => ({
+ sku: r.sku,
+ name: picked.name || undefined,
+ variant: (r.size || r.color) ? variantLabel(r.size || null, r.color || null) : undefined,
+ in_stock: Number(stock) || 0,
+ reorder_at: Number(reorder) || 25,
+ category: picked.type || category.trim() || undefined,
       /**
        * THE SUPPLIER COMES WITH IT — I had this the other way round, on the reasoning that a
        * supplier name is factory-only. It is, and this is a factory field: GET /api/inventory
@@ -1343,12 +1343,12 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
        * it, a row we created from a catalogue product that plainly names its supplier still
        * reaches the cart as "Unassigned · order by hand" — a line nobody can place.
        */
-      supplier: picked.supplier?.trim() || undefined,
-      visibility,
+ supplier: picked.supplier?.trim() || undefined,
+ visibility,
     })))
   }
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader><DialogTitle>Add inventory item</DialogTitle></DialogHeader>
@@ -1357,10 +1357,10 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
             <div className="flex w-fit rounded-full border border-border p-0.5">
               {([{ id: "catalog", label: "From catalogue" }, { id: "manual", label: "By hand" }] as const).map((t) => (
                 <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => { setMode(t.id); setErr(null) }}
-                  className={"eg-tap rounded-full px-3 py-1 text-xs font-medium transition-colors " + (mode === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+ key={t.id}
+ type="button"
+ onClick={() => { setMode(t.id); setErr(null) }}
+ className={"eg-tap rounded-full px-3 py-1 text-xs font-medium transition-colors " + (mode === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
                 >
                   {t.label}
                 </button>
@@ -1383,10 +1383,10 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                       </div>
                     ) : matches.map((p) => (
                       <button
-                        key={String(p.id ?? p.sku)}
-                        type="button"
-                        onClick={() => pick(p)}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent"
+ key={String(p.id ?? p.sku)}
+ type="button"
+ onClick={() => pick(p)}
+ className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent"
                       >
                         <Thumb src={imageFor(p, null)} name={p.name ?? "?"} size={34} />
                         <span className="min-w-0 flex-1">
@@ -1409,15 +1409,15 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                     <Button size="sm" variant="outline" onClick={() => { setPickedId(null); setChosen(new Set()) }}>Change</Button>
                   </div>
                   {/* GROUPED BY COLOURWAY, sizes inside it. A flat list of 66 variants is a
-                      scroll; the question anyone actually has is "which colours are we
-                      stocking, and in what sizes", and that is two shallow lists. */}
+ scroll; the question anyone actually has is "which colours are we
+ stocking, and in what sizes", and that is two shallow lists. */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Variants to stock{chosen.size ? ` — ${chosen.size} picked` : ""}</span>
                       <button
-                        type="button"
-                        className="font-medium text-primary hover:underline"
-                        onClick={() => setChosen(chosen.size ? new Set() : new Set(rows.filter((r) => !r.exists).map((r) => r.sku)))}
+ type="button"
+ className="font-medium text-primary hover:underline"
+ onClick={() => setChosen(chosen.size ? new Set() : new Set(rows.filter((r) => !r.exists).map((r) => r.sku)))}
                       >
                         {chosen.size ? "Clear" : "Select all"}
                       </button>
@@ -1426,41 +1426,41 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                       {Object.entries(rows.reduce((acc, r) => {
                         (acc[r.color] ??= []).push(r); return acc
                       }, {} as Record<string, typeof rows>)).map(([color, group]) => {
-                        const free = group.filter((r) => !r.exists)
-                        const allOn = free.length > 0 && free.every((r) => chosen.has(r.sku))
-                        return (
+ const free = group.filter((r) => !r.exists)
+ const allOn = free.length > 0 && free.every((r) => chosen.has(r.sku))
+ return (
                           <div key={color || "one"}>
                             <div className="mb-1 flex items-center gap-1.5">
                               <input
-                                type="checkbox"
-                                checked={allOn}
-                                disabled={free.length === 0}
-                                aria-label={`All sizes of ${color ? prettyColorName(color) : "this product"}`}
-                                onChange={(e) => setChosen((prev) => {
-                                  const n = new Set(prev)
-                                  for (const r of free) { if (e.target.checked) n.add(r.sku); else n.delete(r.sku) }
-                                  return n
+ type="checkbox"
+ checked={allOn}
+ disabled={free.length === 0}
+ aria-label={`All sizes of ${color ? prettyColorName(color) : "this product"}`}
+ onChange={(e) => setChosen((prev) => {
+ const n = new Set(prev)
+ for (const r of free) { if (e.target.checked) n.add(r.sku); else n.delete(r.sku) }
+ return n
                                 })}
-                                className="size-3.5 accent-[var(--primary)]"
+ className="size-3.5 accent-[var(--primary)]"
                               />
                               <span className="text-xs font-medium">{color ? prettyColorName(color) : "All sizes"}</span>
                             </div>
                             <div className="flex flex-wrap gap-1 pl-5">
                               {group.map((r) => (
                                 <label
-                                  key={r.sku}
-                                  title={r.exists ? `${r.sku} — already stocked` : r.sku}
-                                  className={"inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs "
+ key={r.sku}
+ title={r.exists ? `${r.sku} — already stocked` : r.sku}
+ className={"inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs "
                                     + (r.exists ? "border-border opacity-40"
-                                      : chosen.has(r.sku) ? "cursor-pointer border-primary bg-primary/10 text-primary"
-                                        : "cursor-pointer border-border")}
+ : chosen.has(r.sku) ? "cursor-pointer border-primary bg-primary/10 text-primary"
+ : "cursor-pointer border-border")}
                                 >
                                   <input
-                                    type="checkbox"
-                                    checked={chosen.has(r.sku)}
-                                    disabled={r.exists}
-                                    onChange={(e) => setChosen((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.sku); else n.delete(r.sku); return n })}
-                                    className="sr-only"
+ type="checkbox"
+ checked={chosen.has(r.sku)}
+ disabled={r.exists}
+ onChange={(e) => setChosen((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.sku); else n.delete(r.sku); return n })}
+ className="sr-only"
                                   />
                                   {r.size || "One size"}
                                 </label>
@@ -1494,16 +1494,16 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Visibility</span>
             <select
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as SkuVisibility)}
-              className="eg-select eg-control pr-8"
+ value={visibility}
+ onChange={(e) => setVisibility(e.target.value as SkuVisibility)}
+ className="eg-select eg-control pr-8"
             >
               {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
             <span className="text-2xs text-muted-foreground">
               {visibility === "factory" ? "Internal only — nothing outside the factory sees this SKU."
-                : visibility === "seller" ? "Published in the partner stock feed."
-                  : "Cleared for unauthenticated surfaces too. Nothing reads that yet — this records the decision."}
+ : visibility === "seller" ? "Published in the partner stock feed."
+ : "Cleared for unauthenticated surfaces too. Nothing reads that yet — this records the decision."}
             </span>
           </label>
           {mode === "manual" && sku.trim() && <div className="flex justify-center rounded-lg border border-border bg-muted/30 py-2"><Barcode value={sku.trim()} height={40} /></div>}

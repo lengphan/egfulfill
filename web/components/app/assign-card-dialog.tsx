@@ -25,58 +25,58 @@ import { numOf, variantOf } from "@/lib/order-format"
  * disagreeing about the world.
  */
 export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
-  card: DesignCard | null
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  onDone?: () => void
+ card: DesignCard | null
+ open: boolean
+ onOpenChange: (v: boolean) => void
+ onDone?: () => void
 }) {
-  const [orders, setOrders] = useState<OrderRow[] | null>(null)
-  const [q, setQ] = useState("")
-  const [picked, setPicked] = useState<OrderRow | null>(null)
-  const [line, setLine] = useState<OrderItem | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+ const [orders, setOrders] = useState<OrderRow[] | null>(null)
+ const [q, setQ] = useState("")
+ const [picked, setPicked] = useState<OrderRow | null>(null)
+ const [line, setLine] = useState<OrderItem | null>(null)
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+ const [done, setDone] = useState(false)
 
-  const reset = useCallback(() => {
-    setQ(""); setPicked(null); setLine(null); setErr(null); setDone(false)
+ const reset = useCallback(() => {
+ setQ(""); setPicked(null); setLine(null); setErr(null); setDone(false)
   }, [])
 
-  useEffect(() => {
-    if (!open) return
-    const t = setTimeout(() => {
-      reset()
-      getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
+ useEffect(() => {
+ if (!open) return
+ const t = setTimeout(() => {
+ reset()
+ getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [open, reset])
 
   // Search covers the order number and the customer — the two things someone holding a
   // loose design actually knows about where it belongs.
-  const matches = useMemo(() => {
-    const term = q.trim().toLowerCase()
-    if (!term) return []
-    return (orders ?? [])
+ const matches = useMemo(() => {
+ const term = q.trim().toLowerCase()
+ if (!term) return []
+ return (orders ?? [])
       .filter((o) => [numOf(o), o.customer?.name, o.store].some((f) => String(f ?? "").toLowerCase().includes(term)))
       .slice(0, 8)
   }, [orders, q])
 
-  const submit = async () => {
-    if (!card || !picked || !line) return
-    const sku = String(line.sku ?? "").trim()
-    if (!sku) { setErr("That line has no SKU, so there's nothing to key the design to."); return }
-    setBusy(true); setErr(null)
-    try {
-      const r = await assignDesignCard(String(card.id), {
-        orderId: String(picked.id), sku, lineId: line.line_id ? String(line.line_id) : undefined,
+ const submit = async () => {
+ if (!card || !picked || !line) return
+ const sku = String(line.sku ?? "").trim()
+ if (!sku) { setErr("That line has no SKU, so there's nothing to key the design to."); return }
+ setBusy(true); setErr(null)
+ try {
+ const r = await assignDesignCard(String(card.id), {
+ orderId: String(picked.id), sku, lineId: line.line_id ? String(line.line_id) : undefined,
       })
-      if (r.error) throw new Error(r.error)
-      setDone(true)
-      onDone?.()
+ if (r.error) throw new Error(r.error)
+ setDone(true)
+ onDone?.()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
-  return (
+ return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v) }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -85,7 +85,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
           </DialogTitle>
           <DialogDescription>
             {card?.title ? `“${card.title}” ` : "This card "}
-            joins the order&apos;s normal flow, and its artwork attaches to the line you pick.
+ joins the order&apos;s normal flow, and its artwork attaches to the line you pick.
           </DialogDescription>
         </DialogHeader>
 
@@ -94,7 +94,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
             <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" />
             <span>
               Attached to <strong>{picked ? numOf(picked) : "the order"}</strong>. Its design tag
-              will show the artwork — the card now moves with that order.
+ will show the artwork — the card now moves with that order.
             </span>
           </div>
         ) : (
@@ -104,8 +104,8 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
               <div className="relative">
                 <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input id="ac-q" value={q}
-                  onChange={(e) => { setQ(e.target.value); setPicked(null); setLine(null) }}
-                  placeholder="Order number, customer or store…" className="h-9 pl-8" />
+ onChange={(e) => { setQ(e.target.value); setPicked(null); setLine(null) }}
+ placeholder="Order number, customer or store…" className="h-9 pl-8" />
               </div>
             </div>
 
@@ -119,7 +119,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                   <span className="tabular-nums text-xs">{numOf(picked)}</span>
                   <span className="truncate text-muted-foreground">{picked.customer?.name ?? "—"}</span>
                   <Button size="sm" variant="ghost" className="ml-auto"
-                    onClick={() => { setPicked(null); setLine(null) }}>Change</Button>
+ onClick={() => { setPicked(null); setLine(null) }}>Change</Button>
                 </div>
                 <div>
                   <span className="mb-1 block text-xs font-medium">Which line?</span>
@@ -128,12 +128,12 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                   ) : (
                     <div className="space-y-1">
                       {(picked.items ?? []).map((it, i) => {
-                        const on = line === it
-                        return (
+ const on = line === it
+ return (
                           <button
-                            key={String(it.line_id ?? it.sku ?? i)}
-                            onClick={() => setLine(it)}
-                            className={"flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors " +
+ key={String(it.line_id ?? it.sku ?? i)}
+ onClick={() => setLine(it)}
+ className={"flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors " +
                               (on ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
                           >
                             <span className="min-w-0 flex-1 truncate">{it.name ?? it.sku ?? "Line"}</span>
@@ -154,7 +154,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
               <div className="space-y-1">
                 {matches.map((o) => (
                   <button key={o.id} onClick={() => setPicked(o)}
-                    className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent">
+ className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent">
                     <span className="shrink-0 tabular-nums text-xs">{numOf(o)}</span>
                     <span className="min-w-0 flex-1 truncate text-muted-foreground">{o.customer?.name ?? "—"}</span>
                     <span className="shrink-0 text-2xs text-muted-foreground">{(o.items ?? []).length} lines</span>
@@ -166,7 +166,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
         )}
 
         {err && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" /> {err}
           </div>
         )}

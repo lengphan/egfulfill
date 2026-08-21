@@ -8,14 +8,14 @@ import { getSupplierOptions, setFactorySettings, type SupplierOptions } from "@/
 import { OttoCardOnFile } from "@/components/app/otto-card-on-file"
 
 const maskCard = (label: string | null) => {
-  if (!label) return "Saved payment method"
+ if (!label) return "Saved payment method"
   // S&S already return a masked label; this only guards against a future field that
   // isn't masked, so a full number can never reach the screen from here.
-  return label.replace(/\b\d{12,19}\b/g, (n) => "•••• " + n.slice(-4))
+ return label.replace(/\b\d{12,19}\b/g, (n) => "•••• " + n.slice(-4))
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
+ return (
     <label className="flex flex-col gap-1">
       <span className="text-sm font-medium">{label}</span>
       {children}
@@ -43,68 +43,68 @@ const selectCls =
  * of the nightly dump. See lib/otto-card.ts.
  */
 export function SupplierOrderingSettings() {
-  const [opts, setOpts] = useState<SupplierOptions | null>(null)
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+ const [opts, setOpts] = useState<SupplierOptions | null>(null)
+ const [form, setForm] = useState<Record<string, string>>({})
+ const [busy, setBusy] = useState(false)
+ const [saved, setSaved] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    getSupplierOptions()
+ const load = useCallback(() => {
+ getSupplierOptions()
       .then((o) => {
-        setOpts(o)
-        setForm({
-          ss_order_email: o.defaults.ss_order_email || o.defaults.order_email || "",
-          ss_payment_profile: o.defaults.ss_payment_profile || "",
-          ss_shipping_method: o.defaults.ss_shipping_method || "",
-          otto_order_email: o.defaults.otto_order_email || o.defaults.order_email || "",
-          otto_payment_method: o.defaults.otto_payment_method || "",
-          otto_shipping_method: o.defaults.otto_shipping_method || "",
-          otto_customer: o.defaults.otto_customer || "",
-          otto_contact: o.defaults.otto_contact || "",
+ setOpts(o)
+ setForm({
+ ss_order_email: o.defaults.ss_order_email || o.defaults.order_email || "",
+ ss_payment_profile: o.defaults.ss_payment_profile || "",
+ ss_shipping_method: o.defaults.ss_shipping_method || "",
+ otto_order_email: o.defaults.otto_order_email || o.defaults.order_email || "",
+ otto_payment_method: o.defaults.otto_payment_method || "",
+ otto_shipping_method: o.defaults.otto_shipping_method || "",
+ otto_customer: o.defaults.otto_customer || "",
+ otto_contact: o.defaults.otto_contact || "",
         })
       })
       .catch(() => setErr("Couldn't load supplier options."))
   }, [])
-  useEffect(() => {
-    const id = setTimeout(load, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ const id = setTimeout(load, 0)
+ return () => clearTimeout(id)
   }, [load])
 
-  const set = (k: string, v: string) =>
-    setForm((f) => ({ ...f, ...(k === "otto_customer" ? { otto_contact: "" } : {}), [k]: v }))
+ const set = (k: string, v: string) =>
+ setForm((f) => ({ ...f, ...(k === "otto_customer" ? { otto_contact: "" } : {}), [k]: v }))
 
-  const save = async () => {
-    setBusy(true); setErr(null); setSaved(false)
-    try {
-      const r = await setFactorySettings(form)
-      if (r?.error) throw new Error(r.error)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+ const save = async () => {
+ setBusy(true); setErr(null); setSaved(false)
+ try {
+ const r = await setFactorySettings(form)
+ if (r?.error) throw new Error(r.error)
+ setSaved(true)
+ setTimeout(() => setSaved(false), 2500)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save.")
+ setErr(e instanceof Error ? e.message : "Couldn't save.")
     } finally { setBusy(false) }
   }
 
-  if (!opts) {
-    return (
+ if (!opts) {
+ return (
       <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
         <CircleNotch size={15} className="animate-spin" /> Loading supplier options…
       </div>
     )
   }
 
-  const ssProfiles = opts.suppliers.ss.paymentProfiles
-  const ottoCustomer = (opts.ottoCustomers ?? []).find((c) => c.id === form.otto_customer)
-  const asOptions = (v: unknown[]): { value: string; label: string }[] =>
+ const ssProfiles = opts.suppliers.ss.paymentProfiles
+ const ottoCustomer = (opts.ottoCustomers ?? []).find((c) => c.id === form.otto_customer)
+ const asOptions = (v: unknown[]): { value: string; label: string }[] =>
     (v ?? []).map((x) => {
-      const o = x as Record<string, unknown>
-      const value = String(o.id ?? o.code ?? o.value ?? o.service ?? "")
-      const label = String(o.label ?? o.name ?? o.description ?? value)
-      return { value, label }
+ const o = x as Record<string, unknown>
+ const value = String(o.id ?? o.code ?? o.value ?? o.service ?? "")
+ const label = String(o.label ?? o.name ?? o.description ?? value)
+ return { value, label }
     }).filter((o) => o.value)
 
-  return (
+ return (
     <div className="space-y-6 p-5">
       <p className="text-sm text-muted-foreground">
         Chosen once here and applied to every purchase order, so the ordering dialog stops asking.
@@ -116,7 +116,7 @@ export function SupplierOrderingSettings() {
 
         <Row label="Ordering email">
           <Input value={form.ss_order_email ?? ""} onChange={(e) => set("ss_order_email", e.target.value)}
-            placeholder="buyer@yourcompany.com" />
+ placeholder="buyer@yourcompany.com" />
         </Row>
 
         <Row label="Pays with">
@@ -149,7 +149,7 @@ export function SupplierOrderingSettings() {
         <h3 className="text-sm font-semibold">Otto Cap</h3>
 
         {!opts.suppliers.otto.available ? (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
             <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
             <span>{opts.suppliers.otto.reason ?? "Otto Cap isn't connected."}</span>
           </div>
@@ -157,7 +157,7 @@ export function SupplierOrderingSettings() {
           <>
             <Row label="Ordering email">
               <Input value={form.otto_order_email ?? ""} onChange={(e) => set("otto_order_email", e.target.value)}
-                placeholder="buyer@yourcompany.com" />
+ placeholder="buyer@yourcompany.com" />
             </Row>
 
             <Row label="Pays with">
@@ -170,9 +170,9 @@ export function SupplierOrderingSettings() {
             </Row>
 
             {/* Otto reject a credit-card order that arrives without a card — they do NOT bill
-                one held on the account, which is what the old copy here assumed. So a card has
-                to be sent, and this is where it's entered: once, in the browser, instead of in
-                a dialog on every placement. */}
+ one held on the account, which is what the old copy here assumed. So a card has
+ to be sent, and this is where it's entered: once, in the browser, instead of in
+ a dialog on every placement. */}
             <div className="rounded-lg border border-border bg-muted/20 p-3">
               <OttoCardOnFile />
             </div>
@@ -186,7 +186,7 @@ export function SupplierOrderingSettings() {
 
             <Row label="Contact">
               <select value={form.otto_contact ?? ""} onChange={(e) => set("otto_contact", e.target.value)}
-                disabled={!ottoCustomer} className={selectCls}>
+ disabled={!ottoCustomer} className={selectCls}>
                 <option value="">{ottoCustomer ? "— choose a contact —" : "Pick a customer first"}</option>
                 {(ottoCustomer?.contacts ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>

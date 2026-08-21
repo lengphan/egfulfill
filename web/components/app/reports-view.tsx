@@ -30,51 +30,51 @@ const DEMO: OrderRow[] = [
 ]
 
 export function ReportsView() {
-  const [orders, setOrders] = useState<OrderRow[] | null>(null)
-  const [isDemo, setIsDemo] = useState(false)
+ const [orders, setOrders] = useState<OrderRow[] | null>(null)
+ const [isDemo, setIsDemo] = useState(false)
   // A failed read must not render as "Fulfillment rate 0%" and "No revenue yet" — those
   // are claims. Signed in, a failure leaves `orders` null and reports itself instead.
-  const [loadErr, setLoadErr] = useState<string | null>(null)
-  const [now, setNow] = useState(0)
+ const [loadErr, setLoadErr] = useState<string | null>(null)
+ const [now, setNow] = useState(0)
 
-  const load = useCallback(() => {
+ const load = useCallback(() => {
     // Demo only when signed out; a signed-in account with no orders sees empty (real) charts.
-    const signedIn = !!getToken()
-    getOrders()
+ const signedIn = !!getToken()
+ getOrders()
       .then((rows) => {
-        setLoadErr(null)
-        if (rows && rows.length) { setOrders(rows); setIsDemo(false) }
-        else { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) }
+ setLoadErr(null)
+ if (rows && rows.length) { setOrders(rows); setIsDemo(false) }
+ else { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) }
       })
       .catch((e) => {
-        if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
-        setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.")
+ if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
+ setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.")
       })
   }, [])
-  useEffect(() => {
-    const id = setTimeout(() => { setNow(Date.now()); load() }, 0)
-    return () => clearTimeout(id)
+ useEffect(() => {
+ const id = setTimeout(() => { setNow(Date.now()); load() }, 0)
+ return () => clearTimeout(id)
   }, [load])
 
-  const list = useMemo(() => orders ?? [], [orders])
+ const list = useMemo(() => orders ?? [], [orders])
 
-  const stats = useMemo(() => {
-    const in30 = list.filter((o) => !isNaN(orderTs(o)) && now - orderTs(o) < 30 * DAY)
-    const rev = in30.reduce((s, o) => s + orderTotalOf(o), 0)
-    const shipped = list.filter((o) => sellerStatus(o).group === "shipped").length
-    return {
-      rev30: rev,
-      orders30: in30.length,
-      aov: in30.length ? rev / in30.length : 0,
-      fulfillRate: list.length ? Math.round((shipped / list.length) * 100) : 0,
+ const stats = useMemo(() => {
+ const in30 = list.filter((o) => !isNaN(orderTs(o)) && now - orderTs(o) < 30 * DAY)
+ const rev = in30.reduce((s, o) => s + orderTotalOf(o), 0)
+ const shipped = list.filter((o) => sellerStatus(o).group === "shipped").length
+ return {
+ rev30: rev,
+ orders30: in30.length,
+ aov: in30.length ? rev / in30.length : 0,
+ fulfillRate: list.length ? Math.round((shipped / list.length) * 100) : 0,
     }
   }, [list, now])
 
-  const series = useMemo(() => revenueSeries(list, now), [list, now])
-  const channels = useMemo(() => channelBreakdown(list), [list])
-  const top = useMemo(() => topProducts(list), [list])
+ const series = useMemo(() => revenueSeries(list, now), [list, now])
+ const channels = useMemo(() => channelBreakdown(list), [list])
+ const top = useMemo(() => topProducts(list), [list])
 
-  return (
+ return (
     <div className="space-y-4">
       <StatGrid>
         <StatCard label="Revenue (30d)" value={orders === null ? "—" : usd(stats.rev30)} sub="gross" tone="pos" />
@@ -84,13 +84,13 @@ export function ReportsView() {
       </StatGrid>
 
       {isDemo && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+        <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Sparkle size={13} weight="fill" /> Showing sample analytics — sign in to load your live data.
         </div>
       )}
 
       {loadErr && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+        <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
           <span>Couldn&apos;t load your orders, so these analytics are unavailable — not zero. {loadErr}</span>
         </div>
@@ -116,7 +116,7 @@ export function ReportsView() {
           ) : channels.length === 0 ? (
             <div className="text-sm text-muted-foreground">No revenue yet.</div>
           ) : (
-            channels.map((c, i) => (
+ channels.map((c, i) => (
               <div key={c.name}>
                 <div className="mb-1.5 flex justify-between text-sm">
                   <span className="font-medium">{c.name}</span>

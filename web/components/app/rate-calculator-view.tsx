@@ -13,8 +13,8 @@ const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 /**
  * DIMENSIONAL WEIGHT — the rule that makes a big light parcel cost like a heavy one.
  *
- *   dim weight (lb) = L × W × H ÷ divisor
- *   billable weight = max(actual, dim), rounded up to the next whole pound
+ * dim weight (lb) = L × W × H ÷ divisor
+ * billable weight = max(actual, dim), rounded up to the next whole pound
  *
  * The divisors are the carriers' published US domestic figures. They matter because a
  * carrier sells space on a truck: a 9×8×6 box holding half a pound of poly mailer bills as
@@ -79,108 +79,108 @@ const WEIGHT_PRESETS: { label: string; oz: number }[] = [
  * buyer uses, so what it shows is what a label would actually cost.
  */
 export function RateCalculatorView() {
-  const [fromZip, setFromZip] = useState("")
-  const [toZip, setToZip] = useState("")
-  const [lb, setLb] = useState("0")
-  const [oz, setOz] = useState("8")
+ const [fromZip, setFromZip] = useState("")
+ const [toZip, setToZip] = useState("")
+ const [lb, setLb] = useState("0")
+ const [oz, setOz] = useState("8")
   // Opens on the mailer reached for most, not an invented placeholder — same list the
   // label dialog uses (lib/parcel-sizes.ts), so a size added there shows up here too.
-  const [len, setLen] = useState(String(DEFAULT_SIZE.length))
-  const [wid, setWid] = useState(String(DEFAULT_SIZE.width))
-  const [hei, setHei] = useState(String(DEFAULT_SIZE.height))
-  const [mine, setMine] = useState<ParcelSize[]>([])
-  useEffect(() => {
+ const [len, setLen] = useState(String(DEFAULT_SIZE.length))
+ const [wid, setWid] = useState(String(DEFAULT_SIZE.width))
+ const [hei, setHei] = useState(String(DEFAULT_SIZE.height))
+ const [mine, setMine] = useState<ParcelSize[]>([])
+ useEffect(() => {
     // localStorage, so after mount — reading it during render would differ from the server
     // pass and hydrate wrong.
-    const t = setTimeout(() => setMine(customSizes()), 0)
-    return () => clearTimeout(t)
+ const t = setTimeout(() => setMine(customSizes()), 0)
+ return () => clearTimeout(t)
   }, [])
 
-  const [rates, setRates] = useState<ShippingRate[] | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState("")
+ const [rates, setRates] = useState<ShippingRate[] | null>(null)
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState("")
 
   // Default the origin to the warehouse — the answer is nearly always "from here".
-  useEffect(() => {
-    const t = setTimeout(() => {
-      getFactorySettings()
+ useEffect(() => {
+ const t = setTimeout(() => {
+ getFactorySettings()
         .then((s) => {
-          const z = String((s?.ship_from as { zip?: string } | undefined)?.zip ?? "")
-          if (/^\d{5}$/.test(z)) setFromZip((cur) => cur || z)
+ const z = String((s?.ship_from as { zip?: string } | undefined)?.zip ?? "")
+ if (/^\d{5}$/.test(z)) setFromZip((cur) => cur || z)
         })
         .catch(() => {})
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [])
 
   /** "Custom size…" is a MODE, not a size — picking it reveals the boxes and keeps them
-   *  revealed even if the numbers happen to land back on a stock size. */
-  const [custom, setCustom] = useState(false)
-  const weightOz = (Number(lb) || 0) * 16 + (Number(oz) || 0)
-  const dims = { l: Number(len) || 0, w: Number(wid) || 0, h: Number(hei) || 0 }
-  const allSizes = [...STOCK_SIZES, ...mine]
-  const matchedSize = allSizes.find((z) => sizeKey(z) === sizeKey({ length: dims.l, width: dims.w, height: dims.h }))
-  const cuIn = dims.l * dims.w * dims.h
-  const actualLb = weightOz / 16
+   * revealed even if the numbers happen to land back on a stock size. */
+ const [custom, setCustom] = useState(false)
+ const weightOz = (Number(lb) || 0) * 16 + (Number(oz) || 0)
+ const dims = { l: Number(len) || 0, w: Number(wid) || 0, h: Number(hei) || 0 }
+ const allSizes = [...STOCK_SIZES, ...mine]
+ const matchedSize = allSizes.find((z) => sizeKey(z) === sizeKey({ length: dims.l, width: dims.w, height: dims.h }))
+ const cuIn = dims.l * dims.w * dims.h
+ const actualLb = weightOz / 16
 
   /** The arithmetic, kept as data so the panel can show each step rather than a verdict. */
-  const billing = useMemo(() => {
-    const upsDim = cuIn / UPS_DAILY_DIVISOR
-    const uspsDimApplies = cuIn > USPS_DIM_THRESHOLD_CU_IN
-    const uspsDim = uspsDimApplies ? cuIn / USPS_DIVISOR : 0
-    const upsBillable = Math.max(actualLb, upsDim)
-    const uspsBillable = Math.max(actualLb, uspsDim)
-    return {
-      upsDim, uspsDim, uspsDimApplies,
-      upsBillable: Math.ceil(upsBillable * 100) / 100,
-      uspsBillable: Math.ceil(uspsBillable * 100) / 100,
+ const billing = useMemo(() => {
+ const upsDim = cuIn / UPS_DAILY_DIVISOR
+ const uspsDimApplies = cuIn > USPS_DIM_THRESHOLD_CU_IN
+ const uspsDim = uspsDimApplies ? cuIn / USPS_DIVISOR : 0
+ const upsBillable = Math.max(actualLb, upsDim)
+ const uspsBillable = Math.max(actualLb, uspsDim)
+ return {
+ upsDim, uspsDim, uspsDimApplies,
+ upsBillable: Math.ceil(upsBillable * 100) / 100,
+ uspsBillable: Math.ceil(uspsBillable * 100) / 100,
       // "Is the BOX driving this price, or the scale?" — the one sentence people want.
-      upsSizeDriven: upsDim > actualLb,
-      uspsSizeDriven: uspsDimApplies && uspsDim > actualLb,
+ upsSizeDriven: upsDim > actualLb,
+ uspsSizeDriven: uspsDimApplies && uspsDim > actualLb,
     }
   }, [cuIn, actualLb])
 
   // Plain functions: both are only ever called from a click, so there is nothing to
   // memoize for — and hand-rolled memos here are ones the compiler can't preserve.
-  const addrs = (toZ: string) => ({
-    from: { street: "1 Main St", city: "", state: "", zip: fromZip },
-    to: { street: "1 Main St", city: "", state: "", zip: toZ },
+ const addrs = (toZ: string) => ({
+ from: { street: "1 Main St", city: "", state: "", zip: fromZip },
+ to: { street: "1 Main St", city: "", state: "", zip: toZ },
   })
 
-  const quote = async (toZ: string, oz2: number): Promise<{ rates: ShippingRate[]; err?: string }> => {
-    const a = addrs(toZ)
-    try {
-      const r = await getShippingRates({ ...a, parcel: { weightOz: oz2, length: dims.l, width: dims.w, height: dims.h } })
-      if (r.error) return { rates: [], err: r.error }
-      return { rates: (r.rates || []).slice().sort((x, y) => x.amount - y.amount) }
+ const quote = async (toZ: string, oz2: number): Promise<{ rates: ShippingRate[]; err?: string }> => {
+ const a = addrs(toZ)
+ try {
+ const r = await getShippingRates({ ...a, parcel: { weightOz: oz2, length: dims.l, width: dims.w, height: dims.h } })
+ if (r.error) return { rates: [], err: r.error }
+ return { rates: (r.rates || []).slice().sort((x, y) => x.amount - y.amount) }
     } catch (e) {
-      return { rates: [], err: e instanceof Error ? e.message : "Couldn't fetch rates." }
+ return { rates: [], err: e instanceof Error ? e.message : "Couldn't fetch rates." }
     }
   }
 
-  const zipsOk = /^\d{5}$/.test(fromZip) && /^\d{5}$/.test(toZip)
+ const zipsOk = /^\d{5}$/.test(fromZip) && /^\d{5}$/.test(toZip)
 
-  const run = async () => {
-    if (!zipsOk) { setErr("Enter a 5-digit From and To ZIP."); return }
-    setErr(""); setBusy(true); setRates(null)
-    const r = await quote(toZip, weightOz)
-    setRates(r.rates)
-    if (r.err) setErr(r.err)
-    else if (!r.rates.length) setErr("No rates came back for that parcel.")
-    setBusy(false)
+ const run = async () => {
+ if (!zipsOk) { setErr("Enter a 5-digit From and To ZIP."); return }
+ setErr(""); setBusy(true); setRates(null)
+ const r = await quote(toZip, weightOz)
+ setRates(r.rates)
+ if (r.err) setErr(r.err)
+ else if (!r.rates.length) setErr("No rates came back for that parcel.")
+ setBusy(false)
   }
 
 
-  return (
+ return (
     <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
       {/* ── THE PARCEL ─────────────────────────────────────────────────────── */}
       <div className="space-y-4 xl:sticky xl:top-20">
         <SectionCard title="Parcel" bodyClassName="space-y-3 p-4">
           {/* THREE CONTROLS, not six rows of pills.
               Chips read as clutter once there are eleven cities and eight weights — the
-              same choice as a select, spending five times the height. The select is also
-              what the label dialog already uses for package size, so the two screens now
-              ask the question the same way. */}
+ same choice as a select, spending five times the height. The select is also
+ what the label dialog already uses for package size, so the two screens now
+ ask the question the same way. */}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">From ZIP</span>
@@ -193,17 +193,17 @@ export function RateCalculatorView() {
           </div>
 
           {/* The city list fills the ZIP beside it — a quote is zone-based, so the ZIP is
-              the only part of a destination that changes the price. */}
+ the only part of a destination that changes the price. */}
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Or pick a city</span>
             <select
-              value={DEST_PRESETS.find((d) => d.zip === toZip) ? toZip : "custom"}
-              onChange={(e) => { if (e.target.value !== "custom") setToZip(e.target.value) }}
-              className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+ value={DEST_PRESETS.find((d) => d.zip === toZip) ? toZip : "custom"}
+ onChange={(e) => { if (e.target.value !== "custom") setToZip(e.target.value) }}
+ className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
             >
               {/* Reads "Select" until there IS something, then says what was typed — a
-                  dropdown showing a city name while the ZIP beside it is somewhere else
-                  is the one thing this control must never do. */}
+ dropdown showing a city name while the ZIP beside it is somewhere else
+ is the one thing this control must never do. */}
               <option value="custom">{/^\d{5}$/.test(toZip) ? `Typed · ${toZip}` : "Select"}</option>
               {DEST_PRESETS.map((d) => <option key={d.zip} value={d.zip}>{d.label}</option>)}
             </select>
@@ -221,13 +221,13 @@ export function RateCalculatorView() {
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Common</span>
               <select
-                value={WEIGHT_PRESETS.find((w) => w.oz === weightOz)?.oz ?? ""}
-                onChange={(e) => {
-                  const n = Number(e.target.value)
-                  if (!n) return
-                  setLb(String(Math.floor(n / 16))); setOz(String(n % 16))
+ value={WEIGHT_PRESETS.find((w) => w.oz === weightOz)?.oz ?? ""}
+ onChange={(e) => {
+ const n = Number(e.target.value)
+ if (!n) return
+ setLb(String(Math.floor(n / 16))); setOz(String(n % 16))
                 }}
-                className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+ className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
               >
                 <option value="">Typed</option>
                 {WEIGHT_PRESETS.map((w) => <option key={w.oz} value={w.oz}>{w.label}</option>)}
@@ -236,21 +236,21 @@ export function RateCalculatorView() {
           </div>
 
           {/* Size, and the three boxes only when they're yours to fill — same control and
-              same "Custom size…" escape hatch as the label dialog. */}
+ same "Custom size…" escape hatch as the label dialog. */}
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Package</span>
             <select
               /* `custom` wins over a coincidental match. Picking "Custom size…" while the
-                 boxes still held 13/10/1 snapped the label straight back to "10 × 13 poly
-                 mailer" — dropdown and open boxes disagreeing about which mode you're in. */
-              value={custom || !matchedSize ? "custom" : sizeKey(matchedSize)}
-              onChange={(e) => {
-                const hit = allSizes.find((z) => sizeKey(z) === e.target.value)
-                if (!hit) { setCustom(true); return }
-                setCustom(false)
-                setLen(String(hit.length)); setWid(String(hit.width)); setHei(String(hit.height))
+ boxes still held 13/10/1 snapped the label straight back to "10 × 13 poly
+ mailer" — dropdown and open boxes disagreeing about which mode you're in. */
+ value={custom || !matchedSize ? "custom" : sizeKey(matchedSize)}
+ onChange={(e) => {
+ const hit = allSizes.find((z) => sizeKey(z) === e.target.value)
+ if (!hit) { setCustom(true); return }
+ setCustom(false)
+ setLen(String(hit.length)); setWid(String(hit.width)); setHei(String(hit.height))
               }}
-              className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
+ className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
             >
               {allSizes.map((z) => <option key={sizeKey(z)} value={sizeKey(z)}>{z.label}</option>)}
               <option value="custom">Custom size…</option>
@@ -276,7 +276,7 @@ export function RateCalculatorView() {
 
         {/* ── HOW IT'S BILLED ──────────────────────────────────────────────
             The arithmetic and nothing else. The prose that used to sit around it
-            explained the rule three times over; the numbers say it once. */}
+ explained the rule three times over; the numbers say it once. */}
         <SectionCard title="How it's billed" bodyClassName="space-y-2 p-4 text-xs">
           <div className="rounded-lg bg-muted/40 p-2 text-center tabular-nums text-2xs">
             {dims.l} × {dims.w} × {dims.h} = <strong>{cuIn.toLocaleString()}</strong> cu in
@@ -285,7 +285,7 @@ export function RateCalculatorView() {
             <div className="flex justify-between"><dt className="text-muted-foreground">On the scale</dt><dd className="tabular-nums">{actualLb.toFixed(2)} lb</dd></div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">UPS dim ({cuIn.toLocaleString()} ÷ {UPS_DAILY_DIVISOR})</dt>
-              <dd className={"tabular-nums " + (billing.upsSizeDriven ? "font-semibold text-amber-700" : "")}>{billing.upsDim.toFixed(2)} lb</dd>
+              <dd className={"tabular-nums " + (billing.upsSizeDriven ? "font-semibold text-hold" : "")}>{billing.upsDim.toFixed(2)} lb</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">USPS dim</dt>
@@ -297,7 +297,7 @@ export function RateCalculatorView() {
             </div>
           </dl>
           {billing.upsSizeDriven && (
-            <p className="flex items-start gap-1.5 text-amber-700">
+            <p className="flex items-start gap-1.5 text-hold">
               <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
               <span>The box sets the UPS price, not the scale.</span>
             </p>
@@ -308,9 +308,9 @@ export function RateCalculatorView() {
       {/* ── RESULTS ────────────────────────────────────────────────────────── */}
       <div className="space-y-4">
         <SectionCard
-          title="Rates"
-          description={rates ? `${rates.length} live quotes — nothing is bought` : "Every service both carriers will run for this parcel"}
-          bodyClassName="p-0"
+ title="Rates"
+ description={rates ? `${rates.length} live quotes — nothing is bought` : "Every service both carriers will run for this parcel"}
+ bodyClassName="p-0"
         >
           {!rates ? (
             <p className="p-4 text-sm text-muted-foreground">Fill in the parcel and press <strong>Get rates</strong>.</p>

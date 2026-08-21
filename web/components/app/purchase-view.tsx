@@ -11,9 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  getInventory, patchInventoryItem, addInventoryItem, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder, receivePurchaseOrder,
-  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
-  ssOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
+ getInventory, patchInventoryItem, addInventoryItem, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder, receivePurchaseOrder,
+ getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
+ ssOrder, resolveSuppliers, getSupplierOptions, setFactorySettings, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine, type PaymentProfile,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -61,11 +61,11 @@ const POOL: PurchaseOrder = { num: "__pool__", supplier: null, items: [], status
  * arrives. A dashed square means "no picture", never "still loading".
  */
 function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src: string, label: string) => void; label?: string }) {
-  if (!src) return <span className="size-11 shrink-0 rounded border border-dashed border-border" aria-hidden />
-  return (
+ if (!src) return <span className="size-11 shrink-0 rounded border border-dashed border-border" aria-hidden />
+ return (
     <button type="button" onClick={() => onZoom?.(src, label ?? "")}
-      title="Click to enlarge" aria-label={`Enlarge ${label || "product image"}`}
-      className="shrink-0 rounded border border-border bg-white transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+ title="Click to enlarge" aria-label={`Enlarge ${label || "product image"}`}
+ className="shrink-0 rounded border border-border bg-white transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" loading="lazy" className="size-11 rounded object-contain" />
     </button>
@@ -81,9 +81,9 @@ function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src:
  * scaling the thumbnail up into mush.
  */
 function ImageZoom({ img, onClose }: { img: { src: string; label: string } | null; onClose: () => void }) {
-  if (!img) return null
-  const big = img.src.replace(/_(fs|fm)(\.[a-z]+)/i, "_fl$2")
-  return (
+ if (!img) return null
+ const big = img.src.replace(/_(fs|fm)(\.[a-z]+)/i, "_fl$2")
+ return (
     <Dialog open onOpenChange={(o: boolean) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -94,8 +94,8 @@ function ImageZoom({ img, onClose }: { img: { src: string; label: string } | nul
           <img src={big} alt={img.label}
             // Fall back to the size we already have if the large variant doesn't exist —
             // a smaller picture beats a broken one.
-            onError={(e) => { const t = e.currentTarget; if (t.src !== img.src) t.src = img.src }}
-            className="max-h-[65vh] w-auto object-contain" />
+ onError={(e) => { const t = e.currentTarget; if (t.src !== img.src) t.src = img.src }}
+ className="max-h-[65vh] w-auto object-contain" />
         </div>
       </DialogContent>
     </Dialog>
@@ -103,9 +103,9 @@ function ImageZoom({ img, onClose }: { img: { src: string; label: string } | nul
 }
 
 function SourceTags({ line }: { line: POLine }) {
-  const src = Array.isArray(line.sources) ? line.sources : []
-  if (!src.length) return null
-  return (
+ const src = Array.isArray(line.sources) ? line.sources : []
+ if (!src.length) return null
+ return (
     <span className="mt-0.5 flex flex-wrap items-center gap-1">
       {src.slice(0, 4).map((s, i) => {
         // THE NUMBER, not the internal id. A marketplace order's id is "etsy-3311908445"
@@ -118,10 +118,10 @@ function SourceTags({ line }: { line: POLine }) {
         // made a 24-character key look like one, and that format appears nowhere else in the
         // product, because everywhere else holds the order row and shows its #seq. The full
         // id stays in the title for anyone who needs to match it against the database.
-        const label = s.num || shortOrderRef(s.order)
-        return (
+ const label = s.num || shortOrderRef(s.order)
+ return (
           <span key={i} className="rounded bg-muted px-1.5 py-0.5 tabular-nums text-2xs text-muted-foreground"
-                title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
+ title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
             {label} ×{s.qty}
           </span>
         )
@@ -166,38 +166,38 @@ const HELD_BACK = "Otto is ordered by hand — those lines were left in the cart
 const OTTO_MIN_UNITS = 24
 
 function ottoQty(r: unknown): number | null {
-  const seen = new Set<unknown>()
-  const walk = (v: unknown, depth: number): number | null => {
-    if (v == null || depth > 4 || typeof v !== "object" || seen.has(v)) return null
-    seen.add(v)
-    if (Array.isArray(v)) {
+ const seen = new Set<unknown>()
+ const walk = (v: unknown, depth: number): number | null => {
+ if (v == null || depth > 4 || typeof v !== "object" || seen.has(v)) return null
+ seen.add(v)
+ if (Array.isArray(v)) {
       // A list of variants: sum what we can read, but only if we read at least one.
-      let total = 0, found = false
-      for (const item of v) { const n = walk(item, depth + 1); if (n != null) { total += n; found = true } }
-      return found ? total : null
+ let total = 0, found = false
+ for (const item of v) { const n = walk(item, depth + 1); if (n != null) { total += n; found = true } }
+ return found ? total : null
     }
-    const o = v as Record<string, unknown>
-    for (const k of ["quantity", "qty", "available", "availableQuantity", "stock", "inventory", "onHand", "on_hand"]) {
-      const n = Number(o[k])
-      if (o[k] != null && isFinite(n)) return n
+ const o = v as Record<string, unknown>
+ for (const k of ["quantity", "qty", "available", "availableQuantity", "stock", "inventory", "onHand", "on_hand"]) {
+ const n = Number(o[k])
+ if (o[k] != null && isFinite(n)) return n
     }
-    for (const val of Object.values(o)) { const n = walk(val, depth + 1); if (n != null) return n }
-    return null
+ for (const val of Object.values(o)) { const n = walk(val, depth + 1); if (n != null) return n }
+ return null
   }
-  return walk(r, 0)
+ return walk(r, 0)
 }
 
 // `embedded` hides the mobile hero when this sits inside the Purchasing tab shell.
 /** `refreshKey` — bumped by the Purchasing tab shell when this view is re-shown. It stays
- *  mounted between tab switches, so this is what picks up a blank added to the cart from
- *  the All-suppliers tab. `load` overwrites the lists in place, never blanking them, so
- *  the refresh never flashes a spinner over a cart you're reading. */
+ * mounted between tab switches, so this is what picks up a blank added to the cart from
+ * the All-suppliers tab. `load` overwrites the lists in place, never blanking them, so
+ * the refresh never flashes a spinner over a cart you're reading. */
 export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: boolean; refreshKey?: number }) {
-  const prompt = usePrompt()
-  const confirm = useConfirm()
-  const [inv, setInv] = useState<InventoryItem[] | null>(null)
-  const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
+ const prompt = usePrompt()
+ const confirm = useConfirm()
+ const [inv, setInv] = useState<InventoryItem[] | null>(null)
+ const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
+ const [busy, setBusy] = useState<string | null>(null)
   /**
    * `lines` is the per-supplier outcome, kept APART from `text`.
    *
@@ -210,104 +210,104 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * `cardRetry` is set when a failure was about PAYMENT rather than the order — the one
    * failure with an obvious next action, so it gets a button instead of a paragraph.
    */
-  const [msg, setMsg] = useState<{
-    ok: boolean; text: string; tone?: "warn"
-    lines?: { supplier: string; ok: boolean; short: string; detail?: string }[]
-    cardRetry?: boolean
+ const [msg, setMsg] = useState<{
+ ok: boolean; text: string; tone?: "warn"
+ lines?: { supplier: string; ok: boolean; short: string; detail?: string }[]
+ cardRetry?: boolean
   } | null>(null)
   // Set when S&S declines the saved card, so we can offer a "Change payment" shortcut
   // instead of sending the buyer off to Settings.
-  const [declineFix, setDeclineFix] = useState<{ profiles: PaymentProfile[]; current: string; email: string } | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickCard, setPickCard] = useState("")
-  const [pickSaving, setPickSaving] = useState(false)
-  const saveCardPick = async () => {
-    setPickSaving(true)
-    try {
-      const r = await setFactorySettings({ ss_payment_profile: pickCard })
-      if (r.error) { setMsg({ ok: false, text: r.error }); return }
-      setPickerOpen(false)
+ const [declineFix, setDeclineFix] = useState<{ profiles: PaymentProfile[]; current: string; email: string } | null>(null)
+ const [pickerOpen, setPickerOpen] = useState(false)
+ const [pickCard, setPickCard] = useState("")
+ const [pickSaving, setPickSaving] = useState(false)
+ const saveCardPick = async () => {
+ setPickSaving(true)
+ try {
+ const r = await setFactorySettings({ ss_payment_profile: pickCard })
+ if (r.error) { setMsg({ ok: false, text: r.error }); return }
+ setPickerOpen(false)
       // THE STRIP GOES, it doesn't turn green. It described a decline that is no longer the
       // state, and the "place the order again" it would have said was already said by the
       // dialog you just used. Leaving a banner behind makes a finished repair look like it
       // still needs reading. `declineFix` goes with it so the Change payment shortcut it
       // powers doesn't outlive the failure that raised it.
-      setMsg(null); setDeclineFix(null)
+ setMsg(null); setDeclineFix(null)
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't update the payment." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't update the payment." })
     } finally { setPickSaving(false) }
   }
   // Every action's outcome lands in ONE banner near the top of the view. But actions are
   // taken far down the list too — cancelling or receiving a placed PO — so when the banner
   // changes, scroll it into view. Otherwise the result appears off-screen and the click
   // reads as "nothing happened", which is exactly what a cancel refusal looked like.
-  const msgRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (!msg) return
-    const t = setTimeout(() => msgRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0)
-    return () => clearTimeout(t)
+ const msgRef = useRef<HTMLDivElement | null>(null)
+ useEffect(() => {
+ if (!msg) return
+ const t = setTimeout(() => msgRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0)
+ return () => clearTimeout(t)
   }, [msg])
 
   // Lines pulled out of a draft but kept for a later order. Factory-global (staff
   // share one list), so it survives the browser that removed the line.
-  const [saved, setSaved] = useState<SavedPOLine[]>([])
-  const [addTo, setAddTo] = useState<PurchaseOrder | null>(null)
+ const [saved, setSaved] = useState<SavedPOLine[]>([])
+ const [addTo, setAddTo] = useState<PurchaseOrder | null>(null)
   // Which history rows are expanded. A set, not a single id — comparing two past POs
   // side by side is the normal reason to open them.
-  const [open, setOpen] = useState<Set<string>>(new Set())
-  const [supplierCfg, setSupplierCfg] = useState(false)
-  const [scanOpen, setScanOpen] = useState(false)
+ const [open, setOpen] = useState<Set<string>>(new Set())
+ const [supplierCfg, setSupplierCfg] = useState(false)
+ const [scanOpen, setScanOpen] = useState(false)
   // Otto have no saved cards, so a card order carries one. It normally comes from the card
   // on file in this browser (Order settings › Payment) and nothing opens; this is only for
   // the case where there isn't a usable one to send.
-  const [needCard, setNeedCard] = useState(false)
-  const [returning, setReturning] = useState<PurchaseOrder | null>(null)
+ const [needCard, setNeedCard] = useState(false)
+ const [returning, setReturning] = useState<PurchaseOrder | null>(null)
   // S&S tracking, keyed by PO number. Fetched on demand rather than stored: a shipment in
   // transit changes, and a number cached at receipt time would stop being true the moment
   // it moved.
-  const [tracking, setTrackingData] = useState<Record<string, SsShipment[] | "loading" | "none">>({})
+ const [tracking, setTrackingData] = useState<Record<string, SsShipment[] | "loading" | "none">>({})
 
   /** Pull tracking from S&S for a PO, using the order number they gave us back. */
-  const fetchTracking = async (po: PurchaseOrder) => {
-    const orderNo = supplierOrderNo(po)
-    if (!orderNo) return
-    setTrackingData((p) => ({ ...p, [po.num]: "loading" }))
-    try {
-      const r = await getSsTracking({ orderNumbers: [orderNo] })
-      setTrackingData((p) => ({ ...p, [po.num]: r.shipments?.length ? r.shipments : "none" }))
+ const fetchTracking = async (po: PurchaseOrder) => {
+ const orderNo = supplierOrderNo(po)
+ if (!orderNo) return
+ setTrackingData((p) => ({ ...p, [po.num]: "loading" }))
+ try {
+ const r = await getSsTracking({ orderNumbers: [orderNo] })
+ setTrackingData((p) => ({ ...p, [po.num]: r.shipments?.length ? r.shipments : "none" }))
     } catch {
-      setTrackingData((p) => ({ ...p, [po.num]: "none" }))
+ setTrackingData((p) => ({ ...p, [po.num]: "none" }))
     }
   }
 
-  const load = useCallback(() => {
-    if (!getToken()) { setInv([]); setPos([]); return }
-    getInventory().then((r) => setInv(r ?? [])).catch(() => setInv([]))
-    getPurchaseOrders().then((r) => setPos(r ?? [])).catch(() => setPos([]))
-    getFactoryList<SavedPOLine[]>("po_saved").then((r) => setSaved(Array.isArray(r) ? r : [])).catch(() => {})
+ const load = useCallback(() => {
+ if (!getToken()) { setInv([]); setPos([]); return }
+ getInventory().then((r) => setInv(r ?? [])).catch(() => setInv([]))
+ getPurchaseOrders().then((r) => setPos(r ?? [])).catch(() => setPos([]))
+ getFactoryList<SavedPOLine[]>("po_saved").then((r) => setSaved(Array.isArray(r) ? r : [])).catch(() => {})
   }, [])
-  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load, refreshKey])
+ useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load, refreshKey])
 
   // Low-stock items grouped by supplier → reorder suggestions.
-  const suggestions = useMemo(() => {
-    const low = (inv ?? []).filter(isLow)
-    const g: Record<string, InventoryItem[]> = {}
-    for (const it of low) (g[supKey(it.supplier)] ??= []).push(it)
-    return g
+ const suggestions = useMemo(() => {
+ const low = (inv ?? []).filter(isLow)
+ const g: Record<string, InventoryItem[]> = {}
+ for (const it of low) (g[supKey(it.supplier)] ??= []).push(it)
+ return g
   }, [inv])
 
-  const [tab, setTab] = useState("cart")  // controlled so reorder can jump to what it changed
-  const drafts = (pos ?? []).filter((p) => p.status === "draft")
+ const [tab, setTab] = useState("cart")  // controlled so reorder can jump to what it changed
+ const drafts = (pos ?? []).filter((p) => p.status === "draft")
   // In flight: placed and waiting on the supplier. These belong with the drafts, not in
   // history — an order you're still expecting is something to act on, and burying it
   // under every PO ever received is how a late delivery goes unnoticed.
-  const placed = (pos ?? []).filter((p) => p.status === "placed")
+ const placed = (pos ?? []).filter((p) => p.status === "placed")
   // History grows forever — every PO ever placed — so it pages. Drafts are the working
   // set and stay whole; there are never many, and hiding one behind a page would mean
   // missing something you're mid-way through.
   // Settled: received or cancelled. Nothing further is expected from these.
-  const history = (pos ?? []).filter((p) => p.status === "received" || p.status === "cancelled")
-  const pagedHistory = usePaged(history, 20)
+ const history = (pos ?? []).filter((p) => p.status === "received" || p.status === "cancelled")
+ const pagedHistory = usePaged(history, 20)
 
   /**
    * MOVE A PO TO HISTORY WITHOUT TOUCHING THE SUPPLIER.
@@ -323,27 +323,27 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * rather than `received` because receiving ADDS STOCK, and inventing stock for a parcel
    * nobody can confirm arrived is the one outcome worse than a stale row.
    */
-  const archive = async (list: PurchaseOrder[]) => {
-    if (!list.length) return
-    const many = list.length > 1
-    if (!(await confirm({
-      title: many ? `Move ${list.length} orders to history?` : `Move ${list[0].num} to history?`,
-      body: "This only clears our board — the supplier is NOT contacted and nothing is cancelled with them. Nothing is received into stock either. Use it for orders that are already over.",
-      confirmLabel: many ? `Move ${list.length} to history` : "Move to history",
+ const archive = async (list: PurchaseOrder[]) => {
+ if (!list.length) return
+ const many = list.length > 1
+ if (!(await confirm({
+ title: many ? `Move ${list.length} orders to history?` : `Move ${list[0].num} to history?`,
+ body: "This only clears our board — the supplier is NOT contacted and nothing is cancelled with them. Nothing is received into stock either. Use it for orders that are already over.",
+ confirmLabel: many ? `Move ${list.length} to history` : "Move to history",
     }))) return
-    setBusy("archive"); setMsg(null)
-    try {
-      for (const po of list) {
-        await savePurchaseOrder({
+ setBusy("archive"); setMsg(null)
+ try {
+ for (const po of list) {
+ await savePurchaseOrder({
           ...po, status: "cancelled",
-          meta: { ...(po.meta || {}), archivedAt: new Date().toISOString(),
-                  archivedNote: "Moved to history from the board — the supplier was not contacted." },
+ meta: { ...(po.meta || {}), archivedAt: new Date().toISOString(),
+ archivedNote: "Moved to history from the board — the supplier was not contacted." },
         })
       }
-      setMsg({ ok: true, text: `Moved ${list.length} order${many ? "s" : ""} to history. The supplier wasn't contacted.` })
-      load()
+ setMsg({ ok: true, text: `Moved ${list.length} order${many ? "s" : ""} to history. The supplier wasn't contacted.` })
+ load()
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't move those to history." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't move those to history." })
     } finally { setBusy(null) }
   }
 
@@ -356,37 +356,37 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * searches them. Restocking ahead of a season, or buying a blank never stocked before,
    * had no entry point at all.
    */
-  const startBlankDraft = async () => {
-    setBusy("new"); setMsg(null)
-    const po: PurchaseOrder = { num: nextNum(), supplier: null, items: [], status: "draft" }
-    try {
-      const r = await savePurchaseOrder(po)
-      if (r?.error) throw new Error(r.error)
-      setPos((prev) => [po, ...(prev ?? [])])
-      setAddTo(po)          // straight into the picker — an empty PO is not the goal
+ const startBlankDraft = async () => {
+ setBusy("new"); setMsg(null)
+ const po: PurchaseOrder = { num: nextNum(), supplier: null, items: [], status: "draft" }
+ try {
+ const r = await savePurchaseOrder(po)
+ if (r?.error) throw new Error(r.error)
+ setPos((prev) => [po, ...(prev ?? [])])
+ setAddTo(po)          // straight into the picker — an empty PO is not the goal
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't start a new purchase order." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't start a new purchase order." })
     } finally { setBusy(null) }
   }
 
-  const createDraft = async (supplier: string, items: InventoryItem[]) => {
-    setBusy("new"); setMsg(null)
-    const lines: POLine[] = items.map((it) => ({ sku: it.sku, name: it.name || undefined, variant: it.variant || undefined, qty: suggestQty(it), price: 0 }))
-    const po: PurchaseOrder = { num: nextNum(), supplier, items: lines, status: "draft" }
-    try { await savePurchaseOrder(po); load() } catch { /* ignore */ } finally { setBusy(null) }
+ const createDraft = async (supplier: string, items: InventoryItem[]) => {
+ setBusy("new"); setMsg(null)
+ const lines: POLine[] = items.map((it) => ({ sku: it.sku, name: it.name || undefined, variant: it.variant || undefined, qty: suggestQty(it), price: 0 }))
+ const po: PurchaseOrder = { num: nextNum(), supplier, items: lines, status: "draft" }
+ try { await savePurchaseOrder(po); load() } catch { /* ignore */ } finally { setBusy(null) }
   }
 
-  const patchPO = (po: PurchaseOrder, items: POLine[]) => {
-    setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, items } : p)))
-    savePurchaseOrder({ ...po, items }).catch(() => {})
+ const patchPO = (po: PurchaseOrder, items: POLine[]) => {
+ setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, items } : p)))
+ savePurchaseOrder({ ...po, items }).catch(() => {})
   }
-  const setLineQty = (po: PurchaseOrder, sku: string, qty: number) =>
-    patchPO(po, po.items.map((l) => (l.sku === sku ? { ...l, qty } : l)))
-  const removeLine = (po: PurchaseOrder, sku: string) =>
-    patchPO(po, po.items.filter((l) => l.sku !== sku))
+ const setLineQty = (po: PurchaseOrder, sku: string, qty: number) =>
+ patchPO(po, po.items.map((l) => (l.sku === sku ? { ...l, qty } : l)))
+ const removeLine = (po: PurchaseOrder, sku: string) =>
+ patchPO(po, po.items.filter((l) => l.sku !== sku))
 
   /** What a line is still waiting on, in the unit it was ORDERED in. */
-  const owedOn = (l: POLine) => Math.max(0, (Number(l.qty) || 0) - (Number(l.received) || 0))
+ const owedOn = (l: POLine) => Math.max(0, (Number(l.qty) || 0) - (Number(l.received) || 0))
 
   /**
    * BOOK THE WHOLE DELIVERY IN.
@@ -398,43 +398,43 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * Every line still owed goes in one call; the server clamps each to its own outstanding,
    * so a line somebody already booked is skipped and SAID, never doubled.
    */
-  const receiveAll = async (po: PurchaseOrder) => {
-    const owed = po.items.map((l) => ({ sku: l.sku, qty: owedOn(l) })).filter((l) => l.qty > 0)
-    if (!owed.length) return
-    setBusy(`recv:${po.num}`)
-    try {
-      const r = await receivePurchaseOrder(po.num, owed)
-      if (r?.error) throw new Error(r.error)
-      const n = r.received?.length ?? 0
-      const pieces = (r.received ?? []).reduce((t, g) => t + (Number(g.eaches) || 0), 0)
-      setMsg(r.problems?.length
+ const receiveAll = async (po: PurchaseOrder) => {
+ const owed = po.items.map((l) => ({ sku: l.sku, qty: owedOn(l) })).filter((l) => l.qty > 0)
+ if (!owed.length) return
+ setBusy(`recv:${po.num}`)
+ try {
+ const r = await receivePurchaseOrder(po.num, owed)
+ if (r?.error) throw new Error(r.error)
+ const n = r.received?.length ?? 0
+ const pieces = (r.received ?? []).reduce((t, g) => t + (Number(g.eaches) || 0), 0)
+ setMsg(r.problems?.length
         ? { ok: false, text: r.problems.join("; ") }
-        : { ok: true, text: `${n} line${n === 1 ? "" : "s"} received — ${pieces} onto the shelf.` })
-      load()
+ : { ok: true, text: `${n} line${n === 1 ? "" : "s"} received — ${pieces} onto the shelf.` })
+ load()
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't receive this delivery." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't receive this delivery." })
     } finally { setBusy(null) }
   }
 
   /** One line, for a part delivery — the rest of the box turns up later. */
-  const receiveLine = async (po: PurchaseOrder, l: POLine) => {
-    const owed = owedOn(l)
-    if (owed <= 0) return
-    setBusy(`recv:${po.num}:${l.sku}`)
-    try {
-      const r = await receivePurchaseOrder(po.num, [{ sku: l.sku, qty: owed }])
-      if (r?.error) throw new Error(r.error)
-      const g = r.received?.[0]
+ const receiveLine = async (po: PurchaseOrder, l: POLine) => {
+ const owed = owedOn(l)
+ if (owed <= 0) return
+ setBusy(`recv:${po.num}:${l.sku}`)
+ try {
+ const r = await receivePurchaseOrder(po.num, [{ sku: l.sku, qty: owed }])
+ if (r?.error) throw new Error(r.error)
+ const g = r.received?.[0]
       // Ordered units and shelf pieces are the same for singles and differ when a line has
       // a pack — saying only one is how "I received 2" becomes "why does it say 48".
-      setMsg(r.problems?.length
+ setMsg(r.problems?.length
         ? { ok: false, text: r.problems.join("; ") }
-        : { ok: true, text: g
+ : { ok: true, text: g
             ? `${g.qty} × ${l.sku}${(g.pack ?? 1) > 1 ? ` (${g.pack} per pack = ${g.eaches})` : ""} received — ${g.inStock} on the shelf.`
-            : `Received ${owed} × ${l.sku}.` })
-      load()
+ : `Received ${owed} × ${l.sku}.` })
+ load()
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't receive that line." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't receive that line." })
     } finally { setBusy(null) }
   }
 
@@ -446,28 +446,28 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   // last, the lines that were just ordered reappear in the pool, and the obvious next
   // click sends them to the supplier a SECOND time. A duplicate purchase order is the
   // one mistake here that costs real money, so the ordering is not optional.
-  const putSaved = (next: SavedPOLine[]) => {
-    setSaved(next)
-    return saveFactoryList("po_saved", next).then(cartChanged).catch(() => {})
+ const putSaved = (next: SavedPOLine[]) => {
+ setSaved(next)
+ return saveFactoryList("po_saved", next).then(cartChanged).catch(() => {})
   }
   /** Pull a line OUT of the draft but keep it — the common "not this order, next one" case. */
-  const saveForLater = (po: PurchaseOrder, l: POLine) => {
-    removeLine(po, l.sku)
-    if (saved.some((s) => lineKey(s) === lineKey(l))) return   // already parked, same sku AND variant
-    putSaved([...saved, { ...l, supplier: po.supplier ?? null, savedAt: new Date().toISOString() }])
+ const saveForLater = (po: PurchaseOrder, l: POLine) => {
+ removeLine(po, l.sku)
+ if (saved.some((s) => lineKey(s) === lineKey(l))) return   // already parked, same sku AND variant
+ putSaved([...saved, { ...l, supplier: po.supplier ?? null, savedAt: new Date().toISOString() }])
   }
   /** Put a parked line back on a draft, merging the qty if the sku is already there. */
-  const restore = (l: SavedPOLine) => {
-    const target = drafts.find((p) => supKey(p.supplier) === supKey(l.supplier)) ?? drafts[0]
-    if (!target) { setMsg({ ok: false, text: "No draft PO open — create one first, then restore into it." }); return }
-    const hit = target.items.find((x) => lineKey(x) === lineKey(l))
-    patchPO(target, hit
+ const restore = (l: SavedPOLine) => {
+ const target = drafts.find((p) => supKey(p.supplier) === supKey(l.supplier)) ?? drafts[0]
+ if (!target) { setMsg({ ok: false, text: "No draft PO open — create one first, then restore into it." }); return }
+ const hit = target.items.find((x) => lineKey(x) === lineKey(l))
+ patchPO(target, hit
       ? target.items.map((x) => (lineKey(x) === lineKey(l) ? { ...x, qty: num(x.qty) + num(l.qty) } : x))
-      : [...target.items, { sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty) || 1, price: l.price }])
-    putSaved(saved.filter((s) => s.sku !== l.sku))
+ : [...target.items, { sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty) || 1, price: l.price }])
+ putSaved(saved.filter((s) => s.sku !== l.sku))
   }
   /** Merge lines into an existing set, combining quantities on a repeated sku. Pure, so
-   *  the "add items" path and the reorder path can't drift apart. */
+   * the "add items" path and the reorder path can't drift apart. */
   /**
    * WHAT MAKES TWO LINES THE SAME LINE — sku AND variant, never sku alone.
    *
@@ -485,20 +485,20 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * Trimmed and case-folded because "Black / 2XL" and "black / 2xl" are one variant typed
    * by two people, and treating them as two would split a line that should merge.
    */
-  const lineKey = (l: { sku?: string | null; variant?: string | null }) =>
+ const lineKey = (l: { sku?: string | null; variant?: string | null }) =>
     `${String(l.sku ?? "").trim().toUpperCase()}|${String(l.variant ?? "").trim().toLowerCase()}`
 
-  const mergeLines = (existing: POLine[], add: POLine[]): POLine[] => {
-    const next = existing.map((l) => ({ ...l }))
-    for (const l of add) {
-      const hit = next.find((x) => lineKey(x) === lineKey(l))
-      if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
-      else next.push({ ...l, qty: num(l.qty) || 1 })
+ const mergeLines = (existing: POLine[], add: POLine[]): POLine[] => {
+ const next = existing.map((l) => ({ ...l }))
+ for (const l of add) {
+ const hit = next.find((x) => lineKey(x) === lineKey(l))
+ if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
+ else next.push({ ...l, qty: num(l.qty) || 1 })
     }
-    return next
+ return next
   }
   /** Add picked supplier-catalog / inventory lines onto a draft, merging by sku. */
-  const addLines = (po: PurchaseOrder, lines: POLine[]) => patchPO(po, mergeLines(po.items, lines))
+ const addLines = (po: PurchaseOrder, lines: POLine[]) => patchPO(po, mergeLines(po.items, lines))
 
   /**
    * Place a PO — split by the SUPPLIER EACH LINE ACTUALLY COMES FROM.
@@ -518,123 +518,123 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * draft to be handled by hand, because the failure mode of guessing here is a real
    * order placed with the wrong company.
    */
-  const place = async (po: PurchaseOrder) => {
-    const lines = po.items.filter((l) => num(l.qty) > 0)
-    if (!lines.length) { setMsg({ ok: false, text: "Add at least one item with a quantity." }); return }
-    setBusy(po.num); setMsg(null)
-    try {
-      const [{ bySku }, opts] = await Promise.all([
-        resolveSuppliers(lines.map((l) => l.sku)),
-        getSupplierOptions(),
+ const place = async (po: PurchaseOrder) => {
+ const lines = po.items.filter((l) => num(l.qty) > 0)
+ if (!lines.length) { setMsg({ ok: false, text: "Add at least one item with a quantity." }); return }
+ setBusy(po.num); setMsg(null)
+ try {
+ const [{ bySku }, opts] = await Promise.all([
+ resolveSuppliers(lines.map((l) => l.sku)),
+ getSupplierOptions(),
       ])
 
       // No delivery address means the supplier has nowhere to send the blanks. Refuse
       // rather than place an order that arrives nowhere — this is the one field a
       // purchase order genuinely cannot be completed without.
-      if (!opts.shipToComplete) {
-        setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Settings › Ship-from address, or via Order settings." })
-        return
+ if (!opts.shipToComplete) {
+ setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Settings › Ship-from address, or via Order settings." })
+ return
       }
 
       // Group by the API that can place it; unresolved lines are kept aside, not sent.
-      const groups = new Map<string, { api: "ss" | "otto" | null; supplier: string | null; lines: POLine[] }>()
-      for (const l of lines) {
-        const r = bySku[l.sku] ?? { api: null, supplier: null, source: "unknown" }
+ const groups = new Map<string, { api: "ss" | "otto" | null; supplier: string | null; lines: POLine[] }>()
+ for (const l of lines) {
+ const r = bySku[l.sku] ?? { api: null, supplier: null, source: "unknown" }
         // Key on the API when there is one, else on the supplier name, so two hand-ordered
         // suppliers don't collapse into one pile.
-        const key = r.api ?? `manual:${r.supplier ?? "unassigned"}`
-        if (!groups.has(key)) groups.set(key, { api: r.api, supplier: r.supplier, lines: [] })
-        groups.get(key)!.lines.push(l)
+ const key = r.api ?? `manual:${r.supplier ?? "unassigned"}`
+ if (!groups.has(key)) groups.set(key, { api: r.api, supplier: r.supplier, lines: [] })
+ groups.get(key)!.lines.push(l)
       }
 
-      const parts = [...groups.values()]
-      const placedAt = new Date().toISOString()
-      const results: string[] = []
+ const parts = [...groups.values()]
+ const placedAt = new Date().toISOString()
+ const results: string[] = []
 
-      for (const [i, g] of parts.entries()) {
-        const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) }))
-        let resp: unknown = { manual: true }
-        let placedOk = true
-        try {
+ for (const [i, g] of parts.entries()) {
+ const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) }))
+ let resp: unknown = { manual: true }
+ let placedOk = true
+ try {
           // The rest of what a purchase order needs: where it goes, how it ships, how it
           // pays, and a PO number that ties their confirmation back to this row.
-          if (g.api === "otto") {
+ if (g.api === "otto") {
             // HELD BACK, not sent — see NO_AUTO_ORDER. Thrown so this group lands in
             // the same "did not place" path a failure uses, which already reports the
             // supplier by name and leaves its lines in the cart.
-            throw new Error(HELD_BACK)
+ throw new Error(HELD_BACK)
           } else if (g.api === "ss") {
-            const r = await ssOrder(payload, {
-              shippingAddress: opts.shipTo,
-              shippingMethod: opts.defaults.ss_shipping_method || undefined,
-              email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
-              poNumber: po.num,
+ const r = await ssOrder(payload, {
+ shippingAddress: opts.shipTo,
+ shippingMethod: opts.defaults.ss_shipping_method || undefined,
+ email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
+ poNumber: po.num,
               // Same as the place-all path: send the selected saved card, else account terms.
-              paymentProfileId: opts.defaults.ss_payment_profile || undefined,
-              paymentProfileEmail: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
+ paymentProfileId: opts.defaults.ss_payment_profile || undefined,
+ paymentProfileEmail: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
             })
-            if (r.error) throw new Error(r.error); resp = r
+ if (r.error) throw new Error(r.error); resp = r
           }
         } catch (e) {
-          placedOk = false
-          resp = { error: e instanceof Error ? e.message : "failed" }
+ placedOk = false
+ resp = { error: e instanceof Error ? e.message : "failed" }
         }
 
         // One PO per supplier. The original keeps its number when there's only one group,
         // so the common single-supplier case doesn't gain a confusing suffix.
-        const numFor = parts.length === 1 ? po.num : `${po.num}-${(g.supplier || "MANUAL").replace(/[^A-Za-z0-9]+/g, "").slice(0, 6).toUpperCase() || String(i + 1)}`
-        await savePurchaseOrder({
+ const numFor = parts.length === 1 ? po.num : `${po.num}-${(g.supplier || "MANUAL").replace(/[^A-Za-z0-9]+/g, "").slice(0, 6).toUpperCase() || String(i + 1)}`
+ await savePurchaseOrder({
           ...po,
-          num: numFor,
-          supplier: g.supplier ?? po.supplier ?? null,
+ num: numFor,
+ supplier: g.supplier ?? po.supplier ?? null,
           // Priced as they go out — see freezeLines.
-          items: freezeLines(g.lines),
-          status: placedOk && g.api ? "placed" : placedOk ? "placed" : "draft",
-          meta: { ...(po.meta || {}), response: resp, placedAt, api: g.api, splitFrom: parts.length > 1 ? po.num : undefined },
+ items: freezeLines(g.lines),
+ status: placedOk && g.api ? "placed" : placedOk ? "placed" : "draft",
+ meta: { ...(po.meta || {}), response: resp, placedAt, api: g.api, splitFrom: parts.length > 1 ? po.num : undefined },
         })
         // Say what ACTUALLY happened, not a blanket "test/dry-run": a real dry run (live
         // keys off) never reached the supplier, while a live placement returns an order
         // number worth surfacing. The old hardcoded line made a placed order look like a
         // dry run and vice-versa — the exact confusion behind "why can't I cancel this".
-        const rr = resp as Record<string, unknown>
-        const dry = rr.dryRun === true
-        const ssNo = (() => {
-          const os = rr.orders
-          if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
-          return null
+ const rr = resp as Record<string, unknown>
+ const dry = rr.dryRun === true
+ const ssNo = (() => {
+ const os = rr.orders
+ if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
+ return null
         })()
-        results.push(
+ results.push(
           !placedOk ? `${g.supplier ?? "Unassigned"}: failed — ${(resp as { error?: string }).error}`
-            : g.api ? (dry
+ : g.api ? (dry
                 ? `${g.supplier}: DRY RUN — not sent to ${g.api === "ss" ? "S&S" : "Otto"} (live keys off). Set SS_ORDER_LIVE=1 to place for real.`
-                : `${g.supplier}: placed${ssNo ? ` — ${g.api === "ss" ? "S&S" : "Otto"} order #${ssNo}` : " — but no order number came back; check for line errors"}`)
-              : `${g.supplier ?? "Unassigned"}: marked placed, order it manually (no supplier API for these SKUs)`
+ : `${g.supplier}: placed${ssNo ? ` — ${g.api === "ss" ? "S&S" : "Otto"} order #${ssNo}` : " — but no order number came back; check for line errors"}`)
+ : `${g.supplier ?? "Unassigned"}: marked placed, order it manually (no supplier API for these SKUs)`
         )
       }
 
       // The original is superseded by its parts; leaving it would double-count the spend.
-      if (parts.length > 1) await deletePurchaseOrder(po.num).catch(() => {})
+ if (parts.length > 1) await deletePurchaseOrder(po.num).catch(() => {})
 
       // A mixed result is neither. Reporting "S&S sent, Otto failed" in red reads as
       // nothing having happened — and the S&S half really was placed, so acting on that
       // belief means placing it twice.
-      const anyFailed = results.some((r) => r.includes("failed"))
-      const anySent = results.some((r) => !r.includes("failed"))
-      setMsg({
-        ok: !anyFailed,
-        tone: anyFailed && anySent ? "warn" : undefined,
-        text: (anyFailed && anySent ? "Partly placed. " : "") + results.join(" · "),
+ const anyFailed = results.some((r) => r.includes("failed"))
+ const anySent = results.some((r) => !r.includes("failed"))
+ setMsg({
+ ok: !anyFailed,
+ tone: anyFailed && anySent ? "warn" : undefined,
+ text: (anyFailed && anySent ? "Partly placed. " : "") + results.join(" · "),
       })
-      load()
+ load()
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place the order." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place the order." })
     } finally { setBusy(null) }
   }
 
   // Receive: add each line's qty into inventory, mark the PO received.
-  const receive = async (po: PurchaseOrder) => {
-    setBusy(po.num); setMsg(null)
-    try {
+ const receive = async (po: PurchaseOrder) => {
+ setBusy(po.num); setMsg(null)
+ try {
       /**
        * PER LINE, NEVER THE WHOLE LIST.
        *
@@ -653,23 +653,23 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
        * find nothing and push a duplicate row for a sku that already existed — two rows for
        * one shelf, which the whole-list write would then persist.
        */
-      const live = (await getInventory()) ?? []
-      const bySku = new Map(live.map((it) => [String(it.sku).toUpperCase(), it]))
-      for (const l of po.items) {
-        const key = String(l.sku || "").trim().toUpperCase()
-        if (!key) continue
-        const existing = bySku.get(key)
-        if (existing) await patchInventoryItem(existing.sku, { in_stock: num(existing.in_stock) + num(l.qty) })
-        else await addInventoryItem({
-          sku: l.sku, name: l.name, variant: l.variant, in_stock: num(l.qty),
-          reorder_at: 25, supplier: po.supplier ?? undefined, visibility: "factory",
+ const live = (await getInventory()) ?? []
+ const bySku = new Map(live.map((it) => [String(it.sku).toUpperCase(), it]))
+ for (const l of po.items) {
+ const key = String(l.sku || "").trim().toUpperCase()
+ if (!key) continue
+ const existing = bySku.get(key)
+ if (existing) await patchInventoryItem(existing.sku, { in_stock: num(existing.in_stock) + num(l.qty) })
+ else await addInventoryItem({
+ sku: l.sku, name: l.name, variant: l.variant, in_stock: num(l.qty),
+ reorder_at: 25, supplier: po.supplier ?? undefined, visibility: "factory",
         })
       }
-      await savePurchaseOrder({ ...po, status: "received", meta: { ...(po.meta || {}), receivedAt: new Date().toISOString() } })
+ await savePurchaseOrder({ ...po, status: "received", meta: { ...(po.meta || {}), receivedAt: new Date().toISOString() } })
       // Re-read rather than setting a locally-built array: the shelf just changed under
       // several writes, and the truth is the server's.
-      getInventory().then((r) => setInv(r ?? [])).catch(() => {})
-      setMsg({ ok: true, text: "Received into inventory." }); load()
+ getInventory().then((r) => setInv(r ?? [])).catch(() => {})
+ setMsg({ ok: true, text: "Received into inventory." }); load()
     } catch { setMsg({ ok: false, text: "Couldn't receive." }) } finally { setBusy(null) }
   }
 
@@ -685,29 +685,29 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    */
   /** The same read, against a response we are HOLDING rather than one already stored on a
    *  PO — so the message shown at placement can name the order number the supplier just
-   *  gave us, without waiting for the reload that persists it. */
-  const supplierOrderNoOf = (resp: unknown): string | null => {
-    const r = (resp ?? {}) as Record<string, unknown>
-    const pick = (o: unknown): string | null => {
-      if (!o || typeof o !== "object") return null
+   * gave us, without waiting for the reload that persists it. */
+ const supplierOrderNoOf = (resp: unknown): string | null => {
+ const r = (resp ?? {}) as Record<string, unknown>
+ const pick = (o: unknown): string | null => {
+ if (!o || typeof o !== "object") return null
       // Their responses are arrays as often as objects — one entry per warehouse.
-      if (Array.isArray(o)) { for (const x of o) { const v = pick(x); if (v) return v } return null }
-      const rec = o as Record<string, unknown>
-      const v = rec.orderNumber ?? rec.order_number ?? rec.orderNo ?? rec.salesOrderNumber
-      return v == null || v === "" ? null : String(v)
+ if (Array.isArray(o)) { for (const x of o) { const v = pick(x); if (v) return v } return null }
+ const rec = o as Record<string, unknown>
+ const v = rec.orderNumber ?? rec.order_number ?? rec.orderNo ?? rec.salesOrderNumber
+ return v == null || v === "" ? null : String(v)
     }
-    return pick(r.orders) ?? pick(r.ssResponse) ?? pick(r.ottoResponse) ?? pick(r)
+ return pick(r.orders) ?? pick(r.ssResponse) ?? pick(r.ottoResponse) ?? pick(r)
   }
-  const supplierOrderNo = (po: PurchaseOrder): string | null =>
-    supplierOrderNoOf(((po.meta || {}) as Record<string, unknown>).response)
-  const trackingOf = (po: PurchaseOrder): string =>
+ const supplierOrderNo = (po: PurchaseOrder): string | null =>
+ supplierOrderNoOf(((po.meta || {}) as Record<string, unknown>).response)
+ const trackingOf = (po: PurchaseOrder): string =>
     String(((po.meta || {}) as Record<string, string>).tracking ?? "")
 
   /** Record a carrier tracking number against a PO, so an inbound box can be chased. */
-  const setTracking = async (po: PurchaseOrder, tracking: string) => {
-    const meta = { ...(po.meta || {}), tracking: tracking.trim() || undefined }
-    setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, meta } : p)))
-    await savePurchaseOrder({ ...po, meta }).catch(() => {})
+ const setTracking = async (po: PurchaseOrder, tracking: string) => {
+ const meta = { ...(po.meta || {}), tracking: tracking.trim() || undefined }
+ setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, meta } : p)))
+ await savePurchaseOrder({ ...po, meta }).catch(() => {})
   }
 
   /**
@@ -721,9 +721,9 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * So a placed PO says so plainly and asks for confirmation. A draft was never sent
    * anywhere, so it just goes.
    */
-  const cancelPO = async (po: PurchaseOrder) => {
-    const wasPlaced = po.status === "placed"
-    const sent = reallySent(po)
+ const cancelPO = async (po: PurchaseOrder) => {
+ const wasPlaced = po.status === "placed"
+ const sent = reallySent(po)
     // Only warn about phoning the supplier when there IS an order at the supplier.
     // Telling someone to chase a dry run sends them looking for something that was never
     // there — which is exactly what happened.
@@ -731,104 +731,104 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     // said "does NOT cancel the order with the supplier" while cancelPO asks S&S FIRST
     // and refuses to touch our record if they decline. Someone read that, believed the
     // order was still live, and phoned a supplier who had already cancelled it.
-    const isSsPo = /s&s|activewear/i.test(po.supplier || "")
-    if (wasPlaced && sent && !(await confirm(
-      isSsPo
+ const isSsPo = /s&s|activewear/i.test(po.supplier || "")
+ if (wasPlaced && sent && !(await confirm(
+ isSsPo
         ? { title: `Cancel ${po.num} with S&S?`, confirmLabel: "Cancel order" }
-        : { title: `Cancel ${po.num}?`, body: `${po.supplier || "This supplier"} has no cancel API — you'll need to contact them directly to stop the actual order.`, confirmLabel: "Cancel order" }
+ : { title: `Cancel ${po.num}?`, body: `${po.supplier || "This supplier"} has no cancel API — you'll need to contact them directly to stop the actual order.`, confirmLabel: "Cancel order" }
     ))) return
-    setBusy(po.num); setMsg(null)
-    try {
+ setBusy(po.num); setMsg(null)
+ try {
       // Ask the SUPPLIER first, where we can. Marking our record cancelled while their
       // order stands is the failure that costs money — stock arrives against an order the
       // system says doesn't exist. But an order the operator has ALREADY cancelled with S&S
       // directly must still be clearable here, or it's stuck as "placed" forever — so when
       // the API can't confirm, we fall back to an explicit, warned attestation rather than
       // a dead-end.
-      let supplierCancelled = false   // S&S themselves confirmed (API or status reconcile)
-      let manualCancel = false        // operator attested they cancelled it out-of-band
-      let reconciled = false          // S&S already had it cancelled — we just caught our record up
-      const orderNo = supplierOrderNo(po)
-      const isSs = /s&s|activewear/i.test(po.supplier || "")
+ let supplierCancelled = false   // S&S themselves confirmed (API or status reconcile)
+ let manualCancel = false        // operator attested they cancelled it out-of-band
+ let reconciled = false          // S&S already had it cancelled — we just caught our record up
+ const orderNo = supplierOrderNo(po)
+ const isSs = /s&s|activewear/i.test(po.supplier || "")
       // No order number means we CAN'T ask S&S — so we can't verify, but we also can't
       // leave it stuck. Let the operator attest they've already cancelled it directly.
-      if (sent && isSs && !orderNo) {
+ if (sent && isSs && !orderNo) {
         // No S&S number was recorded at placement. RESOLVE it from OUR po number — we sent
         // it as the poNumber, and S&S's /orders/{reference} accepts it — so cancellation is
         // automatic and nobody has to hunt for their number. If it still can't be found,
         // fall back to pasting it; blank = attest it was already stopped directly.
-        const ref = String((po.meta as { splitFrom?: string } | undefined)?.splitFrom || po.num)
-        const looked = await getSsOrder(ref).catch(() => null)
-        let numToCancel: string | null = (looked?.orders?.find((o) => o.orderNumber)?.orderNumber) || null
-        if (!numToCancel) {
-          const entered = await prompt({
-            title: `Cancel ${po.num} with S&S`,
-            body: `No S&S order number is saved and we couldn't find one by PO number. Paste it (from the portal or confirmation email) to cancel via their API — or leave blank if you've already cancelled it with S&S directly.`,
-            placeholder: "S&S order number",
-            required: false,
-            confirmLabel: "Cancel order",
-            cancelLabel: "Back",
+ const ref = String((po.meta as { splitFrom?: string } | undefined)?.splitFrom || po.num)
+ const looked = await getSsOrder(ref).catch(() => null)
+ let numToCancel: string | null = (looked?.orders?.find((o) => o.orderNumber)?.orderNumber) || null
+ if (!numToCancel) {
+ const entered = await prompt({
+ title: `Cancel ${po.num} with S&S`,
+ body: `No S&S order number is saved and we couldn't find one by PO number. Paste it (from the portal or confirmation email) to cancel via their API — or leave blank if you've already cancelled it with S&S directly.`,
+ placeholder: "S&S order number",
+ required: false,
+ confirmLabel: "Cancel order",
+ cancelLabel: "Back",
           })
-          if (entered === null) { setMsg({ ok: false, text: `${po.num} left as-is.` }); return }
-          numToCancel = entered.trim() || null
+ if (entered === null) { setMsg({ ok: false, text: `${po.num} left as-is.` }); return }
+ numToCancel = entered.trim() || null
         }
-        if (numToCancel) {
-          const c = await cancelSsOrder(numToCancel).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
-          if ("error" in c && c.error) {
-            if (!(await confirm({
-              title: `S&S wouldn't cancel ${numToCancel}`,
-              body: `${c.error}. If you've already cancelled it with S&S directly, mark it cancelled here — but only if S&S has actually stopped it, or the blanks will still ship.`,
-              confirmLabel: "Mark cancelled",
+ if (numToCancel) {
+ const c = await cancelSsOrder(numToCancel).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
+ if ("error" in c && c.error) {
+ if (!(await confirm({
+ title: `S&S wouldn't cancel ${numToCancel}`,
+ body: `${c.error}. If you've already cancelled it with S&S directly, mark it cancelled here — but only if S&S has actually stopped it, or the blanks will still ship.`,
+ confirmLabel: "Mark cancelled",
             }))) { setMsg({ ok: false, text: `S&S wouldn't cancel ${numToCancel}: ${c.error}` }); return }
-            manualCancel = true
+ manualCancel = true
           } else {
-            reconciled = (c as { reconciled?: boolean }).reconciled === true
-            supplierCancelled = true
+ reconciled = (c as { reconciled?: boolean }).reconciled === true
+ supplierCancelled = true
           }
         } else {
-          if (!(await confirm({
-            title: `Mark ${po.num} cancelled without an order number?`,
-            body: `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`,
-            confirmLabel: "Mark cancelled",
+ if (!(await confirm({
+ title: `Mark ${po.num} cancelled without an order number?`,
+ body: `Only do this if S&S has actually stopped it — otherwise the blanks will still ship.`,
+ confirmLabel: "Mark cancelled",
           }))) { setMsg({ ok: false, text: `${po.num} left as-is. Cancel it in the S&S portal, then use Cancel again to clear it here.` }); return }
-          manualCancel = true
+ manualCancel = true
         }
       } else if (sent && isSs && orderNo) {
-        const c = await cancelSsOrder(orderNo).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
-        if ("error" in c && c.error) {
+ const c = await cancelSsOrder(orderNo).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
+ if ("error" in c && c.error) {
           // S&S declined via the API (almost always past their 10-minute window). Don't
           // dead-end: show their reason and let the operator attest they cancelled it in
           // the portal — otherwise a genuinely-cancelled order can never be cleared.
-          if (!(await confirm({
-            title: `S&S wouldn't cancel ${orderNo}`,
-            body: `${c.error}. If you've already cancelled it with S&S directly, mark it cancelled here — but only if S&S has actually stopped it, or the blanks will still ship.`,
-            confirmLabel: "Mark cancelled",
+ if (!(await confirm({
+ title: `S&S wouldn't cancel ${orderNo}`,
+ body: `${c.error}. If you've already cancelled it with S&S directly, mark it cancelled here — but only if S&S has actually stopped it, or the blanks will still ship.`,
+ confirmLabel: "Mark cancelled",
           }))) { setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` }); return }
-          manualCancel = true
+ manualCancel = true
         } else {
           // Reconciled = the API cancel was too late, but S&S already had it cancelled, so
           // this is catching our stale record up rather than stopping a live order.
-          reconciled = (c as { reconciled?: boolean }).reconciled === true
-          supplierCancelled = true
+ reconciled = (c as { reconciled?: boolean }).reconciled === true
+ supplierCancelled = true
         }
       }
 
-      const r = await savePurchaseOrder({
+ const r = await savePurchaseOrder({
         ...po, status: "cancelled",
-        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString(), supplierCancelled, manualCancel: manualCancel || undefined },
+ meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString(), supplierCancelled, manualCancel: manualCancel || undefined },
       })
-      if (r?.error) throw new Error(r.error)
-      setMsg({ ok: true, text: !wasPlaced || !sent
+ if (r?.error) throw new Error(r.error)
+ setMsg({ ok: true, text: !wasPlaced || !sent
         ? `${po.num} cancelled.`
-        : supplierCancelled
+ : supplierCancelled
           ? `${po.num} cancelled successfully.${reconciled ? " (S&S already had it cancelled.)" : ""}`
-          : manualCancel
+ : manualCancel
             ? `${po.num} cancelled — you confirmed it was already stopped with ${po.supplier || "the supplier"} directly.`
             // Otto document no cancel endpoint, so theirs is still a phone call.
-            : `${po.num} cancelled here — ${po.supplier || "the supplier"} has no cancel API, so contact them to stop the actual order.` })
-      load()
+ : `${po.num} cancelled here — ${po.supplier || "the supplier"} has no cancel API, so contact them to stop the actual order.` })
+ load()
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })
     } finally { setBusy(null) }
   }
 
@@ -839,54 +839,54 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
   // Images for lines inside an opened purchase order. Historic POs predate line images,
   // so they're resolved by sku when a row is expanded — not on load, since most rows are
   // never opened and a lookup per PO would cost a query for nothing.
-  const [poImgs, setPoImgs] = useState<Record<string, string>>({})
-  const [zoom, setZoom] = useState<{ src: string; label: string } | null>(null)
+ const [poImgs, setPoImgs] = useState<Record<string, string>>({})
+ const [zoom, setZoom] = useState<{ src: string; label: string } | null>(null)
   // A ticking clock, so the S&S 10-minute cancellation window counts down on screen
   // instead of freezing at whatever it was when the page rendered.
-  const [now, setNow] = useState(0)
-  useEffect(() => {
+ const [now, setNow] = useState(0)
+ useEffect(() => {
     // Deferred, not synchronous: setting state directly in an effect body cascades a
     // second render immediately. The pattern used across the app pages here.
-    const first = setTimeout(() => setNow(Date.now()), 0)
-    const id = setInterval(() => setNow(Date.now()), 30000)
-    return () => { clearTimeout(first); clearInterval(id) }
+ const first = setTimeout(() => setNow(Date.now()), 0)
+ const id = setInterval(() => setNow(Date.now()), 30000)
+ return () => { clearTimeout(first); clearInterval(id) }
   }, [])
   // Per-warehouse stock for the lines about to be ordered, and how long each warehouse
   // takes to reach us. Together they answer what the blank space was leaving unsaid: not
   // "is there stock" but WHERE, and whether pulling from there costs a day.
-  const [stock, setStock] = useState<Record<string, { total: number; warehouses: { abbr: string; qty: number }[] }>>({})
+ const [stock, setStock] = useState<Record<string, { total: number; warehouses: { abbr: string; qty: number }[] }>>({})
   // Per-warehouse quantities, keyed "sku:ABBR". Empty everywhere = today's behaviour:
   // autoselectWarehouse stays on and S&S split the line themselves. The server refuses the
   // contradiction of picks WITH autoselect on, so this drives that flag too.
-  const [split, setSplit] = useState<Record<string, string>>({})
-  const [transit, setTransit] = useState<Record<string, { days: number | null; cutOff: string }>>({})
+ const [split, setSplit] = useState<Record<string, string>>({})
+ const [transit, setTransit] = useState<Record<string, { days: number | null; cutOff: string }>>({})
 
   /* `price` is the supplier catalogue's last synced per-unit figure — see unitPrice, and
-     the note on resolveSuppliers for why it is a reference and not a quote. */
-  const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null; price?: number | null }>>({})
-  useEffect(() => {
-    const skus = saved.map((l) => l.sku).filter(Boolean)
-    if (!skus.length) return
-    const t = setTimeout(() => {
-      resolveSuppliers(skus).then((r) => setSupByS(r.bySku ?? {})).catch(() => {})
+ the note on resolveSuppliers for why it is a reference and not a quote. */
+ const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null; price?: number | null }>>({})
+ useEffect(() => {
+ const skus = saved.map((l) => l.sku).filter(Boolean)
+ if (!skus.length) return
+ const t = setTimeout(() => {
+ resolveSuppliers(skus).then((r) => setSupByS(r.bySku ?? {})).catch(() => {})
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [saved])
 
   // Stock + transit for the S&S lines in the pool. S&S only: Otto's inventory endpoint
   // takes one sku per call, which would be a request per line.
-  useEffect(() => {
-    const ssSkus = saved.filter((l) => supByS[l.sku]?.api === "ss").map((l) => l.sku)
-    if (!ssSkus.length) return
-    const t = setTimeout(() => {
-      getSsInventory(ssSkus)
+ useEffect(() => {
+ const ssSkus = saved.filter((l) => supByS[l.sku]?.api === "ss").map((l) => l.sku)
+ if (!ssSkus.length) return
+ const t = setTimeout(() => {
+ getSsInventory(ssSkus)
         .then((r) => setStock(Object.fromEntries((r.items ?? []).map((i) => [i.sku, { total: i.total, warehouses: i.warehouses }]))))
         .catch(() => {})
-      getSsDaysInTransit()
+ getSsDaysInTransit()
         .then((r) => setTransit(Object.fromEntries((r.warehouses ?? []).map((w) => [w.warehouse, { days: w.days, cutOff: w.cutOff }]))))
         .catch(() => {})
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [saved, supByS])
 
   /**
@@ -899,18 +899,18 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * honestly rather than reporting a zero it invented. "Out of stock" and "we don't know"
    * lead to opposite decisions, and only one of them is ours to guess at.
    */
-  const [ottoStock, setOttoStock] = useState<Record<string, number | null>>({})
-  useEffect(() => {
-    const skus = saved.filter((l) => supByS[l.sku]?.api === "otto").map((l) => l.sku).slice(0, 20)
-    if (!skus.length) return
-    const t = setTimeout(() => {
-      for (const sku of skus) {
-        getOttoInventory(sku)
+ const [ottoStock, setOttoStock] = useState<Record<string, number | null>>({})
+ useEffect(() => {
+ const skus = saved.filter((l) => supByS[l.sku]?.api === "otto").map((l) => l.sku).slice(0, 20)
+ if (!skus.length) return
+ const t = setTimeout(() => {
+ for (const sku of skus) {
+ getOttoInventory(sku)
           .then((r) => setOttoStock((p) => ({ ...p, [sku]: ottoQty(r) })))
           .catch(() => setOttoStock((p) => ({ ...p, [sku]: null })))
       }
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [saved, supByS])
 
   /**
@@ -927,13 +927,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * source in the title, and a total built on it says so. Reporting it as a firm price is
    * how a $4.85 estimate becomes a complaint about a $5.40 invoice.
    */
-  const unitPrice = useCallback((l: { sku: string; price?: number | null }) => {
-    const own = num(l.price)
-    if (own) return { unit: own, from: "line" as const }
-    const cat = supByS[l.sku]?.price
-    return cat != null && isFinite(Number(cat)) && Number(cat) > 0
+ const unitPrice = useCallback((l: { sku: string; price?: number | null }) => {
+ const own = num(l.price)
+ if (own) return { unit: own, from: "line" as const }
+ const cat = supByS[l.sku]?.price
+ return cat != null && isFinite(Number(cat)) && Number(cat) > 0
       ? { unit: Number(cat), from: "catalog" as const }
-      : { unit: 0, from: "none" as const }
+ : { unit: 0, from: "none" as const }
   }, [supByS])
 
   /**
@@ -949,31 +949,31 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * and a line with no price anywhere stays unpriced rather than being stamped 0 — an
    * invented zero would read as free, permanently, on a document nobody revisits.
    */
-  const freezeLines = useCallback(<T extends { sku: string; price?: number | null }>(lines: T[]) =>
-    lines.map((l) => {
-      const { unit, from } = unitPrice(l)
-      return from === "catalog" && unit > 0 ? { ...l, price: unit, priceSource: "catalog" as const } : l
+ const freezeLines = useCallback(<T extends { sku: string; price?: number | null }>(lines: T[]) =>
+ lines.map((l) => {
+ const { unit, from } = unitPrice(l)
+ return from === "catalog" && unit > 0 ? { ...l, price: unit, priceSource: "catalog" as const } : l
     }), [unitPrice])
 
-  const toOrderGroups = useMemo(() => {
-    const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
-    for (const l of saved) {
-      const r = supByS[l.sku] ?? { api: null, supplier: l.supplier ?? null }
-      const key = r.api ?? `manual:${r.supplier ?? l.supplier ?? "unassigned"}`
-      if (!g.has(key)) g.set(key, { key, api: r.api, supplier: r.supplier ?? l.supplier ?? null, lines: [], total: 0 })
-      const grp = g.get(key)!
-      grp.lines.push(l)
+ const toOrderGroups = useMemo(() => {
+ const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
+ for (const l of saved) {
+ const r = supByS[l.sku] ?? { api: null, supplier: l.supplier ?? null }
+ const key = r.api ?? `manual:${r.supplier ?? l.supplier ?? "unassigned"}`
+ if (!g.has(key)) g.set(key, { key, api: r.api, supplier: r.supplier ?? l.supplier ?? null, lines: [], total: 0 })
+ const grp = g.get(key)!
+ grp.lines.push(l)
       // The same figure the LINE shows. A total that silently counts an unpriced line as
       // zero disagrees with the rows above it, and the row is the one people check.
-      grp.total += unitPrice(l).unit * num(l.qty)
+ grp.total += unitPrice(l).unit * num(l.qty)
     }
-    return [...g.values()]
+ return [...g.values()]
   }, [saved, supByS, unitPrice])
-  const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
+ const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
   /** Split by what this screen can actually send. Otto is in `handGroups` by rule, not by
-   *  accident — see NO_AUTO_ORDER. */
-  const autoGroups = toOrderGroups.filter((g) => placeable(g.api))
-  const handGroups = toOrderGroups.filter((g) => !placeable(g.api))
+   * accident — see NO_AUTO_ORDER. */
+ const autoGroups = toOrderGroups.filter((g) => placeable(g.api))
+ const handGroups = toOrderGroups.filter((g) => !placeable(g.api))
 
   /**
    * WHAT FREIGHT ACTUALLY COST LAST TIME, per supplier.
@@ -987,27 +987,27 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * and "we don't know yet" with last month's real figure beside it is far more use than a
    * confident number nobody can stand behind.
    */
-  const lastFreightBySupplier = useMemo(() => {
-    const out: Record<string, { freight: number; goods: number; at: string }> = {}
-    for (const po of pos ?? []) {
-      const r = (po.meta as { response?: { ottoResponse?: { sub_total?: string; shipping_total?: string }[] }; placedAt?: string } | null)?.response
-      const o = r?.ottoResponse?.[0]
-      const freight = Number(o?.shipping_total)
-      const goods = Number(o?.sub_total)
-      if (!Number.isFinite(freight) || freight <= 0) continue
-      const key = (po.supplier || "").trim()
-      const at = String((po.meta as { placedAt?: string } | null)?.placedAt || po.created_at || "")
+ const lastFreightBySupplier = useMemo(() => {
+ const out: Record<string, { freight: number; goods: number; at: string }> = {}
+ for (const po of pos ?? []) {
+ const r = (po.meta as { response?: { ottoResponse?: { sub_total?: string; shipping_total?: string }[] }; placedAt?: string } | null)?.response
+ const o = r?.ottoResponse?.[0]
+ const freight = Number(o?.shipping_total)
+ const goods = Number(o?.sub_total)
+ if (!Number.isFinite(freight) || freight <= 0) continue
+ const key = (po.supplier || "").trim()
+ const at = String((po.meta as { placedAt?: string } | null)?.placedAt || po.created_at || "")
       // Most recent wins — an older freight figure is a worse guide than a newer one.
-      if (!out[key] || at > out[key].at) out[key] = { freight, goods: Number.isFinite(goods) ? goods : 0, at }
+ if (!out[key] || at > out[key].at) out[key] = { freight, goods: Number.isFinite(goods) ? goods : 0, at }
     }
-    return out
+ return out
   }, [pos])
   // What the Active tab actually shows: lines waiting to be ordered, plus orders in
   // flight. Counting anything else makes the badge a claim you can't verify on screen.
-  const activeCount = saved.length + placed.length
+ const activeCount = saved.length + placed.length
 
-  const setSavedQty = (sku: string, qty: number) =>
-    putSaved(saved.map((l) => (l.sku === sku ? { ...l, qty } : l)))
+ const setSavedQty = (sku: string, qty: number) =>
+ putSaved(saved.map((l) => (l.sku === sku ? { ...l, qty } : l)))
 
   /**
    * Place every group — one purchase order per supplier, in one action.
@@ -1019,12 +1019,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * Lines that go out leave the pool; anything that FAILED stays, so a retry re-sends
    * only what didn't make it rather than duplicating what did.
    */
-  const placeAllGroups = async (card?: CardDetails) => {
-    if (!saved.length) return
-    const opts = await getSupplierOptions().catch(() => null)
-    if (!opts?.shipToComplete) {
-      setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Order settings." })
-      return
+ const placeAllGroups = async (card?: CardDetails) => {
+ if (!saved.length) return
+ const opts = await getSupplierOptions().catch(() => null)
+ if (!opts?.shipToComplete) {
+ setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Order settings." })
+ return
     }
     // Check what each supplier REQUIRES before sending. Their rejections are accurate but
     // name their own fields, and arrive one round trip later — "shipping_address.state:
@@ -1035,7 +1035,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     // themselves say otherwise. Their live reply, on a sandbox order placed 2026-08-10:
     //
     //   "Otto reject a credit-card order with no card on it — they do not bill a card held
-    //    on your account."
+    // on your account."
     //
     // So every Otto card order failed, and it failed for a reason nothing on this page
     // asked about, because the dialog that collects the number had been removed. The belief
@@ -1055,109 +1055,109 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
     //
     // NB the server also refuses a typed card unless OTTO_CARD_ORDERS=1, so that env must
     // be set or the card is stripped and Otto reject the order for the same reason again.
-    const ottoCard = card ?? usableCard() ?? undefined
-    const ottoNeedsCard = /credit\s*card/i.test(String(opts.defaults.otto_payment_method || "")) && !ottoCard
-    const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
+ const ottoCard = card ?? usableCard() ?? undefined
+ const ottoNeedsCard = /credit\s*card/i.test(String(opts.defaults.otto_payment_method || "")) && !ottoCard
+ const ottoMissingParty = !(opts.defaults.otto_customer && opts.defaults.otto_contact)
 
-    setBusy("place-all"); setMsg(null)
-    const outcomes: { supplier: string; ok: boolean; short: string; detail?: string }[] = []
-    const results: string[] = []
-    const placedKeys = new Set<string>()
+ setBusy("place-all"); setMsg(null)
+ const outcomes: { supplier: string; ok: boolean; short: string; detail?: string }[] = []
+ const results: string[] = []
+ const placedKeys = new Set<string>()
     // The Otto lines held back for a card — the SKUs themselves, not a flag. A flag can
     // only say "something was deferred"; what has to be true before re-opening the card
     // dialog is that those particular lines are still unplaced.
-    const deferredForCard = new Set<string>()
-    try {
-      for (const g of toOrderGroups) {
+ const deferredForCard = new Set<string>()
+ try {
+ for (const g of toOrderGroups) {
         // Otto's blockers are Otto's alone — skip the Otto group (leave it in the pool) but
         // never stop S&S/manual from going out.
-        if (g.api === "otto" && ottoNeedsCard) {
+ if (g.api === "otto" && ottoNeedsCard) {
           // Only lines that would ACTUALLY be ordered. A group sitting entirely at qty 0
           // places nothing, and asking for a card number to pay for nothing is how the
           // dialog kept re-appearing with no order behind it.
-          for (const l of g.lines) if (num(l.qty) > 0) deferredForCard.add(lineKey(l))
-          continue
+ for (const l of g.lines) if (num(l.qty) > 0) deferredForCard.add(lineKey(l))
+ continue
         }
-        if (g.api === "otto" && ottoMissingParty) {
-          results.push(`${g.supplier ?? "Otto"}: needs a customer + contact (Order settings › Payment) — left in the pool`)
-          continue
+ if (g.api === "otto" && ottoMissingParty) {
+ results.push(`${g.supplier ?? "Otto"}: needs a customer + contact (Order settings › Payment) — left in the pool`)
+ continue
         }
-        const poNum = nextNum()
-        const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) })).filter((l) => l.qty > 0)
-        if (!payload.length) continue
-        let resp: unknown = { manual: true }
-        let ok = true
-        try {
-          if (g.api === "otto") {
+ const poNum = nextNum()
+ const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) })).filter((l) => l.qty > 0)
+ if (!payload.length) continue
+ let resp: unknown = { manual: true }
+ let ok = true
+ try {
+ if (g.api === "otto") {
             // HELD BACK, not sent — see NO_AUTO_ORDER. Thrown so this group lands in
             // the same "did not place" path a failure uses, which already reports the
             // supplier by name and leaves its lines in the cart.
-            throw new Error(HELD_BACK)
+ throw new Error(HELD_BACK)
           } else if (g.api === "ss") {
-            const r = await ssOrder(payload, {
-              shippingAddress: opts.shipTo, shippingMethod: opts.defaults.ss_shipping_method || undefined,
+ const r = await ssOrder(payload, {
+ shippingAddress: opts.shipTo, shippingMethod: opts.defaults.ss_shipping_method || undefined,
               // S&S's OWN registered address — the accounts use different emails, and
               // the payment profile is looked up against this one.
-              email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
-              poNumber: poNum,
+ email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
+ poNumber: poNum,
               // Which saved card pays. Omitted entirely when unset, so the account's own
               // terms apply rather than an empty profile being sent.
-              paymentProfileId: opts.defaults.ss_payment_profile || undefined,
-              paymentProfileEmail: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
+ paymentProfileId: opts.defaults.ss_payment_profile || undefined,
+ paymentProfileEmail: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
             })
-            if (r.error) throw new Error(r.error); resp = r
+ if (r.error) throw new Error(r.error); resp = r
           }
         } catch (e) {
-          ok = false
-          resp = { error: e instanceof Error ? e.message : "failed" }
+ ok = false
+ resp = { error: e instanceof Error ? e.message : "failed" }
         }
         // The PO record is created HERE, at the moment of placing — never before. That
         // document existing beforehand is exactly what "draft PO" was.
-        await savePurchaseOrder({
+ await savePurchaseOrder({
           // Priced as they go out — see freezeLines.
-          num: poNum, supplier: g.supplier ?? null, items: freezeLines(g.lines), status: ok ? "placed" : "draft",
-          meta: { response: resp, placedAt: new Date().toISOString(), api: g.api },
+ num: poNum, supplier: g.supplier ?? null, items: freezeLines(g.lines), status: ok ? "placed" : "draft",
+ meta: { response: resp, placedAt: new Date().toISOString(), api: g.api },
         }).catch(() => {})
-        if (ok) g.lines.forEach((l) => placedKeys.add(lineKey(l)))
-        const failMsg = (resp as { error?: string }).error || "failed"
+ if (ok) g.lines.forEach((l) => placedKeys.add(lineKey(l)))
+ const failMsg = (resp as { error?: string }).error || "failed"
         // A card decline on an S&S order is S&S's OWN saved payment profile (Order settings ›
         // Payment) — never the card typed for Otto, which S&S never receives. Spell that out,
         // because otherwise it reads as "the card I just entered doesn't work". A bank/
         // processor decline also needs a next step, not just a "which card" — the fix is with
         // the card itself, not our code.
-        const isBankDecline = g.api === "ss" && /processor_declined|issuing bank|declined/i.test(failMsg)
+ const isBankDecline = g.api === "ss" && /processor_declined|issuing bank|declined/i.test(failMsg)
         // Surface a "Change payment" shortcut with the account's saved cards, so a decline
         // is fixable in place rather than a trip to Order settings.
-        if (isBankDecline) setDeclineFix({
-          profiles: opts.suppliers.ss.paymentProfiles?.profiles ?? [],
-          current: opts.defaults.ss_payment_profile || "",
-          email: opts.defaults.ss_order_email || opts.defaults.order_email || "",
+ if (isBankDecline) setDeclineFix({
+ profiles: opts.suppliers.ss.paymentProfiles?.profiles ?? [],
+ current: opts.defaults.ss_payment_profile || "",
+ email: opts.defaults.ss_order_email || opts.defaults.order_email || "",
         })
-        const clarified = isBankDecline
+ const clarified = isBankDecline
           ? `${failMsg} — S&S's own saved card (Order settings › Payment), not the Otto card. The bank declined it: check it isn't expired or over its limit, update it with S&S, or pick another saved card.`
-          : g.api === "ss" && /card|payment/i.test(failMsg)
+ : g.api === "ss" && /card|payment/i.test(failMsg)
             ? `${failMsg} — this is S&S's saved payment (Order settings › Payment), not the Otto card`
-            : failMsg
+ : failMsg
         // Say what ACTUALLY happened. A real placement returns an order number → "placed
         // successfully"; a dry run (live ordering off) never reached S&S and must NOT read
         // as placed, or blanks look ordered when they aren't.
-        const rr = resp as Record<string, unknown>
-        const dry = rr.dryRun === true
-        const ssNo = (() => {
-          const os = rr.orders
-          if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
-          return null
+ const rr = resp as Record<string, unknown>
+ const dry = rr.dryRun === true
+ const ssNo = (() => {
+ const os = rr.orders
+ if (Array.isArray(os)) for (const o of os) { const n = (o as { orderNumber?: unknown })?.orderNumber; if (n) return String(n) }
+ return null
         })()
-        const ottoNo = supplierOrderNoOf(resp)
+ const ottoNo = supplierOrderNoOf(resp)
         // A SANDBOX order is a real order — placed, numbered, answerable — against Otto's
         // test environment. It will never appear in the live account, so "order placed
         // successfully" on its own sends someone looking for it in a portal that has never
         // heard of it. Named here for the same reason a dry run is.
-        const sandbox = rr.sandbox === true
+ const sandbox = rr.sandbox === true
         // The service was substituted because the saved one isn't one Otto will run. Said
         // here, on the placement, because it changes the freight and the arrival date.
-        const fb = rr.shippingFallback as { used?: string; why?: string } | null | undefined
-        const shipNote = fb?.used ? ` · shipping on ${fb.used}${fb.why ? ` — ${fb.why}` : ""}` : ""
+ const fb = rr.shippingFallback as { used?: string; why?: string } | null | undefined
+ const shipNote = fb?.used ? ` · shipping on ${fb.used}${fb.why ? ` — ${fb.why}` : ""}` : ""
         // The short line is what goes on screen; `clarified` is the supplier's own wording
         // and goes behind Details. A refused card is singled out because it is the one
         // failure with an obvious next step.
@@ -1166,54 +1166,54 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         // S&S decline, and offering it would send someone to enter a PAN that never
         // reaches S&S at all. Their fix is "Change payment": pick a different saved
         // profile, which the decline handler above already surfaces.
-        const isCardFail = !ok && g.api === "otto" && /card|payment|declin|cvv|expir/i.test(String(clarified))
-        outcomes.push({
-          supplier: g.supplier ?? "Unassigned",
-          ok,
-          short: ok
+ const isCardFail = !ok && g.api === "otto" && /card|payment|declin|cvv|expir/i.test(String(clarified))
+ outcomes.push({
+ supplier: g.supplier ?? "Unassigned",
+ ok,
+ short: ok
             ? (g.api
                 ? (dry ? "dry run — not sent" : sandbox ? `placed in SANDBOX${ottoNo ? ` · ${ottoNo}` : ""}` : `placed${ssNo || ottoNo ? ` · #${ssNo ?? ottoNo}` : ""}`)
-                : "recorded — order it by hand")
-            : /declin|payment|card/i.test(String(clarified)) ? "payment refused" : "failed",
-          detail: ok ? (shipNote ? shipNote.replace(/^ · /, "") : undefined) : String(clarified),
+ : "recorded — order it by hand")
+ : /declin|payment|card/i.test(String(clarified)) ? "payment refused" : "failed",
+ detail: ok ? (shipNote ? shipNote.replace(/^ · /, "") : undefined) : String(clarified),
         })
-        results.push(ok
+ results.push(ok
           ? (g.api
               ? (dry
                   ? `${g.supplier}: dry run — not sent to ${g.api === "ss" ? "S&S" : "Otto"} (live ordering off)${shipNote}`
-                  : sandbox
+ : sandbox
                     ? `${g.supplier}: placed in Otto's SANDBOX${ottoNo ? ` — test order ${ottoNo}` : ""} — it will not appear in your live Otto account${shipNote}`
-                    : `${g.supplier}: order placed successfully${ssNo || ottoNo ? ` — order #${ssNo ?? ottoNo}` : ""}${shipNote}`)
-              : `${g.supplier ?? "Unassigned"}: recorded — order it by hand`)
-          : `${g.supplier ?? "Unassigned"}: failed — ${clarified}`)
+ : `${g.supplier}: order placed successfully${ssNo || ottoNo ? ` — order #${ssNo ?? ottoNo}` : ""}${shipNote}`)
+ : `${g.supplier ?? "Unassigned"}: recorded — order it by hand`)
+ : `${g.supplier ?? "Unassigned"}: failed — ${clarified}`)
       }
       // AWAITED, and before load(). See putSaved: the reload re-reads this list, so an
       // un-awaited write here can be overtaken and put the ordered lines back in the pool.
-      if (placedKeys.size) await putSaved(saved.filter((l) => !placedKeys.has(lineKey(l))))
-      const anyFailed = outcomes.some((o) => !o.ok)
-      if (outcomes.length) {
-        const done = outcomes.filter((o) => o.ok).length
-        setMsg({
-          ok: !anyFailed,
-          tone: anyFailed && placedKeys.size ? "warn" : undefined,
+ if (placedKeys.size) await putSaved(saved.filter((l) => !placedKeys.has(lineKey(l))))
+ const anyFailed = outcomes.some((o) => !o.ok)
+ if (outcomes.length) {
+ const done = outcomes.filter((o) => o.ok).length
+ setMsg({
+ ok: !anyFailed,
+ tone: anyFailed && placedKeys.size ? "warn" : undefined,
           // A one-line summary; the per-supplier detail is the list below it.
-          text: anyFailed
+ text: anyFailed
             ? (done ? `${done} of ${outcomes.length} placed.` : "Nothing was placed.")
-            : outcomes.length > 1 ? `All ${outcomes.length} orders placed.` : "Order placed.",
-          lines: outcomes,
-          cardRetry: outcomes.some((o) => !o.ok && o.short === "payment refused"),
+ : outcomes.length > 1 ? `All ${outcomes.length} orders placed.` : "Order placed.",
+ lines: outcomes,
+ cardRetry: outcomes.some((o) => !o.ok && o.short === "payment refused"),
         })
       }
-      load()
+ load()
       // Everything that could place now has. If the only thing left to do is enter Otto's
       // card, open that dialog — the S&S/manual orders already went without waiting on it.
       //
       // Asked line by line rather than on a flag: the dialog may only re-open for lines
       // that are STILL unplaced. Re-opening after an order that went through reads as
       // "that failed, pay again", and the honest response to that is a second Otto order.
-      if ([...deferredForCard].some((k) => !placedKeys.has(k))) setNeedCard(true)
+ if ([...deferredForCard].some((k) => !placedKeys.has(k))) setNeedCard(true)
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
     } finally { setBusy(null) }
   }
 
@@ -1230,14 +1230,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * MINUTES — after that their API refuses and it becomes a phone call. Knowing which
    * side of that line you're on changes whether Cancel is worth pressing at all.
    */
-  const minutesSincePlaced = (po: PurchaseOrder) => {
-    const at = ((po.meta || {}) as { placedAt?: string }).placedAt
-    if (!at) return null
+ const minutesSincePlaced = (po: PurchaseOrder) => {
+ const at = ((po.meta || {}) as { placedAt?: string }).placedAt
+ if (!at) return null
     // `now` is state, refreshed on a timer — reading the clock during render is impure,
     // and a countdown computed that way updates only when something else happens to
     // re-render, which is exactly when it would be wrong.
-    const ms = now - new Date(at).getTime()
-    return isFinite(ms) ? Math.floor(ms / 60000) : null
+ const ms = now - new Date(at).getTime()
+ return isFinite(ms) ? Math.floor(ms / 60000) : null
   }
 
   /**
@@ -1251,23 +1251,23 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * other is OTTOCAP_API_BASE still pointing at sandbox-api.ottocap.com. Opening the first
    * without the second is what produced an order nobody could find in their account.
    */
-  const isSandboxOrder = (po: PurchaseOrder) => {
-    const r = (((po.meta || {}) as Record<string, unknown>).response ?? {}) as Record<string, unknown>
-    return r.sandbox === true && r.dryRun !== true && !r.error
+ const isSandboxOrder = (po: PurchaseOrder) => {
+ const r = (((po.meta || {}) as Record<string, unknown>).response ?? {}) as Record<string, unknown>
+ return r.sandbox === true && r.dryRun !== true && !r.error
   }
 
-  const reallySent = (po: PurchaseOrder) => {
-    const m = (po.meta || {}) as Record<string, unknown>
-    const r = (m.response ?? {}) as Record<string, unknown>
-    if (r.dryRun === true) return false
-    if (r.manual === true) return false          // no supplier API — recorded, never sent
-    if (r.error) return false
-    return !!m.api                                // an api was involved and it didn't dry-run
+ const reallySent = (po: PurchaseOrder) => {
+ const m = (po.meta || {}) as Record<string, unknown>
+ const r = (m.response ?? {}) as Record<string, unknown>
+ if (r.dryRun === true) return false
+ if (r.manual === true) return false          // no supplier API — recorded, never sent
+ if (r.error) return false
+ return !!m.api                                // an api was involved and it didn't dry-run
   }
 
-  const returnsOf = (po: PurchaseOrder): PoReturn[] => {
-    const r = ((po.meta || {}) as { returns?: PoReturn[] }).returns
-    return Array.isArray(r) ? r : []
+ const returnsOf = (po: PurchaseOrder): PoReturn[] => {
+ const r = ((po.meta || {}) as { returns?: PoReturn[] }).returns
+ return Array.isArray(r) ? r : []
   }
 
   /**
@@ -1275,68 +1275,68 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * estimate: restocking fees and partial credits mean what arrives is often not what
    * was expected, and a booked figure that was never received is worse than none.
    */
-  const confirmCredit = async (po: PurchaseOrder, r: PoReturn) => {
-    const typed = await prompt({
-      title: "How much was credited?",
-      body: `The amount ${po.supplier || "the supplier"} actually credited back.`,
-      defaultValue: String(r.credit || ""),
-      placeholder: "0.00",
-      confirmLabel: "Record credit",
+ const confirmCredit = async (po: PurchaseOrder, r: PoReturn) => {
+ const typed = await prompt({
+ title: "How much was credited?",
+ body: `The amount ${po.supplier || "the supplier"} actually credited back.`,
+ defaultValue: String(r.credit || ""),
+ placeholder: "0.00",
+ confirmLabel: "Record credit",
     })
-    if (typed == null) return
-    const amount = Number(typed)
-    if (!isFinite(amount) || amount <= 0) { setMsg({ ok: false, text: "A credit needs an amount greater than zero." }); return }
-    setBusy(po.num); setMsg(null)
-    try {
-      const res = await creditPoReturn(po.num, r.id, amount)
-      if (res.error) throw new Error(res.error)
-      setMsg({ ok: true, text: `${usd(amount)} credit recorded against ${po.num}.` })
-      load()
+ if (typed == null) return
+ const amount = Number(typed)
+ if (!isFinite(amount) || amount <= 0) { setMsg({ ok: false, text: "A credit needs an amount greater than zero." }); return }
+ setBusy(po.num); setMsg(null)
+ try {
+ const res = await creditPoReturn(po.num, r.id, amount)
+ if (res.error) throw new Error(res.error)
+ setMsg({ ok: true, text: `${usd(amount)} credit recorded against ${po.num}.` })
+ load()
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't record that credit." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't record that credit." })
     } finally { setBusy(null) }
   }
 
-  const del = async (po: PurchaseOrder) => { setBusy(po.num); try { await deletePurchaseOrder(po.num); load() } catch { /* ignore */ } finally { setBusy(null) } }
+ const del = async (po: PurchaseOrder) => { setBusy(po.num); try { await deletePurchaseOrder(po.num); load() } catch { /* ignore */ } finally { setBusy(null) } }
 
-  const poTotal = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.qty), 0)
+ const poTotal = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.qty), 0)
   /** What this PO COSTS. Distinct from poTotal, which counts units — the two were easy to
-   *  confuse when only one was ever shown, and only one of them is money. */
-  const poMoney = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.price) * num(l.qty), 0)
-  const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
+   * confuse when only one was ever shown, and only one of them is money. */
+ const poMoney = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.price) * num(l.qty), 0)
+ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
   /** True when nothing on the PO carries a price. Lines drafted from low stock have no
-   *  price until someone fills one in, and a confident "$0.00" would read as free. */
-  const unpriced = (po: PurchaseOrder) => po.items.length > 0 && po.items.every((l) => !num(l.price))
+   * price until someone fills one in, and a confident "$0.00" would read as free. */
+ const unpriced = (po: PurchaseOrder) => po.items.length > 0 && po.items.every((l) => !num(l.price))
 
   /** When a past PO actually happened — received beats placed, both beat the row's birth. */
-  const poDate = (po: PurchaseOrder) => {
-    const m = (po.meta || {}) as Record<string, unknown>
-    const raw = (m.receivedAt || m.placedAt || po.created_at) as string | undefined
-    if (!raw) return ""
-    const d = new Date(raw)
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+ const poDate = (po: PurchaseOrder) => {
+ const m = (po.meta || {}) as Record<string, unknown>
+ const raw = (m.receivedAt || m.placedAt || po.created_at) as string | undefined
+ if (!raw) return ""
+ const d = new Date(raw)
+ return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
   }
 
-  const toggle = (n: string) => {
-    const opening = !open.has(n)
-    setOpen((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(n)) next.add(n)
-      return next
+ const toggle = (n: string) => {
+ const opening = !open.has(n)
+ setOpen((prev) => {
+ const next = new Set(prev)
+ if (!next.delete(n)) next.add(n)
+ return next
     })
-    if (!opening) return
+ if (!opening) return
 
     // Fetch OUTSIDE the state updater. An updater must be pure — React may call it more
     // than once, or not when you expect — so a network call in there is unreliable as
     // well as wrong, which is why these thumbnails never appeared.
-    const po = (pos ?? []).find((p) => p.num === n)
-    const want = [...new Set((po?.items ?? []).map((l) => l.sku).filter((sku) => sku && !poImgs[sku]))]
-    if (!want.length) return
-    resolveSuppliers(want)
+ const po = (pos ?? []).find((p) => p.num === n)
+ const want = [...new Set((po?.items ?? []).map((l) => l.sku).filter((sku) => sku && !poImgs[sku]))]
+ if (!want.length) return
+ resolveSuppliers(want)
       .then((r) => setPoImgs((m) => {
-        const add: Record<string, string> = {}
-        for (const [sku, v] of Object.entries(r.bySku ?? {})) if (v.image) add[sku] = v.image
-        return Object.keys(add).length ? { ...m, ...add } : m
+ const add: Record<string, string> = {}
+ for (const [sku, v] of Object.entries(r.bySku ?? {})) if (v.image) add[sku] = v.image
+ return Object.keys(add).length ? { ...m, ...add } : m
       }))
       .catch(() => { /* a missing thumbnail is not worth an error banner */ })
   }
@@ -1350,38 +1350,38 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * Quantities are copied as they were, since "the same order again" is the request —
    * the draft is editable before it goes anywhere.
    */
-  const reorder = async (po: PurchaseOrder, only?: POLine) => {
-    const src = (only ? [only] : po.items).filter((l) => num(l.qty) > 0)
-    if (!src.length) { setMsg({ ok: false, text: "Nothing on that order to reorder." }); return }
-    const lines: POLine[] = src.map((l) => ({ sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty), price: l.price }))
+ const reorder = async (po: PurchaseOrder, only?: POLine) => {
+ const src = (only ? [only] : po.items).filter((l) => num(l.qty) > 0)
+ if (!src.length) { setMsg({ ok: false, text: "Nothing on that order to reorder." }); return }
+ const lines: POLine[] = src.map((l) => ({ sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty), price: l.price }))
 
-    const target = drafts.find((p) => supKey(p.supplier) === supKey(po.supplier))
-    setBusy(po.num); setMsg(null)
-    try {
-      if (target) {
+ const target = drafts.find((p) => supKey(p.supplier) === supKey(po.supplier))
+ setBusy(po.num); setMsg(null)
+ try {
+ if (target) {
         // Await it AND check the result: this once fire-and-forgot, then only awaited, so a
         // server-REFUSED merge still reported success and updated local state alone — the
         // line then vanished on the next load. Check r.error like the new-draft path does.
-        const merged = mergeLines(target.items, lines)
-        const r = await savePurchaseOrder({ ...target, items: merged })
-        if (r?.error) throw new Error(r.error)
-        setPos((prev) => (prev ?? []).map((p) => (p.num === target.num ? { ...p, items: merged } : p)))
-        setTab("ongoing")   // a draft is an order in progress — that is the Ongoing tab now
-        setMsg({ ok: true, text: `Added ${lines.length} line${lines.length === 1 ? "" : "s"} to the open draft ${target.num} — review the quantities before placing.` })
+ const merged = mergeLines(target.items, lines)
+ const r = await savePurchaseOrder({ ...target, items: merged })
+ if (r?.error) throw new Error(r.error)
+ setPos((prev) => (prev ?? []).map((p) => (p.num === target.num ? { ...p, items: merged } : p)))
+ setTab("ongoing")   // a draft is an order in progress — that is the Ongoing tab now
+ setMsg({ ok: true, text: `Added ${lines.length} line${lines.length === 1 ? "" : "s"} to the open draft ${target.num} — review the quantities before placing.` })
       } else {
-        const draft: PurchaseOrder = { num: nextNum(), supplier: po.supplier ?? null, items: lines, status: "draft" }
-        const r = await savePurchaseOrder(draft)
+ const draft: PurchaseOrder = { num: nextNum(), supplier: po.supplier ?? null, items: lines, status: "draft" }
+ const r = await savePurchaseOrder(draft)
         // savePurchaseOrder resolves with {error} for some refusals rather than throwing,
         // so checking only for a thrown error reported a failure as a success.
-        if (r?.error) throw new Error(r.error)
-        setTab("ongoing")   // show the new draft where orders in progress live
-        setMsg({ ok: true, text: `Drafted ${draft.num} from ${po.num} — review the quantities before placing.` })
-        load()
+ if (r?.error) throw new Error(r.error)
+ setTab("ongoing")   // show the new draft where orders in progress live
+ setMsg({ ok: true, text: `Drafted ${draft.num} from ${po.num} — review the quantities before placing.` })
+ load()
       }
     } catch (e) {
       // Say what actually went wrong. The generic message here hid the server's reason,
       // which is the only thing that makes this fixable rather than mysterious.
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't create the reorder draft." })
+ setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't create the reorder draft." })
     } finally { setBusy(null) }
   }
 
@@ -1390,13 +1390,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    * want the same summary and the same expanded detail, and two copies would drift the
    * moment either gained a field.
    */
-  const poRow = (po: PurchaseOrder) => {
-              const isOpen = open.has(po.num)
-              return (
+ const poRow = (po: PurchaseOrder) => {
+ const isOpen = open.has(po.num)
+ return (
                 <div key={po.num}>
                   <div className="flex flex-wrap items-center gap-2 px-5 py-3">
                     {/* The whole summary toggles — a caret-sized hit target on a row this
-                        wide is a miss waiting to happen. */}
+ wide is a miss waiting to happen. */}
                     <button onClick={() => toggle(po.num)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={isOpen}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
                       <span className="tabular-nums text-sm font-medium">{po.num}</span>
@@ -1406,8 +1406,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       </span>
                     </button>
                     {po.status === "placed" && !reallySent(po)
-                      ? <span className="whitespace-nowrap text-xs font-medium text-amber-700"
-                              title="Built and recorded, but never transmitted — the supplier's live-order gate is off">
+                      ? <span className="whitespace-nowrap text-xs font-medium text-hold"
+ title="Built and recorded, but never transmitted — the supplier's live-order gate is off">
                           Not sent
                         </span>
                       // A SANDBOX order really was placed — it has an order number and Otto
@@ -1415,14 +1415,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       // never appear in the live account and no blanks are coming. Reading
                       // "Placed" for that is the same lie as reading it for a dry run, and
                       // costs someone a search through a portal that has never seen it.
-                      : po.status === "placed" && isSandboxOrder(po)
+ : po.status === "placed" && isSandboxOrder(po)
                       ? <span className="whitespace-nowrap text-xs font-medium text-violet-700"
-                              title="Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.">
+ title="Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.">
                           Sandbox
                         </span>
-                      : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-sky-700">Placed</span>
-                      : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
-                        : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
+ : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-sky-700">Placed</span>
+ : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
+ : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
                     {/**
               * RECEIVE THE WHOLE DELIVERY, at the top where a box gets opened.
               *
@@ -1436,8 +1436,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
               */}
             {po.items.some((l) => owedOn(l) > 0) && (
               <Button size="sm" variant="outline" onClick={() => void receiveAll(po)}
-                disabled={busy === `recv:${po.num}` || busy === po.num}
-                title="Book in everything this order is still waiting on and add it to the shelf">
+ disabled={busy === `recv:${po.num}` || busy === po.num}
+ title="Book in everything this order is still waiting on and add it to the shelf">
                 {busy === `recv:${po.num}` ? "Receiving…" : "Receive all"}
               </Button>
             )}
@@ -1447,7 +1447,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     {/* Only where it makes sense: an order already settled is IN history. */}
                     {(po.status === "draft" || po.status === "placed") && (
                       <Button size="sm" variant="outline" onClick={() => archive([po])} disabled={busy === "archive"}
-                              title="Clear it off the board — the supplier is not contacted">
+ title="Clear it off the board — the supplier is not contacted">
                         To history
                       </Button>
                     )}
@@ -1462,23 +1462,23 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : null} Receive into stock
                         </Button>
                         {(() => {
-                          const mins = minutesSincePlaced(po)
-                          const ss = /s&s|activewear/i.test(po.supplier || "")
-                          const sentSs = ss && reallySent(po)
+ const mins = minutesSincePlaced(po)
+ const ss = /s&s|activewear/i.test(po.supplier || "")
+ const sentSs = ss && reallySent(po)
                           // Past their documented 10 minutes S&S USUALLY refuse — but only
                           // usually. Labelling it "(our record only)" stated an outcome we
                           // had not asked for, and S&S then cancelled for real, so the app
                           // said one thing and the supplier did another. The button no
                           // longer predicts: it asks, and reports whatever comes back.
-                          const past = sentSs && mins != null && mins >= 10
-                          return (
+ const past = sentSs && mins != null && mins >= 10
+ return (
                             <button onClick={() => cancelPO(po)} disabled={busy === po.num}
-                              className="text-xs font-medium text-muted-foreground hover:text-red-600"
-                              title={past
+ className="text-xs font-medium text-muted-foreground hover:text-red-600"
+ title={past
                                 ? "Past S&S's usual 10-minute window — we'll still ask them, and tell you what they say"
-                                : sentSs
+ : sentSs
                                   ? `Cancels with S&S too — about ${Math.max(0, 10 - (mins ?? 0))} min left of their window`
-                                  : "Cancel our record of this order"}>
+ : "Cancel our record of this order"}>
                               Cancel
                             </button>
                           )
@@ -1489,8 +1489,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                   {isOpen && (
                     <div className="border-t border-border bg-muted/30 px-5 py-1">
                       {/* How to chase this order: their reference, and the carrier number
-                          for the box coming back. Kept on the PO because "where are my
-                          blanks" is asked of the PO, not of a shipment record elsewhere. */}
+ for the box coming back. Kept on the PO because "where are my
+ blanks" is asked of the PO, not of a shipment record elsewhere. */}
                       {po.status !== "cancelled" && (
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border py-2.5 text-xs">
                           <span className="text-muted-foreground">
@@ -1498,22 +1498,22 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                             <span className="tabular-nums text-foreground">{supplierOrderNo(po) ?? "—"}</span>
                           </span>
                           {/* S&S know their own tracking, so ask them rather than making
-                              someone copy it across. Manual entry stays for suppliers with
-                              no API — an Otto or hand-placed order still needs a box
-                              chased. */}
+ someone copy it across. Manual entry stays for suppliers with
+ no API — an Otto or hand-placed order still needs a box
+ chased. */}
                           {supplierOrderNo(po) && /s&s|activewear/i.test(po.supplier || "") ? (
                             <button onClick={() => fetchTracking(po)} disabled={tracking[po.num] === "loading"}
-                              className="font-medium text-primary hover:underline disabled:opacity-60">
+ className="font-medium text-primary hover:underline disabled:opacity-60">
                               {tracking[po.num] === "loading" ? "Checking S&S…" : "Get tracking from S&S"}
                             </button>
                           ) : (
                             <label className="flex items-center gap-1.5 text-muted-foreground">
                               Tracking
                               <Input
-                                defaultValue={trackingOf(po)}
-                                onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
-                                placeholder="paste carrier number"
-                                className="h-7 w-48 tabular-nums text-xs"
+ defaultValue={trackingOf(po)}
+ onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
+ placeholder="paste carrier number"
+ className="h-7 w-48 tabular-nums text-xs"
                               />
                             </label>
                           )}
@@ -1526,15 +1526,15 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                               <span className="font-medium">{t.carrier}</span>
                               <span className="tabular-nums text-foreground">{t.tracking}</span>
                               {/* A box number only appears on split shipments — which is
-                                  exactly when you need to know there's more than one. */}
+ exactly when you need to know there's more than one. */}
                               {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">box {t.box}</span>}
                               {t.deliveredAt
                                 ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
                                     <CheckCircle size={10} weight="fill" /> delivered
                                   </span>
-                                : t.lastUpdate?.status
+ : t.lastUpdate?.status
                                   ? <span className="truncate text-muted-foreground">{t.lastUpdate.status}</span>
-                                  : null}
+ : null}
                             </div>
                           ))}
                         </div>
@@ -1560,13 +1560,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                                 </span>
                               ) : (
                                 <>
-                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                                  <span className="rounded-full bg-hold/15 px-2 py-0.5 font-medium text-hold">
                                     {usd(r.credit)} expected
                                   </span>
                                   {/* Confirmed separately, because a credit lands when the
-                                      supplier says so — not when the box went back. */}
+ supplier says so — not when the box went back. */}
                                   <button onClick={() => confirmCredit(po, r)} disabled={busy === po.num}
-                                    className="font-medium text-primary hover:underline">
+ className="font-medium text-primary hover:underline">
                                     Credit received
                                   </button>
                                 </>
@@ -1580,7 +1580,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       ) : po.items.map((l) => (
                         <div key={l.sku} className="flex items-center gap-3 py-2 text-sm">
                           <LineThumb src={l.image ?? poImgs[l.sku]} onZoom={(src, label) => setZoom({ src, label })}
-                            label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
+ label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium">{l.name || l.sku}</div>
                             <div className="truncate text-xs text-muted-foreground">
@@ -1590,38 +1590,38 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                             <SourceTags line={l} />
                           </div>
                           {/* WHAT HAS LANDED, when any has. A bare ×12 cannot tell a line
-                              nobody has touched from one that is fully in — which is the
-                              question this panel exists to answer. */}
+ nobody has touched from one that is fully in — which is the
+ question this panel exists to answer. */}
                           {num(l.received) > 0 ? (
-                            <span className={"shrink-0 tabular-nums " + (owedOn(l) === 0 ? "text-success" : "text-amber-700 dark:text-amber-400")}
-                              title={`${num(l.received)} of ${num(l.qty)} received`}>
+                            <span className={"shrink-0 tabular-nums " + (owedOn(l) === 0 ? "text-success" : "text-hold")}
+ title={`${num(l.received)} of ${num(l.qty)} received`}>
                               {num(l.received)}/{num(l.qty)}
                             </span>
                           ) : (
                             <span className="shrink-0 text-muted-foreground">×{num(l.qty)}</span>
                           )}
                           {/* Only while something is owed. A button that receives nothing is
-                              a way to double-count a delivery. */}
+ a way to double-count a delivery. */}
                           {owedOn(l) > 0 && (
                             <Button
-                              size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs"
-                              disabled={busy === `recv:${po.num}:${l.sku}` || busy === `recv:${po.num}`}
-                              onClick={() => void receiveLine(po, l)}
-                              title={`Book in the ${owedOn(l)} still owed and add them to the shelf`}
+ size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs"
+ disabled={busy === `recv:${po.num}:${l.sku}` || busy === `recv:${po.num}`}
+ onClick={() => void receiveLine(po, l)}
+ title={`Book in the ${owedOn(l)} still owed and add them to the shelf`}
                             >
                               {busy === `recv:${po.num}:${l.sku}` ? "…" : "Receive"}
                             </Button>
                           )}
                           {/* THE RECORDED PRICE, and only that. A placed PO is not re-costed
-                              from today's catalogue — what it cost is a fact. The title says
-                              when the figure was our own catalogue snapshot rather than a
-                              price the supplier confirmed, because the invoice can differ
-                              and the two must not read as the same claim. */}
+ from today's catalogue — what it cost is a fact. The title says
+ when the figure was our own catalogue snapshot rather than a
+ price the supplier confirmed, because the invoice can differ
+ and the two must not read as the same claim. */}
                           <span
-                            className="w-20 text-right tabular-nums text-muted-foreground"
-                            title={num(l.price)
+ className="w-20 text-right tabular-nums text-muted-foreground"
+ title={num(l.price)
                               ? `${usd(num(l.price))} each${l.priceSource === "catalog" ? " — our catalogue price when this was placed, not a supplier confirmation" : ""}`
-                              : "No price was recorded on this line"}
+ : "No price was recorded on this line"}
                           >
                             {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
                           </span>
@@ -1636,11 +1636,11 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
               )
   }
 
-  return (
+ return (
     <div className="space-y-4">
       {!embedded && (
         <div className="flex items-center gap-3 md:hidden">
-          <ShoppingCart size={18} weight="regular"  className="shrink-0 text-primary" />
+          <ShoppingCart size={18} weight="regular" className="shrink-0 text-primary" />
           <div className="min-w-0">
             <h1 className="font-title text-2xl font-semibold tracking-tight">Purchase</h1>
             <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
@@ -1650,21 +1650,21 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
 
       <div className="flex items-center justify-end gap-2">
         {/* WORDS, NOT ICONS. A barcode, a truck and a plus sat in a row above the board and
-            each needed decoding before its label was read — three small pictures competing
-            with three short phrases that already said it. The spinner stays on the one
-            button that waits for something, because that is state rather than decoration.
+ each needed decoding before its label was read — three small pictures competing
+ with three short phrases that already said it. The spinner stays on the one
+ button that waits for something, because that is state rather than decoration.
 
             Receiving a BOX is its own job, done at the bench with a scanner — that is for
-            goods already carrying our own label, which means consigned stock, where we
-            printed the barcode. A supplier's carton never does, so those are received
-            against the PO line instead (the Receive button on each line), where the mapping
-            to our sku was already made when the order was raised. */}
+ goods already carrying our own label, which means consigned stock, where we
+ printed the barcode. A supplier's carton never does, so those are received
+ against the PO line instead (the Receive button on each line), where the mapping
+ to our sku was already made when the order was raised. */}
         <Button size="sm" variant="outline" onClick={() => setScanOpen(true)}>
           Receive a box
         </Button>
         {/* "Settings", not "Order settings": it sits on the purchasing board, where there is
-            nothing else it could be the settings for, and the extra word was the longest
-            thing in the row. */}
+ nothing else it could be the settings for, and the extra word was the longest
+ thing in the row. */}
         <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
           Settings
         </Button>
@@ -1678,32 +1678,32 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
         <StatCard label="To order" value={String(saved.length)} sub="waiting to be placed" />
         {/* Counts only what REALLY went. status === "placed" also covers a manual supplier
-            recorded for hand-ordering and a dry run that never left the building — both
-            already carry a "Not sent" badge in the list, so a tile reading "sent to
-            suppliers" while counting them contradicted the rows underneath it. The unsent
-            ones get their own tile rather than disappearing: they are the pile someone still
-            has to act on. */}
+ recorded for hand-ordering and a dry run that never left the building — both
+ already carry a "Not sent" badge in the list, so a tile reading "sent to
+ suppliers" while counting them contradicted the rows underneath it. The unsent
+ ones get their own tile rather than disappearing: they are the pile someone still
+ has to act on. */}
         <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed" && reallySent(p)).length)} sub="sent to suppliers" />
         {(() => {
-          const unsent = (pos ?? []).filter((p) => p.status === "placed" && !reallySent(p)).length
-          return unsent ? <StatCard label="Not sent" value={String(unsent)} sub="order these by hand" tone="neg" /> : null
+ const unsent = (pos ?? []).filter((p) => p.status === "placed" && !reallySent(p)).length
+ return unsent ? <StatCard label="Not sent" value={String(unsent)} sub="order these by hand" tone="neg" /> : null
         })()}
         <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
       </StatGrid>
 
       {msg && (
         <div ref={msgRef} className={"rounded-lg border px-4 py-2 text-sm " + (
-          msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
-            : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-destructive/30 bg-destructive/10 text-destructive")}>
+ msg.tone === "warn" ? "border-hold/20 bg-hold/10 text-hold"
+ : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+ : "border-destructive/30 bg-destructive/10 text-destructive")}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="min-w-0 font-medium">{msg.text}</span>
             <span className="flex shrink-0 gap-2">
               {/* THE ONE FAILURE WITH AN OBVIOUS NEXT STEP gets a button rather than a
-                  paragraph. Re-opening the card window puts the saved card in front of you
-                  with the option to type a different one, and placing again only retries
-                  what is STILL in the pool — the orders that went through were removed from
-                  it, so a retry cannot double-order them. */}
+ paragraph. Re-opening the card window puts the saved card in front of you
+ with the option to type a different one, and placing again only retries
+ what is STILL in the pool — the orders that went through were removed from
+ it, so a retry cannot double-order them. */}
               {msg.cardRetry && (
                 <Button size="sm" variant="outline" onClick={() => setNeedCard(true)}>Enter card &amp; retry</Button>
               )}
@@ -1713,9 +1713,9 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             </span>
           </div>
           {/* ONE LINE PER SUPPLIER. Four outcomes joined into a paragraph — each carrying a
-              supplier's verbatim error — was a wall nobody read to the end of. The exact
-              wording is still here, one <details> away, which is where it belongs: it only
-              matters after you have decided which supplier to look at. */}
+ supplier's verbatim error — was a wall nobody read to the end of. The exact
+ wording is still here, one <details> away, which is where it belongs: it only
+ matters after you have decided which supplier to look at. */}
           {msg.lines && msg.lines.length > 0 && (
             <ul className="mt-1.5 space-y-1">
               {msg.lines.map((l, i) => (
@@ -1748,7 +1748,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
               ))}
             </select>
           ) : (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-xs text-hold">
               No other saved cards on this S&amp;S account{declineFix?.email ? ` (${declineFix.email})` : ""}. Add or update the card with S&amp;S, then retry.
             </div>
           )}
@@ -1763,38 +1763,38 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         {/* THREE TABS, because they are three different jobs.
             Cart is what you are ABOUT to buy — a list you edit. Ongoing is money already
-            committed and goods you are waiting for — a list you chase. History is settled.
+ committed and goods you are waiting for — a list you chase. History is settled.
             Cart and Ongoing shared one "Active" tab, so the thing you were mid-way through
-            deciding sat directly above orders that only needed watching, and neither read
-            cleanly. */}
+ deciding sat directly above orders that only needed watching, and neither read
+ cleanly. */}
         <TabsList>
           <TabsTrigger value="cart">Cart{saved.length ? ` (${saved.length})` : ""}</TabsTrigger>
           <TabsTrigger value="ongoing">Ongoing{placed.length ? ` (${placed.length})` : ""}</TabsTrigger>
           {/* No count on History. It only grows — hundreds of POs eventually — and a
-              number that always climbs and never needs acting on is decoration. */}
+ number that always climbs and never needs acting on is decoration. */}
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         {/* CART — what is short and about to be bought. Nothing here is a purchase order:
-            none exists until you place one.
+ none exists until you place one.
 
             Two columns: the lines on the left, the money on the right. The totals used to
-            be a single "N units · $X" caption in the card header, which is the wrong place
-            for the figure that decides whether you place the order at all. */}
+ be a single "N units · $X" caption in the card header, which is the wrong place
+ for the figure that decides whether you place the order at all. */}
         <TabsContent value="cart" className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="space-y-4">
 
         {/* ── TO ORDER ─────────────────────────────────────────────────────────
             One panel, always open. This is the working surface, and something you're
-            mid-way through deciding shouldn't sit behind a click.
+ mid-way through deciding shouldn't sit behind a click.
 
             Grouped by the supplier each line ACTUALLY comes from, so the split is
-            visible BEFORE placing rather than being a surprise after. Nothing here is
-            a "draft PO": no purchase order exists until you place one. Until then this
-            is a list of what's short, which is the only honest description of it. */}
+ visible BEFORE placing rather than being a surprise after. Nothing here is
+ a "draft PO": no purchase order exists until you place one. Until then this
+ is a list of what's short, which is the only honest description of it. */}
         <SectionCard
-          title="To order"
-          actions={
+ title="To order"
+ actions={
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
                 {saved.reduce((s, l) => s + num(l.qty), 0)} units{toOrderTotal > 0 ? ` · ${usd(toOrderTotal)}` : ""}
@@ -1803,16 +1803,16 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                 Add items
               </Button>
               {/* COUNTS WHAT WILL ACTUALLY GO. The label said "Place 2 orders" over a cart
-                  whose second supplier is ordered by hand, and the button stayed live on a
-                  cart that was ALL Otto — a press that could only fail. Disabled with the
-                  reason on the tooltip when there is nothing this button can send. */}
+ whose second supplier is ordered by hand, and the button stayed live on a
+ cart that was ALL Otto — a press that could only fail. Disabled with the
+ reason on the tooltip when there is nothing this button can send. */}
               <Button
-                size="sm"
-                onClick={() => void placeAllGroups()}
-                disabled={!autoGroups.length || busy === "place-all"}
-                title={autoGroups.length
+ size="sm"
+ onClick={() => void placeAllGroups()}
+ disabled={!autoGroups.length || busy === "place-all"}
+ title={autoGroups.length
                   ? undefined
-                  : (handGroups.length ? "Every supplier in this cart is ordered by hand." : "Nothing to place.")}
+ : (handGroups.length ? "Every supplier in this cart is ordered by hand." : "Nothing to place.")}
               >
                 {busy === "place-all" && <CircleNotch size={14} className="animate-spin" />}
                 {autoGroups.length > 1 ? `Place ${autoGroups.length} orders` : "Place order"}
@@ -1823,7 +1823,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           {saved.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
               Nothing waiting to be ordered. Items land here when an order runs stock short,
-              or add them yourself with <strong>Add items</strong>.
+ or add them yourself with <strong>Add items</strong>.
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -1832,17 +1832,17 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                   <div className="flex flex-wrap items-center gap-2 bg-muted/40 px-5 py-2">
                     <span className="text-sm font-semibold">{g.supplier ?? "Unassigned"}</span>
                     {/* Only the exception is worth a chip. "Orders via API" was on the
-                        majority of rows saying nothing actionable; "order by hand" is the
-                        one that changes what you do next. */}
+ majority of rows saying nothing actionable; "order by hand" is the
+ one that changes what you do next. */}
                     {!placeable(g.api) && (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">order by hand</span>
                     )}
                     {/* THEIR MINIMUM, said before it is keyed in rather than after they refuse
-                        it. Amber, not an error: this cart is legal, it just cannot be sent yet,
-                        and only Otto imposes it. */}
+ it. Amber, not an error: this cart is legal, it just cannot be sent yet,
+ and only Otto imposes it. */}
                     {g.api === "otto" && g.lines.reduce((n, l) => n + num(l.qty), 0) < OTTO_MIN_UNITS && (
-                      <span className="whitespace-nowrap text-2xs font-medium text-amber-700">
-                        under Otto&apos;s {OTTO_MIN_UNITS}-piece minimum
+                      <span className="whitespace-nowrap text-2xs font-medium text-hold">
+ under Otto&apos;s {OTTO_MIN_UNITS}-piece minimum
                       </span>
                     )}
                     <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
@@ -1854,10 +1854,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     <div key={l.sku} className="px-5 py-3">
                      <div className="flex items-start gap-4">
                       <LineThumb src={l.image ?? supByS[l.sku]?.image} onZoom={(src, label) => setZoom({ src, label })}
-                        label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
+ label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
                       {/* Product identity — a FIXED-ish column (doesn't grow) so the qty pills
-                          get the whole middle band to spread across, rather than being shoved
-                          against the price by a title that ate all the slack. */}
+ get the whole middle band to spread across, rather than being shoved
+ against the price by a title that ate all the slack. */}
                       <div className="min-w-0 basis-56">
                         <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
                         <div className="truncate text-xs text-muted-foreground">
@@ -1866,70 +1866,70 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         </div>
                         <SourceTags line={l} />
                         {/* ONE CLICK TO THE PAGE IT IS BOUGHT ON. A hand-ordered line used
-                            to carry a supplier's name and nothing else, so "order by hand"
-                            meant "go and remember where this came from". Typed once on the
-                            product; every shortage of it arrives with the link. */}
+ to carry a supplier's name and nothing else, so "order by hand"
+ meant "go and remember where this came from". Typed once on the
+ product; every shortage of it arrives with the link. */}
                         {(l as { supplierUrl?: string | null }).supplierUrl && (
                           <a
-                            href={String((l as { supplierUrl?: string | null }).supplierUrl)}
-                            target="_blank" rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-0.5 inline-flex items-center gap-1 text-2xs font-medium text-primary hover:underline"
+ href={String((l as { supplierUrl?: string | null }).supplierUrl)}
+ target="_blank" rel="noopener noreferrer"
+ onClick={(e) => e.stopPropagation()}
+ className="mt-0.5 inline-flex items-center gap-1 text-2xs font-medium text-primary hover:underline"
                           >
                             <ArrowSquareOut size={11} weight="bold" /> Where to buy
                           </a>
                         )}
                       </div>
                       {/* QTY SLOTS — flex-1 so they occupy the band BETWEEN the product and
-                          the price, but kept as a TIGHT cluster (fixed small gap) centred in
-                          that band rather than stretched edge-to-edge — justify-between fanned
-                          them too far apart on a wide row. Wraps when the row is narrow. Each box
+ the price, but kept as a TIGHT cluster (fixed small gap) centred in
+ that band rather than stretched edge-to-edge — justify-between fanned
+ them too far apart on a wide row. Wraps when the row is narrow. Each box
                           STACKS four facts — how many to take, the warehouse code, its stock,
-                          and the arrival date — because in a row they'd read as one run-on line.
+ and the arrival date — because in a row they'd read as one run-on line.
                             • S&S  → one box per warehouse, nearest first (blank = let S&S
-                                     split it; typing turns the line into a manual split, and
-                                     the line qty follows the sum of the boxes).
+ split it; typing turns the line into a manual split, and
+ the line qty follows the sum of the boxes).
                             • Otto → a single box (their inventory is per-sku, no warehouse).
                             • else → one plain box (a manual line, or S&S before stock loads),
-                                     the sole quantity control in that case. */}
+ the sole quantity control in that case. */}
                       <div className="flex flex-1 flex-wrap items-start justify-center gap-2 sm:gap-2.5">
                         {g.api === "ss" && stock[l.sku] ? (
-                          stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
+ stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
                             <span className="self-center text-2xs font-medium text-destructive">No stock in any warehouse</span>
                           ) : (
-                            stock[l.sku].warehouses
+ stock[l.sku].warehouses
                               .filter((w) => w.qty > 0)
                               .sort((a, b) => (transit[a.abbr]?.days ?? 99) - (transit[b.abbr]?.days ?? 99))
                               .slice(0, 5)
                               .map((w) => {
-                                const t = transit[w.abbr]
-                                const eta = warehouseEta(t?.days ?? null, t?.cutOff ?? null, new Date(now || Date.now()))
-                                const covers = w.qty >= num(l.qty)
-                                const key = `${l.sku}:${w.abbr}`
-                                const taken = split[key] ?? ""
-                                return (
+ const t = transit[w.abbr]
+ const eta = warehouseEta(t?.days ?? null, t?.cutOff ?? null, new Date(now || Date.now()))
+ const covers = w.qty >= num(l.qty)
+ const key = `${l.sku}:${w.abbr}`
+ const taken = split[key] ?? ""
+ return (
                                   <label key={w.abbr}
-                                    title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
-                                    className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
+ title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
+ className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
                                     {/* Shared Input primitive — pill shape + violet focus ring
-                                        come from the theme, so they can't drift. Capped at the
-                                        warehouse's stock; over-asking is a rejection S&S only
-                                        find later. */}
+ come from the theme, so they can't drift. Capped at the
+ warehouse's stock; over-asking is a rejection S&S only
+ find later. */}
                                     <Input
-                                      value={taken}
-                                      onChange={(e) => {
-                                        const v = e.target.value.replace(/[^0-9]/g, "")
-                                        const capped = v === "" ? "" : String(Math.min(Number(v), w.qty))
-                                        const next = { ...split, [key]: capped }
-                                        setSplit(next)
-                                        const sum = stock[l.sku].warehouses
+ value={taken}
+ onChange={(e) => {
+ const v = e.target.value.replace(/[^0-9]/g, "")
+ const capped = v === "" ? "" : String(Math.min(Number(v), w.qty))
+ const next = { ...split, [key]: capped }
+ setSplit(next)
+ const sum = stock[l.sku].warehouses
                                           .reduce((a, x) => a + Number(next[`${l.sku}:${x.abbr}`] || 0), 0)
-                                        if (sum > 0) setSavedQty(l.sku, sum)
+ if (sum > 0) setSavedQty(l.sku, sum)
                                       }}
-                                      placeholder="0"
-                                      inputMode="numeric"
-                                      aria-label={`Quantity to take from ${w.abbr}`}
-                                      className="h-8 w-full px-1 text-center text-sm tabular-nums"
+ placeholder="0"
+ inputMode="numeric"
+ aria-label={`Quantity to take from ${w.abbr}`}
+ className="h-8 w-full px-1 text-center text-sm tabular-nums"
                                     />
                                     <span className="flex items-baseline gap-1 text-2xs leading-none">
                                       <span className={covers ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}>{w.abbr}</span>
@@ -1944,17 +1944,17 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           )
                         ) : g.api === "otto" ? (
                           <label
-                            title={ottoStock[l.sku] == null
+ title={ottoStock[l.sku] == null
                               ? "Otto didn't return a stock figure we could read"
-                              : `${ottoStock[l.sku]} available from Otto`}
-                            className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
+ : `${ottoStock[l.sku]} available from Otto`}
+ className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
                             <Input
-                              value={String(num(l.qty) || "")}
-                              onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                              placeholder="0"
-                              inputMode="numeric"
-                              aria-label={`Quantity to order from Otto for ${l.sku}`}
-                              className="h-8 w-full px-1 text-center text-sm tabular-nums"
+ value={String(num(l.qty) || "")}
+ onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+ placeholder="0"
+ inputMode="numeric"
+ aria-label={`Quantity to order from Otto for ${l.sku}`}
+ className="h-8 w-full px-1 text-center text-sm tabular-nums"
                             />
                             <span className="text-2xs font-medium leading-none">Otto</span>
                             <span className="text-2xs leading-none text-muted-foreground">
@@ -1963,30 +1963,30 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           </label>
                         ) : (
                           <Input
-                            value={String(num(l.qty))}
-                            onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                            inputMode="numeric" className="h-8 w-20 text-center text-sm tabular-nums"
-                            aria-label={`Quantity of ${l.sku}`}
+ value={String(num(l.qty))}
+ onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+ inputMode="numeric" className="h-8 w-20 text-center text-sm tabular-nums"
+ aria-label={`Quantity of ${l.sku}`}
                           />
                         )}
                       </div>
                       {/* Line total — foreground weight so the money reads at a glance rather
-                          than hiding as muted micro-text.
+ than hiding as muted micro-text.
 
                           A catalogue price is shown, and shown AS ONE: muted, with "catalog"
-                          under it and the per-unit figure and its source in the title. It is
-                          the last synced number rather than a quote, and the two must not
-                          look alike — but "—" on a line of real goods, with the order total
-                          counting it as zero, was the worse of the two lies. */}
+ under it and the per-unit figure and its source in the title. It is
+ the last synced number rather than a quote, and the two must not
+ look alike — but "—" on a line of real goods, with the order total
+ counting it as zero, was the worse of the two lies. */}
                       {(() => {
-                        const { unit, from } = unitPrice(l)
-                        if (!unit) return <span className="w-24 shrink-0 self-center text-right text-sm text-muted-foreground">—</span>
-                        return (
+ const { unit, from } = unitPrice(l)
+ if (!unit) return <span className="w-24 shrink-0 self-center text-right text-sm text-muted-foreground">—</span>
+ return (
                           <span
-                            title={from === "catalog"
+ title={from === "catalog"
                               ? `${usd(unit)} each — last synced ${supByS[l.sku]?.supplier ?? "supplier"} catalogue price, not a quote`
-                              : `${usd(unit)} each`}
-                            className={"w-24 shrink-0 self-center text-right text-sm tabular-nums " +
+ : `${usd(unit)} each`}
+ className={"w-24 shrink-0 self-center text-right text-sm tabular-nums " +
                               (from === "catalog" ? "font-normal text-muted-foreground" : "font-semibold")}
                           >
                             {usd(unit * num(l.qty))}
@@ -1995,17 +1995,17 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         )
                       })()}
                       <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
-                        className="self-center text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
+ className="self-center text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
                         <Trash size={14} />
                       </button>
                      </div>
                      {/* Split warning spans the full row width BELOW it — it's about the whole
-                         line and needs room to breathe, not a squeeze into a column. */}
+ line and needs room to breathe, not a squeeze into a column. */}
                      {g.api === "ss" && stock[l.sku] && (
                        <StockSplitWarning
-                         qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
-                         onReduce={(q) => setSavedQty(l.sku, q)}
-                         onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
+ qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
+ onReduce={(q) => setSavedQty(l.sku, q)}
+ onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
                        />
                      )}
                     </div>
@@ -2019,8 +2019,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
 
           {/* ── WHAT IT COSTS ────────────────────────────────────────────────────
               Goods are known now. Freight is NOT: no supplier here quotes it before the
-              order exists, so the panel says so and shows what it actually came to last
-              time rather than an invented estimate. */}
+ order exists, so the panel says so and shows what it actually came to last
+ time rather than an invented estimate. */}
           <aside className="space-y-4 xl:sticky xl:top-20">
             <SectionCard title="Order total" bodyClassName="space-y-3 p-4 text-sm">
               {toOrderGroups.length === 0 ? (
@@ -2029,8 +2029,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                 <>
                   <dl className="space-y-1.5">
                     {toOrderGroups.map((g) => {
-                      const units = g.lines.reduce((n, l) => n + num(l.qty), 0)
-                      return (
+ const units = g.lines.reduce((n, l) => n + num(l.qty), 0)
+ return (
                         <div key={g.key} className="flex items-baseline justify-between gap-3">
                           <dt className="min-w-0 truncate text-muted-foreground">
                             {g.supplier ?? "Unassigned"}
@@ -2048,12 +2048,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                   </div>
 
                   {/* ONE LINE, like every other line in this column. The panel is a column of
-                      figures and this was three paragraphs of prose in the middle of it.
+ figures and this was three paragraphs of prose in the middle of it.
                       A DASH, NOT "FREE" and not a number: no supplier here quotes freight
-                      before the order exists, so we do not have the figure — and "Free" is the
-                      one word that would be a lie about a cost that regularly dwarfs the goods.
+ before the order exists, so we do not have the figure — and "Free" is the
+ one word that would be a lie about a cost that regularly dwarfs the goods.
                       The note under the total already says freight is added at placement, so
-                      nothing true was lost with the paragraphs. */}
+ nothing true was lost with the paragraphs. */}
                   <div className="flex items-baseline justify-between gap-3">
                     <dt className="text-xs font-medium">Shipping</dt>
                     <dd className="text-xs tabular-nums text-muted-foreground">—</dd>
@@ -2073,15 +2073,15 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         </TabsContent>
 
         {/* ONGOING — placed and in flight, plus any draft still to finish. Money is already
-            committed here; the job is chasing, not deciding. */}
+ committed here; the job is chasing, not deciding. */}
         <TabsContent value="ongoing" className="mt-4 space-y-4">
           {placed.length > 0 && (
             <SectionCard
-              title="On order"
+ title="On order"
               // The bulk form of the same action, because a board that has drifted has
               // drifted by more than one row — clearing them one at a time is how it got
               // like this. Same confirm, same "the supplier is not contacted".
-              actions={placed.length > 1 ? (
+ actions={placed.length > 1 ? (
                 <Button size="sm" variant="outline" onClick={() => archive(placed)} disabled={busy === "archive"}>
                   {busy === "archive" ? <CircleNotch size={13} className="animate-spin" /> : null}
                   Move all {placed.length} to history
@@ -2112,8 +2112,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             )}
             {history.length > 20 && (
               <Pagination page={pagedHistory.page} pageCount={pagedHistory.pageCount} perPage={pagedHistory.perPage}
-                total={pagedHistory.total} start={pagedHistory.start}
-                onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
+ total={pagedHistory.total} start={pagedHistory.start}
+ onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
             )}
           </SectionCard>
         </TabsContent>
@@ -2124,14 +2124,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       <ReceiveScanDialog open={scanOpen} onOpenChange={setScanOpen} onReceived={load} />
 
       <CardEntryDialog
-        open={needCard}
-        onOpenChange={setNeedCard}
-        amount={toOrderGroups.filter((g) => g.api === "otto").reduce((s2, g) => s2 + g.total, 0)}
+ open={needCard}
+ onOpenChange={setNeedCard}
+ amount={toOrderGroups.filter((g) => g.api === "otto").reduce((s2, g) => s2 + g.total, 0)}
         // Straight on to placing with the card in hand. It exists only for this call.
         // Clear the failure banner on the way through: placeAllGroups does it too, but only
         // after a round trip for the ship-from settings, so the strip that sent you here
         // would sit there through the retry it was asking for.
-        onSubmit={(c) => { setNeedCard(false); setMsg(null); setDeclineFix(null); void placeAllGroups(c) }}
+ onSubmit={(c) => { setNeedCard(false); setMsg(null); setDeclineFix(null); void placeAllGroups(c) }}
       />
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
@@ -2139,21 +2139,21 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       <PoReturnDialog po={returning} onClose={() => setReturning(null)} onDone={load} />
 
       <POAddItems
-        key={addTo?.num ?? "none"}
-        po={addTo}
-        onClose={() => setAddTo(null)}
-        inventory={inv ?? []}
+ key={addTo?.num ?? "none"}
+ po={addTo}
+ onClose={() => setAddTo(null)}
+ inventory={inv ?? []}
         // Picked items go into the POOL, merged by sku AND VARIANT — the same key the
         // shortage path uses, so something both short and hand-picked doesn't appear twice
         // while two colours of one style still stay two lines.
-        onAdd={(lines) => {
-          const next = saved.map((l) => ({ ...l }))
-          for (const l of lines) {
-            const hit = next.find((x) => lineKey(x) === lineKey(l))
-            if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
-            else next.push({ ...l, qty: num(l.qty) || 1, savedAt: new Date().toISOString() })
+ onAdd={(lines) => {
+ const next = saved.map((l) => ({ ...l }))
+ for (const l of lines) {
+ const hit = next.find((x) => lineKey(x) === lineKey(l))
+ if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
+ else next.push({ ...l, qty: num(l.qty) || 1, savedAt: new Date().toISOString() })
           }
-          putSaved(next)
+ putSaved(next)
         }}
       />
     </div>

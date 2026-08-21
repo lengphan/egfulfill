@@ -15,20 +15,20 @@ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
 
 export type QuickOrderProduct = {
   /** Style-level identity — the sku is built per size when the supplier gives one. */
-  style: string
-  name: string
-  supplier: string | null
-  image?: string | null
+ style: string
+ name: string
+ supplier: string | null
+ image?: string | null
   /** Sizes offered. A size with a known sku orders exactly; one without is recorded
-   *  against the style for someone to resolve, rather than dropped. */
-  sizes: { size: string; sku?: string | null; price?: number | null; image?: string | null }[]
-  defaultPrice?: number | null
+   * against the style for someone to resolve, rather than dropped. */
+ sizes: { size: string; sku?: string | null; price?: number | null; image?: string | null }[]
+ defaultPrice?: number | null
   /** Why the variant lookup came back empty. Distinguishes a failed request from a
-   *  product that genuinely has no sizes — they are not the same fact. */
-  loadError?: string
+   * product that genuinely has no sizes — they are not the same fact. */
+ loadError?: string
   /** The variant already chosen in the detail window, so it is not chosen twice. Absent
-   *  when opened from a tile, where nothing has been chosen yet. */
-  preselect?: { color?: string | null; size?: string | null; qty?: number }
+   * when opened from a tile, where nothing has been chosen yet. */
+ preselect?: { color?: string | null; size?: string | null; qty?: number }
 }
 
 /**
@@ -45,83 +45,83 @@ export type QuickOrderProduct = {
  * is what the invoice will say, not what a catalogue said last month.
  */
 export function QuickOrderDialog({
-  product, onClose, onAdded,
+ product, onClose, onAdded,
 }: { product: QuickOrderProduct | null; onClose: () => void; onAdded?: () => void }) {
-  const [qty, setQty] = useState<Record<string, string>>({})
-  const [price, setPrice] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+ const [qty, setQty] = useState<Record<string, string>>({})
+ const [price, setPrice] = useState<Record<string, string>>({})
+ const [busy, setBusy] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setQty({}); setErr(null)
+ useEffect(() => {
+ const t = setTimeout(() => {
+ setQty({}); setErr(null)
       // Seed prices from the supplier's own, so the common case is "type quantities".
-      const seed: Record<string, string> = {}
-      for (const s of product?.sizes ?? []) {
-        const p = s.price ?? product?.defaultPrice ?? null
-        if (p != null) seed[s.size] = String(p)
+ const seed: Record<string, string> = {}
+ for (const s of product?.sizes ?? []) {
+ const p = s.price ?? product?.defaultPrice ?? null
+ if (p != null) seed[s.size] = String(p)
       }
-      setPrice(seed)
+ setPrice(seed)
     }, 0)
-    return () => clearTimeout(t)
+ return () => clearTimeout(t)
   }, [product])
 
-  const picked = useMemo(
+ const picked = useMemo(
     () => (product?.sizes ?? [])
       .map((s) => ({ s, q: parseInt(qty[s.size] ?? "", 10) || 0 }))
       .filter((x) => x.q > 0),
-    [product, qty]
+ [product, qty]
   )
-  const total = picked.reduce((sum, { s, q }) => sum + num(price[s.size]) * q, 0)
-  const units = picked.reduce((sum, { q }) => sum + q, 0)
+ const total = picked.reduce((sum, { s, q }) => sum + num(price[s.size]) * q, 0)
+ const units = picked.reduce((sum, { q }) => sum + q, 0)
 
-  if (!product) return null
+ if (!product) return null
 
-  const submit = async () => {
-    setBusy(true); setErr(null)
-    try {
+ const submit = async () => {
+ setBusy(true); setErr(null)
+ try {
       // Merge into the shared list rather than replacing it — this is a factory-wide blob
       // and someone else may have added to it since the page loaded.
-      const current = await getFactoryList<SavedPOLine[]>("po_saved").catch(() => [])
-      const next: SavedPOLine[] = Array.isArray(current) ? current.map((l) => ({ ...l })) : []
-      for (const { s, q } of picked) {
+ const current = await getFactoryList<SavedPOLine[]>("po_saved").catch(() => [])
+ const next: SavedPOLine[] = Array.isArray(current) ? current.map((l) => ({ ...l })) : []
+ for (const { s, q } of picked) {
         // Never invent a sku. `style-size` produced codes no supplier has ever heard of —
         // they look orderable, reach a purchase order, and are rejected at the supplier.
         // A size without a real sku is skipped and reported instead.
-        const sku = s.sku
-        if (!sku) continue
-        const hit = next.find((x) => x.sku === sku)
-        if (hit) hit.qty = num(hit.qty) + q
-        else next.push({
-          sku,
-          name: product.name,
+ const sku = s.sku
+ if (!sku) continue
+ const hit = next.find((x) => x.sku === sku)
+ if (hit) hit.qty = num(hit.qty) + q
+ else next.push({
+ sku,
+ name: product.name,
           // Keep the picture with the line. Resolving it later works only while the sku is
           // still in a synced catalogue; carrying it survives that.
-          image: product.image ?? null,
-          variant: s.size,
-          qty: q,
-          price: num(price[s.size]) || 0,
-          supplier: product.supplier ?? null,
-          savedAt: new Date().toISOString(),
+ image: product.image ?? null,
+ variant: s.size,
+ qty: q,
+ price: num(price[s.size]) || 0,
+ supplier: product.supplier ?? null,
+ savedAt: new Date().toISOString(),
         })
       }
-      const skipped = picked.filter(({ s }) => !s.sku).length
-      if (skipped === picked.length) {
-        setErr("None of these sizes have a supplier sku yet, so there's nothing orderable to add. Open the style in Add items instead.")
-        return
+ const skipped = picked.filter(({ s }) => !s.sku).length
+ if (skipped === picked.length) {
+ setErr("None of these sizes have a supplier sku yet, so there's nothing orderable to add. Open the style in Add items instead.")
+ return
       }
-      await saveFactoryList("po_saved", next)
+ await saveFactoryList("po_saved", next)
       // The badge in the header is listening for exactly this.
-      cartChanged()
-      onAdded?.()
-      if (skipped) setErr(`Added — but ${skipped} size${skipped === 1 ? "" : "s"} had no supplier sku and were left out.`)
-      else onClose()
+ cartChanged()
+ onAdded?.()
+ if (skipped) setErr(`Added — but ${skipped} size${skipped === 1 ? "" : "s"} had no supplier sku and were left out.`)
+ else onClose()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't add these to the order list.")
+ setErr(e instanceof Error ? e.message : "Couldn't add these to the order list.")
     } finally { setBusy(false) }
   }
 
-  return (
+ return (
     <Dialog open={!!product} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -141,7 +141,7 @@ export function QuickOrderDialog({
               <p className="text-muted-foreground">
                 {product.loadError
                   ? "Couldn't load this product's sizes."
-                  : "This product lists no sizes, so there's nothing to order against."}
+ : "This product lists no sizes, so there's nothing to order against."}
               </p>
               {product.loadError && (
                 <p className="mx-auto max-w-sm text-xs text-destructive">{product.loadError}</p>
@@ -150,28 +150,28 @@ export function QuickOrderDialog({
           ) : product.sizes.map((s) => (
             <div key={s.size} className="flex items-center gap-2 py-1.5">
               {/* The variant's OWN picture. Colour names alone can't be checked — "S.Pnk"
-                  against "H.Pnk" is a guess until you see them side by side. */}
+ against "H.Pnk" is a guess until you see them side by side. */}
               {s.image
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={s.image} alt="" loading="lazy" className="size-16 shrink-0 rounded border border-border bg-white object-contain" />
-                : <span className="size-16 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+ : <span className="size-16 shrink-0 rounded border border-dashed border-border" aria-hidden />}
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium">{s.size}</div>
                 {s.sku
                   ? <div className="truncate tabular-nums text-2xs text-muted-foreground">{s.sku}</div>
-                  : <div className="truncate text-2xs text-amber-700">no supplier sku — can&apos;t be ordered</div>}
+ : <div className="truncate text-2xs text-hold">no supplier sku — can&apos;t be ordered</div>}
               </div>
               <Input
-                value={qty[s.size] ?? ""}
-                onChange={(e) => setQty((p) => ({ ...p, [s.size]: e.target.value.replace(/[^0-9]/g, "") }))}
-                placeholder="0" inputMode="numeric" disabled={busy || !s.sku}
-                className="h-8 w-16 text-center" aria-label={`Quantity for ${s.size}`}
+ value={qty[s.size] ?? ""}
+ onChange={(e) => setQty((p) => ({ ...p, [s.size]: e.target.value.replace(/[^0-9]/g, "") }))}
+ placeholder="0" inputMode="numeric" disabled={busy || !s.sku}
+ className="h-8 w-16 text-center" aria-label={`Quantity for ${s.size}`}
               />
               <Input
-                value={price[s.size] ?? ""}
-                onChange={(e) => setPrice((p) => ({ ...p, [s.size]: e.target.value.replace(/[^0-9.]/g, "") }))}
-                placeholder="0.00" inputMode="decimal" disabled={busy}
-                className="h-8 w-24 text-right tabular-nums" aria-label={`Unit price for ${s.size}`}
+ value={price[s.size] ?? ""}
+ onChange={(e) => setPrice((p) => ({ ...p, [s.size]: e.target.value.replace(/[^0-9.]/g, "") }))}
+ placeholder="0.00" inputMode="decimal" disabled={busy}
+ className="h-8 w-24 text-right tabular-nums" aria-label={`Unit price for ${s.size}`}
               />
             </div>
           ))}

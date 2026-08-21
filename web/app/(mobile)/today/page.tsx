@@ -22,29 +22,29 @@ import { useMounted } from "@/lib/use-mounted"
  */
 
 type Job = {
-  key: string
-  label: string
-  hint: string
-  href: string
-  count: number
+ key: string
+ label: string
+ hint: string
+ href: string
+ count: number
   /** Reserved status colours — amber warns, red alerts, violet is working. */
-  tone: "alert" | "warn" | "work" | "quiet"
+ tone: "alert" | "warn" | "work" | "quiet"
   /** Counts toward "needs you now". Work in progress does not: it is already happening. */
-  urgent?: boolean
-  icon: typeof Warning
+ urgent?: boolean
+ icon: typeof Warning
 }
 
 const TONE: Record<Job["tone"], { dot: string; count: string }> = {
-  alert: { dot: "bg-destructive", count: "text-destructive" },
-  warn: { dot: "bg-amber-500", count: "text-amber-600 dark:text-amber-400" },
-  work: { dot: "bg-primary", count: "text-primary" },
-  quiet: { dot: "bg-muted-foreground/40", count: "text-foreground" },
+ alert: { dot: "bg-destructive", count: "text-destructive" },
+ warn: { dot: "bg-hold", count: "text-hold" },
+ work: { dot: "bg-primary", count: "text-primary" },
+ quiet: { dot: "bg-muted-foreground/40", count: "text-foreground" },
 }
 
 export default function TodayPage() {
-  const [orders, setOrders] = useState<OrderRow[] | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+ const [orders, setOrders] = useState<OrderRow[] | null>(null)
+ const [err, setErr] = useState<string | null>(null)
+ const [busy, setBusy] = useState(false)
   /*
    * BOTH OF THESE ARE CLIENT-ONLY FACTS, and rendering them during SSR is a hydration
    * mismatch: the name comes from localStorage (absent on the server) and the date is
@@ -54,44 +54,44 @@ export default function TodayPage() {
    * server, true once mounted" — no effect, no setState, and nothing for the
    * set-state-in-effect rule to catch.
    */
-  const mounted = useMounted()
-  const name = mounted ? (getUser()?.name?.split(" ")[0] || "there") : ""
-  const today = mounted
+ const mounted = useMounted()
+ const name = mounted ? (getUser()?.name?.split(" ")[0] || "there") : ""
+ const today = mounted
     ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : ""
+ : ""
 
-  const load = useCallback(async () => {
-    setBusy(true); setErr(null)
-    try { setOrders(await getOrders()) }
-    catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load orders.") }
-    finally { setBusy(false) }
+ const load = useCallback(async () => {
+ setBusy(true); setErr(null)
+ try { setOrders(await getOrders()) }
+ catch (e) { setErr(e instanceof Error ? e.message : "Couldn't load orders.") }
+ finally { setBusy(false) }
   }, [])
 
   // Fetch on mount only. Refresh is a BUTTON — an effect that refetched on the state its own
   // fetch writes is the shape that took a machine down here once.
-  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+ useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
 
-  const jobs = useMemo<Job[]>(() => {
-    const os = orders ?? []
-    const open = os.filter((o) => !["shipped", "cancelled", "refunded"].includes(normalizeStage(o.factory_status)))
-    return [
+ const jobs = useMemo<Job[]>(() => {
+ const os = orders ?? []
+ const open = os.filter((o) => !["shipped", "cancelled", "refunded"].includes(normalizeStage(o.factory_status)))
+ return [
       { key: "overdue", label: "Overdue", hint: "past the ship-by date", href: "/orders?status=overdue",
-        count: open.filter((o) => isOverdue(o)).length, tone: "alert", icon: Warning, urgent: true },
+ count: open.filter((o) => isOverdue(o)).length, tone: "alert", icon: Warning, urgent: true },
       { key: "rush", label: "Rush", hint: "flagged urgent", href: "/orders?status=rush",
-        count: open.filter((o) => o.rush).length, tone: "warn", icon: Lightning, urgent: true },
+ count: open.filter((o) => o.rush).length, tone: "warn", icon: Lightning, urgent: true },
       { key: "working", label: "Working", hint: "on the floor now", href: "/orders",
-        count: open.filter((o) => normalizeStage(o.factory_status) === "working").length, tone: "work", icon: ArrowClockwise },
+ count: open.filter((o) => normalizeStage(o.factory_status) === "working").length, tone: "work", icon: ArrowClockwise },
       { key: "scan", label: "Awaiting scan", hint: "printed, not yet scanned", href: "/inventory?tab=scan",
-        count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length, tone: "quiet", icon: Barcode },
+ count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length, tone: "quiet", icon: Barcode },
     ]
   }, [orders])
 
-  const needsYou = jobs.filter((j) => j.urgent).reduce((n, j) => n + j.count, 0)
+ const needsYou = jobs.filter((j) => j.urgent).reduce((n, j) => n + j.count, 0)
 
-  return (
+ return (
     <div className="mx-auto max-w-lg">
       {/* HEADER. A greeting and the date, because the first thing you check on a phone is
-          whether you are looking at today. No logo bar: the tab bar already says where you are. */}
+ whether you are looking at today. No logo bar: the tab bar already says where you are. */}
       <header className="px-5 pb-4 pt-[calc(1.5rem+env(safe-area-inset-top))]">
         {/* min-h holds the line's height before it fills, so the heading doesn't jump. */}
         <p className="min-h-5 text-sm text-muted-foreground">{today}</p>
@@ -101,8 +101,8 @@ export default function TodayPage() {
       {/* THE ONE NUMBER, and it is a door. Everything under it explains it. */}
       <section className="px-5">
         <Link
-          href="/orders"
-          className="block rounded-2xl bg-primary p-5 text-primary-foreground transition-transform active:scale-[0.99]"
+ href="/orders"
+ className="block rounded-2xl bg-primary p-5 text-primary-foreground transition-transform active:scale-[0.99]"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.08em] opacity-80">Needs you now</p>
           <div className="mt-2 flex items-center justify-between gap-3">
@@ -124,8 +124,8 @@ export default function TodayPage() {
         <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">What needs doing</h2>
         <ul className="overflow-hidden rounded-2xl border border-border">
           {jobs.map((j, i) => {
-            const Ico = j.icon
-            return (
+ const Ico = j.icon
+ return (
               <li key={j.key} className={i ? "border-t border-border" : ""}>
                 <Link href={j.href} className="flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-accent/60">
                   <span className={"size-1.5 shrink-0 rounded-full " + TONE[j.tone].dot} />
@@ -157,9 +157,9 @@ export default function TodayPage() {
 
       <div className="px-5 py-6">
         <button
-          onClick={load}
-          disabled={busy}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-colors active:bg-accent disabled:opacity-60"
+ onClick={load}
+ disabled={busy}
+ className="inline-flex h-10 items-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-colors active:bg-accent disabled:opacity-60"
         >
           {busy ? <CircleNotch size={15} className="animate-spin" /> : <ArrowClockwise size={15} />}
           {busy ? "Refreshing" : "Refresh"}
