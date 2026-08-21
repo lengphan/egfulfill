@@ -254,7 +254,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
       // px-2 (see the Tag in readiness-dots.tsx). Sitting in the same row a size larger and
       // a notch wider, "Stock" read as a different KIND of thing from Label/Scan/Design
       // when it is the fourth of the same set.
- className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1 py-0.5 text-2xs transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
+ className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1 py-0.5 text-xs transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
     >
       {sending ? "Sending…" : label}
     </button>

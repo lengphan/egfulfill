@@ -1,4 +1,4 @@
-import {
+import { Sparkle,
   SquaresFour,
   ShoppingBag,
   Tag,
@@ -29,6 +29,7 @@ export const sellerNav: NavSection[] = [
       { label: "Reports", href: "/reports", icon: ChartBar },
       { label: "Wallet", href: "/wallet", icon: Wallet },
       { label: "Design Lab", href: "/design", icon: PenNib },
+      { label: "Studio", href: "/studio", icon: Sparkle },
       { label: "Chat", href: "/chat", icon: ChatCircleDots },
     ],
   },
