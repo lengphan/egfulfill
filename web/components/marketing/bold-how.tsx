@@ -52,7 +52,7 @@ export function BoldHow() {
         <div className="grid gap-4 md:grid-cols-3">
           {steps.map((s, i) => (
             <Rise key={s.title} preset="drift" index={i} className="rounded-2xl border border-black/[0.09] bg-white p-8">
-              <div className="font-display font-black leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3rem, 6vw, 4.5rem)" }}>
+              <div className="font-display font-semibold leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3rem, 6vw, 4.5rem)" }}>
                 {String(i + 1).padStart(2, "0")}
               </div>
               {/* No icon plate — the 01/02/03 above already carries the step, and stacking a
@@ -72,7 +72,7 @@ export function BoldHow() {
       {/* The real status flow. Tones are the product's own, deliberately not re-tinted. */}
       <section className="py-16" style={{ background: "rgba(0,0,0,0.03)" }}>
         <div className="mx-auto max-w-4xl px-6">
-          <h2 className="font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
+          <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
             What you&apos;ll actually see.
           </h2>
           <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/55">
@@ -93,7 +93,7 @@ export function BoldHow() {
 
       <section className="px-6 py-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
+          <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
             Connect a store and watch it work.
           </h2>
           <div className="mt-8 flex justify-center">

@@ -188,7 +188,7 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
                 one figure was quoting a price you cannot always order at — and a product with
                 a single price must not be dressed up as a range either. The server says which
                 it is (priceVaries); this only reads it. */}
-            <span className="text-lg font-black tabular-nums">
+            <span className="text-lg font-semibold tabular-nums">
               {p.priceVaries && <span className="mr-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-black/45">from</span>}
               {usd(from)}
             </span>
@@ -523,7 +523,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
 
       <section className="px-6 pb-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-display font-black leading-[0.95] tracking-[-0.035em]" style={{ ...HEADING, color: SURFACE }}>
+          <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
             Pick a blank, upload art, ship it.
           </h2>
           <div className="mt-8 flex justify-center">

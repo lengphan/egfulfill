@@ -207,7 +207,7 @@ export function BoldProduct({ product, shipping }: {
                 {[product.brand, product.category].filter(Boolean).join(" · ")}
               </div>
             )}
-            <h1 className="mt-3 font-display font-black leading-[0.95] tracking-[-0.035em]" style={HEADING}>
+            <h1 className="mt-3 font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
               {product.name}
             </h1>
 
@@ -219,7 +219,7 @@ export function BoldProduct({ product, shipping }: {
                 {product.priceVaries && !size && (
                   <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-black/45">from</span>
                 )}
-                <span className="text-4xl font-black tracking-tight tabular-nums">{usd(size ? shown : (product.priceFrom ?? product.price))}</span>
+                <span className="text-4xl font-semibold tracking-tight tabular-nums">{usd(size ? shown : (product.priceFrom ?? product.price))}</span>
                 {size && <span className="text-sm font-semibold text-black/55">for {size}</span>}
               </div>
               {/* Say WHOSE price this is. It's what a seller pays us to make and ship one —
@@ -381,7 +381,7 @@ export function BoldProduct({ product, shipping }: {
                 this is the anchor it points at. */}
             {specNames.length > 0 && (
             <Rise preset="cut">
-                <h2 id="size-chart" className="scroll-mt-24 font-display text-2xl font-black tracking-tight">Size chart</h2>
+                <h2 id="size-chart" className="scroll-mt-24 font-display text-2xl font-semibold tracking-tight">Size chart</h2>
                 <p className="mt-1.5 text-sm text-black/50">
                   Garment measurements from the manufacturer, in inches.
                 </p>
@@ -418,7 +418,7 @@ export function BoldProduct({ product, shipping }: {
 
             {product.methods.length > 0 && (
               <Rise preset="cut" index={1}>
-                <h2 className="font-display text-2xl font-black tracking-tight">Where we can print</h2>
+                <h2 className="font-display text-2xl font-semibold tracking-tight">Where we can print</h2>
                 <p className="mt-1.5 text-sm text-black/50">
                   Placements available on this garment.
                 </p>
@@ -503,12 +503,12 @@ export function BoldProduct({ product, shipping }: {
                     calls it "type rather than a glow" — this is the one ground it works on
                     (1.12:1 on paper, where it disappears), so the plate is where the brand's
                     second colour finally gets to appear. */}
-                <div className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: ACID }}>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: ACID }}>
                   {/* The methods, when the product names any. Without them the line still has
                       to say what the section IS, rather than trailing off after a middot. */}
                   What to send us{product.methods.length > 0 ? ` · ${product.methods.join(" / ")}` : ""}
                 </div>
-                <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
+                <h2 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
                   Artwork guidelines
                 </h2>
                 {/* -mb-8 cancels the last card's own margin, so the plate's bottom padding is
@@ -520,7 +520,7 @@ export function BoldProduct({ product, shipping }: {
                         <span className="tabular-nums text-xs font-bold tabular-nums" style={{ color: ACID }}>
                           {String(i + 1).padStart(2, "0")}
                         </span>
-                        <span className="text-base font-black tracking-tight" style={{ color: ACCENT_INK }}>{g.label}</span>
+                        <span className="text-base font-semibold tracking-tight" style={{ color: ACCENT_INK }}>{g.label}</span>
                       </dt>
                       <dd className="mt-1.5 pl-[2.4rem] text-sm leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.8 }}>
                         {g.body}

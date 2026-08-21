@@ -436,7 +436,7 @@ export function PlateHero({ title, accent, sub, children }: {
   return (
     <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
-        <h1 className="mx-auto max-w-5xl text-center font-display font-black leading-[0.92] tracking-[-0.04em]" style={{ ...DISPLAY, color: INK }}>
+        <h1 className="mx-auto max-w-5xl text-center font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ ...DISPLAY, color: INK }}>
           <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACCENT} /></> : null}
         </h1>
         {sub && (
