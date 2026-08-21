@@ -15,7 +15,8 @@ import { aiComplete } from './support_ai.js';
 import { imageBytesFrom } from '../images.js';
 import { generateImage, IMAGE_MODELS, ASPECT_RATIOS } from '../gemini.js';
 import { putObject, storageEnabled } from '../storage.js';
-import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost } from '../ai-pricing.js';
+import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost, effectiveSeller } from '../ai-pricing.js';
+import { q } from '../db.js';
 
 const LABEL = { etsy: 'Etsy', tiktok: 'TikTok Shop', shopify: 'Shopify' };
 
@@ -303,6 +304,90 @@ export function publishRoutes(app, requireAuth) {
    */
   const MAX_BATCH = 4;
 
+  /*
+   * THE HISTORY — every render, kept, because every render was paid for.
+   *
+   * The candidates lived in the dialog's own state, so closing the window threw away work
+   * somebody had been charged for. The picture itself was never lost — it is a private
+   * object in storage behind a same-origin proxy path, and a published listing reads it
+   * back from there — but the ONLY thing that knew the path was a React array, and that
+   * array does not survive the window shutting.
+   *
+   * FILED UNDER THE ACCOUNT THAT PAID, not the person who pressed. A team member spends the
+   * owner's wallet (effectiveSeller), so filing by `sub` would hide a member's renders from
+   * the owner whose money made them. Staff pay nothing and are their own account.
+   *
+   * DELETING A ROW DELETES THE ROW. The stored object stays, deliberately: by the time you
+   * tidy the history the photo may already be live on a listing, and removing it from a
+   * history panel must never be a way to blank a marketplace photo. This is the list of what
+   * you can come back to, not the storage itself.
+   *
+   * Created at route load rather than in schema.sql, which runs on first db init only — the
+   * same pattern as ai_generations, order_designs and the rest of the late tables.
+   */
+  let _renders;
+  const renderHistoryTable = () => {
+    _renders ??= q(`create table if not exists listing_renders (
+        id          bigserial primary key,
+        owner_id    text not null,
+        actor_id    text,
+        url         text not null,
+        prompt      text,
+        model       text,
+        size        text,
+        aspect_ratio text,
+        charged     numeric(10,4) not null default 0,
+        created_at  timestamptz not null default now()
+      )`)
+      .then(() => q('create index if not exists listing_renders_owner on listing_renders (owner_id, created_at desc)'))
+      .catch((e) => { _renders = undefined; throw e; });
+    return _renders;
+  };
+
+  /** Whose history this is. Null from effectiveSeller means staff — their own account. */
+  const historyOwner = async (user) => (await effectiveSeller(user)) || String(user?.sub || '');
+
+  const historyRow = (r) => ({
+    id: String(r.id),
+    url: r.url,
+    prompt: r.prompt || undefined,
+    model: r.model || '',
+    size: r.size || '',
+    aspectRatio: r.aspect_ratio || '1:1',
+    charged: Number(r.charged || 0),
+    createdAt: r.created_at,
+  });
+
+  /*
+   * A GET, and safe as one: it reads a table and spends nothing, which is exactly the
+   * property the two POSTs above do not have. The dialog may call it on open.
+   */
+  app.get('/api/publish/photo-history', { preHandler: requireAuth }, async (req) => {
+    await renderHistoryTable();
+    const owner = await historyOwner(req.user);
+    const limit = Math.min(200, Math.max(1, Math.floor(Number(req.query?.limit) || 60)));
+    const r = await q(
+      `select id, url, prompt, model, size, aspect_ratio, charged, created_at
+         from listing_renders where owner_id = $1
+        order by created_at desc, id desc limit $2`, [owner, limit]);
+    return { renders: r.rows.map(historyRow) };
+  });
+
+  app.delete('/api/publish/photo-history/:id', { preHandler: requireAuth }, async (req, reply) => {
+    // Validated as digits BEFORE the cast: `id = $1::bigint` on 'abc' is a 500 from Postgres
+    // rather than the 404 this should be.
+    const id = String(req.params?.id || '');
+    if (!/^\d+$/.test(id)) { reply.code(400); return { error: 'That is not a render id.' }; }
+    await renderHistoryTable();
+    const owner = await historyOwner(req.user);
+    // Scoped by owner in the WHERE, not checked after the read — one query, and no way to
+    // delete a row off another account by guessing its id.
+    const r = await q('delete from listing_renders where id = $1::bigint and owner_id = $2 returning id', [id, owner]);
+    if (!r.rowCount) { reply.code(404); return { error: 'That photo is not in your history.' }; }
+    return { ok: true };
+  });
+
+
   app.post('/api/publish/photo-generate', { preHandler: requireAuth }, async (req, reply) => {
     const denied = await genGate(req, reply); if (denied) return denied;
     if (!storageEnabled()) { reply.code(503); return { error: 'File storage is not configured, so a generated photo could not be kept.' }; }
@@ -370,7 +455,7 @@ export function publishRoutes(app, requireAuth) {
       // Google has billed us for this one — booked before anything else can go wrong with it.
       await recordGenerationCost(charge.ref, img.usd, `Image · ${img.model} · ${img.size} · ${img.aspectRatio} · listing photo`);
 
-      results.push({
+      const row = {
         url: `${base}/api/support/asset/${name}`,
         model: img.model, size: img.size, aspectRatio: img.aspectRatio,
         // `usd` is what GOOGLE cost US and is staff-only reading; `charged` is what the
@@ -378,7 +463,30 @@ export function publishRoutes(app, requireAuth) {
         // their price.
         usd: charge.staff ? img.usd : undefined,
         charged: charge.usd, free: charge.free,
-      });
+      };
+
+      /*
+       * FILE IT — after the money and after the storage, and never fatal.
+       *
+       * The render exists and has been paid for by the time this runs, so a history insert
+       * that fails must hand back the photo anyway; losing the row costs a line in a panel,
+       * and throwing here would cost the picture. The prompt rides along because coming back
+       * to a render you liked is mostly about coming back to the BRIEF that made it.
+       */
+      try {
+        await renderHistoryTable();
+        const ins = await q(
+          `insert into listing_renders (owner_id, actor_id, url, prompt, model, size, aspect_ratio, charged)
+           values ($1,$2,$3,$4,$5,$6,$7,$8) returning id, created_at`,
+          [charge.sellerId || String(req.user?.sub || ''), String(req.user?.sub || ''), row.url,
+           prompt.slice(0, 4000), row.model, row.size, row.aspectRatio, charge.usd || 0]);
+        row.id = String(ins.rows[0].id);
+        row.createdAt = ins.rows[0].created_at;
+      } catch (e) {
+        req.log?.warn?.({ err: String(e) }, 'listing-photo history insert failed');
+      }
+
+      results.push(row);
     }
 
     return {

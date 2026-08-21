@@ -1,11 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown, ImageSquare } from "@phosphor-icons/react"
+import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown, CaretLeft, CaretRight, ImageSquare, MagnifyingGlassPlus, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, type DeskImageConfig, type ListingRender, type AiQuote } from "@/lib/api"
+import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, listListingRenders, deleteListingRender, type DeskImageConfig, type ListingRender, type AiQuote } from "@/lib/api"
 import { promptWarning } from "@/lib/image-gen"
 import { removeBackground } from "@/lib/remove-background"
 import { canvasReadableSrc } from "@/lib/thread-match"
@@ -60,6 +60,64 @@ const unit = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`
 const money = (n: number) => `$${n.toFixed(2)}`
 
 /**
+ * THE FRAME IS THE PICTURE'S SHAPE — not a square with the picture parked inside it.
+ *
+ * Both wells were `aspect-square` with `object-contain`, which is correct only for a 1:1
+ * render. Ask for 4:5 — Etsy's own listing shape, and the reason the ratio picker exists —
+ * and what came back was a portrait photograph sitting in a square with grey bars down both
+ * sides, at roughly two thirds of the area the panel had already reserved for it. The whole
+ * job here is judging a photograph against another photograph, and it was being judged
+ * small, in the wrong shape, beside a reference that was ALSO being letterboxed because a
+ * marketplace photo is rarely square either.
+ *
+ * So the frame takes the aspect of what is in it and the image fills the frame exactly.
+ * Nothing is cropped and nothing is letterboxed, because those are the same statement: the
+ * box now agrees with the picture instead of the picture apologising to the box.
+ *
+ * The HEIGHT is what is capped, not the width. A 9:16 at full column width would push the
+ * composer off the bottom of the window, so the frame is bounded by a height and its width
+ * follows from the aspect — which is why the cap is expressed as a max-WIDTH of
+ * `cap × aspect` rather than a max-height that CSS would then have to argue with.
+ */
+const FRAME_CAP = "min(50dvh, 30rem)"
+
+/** "4:5" → 0.8. Anything unparseable is a square, which is what the panel opened as. */
+const ratioOf = (s?: string) => {
+  const m = /^\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)\s*$/.exec(String(s || ""))
+  if (!m) return 1
+  const w = Number(m[1]), h = Number(m[2])
+  return w > 0 && h > 0 ? w / h : 1
+}
+
+/**
+ * One well, at one aspect. Module scope for the same reason RefTile is — a component
+ * declared during render is a new type every pass and remounts its subtree, which on an
+ * <img> means the picture reloads and flashes on every keystroke in the prompt box.
+ */
+function Frame({ aspect, className, children }: {
+  aspect: number
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    /* THE BAND IS FIXED; THE PICTURE IS CENTRED IN IT.
+       Without the outer band the wells were different heights whenever the two sides were
+       different shapes — a 16:9 reference beside a 4:5 render — so the thumbnail strips
+       under them sat at different heights and the whole panel grew and shrank as you paged
+       through references. Same reasoning as the note on the grid below: reserve the space
+       once, and let only the contents change. */
+    <div className="flex items-center justify-center" style={{ minHeight: FRAME_CAP }}>
+      <div
+        style={{ aspectRatio: String(aspect), maxWidth: `calc(${FRAME_CAP} * ${aspect})` }}
+        className={"relative flex w-full items-center justify-center overflow-hidden rounded-lg " + (className || "")}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/**
  * ONE REFERENCE TILE, at either size.
  *
  * Two jobs, two controls, as SIBLINGS: the picture selects which one is shown big, the
@@ -106,7 +164,7 @@ function RefTile({ src, i, picked, current, onShow, onToggle }: {
         /* Same two states as the grid on the publish page: one ring, filled or not. */
         className={"absolute -right-1 -top-1 grid place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
           "size-4 " +
-          (picked ? "border-white bg-white text-slate-900" : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
+          (picked ? "border-white bg-white text-draft" : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
       >
         <Check size={9} weight="bold" />
       </button>
@@ -183,6 +241,40 @@ export function ListingPhotoStudio({
   const [heroRef, setHeroRef] = useState(0)
   const [heroGen, setHeroGen] = useState(0)
 
+  /*
+   * THE SHAPE OF A REFERENCE, learned from the picture itself.
+   *
+   * A competitor's photo arrives with no metadata — a URL and nothing else — so the only
+   * honest source for its aspect is the loaded image. Read in the LOAD event, which is an
+   * event and not a loader: the frame changing shape does not change the src, so nothing
+   * here can re-trigger the load that wrote it. Keyed by index, because the strip switches
+   * between photos of different shapes and each keeps its own.
+   */
+  const [refAspects, setRefAspects] = useState<Record<number, number>>({})
+
+  /*
+   * ZOOM. Which picture is open full-size, and from which side.
+   *
+   * `side` decides which list the arrow keys walk, so paging stays inside the set you opened
+   * instead of running off the end of it into the other one — the same shape the publish
+   * page's lightbox settled on.
+   */
+  const [zoom, setZoom] = useState<{ side: "ref" | "gen"; index: number } | null>(null)
+  /** Fit, or bigger than the window with the frame scrolling under it. */
+  const [zoomedIn, setZoomedIn] = useState(false)
+  const zoomBox = useRef<HTMLDivElement | null>(null)
+
+  /*
+   * THE HISTORY — renders that outlive the window.
+   *
+   * `cands` is this session's batch and nothing more; closing the dialog used to throw away
+   * work that had been charged for. This is the same list read back from the server, so it
+   * survives a reload, a different machine, and the browser being cleared.
+   */
+  const [history, setHistory] = useState<ListingRender[]>([])
+  const [histOpen, setHistOpen] = useState(false)
+  const [histErr, setHistErr] = useState<string | null>(null)
+
   const pickedSet = new Set(picked)
   /** Is there a right-hand side yet? A render, or one on its way — the spinner needs the pane
    *  open, or the panel would jump sideways the instant the picture arrived. */
@@ -240,6 +332,24 @@ export function ListingPhotoStudio({
     }
   }, [])
 
+  /**
+   * READ THE HISTORY. Once per open, and once after a batch lands.
+   *
+   * Never keyed to the list it fills — that is the loader shape this codebase has already
+   * been bitten by. It runs on an open, which is an event, and on a generation, which is a
+   * press; neither can re-fire on the state this writes.
+   *
+   * A failure is QUIET. The history is a convenience beside a panel whose actual job is
+   * rendering, and an error banner over a feature nobody asked for yet would be the loudest
+   * thing in the window. It reappears empty and the section simply does not render.
+   */
+  const loadHistory = useCallback(async () => {
+    try {
+      const r = await listListingRenders(60)
+      if (r.renders) setHistory(r.renders)
+    } catch { /* quiet — see above */ }
+  }, [])
+
   /** Read the ticked references and put the result in the box. A CLICK, never anything automatic. */
   const runRead = useCallback(async (idxs: number[], extra: string[] = []) => {
     const imgs = [...idxs.map((i) => references[i]), ...extra].filter(Boolean)
@@ -285,6 +395,7 @@ export function ListingPhotoStudio({
     const t = setTimeout(() => {
       setHeroRef(focusIndex)
       if (!cfg) loadCfg()
+      loadHistory()
       // Only when something is actually ticked. Nothing is, by default — the grid opens for
       // you to choose from, and a read of an empty set would be a call with no input.
       if (picked.length) runRead(picked)
@@ -324,7 +435,12 @@ export function ListingPhotoStudio({
       })
       // Partial success is the NORMAL shape here, not an edge case: a daily cap or an empty
       // wallet stops the batch part-way, so both halves are shown rather than one winning.
-      if (r.results?.length) { setCands((p) => [...r.results, ...p]); setHeroGen(0) }
+      if (r.results?.length) {
+        setCands((p) => [...r.results, ...p]); setHeroGen(0)
+        // The server filed each one as it rendered and handed the row back, so the history
+        // moves with the batch rather than waiting for the next time the window opens.
+        setHistory((p) => [...r.results.filter((x) => x.id), ...p])
+      }
       setGenErrs(r.errors?.length ? r.errors : (r.error ? [r.error] : []))
       // The allowance moved, so the price line has to move with it.
       if (r.quote) setCfg((c) => (c ? { ...c, quote: r.quote } : c))
@@ -352,7 +468,7 @@ export function ListingPhotoStudio({
   const cutOut = async (r: ListingRender) => {
     setCutting(r.url); setCutErr(null)
     try {
-      const out = await removeBackground(r.url.startsWith("data:") ? r.url : canvasReadableSrc(r.url), 12)
+      const out = await removeBackground(r.url.startsWith("data:") ? r.url : canvasReadableSrc(r.url))
       if ("error" in out) { setCutErr(out.error); return }
       setCands((p) => p.map((x) => (x.url === r.url ? { ...x, url: out.url, cutOut: true } : x)))
     } catch (e) {
@@ -371,12 +487,124 @@ export function ListingPhotoStudio({
   }
   const use = (r: ListingRender) => { onUse(r.url); drop(r.url) }
 
+  /**
+   * BRING ONE BACK. A history thumb becomes the big picture on the right, which is where
+   * every decision about a render already lives — use it, cut its background out, feed it
+   * to the next one, discard it. Nothing is duplicated: if it is already in this session's
+   * batch it is simply selected.
+   */
+  const openFromHistory = (h: ListingRender) => {
+    setHistOpen(false)
+    const at = cands.findIndex((c) => c.url === h.url)
+    if (at >= 0) { setHeroGen(at); return }
+    setCands((p) => [h, ...p]); setHeroGen(0)
+  }
+
+  /**
+   * REMOVE ONE FROM THE LIST — and only from the list.
+   *
+   * The stored photo stays where it is, on purpose: by the time anyone tidies this panel the
+   * picture may already be published on a listing, and a delete here must never be a way to
+   * blank a live marketplace photo. Optimistic, then put back if the server refused, because
+   * a row that vanishes and returns is honest and a row that vanishes when nothing happened
+   * is not.
+   */
+  const forgetFromHistory = async (h: ListingRender) => {
+    if (!h.id) return
+    setHistErr(null)
+    const before = history
+    setHistory((p) => p.filter((x) => x.id !== h.id))
+    try {
+      const r = await deleteListingRender(h.id)
+      if (r.error) { setHistory(before); setHistErr(r.error) }
+    } catch (e) {
+      setHistory(before)
+      setHistErr(e instanceof Error ? e.message : "Couldn't remove that one.")
+    }
+  }
+
   const selectCls = "h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
   const hero = cands[heroGen] || null
 
+  /*
+   * WHAT SHAPE EACH WELL IS.
+   *
+   * Ours follows the render being shown, and BEFORE there is one it follows the ratio in the
+   * settings — so the empty well is already the shape of what the button would make, rather
+   * than a square that changes size the moment the picture lands.
+   *
+   * Theirs follows the photograph, once the browser has told us what shape it is.
+   */
+  const genAspect = ratioOf(hero ? hero.aspectRatio : ratio)
+  const refAspect = refAspects[heroRef] ?? 1
+
+  /** Which list the lightbox is paging through, and what it is showing. */
+  const zoomList = zoom?.side === "gen" ? cands.map((c) => c.url) : references
+  const zoomSrc = zoom ? zoomList[zoom.index] : null
+  const openZoom = (side: "ref" | "gen", index: number) => { setZoomedIn(false); setZoom({ side, index }) }
+  const stepZoom = (d: number) =>
+    setZoom((z) => {
+      if (!z) return z
+      const n = (z.side === "gen" ? cands.length : references.length)
+      if (!n) return z
+      setZoomedIn(false)
+      return { ...z, index: (z.index + d + n) % n }
+    })
+
+  /**
+   * ARROWS WALK THE SET, and the listener is on CAPTURE.
+   *
+   * A bubble-phase listener never fires from inside a Base UI popup — something between the
+   * popup and the window stops the key on its way up, which is how the publish page's
+   * gallery ended up ignoring the keyboard entirely. Verified there; the same applies here,
+   * where the lightbox is a popup opened over another popup.
+   */
+  useEffect(() => {
+    if (!zoom) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+      e.preventDefault()
+      stepZoom(e.key === "ArrowRight" ? 1 : -1)
+    }
+    window.addEventListener("keydown", onKey, true)
+    return () => window.removeEventListener("keydown", onKey, true)
+    // stepZoom closes over the two lists, which is what the deps below stand for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, cands.length, references.length])
+
+  /**
+   * ZOOM IN ON THE MIDDLE, not on the top-left corner.
+   *
+   * Scaling past the frame with the scroll box parked at 0,0 shows a shoulder and a bit of
+   * background — never the print, which is the one part anybody opens this to look at.
+   */
+  const toggleZoomedIn = () => {
+    setZoomedIn((v) => {
+      const next = !v
+      if (next) {
+        // After paint, or the box has not grown yet and there is nothing to scroll.
+        setTimeout(() => {
+          const el = zoomBox.current
+          if (!el) return
+          el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2
+          el.scrollTop = (el.scrollHeight - el.clientHeight) / 2
+        }, 0)
+      }
+      return next
+    })
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92dvh] w-auto max-w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,74rem)]">
+      {/* A DEFINITE WIDTH, not w-auto. The frames size themselves now, and a dialog that
+            hugged its content shrank to whatever the two pictures happened to want — so a
+            pair of portraits opened a window two thirds the width of the one a pair of
+            landscapes opened, and the panel changed size as you paged the thumbnails.
+            Fixing the width is what lets the pictures be as large as the space allows
+            WITHOUT the space itself moving, which is what the note on the panel grid
+            below is about. */}
+      <DialogContent className="flex max-h-[92dvh] w-auto max-w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:w-[min(96vw,74rem)] sm:max-w-[min(96vw,74rem)]">
         {/* No subtitle. It changed text halfway through the job, which put a second moving
             part in the header of a window whose whole problem was things moving. The two
             column headings below already say which side is which. */}
@@ -430,12 +658,41 @@ export function ListingPhotoStudio({
                   line around something that already has a boundary. This is the outlined-box
                   count CLAUDE.md §4 is about — the app carried 490 of them, and two of them
                   were here disagreeing with each other. */}
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted/40">
+              <Frame aspect={refAspect} className="bg-muted/40">
                 {references[heroRef] ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={references[heroRef]} alt="" className="size-full object-contain" />
+                  /* THE PICTURE IS THE BUTTON. A magnifier hovering in the corner is a
+                     control to find before you can look closer; the photograph itself is
+                     already under the pointer, which is where every gallery worth copying
+                     puts this. The glyph stays as the AFFORDANCE — it says a click does
+                     something — and the cursor says what. */
+                  <button
+                    type="button"
+                    onClick={() => openZoom("ref", heroRef)}
+                    aria-label="View this reference photo full size"
+                    title="View full size"
+                    className="group size-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={references[heroRef]}
+                      alt=""
+                      className="size-full object-contain"
+                      /* The only place the shape of a competitor's photo can be learned. An
+                         EVENT, not a loader: the frame resizing does not change the src, so
+                         this cannot re-trigger what wrote it. */
+                      onLoad={(e) => {
+                        const el = e.currentTarget
+                        if (!el.naturalWidth || !el.naturalHeight) return
+                        const a = el.naturalWidth / el.naturalHeight
+                        setRefAspects((p) => (Math.abs((p[heroRef] ?? 0) - a) < 0.001 ? p : { ...p, [heroRef]: a }))
+                      }}
+                    />
+                    <span aria-hidden className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/45 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <MagnifyingGlassPlus size={13} weight="bold" />
+                    </span>
+                  </button>
                 ) : <span className="text-xs text-muted-foreground">No reference photo</span>}
-              </div>
+              </Frame>
               {references.length > 1 && (
                 <div className="flex flex-wrap gap-1.5">
                   {references.map((src, i) => (
@@ -462,9 +719,18 @@ export function ListingPhotoStudio({
                   rather than as something that failed. The distinction the honesty rule
                   actually cares about is empty-versus-broken, and a deliberate tint carries
                   that where grey does not. */}
-              <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg">
+              <Frame aspect={genAspect}>
                 {hero && !busy ? (
-                  <>
+                  <button
+                    type="button"
+                    onClick={() => openZoom("gen", heroGen)}
+                    aria-label="View this render full size"
+                    title="View full size"
+                    className="group size-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+                  >
+                    {/* object-contain against a frame that is ALREADY this render's aspect —
+                        so it fills the well exactly. Contain rather than cover because the
+                        two agree: nothing to letterbox, and nothing to crop either. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={hero.url} alt="" className="size-full bg-muted/40 object-contain" />
                     {/* The size rode in a header row that is gone. On the picture is where it
@@ -472,7 +738,10 @@ export function ListingPhotoStudio({
                     <span className="absolute bottom-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-2xs tabular-nums text-white">
                       {hero.size} · {hero.aspectRatio}
                     </span>
-                  </>
+                    <span aria-hidden className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/45 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <MagnifyingGlassPlus size={13} weight="bold" />
+                    </span>
+                  </button>
                 ) : (
                   <div className="absolute inset-0 bg-brand/20">
                     {/* A SHEEN WHILE IT WORKS, and stillness while it waits — the difference
@@ -504,7 +773,7 @@ export function ListingPhotoStudio({
                     </div>
                   </div>
                 )}
-              </div>
+              </Frame>
               {/* The decision, on the big version — which is the point of showing it big. */}
               {hero && (
                 <>
@@ -532,6 +801,18 @@ export function ListingPhotoStudio({
                       <Check size={13} weight="bold" />
                       {usedAsRef.includes(hero.url) ? "Used as reference" : "Use as reference"}
                     </Button>
+                    {/* THE WORDS THAT MADE IT. Only offered when the box does not already
+                        hold them, and only on a render that came back from the history with
+                        its brief — which is the whole reason to come back to one. It
+                        REPLACES what is typed, the same rule "Rewrite from photos" follows,
+                        so the label says which brief you are getting. */}
+                    {hero.prompt && hero.prompt !== prompt && (
+                      <Button size="sm" variant="ghost" className="text-muted-foreground"
+                        onClick={() => { setPrompt(hero.prompt || ""); setPreset(null) }}
+                        title={hero.prompt}>
+                        <Sparkle size={13} weight="fill" /> Use this brief
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => drop(hero.url)}>
                       <X size={13} weight="bold" /> Discard
                     </Button>
@@ -561,7 +842,7 @@ export function ListingPhotoStudio({
                       {/* The SAME mark the reference strip uses, so "this one is feeding the
                           render" looks identical on both sides of the window. */}
                       {usedAsRef.includes(c.url) && (
-                        <span aria-hidden className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-2 border-white bg-white text-slate-900 shadow-sm">
+                        <span aria-hidden className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-2 border-white bg-white text-draft shadow-sm">
                           <Check size={9} weight="bold" />
                         </span>
                       )}
@@ -590,7 +871,7 @@ export function ListingPhotoStudio({
             )}
 
             {cfg && !cfg.enabled && (
-              <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="flex items-start gap-2 rounded-md bg-hold/10 p-2 text-xs text-hold">
                 <Warning size={14} className="mt-0.5 shrink-0" />
                 <span>{!cfg.keySet
                   ? "No Google AI key is set. An admin can add one in Settings › Integrations."
@@ -753,7 +1034,7 @@ export function ListingPhotoStudio({
                     with a painted-on checkerboard is a charge for something unusable, and the
                     natural next move is to ask again, and pay again. */}
                 {promptWarning(prompt) && (
-                  <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <div className="flex items-start gap-2 rounded-md bg-hold/10 p-2 text-xs leading-relaxed text-hold">
                     <Warning size={14} className="mt-0.5 shrink-0" />
                     <span>{promptWarning(prompt)}</span>
                   </div>
@@ -767,8 +1048,162 @@ export function ListingPhotoStudio({
               </>
             )}
           </div>
+
+          {/* ── EVERYTHING THIS ACCOUNT HAS RENDERED ─────────────────────────────
+                Closed by default and only present when there is something in it. Open, it
+                is a wall of thumbnails under a day heading, which is the only ordering that
+                matches how anyone looks for one of these — "the ones from Tuesday", never
+                "render 41".
+
+                A thumb PUTS THE PICTURE BACK on the right rather than doing anything itself,
+                because every decision about a render already lives there and a second set of
+                actions down here would be the same four buttons in a smaller font. ── */}
+          {history.length > 0 && (
+            <div className="border-t border-border px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setHistOpen((o) => !o)}
+                aria-expanded={histOpen}
+                className="flex w-full items-center gap-1.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+              >
+                <CaretDown size={11} weight="bold" className={"text-muted-foreground transition-transform " + (histOpen ? "" : "-rotate-90")} />
+                History
+                <span className="tabular-nums text-muted-foreground">{history.length}</span>
+              </button>
+
+              {histOpen && (
+                <div className="mt-3 space-y-3">
+                  {histErr && (
+                    <div className="flex items-start gap-1.5 text-2xs text-destructive">
+                      <Warning size={12} className="mt-0.5 shrink-0" /><span>{histErr}</span>
+                    </div>
+                  )}
+                  {groupByDay(history).map(([day, rows]) => (
+                    <div key={day} className="space-y-1.5">
+                      <div className="text-2xs text-muted-foreground">{day}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {rows.map((h) => (
+                          <div key={h.id || h.url} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => openFromHistory(h)}
+                              title={h.prompt || "Open this render"}
+                              aria-label="Open this render"
+                              className="size-20 overflow-hidden rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/60"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={h.url} alt="" className="size-full object-cover" />
+                            </button>
+                            {/* The same corner mark the ticks use, so a control in that
+                                position reads as a control here too. It removes the ROW —
+                                the photo itself stays in storage, because it may already be
+                                live on a listing. */}
+                            <button
+                              type="button"
+                              onClick={() => forgetFromHistory(h)}
+                              aria-label="Remove this render from the history"
+                              title="Remove from history — the photo itself is kept"
+                              className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full border-2 border-white bg-black/45 text-white shadow-sm outline-none transition-colors hover:bg-destructive focus-visible:ring-2 focus-visible:ring-ring/60"
+                            >
+                              <Trash size={10} weight="bold" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* ── FULL SIZE ────────────────────────────────────────────────────────────────
+          A SIBLING of the studio dialog, never a child of it. A second Base UI dialog
+          mounted INSIDE the first one's popup opens and shuts in the same frame — the
+          parent's dismiss logic counts the newly mounted child as an outside press. That
+          was verified on the publish page's lightbox; this is the same fix.
+
+          Two steps, because they answer different questions. Fit answers "is the whole
+          composition right"; actual size answers "is the print sharp, is the type straight,
+          did it invent a seam" — which is the question you cannot ask of a 300px tile, and
+          the reason this window exists at all. ── */}
+    <Dialog open={zoomSrc != null} onOpenChange={(o) => { if (!o) setZoom(null) }}>
+      {/* Fit HUGS the picture — a portrait in a letterbox-wide window is the same
+          letterboxing this whole change is about, one layer up. Zoomed it takes the
+          window instead, because at that point the frame is a viewport onto something
+          bigger and a narrow one shows less of it. */}
+      <DialogContent className={"w-auto max-w-[calc(100vw-1.5rem)] gap-2 p-3 sm:max-w-[min(96vw,80rem)] "
+        + (zoomedIn ? "sm:w-[min(96vw,80rem)]" : "")}>
+        <DialogTitle className="pr-10 text-xs font-medium text-muted-foreground">
+          {zoom?.side === "gen"
+            ? `Our render ${(zoom.index ?? 0) + 1} of ${cands.length}`
+            : `Reference photo ${(zoom?.index ?? 0) + 1} of ${references.length} — the competitor's own shot`}
+        </DialogTitle>
+        <div
+          ref={zoomBox}
+          className={"max-h-[78dvh] overflow-auto rounded-lg bg-muted/40 " + (zoomedIn ? "cursor-zoom-out" : "cursor-zoom-in")}
+        >
+          {zoomSrc && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={zoomSrc}
+              alt=""
+              onClick={toggleZoomedIn}
+              className={zoomedIn
+                ? "max-w-none"
+                : "mx-auto max-h-[78dvh] w-auto max-w-full object-contain"}
+              style={zoomedIn ? { width: "220%" } : undefined}
+            />
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <Button size="sm" variant="outline" onClick={toggleZoomedIn}>
+            <MagnifyingGlassPlus size={13} weight="bold" />
+            {zoomedIn ? "Fit" : "Zoom in"}
+          </Button>
+          {zoomList.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => stepZoom(-1)} aria-label="Previous">
+                <CaretLeft size={13} weight="bold" />
+              </Button>
+              <span className="text-2xs tabular-nums text-muted-foreground">{(zoom?.index ?? 0) + 1} / {zoomList.length}</span>
+              <Button size="sm" variant="outline" onClick={() => stepZoom(1)} aria-label="Next">
+                <CaretRight size={13} weight="bold" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
+}
+
+/**
+ * NEWEST FIRST, UNDER A DAY.
+ *
+ * "Today" and "Yesterday" rather than a date for the two days anybody is actually looking
+ * for — a date string for this morning is a small puzzle, and the list is read from the top.
+ * The rows arrive ordered from the server, so this only has to keep that order.
+ */
+function groupByDay(rows: ListingRender[]): [string, ListingRender[]][] {
+  const out: [string, ListingRender[]][] = []
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  for (const r of rows) {
+    const t = r.createdAt ? new Date(r.createdAt) : null
+    let label = "Earlier"
+    if (t && !Number.isNaN(t.getTime())) {
+      const d = new Date(t); d.setHours(0, 0, 0, 0)
+      const days = Math.round((today.getTime() - d.getTime()) / 86400000)
+      label = days <= 0 ? "Today" : days === 1 ? "Yesterday"
+        : t.toLocaleDateString(undefined, { day: "numeric", month: "short", year: t.getFullYear() === today.getFullYear() ? undefined : "numeric" })
+    }
+    const last = out[out.length - 1]
+    if (last && last[0] === label) last[1].push(r)
+    else out.push([label, [r]])
+  }
+  return out
 }
