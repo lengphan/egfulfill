@@ -60,6 +60,10 @@ export function reportsRoutes(app, requireStaff) {
   app.get('/api/reports/overview', { preHandler: requireStaff }, async (req) => {
     const days = Math.max(1, Math.min(365, Number(req.query?.days) || 30));
     const since = Date.now() - days * DAY;
+    // The line follows the window only when the caller asks. A role without the toggle sees
+    // the live floor, and hiding orders behind a filter someone cannot see is worse than
+    // showing all of them.
+    const windowedLine = String(req.query?.windowLine || '') === '1';
 
     /*
      * ONE QUERY, LEAN COLUMNS. `items` is 892 of the 2,671 bytes an order weighs on
@@ -67,7 +71,7 @@ export function reportsRoutes(app, requireStaff) {
      * order's stage. Everything else is a scalar.
      */
     const rows = (await q(`
-      select o.id, o.seq, o.factory_status, o.status, o.total, o.created_at,
+      select o.id, o.seq, o.store, o.source, o.factory_status, o.status, o.total, o.created_at,
              o.label_scanned_at, o.delivered_at, o.delivery_status, o.delivery_checked_at,
              o.est_delivery, o.customer->>'name' as customer_name,
              coalesce(array_agg(i.factory_status) filter (where i.id is not null), '{}') as item_statuses
@@ -120,6 +124,25 @@ export function reportsRoutes(app, requireStaff) {
       if (!isNaN(deliv) && !isNaN(eta)) { onTimeN++; if (deliv <= eta + DAY) onTimeHit++; }
     }
 
+    /*
+     * THE PRODUCTION LINE, pre-grouped. The card draws one row per stage, split by channel,
+     * with the age of the oldest order in it — all of which is counting, and counting is
+     * what a database is for. `platformOf` on the client reads the id prefix; so does this.
+     */
+    const platformOf = (id) => (/^etsy-/i.test(id) ? 'etsy' : /^shopify-/i.test(id) ? 'shopify' : /^tiktok-/i.test(id) ? 'tiktok' : 'manual');
+    const line = new Map();
+    for (const r of rows) {
+      const t = r.created_at ? new Date(r.created_at).getTime() : NaN;
+      if (windowedLine && (isNaN(t) || t < since)) continue;
+      const stage = stageOf(r.factory_status || r.status, r.item_statuses);
+      let e = line.get(stage);
+      if (!e) { e = { id: stage, n: 0, oldest: null, byPlatform: {} }; line.set(stage, e); }
+      e.n++;
+      const p = platformOf(String(r.id || ''));
+      e.byPlatform[p] = (e.byPlatform[p] || 0) + 1;
+      if (r.created_at && (!e.oldest || new Date(r.created_at) < new Date(e.oldest))) e.oldest = r.created_at;
+    }
+
     const max = Math.max(...bars, 1);
     return {
       days,
@@ -134,9 +157,11 @@ export function reportsRoutes(app, requireStaff) {
         total: { days: round1(median(tot)), n: tot.length },
         onTime: { pct: onTimeN ? Math.round((onTimeHit / onTimeN) * 100) : null, n: onTimeN },
       },
+      line: [...line.values()],
       // Eight rows, and only what the list prints — not the orders themselves.
       recent: rows.slice(0, 8).map((r) => ({
-        id: r.id, seq: r.seq, customer: r.customer_name || null,
+        id: r.id, seq: r.seq, store: r.store || null, source: r.source || null,
+        customer: r.customer_name || null,
         total: num(r.total), stage: stageOf(r.factory_status || r.status, r.item_statuses),
         created_at: r.created_at,
       })),

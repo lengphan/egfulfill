@@ -3,7 +3,7 @@
 import { Fragment } from "react"
 import { FACTORY_STAGES, EXCEPTION_STAGES, orderStage } from "@/lib/factory-status"
 import { platformOf } from "@/lib/order-format"
-import { type OrderRow } from "@/lib/api"
+import { type OrderRow, type OverviewLineRow } from "@/lib/api"
 import { useT, useLabelT } from "@/lib/i18n"
 
 // The linear stages, Draft first — the same vocabulary the boards show as badges. Exception
@@ -56,14 +56,30 @@ const ageLabel = (d: number, today: string) => (!Number.isFinite(d) ? "" : d < 1
 // is stale" is ever wanted again, it belongs as a column or a filter on the queue, not as
 // three extra rows here.)
 
-export function ProductionLine({ orders }: { orders: OrderRow[] }) {
+/**
+ * `line` is the same shape already counted by the server (GET /api/reports/overview) — the
+ * dashboard passes it so the card no longer needs every order in the browser to count them.
+ * `orders` stays for callers that already hold a list; whichever arrives is used.
+ */
+export function ProductionLine({ orders, line }: { orders?: OrderRow[]; line?: OverviewLineRow[] }) {
   const t = useT()
   // Stage names come from FACTORY_STAGES and are translated ONLY at render — `s.id` and the
   // channel `name` are identity here (slotFor matches on it), so nothing above this line
   // may be localised or the grouping breaks.
   const tl = useLabelT()
-  const rows = [...LINE, ...OFF_LINE].map((s) => {
-    const inStage = orders.filter((o) => orderStage(o.items ?? []) === s.id)
+  // PLATFORM NAME → SLOT. The server counts by platform id (etsy/shopify/tiktok/manual);
+  // the slots are named for people. One map, so the two can't drift into "TikTok" vs "tiktok".
+  const SLOT_OF: Record<string, string> = { etsy: "Etsy", tiktok: "TikTok", shopify: "Shopify", manual: "Manual" }
+  const rows = line
+    ? [...LINE, ...OFF_LINE].map((s) => {
+      const e = line.find((x) => x.id === s.id)
+      const byChannel = [...CHANNELS, OTHER]
+        .map((c) => ({ ...c, n: Object.entries(e?.byPlatform ?? {}).reduce((n, [p, v]) => n + ((SLOT_OF[p] ?? OTHER.name) === c.name ? v : 0), 0) }))
+        .filter((c) => c.n > 0)
+      return { ...s, n: e?.n ?? 0, byChannel, oldest: dayjs(e?.oldest), off: OFF_LINE.some((x) => x.id === s.id) }
+    })
+    : [...LINE, ...OFF_LINE].map((s) => {
+    const inStage = (orders ?? []).filter((o) => orderStage(o.items ?? []) === s.id)
     // Grouped in the fixed slot order, so a stack's bands sit in the same order on every row
     // and can be compared straight down the card.
     const byChannel = [...CHANNELS, OTHER]

@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { Timer, Truck, Clock, SealCheck, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { fulfillmentSpeed, type SpeedStat } from "@/lib/analytics"
+import { fulfillmentSpeed, type SpeedStat, type FulfillmentSpeed as FulfillmentSpeedT } from "@/lib/analytics"
 import type { OrderRow } from "@/lib/api"
 import { useT, useLabelT } from "@/lib/i18n"
 
@@ -20,10 +20,16 @@ const fmtDays = (d: number | null) => {
  * with no qualifying orders says so plainly rather than showing a hollow 0 — an empty
  * metric and a fast one must never look the same.
  */
-export function FulfillmentSpeed({ orders, loading }: { orders: OrderRow[]; loading?: boolean }) {
+/**
+ * `speed` is the same medians already computed by the server (GET /api/reports/overview) —
+ * the dashboard passes it so the card no longer needs every order in the browser to take a
+ * median. `orders` stays for callers that already hold a list; whichever arrives is used.
+ */
+export function FulfillmentSpeed({ orders, loading, speed }: { orders?: OrderRow[]; loading?: boolean; speed?: FulfillmentSpeedT }) {
  const t = useT()
  const tl = useLabelT()
- const s = useMemo(() => fulfillmentSpeed(orders), [orders])
+ const computed = useMemo(() => fulfillmentSpeed(orders ?? []), [orders])
+ const s = speed ?? computed
 
   // The day figures themselves ("3.2d", "18h") are unit-suffixed numbers, not prose, and
   // stay as they are in every locale — same reasoning as the money on the tiles above.
