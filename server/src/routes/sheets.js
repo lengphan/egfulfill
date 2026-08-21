@@ -403,6 +403,20 @@ export function buildTemplate(title, lists = null) {
       } });
     }
     for (const id of opts.dropNamedRanges || []) out.push({ deleteNamedRange: { namedRangeId: id } });
+    /**
+     * WIPE THE OLD RULES BEFORE WRITING THE NEW ONES.
+     *
+     * Formatting only ever SET validation, so a rule outlived the column it was written for.
+     * Inserting Image ID pushed Print Type one column right, and the dependent rule that used
+     * to live there stayed behind on Item Quantity — a quantity cell offering a broken list of
+     * print methods, which is worse than no dropdown because it looks deliberate.
+     *
+     * A setDataValidation with no `rule` clears the range. It runs first, so everything below
+     * writes onto a clean grid and a column that no longer has a list ends up with none.
+     */
+    out.push({ setDataValidation: {
+      range: { sheetId: gid, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: NCOL },
+    } });
     for (const b of BANDS) {
       if (b.count > 1) out.push({ mergeCells: { mergeType: 'MERGE_ALL', range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: b.start, endColumnIndex: b.start + b.count } } });
     }
@@ -454,7 +468,7 @@ export function buildTemplate(title, lists = null) {
         out.push({ setDataValidation: {
           range: { sheetId: gid, startRowIndex: 2, startColumnIndex: i, endColumnIndex: i + 1 },
           rule: {
-            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$A$2:$A${listRowCount}` }] },
+            condition: { type: 'ONE_OF_RANGE', values: [{ userEnteredValue: `=Lists!$A$2:$A${P.length + 1}` }] },
             showCustomUi: true, strict: false,
           },
         } });
