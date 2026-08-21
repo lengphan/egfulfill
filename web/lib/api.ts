@@ -2285,7 +2285,15 @@ export type DesignPos = { x: number; y: number; w: number; h?: number; r: number
  *  line tracking have, and is only a fallback. Look up as `map[line_id] ?? map[sku]`. */
 export type OrderDesign = { sku?: string; line_id?: string | null; kind?: string; data?: string; name?: string; pos?: DesignPos | null
   /** Which face of the garment. Absent = front, which is what every pre-per-side row is. */
-  side?: string | null }
+  side?: string | null
+  /**
+   * The template this artwork came off — `TPL-…`, or null for artwork somebody dropped.
+   *
+   * Recorded per line and per SIDE, because that is how a template is chosen: two lines of
+   * one order can come off two different recipes. It survives to the factory, so "what else
+   * have we cut from this one" is an index lookup rather than a perceptual guess.
+   */
+  template_id?: string | null }
 
 /**
  * Index designs so both keys resolve. A line-keyed row is stored under its line_id AND
@@ -2599,7 +2607,10 @@ export function setItemMockup(orderId: string, body: { line_id?: string | null; 
     { method: "POST", body: JSON.stringify(body) },
   )
 }
-export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
+export function postOrderDesign(id: string, body: { sku: string; line_id?: string; /** Which face. Omitted = front, which is what the server assumes. */ side?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null
+  /** The template this placement came from. Omitting it LEAVES any id already recorded
+   *  alone — the server coalesces — so a routine re-save cannot erase the provenance. */
+  template_id?: string | null }) {
   /** `design_no`/`design_id` come back from the save: the number minted for these exact
    *  bytes, or the existing one if this artwork has been seen before (server/design-id.js). */
   return api<{ ok?: boolean; error?: string; design_no?: number | null; design_id?: string | null }>(`/api/orders/${encodeURIComponent(id)}/designs`, {

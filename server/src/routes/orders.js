@@ -1200,6 +1200,24 @@ export function ordersRoutes(app, requireAuth) {
     .then(async () => {
       await q('alter table order_designs add column if not exists side text')
         .catch((e) => console.error('[order_designs] could not add side:', e.message));
+      /**
+       * WHICH TEMPLATE THIS ARTWORK CAME OFF, if any.
+       *
+       * A template is a placement recipe — artwork, where it sits, which blank it was placed
+       * on — and picking one threw its identity away the instant the pieces landed on the
+       * canvas. So a submitted order carried the RESULT of TPL-12 with no memory that TPL-12
+       * existed, and the factory had no way to ask "what else have we cut from this recipe".
+       *
+       * It rides on the ARTWORK, not the order: a template is chosen per line and per side,
+       * and two lines of one order can come off two different templates. Nullable and never
+       * required — most artwork is a file somebody dropped, and that is not a failure state.
+       *
+       * This is the same identifier Printful's Orders API accepts as `product_template_id`
+       * on an order item: a template id is a legitimate way to say what to make, not just a
+       * design-time convenience.
+       */
+      await q('alter table order_designs add column if not exists template_id text')
+        .catch((e) => console.error('[order_designs] could not add template_id:', e.message));
       await q(`create unique index if not exists order_designs_line_side_key
                  on order_designs (order_id, (${DESIGN_KEY}), kind, coalesce(side,'front'))`)
         .catch((e) => console.error('[order_designs] COULD NOT CREATE order_designs_line_side_key — per-side artwork is off and saves keep the old one-per-line behaviour:', e.message));
@@ -2747,12 +2765,31 @@ export function ordersRoutes(app, requireAuth) {
       // Anything else is a plain link — a marketplace image, a library pick. Stored as a
       // link, which is what it is; readers already render `data` as an <img src>.
     }
+    /**
+     * ABSENT, EMPTY AND SET ARE THREE DIFFERENT ANSWERS.
+     *
+     * - absent  — the caller has nothing to say about provenance (the mobile app, an older
+     *             web build, any integration written before this existed). KEEP what is
+     *             recorded: a client that does not know about templates must not be able to
+     *             erase one by saving a line for an unrelated reason.
+     * - ""      — the caller is saying "this artwork did NOT come off a template", which is
+     *             what replacing a templated design with an uploaded file means. CLEAR it,
+     *             because leaving the old id would attribute a new picture to a recipe it
+     *             was never cut from, and a wrong provenance is worse than none.
+     * - "TPL-…" — set it.
+     */
+    const rawTpl = (req.body || {}).template_id ?? (req.body || {}).templateId;
+    const tplSpoken = rawTpl !== undefined && rawTpl !== null;
+    const templateId = String(rawTpl || '').trim().slice(0, 64) || null;
     await q(
-      `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, updated_at)
-       values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8, now())
+      `insert into order_designs (order_id, sku, line_id, kind, side, data, storage_key, name, pos, art_hash, art_phash, template_id, updated_at)
+       values ($1,$2,$10,$3,$11,$4,$9,$5,$6,$7,$8,$12, now())
        on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind, (coalesce(side,'front'))) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
-         art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side]
+         art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash),
+         /* $13 is "the caller spoke about templates at all" — see tplSpoken above. A save
+            that says nothing keeps what is there; a save that says "" clears it. */
+         template_id=(case when $13 then $12 else coalesce($12, order_designs.template_id) end), updated_at=now()`,
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId, side, templateId, tplSpoken]
     );
     // The artwork now has a number, minted on first sight of these exact bytes and reused
     // every time they turn up again — see design-id.js. Handed back so the uploader sees it
@@ -3375,7 +3412,7 @@ export function ordersRoutes(app, requireAuth) {
     // SIGNED CROSS-ORIGIN link instead — which expires, taints the canvas so the thread
     // matcher reports "couldn't open this image to read its colours", and is the string the
     // client hands back on the next save.
-    const r = await q(`select sku, line_id, kind, coalesce(side,'front') as side, data, storage_key, art_hash, name, pos from order_designs where order_id=$1`, [req.params.id]);
+    const r = await q(`select sku, line_id, kind, coalesce(side,'front') as side, data, storage_key, art_hash, name, pos, template_id from order_designs where order_id=$1`, [req.params.id]);
     // Minted per read, not stored: a signed URL expires, so a persisted one would go
     // stale. Returned through `data` because that's what every client already renders
     // (an <img src> takes a URL or a data-URL either way).
@@ -3394,7 +3431,11 @@ export function ordersRoutes(app, requireAuth) {
        */
       const designId = row.art_hash ? `D-${String(row.art_hash).slice(0, 8).toUpperCase()}` : null;
       // line_id is what a caller should key on; sku stays for rows that predate it.
-      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId };
+      /* The template this artwork came off, if it came off one. Not a secret and not
+         seller-specific — it names one of OUR placement recipes, so it travels to whoever
+         can already see the order. Null for artwork somebody simply dropped, which is most
+         of it. */
+      return { sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name, pos: row.pos, data: url || row.data, url, design_id: designId, template_id: row.template_id || null };
     });
   });
 
