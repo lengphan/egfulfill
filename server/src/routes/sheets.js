@@ -643,6 +643,84 @@ function toCopyUrl(url) {
   return id ? `https://docs.google.com/spreadsheets/d/${id}/copy` : '';
 }
 
+/**
+ * THE ONE THING DATA VALIDATION CANNOT DO — a dropdown that depends on another cell.
+ *
+ * Sheets will not evaluate INDIRECT inside a validation rule (verified against the live
+ * master: the rule is stored verbatim, read back verbatim, and resolves to an empty list),
+ * so a per-row list cannot be expressed as a rule at all. An onEdit trigger can: it rewrites
+ * that ROW's validation the moment a product is chosen, which is how every working dependent
+ * dropdown in Sheets is actually built.
+ *
+ * It reads the hidden Lists tab by NAME rather than by position — each product's three
+ * columns carry the product's own name in row 1 — so adding products, reordering columns or
+ * renaming a header on the Orders tab cannot break it. The catalogue itself is refreshed by
+ * the server on every template format, and this simply reads whatever is there.
+ *
+ * WHY IT IS PASTED RATHER THAN INSTALLED: creating a bound script needs Drive, and this
+ * deployment's service account has none — the same 403 that stops it creating a spreadsheet
+ * at all. A bound script IS carried into every copy someone makes, so it is a one-time paste
+ * on the master and then it travels.
+ */
+const APPS_SCRIPT = `/**
+ * EGFULFILL order-import helper.
+ *
+ * Pick a Blank Product and this narrows that row's Print Type, Color and Size to what the
+ * product actually comes in. Clear the product and they go back to offering everything.
+ *
+ * Reads the hidden "Lists" tab, which the EGFULFILL server rewrites from the live catalogue
+ * every time the master template is formatted. Nothing here needs editing when products
+ * change.
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var sh = e.range.getSheet();
+    if (sh.getName() !== 'Orders') return;
+    var row = e.range.getRow();
+    if (row < 3) return;                      // rows 1-2 are the banner and the headers
+
+    var head = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
+    var col = function (name) { return head.indexOf(name) + 1; };  // 0 when absent
+    var productCol = col('Blank Product');
+    if (!productCol || e.range.getColumn() !== productCol) return;
+
+    var lists = e.source.getSheetByName('Lists');
+    if (!lists) return;
+    var listHead = lists.getRange(1, 1, 1, lists.getLastColumn()).getValues()[0];
+    var product = String(e.value == null ? '' : e.value).trim();
+
+    // A product's three columns are headed with its own name, in colour/size/method order.
+    // Falling back to the union columns is what makes clearing the cell put everything back.
+    var at = product ? listHead.indexOf(product) : -1;
+    var cols = at >= 0
+      ? { Color: at + 1, Size: at + 2, 'Print Type': at + 3 }
+      : { Color: listHead.indexOf('All colors') + 1, Size: listHead.indexOf('All sizes') + 1, 'Print Type': listHead.indexOf('All methods') + 1 };
+
+    Object.keys(cols).forEach(function (header) {
+      var target = col(header);
+      var source = cols[header];
+      if (!target || !source) return;
+      var values = lists.getRange(2, source, Math.max(1, lists.getLastRow() - 1), 1)
+        .getValues().map(function (r) { return String(r[0] || '').trim(); })
+        .filter(function (v) { return v; });
+      var cell = sh.getRange(row, target);
+      if (!values.length) { cell.clearDataValidations(); return; }
+      // setAllowInvalid(true) on purpose: a rejected paste is worse than an odd value, and
+      // the importer normalises and checks the combination server-side anyway.
+      cell.setDataValidation(
+        SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(true).build()
+      );
+      // A value that the new product does not offer is not silently kept.
+      var current = String(cell.getValue() || '').trim();
+      if (current && values.indexOf(current) === -1) cell.clearContent();
+    });
+  } catch (err) {
+    // A helper must never block someone typing. Swallowed on purpose.
+  }
+}
+`;
+
 export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // Public config: is import enabled, the template link, and whether the server
   // can auto-create a filled sheet (service account present).
@@ -655,6 +733,16 @@ export function sheetsRoutes(app, requireAuth, requireAdmin) {
   // address is meant to be handed out, but our Cloud project id needn't be broadcast. The
   // onRequest hook in index.js has already attached req.user, so no preHandler is needed
   // and the public shape is unchanged for anyone without a token.
+  /**
+   * The helper script, served rather than stored in the bundle, so it can never drift from
+   * the column names this file writes. Admin-only: it is a setup step, not a seller's.
+   */
+  app.get('/api/sheets/apps-script', { preHandler: requireAdmin }, async () => ({
+    script: APPS_SCRIPT,
+    // Named here so the instructions and the template can't disagree about which tab.
+    tab: 'Orders', listsTab: 'Lists',
+  }));
+
   app.get('/api/sheets/config', async (req) => {
     const sa = loadSA();
     const templateUrl = await readTemplateUrl();

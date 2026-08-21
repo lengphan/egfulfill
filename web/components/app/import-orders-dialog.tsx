@@ -25,7 +25,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
+import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getSheetsAppsScript, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, type DesignPos } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
@@ -136,20 +136,10 @@ async function downloadXlsxTemplate() {
       const validations = (ws as unknown as {
         dataValidations: { add: (range: string, rule: Record<string, unknown>) => void }
       }).dataValidations
-      /*
-       * A DEFINED NAME, not a raw cross-sheet range.
-       *
-       * `Lists!$A$2:$A$28` inside a validation formula is understood by current Excel and by
-       * very little else — Numbers drops it, and Google's importer discards validation on
-       * conversion whatever form it takes. A defined name is what Excel itself writes when
-       * you point a list at another sheet, and it is the form the other readers support.
-       */
-      const nameFor = `EG_${key.toUpperCase()}`
-      wb.definedNames.add(`Lists!$${col}$2:$${col}$${values.length + 1}`, nameFor)
       validations.add(`${letter}3:${letter}${DATA_ROWS}`, {
         type: "list",
         allowBlank: true,
-        formulae: [nameFor],
+        formulae: [`Lists!$${col}$2:$${col}$${values.length + 1}`],
         showErrorMessage: false,
       })
       return
@@ -204,6 +194,12 @@ export function ImportOrdersDialog({
   // been configured yet. Server-supplied: the master lives in a setting, not in the bundle.
   const [copyUrl, setCopyUrl] = useState("")
   const [needsTemplate, setNeedsTemplate] = useState(false)
+  // Admin-only setup. The master's formatting looks after itself; the helper script below is
+  // the one step Google will not let us perform on someone's behalf.
+  const [isTemplateAdmin, setIsTemplateAdmin] = useState(false)
+  const [helper, setHelper] = useState<string | null>(null)
+  const [helperOpen, setHelperOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [tplInput, setTplInput] = useState("")
   const [tplSaving, setTplSaving] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -218,9 +214,9 @@ export function ImportOrdersDialog({
     return getSheetsConfig()
       .then((c) => {
         setSheetsEnabled(!!c.enabled)
-        setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate)
+        setCopyUrl(c.copyUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
       })
-      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setConfigErr(true) })
+      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false); setConfigErr(true) })
   }, [])
 
   useEffect(() => {
@@ -665,6 +661,65 @@ export function ImportOrdersDialog({
                       is the screen where its absence is felt, and the master has to be made by
                       a real Google account — our service account gets 403 PERMISSION_DENIED
                       creating a spreadsheet, since it has no Drive of its own. */}
+                  {/* THE ONE STEP GOOGLE WILL NOT LET US DO FOR YOU.
+                      Everything else about the master maintains itself. A dependent dropdown
+                      cannot be written as a validation rule at all — Sheets does not evaluate
+                      INDIRECT in one — so it takes an onEdit trigger, and creating a bound
+                      script needs Drive, which this deployment's service account has none of
+                      (the same 403 that stops it creating a spreadsheet). One paste on the
+                      master, and every copy made afterwards carries it. */}
+                  {isTemplateAdmin && copyUrl && (
+                    <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="eg-label text-muted-foreground">Admin · optional</span>
+                        <span className="text-xs font-medium">Make Colour, Size and Print Type follow the product</span>
+                        <button
+                          type="button"
+                          className="ms-auto text-2xs text-primary hover:underline"
+                          onClick={() => {
+                            setHelperOpen((v) => !v)
+                            if (!helper) getSheetsAppsScript().then((r) => setHelper(r.script)).catch(() => setHelper(""))
+                          }}
+                        >
+                          {helperOpen ? "Hide" : "Show me how"}
+                        </button>
+                      </div>
+                      {helperOpen && (
+                        <div className="space-y-2">
+                          <p className="text-2xs text-muted-foreground">
+                            Without this, those three columns offer every colour, size and method in the
+                            catalogue — a real list, just not narrowed to the row&apos;s product. Sheets
+                            cannot narrow it with a formula, so it takes a small script.
+                          </p>
+                          <ol className="list-inside list-decimal space-y-0.5 text-2xs text-muted-foreground">
+                            <li>Open the master → <span className="font-medium text-foreground">Extensions → Apps Script</span></li>
+                            <li>Replace whatever is in the editor with the code below</li>
+                            <li><span className="font-medium text-foreground">Save</span>. Nothing else — the trigger is built in</li>
+                            <li>In the sheet, pick a Blank Product on any row. Google asks the copy&apos;s owner to authorise the script the first time</li>
+                          </ol>
+                          <textarea
+                            readOnly
+                            value={helper ?? "Loading…"}
+                            onFocus={(e) => e.currentTarget.select()}
+                            className="h-40 w-full rounded-lg border border-border bg-card p-2 font-mono text-[10px] leading-tight"
+                          />
+                          <button
+                            type="button"
+                            disabled={!helper}
+                            onClick={() => {
+                              if (!helper) return
+                              navigator.clipboard?.writeText(helper)
+                                .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+                                .catch(() => {})
+                            }}
+                            className="rounded-lg border border-border px-2 py-1 text-2xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                          >
+                            {copied ? "Copied" : "Copy the script"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {/* THE APPLY BUTTON IS GONE, and so is the row of state around it.
                       The master keeps itself current: the server fingerprints the catalogue
                       and the column list, and re-formats the sheet when that changes — see
