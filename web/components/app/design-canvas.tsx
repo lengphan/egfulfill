@@ -2163,6 +2163,27 @@ export function DesignCanvasDialog({
               {/* The background BUTTONS moved onto the selection strip (see the stage props
                   above). What stays here is what the strip cannot say: the sentence the
                   eraser leaves behind when it finds nothing flat to cut. */}
+              {/* THE TOLERANCE, WHERE THE ERASER IS.
+                  The Design maker has had this slider since the tool was built; the mini
+                  designer got the button and not the dial, so every removal here ran at the
+                  default 12 and the only recourse when it left a fringe — or ate a pale part
+                  of the artwork — was to undo and give up. It is one number and it is the
+                  whole difference between the two outcomes.
+
+                  Not on the floating rail beside the artwork: that strip is what your hand
+                  is on while dragging, and a slider there is a thing you knock. */}
+              <label className="pointer-events-auto flex items-center gap-2 rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">
+                <span className="whitespace-nowrap">Erase tolerance</span>
+                <input
+                  type="range" min={4} max={40}
+                  value={bg.tolerance}
+                  onChange={(e) => bg.changeTolerance(Number(e.target.value))}
+                  className="w-24"
+                  aria-label="Background removal tolerance"
+                  title="Higher lifts more of a shaded or uneven backdrop; lower protects pale parts of the artwork."
+                />
+                <span className="w-4 text-right tabular-nums">{bg.tolerance}</span>
+              </label>
               {bg.msg && (
                 <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">{bg.msg}</span>
               )}
