@@ -35,6 +35,24 @@ const KEY = 'branding';
  */
 const ACCENTS = ['rose', 'lime'];
 const DEFAULT_ACCENT = 'rose';
+
+/**
+ * The SKINS — the site's palette, on exactly the terms the accent already runs on.
+ *
+ * A KEY, never a colour. The values live in web/app/globals.css under [data-skin="…"]; this
+ * file's job is only to say which keys exist, so that what can be selected is what has been
+ * measured. A stored hex would mean the next palette is typed into a text field with nothing
+ * checking it, which is the free colour picker this route has always refused.
+ *
+ *   studio  ink on white, one bright accent — the default
+ *   press   electric violet plate over warm paper — what the site was before
+ *
+ * A skin CANNOT reach --primary (it inks ~247 pieces of text as well as filling buttons),
+ * the floor's status vocabulary, or --pop. Adding one means adding it to globals.css AND
+ * here, then running `node tools/check-skins.mjs`.
+ */
+const SKINS = ['studio', 'press'];
+const DEFAULT_SKIN = 'studio';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_FAVICON = path.join(HERE, '..', 'assets', 'default-favicon.png');
 
@@ -66,12 +84,13 @@ async function read() {
       // attribute matching no rule leaves the app on whatever :root says, which is the same
       // colour by a longer route; returning the default makes the panel agree with the page.
       accent: ACCENTS.includes(o.accent) ? o.accent : DEFAULT_ACCENT,
+      skin: SKINS.includes(o.skin) ? o.skin : DEFAULT_SKIN,
     };
   } catch {
     // A settings read that FAILS is not the same as branding that was never set — but for
     // reading marks, defaults are the right answer either way. The admin PUT is where a
     // database problem must surface.
-    return { appName: '', logoUrl: '', faviconUrl: '', faviconKey: '', accent: DEFAULT_ACCENT };
+    return { appName: '', logoUrl: '', faviconUrl: '', faviconKey: '', accent: DEFAULT_ACCENT, skin: DEFAULT_SKIN };
   }
 }
 
@@ -103,7 +122,7 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
   /** What the marks are. Any signed-in surface renders them, so this is auth, not admin. */
   app.get('/api/branding', { preHandler: requireAuth }, async () => {
     const b = await read();
-    return { appName: b.appName, logoUrl: b.logoUrl, faviconUrl: b.faviconUrl, accent: b.accent, accents: ACCENTS };
+    return { appName: b.appName, logoUrl: b.logoUrl, faviconUrl: b.faviconUrl, accent: b.accent, accents: ACCENTS, skin: b.skin, skins: SKINS };
   });
 
   app.put('/api/admin/branding', { preHandler: requireAdmin }, async (req, reply) => {
@@ -116,6 +135,10 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
       // ALLOW-LIST, not a sanitiser. Nothing outside ACCENTS is stored, so the set of
       // colours the app can wear is the set that has been measured.
       ...(ACCENTS.includes(body.accent) ? { accent: body.accent } : {}),
+      // Allow-listed, like the accent. An unknown key is DROPPED rather than stored — a row
+      // holding a skin no stylesheet declares renders as whatever :root says while the panel
+      // shows it as selected, which is a setting that lies about itself.
+      ...(SKINS.includes(body.skin) ? { skin: body.skin } : {}),
     };
     try {
       await ensure();
@@ -127,7 +150,7 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
       reply.code(502);
       return { error: 'Could not save: ' + ((e && e.message) || 'database error') };
     }
-    return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl, accent: next.accent, accents: ACCENTS };
+    return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl, accent: next.accent, accents: ACCENTS, skin: next.skin, skins: SKINS };
   });
 
   /** Upload a mark. Stored PRIVATE and re-served through our own origin, like chat art. */

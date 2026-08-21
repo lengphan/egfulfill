@@ -19,7 +19,7 @@ import { SURFACE } from "@/components/marketing/bold-kit"
  */
 export default function Loading() {
   return (
-    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-10">
         {/* The back-link slot, so the top of the page doesn't jump when the real one lands. */}
         <div className="h-4 w-28 rounded bg-black/[0.07] motion-safe:animate-pulse" />

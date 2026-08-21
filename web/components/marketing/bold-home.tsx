@@ -113,7 +113,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
   })()
 
   return (
-    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       {/* ── HERO ───────────────────────────────────────────────────────────────── */}
       {/* NOT overflow-hidden. The product panel deliberately hangs past the plate's bottom
           edge — that overhang is the depth — and clipping the section amputated it to a strip
@@ -148,7 +148,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           </h1>
 
           <motion.p
-            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[#0B0B0C]/62"
+            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed text-[var(--mk-ink)]/62"
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
@@ -323,7 +323,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
                   style={{ background: ACCENT }}
                 />
-                <Icon size={26} weight="duotone" className="relative text-[#0B0B0C]" />
+                <Icon size={26} weight="duotone" className="relative text-[var(--mk-ink)]" />
                 <h3 className="relative mt-6 text-xl font-bold tracking-tight">{c.title}</h3>
                 <p className="relative mt-2 text-[15px] leading-relaxed text-black/55">{c.body}</p>
               </motion.div>

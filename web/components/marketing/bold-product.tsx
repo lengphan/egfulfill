@@ -105,11 +105,11 @@ export function BoldProduct({ product, shipping }: {
   const guideCols = guides.length % 3 === 0 ? "sm:columns-2 lg:columns-3" : "sm:columns-2"
 
   return (
-    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-10">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-black/55 transition-colors hover:text-[#0B0B0C]"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-black/55 transition-colors hover:text-[var(--mk-ink)]"
         >
           <ArrowLeft size={14} weight="bold" /> All products
         </Link>
@@ -160,7 +160,7 @@ export function BoldProduct({ product, shipping }: {
                         aria-pressed={colorIdx === i}
                         className={
                           "relative aspect-square w-16 shrink-0 overflow-hidden rounded-xl border transition-colors sm:w-full " +
-                          (colorIdx === i ? "border-[#0B0B0C]" : "border-black/[0.09] hover:border-black/40")
+                          (colorIdx === i ? "border-[var(--mk-ink)]" : "border-black/[0.09] hover:border-black/40")
                         }
                       >
                         <Image src={c.image} alt="" fill unoptimized sizes="80px" className="object-cover" />
@@ -191,7 +191,7 @@ export function BoldProduct({ product, shipping }: {
                 ) : (
                   /* Accent, not a grey box — a product without a photo should read as
                      unfinished rather than as a failed image request. */
-                  <div className="flex size-full flex-col items-center justify-center gap-3 text-[#FAF8F3]/50">
+                  <div className="flex size-full flex-col items-center justify-center gap-3 text-[var(--mk-accent-ink)]/50">
                     <TShirt size={56} weight="duotone" />
                     <span className="text-sm font-semibold">Photo coming</span>
                   </div>
@@ -267,7 +267,7 @@ export function BoldProduct({ product, shipping }: {
                 <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
                   <span>Colours <span className="text-black/30">· {product.colors.length}</span></span>
                   {chosen && (
-                    <span className="truncate text-[13px] font-semibold normal-case tracking-normal text-[#0B0B0C]">
+                    <span className="truncate text-[13px] font-semibold normal-case tracking-normal text-[var(--mk-ink)]">
                       {chosen.name}
                     </span>
                   )}
@@ -284,8 +284,8 @@ export function BoldProduct({ product, shipping }: {
                       className={
                         "size-7 rounded-full border transition-shadow " +
                         (colorIdx === i
-                          ? "border-black/25 ring-2 ring-[#0B0B0C] ring-offset-2 ring-offset-[#FAF8F3]"
-                          : "border-black/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[#FAF8F3]")
+                          ? "border-black/25 ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-accent-ink)]"
+                          : "border-black/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-accent-ink)]")
                       }
                       style={swatchChipStyle(c.name, c.image)}
                     />
@@ -319,13 +319,13 @@ export function BoldProduct({ product, shipping }: {
                           className={
                             "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
                             (on
-                              ? "border-[#0B0B0C] bg-[#0B0B0C] text-[#FAF8F3]"
-                              : "border-black/[0.14] text-black/70 hover:border-black/50 hover:text-[#0B0B0C]")
+                              ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
+                              : "border-black/[0.14] text-black/70 hover:border-black/50 hover:text-[var(--mk-ink)]")
                           }
                         >
                           {s}
                           {product.priceVaries && (
-                            <span className={"ml-2 text-xs font-medium tabular-nums " + (on ? "text-[#FAF8F3]/70" : "text-black/40")}>
+                            <span className={"ml-2 text-xs font-medium tabular-nums " + (on ? "text-[var(--mk-accent-ink)]/70" : "text-black/40")}>
                               {usd(priceOfSize(s))}
                             </span>
                           )}

@@ -41,7 +41,7 @@ const journey = [
 
 export function BoldHow() {
  return (
-    <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <PlateHero
  title="Three steps."
  accent="Then it runs."

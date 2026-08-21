@@ -10,7 +10,7 @@ import { PRODUCT_METHODS } from "@/lib/print-method"
 import type { LookbookBrand } from "@/components/app/lookbook-branding-dialog"
 import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
-import { ACCENT, ACID, INK, ACCENT_INK } from "@/components/marketing/bold-kit"
+import { HEX } from "@/components/marketing/bold-kit"
 
 /**
  * THE PRICE THE SHEET PRINTS — the trade rate, or what a seller pays when there isn't one.
@@ -115,16 +115,21 @@ function Editable({
  * used the same way here — as a fill that carries ink, never as type on paper, where it
  * measures 1.1:1 and vanishes.
  */
-/* IMPORTED, NOT RE-TYPED. Every one of these was a literal copy of a value bold-kit
- already exports — and the comment above already says so in words ("the counterpart the
- marketing kit already pairs with it"). §4: import from the kit, never re-declare a colour
- in a page. `paper` is ACCENT_INK: the kit's name for it is what it does on the plate,
- which is the same cream this prints on. */
+/* IMPORTED, NOT RE-TYPED — but from bold-kit's HEX, not its painted tokens.
+ *
+ * §4 still applies (import from the kit, never re-declare a colour in a page) and these did
+ * import ACCENT/ACID/INK/ACCENT_INK. Those are `var(--mk-…)` references now, and this is one
+ * of the two places that cannot take one: `accent` is the DEFAULT for a value a seller
+ * overrides and we STORE per seller, and the picker that overrides it is an
+ * `<input type="color">`, which resolves a variable name to #000000 without complaining.
+ *
+ * A catalogue's brand colour is a seller's, not the site's theme — so a literal is the
+ * honest type for it, and the escape hatch is named as one in the kit. */
 const HOUSE = {
- accent: ACCENT,
- lime: ACID,
- ink: INK,
- paper: ACCENT_INK,
+ accent: HEX.accent,
+ lime: HEX.acid,
+ ink: HEX.ink,
+ paper: HEX.paper,
 }
 
 /** The default brand a catalogue prints with before a seller sets their own, exported so

@@ -1019,12 +1019,15 @@ export type AiConfig = { keySet?: boolean; last4?: string | null; masked?: strin
 export type Branding = {
   appName?: string; logoUrl?: string; faviconUrl?: string
   accent?: string; accents?: string[]
+  /** The site's PALETTE, on exactly the same terms as `accent`: a key, allow-listed by the
+   *  server, whose values live in globals.css under [data-skin="…"]. See lib/skin.ts. */
+  skin?: string; skins?: string[]
   error?: string
 }
 export function getBranding() {
   return api<Branding>(`/api/branding`)
 }
-export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string }) {
+export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string; skin?: string }) {
   return api<Branding & { ok?: boolean }>(`/api/admin/branding`, { method: "PUT", body: JSON.stringify(body) })
 }
 /** `dataUrl` is a base64 data URL read from a file input. Max 2MB, PNG/JPEG/WebP/SVG/ICO. */
@@ -2150,6 +2153,13 @@ export type Overview = {
   }
   line: OverviewLineRow[]
   recent: { id: string; seq?: number | null; store?: string | null; source?: string | null; customer: string | null; total: number; stage: string; created_at?: string | null }[]
+}
+
+/** The onEdit helper that makes the sheet's variant dropdowns depend on the chosen product.
+ *  Served rather than bundled so it can never drift from the column names the template
+ *  writes — see APPS_SCRIPT in server/src/routes/sheets.js. Admin only. */
+export function getSheetsAppsScript() {
+  return api<{ script: string; tab: string; listsTab: string }>(`/api/sheets/apps-script`)
 }
 
 export function getOverview(days = 30, windowLine = false) {

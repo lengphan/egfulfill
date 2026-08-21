@@ -246,7 +246,7 @@ export function SupportBubble() {
       <button
  onClick={() => setOpen(true)}
  aria-label="Ask us a question"
- className="fixed bottom-5 right-5 z-50 flex size-14 items-center justify-center rounded-full text-[#FAF8F3] shadow-lg transition-transform hover:scale-105"
+ className="fixed bottom-5 right-5 z-50 flex size-14 items-center justify-center rounded-full text-[var(--mk-accent-ink)] shadow-lg transition-transform hover:scale-105"
  style={{ background: ACCENT }}
       >
         <ChatCircleDots size={26} weight="fill" />
@@ -256,7 +256,7 @@ export function SupportBubble() {
 
  return (
     <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl">
-      <div className="flex items-center justify-between px-4 py-3 text-[#FAF8F3]" style={{ background: ACCENT }}>
+      <div className="flex items-center justify-between px-4 py-3 text-[var(--mk-accent-ink)]" style={{ background: ACCENT }}>
         <span className="text-sm font-bold">Ask EGFUL</span>
         <button onClick={() => setOpen(false)} aria-label="Close"><X size={16} weight="bold" /></button>
       </div>
@@ -268,7 +268,7 @@ export function SupportBubble() {
  asks the question the widget exists for. */}
         {msgs.length === 0 && (
           <div className="mb-3">
-            <span className="inline-block max-w-[85%] rounded-2xl bg-black/[0.05] px-3 py-2 text-sm leading-relaxed text-[#0B0B0C]">
+            <span className="inline-block max-w-[85%] rounded-2xl bg-black/[0.05] px-3 py-2 text-sm leading-relaxed text-[var(--mk-ink)]">
               Hi — how can we help? Ask us anything about products, pricing or how fulfilment
  works, and a person can pick it up whenever you&apos;d rather have one.
             </span>
@@ -284,7 +284,7 @@ export function SupportBubble() {
  key={f.q}
  type="button"
  onClick={() => askFaq(f)}
- className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 transition-colors hover:border-black/45 hover:text-[#0B0B0C]"
+ className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 transition-colors hover:border-black/45 hover:text-[var(--mk-ink)]"
               >
                 {f.q}
               </button>
@@ -320,8 +320,8 @@ export function SupportBubble() {
             )}
             <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
               (m.role === "user" ? INK_ON_ACID
- : m.role === "staff" ? "border border-black/10 bg-white text-[#0B0B0C]"
- : "bg-black/[0.05] text-[#0B0B0C]")}>
+ : m.role === "staff" ? "border border-black/10 bg-white text-[var(--mk-ink)]"
+ : "bg-black/[0.05] text-[var(--mk-ink)]")}>
               {m.text}
               {/* The page that answers it properly. On the canned replies only — a model
  answer has no fixed destination, and inventing one would send people to a
@@ -422,7 +422,7 @@ export function SupportBubble() {
  were just given. */}
           {msgs.length > 0 && !done && !withPerson && (
             <button onClick={escalate} disabled={busy}
- className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[#0B0B0C]">
+ className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[var(--mk-ink)]">
               Talk to support
             </button>
           )}

@@ -41,8 +41,8 @@ export function SiteHeader() {
    * last time a hero changed — pricing, features, how-it-works and catalog each drew a
    * lighter bar with dark ink above a deep plate. One appearance everywhere cannot drift.
    */
-  const ink = "text-[#0B0B0C]"
-  const muted = "text-[#0B0B0C]/65 hover:bg-[#0B0B0C]/[0.05] hover:text-[#0B0B0C]"
+  const ink = "text-[var(--mk-ink)]"
+  const muted = "text-[var(--mk-ink)]/65 hover:bg-[var(--mk-ink)]/[0.05] hover:text-[var(--mk-ink)]"
   return (
     <header
       className="sticky top-0 z-30"
@@ -79,7 +79,7 @@ export function SiteHeader() {
                 // Violet fill, lime label — the one loud thing in the bar, and the same pair
                 // the app's primary button uses. Acid alone cannot work here: on paper it is
                 // 1.05:1 and the button would have no shape at all.
-                className="rounded-full px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B0B0C] focus-visible:ring-offset-2"
+                className="rounded-full px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
                 style={{ background: ACCENT, color: ACID }}
               >
                 Start free

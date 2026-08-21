@@ -81,7 +81,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   if (failed || !product) {
     return (
-      <div className="text-[#0B0B0C]" style={{ background: SURFACE }}>
+      <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
         <div className="mx-auto max-w-3xl px-6 py-24 text-center">
           <h1 className="font-display text-3xl font-black tracking-tight">We couldn&apos;t load this product</h1>
           <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-black/55">

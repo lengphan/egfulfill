@@ -814,3 +814,119 @@ td[align="right"] {
 /* Lime is the same colour in both themes — at L 0.89 it is already above the whole dark
    palette, so it needs no dark step, only the darker ink. */
 .dark[data-pop="lime"], .dark [data-pop="lime"] { --pop-foreground: oklch(0.145 0 0); }
+
+/* ── THE SKIN ──────────────────────────────────────────────────────────────────
+ *
+ * The marketing site's palette, as variables rather than as thirteen hex literals compiled
+ * into JSX. `bold-kit.tsx` still exports ACCENT / INK / SURFACE / ACID and thirteen files
+ * still import them — the constants now hold `var(--mk-…)` references, so ~150 inline style
+ * objects were left completely untouched and the VALUES moved here.
+ *
+ * WHY: the palette had to be movable on a running site. Every previous colour change was a
+ * code edit and a deploy, which on a site carrying live orders is the thing you least want
+ * to be doing in order to try a shade. An admin sets data-skin on <html> (Settings ›
+ * Branding), the server stores a KEY, and the keys are the ones declared here — the same
+ * discipline the accent presets above already run on, and for the same reason: a stored hex
+ * means the next palette is typed into a text field with nothing measuring it.
+ *
+ * SCOPE, and it is drawn where the damage stops.
+ *
+ * A skin owns the marketing/auth palette and `--brand`. It does NOT own three things:
+ *
+ *   --primary          it inks ~247 pieces of TEXT as well as filling 206 buttons, so a
+ *                      value that is merely a nice fill blanks a quarter of the product.
+ *                      This is the exact hazard branding.js refused a colour picker over.
+ *   the status set     emerald shipped, amber hold, red alert and the rest carry meaning on
+ *                      the factory floor (§4). A brand decision must never move them.
+ *   --pop              its own axis, chosen separately, already gated by its own tool.
+ *
+ * `--brand` is safe where `--primary` is not, and the difference is a rule §4 already
+ * states: brand is LARGE FILLS ONLY, never text, so we always control what sits on it.
+ *
+ * Gate: `node tools/check-skins.mjs` — every pair a skin declares, measured.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── STUDIO · the default ────────────────────────────────────────────────────
+ *
+ * INK ON WHITE, and the beige is gone.
+ *
+ * The page was #F2F1EC — warm paper under a cool electric-violet plate, and that tension was
+ * deliberate and documented. It is being dropped because it was asked for: the ask is
+ * "modern", and a warm off-white is the single strongest signal of printed rather than made.
+ * Paper reads as a magazine; white reads as a tool.
+ *
+ * The plate goes to near-black with it. A violet banner over a white page is one saturated
+ * rectangle on an otherwise neutral site — the colour ends up meaning "this is the banner"
+ * rather than meaning anything — whereas ink-on-white with ONE bright accent held back for a
+ * single fill is the discipline the app's own chrome already runs on (--primary is
+ * oklch(0.175 0 0), and has been since the palette went chroma-0).
+ *
+ * MEASURED, as §4 requires — nothing here is eyeballed:
+ *   ink #0A0A0A on surface #FFFFFF          20.4:1   body and display
+ *   accent-ink #FFFFFF on accent #0A0A0A    20.4:1   the plate's lettering
+ *   acid #D4F897 on accent #0A0A0A          16.0:1   the one bright thing, on the dark plate
+ *   ink #0A0A0A on acid #D4F897             16.0:1   and the same pair inverted
+ *   auth-edge #8A8A8A on white               3.4:1   clears the 3:1 boundary floor
+ *   auth-muted #5C5C5C on white              7.0:1   real secondary text, not a hint
+ *
+ * The acid green is the one colour left, and it survives the move: it is a LIGHT colour, so
+ * it can only ever be a fill on the dark plate or ink carried BY that fill — on white it is
+ * 1.1:1 and simply disappears. That constraint is unchanged from the violet era; what
+ * changed is the plate it sits on.
+ */
+:root,
+[data-skin="studio"] {
+  --mk-surface: #FFFFFF;
+  --mk-ink: #0A0A0A;
+  --mk-accent: #0A0A0A;
+  --mk-accent-ink: #FFFFFF;
+  /* The accent WORD on the plate. On a dark plate this cannot be "a deeper shade of the
+     plate", which is what it was on the light periwinkle — it has to be lighter. The acid
+     is the site's one accent, so the accent word is the accent. */
+  --mk-plate-accent: #D4F897;
+  --mk-acid: #D4F897;
+  /* AUTH SITS ON THE SAME WHITE. It used to have a ground of its own so its white fields
+     had something to sit against; with the page white too, the field's EDGE is the only
+     thing marking the control, which is why the border below is measured rather than
+     chosen. Do not lighten it to calm the page down — the fields stop being findable. */
+  --mk-auth-field: #FFFFFF;
+  --mk-auth-edge: #8A8A8A;
+  --mk-auth-muted: #5C5C5C;
+  /* The app's large-fill brand, moved with the plate so the product and the site are one
+     decision. Already near-black in the base palette — this states it as the skin's rather
+     than leaving the two to drift apart the next time one of them moves. */
+  --brand: oklch(0.175 0 0);
+  --brand-foreground: oklch(1 0 0);
+}
+
+/* ── PRESS · what the site looked like before ─────────────────────────────────
+ *
+ * Kept, in full, and not as sentiment. Every value below was measured when it was the
+ * default and the notes in bold-kit.tsx are its notes — dropping it would have thrown away
+ * a working, contrast-checked palette to save nine lines, and left the picker with one
+ * option, which is not a picker.
+ *
+ * Electric violet plate over warm paper: the banner reads modern, the page reads printed,
+ * and the contrast between the two was the whole look.
+ *   ink on paper 18.5:1 · paper on plate 5.68:1 · acid on plate 5.07:1 · edge on paper 3.26:1
+ */
+[data-skin="press"] {
+  --mk-surface: #F2F1EC;
+  --mk-ink: #0B0B0C;
+  --mk-accent: #6633FF;
+  --mk-accent-ink: #FAF8F3;
+  /* THE ACID, not the old #1E2A78 — which check-skins.mjs caught measuring 2.10:1.
+     That value was chosen when the plate was the LIGHT periwinkle #A5B7FF, where a deep
+     navy was 6.53:1 and the kit's note still says so. The plate went to electric violet
+     #6633FF and this never moved with it: a "deeper shade of the plate's own hue" is only
+     an accent while the plate is light, and on a dark plate it is a smudge. Nothing
+     rendered it, so nobody saw it — the gate is the only reason it is known at all. */
+  --mk-plate-accent: #D4F897;
+  --mk-acid: #D4F897;
+  --mk-auth-field: #FFFFFF;
+  --mk-auth-edge: #8A8577;
+  --mk-auth-muted: #6B6659;
+  /* Violet fill, paper label — 5.68:1, the pair the marketing bands already run. */
+  --brand: oklch(0.5305 0.2723 283.5);
+  --brand-foreground: #FAF8F3;
+}
