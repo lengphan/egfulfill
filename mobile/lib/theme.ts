@@ -13,11 +13,11 @@
  * pulled three ways at once: warm paper and a warm border at hue ~91, a cool periwinkle
  * accent, and an acid lime on top of both.
  *
- * The signal is CORAL. One token, `pop`. It is ALWAYS a fill carrying dark text — ink on it
- * measures 8.74:1, white on it 2.18:1 — so it is never a text colour and never a hairline.
- * Its shape is only 2.10:1 against the page, which means it cannot be a borderless button
- * on paper; it earns its keep on the dark blocks and as a small badge, where the fill has
- * real separation and the ink label carries the reading.
+ * The signal is ROSE — the web's `--pop`, converted rather than chosen again. One token,
+ * `pop`. It is ALWAYS a fill carrying dark text (ink on it 7.51:1), so it is never a text
+ * colour and never a hairline. Its shape is only 2.45:1 against the page, which means it
+ * cannot be a borderless button on paper; it earns its keep on the dark blocks and as a
+ * small badge, where the fill has real separation and the ink label carries the reading.
  *
  * PAPER, NOT CARDS (2026-08-19, unchanged). Sections are divided by a hairline rule
  * (SECTION) on one continuous surface — never a white card floating on the page. That rule
@@ -63,16 +63,26 @@ export const C = {
   ink: "#101010",
   onInk: "#FBFBFB",
   /**
-   * CORAL — the one signal. #FF927A.
+   * ROSE — the one signal. #F472DC, which is the web's `--pop` converted, not a near-miss.
    *
-   * ONE LINE TO CHANGE: every use reads this token, so swapping the pop is a single edit.
-   * Roughly twice the chroma of the pale tints tried first, which is the whole difference
-   * between a tint and a colour. Warm against an entirely neutral system, which is what
-   * makes it read as a decision.
+   * IT WAS CORAL (#FF927A), and the web had already ruled coral out by measurement. Its
+   * tools/check-pop-presets.mjs sweeps the whole hue circle against every reserved status
+   * colour in both themes, and coral's band (hue 30–50) is the single worst place on it:
+   * boxed in between `alert` (25) and `backorder` (50), with a dark-mode headroom of −0.002
+   * — meaning no lightness and no chroma at that hue clears the floor. The shipped coral
+   * measured 0.048 in OKLab from dark `backorder`. An accent that reads as an order status
+   * is the one thing an accent must never do, and this app puts it on a factory floor.
+   *
+   * `web is canonical, mobile extends` — so the value comes from there rather than being
+   * chosen again here. ONE LINE TO CHANGE: every use reads this token.
    *
    * ALWAYS A FILL, ALWAYS WITH `onPop` ON IT. Never type, never a border, never a hairline.
+   * Ink on it is 7.51:1; its own shape against the page is 2.45:1, so — exactly as with the
+   * coral it replaces — it cannot be a borderless button on paper. It earns its keep on the
+   * dark blocks and as a small badge, where the fill has real separation and the ink label
+   * carries the reading.
    */
-  pop: "#FF927A",
+  pop: "#F472DC",
   onPop: "#101010",
   /** Reserved status colours. These carry meaning on the floor; nothing else may use them.
    *  Converted from the web's --status-* / --success tokens, all AA on the page. */
@@ -87,22 +97,30 @@ export const C = {
 } as const
 
 /**
- * THE FACES — the same pair the web carries, so one product has one letterform.
+ * THE FACES — one, now, and it is the same one the web resolves to.
  *
  * React Native has NO global font default: loading a face does nothing until a style names
- * it. So every piece of type in this app must come through here, and a bare `fontWeight`
- * is now a bug — it silently renders the OS default, which is the look this replaced.
+ * it. So every piece of type in this app must come through here, and a bare `fontWeight` is
+ * a bug — it silently renders the OS default, which is the "AI-generated" look this whole
+ * module exists to have replaced.
  *
- * Playfair is the DISPLAY face and it earns its place only at size: a high-contrast serif
- * set at 13px is mud. Order numbers, screen titles, the one big figure on a card. Inter
- * does everything else, and does most of it at 400 — the old app had 25 declarations at
- * weight 900 and exactly one at 400, which is why nothing on a screen ever looked more
- * important than anything else.
+ * PLAYFAIR IS DROPPED, and the web dropped it first: `--font-display` and `--font-title` in
+ * globals.css both resolve to the body stack, with a note saying a display serif is the
+ * single loudest signal of the opposite of modern. Mobile kept loading it — three weights of
+ * it — so the two halves of one product had different letterforms in exactly the place a
+ * seller notices, which is a screen title.
+ *
+ * THE TOKENS STAY, all three, and every `F.display` call site is untouched. That is the
+ * entire point of resolving a face through a token: the typeface changes here, once. The
+ * three now differ only in WEIGHT, which is what they were always being used for — a screen
+ * title is not a different alphabet from the list under it, it is a heavier one.
+ *
+ * (`web is canonical, mobile extends` — never a mobile-only rule. This was one.)
  */
 export const F = {
-  display: "PlayfairDisplay_700Bold",
-  displaySemi: "PlayfairDisplay_600SemiBold",
-  displayMed: "PlayfairDisplay_500Medium",
+  display: "Inter_700Bold",
+  displaySemi: "Inter_600SemiBold",
+  displayMed: "Inter_500Medium",
   /** Body. The default for anything a person reads a sentence of. */
   body: "Inter_400Regular",
   medium: "Inter_500Medium",
