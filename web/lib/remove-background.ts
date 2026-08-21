@@ -22,7 +22,9 @@ import { canvasReadableSrc } from "./thread-match"
 const MAX_PIXELS = 40_000_000
 
 export type RemoveBgResult =
-  | { url: string; cleared: number }
+  /** `cleared` is fully-transparent pixels; `pixels` is the whole image, so the caller can
+   *  report a share rather than a count nobody can scale. */
+  | { url: string; cleared: number; pixels: number }
   | { error: string }
 
 /**
@@ -173,7 +175,7 @@ export function removeBackground(src: string, tolerance = 12): Promise<RemoveBgR
 
       ctx.putImageData(data, 0, 0)
       try {
-        resolve({ url: c.toDataURL("image/png"), cleared })
+        resolve({ url: c.toDataURL("image/png"), cleared, pixels: w * h })
       } catch {
         resolve({ error: "The edited image couldn't be read back." })
       }
@@ -226,6 +228,14 @@ export function useBackgroundRemoval(url: string, apply: (next: string) => void)
       // artwork is untouched; that is the "if no remove BG then keep the same" half.
       setSwap({ before: url, after: r.url })
       apply(r.url)
+      /*
+       * SAY HOW MUCH CAME OFF. A removal that took 2% of the image and one that took 60%
+       * look identical on a thumbnail against a checkerboard, and the first is the common
+       * failure — a backdrop with a gradient in it, where the flood stops a few pixels from
+       * the border and leaves everything else. Without a number the only way to find out is
+       * to place the design and notice later.
+       */
+      setMsg(`Cleared ${Math.round((r.cleared / Math.max(1, r.pixels)) * 100)}% — nudge the tolerance and run it again if that is too much or too little.`)
     } finally {
       setBusy(false)
     }
