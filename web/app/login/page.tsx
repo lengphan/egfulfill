@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Check } from "@phosphor-icons/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -130,24 +131,37 @@ export default function LoginPage() {
               required
             />
           </label>
-          {/* Two jobs in one box, and the second is the one worth naming: it decides
-              whether the session survives the browser closing. Unchecked, it lives in
-              sessionStorage — which is what you want on the shared floor terminal, where
-              the previous person otherwise stays signed in for you. */}
-          <div className="flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-sm">
+          {/**
+            * ONE CONTROL, ONE LABEL — and the label is the sentence that used to sit beside it.
+            *
+            * It was "Remember me" with `{remember ? "Stay signed in on this device" : "Sign out
+            * when the browser closes"}` in grey alongside: a caption explaining a control that
+            * is already on screen, which §4 calls a defect and which the owner spends real time
+            * deleting. Worse, it explained the WRONG half — "Remember me" reads as "fill my
+            * email in next time", and the thing this box actually decides is whether the
+            * session survives the browser closing (localStorage vs sessionStorage, which is
+            * what you want off on the shared floor terminal, where the previous person
+            * otherwise stays signed in for you). Naming that in the label makes the caption
+            * redundant rather than merely shorter.
+            *
+            * And the checkbox is the app's, not the browser's. A raw `<input type="checkbox">`
+            * was the one unstyled control on the page.
+            */}
+          <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
+            <span className="relative flex size-4 items-center justify-center">
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                className="size-4 accent-primary"
+                className="peer size-4 cursor-pointer appearance-none rounded-[5px] border border-(--auth-edge) bg-(--auth-field) outline-none transition-colors checked:border-foreground checked:bg-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
               />
-              Remember me
-            </label>
-            <span className="text-xs text-muted-foreground">
-              {remember ? "Stay signed in on this device" : "Sign out when the browser closes"}
+              <Check
+                size={11} weight="bold" aria-hidden
+                className="pointer-events-none absolute text-background opacity-0 peer-checked:opacity-100"
+              />
             </span>
-          </div>
+            Stay signed in on this device
+          </label>
           {error && (
             <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
           )}

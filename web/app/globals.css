@@ -892,6 +892,12 @@ td[align="right"] {
   --mk-auth-field: #FFFFFF;
   --mk-auth-edge: #8A8A8A;
   --mk-auth-muted: #5C5C5C;
+  /* A HAIRLINE, which is a different job from an EDGE and needs a different value.
+     --mk-auth-edge is the boundary of a CONTROL and has a 3:1 floor under it (WCAG 1.4.11) —
+     a field you cannot find is a field you cannot fill. A card's rule separates two areas
+     you are not going to interact with, has no floor, and at 3:1 it draws a box around the
+     form loud enough to be the first thing you see. This is the light one. */
+  --mk-hairline: #E4E4E7;
   /* The app's large-fill brand, moved with the plate so the product and the site are one
      decision. Already near-black in the base palette — this states it as the skin's rather
      than leaving the two to drift apart the next time one of them moves. */
@@ -926,6 +932,7 @@ td[align="right"] {
   --mk-auth-field: #FFFFFF;
   --mk-auth-edge: #8A8577;
   --mk-auth-muted: #6B6659;
+  --mk-hairline: #DCD8CD;
   /* Violet fill, paper label — 5.68:1, the pair the marketing bands already run. */
   --brand: oklch(0.5305 0.2723 283.5);
   --brand-foreground: #FAF8F3;

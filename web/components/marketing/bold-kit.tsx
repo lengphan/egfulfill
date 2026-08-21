@@ -182,8 +182,13 @@ export const INK_ON_ACID = "bg-[var(--mk-ink)] text-[var(--mk-acid)]"
 export const AUTH_GROUND = SURFACE
 export const AUTH_FIELD = "var(--mk-auth-field)"
 export const AUTH_EDGE = "var(--mk-auth-edge)"
-/** Secondary type on AUTH_GROUND — 5.06:1, so it stays real text rather than a hint. */
+/** Secondary type on AUTH_GROUND — real text rather than a hint, in both skins. */
 export const AUTH_MUTED = "var(--mk-auth-muted)"
+/** The rule around a CARD, not around a control. See the note beside the token: an edge has
+ *  a 3:1 floor because a field you cannot find is a field you cannot fill; a hairline
+ *  separates two areas nobody interacts with, and at 3:1 it becomes the loudest thing on a
+ *  page whose whole job is one form. */
+export const HAIRLINE = "var(--mk-hairline)"
 
 /**
  * THE LITERAL DIGITS — for the places a `var()` legally cannot go.
