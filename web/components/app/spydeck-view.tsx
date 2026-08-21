@@ -1401,7 +1401,7 @@ export function SpyDeckView() {
                 <FilterField label="Max price ($)">
                   <Input value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Any" className="h-9" inputMode="decimal" />
                 </FilterField>
-                <FilterField label="Min sold/day" hint="estimated">
+                <FilterField label="Min sold/day">
                   <Input value={minSold} onChange={(e) => setMinSold(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
                 <FilterField label="Min favorites">

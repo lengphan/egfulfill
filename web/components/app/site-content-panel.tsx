@@ -24,7 +24,6 @@ function Field({ label, hint, value, onChange, mono }: {
     <label className="block">
       {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       <Input value={value} onChange={(e) => onChange(e.target.value)} className={mono ? "tabular-nums" : ""} />
-      {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
   )
 }
@@ -36,7 +35,6 @@ function Area({ label, hint, value, onChange }: {
     <label className="block">
       {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
       <textarea className={AREA_CLS} value={value} onChange={(e) => onChange(e.target.value)} />
-      {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
   )
 }
@@ -221,7 +219,7 @@ export function SiteContentPanel() {
           <Intro>The first thing above the fold.</Intro>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Headline" value={c.hero.headline} onChange={(v) => edit((x) => { x.hero.headline = v })} />
-            <Field label="Accent word(s)" hint="Shown italic and in violet, right after the headline." value={c.hero.accent} onChange={(v) => edit((x) => { x.hero.accent = v })} />
+            <Field label="Accent word(s)" value={c.hero.accent} onChange={(v) => edit((x) => { x.hero.accent = v })} />
           </div>
           <Area label="Subhead" value={c.hero.subhead} onChange={(v) => edit((x) => { x.hero.subhead = v })} />
           <div className="grid gap-3 sm:grid-cols-2">

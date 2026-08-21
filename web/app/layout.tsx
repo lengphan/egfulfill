@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Playfair_Display } from "next/font/google"
+import { Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -10,33 +10,18 @@ import { cn } from "@/lib/utils"
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
 /**
- * MARKETING DISPLAY FACE — Playfair Display. Chosen from a rendered specimen of the real
- * headline on the real plate, not from a description.
+ * ONE FACE. Inter, for everything.
  *
- * Three faces were tried and rejected here first, and the reasons are worth keeping because
- * each one was a different mistake:
+ * There was a second — Playfair Display — for the marketing hero and auth, on the argument
+ * that a high-contrast serif carries a voice a geometric sans cannot. Fraunces, Space
+ * Grotesk and Outfit were tried and rejected before it, each for its own reason, and that
+ * search is worth remembering only for its conclusion: it was chasing "sophisticated", and
+ * the answer turned out to be fewer things rather than a better serif.
  *
- *   Fraunces        the original. Judged to lack character — correctly, as shipped: its
- *                   personality lives in custom SOFT/WONK axes that were both at zero.
- *   Space Grotesk   a WIDE face. At the hero's 6.2rem its generous sidebearings scale up
- *                   with the type, so the headline read as spaced-out letters, not words.
- *   Outfit          narrow and punchy with a real 900, but a neutral geometric sans has no
- *                   voice by design — "alright, but not sophisticated".
- *
- * Playfair Display is a high-contrast transitional serif: the dramatic thick/thin stroke
- * modulation is what reads as "sophisticated", and it is exactly what a geometric sans
- * cannot do at any weight. Variable 400–900, so `font-display font-black` is a real 900.
- *
- * NOTE it is a WIDE face — wider than Outfit — so the hero wraps to two lines where Outfit
- * fit one. That is a compositional change, not a bug; the hero's leading is already tuned
- * for a two-line headline.
- *
- * This face is MARKETING + auth only. App page titles take `--font-title`; see globals.css.
+ * It is dropped. `--font-display` and `--font-title` both resolve to this stack in
+ * globals.css, so roughly a hundred `font-display` call sites needed no edit at all — and
+ * one fewer webfont is downloaded on every first paint.
  */
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-display-face",
-})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -104,7 +89,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, playfair.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
     >
       <body>
         {/* Zoom, applied BEFORE first paint.
