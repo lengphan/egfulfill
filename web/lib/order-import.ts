@@ -80,11 +80,11 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Blank Product", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
   { header: "Template ID", key: "template_id", required: false, section: "product", help: "A SHORTCUT: a saved template already carries the blank, the placement and the artwork, so a row with one ignores Image ID and the variant columns. Leave it blank and the row is built from the columns instead. Type the number — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   { header: "Image ID", key: "hero_image", required: false, section: "product", help: "THE ARTWORK, placed at the product’s default print area. A row needs this or a Template ID, not both. URL of the listing photo shown on the card." },
-  { header: "Item Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
+  { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "DTG / DTF / EMB / … Defaults to DTG if blank." },
-  { header: "Item Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
-  { header: "Item Size", key: "item_size", required: false, section: "product", help: "Garment size." },
-  { header: "Item Price", key: "item_price", required: false, section: "product", help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
+  { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
+  { header: "Size", key: "item_size", required: false, section: "product", help: "Garment size." },
+  { header: "Price", key: "item_price", required: false, section: "product", help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
   // ── EXTRAS ────────────────────────────────────────────────────────────────
   { header: "Store Name", key: "store_name", required: false, section: "extras", help: "Which shop the order came from." },
   { header: "Shipping Service", key: "shipping_service", required: false, section: "extras", help: "Requested method (e.g. Standard). Saved with the order." },
@@ -190,7 +190,14 @@ export const SHIPPING_SERVICES = [
 export const COLUMN_OPTIONS: Record<string, string[]> = {
   print_type: PRODUCT_METHODS.map((m) => m.key.toUpperCase()),
   ship_state: US_STATES,
-  item_size: ITEM_SIZES,
+  /**
+   * HEADER SPELLINGS, not size values — this was `ITEM_SIZES`, so the aliases for the size
+   * COLUMN were "XS", "S", "M"… A header reading "Item Size" still worked, but only by
+   * falling through to the canonical key when no alias matched; a column headed plainly
+   * "Size" matched nothing and was dropped without a word. Found while shortening the
+   * headers, which would have made that the normal case.
+   */
+  item_size: ["item_size", "size", "variant_size", "lineitem_size", "line_item_size", "item_sizes"],
   shipping_service: SHIPPING_SERVICES,
 }
 

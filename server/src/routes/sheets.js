@@ -106,13 +106,13 @@ const T_COLUMNS = [
    */
   { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
   { h: 'Image ID', g: 'product', duty: '', sample: '' },
-  { h: 'Item Quantity', g: 'product', duty: '', sample: '1' },
+  { h: 'Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
   { h: 'Print Type', g: 'product', duty: '', sample: 'DTG', opts: 'methods', dep: 'methods' },
-  { h: 'Item Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
-  { h: 'Item Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
-  { h: 'Item Price', g: 'product', duty: '', sample: '24.00' },
+  { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
+  { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
+  { h: 'Price', g: 'product', duty: '', sample: '24.00' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
   { h: 'Shipping Service', g: 'extras', duty: '', sample: 'USPS Priority Mail', opts: 'services' },
   { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
