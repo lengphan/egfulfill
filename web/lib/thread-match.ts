@@ -202,7 +202,9 @@ export const MIN_COLOR_SHARE = 0.03
  * BREAKS: the route answers 403 and the browser renders a broken image. Every URL was
  * being proxied, so Etsy artwork loaded and Shopify and TikTok artwork did not.
  */
-const PROXY_HOSTS = /(^|\.)(etsystatic\.com|shopify\.com|shopifycdn\.net|shopifycdn\.com|tiktokcdn\.com|tiktokcdn-us\.com|ibyteimg\.com|byteimg\.com)$/i
+// The host list moved to lib/order-image.ts — see proxiedImageSrc. Two copies of it is how
+// one of them comes to disagree with the server's allowlist.
+import { proxiedImageSrc } from "@/lib/order-image"
 
 /**
  * A same-origin URL for artwork, so a canvas reading it isn't tainted.
@@ -213,10 +215,7 @@ const PROXY_HOSTS = /(^|\.)(etsystatic\.com|shopify\.com|shopifycdn\.net|shopify
  * broken thumbnail with no thread match either.
  */
 export function canvasReadableSrc(url: string): string {
-  if (!/^https?:\/\//i.test(url)) return url
-  let host = ""
-  try { host = new URL(url).hostname } catch { return url }
-  return PROXY_HOSTS.test(host) ? `/api/etsy/img-proxy?url=${encodeURIComponent(url)}` : url
+  return proxiedImageSrc(url)
 }
 
 export function extractDominant(dataUrl: string, max = 6): Promise<DominantColor[]> {

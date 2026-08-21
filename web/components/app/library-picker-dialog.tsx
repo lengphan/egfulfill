@@ -5,6 +5,7 @@ import { PenNib, CircleNotch, MagnifyingGlass, Stack } from "@phosphor-icons/rea
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getDesignLibrary, getDesignLibraryItem, getTemplates, type LibraryDesign, type ProductTemplate } from "@/lib/api"
+import { proxiedImageSrc } from "@/lib/order-image"
 import { TabBar } from "@/components/app/tab-bar"
 
 type Source = "designs" | "templates"
@@ -165,7 +166,12 @@ export function LibraryPickerDialog({
                   <div className="relative flex aspect-square items-center justify-center bg-muted">
                     {d.thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.thumb} alt={d.name ?? ""} className="size-full object-contain p-1" />
+                      /* Through our origin — the same library rows the Design page draws, so
+                         the same marketplace hotlink and the same broken tile. See
+                         proxiedImageSrc. No onError guard here on purpose: this grid is a
+                         picker, and a row you cannot see is still a row you can press to get
+                         the full artwork, which is fetched separately. */
+                      <img src={proxiedImageSrc(d.thumb)} alt={d.name ?? ""} className="size-full object-contain p-1" />
                     ) : (
                       <PenNib size={22} weight="duotone" className="text-muted-foreground/40" />
                     )}
