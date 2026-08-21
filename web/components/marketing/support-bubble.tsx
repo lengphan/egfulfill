@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { ChatCircleDots, X, PaperPlaneRight } from "@phosphor-icons/react"
-import { ACCENT } from "@/components/marketing/bold-kit"
+import { ACCENT, INK_ON_ACID } from "@/components/marketing/bold-kit"
 
 type Msg = { role: string; text: string; at?: string }
 
@@ -319,7 +319,7 @@ export function SupportBubble() {
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">EGFUL support</span>
             )}
             <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
-              (m.role === "user" ? "bg-[#0B0B0C] text-[#D4F897]"
+              (m.role === "user" ? INK_ON_ACID
                 : m.role === "staff" ? "border border-black/10 bg-white text-[#0B0B0C]"
                 : "bg-black/[0.05] text-[#0B0B0C]")}>
               {m.text}
@@ -395,7 +395,7 @@ export function SupportBubble() {
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" type="email"
                  className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
           <button onClick={onIdentity} disabled={busy}
-                  className="w-full rounded-lg bg-[#0B0B0C] px-3 py-2 text-sm font-semibold text-[#D4F897] disabled:opacity-60">
+                  className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${INK_ON_ACID}`}>
             {pendingEscalate ? "Send to support" : "Continue"}
           </button>
         </div>
@@ -409,7 +409,7 @@ export function SupportBubble() {
               className="max-h-24 flex-1 resize-none rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50"
             />
             <button onClick={onSend} disabled={busy || !draft.trim()} aria-label="Send"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#0B0B0C] text-[#D4F897] disabled:opacity-40">
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${INK_ON_ACID}`}>
               <PaperPlaneRight size={15} weight="fill" />
             </button>
           </div>

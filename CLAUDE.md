@@ -248,7 +248,7 @@ usually does, and there is ONE accent. Kit: [web/components/marketing/bold-kit.t
 
 | Token | Value | Use |
 |---|---|---|
-| `ACCENT` | `#A5B7FF` | the hero plate, the header bar, CTA bands, chart bars |
+| `ACCENT` | `#6633FF` | the hero plate, the header bar, CTA bands, chart bars |
 | `ACCENT_INK` | `#0B0B0C` | the typed accent phrase — ink, not a second hue |
 | `INK` | `#0B0B0C` | all display and body type |
 | `SURFACE` | `#FAF8F3` | the page below the plate |
@@ -258,7 +258,7 @@ usually does, and there is ONE accent. Kit: [web/components/marketing/bold-kit.t
   carrying a coloured hero.
 - **ONE ink colour in a headline.** A dark tint of the plate used as foreground reads muddy —
   the eye sees one hue at two strengths rather than a decision. Colour lives in the plate.
-- **CONTRAST IS MEASURED, NOT EYEBALLED.** Cream on `#A5B7FF` is 1.83:1 — a ghost, never type
+- **CONTRAST IS MEASURED, NOT EYEBALLED.** Cream on the old periwinkle `#A5B7FF` was 1.83:1 — a ghost, never type
   a reader needs (`PLATE_GHOST` documents that exception). Ink on it is 10.13:1. If cream must
   carry words the plate has to come down to ~`#4259D6` (5.45:1). Light plate and readable cream
   cannot both be true; every time the plate moved this session the lettering had to be re-measured.
@@ -283,7 +283,7 @@ not violet, and it is split by JOB:
 
 - `--primary` — the deep step (`#4046C2` light / `#8A9CFC` dark). It inks ~247 pieces of TEXT
   as well as filling buttons, so it can never be a light value.
-- `--brand` — `#A5B7FF`, the marketing plate. Large FILLS only (filled buttons via
+- `--brand` — `#6633FF`, the marketing plate. Large FILLS only (filled buttons via
   `bg-brand`), never text.
 - Canvas is **white**; cards are white and separated by the border. The sidebar carries the
   colour — one bounded block that is never underneath the data. A tinted canvas behind a

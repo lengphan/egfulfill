@@ -4,7 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { TShirt, ArrowLeft } from "@phosphor-icons/react"
-import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, INK_ON_ACID } from "@/components/marketing/bold-kit"
 import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
@@ -393,7 +393,7 @@ export function BoldProduct({ product, shipping }: {
                 <div className="mt-5 overflow-x-auto">
                   <table className="w-full min-w-[22rem] border-collapse text-sm">
                     <thead>
-                      <tr className="bg-[#0B0B0C] text-[#D4F897]">
+                      <tr className={INK_ON_ACID}>
                         <th className="rounded-l-lg px-3 py-2 text-left font-bold">Size</th>
                         {specNames.map((n, i) => (
                           <th key={n} className={"px-3 py-2 text-left font-bold" + (i === specNames.length - 1 ? " rounded-r-lg" : "")}>{n}</th>

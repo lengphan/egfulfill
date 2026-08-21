@@ -103,7 +103,11 @@ export const PLATE_ACCENT = '#1E2A78'
  * accent to fire — every accent has to be a mid-tone, and mid-tones are what "muted" means.
  * The green only ever appears here, never on paper, where it measures 1.12:1 and vanishes.
  */
-export const PLATE_DEEP = '#6633FF'
+/* THE SAME VALUE AS ACCENT, BY REFERENCE — not a second copy of the digits.
+   Both were the literal '#6633FF'. Two names for one colour is fine; two literals for one
+   colour is how a palette drifts, because moving the plate means remembering there is a
+   second place that has to move with it. Bound to ACCENT, that cannot happen. */
+export const PLATE_DEEP = ACCENT
 
 /**
  * The one loud accent — a CREAM green, not an acid one.
@@ -117,6 +121,20 @@ export const PLATE_DEEP = '#6633FF'
  * ground; on paper it measures 1.12:1 and disappears entirely.
  */
 export const ACID = '#D4F897'
+
+/**
+ * INK CARRYING ACID — the one dark-on-bright pair, as a class string.
+ *
+ * `bg-[#0B0B0C] text-[#D4F897]` was retyped in four places across three files: the support
+ * bubble's send button and its own message bubbles, and a table header in bold-product.
+ * §4 is explicit that a colour is imported from this kit and never re-declared in a page,
+ * and Tailwind needs a STATIC string, so a constant that holds the class is the form that
+ * rule takes for a utility class rather than a style object.
+ *
+ * Ink on ACID measures 16.56:1 — see the note above; this pair is always a fill carrying
+ * ink, never type on paper.
+ */
+export const INK_ON_ACID = "bg-[#0B0B0C] text-[#D4F897]"
 
 /**
  * THE AUTH GROUND — login, signup, forgot, reset.

@@ -10,6 +10,7 @@ import { PRODUCT_METHODS } from "@/lib/print-method"
 import type { LookbookBrand } from "@/components/app/lookbook-branding-dialog"
 import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
+import { ACCENT, ACID, INK, ACCENT_INK } from "@/components/marketing/bold-kit"
 
 /**
  * THE PRICE THE SHEET PRINTS — the trade rate, or what a seller pays when there isn't one.
@@ -114,12 +115,21 @@ function Editable({
  * used the same way here — as a fill that carries ink, never as type on paper, where it
  * measures 1.1:1 and vanishes.
  */
+/* IMPORTED, NOT RE-TYPED. Every one of these was a literal copy of a value bold-kit
+   already exports — and the comment above already says so in words ("the counterpart the
+   marketing kit already pairs with it"). §4: import from the kit, never re-declare a colour
+   in a page. `paper` is ACCENT_INK: the kit's name for it is what it does on the plate,
+   which is the same cream this prints on. */
 const HOUSE = {
-  accent: "#6633FF",
-  lime: "#D4F897",
-  ink: "#0B0B0C",
-  paper: "#FAF8F3",
+  accent: ACCENT,
+  lime: ACID,
+  ink: INK,
+  paper: ACCENT_INK,
 }
+
+/** The default brand a catalogue prints with before a seller sets their own, exported so
+ *  the picker that overrides it can offer the SAME value rather than its own copy. */
+export const HOUSE_ACCENT = HOUSE.accent
 
 /**
  * THE WELL EVERY PRODUCT PHOTO SITS IN — WHITE, WITH A HAIRLINE BORDER.

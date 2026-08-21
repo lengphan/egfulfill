@@ -722,43 +722,58 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge className={t.tone} variant="secondary">
-                      {t.label}
-                    </Badge>
-                    {t.isTest && (
-                      <Badge variant="secondary" className="ml-1.5 bg-muted text-muted-foreground">Test</Badge>
-                    )}
-                    {/* ADMIN ONLY, and stopPropagation because the row itself opens a dialog.
-                        Marked money is excluded from the balance and every total, and the row
-                        stays put so the decision can be undone. */}
-                    {/* WHICH ACCOUNT IT MOVED THROUGH. Only offered once accounts exist —
-                        an empty select on every row would be chrome asking a question that
-                        has no answers yet. Unattributed shows a dash, not a guess. */}
-                    {isAdmin && !t.rejected && accounts.length > 0 && (
-                      <select
-                        value={t.cashAccount ?? ""}
-                        disabled={markingId === t.id}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => { e.stopPropagation(); void attribute(t, e.target.value) }}
-                        title="Which real account this moved through"
-                        className={"ml-1.5 max-w-[7.5rem] rounded border border-border bg-transparent px-1 py-0.5 text-2xs "
-                          + (t.cashAccount ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}
-                      >
-                        <option value="">— unassigned</option>
-                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    )}
-                    {isAdmin && !t.rejected && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); void toggleTest(t) }}
-                        disabled={markingId === t.id}
-                        title={t.isTest ? "Count this as real money again" : "Exclude this from the balance and all totals"}
-                        className="eg-tap ml-1.5 rounded px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        {markingId === t.id ? "…" : t.isTest ? "Unmark" : "Mark test"}
-                      </button>
-                    )}
+                    {/* A GRID, NOT A ROW — the pill gets a fixed column.
+                        "AI generation" and "Postage" are different widths, so in a flex row
+                        every control after them started at a different x and the column read
+                        as crooked down the page. The badge now sits in a fixed track and
+                        everything after it shares one left edge, which is the whole of the
+                        fix — nothing here changed size. */}
+                    <span className="grid grid-cols-[8.5rem_auto] items-center gap-1.5">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <Badge className={t.tone + " truncate"} variant="secondary">
+                          {t.label}
+                        </Badge>
+                        {t.isTest && (
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground">Test</Badge>
+                        )}
+                      </span>
+                      {/* ONE CONTROL, NOT TWO.
+                          Attributing a row to an account and marking it a test are the same
+                          question asked twice — "what IS this entry" — and they were two
+                          controls of different shapes side by side. Both live in the select
+                          now, separated into groups so the destructive-ish one is not sitting
+                          in the same list as the accounts.
+
+                          stopPropagation throughout, because the row itself opens a dialog.
+                          Marked money is excluded from the balance and every total, and the
+                          row stays put so the decision can be undone. */}
+                      {isAdmin && !t.rejected ? (
+                        <select
+                          value={t.cashAccount ?? ""}
+                          disabled={markingId === t.id}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const v = e.target.value
+                            if (v === "__test__") { void toggleTest(t); return }
+                            void attribute(t, v)
+                          }}
+                          title="Which real account this moved through, or mark it a test"
+                          className={"w-[9.5rem] rounded border border-border bg-transparent px-1 py-0.5 text-2xs "
+                            + (t.cashAccount ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}
+                        >
+                          <option value="">{markingId === t.id ? "…" : "— unassigned"}</option>
+                          {accounts.length > 0 && (
+                            <optgroup label="Account">
+                              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </optgroup>
+                          )}
+                          <optgroup label="Bookkeeping">
+                            <option value="__test__">{t.isTest ? "Count as real money" : "Mark as test"}</option>
+                          </optgroup>
+                        </select>
+                      ) : <span />}
+                    </span>
                   </TableCell>
                   <TableCell
                     className={

@@ -5,6 +5,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getFactorySettings, setFactorySettings } from "@/lib/api"
+/* The SAME default the catalogue falls back to when no accent is set. It was typed here
+   twice as a literal, so the swatch could have offered one colour while the print used
+   another — a picker whose default disagrees with the thing it configures. */
+import { HOUSE_ACCENT } from "@/components/app/catalog-print"
 
 /** `title` is who publishes it — the wordmark on the cover and in every footer. `headline` is
  *  what this edition is CALLED, set in 72px on the cover. Two different things: a private-label
@@ -133,12 +137,12 @@ export function LookbookBrandingDialog({
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={/^#[0-9a-f]{6}$/i.test(accent) ? accent : "#6633FF"}
+                value={/^#[0-9a-f]{6}$/i.test(accent) ? accent : HOUSE_ACCENT}
                 onChange={(e) => setAccent(e.target.value)}
                 aria-label="Lookbook accent colour"
                 className="h-9 w-12 cursor-pointer rounded-md border border-input bg-transparent p-1"
               />
-              <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#6633FF" className="h-9 flex-1 tabular-nums" />
+              <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder={HOUSE_ACCENT} className="h-9 flex-1 tabular-nums" />
             </div>
             {/* Stated rather than discovered at the printer: the covers reverse cream type out
                 of this colour, so a light value makes the title vanish. */}
