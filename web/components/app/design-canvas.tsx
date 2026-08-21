@@ -1153,8 +1153,9 @@ export function DesignCanvasDialog({
    * in so a file filed moments ago in this window counts without a refetch.
    */
   const [hasFile, setHasFile] = useState(false)
-  /** Every file on this line, whatever kind — what the rail badge counts. */
-  const [lineFiles, setLineFiles] = useState<{ kind: string; name: string }[]>([])
+  /** Every file on this line, whatever kind — the list under the stage. Carries the id
+   *  because a row you cannot open is a row that only tells you something is missing. */
+  const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string }[]>([])
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
   const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
@@ -1306,7 +1307,9 @@ export function DesignCanvasDialog({
     } finally { setSending(false) }
   }
 
-  const [dlBusy, setDlBusy] = useState(false)
+  /** The designId currently being fetched, so the spinner sits on the row you pressed
+   *  rather than on all of them. */
+  const [dlBusy, setDlBusy] = useState<string | null>(null)
   const [fileBusy, setFileBusy] = useState(false)
   const [dlErr, setDlErr] = useState<string | null>(null)
   useEffect(() => {
@@ -1330,7 +1333,7 @@ export function DesignCanvasDialog({
            * machine file — and nothing on this screen could answer it once the summary strip
            * came off. The rail badge answers it; the tier still reads `hasFile`.
            */
-          setLineFiles(forLine.map((f) => ({ kind: String(f.kind || ""), name: f.name || "" })))
+          setLineFiles(forLine.map((f) => ({ designId: f.designId, kind: String(f.kind || ""), name: f.name || "" })))
           const mine = forLine.filter((f) => f.kind === "emb" || f.kind === "pes")
           setHasFile(mine.length > 0)
           const newest = mine.slice().sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0]
@@ -1449,12 +1452,13 @@ export function DesignCanvasDialog({
     else setStitchState("none")
   }, [showStitch, stitchPng, latestMachine])
 
-  /** Open this line's machine file. 402 is the paywall, not a fault — say which. */
-  const downloadMachine = useCallback(async () => {
-    if (!latestMachine) return
-    setDlBusy(true); setDlErr(null)
+  /** Open ONE of this line's files, by id. 402 is the paywall, not a fault — say which.
+   *  It took no argument and always fetched `latestMachine`, which is fine for a button that
+   *  means "the machine file" and useless for a list where every row is a different file. */
+  const downloadFile = useCallback(async (designId: string, fallbackName?: string) => {
+    setDlBusy(designId); setDlErr(null)
     try {
-      const r = await downloadDesignFile(latestMachine.designId)
+      const r = await downloadDesignFile(designId)
       const src = r.data || r.url
       if (!src) throw new Error("No file came back.")
       // SAVED WITH ITS NAME. window.open() on a data: URL hands Chrome a file called
@@ -1465,14 +1469,14 @@ export function DesignCanvasDialog({
       const href = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = href
-      a.download = r.name || latestMachine.name || "design.emb"
+      a.download = r.name || fallbackName || "design.emb"
       a.click()
       setTimeout(() => URL.revokeObjectURL(href), 10_000)
     } catch (e) {
       const m = e instanceof Error ? e.message : "Couldn't open that file."
       setDlErr(/402|purchase|paid/i.test(m) ? "Not purchased yet." : m)
-    } finally { setDlBusy(false) }
-  }, [latestMachine])
+    } finally { setDlBusy(null) }
+  }, [])
 
   /**
    * Widen THIS line's machine file to the whole order.
@@ -1795,7 +1799,12 @@ export function DesignCanvasDialog({
            under the stage than a DTG one, and it should scroll INSIDE the window rather than
            pushing the action bar off the screen. Plain block comment: this is an attribute
            list, where a JSX-style comment is a syntax error. */
-        className="max-h-[92vh] overflow-y-auto sm:max-w-md lg:max-w-[min(94vw,600px)]"
+        /* pb-0: the action bar at the foot of this dialog is `sticky bottom-0`, and sticky
+           is clamped to its containing block. With the popup's own 24px of bottom padding in
+           the way the bar pinned ABOVE the padding and the thread list scrolled on underneath
+           it, visible below the button — which reads as a bar that has come loose. Nothing is
+           short of padding: the bar carries its own. */
+        className="max-h-[92vh] overflow-y-auto pb-0 sm:max-w-md lg:max-w-[min(94vw,600px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -2334,12 +2343,65 @@ export function DesignCanvasDialog({
           * derivation with no input has nothing to be wrong about. The moment artwork lands
           * the card appears with the colours in it, which is the answer it was promising.
           */}
+        {/* WHAT HAS ACTUALLY BEEN SENT US — BY NAME.
+            ────────────────────────────────────────────────────────────────────────────
+            Nothing in this window could answer "which files are on this line". The file rows
+            went on the reasoning that the drawer summary carried the name and the order's
+            Design files panel carried the controls; the drawer then went too, and the name
+            went with it. Two removals, each correct on its own, each assuming the other
+            surface was still holding the fact.
+
+            A COUNT WOULD NOT FIX IT. `lineFiles` was kept for a rail badge, and a badge
+            answers "how many" — the question being asked here is "which", and a number cannot
+            answer it. It is also the treatment the house style reserves: a pill carries
+            meaning, never a count. The header count comes along for free.
+
+            So: the names, each one openable. Same list-in-a-card shape as the thread panel
+            below it, because they are the same kind of thing — a read-out of what is attached
+            to this line, not a form. Hidden entirely when the line has nothing, which is
+            honest: an empty frame here would read as a list that failed to load rather than
+            as a line nobody has sent a file for. */}
+        {lineFiles.length > 0 && (
+          <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
+            <div className="mb-1.5 text-xs font-medium text-foreground">Files on this line · {lineFiles.length}</div>
+            <div className="rounded-md border border-border bg-card">
+              <div className="divide-y divide-border">
+                {lineFiles.map((f) => (
+                  <button
+                    key={f.designId}
+                    type="button"
+                    onClick={() => void downloadFile(f.designId, f.name)}
+                    disabled={dlBusy === f.designId}
+                    title={`Open ${f.name || "this file"}`}
+                    className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-accent disabled:opacity-60"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm">{f.name || "Untitled file"}</span>
+                    {/* The kind, not a pill. It is a fact about the row, and boxing every one
+                        of them is exactly the chrome the app was counted for. */}
+                    {f.kind && <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{f.kind}</span>}
+                    {dlBusy === f.designId
+                      ? <CircleNotch size={14} className="shrink-0 animate-spin text-muted-foreground" />
+                      : <DownloadSimple size={14} className="shrink-0 text-muted-foreground" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* THE ONE PLACE A FILE ERROR IS SAID. It used to sit inside the `isEmb` block, so
+                a failed open on a DTG line set the message and nothing rendered it. */}
+            {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
+          </div>
+        )}
         {isEmb && designUrl && (
-          /* A CEILING AND ITS OWN SCROLLBAR. Two cones fit; fourteen would have pushed the
-             action bar off the bottom of the window, which is what shrinking the garment was
-             papering over. The list scrolls, the picture does not move, and Save stays where
-             it is. */
-          <div className="order-last max-h-[17vh] overflow-y-auto rounded-lg border border-border bg-muted/30 p-2.5">
+          /* NO CEILING, AND NO SECOND SCROLLBAR.
+             This was `max-h-[17vh] overflow-y-auto` — a fraction of the VIEWPORT, not of the
+             dialog, so the height it gives the list has nothing to do with the room the list
+             is in. On a short window 17vh is about 80px: the header, one cone, and the top of
+             the next one sliced through, behind a scrollbar most people never notice is there
+             because the dialog around it is already scrolling. Two scrollbars for one list.
+             The cap existed to keep Save on screen. The action bar is pinned to the bottom of
+             the dialog now, so that is no longer this panel's problem and the list can be as
+             long as the design needs. */
+          <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 {/* Count the ROWS, not the saved cone list. They are not the same number:
@@ -2651,7 +2713,6 @@ export function DesignCanvasDialog({
                   </Button>
                 )}
 </div>
-              {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
               {/* BESIDE THE FILE IT COPIES. This was in the action bar next to "Apply All",
                   two buttons inches apart doing different things to different objects, in
                   the row read last before Save. Only when there IS another line to copy to. */}
@@ -2737,7 +2798,16 @@ export function DesignCanvasDialog({
             mid-column with the thread panel below it — survivable when that panel was one
             row of chips, plainly wrong now it is a list of rows you can change. Nothing is
             below the button that ends the job. */}
-        <div className="order-last space-y-2">
+        {/* PINNED, because it is the thing that ends the job.
+            It scrolled away with everything else, so a line with a long thread list put Save
+            below the fold of a window that was already scrolling — and the fix that had been
+            reached for was capping the panel above it, which traded a lost button for a list
+            you could only read a cone and a half of. The bar holds the bottom edge of the
+            dialog instead: -mx-6 bleeds it through the popup's side padding so nothing scrolls
+            past it at the edges, the popup drops its own pb-6 so the bar can reach the bottom,
+            the bottom corners keep the popup's radius, and what passes behind it stays legible
+            under the blur. Same shape the site-content panel uses. */}
+        <div className="order-last sticky bottom-0 z-10 -mx-6 space-y-2 rounded-b-[min(var(--radius-4xl),24px)] border-t border-border bg-popover/95 px-6 py-4 backdrop-blur">
           {/* Say WHY Save is disabled. A machine file without an image is the common case —
               the stitch file is saved, but there's no picture to place on the mockup yet. */}
           {!designUrl && (
