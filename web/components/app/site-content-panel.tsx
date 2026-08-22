@@ -112,7 +112,6 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
 const SUBTABS: { id: string; label: string }[] = [
   { id: "hero", label: "Hero" },
   { id: "stats", label: "Stats" },
-  { id: "specs", label: "Spec strip" },
   { id: "features", label: "Features" },
   { id: "steps", label: "Steps" },
   { id: "testimonials", label: "Testimonials" },
@@ -334,37 +333,22 @@ export function SiteContentPanel() {
           </div>
         </TabsContent>
 
-        {/* ── Spec strip ── */}
-        <TabsContent value="specs" className="mt-4 space-y-3">
-          <Intro>The band of figures below the channels, divided by rules. Empty removes the section.</Intro>
-          <Field label="Section heading (optional)" value={c.specs.heading} onChange={(v) => edit((x) => { x.specs.heading = v })} />
-          {c.specs.items.map((sp, i) => (
-            <div key={i} className="rounded-lg border border-border p-3">
-              <div className="flex gap-2">
-                <div className="w-28"><Field label="Value" value={sp.value} onChange={(v) => edit((x) => { x.specs.items[i].value = v })} /></div>
-                <div className="flex-1"><Field label="Label" value={sp.label} onChange={(v) => edit((x) => { x.specs.items[i].label = v })} /></div>
-                <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.specs.items.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
-              </div>
-              <div className="mt-2"><Field label="Note" value={sp.note ?? ""} onChange={(v) => edit((x) => { x.specs.items[i].note = v })} /></div>
-            </div>
-          ))}
-          {/* Five is what the band fits before it wraps to a second row of orphans. */}
-          {c.specs.items.length < 5 && (
-            <Button variant="outline" size="sm" onClick={() => edit((x) => { x.specs.items.push({ value: "", label: "", note: "" }) })}><Plus size={13} weight="bold" />Add column</Button>
-          )}
-        </TabsContent>
-
         {/* ── Stats ── */}
         <TabsContent value="stats" className="mt-4 space-y-3">
-          <Intro>The row of numbers under the hero.</Intro>
-          {c.stats.map((s, i) => (
-            <div key={i} className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
-              <Field label={i === 0 ? "Value" : ""} value={s.value} onChange={(v) => edit((x) => { x.stats[i].value = v })} />
-              <Field label={i === 0 ? "Label" : ""} value={s.label} onChange={(v) => edit((x) => { x.stats[i].label = v })} />
-              <Button variant="ghost" size="sm" onClick={() => edit((x) => { x.stats.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+          <Intro>The band of figures under the hero, divided by rules. Five is what it fits before it wraps.</Intro>
+          {c.stats.map((st, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="flex gap-2">
+                <div className="w-28"><Field label="Value" value={st.value} onChange={(v) => edit((x) => { x.stats[i].value = v })} /></div>
+                <div className="flex-1"><Field label="Label" value={st.label} onChange={(v) => edit((x) => { x.stats[i].label = v })} /></div>
+                <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.stats.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+              <div className="mt-2"><Field label="Note" value={st.note ?? ""} onChange={(v) => edit((x) => { x.stats[i].note = v })} /></div>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => edit((x) => { x.stats.push({ value: "", label: "" }) })}><Plus size={13} weight="bold" />Add stat</Button>
+          {c.stats.length < 5 && (
+            <Button variant="outline" size="sm" onClick={() => edit((x) => { x.stats.push({ value: "", label: "", note: "" }) })}><Plus size={13} weight="bold" />Add figure</Button>
+          )}
         </TabsContent>
 
         {/* ── Features ── */}

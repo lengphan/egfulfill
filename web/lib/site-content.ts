@@ -9,7 +9,10 @@
 
 import { DEFAULT_MOTION, mergeMotion, type MotionSettings } from "./motion"
 
-export type Stat = { value: string; label: string }
+/** One column of the strip under the hero. `note` is what the figure MEANS — optional, and
+ *  the one sentence a figure is allowed, because it is annotating a number rather than
+ *  sitting under a control. */
+export type Stat = { value: string; label: string; note?: string }
 export type FeatureCard = { title: string; body: string }
 export type Step = { n: string; title: string; body: string }
 export type Testimonial = { quote: string; name: string; role: string }
@@ -17,8 +20,6 @@ export type Faq = { q: string; a: string }
 /** A label tied to the hero figure by a hairline. `note` is optional and is the ONE sentence
  *  a figure may carry — it is annotating a picture, not sitting under a control. */
 export type Callout = { label: string; note?: string }
-/** One column of the spec strip. A figure, what it measures, and optionally why. */
-export type SpecItem = { value: string; label: string; note?: string }
 /** One numbered card. The numeral comes from the POSITION — see NumberedCards. */
 export type NumberedItem = { title: string; body?: string }
 
@@ -56,9 +57,6 @@ export type SiteContent = {
     /** Labels tied to the figure. At most four are drawn. */
     callouts: Callout[]
   }
-  /** The band of figures under the hero. Separate from `stats`, which feeds the app panel —
-   *  same kind of number, two different jobs, and merging them would force one to be wrong. */
-  specs: { heading: string; items: SpecItem[] }
   stats: Stat[]
   features: { heading: string; subhead: string; cards: FeatureCard[] }
   steps: { heading: string; items: Step[] }
@@ -104,30 +102,24 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       { label: "Tracking pushed back", note: "Automatically, to the marketplace" },
     ],
   },
-  specs: {
-    heading: "",
-    items: [
-      { value: "3", label: "Marketplaces", note: "Etsy, Shopify and TikTok Shop sync in" },
-      { value: "7", label: "Print methods", note: "One network, every decoration" },
-      { value: "$0", label: "Platform fee", note: "You pay per order, never per month" },
-      { value: "1", label: "Queue", note: "However many stores you run" },
-      { value: "24h", label: "Artwork check", note: "Before anything reaches a press" },
-    ],
-  },
   /**
-   * Every figure here must be one WE CAN POINT AT in the product.
+   * THE BAND UNDER THE HERO, and every figure in it must be one WE CAN POINT AT.
    *
    * These used to read "2.4M+ orders shipped" and "99.2% on-time fulfillment" — numbers
    * nobody could source. A marketplace assessing us for API access reads unattributable
    * performance claims as a policy problem (Amazon's website guidelines bar them outright),
    * and it is the same rule the app already follows: no invented numbers. Counts of things
    * that exist are safe; rates and totals are not, unless something measures them.
+   *
+   * `note` says what the figure MEANS, which is what turns a row of numbers into a spec
+   * sheet rather than four unexplained digits.
    */
   stats: [
-    { value: "3", label: "marketplaces synced" },
-    { value: "7", label: "print methods" },
-    { value: "$0", label: "monthly platform fee" },
-    { value: "1", label: "queue for every store" },
+    { value: "3", label: "Marketplaces", note: "Etsy, Shopify and TikTok Shop sync in" },
+    { value: "7", label: "Print methods", note: "One network, every decoration" },
+    { value: "$0", label: "Platform fee", note: "You pay per order, never per month" },
+    { value: "1", label: "Queue", note: "However many stores you run" },
+    { value: "24h", label: "Artwork check", note: "Before anything reaches a press" },
   ],
   features: {
     heading: "Everything after the sale, handled.",
@@ -195,7 +187,6 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   const obj = (k: string) => (s[k] && typeof s[k] === "object" ? (s[k] as Record<string, unknown>) : {})
 
   const hero = obj("hero")
-  const specs = obj("specs")
   const features = obj("features")
   const steps = obj("steps")
   const testimonials = obj("testimonials")
@@ -223,15 +214,10 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       ruleRight: typeof hero.ruleRight === "string" ? hero.ruleRight : d.hero.ruleRight,
       callouts: Array.isArray(hero.callouts) ? (hero.callouts as Callout[]) : d.hero.callouts,
     },
-    specs: {
-      // The heading defaults to blank, so `str` would never let it be set — kept as typed.
-      heading: typeof specs.heading === "string" ? specs.heading : d.specs.heading,
-      // isArray, not `arr` — `arr` falls back to the defaults on an EMPTY list, which is
-      // right for the FAQ (a homepage with no questions is a mistake) and wrong here: a
-      // strip an admin has emptied is an admin removing a section, and it has to stay gone.
-      items: Array.isArray(specs.items) ? (specs.items as SpecItem[]) : d.specs.items,
-    },
-    stats: arr<Stat>(s.stats, d.stats),
+    // isArray, not `arr` — `arr` falls back to the defaults on an EMPTY list, which is right
+    // for the FAQ (a homepage with no questions is a mistake) and wrong here: a strip an
+    // admin has emptied is an admin removing a section, and it has to stay gone.
+    stats: Array.isArray(s.stats) ? (s.stats as Stat[]) : d.stats,
     features: {
       heading: str(features.heading, d.features.heading),
       subhead: str(features.subhead, d.features.subhead),

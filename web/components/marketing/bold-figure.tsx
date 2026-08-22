@@ -23,7 +23,7 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import { ACCENT, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
-import type { Callout, SpecItem, NumberedItem } from "@/lib/site-content"
+import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
 
 /** The caps label these boards use everywhere: small, wide, quiet. One definition, because
  *  four different letter-spacings across a page is what makes labels read as noise. */
@@ -190,7 +190,7 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], className = "" }:
  * The vertical rules are on the ITEM, not between items, so the strip wraps at any count
  * without a divider ending up dangling at the start of a row.
  */
-export function SpecStrip({ items, className = "" }: { items: SpecItem[]; className?: string }) {
+export function SpecStrip({ items, className = "" }: { items: Stat[]; className?: string }) {
   const reduce = useReducedMotion()
   if (!items.length) return null
   return (
