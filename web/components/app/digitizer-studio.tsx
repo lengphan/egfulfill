@@ -58,8 +58,14 @@ function Thumb({ src, alt, className }: { src: string; alt?: string; className?:
 // A unifying shape over the three artwork sources.
 type ArtItem = { key: string; name: string; ref?: string; source: Source | "upload"; thumb: string; getImage: () => Promise<string> }
 const orderItem = (u: OrderUpload): ArtItem => ({ key: u.url, name: u.name || "Untitled", ref: u.orderRef, source: "order", thumb: canvasReadableSrc(u.url), getImage: () => toDataUrl(u.url) })
+// IMG-, because this is LIBRARY ARTWORK. The namespaces are fixed (see the note in
+// app/(app)/design/page.tsx): IMG- is a picture in the library, DSN- is the design work on an
+// order, TPL- is a saved template. This said DSN-, so the same picture was IMG-7 in the
+// Images tab and DSN-7 here — while DSN-7 already means an unrelated thing on the board.
+// One id, one meaning: the rule exists because "send me the design id" was otherwise an
+// ambiguous request in a system that runs on ids.
 const libItem = (d: LibraryDesign): ArtItem => ({
- key: `L${d.id}`, name: d.name || "Untitled", ref: `DSN-${d.id}`, source: "library", thumb: d.thumb || "",
+ key: `L${d.id}`, name: d.name || "Untitled", ref: `IMG-${d.id}`, source: "library", thumb: d.thumb || "",
  getImage: async () => { try { const full = await getDesignLibraryItem(d.id); return await toDataUrl(full.data || d.thumb || "") } catch { return toDataUrl(d.thumb || "") } },
 })
 
