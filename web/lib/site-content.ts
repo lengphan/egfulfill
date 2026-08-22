@@ -20,8 +20,63 @@ export type Faq = { q: string; a: string }
 /** A label tied to the hero figure by a hairline. `note` is optional and is the ONE sentence
  *  a figure may carry — it is annotating a picture, not sitting under a control. */
 export type Callout = { label: string; note?: string }
-/** One numbered card. The numeral comes from the POSITION — see NumberedCards. */
-export type NumberedItem = { title: string; body?: string }
+/** One numbered card. The numeral comes from the POSITION — see NumberedCards.
+ *  `points` is the short list of specifics under the body — the "— No CSV exports" run the
+ *  how-it-works steps have always carried. It lives on the ITEM rather than in a second
+ *  component because a card with three facts under it is still one card. */
+export type NumberedItem = { title: string; body?: string; points?: string[] }
+
+/**
+ * THE FIGURE BLOCK, as stored content — the four fields CutoutFigure needs.
+ *
+ * One type rather than four loose keys on three page objects, because the hero already
+ * proved these travel together: a picture with no alt text, or callouts with no picture to
+ * tie them to, are both half a figure. Every page that can carry one carries the same shape,
+ * so the editor panel for it is written once.
+ */
+export type PageFigure = {
+  /** Public URL. Wants a PNG with real alpha — see the note on hero.image. Empty renders
+   *  NOTHING, which is a real answer: no placeholder where a product should be. */
+  image: string
+  imageAlt: string
+  ghostWord: string
+  callouts: Callout[]
+}
+
+/** The rule across the top of a section: a word at each end, a hairline between. */
+export type RuleLabels = { ruleLeft: string; ruleRight: string }
+
+/** What a marketing page's opening plate says. */
+export type PageHead = { title: string; accent: string; sub: string }
+
+/** /features — the six capabilities, as a numbered run. */
+export type FeaturesPage = PageHead & RuleLabels & {
+  figure: PageFigure
+  stats: Stat[]
+  /** The six rows. `points` is the specifics column beside each one. */
+  items: NumberedItem[]
+  cta: { heading: string; button: string }
+}
+
+/**
+ * /how-it-works — three steps, then the real order statuses.
+ *
+ * `journey` stores the LABEL and the BODY, and NOT the colour. The labels are the product's
+ * own status words (mirroring sellerStatus in lib/order-status.ts) and their tones are
+ * resolved from the label at render time — see JOURNEY_TONE in bold-how.tsx. Two reasons,
+ * both load-bearing: a stored tone is a Tailwind class an admin would be typing by hand into
+ * a public page, and a marketing page that re-tints the pipeline into prettier colours is a
+ * page that lies about what the seller will see on their first order.
+ */
+export type HowPage = PageHead & RuleLabels & {
+  figure: PageFigure
+  stats: Stat[]
+  steps: NumberedItem[]
+  journeyHeading: string
+  journeyNote: string
+  journey: { label: string; body: string }[]
+  cta: { heading: string; button: string }
+}
 
 export type SiteContent = {
   hero: {
@@ -63,6 +118,10 @@ export type SiteContent = {
   testimonials: { heading: string; items: Testimonial[] }
   faq: { heading: string; items: Faq[] }
   cta: { heading: string; subhead: string; button: string }
+  /** The other two converted pages. They were hardcoded arrays inside their components until
+   *  now, which meant the only way to change a word on /features was a deploy. */
+  featuresPage: FeaturesPage
+  howPage: HowPage
   /**
    * HOW the marketing pages animate — see lib/motion.ts.
    *
@@ -166,6 +225,137 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     subhead: "Connect a store and send your first hands-off order today. No monthly fee.",
     button: "Start for free",
   },
+
+  /**
+   * ── /features ─────────────────────────────────────────────────────────────────
+   *
+   * The exact copy that was hardcoded in bold-features.tsx, moved here without a word
+   * changed. The six stay a numbered RUN rather than becoming NumberedCards: that component
+   * checkers light and dark two-up, which is right for four short problems and wrong for six
+   * capabilities that each carry a body and a three-item spec column. The run's own big
+   * numerals already give the reading order a card grid can't.
+   */
+  featuresPage: {
+    title: "Everything after",
+    accent: "the sale.",
+    sub: "Six things this platform does so you don't have to. Every one of them runs whether you're watching or not.",
+    ruleLeft: "EGFULFILL",
+    ruleRight: "WHAT THE PLATFORM DOES",
+    figure: {
+      image: "",
+      imageAlt: "A printed garment made through EGFULFILL",
+      ghostWord: "EGFUL",
+      callouts: [
+        { label: "Printed on demand", note: "Nothing is made until it sells" },
+        { label: "Checked before it ships", note: "Intake, print and pack" },
+        { label: "Shipped at cost", note: "Cheapest label, tracking pushed back" },
+      ],
+    },
+    /* Countable facts, every one of them sourceable from the product — see the note on
+       `stats` above. 7 print methods is the seven sku suffixes the order pipeline actually
+       carries; 3 QC stages is the intake/print/pack run named in the copy below. */
+    stats: [
+      { value: "3", label: "Marketplaces", note: "Etsy, Shopify and TikTok Shop" },
+      { value: "7", label: "Print methods", note: "One network, every decoration" },
+      { value: "3", label: "QC stages", note: "Intake, print and pack" },
+      { value: "$0", label: "Monthly fee", note: "You pay per order, never per month" },
+      { value: "1", label: "Queue", note: "However many stores you run" },
+    ],
+    items: [
+      {
+        title: "Every store, one queue",
+        body: "Connect Etsy, Shopify, TikTok Shop and WooCommerce. Orders sync in automatically — no CSV exports, no copy-paste, no missed orders. Tracking is pushed back to each marketplace the moment a label is bought.",
+        points: ["OAuth in ~2 minutes", "Real-time order sync", "Tracking pushed back automatically"],
+      },
+      {
+        title: "Design once, map forever",
+        body: "Upload artwork to your library and map it to products a single time. Our mini designer handles placement, sizing and print-ready file generation — including embroidery thread matching.",
+        points: ["Reusable design library", "Auto placement & print files", "Embroidery thread matching"],
+      },
+      {
+        title: "Vetted print network",
+        body: "Your orders print on a quality-checked partner network with QC at intake, print and pack. Not a black box — you can see each order's stage in real time.",
+        points: ["QC at every stage", "Per-order status visibility", "Consistent quality"],
+      },
+      {
+        title: "Cheapest-label shipping",
+        body: "We rate-shop across carriers and buy the cheapest available label, billed at cost. Tracking flows back to the buyer automatically — you never touch a shipping screen.",
+        points: ["Multi-carrier rate shopping", "Billed at cost", "Automatic tracking"],
+      },
+      {
+        title: "Transparent wallet",
+        body: "A prepaid wallet with clear per-order charges. See exactly what each order costs before it prints — no mystery invoices, no surprise fees.",
+        points: ["Per-order cost breakdown", "Prepaid, no monthly fee", "Instant reconciliation"],
+      },
+      {
+        title: "Quality you can trust",
+        body: "Every order is inspected on a vetted network before it ships. Issues are caught early, so your buyers get exactly what they ordered.",
+        points: ["Pre-ship inspection", "Early issue detection", "Reprints handled for you"],
+      },
+    ],
+    cta: { heading: "All of it, from the first order.", button: "Start free" },
+  },
+
+  /**
+   * ── /how-it-works ─────────────────────────────────────────────────────────────
+   *
+   * Also verbatim from bold-how.tsx. This page is the one the figure kit was made for: the
+   * reference board's annotated product panel IS a how-it-works diagram, so the steps get an
+   * object to point at rather than three boxes of prose.
+   */
+  howPage: {
+    title: "Three steps.",
+    accent: "Then it runs.",
+    sub: "Connect, upload, submit. Everything after that happens without you opening a shipping screen.",
+    ruleLeft: "EGFULFILL",
+    ruleRight: "HOW IT WORKS",
+    figure: {
+      image: "",
+      imageAlt: "A printed garment made through EGFULFILL",
+      ghostWord: "EGFUL",
+      /* What HAPPENS to the object, in order — which is what makes this figure a diagram of
+         the process rather than a photograph with adjectives stuck to it. */
+      callouts: [
+        { label: "Your artwork", note: "Mapped to the product once, reused forever" },
+        { label: "Our press", note: "Printed or stitched on a vetted network" },
+        { label: "Their doorstep", note: "Cheapest label, tracking pushed back" },
+      ],
+    },
+    stats: [
+      { value: "2 min", label: "To connect a store", note: "OAuth, not a CSV export" },
+      { value: "1", label: "Upload per design", note: "Mapped to products once" },
+      { value: "24h", label: "Artwork check", note: "Before anything reaches a press" },
+      { value: "4", label: "Statuses you'll see", note: "The same four your orders show" },
+      { value: "0", label: "Shipping screens", note: "We rate-shop and buy the label" },
+    ],
+    steps: [
+      {
+        title: "Connect your stores",
+        body: "Sign in to Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
+        points: ["No CSV exports", "Every store, one login", "Existing orders backfilled"],
+      },
+      {
+        title: "Upload your designs",
+        body: "Add artwork once and map it to a product. The mini designer sets placement and size, generates the print files, and matches embroidery thread — so every order comes out right.",
+        points: ["Reusable design library", "Print files made for you", "Placement handled"],
+      },
+      {
+        title: "We make and ship it",
+        body: "You submit an order; we accept it, produce it on a vetted network, buy the cheapest label, and push tracking back to your shop. You watch orders go out.",
+        points: ["Reviewed before production", "Cheapest-label shipping", "Tracking pushed back"],
+      },
+    ],
+    journeyHeading: "What you'll actually see.",
+    journeyNote: "These are the exact statuses on your orders — not a simplified version for this page.",
+    journey: [
+      { label: "Draft", body: "Lands in your queue the moment it syncs. Edit it, add items — nothing is charged yet." },
+      { label: "Pending", body: "You submit it and we accept it into production. Still cancellable, for a full refund." },
+      { label: "In process", body: "Being made — printed or stitched, scanned, checked, packed. Nothing for you to do." },
+      { label: "Fulfilled", body: "Out the door on the cheapest label, with tracking pushed back to your shop." },
+    ],
+    cta: { heading: "Connect a store and watch it work.", button: "Start free" },
+  },
+
   motion: DEFAULT_MOTION,
 }
 
@@ -192,6 +382,28 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   const testimonials = obj("testimonials")
   const faq = obj("faq")
   const cta = obj("cta")
+
+  /* ── The two page blobs ────────────────────────────────────────────────────────
+     The same rules as everything above, applied one level deeper: a blank scalar falls back
+     so a cleared field can never blank a live page, and a present array replaces wholesale
+     so deleting the sixth feature actually deletes it. */
+  const nest = (parent: Record<string, unknown>, k: string) =>
+    (parent[k] && typeof parent[k] === "object" && !Array.isArray(parent[k])
+      ? (parent[k] as Record<string, unknown>)
+      : {})
+  /* image / ghostWord / callouts are kept AS TYPED — blank is a deliberate choice for all
+     three (no picture, no ghost word, no labels) and `str` would resurrect a default the
+     admin had just cleared. Same three fields, same reasoning, as the hero above. */
+  const figureOf = (stored: Record<string, unknown>, dflt: PageFigure): PageFigure => ({
+    image: typeof stored.image === "string" ? stored.image : dflt.image,
+    imageAlt: str(stored.imageAlt, dflt.imageAlt),
+    ghostWord: typeof stored.ghostWord === "string" ? stored.ghostWord : dflt.ghostWord,
+    callouts: Array.isArray(stored.callouts) ? (stored.callouts as Callout[]) : dflt.callouts,
+  })
+  const featuresPage = obj("featuresPage")
+  const howPage = obj("howPage")
+  const fCta = nest(featuresPage, "cta")
+  const hCta = nest(howPage, "cta")
 
   return {
     hero: {
@@ -239,6 +451,42 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       heading: str(cta.heading, d.cta.heading),
       subhead: str(cta.subhead, d.cta.subhead),
       button: str(cta.button, d.cta.button),
+    },
+    featuresPage: {
+      title: str(featuresPage.title, d.featuresPage.title),
+      accent: str(featuresPage.accent, d.featuresPage.accent),
+      sub: str(featuresPage.sub, d.featuresPage.sub),
+      ruleLeft: typeof featuresPage.ruleLeft === "string" ? featuresPage.ruleLeft : d.featuresPage.ruleLeft,
+      ruleRight: typeof featuresPage.ruleRight === "string" ? featuresPage.ruleRight : d.featuresPage.ruleRight,
+      figure: figureOf(nest(featuresPage, "figure"), d.featuresPage.figure),
+      // isArray, not `arr`: an emptied strip is an admin REMOVING the section, and it has to
+      // stay gone — exactly as for the homepage stats above.
+      stats: Array.isArray(featuresPage.stats) ? (featuresPage.stats as Stat[]) : d.featuresPage.stats,
+      items: arr<NumberedItem>(featuresPage.items, d.featuresPage.items),
+      cta: {
+        heading: str(fCta.heading, d.featuresPage.cta.heading),
+        button: str(fCta.button, d.featuresPage.cta.button),
+      },
+    },
+    howPage: {
+      title: str(howPage.title, d.howPage.title),
+      accent: str(howPage.accent, d.howPage.accent),
+      sub: str(howPage.sub, d.howPage.sub),
+      ruleLeft: typeof howPage.ruleLeft === "string" ? howPage.ruleLeft : d.howPage.ruleLeft,
+      ruleRight: typeof howPage.ruleRight === "string" ? howPage.ruleRight : d.howPage.ruleRight,
+      figure: figureOf(nest(howPage, "figure"), d.howPage.figure),
+      stats: Array.isArray(howPage.stats) ? (howPage.stats as Stat[]) : d.howPage.stats,
+      steps: arr<NumberedItem>(howPage.steps, d.howPage.steps),
+      journeyHeading: str(howPage.journeyHeading, d.howPage.journeyHeading),
+      journeyNote: str(howPage.journeyNote, d.howPage.journeyNote),
+      // The tone is NOT stored — it is resolved from the label. See the note on HowPage.
+      journey: Array.isArray(howPage.journey)
+        ? (howPage.journey as { label: string; body: string }[])
+        : d.howPage.journey,
+      cta: {
+        heading: str(hCta.heading, d.howPage.cta.heading),
+        button: str(hCta.button, d.howPage.cta.button),
+      },
     },
     // Its own merge, because the rule for a number is not the rule for a string: 0 is a
     // legitimate value for every motion field and `str`'s "blank falls back" test would throw

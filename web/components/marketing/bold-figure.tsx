@@ -22,7 +22,7 @@
  */
 
 import { motion, useReducedMotion } from "motion/react"
-import { ACCENT, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
 import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
 
 /** The caps label these boards use everywhere: small, wide, quiet. One definition, because
@@ -66,13 +66,21 @@ export function LabelRule({ left, right, className = "" }: {
  * it is a bonus rather than the point — which is also what keeps it from being a contrast
  * question. Nothing is measured against it because nothing is ON it.
  */
-export function GhostWord({ children, className = "" }: { children: string; className?: string }) {
+export function GhostWord({ children, color = INK, opacity = 0.05, className = "" }: {
+  children: string
+  /** The ground decides this, not the caller's taste: ink on paper, paper on the plate. */
+  color?: string
+  /** Ink on white disappears at 0.05; paper on a dark plate needs more to read as texture
+   *  rather than as a smudge. It is the same effect at two strengths, not two effects. */
+  opacity?: number
+  className?: string
+}) {
   if (!children) return null
   return (
     <span
       aria-hidden
       className={`pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 select-none text-center font-display font-semibold leading-none tracking-[-0.04em] ${className}`}
-      style={{ fontSize: "clamp(4rem, 18vw, 13rem)", color: INK, opacity: 0.05 }}
+      style={{ fontSize: "clamp(4rem, 18vw, 13rem)", color, opacity }}
     >
       {children}
     </span>
@@ -91,17 +99,42 @@ export function GhostWord({ children, className = "" }: { children: string; clas
  * `src` empty renders NOTHING — not a placeholder, not a grey box. An unset image on a live
  * marketing page must not look like a broken one (§4), and the caller decides what stands in.
  */
-export function CutoutFigure({ src, alt, ghost, callouts = [], className = "" }: {
+export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", className = "" }: {
   src: string
   /** What the picture IS. Never "hero image" — it is a garment, and the alt text is the only
    *  version of it some people get. */
   alt: string
   ghost?: string
   callouts?: Callout[]
+  /**
+   * THE GROUND THE FIGURE STANDS ON.
+   *
+   * `paper` is the homepage device: no edge at all, the subject floating on the page.
+   *
+   * `ink` is AUREL's highlights block — the same figure and the same callouts, inside a dark
+   * panel. It is a TONE on this component and not a second component, because a fork would be
+   * the exact mistake §4's method section documents: two figures that drift apart until a
+   * callout is styled one way here and another way there.
+   *
+   * Use it where the figure is the SUBJECT of the section rather than an illustration beside
+   * the headline — the panel's edge is what says "read this as one diagram", which is why
+   * how-it-works uses it and the hero does not.
+   */
+  tone?: "paper" | "ink"
   className?: string
 }) {
   const reduce = useReducedMotion()
   if (!src) return null
+
+  const ink = tone === "ink"
+  /* Every colour on the dark branch is ACCENT / ACCENT_INK — the pair NumberedCards already
+     fills its dark cards with, so it is measured by tools/check-skins.mjs on every skin and
+     cannot be a hand-picked value that goes unreadable when the palette moves. */
+  const fg = ink ? ACCENT_INK : INK
+  const rule = ink ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE
+  /* ACID is allowed here and ONLY here: §4 permits it as a fill ON the plate, never on white.
+     On paper the dot stays the accent. */
+  const dot = ink ? ACID : ACCENT
 
   return (
     /*
@@ -115,7 +148,10 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], className = "" }:
      * rather than vanishing: three facts about the product are worth more on a phone than a
      * decorative arrangement is.
      */
-    <div className={`grid items-center gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_auto] ${className}`}>
+    <div
+      className={`grid items-center gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_auto] ${ink ? "rounded-3xl px-6 py-10 sm:px-10" : ""} ${className}`}
+      style={ink ? { background: ACCENT, color: ACCENT_INK } : undefined}
+    >
       <div className="relative">
         {/*
           * THE GROUND. A soft radial wash, not a filled card.
@@ -127,9 +163,19 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], className = "" }:
         <div
           aria-hidden
           className="absolute inset-0"
-          style={{ background: `radial-gradient(ellipse 62% 58% at 50% 48%, color-mix(in oklch, ${INK} 8%, transparent), transparent 72%)` }}
+          /*
+           * 22% ON THE PLATE, 8% ON PAPER — and this is not taste, it is the one thing that
+           * makes the dark tone usable. The reference board floats a WHITE robot arm on its
+           * dark panel; nothing stops an admin uploading a black t-shirt, and at paper's 8%
+           * that garment was very nearly invisible against #0A0A0A. A wash the subject can
+           * actually sit against is what keeps the panel from depending on the upload.
+           * Still a radial with no edge, so it is a pool of light and not a second card.
+           */
+          style={{ background: `radial-gradient(ellipse 62% 58% at 50% 48%, color-mix(in oklch, ${fg} ${ink ? 22 : 8}%, transparent), transparent 72%)` }}
         />
-        {ghost && <GhostWord>{ghost}</GhostWord>}
+        {/* Paper needs 0.05 to stay texture; on the plate the same value is invisible, so the
+            word is set in the plate's own foreground at a strength that still reads as ground. */}
+        {ghost && <GhostWord color={fg} opacity={ink ? 0.1 : 0.05}>{ghost}</GhostWord>}
 
         <motion.div
           className="relative flex items-center justify-center py-6"
@@ -165,11 +211,13 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], className = "" }:
             >
               {/* mt-[0.4rem] lands the dot on the CAP HEIGHT of the label beside it rather
                   than on its line box, which is what makes a row of them look aligned. */}
-              <span className="mt-[0.4rem] size-1.5 shrink-0 rounded-full" style={{ background: ACCENT }} />
-              <span className="mt-[0.45rem] hidden h-px w-8 shrink-0 lg:block" style={{ background: HAIRLINE }} />
+              <span className="mt-[0.4rem] size-1.5 shrink-0 rounded-full" style={{ background: dot }} />
+              <span className="mt-[0.45rem] hidden h-px w-8 shrink-0 lg:block" style={{ background: rule }} />
               <span className="min-w-0">
-                <span className={`${CAPS} block`} style={{ color: INK }}>{c.label}</span>
-                {c.note && <span className="mt-1 block text-xs leading-snug" style={{ color: INK, opacity: 0.55 }}>{c.note}</span>}
+                <span className={`${CAPS} block`} style={{ color: fg }}>{c.label}</span>
+                {/* 0.7 on the plate, not 0.55: a note at paper's strength against a dark ground
+                    drops below the 4.5:1 floor, and this one is real body copy. */}
+                {c.note && <span className="mt-1 block text-xs leading-snug" style={{ color: fg, opacity: ink ? 0.7 : 0.55 }}>{c.note}</span>}
               </span>
             </motion.div>
           ))}
@@ -194,11 +242,22 @@ export function SpecStrip({ items, className = "" }: { items: Stat[]; className?
   const reduce = useReducedMotion()
   if (!items.length) return null
   return (
-    <div className={`grid gap-y-8 sm:grid-cols-2 lg:grid-cols-5 ${className}`}>
+    /*
+     * THE PADDING IS THE DIVIDER'S, SO IT ONLY EXISTS WHERE THE DIVIDER DOES.
+     *
+     * This was `px-6 first:pl-0` at every width. Stacked on a phone that put figure 1 flush
+     * with the margin and figures 2–5 indented 24px — five values in one column on two
+     * different left edges, which is precisely the "four different left margins in one
+     * screen" §4 names as what "nothing is aligned" actually is.
+     *
+     * The 24px was only ever breathing room either side of the vertical rule, and the rule is
+     * `lg` only. So the padding is `lg` only, and below that a column gap does the separating.
+     */
+    <div className={`grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-x-0 ${className}`}>
       {items.slice(0, 5).map((s, i) => (
         <motion.div
           key={`${s.label}-${i}`}
-          className="px-6 first:pl-0 lg:border-l lg:first:border-l-0"
+          className="lg:border-l lg:px-6 lg:first:border-l-0 lg:first:pl-0"
           style={{ borderColor: HAIRLINE }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -230,10 +289,25 @@ export function SpecStrip({ items, className = "" }: { items: Stat[]; className?
 export function NumberedCards({ items, className = "" }: { items: NumberedItem[]; className?: string }) {
   const reduce = useReducedMotion()
   if (!items.length) return null
+
+  /*
+   * THREE IS A ROW, NOT A CHECKER.
+   *
+   * The two-up checker is the reference board's, and the board has FOUR problems on it. Three
+   * steps in a two-column grid leaves the third alone on its own row with a card-sized hole
+   * beside it — and the 01-light/02-dark/03-dark pattern put the two dark cards diagonally
+   * adjacent around that hole, so the arrangement read as a mistake rather than a rhythm.
+   *
+   * So the shape follows the COUNT, for the same reason `dark` follows the index: whoever
+   * adds a step should not have to know which layout keeps the pattern honest. Three across,
+   * alternating light-dark-light; anything else keeps the two-up checker.
+   */
+  const triple = items.length === 3
+  const cols = triple ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
   return (
-    <div className={`grid gap-4 sm:grid-cols-2 ${className}`}>
+    <div className={`grid gap-4 ${cols} ${className}`}>
       {items.map((it, i) => {
-        const dark = i % 4 === 1 || i % 4 === 2
+        const dark = triple ? i % 2 === 1 : i % 4 === 1 || i % 4 === 2
         return (
           <motion.div
             key={`${it.title}-${i}`}
@@ -254,6 +328,25 @@ export function NumberedCards({ items, className = "" }: { items: NumberedItem[]
             <div className="my-4 h-px" style={{ background: dark ? "rgba(255,255,255,0.18)" : HAIRLINE }} />
             <div className="text-lg font-semibold leading-snug tracking-[-0.01em]">{it.title}</div>
             {it.body && <p className="mt-2 text-sm leading-relaxed opacity-70">{it.body}</p>}
+            {/*
+              * THE SPECIFICS. An em dash and a word, not a bullet glyph and not a tick.
+              *
+              * These arrived with the how-it-works steps, which had carried them as a list for
+              * as long as the page has existed. Folding them into the body would have lost
+              * three facts per step; a second component beside the card would have been the
+              * fork §4 keeps warning about. So the ITEM carries them, and the one card draws
+              * them — which is also why /features can hand the same shape to the same card.
+              *
+              * Opacity 0.6 sits under the body's 0.7 deliberately: the run is a supporting
+              * detail, and on the dark cards it is still paper on the plate.
+              */}
+            {it.points && it.points.length > 0 && (
+              <ul className="mt-4 space-y-1.5">
+                {it.points.map((pt) => (
+                  <li key={pt} className="text-[13px] leading-snug opacity-60">— {pt}</li>
+                ))}
+              </ul>
+            )}
           </motion.div>
         )
       })}
