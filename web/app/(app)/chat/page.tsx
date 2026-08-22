@@ -768,7 +768,12 @@ export default function ChatPage() {
  own their own scrolling instead of growing the container as threads are added. */}
     <div className="flex h-[calc(100svh-7rem)] min-h-0 gap-4">
       {/* conversation rail */}
-      <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
+      {/* w-60, not w-72. A rail row carries a name, one line of the newest message and a
+ count — none of which get more legible with another 48px, because all three
+          truncate at a word boundary either way. The conversation does get more legible:
+ that width goes to the thread, where a generated image is the widest thing on the
+          page and was the first thing to lose by it. */}
+      <aside className="hidden w-60 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
           <span className="font-semibold">Conversations</span>
           {/* Support team (not designers, who don't handle seller support): live hours
@@ -916,24 +921,37 @@ export default function ChatPage() {
  onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
  onDrop={onDrop}
       >
-        {/* header — also the mobile conversation switcher */}
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        {/*
+          * MOBILE ONLY — on a wide screen this bar said nothing the rail was not already
+          * saying. The row for this conversation is highlighted three inches to the left,
+          * carrying the same icon, the same title and a live subtitle, so the header was the
+          * active row a second time, and it cost ~60px off the top of every message and every
+          * generated image.
+          *
+          * It stays below md because the rail is `hidden md:flex`: on a phone this bar IS the
+          * navigation — the `md:hidden` select inside it is the only way to change
+          * conversation — so hiding it outright would strand someone in one thread.
+          */}
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3 md:hidden">
           <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (isSupport ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
             {convoIcon(active?.kind, 17)}
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{active?.title || "Chat"}</div>
-            <div className="truncate text-xs text-muted-foreground">{isSupport ? "Assistant replies instantly; the team follows up" : active?.sub || "Conversation"}</div>
-          </div>
-          {convos.length > 1 && (
+          {/* THE SWITCHER IS THE TITLE. It renders the active conversation's name as its
+ own value, so a heading beside it printed that name a second time — and the
+ line under it described the room rather than saying anything about it. One
+ name, on the control that changes it. The heading only stands in when there
+              is nothing to switch between. */}
+          {convos.length > 1 ? (
             <select
  value={activeId ?? ""}
  onChange={(e) => setActiveId(e.target.value)}
- className="eg-select h-8 max-w-[45%] rounded-2xl border border-border bg-card px-2 text-xs md:hidden transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+ className="eg-select h-9 min-w-0 flex-1 rounded-lg border border-border bg-card px-2 text-sm font-semibold transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
  aria-label="Switch conversation"
             >
               {convos.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
             </select>
+          ) : (
+            <div className="min-w-0 flex-1 truncate font-semibold">{active?.title || "Chat"}</div>
           )}
         </div>
 
