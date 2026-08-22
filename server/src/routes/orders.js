@@ -3700,6 +3700,80 @@ export function ordersRoutes(app, requireAuth) {
     return !!(row && !row.factory_order && row.seller_id === sel.id);
   }
 
+  /* ── Channel read stamps ───────────────────────────────────────────────────
+   * The rail badges the PINNED channels (EG Channel, My Assistant, Announcements)
+   * the same way it badges a seller thread, because a row that carries a number is
+   * the only thing that tells you a room has something new in it without opening it.
+   *
+   * But "unanswered" is the wrong count here. That number means "a seller is waiting
+   * on us", which is a real state in a support thread and no state at all in a room
+   * where staff talk to each other or an admin broadcasts. So these count UNREAD:
+   * messages that landed since this person last had the channel open.
+   *
+   * Per USER, not per account — two staffers read the factory room independently.
+   * ────────────────────────────────────────────────────────────────────────── */
+  q(`create table if not exists channel_reads (
+       user_id    uuid references users(id) on delete cascade,
+       channel_id text not null,
+       read_at    timestamptz not null default now(),
+       primary key (user_id, channel_id)
+     )`).catch(() => {});
+
+  /**
+   * Last message + unread count for a set of channels, in one round trip.
+   *
+   * Takes ids rather than deriving the list: which rooms a person has pinned is a
+   * front-end decision (a seller has no factory room, a designer has no announcements),
+   * and every id is still run through canSeeThread — the query only ever sees channels
+   * this user may read, so passing someone else's id gets you nothing back rather than
+   * an error that confirms it exists.
+   */
+  app.get('/api/support/channels', { preHandler: requireAuth }, async (req) => {
+    const ids = String(req.query?.ids || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 20);
+    if (!ids.length) return [];
+    const allowed = [];
+    for (const id of ids) {
+      const { channel, orderRef } = await resolveChannel(id);
+      // An order slice is a VIEW of a channel, not a room of its own — it has no rail row.
+      if (orderRef || allowed.includes(channel)) continue;
+      if (await canSeeThread(req.user, channel)) allowed.push(channel);
+    }
+    if (!allowed.length) return [];
+    const staff = isStaff(req.user);
+    const r = await q(
+      `select m.order_id,
+              max(m.created_at) as last_at,
+              -- An attachment-only message has an empty body, and a rail row that goes
+              -- blank when someone sends a photo reads as a broken channel.
+              (select coalesce(nullif(x.body, ''), case when x.attachment is not null then '📎 Attachment' else '' end)
+                 from order_messages x
+                where x.order_id = m.order_id
+                  and ($2::boolean or not coalesce((x.meta->>'internal')::boolean, false))
+                order by x.created_at desc, x.id desc limit 1) as last_body,
+              -- Mine are never unread. The assistant's are: sender_id is null on an AI
+              -- reply, so it can't be mistaken for something I wrote.
+              count(*) filter (
+                where m.created_at > coalesce(cr.read_at, '-infinity'::timestamptz)
+                  and m.sender_id is distinct from $3::uuid
+              )::int as unread
+         from order_messages m
+         left join channel_reads cr on cr.user_id = $3::uuid and cr.channel_id = m.order_id
+        where m.order_id = any($1::text[])
+          and ($2::boolean or not coalesce((m.meta->>'internal')::boolean, false))
+        group by m.order_id, cr.read_at`,
+      [allowed, staff, req.user.sub]);
+    const by = new Map(r.rows.map((x) => [x.order_id, x]));
+    return allowed.map((id) => {
+      const x = by.get(id);
+      return {
+        id,
+        last: (x && x.last_body) || '',
+        last_at: x && x.last_at ? new Date(x.last_at).getTime() : 0,
+        unread: (x && x.unread) || 0,
+      };
+    });
+  });
+
   // Staff-only: list every seller support thread (one row per seller) with its last message, so the
   // staff chat can show "EGFUL Support" conversations that sellers started. Sellers never hit this.
   app.get('/api/support/threads', { preHandler: requireAuth }, async (req, reply) => {
@@ -4038,6 +4112,23 @@ export function ordersRoutes(app, requireAuth) {
            and ($2::text is null or meta->>'order_ref' = $2)
            and ($3::boolean or not coalesce((meta->>'internal')::boolean, false))
          order by created_at asc, id asc`, [channel, orderRef, isStaff(req.user)]);
+    /*
+     * READING THE CHANNEL IS WHAT MARKS IT READ — stamped here, on the only read path,
+     * rather than in a "mark read" call the client has to remember to make. A badge that
+     * depends on the front-end calling a second endpoint is a badge that gets stuck the
+     * first time someone adds a new way to open a thread.
+     *
+     * Only when the WHOLE channel was asked for: an order slice shows a filtered handful
+     * of messages, so treating it as having read the room would clear a count for
+     * conversations that were never on screen.
+     *
+     * Fire-and-forget. This is a read route and a failed stamp must never fail the fetch.
+     */
+    if (!orderRef && req.user?.sub) {
+      q(`insert into channel_reads (user_id, channel_id, read_at) values ($1,$2, now())
+           on conflict (user_id, channel_id) do update set read_at = now()`,
+        [req.user.sub, channel]).catch(() => {});
+    }
     // Reconstruct the client entry shape so getOrderChat round-trips unchanged.
     return r.rows.map((m) => {
       const meta = m.meta || {};
