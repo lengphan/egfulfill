@@ -366,6 +366,69 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
  * the first frame. The flow never changes: press it, then describe the motion in the box you
  * were already typing in.
  */
+/**
+ * The chip that sits on a picture in the thread. Shared so Edit and Animate are the same
+ * object with different verbs — they are two things you can do to one photograph, and a
+ * different shape for each would read as two unrelated controls.
+ *
+ * POSITIONED BY THE CALLER. Both used to carry `absolute right-1.5 top-1.5` themselves,
+ * which is fine for one chip and puts two on top of each other. The page holds them in one
+ * absolutely-positioned row instead.
+ */
+const IMG_CHIP = "inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
+
+/**
+ * EDIT THIS ONE — continue from a specific picture rather than the newest.
+ *
+ * A follow-up already carries the newest image in the thread, which is right almost every
+ * time. This is for the other times: you made four, the second was the good one, and the
+ * next instruction is about that. It reports the pick; the composer draws it and sends it.
+ *
+ * Arms image mode when nothing is armed, because pressing Edit on a picture is a clear
+ * statement of intent, and leaving it disarmed would mean the press did nothing visible.
+ * Cheapest settings for the same reason Animate uses them — an edit is the exploratory
+ * move, and everything is one click away in the panel.
+ */
+export function EditImageButton({ imageName, imageUrl, armed, onArm, onPick }: {
+  imageName: string
+  imageUrl: string
+  armed: GenSettings | null
+  onArm: (g: GenSettings) => void
+  onPick: (p: { name: string; url: string }) => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  const pick = async (e: React.MouseEvent) => {
+    // The image sits inside a link to the full-size file; picking must not navigate away.
+    e.preventDefault(); e.stopPropagation()
+    if (busy) return
+    onPick({ name: imageName, url: imageUrl })
+    if (armed?.mode === "image") return          // already set up to render — only the picture changed
+    setBusy(true)
+    try {
+      const c = await getDeskImageConfig()
+      const priced = c.models
+        .flatMap((m) => m.sizes.map((sz) => ({ m, sz, usd: m.usd[sz] ?? Infinity })))
+        .sort((a, b) => a.usd - b.usd)
+      const p = priced[0]
+      if (!p || !Number.isFinite(p.usd)) return
+      onArm({
+        mode: "image", model: p.m.id, ratio: "1:1", size: p.sz, usd: p.usd,
+        label: `Image · ${p.sz} · 1:1`, short: `${p.sz} · 1:1`,
+      })
+    } catch { /* the pill is the feedback; a failed arm simply doesn't arm */ } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button type="button" onClick={pick} aria-label="Edit this image" className={IMG_CHIP}>
+      {busy ? <CircleNotch size={12} className="animate-spin" /> : null}
+      Edit
+    </button>
+  )
+}
+
 export function AnimateImageButton({ imageName, imageUrl, onArm }: {
  imageName: string
  imageUrl: string
@@ -406,10 +469,7 @@ export function AnimateImageButton({ imageName, imageUrl, onArm }: {
   }
 
  return (
-    <button
- type="button" onClick={arm} aria-label="Animate this image"
- className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-2xs font-medium shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
-    >
+    <button type="button" onClick={arm} aria-label="Animate this image" className={IMG_CHIP}>
       {busy ? <CircleNotch size={12} className="animate-spin" /> : null}
       Animate
     </button>

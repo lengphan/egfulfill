@@ -2807,6 +2807,16 @@ export type SupportThread = {
 export function getSupportThreads() {
   return api<SupportThread[]>(`/api/support/threads`)
 }
+
+/** The pinned rail channels (factory room, own assistant thread, generations,
+ *  announcements) carry the same two things a seller thread does: what was said last,
+ *  and how much of it you haven't seen. `unread` is messages since you last had the
+ *  channel open — not "unanswered", which means nothing in a room nobody owes a reply in. */
+export type ChannelSummary = { id: string; last: string; last_at: number; unread: number }
+export function getChannelSummaries(ids: string[]) {
+  if (!ids.length) return Promise.resolve([] as ChannelSummary[])
+  return api<ChannelSummary[]>(`/api/support/channels?ids=${encodeURIComponent(ids.join(","))}`)
+}
 export function aiDraft(threadId: string) {
   return api<{ ok?: boolean; draft?: string; disabled?: boolean; error?: string }>(`/api/support/ai-draft`, { method: "POST", body: JSON.stringify({ threadId }) })
 }
