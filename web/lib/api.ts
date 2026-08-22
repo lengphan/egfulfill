@@ -5408,3 +5408,66 @@ export function fetchSourcingPrice(url: string) {
                image?: string | null; why?: string; error?: string }>(
     `/api/manual-suppliers/price`, { method: "POST", body: JSON.stringify({ url }) })
 }
+
+/**
+ * A SAVED ORDER SHEET — the rows a seller types at /sheet, kept between visits.
+ *
+ * `rows` is the grid verbatim in CSV_COLUMNS order, WITHOUT the header row: header spellings
+ * belong to the client (TEMPLATE_HEADERS), and storing them would freeze today's column set
+ * into every saved sheet.
+ *
+ * `status` is one-way. A completed sheet is the record of what was submitted — the server
+ * refuses a PATCH on one with 409, so this is not a matter of hiding a button. Coming back
+ * to a finished sheet is `duplicateOrderSheet`, which starts a new draft from its rows.
+ */
+export type OrderSheet = {
+  id: string
+  name: string
+  status: "draft" | "completed"
+  /** Rows with something in them — blank ones the grid opens with are not counted. */
+  rowCount: number
+  orderIds: string[]
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+  /** Only on the single-sheet fetches; the list omits them on purpose (megabytes of cells). */
+  rows?: string[][]
+}
+
+export function getOrderSheets() {
+  return api<{ sheets: OrderSheet[] }>(`/api/order_sheets`)
+}
+
+export function getOrderSheet(id: string) {
+  return api<{ sheet: OrderSheet }>(`/api/order_sheets/${encodeURIComponent(id)}`)
+}
+
+export function createOrderSheet(body: { name?: string; rows?: string[][] } = {}) {
+  return api<{ sheet: OrderSheet }>(`/api/order_sheets`, { method: "POST", body: JSON.stringify(body) })
+}
+
+/** Autosave lands here. Name and rows are independent, so a rename need not ship the grid. */
+export function saveOrderSheet(id: string, body: { name?: string; rows?: string[][] }) {
+  return api<{ sheet: OrderSheet; error?: string }>(`/api/order_sheets/${encodeURIComponent(id)}`, {
+    method: "PATCH", body: JSON.stringify(body),
+  })
+}
+
+/** Copy an old sheet into a new draft. Server-side, so it is one call and cannot be partial. */
+export function duplicateOrderSheet(id: string) {
+  return api<{ sheet: OrderSheet }>(`/api/order_sheets/${encodeURIComponent(id)}/duplicate`, { method: "POST" })
+}
+
+/**
+ * Record that the sheet became orders. Called AFTER they exist, with their ids — this does
+ * not create anything. Idempotent, so a retry after a dropped response is safe.
+ */
+export function completeOrderSheet(id: string, orderIds: string[]) {
+  return api<{ sheet: OrderSheet }>(`/api/order_sheets/${encodeURIComponent(id)}/complete`, {
+    method: "POST", body: JSON.stringify({ orderIds }),
+  })
+}
+
+export function deleteOrderSheet(id: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/order_sheets/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
