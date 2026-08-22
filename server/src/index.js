@@ -6,6 +6,7 @@ import cors from '@fastify/cors';
 import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale, EMAIL_RE } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
+import { orderSheetsRoutes } from './routes/order_sheets.js';
 import { reportsRoutes } from './routes/reports.js';
 import { orderRefundRoutes } from './routes/order_refunds.js';
 import { inventoryRoutes } from './routes/inventory.js';
@@ -540,6 +541,7 @@ app.post('/api/auth/google', async (req, reply) => {
 
 // ── Data routes ──
 ordersRoutes(app, requireAuth);
+  orderSheetsRoutes(app, requireAuth);                    // saved order sheets: drafts, and the record of what was submitted
 reportsRoutes(app, requireStaff);                       // dashboard figures computed in SQL — see the note in reports.js on the 2.3MB it replaces
 orderRefundRoutes(app, requireAuth);                    // itemised per-order charges + partial refunds back to the seller's wallet (admin/warehouse only)
 inventoryRoutes(app, requireStaff, requireWarehouse);
