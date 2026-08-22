@@ -1,65 +1,152 @@
 "use client"
 
 /**
- * THE SHEET, FULL SCREEN.
+ * THE SHEETS A SELLER HAS.
  *
- * It is not in the import dialog because it is 21 columns wide and the dialog showed four —
- * editing there meant dragging a viewport across a spreadsheet. It is not in a second browser
- * tab either: a seller who came from Orders expects Back to take them there, and a new tab
- * turns that into "close this window", which is a different and worse promise.
+ * Drafts they are part-way through, and completed ones kept as the record of what was
+ * submitted. Both live in the same list because "what did I send on the 14th" and "where did
+ * I get to on Tuesday" are the same question asked at different times.
  *
- * So it takes the whole screen in the SAME window, over the app shell, and carries its own
- * way out. A full-page surface with no exit is a trap, which is why `onBack` is not optional
- * in spirit even though the prop is.
- *
- * IT DOES NOT IMPORT ANYTHING. Complete hands the rows to ImportOrdersDialog, which owns the
- * whole pipeline — templates, machine files, design rows, the order id and its meta. Doing
- * the import here would have been a second importer that agrees with the first only until
- * somebody changes one of them (CLAUDE.md §5). The preview a seller reads is the one a
- * dropped .xlsx produces, because it is the same preview.
+ * A COMPLETED SHEET IS NOT EDITABLE, and the way back to one is Duplicate — a new draft
+ * carrying its rows. The server enforces that with a 409 on PATCH; this page only has to
+ * avoid offering a door that is already locked.
  */
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { OrderGrid } from "@/components/app/order-grid"
-import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
-import { TEMPLATE_HEADERS } from "@/lib/order-import"
+import { Button } from "@/components/ui/button"
+import {
+  getOrderSheets, createOrderSheet, duplicateOrderSheet, deleteOrderSheet,
+  type OrderSheet,
+} from "@/lib/api"
 
-export default function SheetPage() {
+/** A name you can tell apart in a list, for a sheet nobody has named. */
+const defaultName = () =>
+  `Sheet · ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+
+export default function SheetsPage() {
   const router = useRouter()
-  /** Header row included, because that is the shape rowsToRecords parses. */
-  const [handoff, setHandoff] = useState<string[][] | null>(null)
+  const [sheets, setSheets] = useState<OrderSheet[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
 
-  const leave = () => router.push("/orders")
+  const load = useCallback(() => {
+    getOrderSheets()
+      .then((r) => { setSheets(r.sheets || []); setErr(null) })
+      .catch(() => { setSheets([]); setErr("Couldn't load your sheets.") })
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const start = async () => {
+    setBusy(true)
+    try {
+      const r = await createOrderSheet({ name: defaultName() })
+      router.push(`/sheet/${r.sheet.id}`)
+    } catch { setErr("Couldn't start a new sheet."); setBusy(false) }
+  }
+
+  const copy = async (id: string) => {
+    setBusy(true)
+    try {
+      const r = await duplicateOrderSheet(id)
+      router.push(`/sheet/${r.sheet.id}`)
+    } catch { setErr("Couldn't copy that sheet."); setBusy(false) }
+  }
+
+  const remove = async (id: string) => {
+    setBusy(true)
+    const r = await deleteOrderSheet(id).catch(() => ({ error: "Couldn't delete that sheet." }))
+    // A completed sheet refuses deletion server-side and says why. That refusal IS the
+    // answer, so it is shown rather than swallowed.
+    if (r && "error" in r && r.error) setErr(r.error)
+    load(); setBusy(false)
+  }
 
   return (
-    /* Over the shell rather than inside it. The sidebar is navigation, and this screen is a
-       single task you are in the middle of — the same reason a print dialog is not a page. */
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-6">
-        <h1 className="text-base font-semibold tracking-tight">Sheet</h1>
-        <span className="text-xs text-muted-foreground">Orders · new</span>
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-semibold tracking-tight">Sheets</h1>
+        <Button className="ms-auto" onClick={start} disabled={busy}>New sheet</Button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
-        <OrderGrid
-          fill
-          onBack={leave}
-          onComplete={(rows) => setHandoff([TEMPLATE_HEADERS as unknown as string[], ...rows])}
-        />
-      </div>
+      {err && (
+        <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">{err}</div>
+      )}
 
-      {/* Keyed on the row count so a second Complete re-opens with the NEW rows rather than
-          rendering the previous preview — reset by remounting, not by an effect that shows
-          stale state for a frame. */}
-      {handoff && (
-        <ImportOrdersDialog
-          key={handoff.length}
-          open
-          initialRows={handoff}
-          onOpenChange={(v) => { if (!v) setHandoff(null) }}
-          onImported={leave}
-        />
+      {sheets === null ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : !sheets.length ? (
+        /* An empty state may carry one sentence, because there is nothing else to read. */
+        <div className="rounded-xl border border-border p-8 text-center">
+          <div className="text-sm font-medium">No sheets yet</div>
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+            A sheet is where you type orders in bulk. It saves as you go, so you can leave it
+            and come back.
+          </p>
+          <Button className="mt-4" onClick={start} disabled={busy}>New sheet</Button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Name</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+                {/* Right-aligned, so tabular figures are already on — globals.css does that
+                    for every text-right cell; adding tabular-nums here would be the second
+                    copy the alignment rule exists to prevent. */}
+                <th className="px-3 py-2 text-right font-medium">Rows</th>
+                <th className="px-3 py-2 text-left font-medium">Updated</th>
+                <th className="w-40 px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {sheets.map((s) => (
+                <tr key={s.id} className="border-t border-border">
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/sheet/${s.id}`)}
+                      className="text-left font-medium hover:underline"
+                    >
+                      {s.name || "Untitled"}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2">
+                    {/* A pill carries MEANING here — the one-way draft/completed state — which
+                        is the only thing §4 allows one for. */}
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
+                        s.status === "completed"
+                          ? "bg-shipped/10 text-shipped"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {s.status === "completed" ? "Sent" : "Draft"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right">{s.rowCount}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {new Date(s.updatedAt).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex justify-end gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => copy(s.id)} disabled={busy}>
+                        Duplicate
+                      </Button>
+                      {s.status === "draft" && (
+                        <Button variant="ghost" size="sm" onClick={() => remove(s.id)} disabled={busy}>
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

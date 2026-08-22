@@ -93,9 +93,19 @@ export type OrderGridProps = {
   /** Let the table take the height it is given instead of capping at half the viewport.
    *  On the full page the cap is what made a 21-column sheet feel like a peephole. */
   fill?: boolean
+  /** Rows to open on, from a saved sheet. Read ONCE, at mount: re-seeding from a prop would
+   *  fight whatever the seller has typed since. Remount with a key to load a different sheet. */
+  initialRows?: string[][]
+  /**
+   * Every change, so the caller can save it.
+   *
+   * An EVENT, never an effect watching `rows`. An effect that writes on state its own result
+   * produced is the shape CLAUDE.md §2.8 warns about — the one that took a machine down.
+   */
+  onRowsChange?: (rows: string[][]) => void
 }
 
-export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
+export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsChange }: OrderGridProps) {
   /**
    * ONE FETCH, ON MOUNT. Deliberately not keyed to anything the fetch itself writes — see
    * CLAUDE.md §2.8, where an effect that re-ran on state its own result produced took a
@@ -108,7 +118,28 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
     return () => { live = false }
   }, [])
 
-  const [rows, setRows] = useState<string[][]>(() => Array.from({ length: OPEN_ROWS }, blankRow))
+  const [rows, setRows] = useState<string[][]>(() => {
+    // Pad a short saved sheet back up to a workable height — a two-row sheet reopening with
+    // exactly two rows leaves nowhere to type the third.
+    const seed = (initialRows ?? []).map((r) => CSV_COLUMNS.map((_, i) => String(r?.[i] ?? "")))
+    while (seed.length < OPEN_ROWS) seed.push(blankRow())
+    return seed
+  })
+
+  /* One place every mutation goes through, so "tell the caller it changed" cannot be
+     forgotten by the next thing that edits a cell.
+     The callback is read from the PROP, not held in a ref — writing a ref during render is
+     what react-hooks/refs rejects, and there is nothing here a dependency cannot express. */
+  const writeRows = useCallback((fn: (prev: string[][]) => string[][]) => {
+    setRows((prev) => {
+      const next = fn(prev)
+      // OUT of the updater. React may invoke an updater more than once, and a side effect
+      // inside one runs as many times as it does — queueMicrotask keeps the state function
+      // pure while still firing on the EVENT rather than from an effect watching `rows`.
+      queueMicrotask(() => onRowsChange?.(next))
+      return next
+    })
+  }, [onRowsChange])
   /**
    * SELECTED IS NOT EDITING, and paste is where the difference matters.
    *
@@ -191,7 +222,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
   )
 
   const setCell = useCallback((r: number, c: number, v: string) => {
-    setRows((prev) => {
+    writeRows((prev) => {
       const next = prev.map((row) => row.slice())
       next[r][c] = v
       /* A NEW PRODUCT INVALIDATES THE VARIANT CELLS. Leaving "Navy" behind when the row now
@@ -205,7 +236,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
       }
       return next
     })
-  }, [])
+  }, [writeRows])
 
   /**
    * PASTE A BLOCK, from Excel or anywhere else.
@@ -227,7 +258,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
     e.preventDefault()
     const block = parsePasted(text)
     if (!block.length) return
-    setRows((prev) => {
+    writeRows((prev) => {
       const need = r + block.length
       const next = prev.map((row) => row.slice())
       while (next.length < need) next.push(blankRow())
@@ -239,7 +270,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
       })
       return next
     })
-  }, [editing])
+  }, [editing, writeRows])
 
   /** Arrow/Enter move between cells. A grid you cannot leave the mouse for is a form. */
   const onKeyDown = useCallback((e: React.KeyboardEvent, r: number, c: number) => {
@@ -281,7 +312,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
     }
   }, [menu])
 
-  const addRows = () => setRows((p) => [...p, ...Array.from({ length: 5 }, blankRow)])
+  const addRows = () => writeRows((p) => [...p, ...Array.from({ length: 5 }, blankRow)])
 
   /**
    * REMOVE THE ROW, not its contents.
@@ -300,7 +331,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
   const removeRow = (r: number) => {
     setEditing(null)
     setMenu(null)
-    setRows((p) => (p.length <= 1 ? [blankRow()] : p.filter((_, i) => i !== r)))
+    writeRows((p) => (p.length <= 1 ? [blankRow()] : p.filter((_, i) => i !== r)))
   }
 
   const complete = async () => {
