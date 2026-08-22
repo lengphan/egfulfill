@@ -282,7 +282,26 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
   }, [menu])
 
   const addRows = () => setRows((p) => [...p, ...Array.from({ length: 5 }, blankRow)])
-  const clearRow = (r: number) => setRows((p) => p.map((row, i) => (i === r ? blankRow() : row)))
+
+  /**
+   * REMOVE THE ROW, not its contents.
+   *
+   * This used to blank the cells and leave the row sitting there, so deleting a line you had
+   * pasted by mistake left a gap you then had to scroll past — and pressing it on the last
+   * row appeared to do nothing at all.
+   *
+   * `editing` and `menu` are keyed by "row-col", so both are dropped: after a splice those
+   * coordinates point at whatever moved up into the gap, which is a menu anchored to a cell
+   * nobody opened.
+   *
+   * The sheet never empties completely — the last row is replaced rather than removed,
+   * because a grid with no rows offers nowhere to start typing.
+   */
+  const removeRow = (r: number) => {
+    setEditing(null)
+    setMenu(null)
+    setRows((p) => (p.length <= 1 ? [blankRow()] : p.filter((_, i) => i !== r)))
+  }
 
   const complete = async () => {
     const filled = rows.filter((r) => r.some((c) => c.trim() !== ""))
@@ -380,9 +399,10 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
                   <td className="border-b border-l border-border text-center">
                     <button
                       type="button"
-                      onClick={() => clearRow(r)}
-                      title="Clear this row"
-                      className="px-1.5 py-1 text-muted-foreground hover:text-foreground"
+                      onClick={() => removeRow(r)}
+                      title="Remove this row"
+                      aria-label={`Remove row ${r + 1}`}
+                      className="px-1.5 py-1 text-muted-foreground transition-colors hover:text-destructive"
                     >
                       ×
                     </button>
