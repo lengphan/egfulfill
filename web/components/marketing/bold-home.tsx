@@ -1,11 +1,10 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
-import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, INK, SURFACE, ACID, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, INK, SURFACE, ACID, HAIRLINE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -87,10 +86,8 @@ function CountUp({ value, className }: { value: string; className?: string }) {
   return <span ref={ref} className={className}>{parts ? shown : value}</span>
 }
 
-const ICONS = [PlugsConnected, Printer, Wallet, Truck]
-
 export function BoldHome({ content }: { content: SiteContent }) {
-  const { hero, stats, features, steps, testimonials, faq, cta } = content
+  const { hero, specs, stats, features, steps, testimonials, faq, cta } = content
   const reduce = useReducedMotion()
   const heroRef = useRef<HTMLDivElement>(null)
 
@@ -133,7 +130,14 @@ export function BoldHome({ content }: { content: SiteContent }) {
           The diagonal went with it: it existed to return the page to paper below the plate,
           and there is no plate to return from. */}
       <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
-        <div className="mx-auto max-w-6xl px-6 pb-32 pt-16 sm:pt-24">
+        {/* pb-32 is sized for the app PANEL, which hangs past the section on a negative
+            margin. A figure sits in the flow, so the same padding is a hole between the
+            buttons and the product it is meant to be introducing. */}
+        <div className={"mx-auto max-w-6xl px-6 pt-16 sm:pt-24 " + (hero.image ? "pb-10" : "pb-32")}>
+          {/* The rule the reference boards open on: who we are at one end, who this is for at
+              the other, a hairline between. It gives the page a top edge without a box, and
+              it says the second thing a visitor needs before the headline says the first. */}
+          <LabelRule left={hero.ruleLeft} right={hero.ruleRight} className="mb-14" />
           <h1 className="max-w-5xl text-center font-display font-semibold leading-[0.92] tracking-[-0.032em] mx-auto"
               // Ink on paper — 17.40:1. The headline is the page; the colour is one phrase.
               style={{ color: INK }}
@@ -170,6 +174,35 @@ export function BoldHome({ content }: { content: SiteContent }) {
           </motion.div>
         </div>
 
+        {/*
+          * THE PRODUCT, WHEN THERE IS ONE — otherwise the app panel below.
+          *
+          * Every reference board is built on a subject cut out and floated on a soft ground,
+          * and until now the only object on this page was a drawing of our own software. That
+          * tells a seller what our admin screens look like and nothing at all about the thing
+          * that arrives in their buyer's hands.
+          *
+          * The picture is not shipped with the code — it is uploaded in Settings › Site
+          * content, from a render the Studio made and the browser cut out. So the page shows
+          * a garment we actually print, chosen by the person who prints it, and replacing it
+          * is an upload rather than a deploy.
+          *
+          * AND THE PANEL STAYS AS THE FALLBACK. An unset image must not read as a broken one
+          * (§4), and the panel is a real, finished, animated section — deleting it to leave a
+          * hole until someone gets round to uploading a PNG would ship a worse page today for
+          * a better one later.
+          */}
+        {hero.image ? (
+          <div className="relative z-10 mx-auto max-w-6xl px-6 pb-14">
+            <CutoutFigure
+              src={hero.image}
+              alt={hero.imageAlt}
+              ghost={hero.ghostWord}
+              callouts={hero.callouts}
+            />
+          </div>
+        ) : (
+        <>
         {/* Floating product panel — the reference's strongest device: a real screen, held
             slightly off the page, with live figures peeled off it as chips. */}
         {/* TWO elements, not one. The entrance animates `y`, and the parallax drives `y` from
@@ -257,6 +290,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
             )}
           </motion.div>
         </motion.div>
+        </>
+        )}
       </section>
 
       {/* ── The channel marquee ────────────────────────────────────────────────
@@ -297,6 +332,29 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </div>
       </section>
 
+      {/*
+        * ── THE SPEC STRIP ────────────────────────────────────────────────────────
+        *
+        * The same figures the app panel carries, said the way a spec sheet says them: a value,
+        * what it measures, a rule between each, and no boxes. A number inside a card reads as
+        * a claim somebody made; a number in a band reads as a specification — which is the
+        * whole reason the reference puts one directly under its hero.
+        *
+        * Skipped entirely when the list is empty, which is how an admin removes the section.
+        */}
+      {specs.items.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 py-16">
+          {specs.heading && (
+            <h2 className="mb-10 max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+              {specs.heading}
+            </h2>
+          )}
+          <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
+            <SpecStrip items={specs.items} />
+          </div>
+        </section>
+      )}
+
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
@@ -304,32 +362,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </h2>
         <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-black/55">{features.subhead}</p>
 
-        <div className="mt-14 grid gap-4 md:grid-cols-2">
-          {features.cards.slice(0, 4).map((c, i) => {
-            const Icon = ICONS[i % ICONS.length]
-            return (
-              <motion.div
-                key={c.title}
-                className="group relative overflow-hidden rounded-2xl border border-black/[0.09] bg-white p-8 transition-colors duration-200 hover:border-black/25"
-                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 22 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "0px 0px -12% 0px" }}
-                transition={{ duration: 0.55, delay: i * 0.07, ease: [0.16, 1, 0.3, 1] }}
-              >
-                {/* The accent arrives on hover as a wipe from the corner — motion that
-                    tells you the card is interactive, not decoration that always runs. */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
-                  style={{ background: ACCENT }}
-                />
-                <Icon size={26} weight="duotone" className="relative text-[var(--mk-ink)]" />
-                <h3 className="relative mt-6 text-xl font-bold tracking-tight">{c.title}</h3>
-                <p className="relative mt-2 text-[15px] leading-relaxed text-black/55">{c.body}</p>
-              </motion.div>
-            )
-          })}
-        </div>
+        {/*
+          * NUMBERED, AND ALTERNATING LIGHT AND DARK.
+          *
+          * Four identical bordered cards read as a list you skim and forget — and §4 has been
+          * counting those: 490 outlined boxes across the app, which is what makes an outline
+          * stop meaning anything. The reference checkers them instead, and the alternation is
+          * doing real work: it gives the eye somewhere to rest and makes four things read as
+          * four things.
+          *
+          * The hover-wipe accent went with the borders. It was motion that ran on a card that
+          * does not do anything when you click it, which is a promise the card cannot keep.
+          */}
+        <NumberedCards items={features.cards} className="mt-14" />
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ──────────────────── */}

@@ -50,11 +50,33 @@ function Intro({ children }: { children: React.ReactNode }) {
  *
  * A phone/DSLR photo is 4–12MB; base64-encoded it blows past Vercel's ~4.5MB proxy body
  * limit, so the upload silently failed on anything but tiny images — which is why "the file
- * is limited". Capping the longest edge and re-encoding as JPEG keeps the payload small
- * (well under the limit) AND stops the homepage shipping a 12MB background. Returns a data
- * URL. Falls back to the original bytes if the canvas isn't available.
+ * is limited". Capping the longest edge and re-encoding keeps the payload small AND stops the
+ * homepage shipping a 12MB background. Returns a data URL. Falls back to the original bytes if
+ * the canvas isn't available.
+ *
+ * ── JPEG WOULD HAVE SILENTLY DESTROYED EVERY CUT-OUT ──────────────────────────────────────
+ *
+ * This re-encoded unconditionally to image/jpeg. JPEG has no alpha channel, so a PNG with a
+ * transparent background came back with that transparency flattened — and canvas flattens to
+ * BLACK, so a garment cut out of its backdrop would have arrived on the homepage in a black
+ * rectangle. There was a guard, `scale === 1 && size < 1.2MB → send as-is`, which is exactly
+ * the case that never applies: a 2K render is over both.
+ *
+ * That is the whole hero figure feature failing as a success, which is the same failure mode
+ * as asking the image model for transparency. So the OUTPUT TYPE FOLLOWS THE INPUT: anything
+ * that can carry alpha keeps it, everything else still becomes a small JPEG.
+ *
+ * PNG compresses far worse than JPEG, so its edge cap is lower. A hero figure renders at most
+ * 26rem tall — 1600px is already more than twice what any screen asks for, and the ceiling
+ * that matters is the ~4.5MB proxy body limit with base64's 33% inflation on top.
  */
+const ALPHA_TYPES = new Set(["image/png", "image/webp", "image/avif"])
 async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<string> {
+  const keepAlpha = ALPHA_TYPES.has(file.type)
+  // PNG is the only alpha format canvas can be relied on to WRITE — toDataURL falls back to
+  // PNG for an unsupported type anyway, so asking for it explicitly is the honest version.
+  const outType = keepAlpha ? "image/png" : "image/jpeg"
+  if (keepAlpha) maxEdge = Math.min(maxEdge, 1600)
  const read = () => new Promise<string>((res, rej) => {
  const fr = new FileReader()
  fr.onload = () => res(String(fr.result))
@@ -70,7 +92,7 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
  i.src = original
     })
  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
-    // Already small in both bytes and dimensions — send as-is (keeps PNG transparency etc.).
+    // Already small in both bytes and dimensions — send the original bytes untouched.
  if (scale === 1 && file.size < 1_200_000) return original
  const w = Math.max(1, Math.round(img.width * scale))
  const h = Math.max(1, Math.round(img.height * scale))
@@ -79,7 +101,9 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
  const ctx = canvas.getContext("2d")
  if (!ctx) return original
  ctx.drawImage(img, 0, 0, w, h)
- return canvas.toDataURL("image/jpeg", quality)
+    // The quality argument is ignored for PNG, which is lossless — passing it is harmless and
+    // keeps this one call site rather than two.
+ return canvas.toDataURL(outType, quality)
   } catch {
  return original
   }
@@ -88,6 +112,7 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
 const SUBTABS: { id: string; label: string }[] = [
   { id: "hero", label: "Hero" },
   { id: "stats", label: "Stats" },
+  { id: "specs", label: "Spec strip" },
   { id: "features", label: "Features" },
   { id: "steps", label: "Steps" },
   { id: "testimonials", label: "Testimonials" },
@@ -228,9 +253,9 @@ export function SiteContentPanel() {
           </div>
           <Field label="'Works with' label" value={c.hero.worksWithLabel} onChange={(v) => edit((x) => { x.hero.worksWithLabel = v })} />
 
-          {/* Hero banner image */}
+          {/* The hero figure — see the note on SiteContent.hero.image. */}
           <div>
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">Banner image</span>
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Hero figure</span>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0])} />
             {(localPreview || c.hero.image) ? (
               <div className="space-y-2">
@@ -244,8 +269,8 @@ export function SiteContentPanel() {
                   </div>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={localPreview || c.hero.image} alt="Hero banner preview" onError={() => setImgBroken(true)}
- className="max-h-44 w-full rounded-lg border border-border object-cover" />
+                  <img src={localPreview || c.hero.image} alt="Hero figure preview" onError={() => setImgBroken(true)}
+ className="max-h-44 w-full rounded-lg border border-border object-contain" />
                 )}
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
@@ -255,19 +280,44 @@ export function SiteContentPanel() {
                 </div>
               </div>
             ) : (
+              /* An EMPTY region may carry one sentence (§4), and the hint is the one fact the
+                 label cannot carry: where a picture with no background comes from. It lives on
+                 this branch only — once a figure is set, the same sentence would be prose
+                 under a control, which is the thing §4 keeps having to delete. */
               <Dropzone
                 icon={ImageIcon}
                 accept="image/*"
                 disabled={uploading}
                 busy={uploading ? "Uploading…" : null}
                 onFiles={(files) => onPickImage(files[0])}
-                label="Drag an image here, or click to choose"
-                hint="JPEG, PNG, WebP or AVIF · big photos are resized automatically"
+                label="Drop the hero figure here"
+                hint="A cut-out PNG stands on the page, a JPEG sits on it. Make one in Studio: Backdrop → cut-out ready, then Remove background."
               />
             )}
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Optional. Sits behind the hero under a scrim, so the text stays readable. Landscape works best — around 1600×900 (16:9). Leave empty for the default gradient. Press Save to publish — it&apos;s live within a minute.
-            </span>
+          </div>
+
+          <Field label="What the picture is, in words" value={c.hero.imageAlt} onChange={(v) => edit((x) => { x.hero.imageAlt = v })} />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Rule label, left" value={c.hero.ruleLeft} onChange={(v) => edit((x) => { x.hero.ruleLeft = v })} />
+            <Field label="Rule label, right" value={c.hero.ruleRight} onChange={(v) => edit((x) => { x.hero.ruleRight = v })} />
+          </div>
+          <Field label="Ghost word behind the figure" value={c.hero.ghostWord} onChange={(v) => edit((x) => { x.hero.ghostWord = v })} />
+
+          <div>
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Figure callouts</span>
+            <div className="space-y-2">
+              {c.hero.callouts.map((co, i) => (
+                <div key={i} className="rounded-lg border border-border p-3">
+                  <div className="flex gap-2">
+                    <div className="flex-1"><Field label="Label" value={co.label} onChange={(v) => edit((x) => { x.hero.callouts[i].label = v })} /></div>
+                    <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.hero.callouts.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+                  </div>
+                  <div className="mt-2"><Field label="Note" value={co.note ?? ""} onChange={(v) => edit((x) => { x.hero.callouts[i].note = v })} /></div>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => edit((x) => { x.hero.callouts.push({ label: "", note: "" }) })}><Plus size={13} weight="bold" />Add callout</Button>
+            </div>
           </div>
 
           <div>
@@ -282,6 +332,26 @@ export function SiteContentPanel() {
               <Button variant="outline" size="sm" onClick={() => edit((x) => { x.hero.integrations.push("") })}><Plus size={13} weight="bold" />Add</Button>
             </div>
           </div>
+        </TabsContent>
+
+        {/* ── Spec strip ── */}
+        <TabsContent value="specs" className="mt-4 space-y-3">
+          <Intro>The band of figures below the channels, divided by rules. Empty removes the section.</Intro>
+          <Field label="Section heading (optional)" value={c.specs.heading} onChange={(v) => edit((x) => { x.specs.heading = v })} />
+          {c.specs.items.map((sp, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="flex gap-2">
+                <div className="w-28"><Field label="Value" value={sp.value} onChange={(v) => edit((x) => { x.specs.items[i].value = v })} /></div>
+                <div className="flex-1"><Field label="Label" value={sp.label} onChange={(v) => edit((x) => { x.specs.items[i].label = v })} /></div>
+                <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.specs.items.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+              <div className="mt-2"><Field label="Note" value={sp.note ?? ""} onChange={(v) => edit((x) => { x.specs.items[i].note = v })} /></div>
+            </div>
+          ))}
+          {/* Five is what the band fits before it wraps to a second row of orphans. */}
+          {c.specs.items.length < 5 && (
+            <Button variant="outline" size="sm" onClick={() => edit((x) => { x.specs.items.push({ value: "", label: "", note: "" }) })}><Plus size={13} weight="bold" />Add column</Button>
+          )}
         </TabsContent>
 
         {/* ── Stats ── */}
