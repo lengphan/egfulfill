@@ -40,6 +40,25 @@ const OPEN_ROWS = 8
 
 const blankRow = () => CSV_COLUMNS.map(() => "")
 
+/**
+ * HOW WIDE A COLUMN NEEDS TO BE, which is not the same for all 21.
+ *
+ * Every column was min-w-32 — 128px — so a quantity of "1" reserved exactly as much room as
+ * a street address, and the sheet was ~2,700px wide before it held anything. Most of what
+ * you drag past horizontally is empty.
+ *
+ * Only the genuinely SHORT ones are narrowed. A first attempt also widened the addresses to
+ * 192px, which made the total WIDER than it started (2,768 against 2,688) — the opposite of
+ * the point. A long value is not truncated by a narrow column here anyway: the cell is an
+ * input, so it scrolls its own text.
+ *
+ * This shaves roughly 10%. It does not solve the scroll and cannot: 21 columns in 1,440px
+ * is 68px each, which no address survives. The full-screen page is what actually helps,
+ * because it roughly doubles the width the dialog had.
+ */
+const NARROW = new Set(["item_quantity", "item_size", "item_price", "ship_state", "ship_zip"])
+const widthFor = (key: string) => (NARROW.has(key) ? "min-w-20" : "min-w-32")
+
 /** Column index by key, so the narrowing below never counts columns by hand. */
 const IDX = Object.fromEntries(CSV_COLUMNS.map((c, i) => [c.key, i])) as Record<string, number>
 
@@ -48,9 +67,15 @@ export type OrderGridProps = {
    *  not know what an order is, only what a row is. */
   onComplete: (rows: string[][]) => Promise<void> | void
   busy?: boolean
+  /** Rendered as "Back" beside Complete. Present when the grid owns the whole screen and
+   *  there is no other way out — a full-page surface with no exit is a trap. */
+  onBack?: () => void
+  /** Let the table take the height it is given instead of capping at half the viewport.
+   *  On the full page the cap is what made a 21-column sheet feel like a peephole. */
+  fill?: boolean
 }
 
-export function OrderGrid({ onComplete, busy }: OrderGridProps) {
+export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
   /**
    * ONE FETCH, ON MOUNT. Deliberately not keyed to anything the fetch itself writes — see
    * CLAUDE.md §2.8, where an effect that re-ran on state its own result produced took a
@@ -191,8 +216,15 @@ export function OrderGrid({ onComplete, busy }: OrderGridProps) {
   }
 
   return (
-    <div className="space-y-3">
-      <div ref={gridRef} className="max-h-[52vh] overflow-auto rounded-xl border border-border">
+    <div className={fill ? "flex min-h-0 flex-1 flex-col gap-3" : "space-y-3"}>
+      <div
+        ref={gridRef}
+        className={
+          fill
+            ? "min-h-0 flex-1 overflow-auto rounded-xl border border-border"
+            : "max-h-[52vh] overflow-auto rounded-xl border border-border"
+        }
+      >
         <table className="w-max min-w-full border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
@@ -201,7 +233,7 @@ export function OrderGrid({ onComplete, busy }: OrderGridProps) {
                 <th
                   key={col.key}
                   title={col.help}
-                  className="min-w-32 border-b border-l border-border px-2 py-1.5 text-left font-medium whitespace-nowrap"
+                  className={`${widthFor(col.key)} border-b border-l border-border px-2 py-1.5 text-left font-medium whitespace-nowrap`}
                 >
                   {col.header}
                   {col.required && <span className="ms-1 text-destructive">*</span>}
@@ -267,6 +299,11 @@ export function OrderGrid({ onComplete, busy }: OrderGridProps) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {onBack && (
+          <Button variant="outline" onClick={onBack} disabled={busy}>
+            Back
+          </Button>
+        )}
         <Button onClick={complete} disabled={!validCount || busy}>
           {busy ? "Working…" : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
         </Button>
