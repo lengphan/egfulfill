@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button"
 import {
   CSV_COLUMNS,
   COLUMN_OPTIONS,
+  ITEM_SIZES,
+  US_STATES,
   TEMPLATE_HEADERS,
   rowsToRecords,
   parsePasted,
@@ -56,6 +58,24 @@ const blankRow = () => CSV_COLUMNS.map(() => "")
  * is 68px each, which no address survives. The full-screen page is what actually helps,
  * because it roughly doubles the width the dialog had.
  */
+/**
+ * WHAT A COLUMN OFFERS WHEN NO PRODUCT NARROWS IT — named explicitly, not read from
+ * COLUMN_OPTIONS.
+ *
+ * COLUMN_OPTIONS does DOUBLE DUTY. For most keys it is the dropdown values, but for
+ * `item_size` it holds HEADER SPELLINGS — "item_size", "variant_size", "lineitem_size" —
+ * because the alias lookup needed somewhere to live (see the note on it in order-import.ts).
+ * Reading it blindly is how the Size cell offered "lineitem_size" as a size.
+ *
+ * So each column names its own source. A key absent here has no fixed list and stays free
+ * text until a product narrows it.
+ */
+const FIXED_OPTIONS: Record<string, string[]> = {
+  item_size: ITEM_SIZES,
+  ship_state: US_STATES,
+  print_type: COLUMN_OPTIONS.print_type ?? [],
+}
+
 const NARROW = new Set(["item_quantity", "item_size", "item_price", "ship_state", "ship_zip"])
 const widthFor = (key: string) => (NARROW.has(key) ? "min-w-20" : "min-w-32")
 
@@ -89,6 +109,30 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
   }, [])
 
   const [rows, setRows] = useState<string[][]>(() => Array.from({ length: OPEN_ROWS }, blankRow))
+  /**
+   * SELECTED IS NOT EDITING, and paste is where the difference matters.
+   *
+   * Every cell is an <input>, so focus alone cannot tell the two apart — but a spreadsheet
+   * has to. Pasting a three-line address into a SELECTED cell means "fill three rows"; the
+   * same paste into a cell you are TYPING in means "this is the value". Without the
+   * distinction a copied address split itself down the column, which is what this fixes.
+   *
+   * A cell becomes editing when you double-click it or type into it, and stops on Escape,
+   * Enter, or moving away. Clicking or arrowing to a cell only SELECTS it.
+   */
+  const [editing, setEditing] = useState<string | null>(null)
+  /**
+   * THE SUGGESTION MENU, POSITIONED BY US.
+   *
+   * This was a native <datalist>, which cannot be positioned, sized or styled at all — the
+   * browser decided, and it decided badly: it opened upward over the toolbar, and it was
+   * wider than the screen for product names.
+   *
+   * Anchored to the cell instead and always DOWNWARD, measured from the input's own rect.
+   * `position: fixed` rather than absolute so the table's overflow cannot clip it — a menu
+   * on the last visible row was otherwise cut in half by the scroll container.
+   */
+  const [menu, setMenu] = useState<{ key: string; left: number; top: number; width: number } | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -130,10 +174,10 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
   const optionsFor = useCallback(
     (colKey: string, row: string[]): string[] | null => {
       const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type"
-      if (!dependent) return COLUMN_OPTIONS[colKey] ?? null
+      if (!dependent) return FIXED_OPTIONS[colKey] ?? null
       const name = (row[IDX.blank] || "").trim().toLowerCase()
       const p = name ? catalog.find((c) => String(c.name || "").trim().toLowerCase() === name) : null
-      if (!p) return COLUMN_OPTIONS[colKey] ?? null
+      if (!p) return FIXED_OPTIONS[colKey] ?? null
       if (colKey === "item_color") return productColors(p as never)
       if (colKey === "item_size") return productSizes(p as never)
       return normalizeMethods([(p as { method?: string }).method]).map((m) => m.label)
@@ -175,6 +219,9 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
    * kind of quiet data loss someone only finds after submitting.
    */
   const onPaste = useCallback((e: React.ClipboardEvent, r: number, c: number) => {
+    // EDITING WINS. The caret is in the text, so the clipboard belongs to this cell — even
+    // when it carries newlines, which is exactly the copied-address case.
+    if (editing === `${r}-${c}`) return
     const text = e.clipboardData.getData("text/plain")
     if (!text || (!text.includes("\t") && !text.includes("\n"))) return   // one cell: let the browser do it
     e.preventDefault()
@@ -192,19 +239,47 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
       })
       return next
     })
-  }, [])
+  }, [editing])
 
   /** Arrow/Enter move between cells. A grid you cannot leave the mouse for is a form. */
   const onKeyDown = useCallback((e: React.KeyboardEvent, r: number, c: number) => {
+    const key = `${r}-${c}`
     const go = (dr: number, dc: number) => {
       e.preventDefault()
+      setEditing(null)
       const sel = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${r + dr}-${c + dc}"]`)
       sel?.focus()
     }
+    if (e.key === "Escape") { setEditing(null); return }
+    // Left/Right inside a value belong to the CARET, not to the grid — stepping columns
+    // while someone is editing a street name is how a half-typed address ends up split.
+    if (editing === key && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return
     if (e.key === "ArrowDown" || e.key === "Enter") go(1, 0)
     else if (e.key === "ArrowUp") go(-1, 0)
     else if (e.key === "Tab" && !e.shiftKey && c === CSV_COLUMNS.length - 1) go(1, -(CSV_COLUMNS.length - 1))
+    // Any character typed into a merely-selected cell starts editing it, so the next paste
+    // lands in the cell rather than across the sheet.
+    else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) setEditing(key)
+  }, [editing])
+
+  const openMenu = useCallback((el: HTMLElement, key: string) => {
+    const r = el.getBoundingClientRect()
+    setMenu({ key, left: r.left, top: r.bottom, width: r.width })
   }, [])
+
+  /* The menu is fixed, so it does not travel with the cell — anything that MOVES the cell
+     has to close it, or it hangs over the sheet pointing at nothing. Capture phase, because
+     the scroll happens on the table container rather than on the window. */
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
+    }
+  }, [menu])
 
   const addRows = () => setRows((p) => [...p, ...Array.from({ length: 5 }, blankRow)])
   const clearRow = (r: number) => setRows((p) => p.map((row, i) => (i === r ? blankRow() : row)))
@@ -245,39 +320,60 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
           <tbody>
             {rows.map((row, r) => {
               const rec = byRow.get(r)
-              const bad = rec && !rec._valid
+              /**
+               * THE RED IS PER-CELL, AND ONLY ON A ROW SOMEONE STARTED.
+               *
+               * Tinting the whole ROW meant every blank row in the sheet was pink before
+               * anyone typed — eight rows of alarm describing nothing, which reads as the
+               * feature being broken rather than as work to do. And even on a real row it
+               * said "something here is wrong" without saying WHICH of 21 cells.
+               *
+               * So: a required cell, left empty, on a row that has any content at all.
+               * An untouched row is not a mistake; it is an untouched row.
+               */
+              const started = rows[r].some((v) => v.trim() !== "")
               return (
-                <tr key={r} className={bad ? "bg-destructive/5" : undefined}>
+                <tr key={r}>
                   <td
-                    title={rec?._errors || rec?._warnings || undefined}
-                    className="border-b border-border px-2 py-1 text-right text-muted-foreground tabular-nums"
+                    title={started ? (rec?._errors || rec?._warnings || undefined) : undefined}
+                    className="border-b border-border bg-muted/40 px-2 py-1 text-right text-muted-foreground tabular-nums"
                   >
                     {r + 1}
                   </td>
                   {CSV_COLUMNS.map((col, c) => {
                     const opts = optionsFor(col.key, row)
                     const list = col.key === "blank" ? productNames : opts
+                    const missing = started && col.required && !(row[c] ?? "").trim()
                     return (
-                      <td key={col.key} className="border-b border-l border-border p-0">
+                      <td
+                        key={col.key}
+                        className={`border-b border-l border-border p-0 ${missing ? "bg-destructive/10" : ""}`}
+                      >
                         <input
                           data-cell={`${r}-${c}`}
-                          list={list ? `og-${col.key}-${r}` : undefined}
                           value={row[c] ?? ""}
-                          onChange={(e) => setCell(r, c, e.target.value)}
+                          onFocus={(e) => { if (list?.length) openMenu(e.currentTarget, `${r}-${c}`) }}
+                          onChange={(e) => {
+                            setEditing(`${r}-${c}`)
+                            setCell(r, c, e.target.value)
+                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`)
+                          }}
                           onPaste={(e) => onPaste(e, r, c)}
                           onKeyDown={(e) => onKeyDown(e, r, c)}
+                          /* Double-click is the spreadsheet gesture for "let me into this
+                             value". A single click only selects, so the next paste still
+                             spreads across rows the way a copied column should. */
+                          onDoubleClick={() => setEditing(`${r}-${c}`)}
+                          onBlur={() => {
+                            setEditing((k) => (k === `${r}-${c}` ? null : k))
+                            setMenu((m) => (m?.key === `${r}-${c}` ? null : m))
+                          }}
+                          /* The caret is the ONLY signal telling the two modes apart, so a
+                             merely-selected cell must not show one — otherwise the rule
+                             "if it is flashing, paste goes in the box" is unreadable. */
+                          style={editing === `${r}-${c}` ? undefined : { caretColor: "transparent" }}
                           className="w-full bg-transparent px-2 py-1 outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
                         />
-                        {/* A datalist, not a select: it SUGGESTS and still accepts anything.
-                            The sheet's own validation was strict:false for the same reason —
-                            a seller with a product we have not catalogued yet must still be
-                            able to type it and see the row flagged, rather than be unable to
-                            express it at all. */}
-                        {list && (
-                          <datalist id={`og-${col.key}-${r}`}>
-                            {list.map((o) => <option key={o} value={o} />)}
-                          </datalist>
-                        )}
                       </td>
                     )
                   })}
@@ -297,6 +393,40 @@ export function OrderGrid({ onComplete, busy, onBack, fill }: OrderGridProps) {
           </tbody>
         </table>
       </div>
+
+      {/* ALWAYS DOWNWARD, ALWAYS ANCHORED. Rendered here rather than inside the cell so the
+          table's overflow cannot clip it, and capped so a 4,000-product catalogue is a
+          scrollable list rather than a column taller than the screen.
+          It SUGGESTS and still accepts anything typed — the sheet's own validation was
+          strict:false for the same reason: a seller whose product we have not catalogued yet
+          must be able to write it down and see the row flagged, not be unable to say it. */}
+      {menu && (() => {
+        const [mr, mc] = menu.key.split("-").map(Number)
+        const col = CSV_COLUMNS[mc]
+        const all = col.key === "blank" ? productNames : optionsFor(col.key, rows[mr] ?? [])
+        const typed = (rows[mr]?.[mc] ?? "").trim().toLowerCase()
+        const shown = (all ?? []).filter((o) => !typed || o.toLowerCase().includes(typed)).slice(0, 50)
+        if (!shown.length) return null
+        return (
+          <div
+            style={{ position: "fixed", left: menu.left, top: menu.top, minWidth: Math.max(menu.width, 180), maxWidth: 320 }}
+            className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-xs shadow-lg"
+          >
+            {shown.map((o) => (
+              <button
+                key={o}
+                type="button"
+                /* mousedown, not click: the input blurs first and would close this menu
+                   before a click ever landed. preventDefault keeps the caret where it is. */
+                onMouseDown={(e) => { e.preventDefault(); setCell(mr, mc, o); setMenu(null) }}
+                className="block w-full truncate px-2.5 py-1.5 text-left hover:bg-accent"
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
 
       <div className="flex flex-wrap items-center gap-2">
         {onBack && (
