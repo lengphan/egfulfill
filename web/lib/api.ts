@@ -2751,10 +2751,15 @@ export function getDeskImageConfig() {
 }
 /** Generates, stores, and posts the image into the caller's own assistant thread.
  *  Returns `ok:false` with a reason rather than throwing, same as the other AI calls. */
+/** `backdrop` asks the render for a flat sweep that `removeBackground()` can separate
+ *  afterwards. It is NOT transparency — the API returns JPEG and always will — it is the
+ *  only thing that makes a free browser cut-out work on a generated photo. */
+export type Backdrop = "white" | "grey"
 export function generateDeskImage(body: {
   prompt: string; aspectRatio?: string; imageSize?: string; model?: string
   /** Bare asset filenames of reference photos already stored for this chat. */
   imageNames?: string[]
+  backdrop?: Backdrop
 }) {
   return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; refsUsed?: number; disabled?: boolean; overloaded?: boolean; error?: string }>(
     `/api/desk/image`, { method: "POST", body: JSON.stringify(body) })
@@ -3601,6 +3606,7 @@ export function generateListingPhotos(body: {
   images?: string[]
   model?: string; aspectRatio?: string; imageSize?: string
   count?: number
+  backdrop?: Backdrop
 }) {
   return api<{ ok?: boolean; results: ListingRender[]; errors: string[]; quote?: AiQuote; error?: string }>(
     `/api/publish/photo-generate`, { method: "POST", body: JSON.stringify(body) })

@@ -26,7 +26,7 @@ const TRANSPARENCY = /\b(transparent|transparency|no background|(remove|delete|e
 /** Cheap intent check. Returns a sentence to show, or null when nothing is wrong. */
 export function promptWarning(prompt: string): string | null {
   if (TRANSPARENCY.test(prompt || "")) {
-    return "Renders come back as JPEG, which has no transparency — asking for a removed or transparent background makes the model paint a grey checkerboard instead. Describe the background you DO want (a plain white sweep, a wooden surface), then cut it out afterwards if you need a PNG."
+    return "Renders come back as JPEG, which has no transparency — asking for a removed or transparent background makes the model paint a grey checkerboard instead. Set Backdrop to a cut-out-ready sweep in the Generate panel, then press Remove background on the render: that gives you a real PNG, free."
   }
   return null
 }

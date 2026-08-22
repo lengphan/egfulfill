@@ -586,6 +586,7 @@ export default function ChatPage() {
  const r = await generateDeskImage({
  prompt: text, aspectRatio: gen.ratio, imageSize: gen.size, model: gen.model,
  imageNames: uniq.length ? uniq : undefined,
+ backdrop: gen.backdrop,
         })
  if (!r.ok || !r.attachment) {
           // Keep the words the user typed — losing a prompt to a transient failure means

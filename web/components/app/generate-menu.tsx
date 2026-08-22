@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Warning, Sparkle, ImageSquare, FilmSlate, CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig } from "@/lib/api"
+import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig, type Backdrop } from "@/lib/api"
 
 /**
  * What the composer is armed to make. Null means the message box behaves normally.
@@ -18,6 +18,10 @@ export type GenSettings = {
  ratio: string
   /** image only */
  size?: string
+  /** image only — ask for a flat sweep the browser cut-out can separate afterwards.
+   *  Undefined means "as described", which is the default and stays the default: most
+   *  renders are lifestyle shots where a seamless backdrop would be wrong. */
+ backdrop?: Backdrop
   /** video only */
  resolution?: string
  seconds?: number
@@ -56,6 +60,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
 }) {
  const [open, setOpen] = useState(false)
  const [mode, setMode] = useState<Mode>("image")
+ const [backdrop, setBackdrop] = useState<Backdrop | "">("")
  const [img, setImg] = useState<DeskImageConfig | null>(null)
  const [vid, setVid] = useState<DeskVideoConfig | null>(null)
  const [loading, setLoading] = useState(false)
@@ -177,7 +182,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
    * right now (state setters are async, so reading them back here would arm the PREVIOUS
    * choice — the bug that makes a picker feel one step behind).
    */
- const armWith = (o: Partial<{ mode: Mode; imgModel: string; imgSize: string; imgRatio: string; vidModel: string; vidRes: string; vidRatio: string; secs: number }> = {}) => {
+ const armWith = (o: Partial<{ mode: Mode; imgModel: string; imgSize: string; imgRatio: string; vidModel: string; vidRes: string; vidRatio: string; secs: number; backdrop: Backdrop | "" }> = {}) => {
  const m = o.mode ?? mode
  const video = m === "video"
  const iM = o.imgModel ?? imgModel, vM = o.vidModel ?? vidModel
@@ -187,6 +192,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
  const vRes = vSpec ? (vSpec.resolutions.includes(o.vidRes ?? vidRes) ? (o.vidRes ?? vidRes) : vSpec.defaultResolution) : (o.vidRes ?? vidRes)
  const sc = o.secs ?? secs
  const iRatio = o.imgRatio ?? imgRatio, vRatio = o.vidRatio ?? vidRatio
+ const bd = o.backdrop ?? backdrop
 
  onArm(video
       ? {
@@ -196,8 +202,12 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
       }
  : {
  mode: "image", model: iM, ratio: iRatio, size: iSize,
+ backdrop: bd || undefined,
  usd: iSpec?.usd[iSize] ?? 0,
- label: `Image · ${iSize} · ${iRatio}`, short: `${iSize} · ${iRatio}`,
+ label: `Image · ${iSize} · ${iRatio}`,
+        // The chip has to say a cut-out backdrop is armed, or the next render comes back on a
+        // white sweep for a reason nothing on screen explains.
+ short: bd ? `${iSize} · ${iRatio} · cut-out` : `${iSize} · ${iRatio}`,
       })
   }
 
@@ -332,6 +342,31 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                     </div>
                   )}
                 </div>
+
+                {/*
+                  * BACKDROP — the answer to "remove the background", asked at the only point
+                  * it can be answered.
+                  *
+                  * A render comes back as JPEG and always will, so transparency cannot be
+                  * bought here at any price; what CAN be bought is a sweep flat enough that
+                  * the free browser cut-out separates it perfectly afterwards. Grey is not a
+                  * style choice — a colour-distance flood cannot separate a white shirt from
+                  * a white sweep, and a white shirt is the most common thing photographed here.
+                  *
+                  * Image only. It is a FIELD, so it wears field chrome: it is something you
+                  * set, not something you press.
+                  */}
+                {!isVideo && (
+                  <div>
+                    <div className="mb-1 text-2xs text-muted-foreground">Backdrop</div>
+                    <select value={backdrop} className={selectCls}
+ onChange={(e) => { const v = e.target.value as Backdrop | ""; setBackdrop(v); armWith({ backdrop: v }) }}>
+                      <option value="">As described</option>
+                      <option value="white">Flat white — cut-out ready</option>
+                      <option value="grey">Flat grey — cut-out ready, for white garments</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* Arms the composer; it does not spend anything yet. The price rides onto the
  pill so it stays visible while you type, not only at the moment of choosing. */}
