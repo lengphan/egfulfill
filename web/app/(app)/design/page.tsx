@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useState } from "react"
-import { Plus, PenNib, Trash } from "@phosphor-icons/react"
+import { Plus, PenNib, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TemplatesPanel } from "@/components/app/templates-panel"
 import { MachineFilesPanel } from "@/components/app/machine-files-panel"
@@ -153,7 +153,7 @@ function DesignLab() {
  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"
  aria-label="Delete image"
                     >
-                      <Trash size={13} weight="bold" />
+                      <X size={13} weight="bold" />
                     </button>
                   </div>
                   {/* flex-1 + flex-col so the meta row can pin to the BOTTOM (mt-auto below).

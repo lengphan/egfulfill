@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { CircleNotch, DownloadSimple, Needle, Trash } from "@phosphor-icons/react"
+import { CircleNotch, DownloadSimple, Needle, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { EmptyState } from "@/components/app/empty-state"
 import { Dropzone, formatBytes } from "@/components/app/dropzone"
@@ -208,7 +208,7 @@ export function MachineFilesPanel() {
                     type="button"
                     onClick={() => { navigator.clipboard?.writeText(f.ref).catch(() => {}); setCopied(f.id); setTimeout(() => setCopied(null), 1400) }}
                     title="Copy this file's reference"
-                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
                     {copied === f.id ? "Copied" : f.ref}
                   </button>
@@ -228,7 +228,7 @@ export function MachineFilesPanel() {
                   onClick={() => void remove(f)}
                   className="text-muted-foreground hover:text-destructive"
                 >
-                  <Trash size={14} weight="bold" />
+                  <X size={14} weight="bold" />
                 </Button>
               </div>
             </div>

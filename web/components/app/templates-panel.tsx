@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Stack, Trash, PenNib, CircleNotch, Plus } from "@phosphor-icons/react"
+import { Stack, X, PencilSimple, CircleNotch, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getTemplates, deleteTemplate, getCatalogProducts, type ProductTemplate, type CatalogProduct } from "@/lib/api"
@@ -116,6 +116,21 @@ export function TemplatesPanel() {
                     <Stack size={26} weight="duotone" />
                   </div>
                 ) : null}
+                {/* THE SAME REMOVE AS THE IMAGES CARD: an X on the thumbnail, revealed on
+                    hover, rather than a trash can parked in the footer beside the title.
+                    A card's destructive action should not sit in the row you read — and the
+                    two grids are the same object at different sizes, so they get the same
+                    gesture. */}
+                <button
+                  type="button"
+                  disabled={busy === t.id}
+                  onClick={() => remove(t.id)}
+                  aria-label={`Remove ${t.name || "template"}`}
+                  title={`Remove ${t.name || "template"}`}
+                  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"
+                >
+                  <X size={13} weight="bold" />
+                </button>
               </div>
               <div className="flex flex-col gap-1 p-2">
                 <div className="flex items-center gap-1">
@@ -126,17 +141,7 @@ export function TemplatesPanel() {
                     aria-label={`Open ${t.name || "template"} in the maker`}
                     onClick={() => router.push(`/design/maker?template=${encodeURIComponent(t.id)}`)}
                   >
-                    <PenNib size={14} weight="bold" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={`Delete ${t.name || "template"}`}
-                    disabled={busy === t.id}
-                    onClick={() => remove(t.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash size={14} weight="bold" />
+                    <PencilSimple size={14} weight="bold" />
                   </Button>
                 </div>
                 <div className="flex items-center gap-1.5">
