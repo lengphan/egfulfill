@@ -5,12 +5,12 @@ import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Meg
 import { DictateButton } from "@/components/app/dictate-button"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment, getAiQuote, type AiQuote } from "@/lib/api"
+import { generateDeskImage, generateDeskVideo, getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, getChannelSummaries, type ChannelSummary, searchSellers, aiDraft, getSupportAvailability, getOrderMentions, getMentionPeople, uploadChatAttachment, type ChatEntry, type SellerMatch, type SupportThread, type SupportAvailability, type OrderRow, type MentionPerson, type ChatAttachment, getAiQuote, type AiQuote } from "@/lib/api"
 import { fileToUploadUrl, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
-import { GenerateButton, AnimateImageButton, type GenSettings } from "@/components/app/generate-menu"
+import { GenerateButton, AnimateImageButton, EditImageButton, type GenSettings } from "@/components/app/generate-menu"
 import { promptWarning } from "@/lib/image-gen"
 import { UserAvatar } from "@/components/app/user-avatar"
 
@@ -67,6 +67,9 @@ export default function ChatPage() {
  const [search, setSearch] = useState("")
  const [found, setFound] = useState<SellerMatch[]>([])  // staff: sellers with no thread yet
  const [opened, setOpened] = useState<Convo[]>([])      // channels started from the directory
+  /** Newest message + unread count for the PINNED channels, keyed by channel id. Seller
+   *  threads get theirs from getSupportThreads; these rooms have no inbox row to ride on. */
+ const [chanMeta, setChanMeta] = useState<Record<string, ChannelSummary>>({})
  const [drafting, setDrafting] = useState(false)
  const [activeId, setActiveId] = useState<string | null>(null)
  const [messages, setMessages] = useState<ChatEntry[] | null>(null)
@@ -93,6 +96,32 @@ export default function ChatPage() {
  const [hoursOpen, setHoursOpen] = useState(false)  // staff: support-hours editor dialog
  const [emojiOpen, setEmojiOpen] = useState(false)  // composer emoji picker
  const [pendingAtt, setPendingAtt] = useState<ChatAttachment | null>(null)  // staged attachment
+
+  /*
+   * WHAT A FOLLOW-UP CONTINUES FROM.
+   *
+   * The generator was stateless in the one place a person assumes it is not: every prompt
+   * went to Google with only the words in the box, so "remove the top and bottom objects,
+   * keep the shirt only" was a brand-new render of a sentence that means nothing on its
+   * own. The model had never seen the picture being described. What came back was a
+   * different room, which reads as the conversation being ignored — because it was.
+   *
+   * So a follow-up carries the newest picture in this thread as its reference, which is
+   * what turns a prompt into an EDIT of what is on screen. Three states rather than a
+   * boolean, because "nothing chosen yet" and "deliberately starting fresh" are different
+   * answers and only one of them should be overridden by the next render landing:
+   *
+   *   auto  — the newest image in the thread. The default, and where it returns after
+   *           every generation, so a chain of edits just works.
+   *   none  — the ✕ on the pill. This next render starts from nothing.
+   *   pick  — Edit pressed on a specific picture further up the thread.
+   *
+   * It is never silent: the pill above the composer shows the thumbnail being continued
+   * from, for the same reason the armed-still pill exists — a reference you cannot see is
+   * indistinguishable from a model that ignored you.
+   */
+ type ContinueFrom = { kind: "auto" } | { kind: "none" } | { kind: "pick"; name: string; url: string }
+ const [cont, setCont] = useState<ContinueFrom>({ kind: "auto" })
  const [attaching, setAttaching] = useState(false)
   /* Drag counter, not a boolean. dragenter/dragleave fire for every child element the
  pointer crosses, so a plain flag flickers off the moment you move over a message. */
@@ -132,7 +161,7 @@ export default function ChatPage() {
   /*
    * WHERE THE CONTROL LIVES HAS TO MATCH WHERE THE IMAGE LANDS.
    *
-   * Staff generate into their own "My EG" assistant thread. A seller's images go to their
+   * Staff generate into their own "My Assistant" thread. A seller's images go to their
    * Generations channel — so gating the button on the support thread left sellers looking at
    * the very channel their images arrive in, with no way to make one.
    */
@@ -150,7 +179,7 @@ export default function ChatPage() {
   }, [])
 
   // Everyone gets an EGFUL Support thread (support-<uid>); staff ALSO get the shared
-  // internal Factory channel and default to it. Sellers additionally see their orders.
+  // internal EG Channel and default to it. Sellers additionally see their orders.
  useEffect(() => {
  let alive = true
  const id = setTimeout(async () => {
@@ -173,16 +202,32 @@ export default function ChatPage() {
 
  const convos = useMemo<Convo[]>(() => {
  const list: Convo[] = []
- if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "All boards — production & artwork" })
- if (supportId) list.push({ id: supportId, kind: "support", title: isStaffUser ? "My EG" : "EGFUL Support", sub: isStaffUser ? "Your AI assistant" : "Assistant + team" })
+    // The newest message stands in for the subtitle; an empty room says so, because a blank
+    // line beside a title reads as a row that failed to load rather than one nobody has used.
+ const pin = (c: Convo): Convo => {
+ const m = chanMeta[c.id]
+ return { ...c, sub: m?.last || "No messages yet", count: m?.unread || 0 }
+    }
+    /*
+     * A PINNED ROW READS LIKE EVERY OTHER ROW.
+     *
+     * These four carried a fixed subtitle — "All boards — production & artwork", "Your AI
+     * assistant" — which is a description of the room, not news from it. Sitting directly
+     * above seller threads that show their newest message, the effect was that the rooms
+     * with the most traffic in them were the only ones that never looked like anything had
+     * happened. `pin()` gives them the same two facts a seller row carries: what was said
+     * last, and how much of it you haven't seen (see chanMeta).
+     */
+ if (isStaffUser) list.push(pin({ id: STAFF_CHANNEL, kind: "staff", title: "EG Channel", sub: "" }))
+ if (supportId) list.push(pin({ id: supportId, kind: "support", title: isStaffUser ? "My Assistant" : "EGFUL Support", sub: "" }))
     /*
      * GENERATIONS — the account's own channel, so AI images stop arriving in the middle of a
      * support conversation staff are reading. Listed only when the server says this account
      * has one (it names the id: a team member cannot derive their owner's account id).
      */
- if (genChannel) list.push({ id: genChannel, kind: "gen", title: "Generations", sub: "Images you have made with AI" })
+ if (genChannel) list.push(pin({ id: genChannel, kind: "gen", title: "Generations", sub: "" }))
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
- if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFUL" })
+ if (!isDesigner) list.push(pin({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: "" }))
     /**
      * NEWEST MESSAGE FIRST, under the pinned channels.
      *
@@ -208,7 +253,7 @@ export default function ChatPage() {
     // vanish from the rail the moment you click one.
  for (const c of opened) if (!list.some((x) => x.id === c.id)) list.push(c)
  return list
-  }, [isStaffUser, isDesigner, isAdmin, supportId, inbox, opened, genChannel])
+  }, [isStaffUser, isDesigner, supportId, inbox, opened, genChannel, chanMeta])
 
   // Filtered rail. Searching only narrows what's already there; sellers who have
   // never written in come from the directory below, not from this list.
@@ -278,7 +323,7 @@ export default function ChatPage() {
  return () => clearTimeout(id)
   }, [activeId])
 
-  // Order suggestions — for the seller support threads AND the staff Factory channel; the
+  // Order suggestions — for the seller support threads AND the staff EG Channel; the
   // server gates access and SEARCHES BY NUMBER, so typing "@14" finds even an old order past
   // the recent window. Debounced so a query hits the server once, not per keystroke.
  useEffect(() => {
@@ -354,6 +399,31 @@ export default function ChatPage() {
  const attachedImageName = (a: { url?: string; mime?: string } | null) =>
     (a?.url && a.mime?.startsWith("image/") ? a.url.split("/api/support/asset/")[1] || null : null)
 
+  /**
+   * THE NEWEST PICTURE IN THIS THREAD, whoever put it there.
+   *
+   * Ours or yours — an image you dropped in two messages ago is as valid a thing to edit as
+   * one the model made, and the person asking does not think of them as different objects.
+   * It has to be one WE hold, because the route takes a bare asset name and never a URL.
+   */
+ const lastImage = useMemo(() => {
+    // Filtered rather than a reverse loop with an early return: the React Compiler cannot
+    // preserve memoization across a break out of a loop, and this file is under
+    // react-hooks/preserve-manual-memoization.
+ const held = (messages ?? [])
+      .map((m) => m.attachment as ChatAttachment | undefined)
+      .filter((a) => !!a?.url && !!a.mime?.startsWith("image/"))
+      .map((a) => ({ name: (a as ChatAttachment).url.split("/api/support/asset/")[1] || "", url: (a as ChatAttachment).url }))
+      .filter((x) => !!x.name)
+ return held.length ? held[held.length - 1] : null
+  }, [messages])
+
+  /** Resolved: the picture this next render will start from, or null for a blank page. */
+ const carried = gen?.mode !== "image" ? null
+ : cont.kind === "none" ? null
+ : cont.kind === "pick" ? { name: cont.name, url: cont.url }
+ : lastImage
+
  const onDrop = (e: React.DragEvent) => {
  e.preventDefault()
  dragDepth.current = 0; setDragging(false)
@@ -401,10 +471,54 @@ export default function ChatPage() {
   // Load + poll the active thread; reset messages when switching.
  useEffect(() => {
  if (!activeId) return
- const t = setTimeout(() => { setMessages(null); load() }, 0)
+    // A picked reference belongs to the thread it was picked in — carrying it across would
+    // hand the next channel a picture from a conversation it has nothing to do with.
+ const t = setTimeout(() => { setMessages(null); setCont({ kind: "auto" }); load() }, 0)
  const iv = setInterval(load, 5000)
  return () => { clearTimeout(t); clearInterval(iv) }
   }, [activeId, load])
+
+  /*
+   * PINNED CHANNEL META, on the same cadence as the inbox.
+   *
+   * Sellers poll this too — they have no inbox, but they do have a support thread, a
+   * generations channel and announcements, and those are exactly the rows that used to be
+   * unable to tell them anything had arrived.
+   *
+   * The ACTIVE channel is forced to zero locally rather than waiting for the server to
+   * agree. Reading a channel stamps read_at server-side (GET .../messages), but that stamp
+   * and this count are two different requests on two different timers, so the badge on the
+   * room you are looking at would otherwise sit there for up to a poll interval.
+   */
+ const pinnedIds = useMemo(() => [
+    ...(isStaffUser ? [STAFF_CHANNEL] : []),
+    ...(supportId ? [supportId] : []),
+    ...(genChannel ? [genChannel] : []),
+    ...(isDesigner ? [] : [ANNOUNCE_CHANNEL]),
+  ], [isStaffUser, isDesigner, supportId, genChannel])
+
+ const refreshChanMeta = useCallback(() => {
+ if (!pinnedIds.length || !getToken()) return
+ getChannelSummaries(pinnedIds).then((rows) => {
+ if (!Array.isArray(rows)) return
+ setChanMeta(Object.fromEntries(rows.map((r) => [r.id, r.id === activeId ? { ...r, unread: 0 } : r])))
+    }).catch(() => {})
+  }, [pinnedIds, activeId])
+
+ useEffect(() => {
+ const t = setTimeout(refreshChanMeta, 0)
+ const iv = setInterval(refreshChanMeta, 20000)
+ return () => { clearTimeout(t); clearInterval(iv) }
+  }, [refreshChanMeta])
+
+  // Opening a room clears its badge now, not on the next poll.
+ useEffect(() => {
+ if (!activeId) return
+ const t = setTimeout(() => setChanMeta((prev) => (
+ prev[activeId] && prev[activeId].unread ? { ...prev, [activeId]: { ...prev[activeId], unread: 0 } } : prev
+    )), 0)
+ return () => clearTimeout(t)
+  }, [activeId])
 
   /**
    * THE RAIL ITSELF HAS TO REFRESH, or the badge is a number from whenever the page opened.
@@ -458,10 +572,20 @@ export default function ChatPage() {
  try {
  const attached = attachedImageName(pendingAtt)
  if (gen.mode === "image") {
- const refs = attached ? [attached] : []
+        /*
+         * WHAT THE MODEL ACTUALLY SEES. An attachment staged in the composer is the most
+         * explicit thing on screen, so it goes first; the picture being continued from goes
+         * with it, and is dropped when it IS the attachment rather than sent twice.
+         *
+         * `carried` is null when the pill's ✕ was pressed, which is the only way to say
+         * "start from nothing" — and the reason the ✕ exists, because otherwise a thread
+         * with any picture in it could never render a blank page again.
+         */
+ const refs = [attached, carried?.name].filter((n): n is string => !!n)
+ const uniq = Array.from(new Set(refs))
  const r = await generateDeskImage({
  prompt: text, aspectRatio: gen.ratio, imageSize: gen.size, model: gen.model,
- imageNames: refs.length ? refs : undefined,
+ imageNames: uniq.length ? uniq : undefined,
         })
  if (!r.ok || !r.attachment) {
           // Keep the words the user typed — losing a prompt to a transient failure means
@@ -471,6 +595,10 @@ export default function ChatPage() {
  return
         }
  setInput(""); setPendingAtt(null)
+        // Back to auto: the render that just landed is the newest picture in the thread, so
+        // the next prompt continues from IT. A ✕ applies to the render it was pressed for,
+        // not to the rest of the session.
+ setCont({ kind: "auto" })
  await load()
       } else {
         /**
@@ -535,13 +663,16 @@ export default function ChatPage() {
        * if the seller writes again a second later, the next refresh puts a 1 back, which
        * is correct rather than a flicker.
        *
-       * Only for a reply into SOMEONE ELSE's thread. On your own My EG thread you are the
+       * Only for a reply into SOMEONE ELSE's thread. On your own My Assistant thread you are the
        * asker, and there is no badge to clear.
        */
  if (myRole === "staff") {
  setInbox((prev) => prev.map((t) => (t.order_id === activeId ? { ...t, unanswered: 0 } : t)))
  refreshRail()
       }
+      // A pinned row's subtitle IS the newest message, so the thing you just said has to
+      // appear on it now rather than up to 20 seconds later.
+ refreshChanMeta()
       // Only the Support thread gets an AI reply; order threads are seller↔factory.
  if (isSupport) {
  setAiTyping(true)
@@ -585,7 +716,7 @@ export default function ChatPage() {
  else setAiNote(null)
         } catch {
           // "A teammate will follow up" is true of a SELLER's thread, which has a queue
-          // behind it. My EG has no one behind it but the model, so the same sentence there
+          // behind it. My Assistant has no one behind it but the model, so the same sentence there
           // promises an admin a person who is never coming.
  setAiNote(isStaffUser
             ? "The assistant didn't answer that one — try again in a moment."
@@ -679,7 +810,7 @@ export default function ChatPage() {
                 {/* THE PERSON, not a parcel. Every row drew the same glyph, so an inbox of
  eight conversations looked like eight copies of one thing and the only way
  to find the one you were mid-sentence with was to read names. The pinned
- channels (Announcements, Factory, My EG) keep their icons — those are
+ channels (Announcements, EG Channel, My Assistant) keep their icons — those are
  places, not people. A website visitor has no account, so UserAvatar falls
  back to their initial rather than inventing a face. */}
                 {c.avatar ? (
@@ -834,7 +965,7 @@ export default function ChatPage() {
               <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 {convoIcon(active?.kind, 21)}
               </span>
-              <div className="font-medium">{isSupport ? "How can we help?" : active?.kind === "staff" ? "Factory channel" : active?.kind === "announce" ? "Announcements" : `Chat with ${active?.title ?? "this seller"}`}</div>
+              <div className="font-medium">{isSupport ? "How can we help?" : active?.kind === "staff" ? "EG Channel" : active?.kind === "announce" ? "Announcements" : `Chat with ${active?.title ?? "this seller"}`}</div>
               <div className="max-w-xs text-sm text-muted-foreground">
                 {isSupport ? "Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed."
  : active?.kind === "staff" ? "Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in."
@@ -860,7 +991,7 @@ export default function ChatPage() {
                 // teammate's reply is never mistaken for the seller's own message. Other
                 // channels keep the plain seller-on-the-right convention.
  const role = m.role ?? "seller"
-                // "Mine" is by IDENTITY, not role — the Factory channel is staff↔staff, where
+                // "Mine" is by IDENTITY, not role — the EG Channel is staff↔staff, where
                 // role can't tell me from a teammate, and role-based sides put everyone on one
                 // side. Prefer the server's `me` flag; fall back to a name match so it's right
                 // before the backend redeploy. The assistant is never "mine".
@@ -910,6 +1041,10 @@ export default function ChatPage() {
                           // stored for this chat can be one — anything else has no name to give.
  const assetName = isImg ? att.url.split("/api/support/asset/")[1] : undefined
  const canAnimate = !!assetName && isAdmin && activeId === supportId
+                          // Edit follows the GENERATE gate, not the animate one: a seller with
+                          // generation switched on can edit a picture in their own Generations
+                          // channel, which is the whole point of that channel existing.
+ const canEdit = !!assetName && canGenerate && genHere
                           // w-fit, not a bare block: the overlay anchors to this link, and a
                           // full-width block put "Animate" at the BUBBLE's right edge,
                           // floating in space beside the picture instead of on it.
@@ -942,8 +1077,21 @@ export default function ChatPage() {
                                 <>
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={att.url} alt={att.name || "attachment"} className="max-h-[30rem] max-w-full rounded-lg border border-border object-contain" />
-                                  {canAnimate && (
-                                    <AnimateImageButton imageName={assetName} imageUrl={att.url} onArm={setGen} />
+                                  {(canEdit || canAnimate) && (
+                                    /* ONE ROW. Both chips used to position themselves at the
+                                       same corner, so a second one would have landed on top
+                                       of the first. */
+                                    <span className="absolute right-1.5 top-1.5 z-10 flex gap-1">
+                                      {canEdit && (
+                                        <EditImageButton
+ imageName={assetName!} imageUrl={att.url} armed={gen}
+ onArm={setGen} onPick={(pk) => setCont({ kind: "pick", ...pk })}
+                                        />
+                                      )}
+                                      {canAnimate && (
+                                        <AnimateImageButton imageName={assetName!} imageUrl={att.url} onArm={setGen} />
+                                      )}
+                                    </span>
                                   )}
                                 </>
                               ) : (
@@ -1091,6 +1239,29 @@ export default function ChatPage() {
                 <span className="text-2xs text-muted-foreground">animating this still</span>
               </div>
             )}
+            {/* CONTINUING FROM a picture: the same pill, for the same reason.
+                An armed still says which frame a clip starts from; this says which picture
+ the next prompt edits. Without it the reference is invisible, and an invisible
+ reference and a model that ignored you look identical from here — which is the
+ complaint this whole change came from. Not drawn when the composer already has
+ an attachment, because that thumbnail is right underneath and saying it twice
+ would imply two pictures are going. */}
+            {carried && !pendingAtt && (
+              <div className="flex items-center gap-2 p-2 pb-0">
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={carried.url} alt="" className="size-16 rounded-lg border border-border object-cover" />
+                  <button
+ onClick={() => setCont({ kind: "none" })} aria-label="Start from a blank page instead"
+ title="Start from a blank page instead"
+ className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+                  >
+                    <X size={11} weight="bold" />
+                  </button>
+                </div>
+                <span className="text-2xs text-muted-foreground">editing this</span>
+              </div>
+            )}
             {pendingAtt && (
               <div className="flex flex-wrap gap-2 p-2 pb-0">
                 <div className="group relative">
@@ -1188,7 +1359,7 @@ export default function ChatPage() {
             {/* Controls UNDER the text, not flanking it — the field gets its full width back,
  which is what makes a long prompt readable while you write it. */}
             <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
-              {/* Generate — STAFF ONLY, and only in the staffer's own "My EG" channel. Each
+              {/* Generate — STAFF ONLY, and only in the staffer's own "My Assistant" channel. Each
  generation bills Google, so it is not offered on a seller thread, a factory
  room or an inbox conversation; the server enforces the same two rules. */}
               {canGenerate && genHere && (
@@ -1196,7 +1367,7 @@ export default function ChatPage() {
  disabled={signedOut || !activeId} armed={gen} onArm={setGen}
  allowVideo={isAdmin} priceNote={priceNote}
                   /* The Generations channel exists ONLY to generate, so it arms itself. A
- staffer's "My EG" is a general assistant thread where most messages are
+ staffer's "My Assistant" is a general assistant thread where most messages are
  not image prompts, and arming it would put a price on the send button
  for ordinary chat. */
  autoArm={!!genChannel && activeId === genChannel}
