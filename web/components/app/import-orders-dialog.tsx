@@ -1,11 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
+import { useEffect, useMemo, useState } from "react"
+import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   parseCSV,
   parsePasted,
@@ -16,7 +15,6 @@ import {
   type TemplatePos,
   CSV_COLUMNS,
   COLUMN_OPTIONS,
-  TEMPLATE_HEADERS,
   GROUP_LABEL,
   DUTY_LABEL,
   DUTY_MARK,
@@ -26,8 +24,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { OrderGrid } from "@/components/app/order-grid"
-import { createOrder, getOrders, getSheetsConfig, setSheetTemplate, getSheetsAppsScript, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile } from "@/lib/api"
+import { createOrder, getOrders, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
@@ -109,8 +106,13 @@ async function downloadXlsxTemplate() {
     const names = [...new Set((cat ?? []).map((p) => String(p.name || "").trim()).filter(Boolean))].sort()
     const colors = [...new Set((cat ?? []).flatMap((p) => productColors(p)))].sort()
     const sizes = [...new Set((cat ?? []).flatMap((p) => productSizes(p)))]
+    /* THE WORDS, NOT THE KEYS — the same change COLUMN_OPTIONS took, and this is the copy
+       that was missed. The .xlsx handed to a seller kept offering EMB / APL / DTF while the
+       app had moved to Embroidery / Appliqué / DTF printing, which is a template disagreeing
+       with the product it feeds. Third place this vocabulary is written; methodCode() reads
+       every spelling back, so old sheets are unaffected. */
     const methods = [...new Set(normalizeMethods((cat ?? []).flatMap((p) => [p.method, ...(p.methods ?? [])]))
-      .map((m) => m.key.toUpperCase()))]
+      .map((m) => m.label))]
     if (names.length) live.blank = names
     if (colors.length) live.item_color = colors
     if (sizes.length) live.item_size = sizes
@@ -174,10 +176,20 @@ export function ImportOrdersDialog({
   open,
   onOpenChange,
   onImported,
+  initialRows,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   onImported?: (count: number) => void
+  /**
+   * Rows handed over by the full-page sheet at /sheet, header row included.
+   *
+   * The sheet does NOT import anything itself. It edits, and then hands the rows to this
+   * dialog, which owns the whole pipeline — templates, machine files, design rows, the
+   * order id, the meta. Re-implementing that on the page would have been a second importer
+   * that agrees with this one only until someone changes one of them.
+   */
+  initialRows?: string[][]
 }) {
   const [records, setRecords] = useState<ImportRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -186,31 +198,15 @@ export function ImportOrdersDialog({
   const [notice, setNotice] = useState<string | null>(null)
   // Header row shown for manual copying when the clipboard write did not happen.
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
-  const [sheetsEnabled, setSheetsEnabled] = useState(false)
-  // The config call FAILED, as opposed to answering "not configured". A two-second API
-  // blip during a deploy used to hide the Sheet tab outright, which reads as the feature
-  // having been deleted — CLAUDE.md's rule that a broken thing must never look identical
-  // to an absent one. The tab stays, and says which it is.
-  const [configErr, setConfigErr] = useState(false)
-  // Google's force-a-copy URL for our master template, and (admins only) whether one has
-  // been configured yet. Server-supplied: the master lives in a setting, not in the bundle.
-  const [copyUrl, setCopyUrl] = useState("")
-  // The master itself, for the admin who has to open it. `copyUrl` is the seller's
-  // force-a-copy form and lands on Google's copy dialog, which is the wrong door for
-  // Extensions -> Apps Script.
-  const [masterUrl, setMasterUrl] = useState("")
-  const [needsTemplate, setNeedsTemplate] = useState(false)
-  // Admin-only setup. The master's formatting looks after itself; the helper script below is
-  // the one step Google will not let us perform on someone's behalf.
-  const [isTemplateAdmin, setIsTemplateAdmin] = useState(false)
-  const [helper, setHelper] = useState<string | null>(null)
-  // The manifest is the half that removes the "unsafe" interstitial — see APPS_MANIFEST
-  // in server/src/routes/sheets.js. Served with the script so the two cannot drift.
-  const [manifest, setManifest] = useState<string | null>(null)
-  const [helperOpen, setHelperOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [tplInput, setTplInput] = useState("")
-  const [tplSaving, setTplSaving] = useState(false)
+  /**
+   * THE GOOGLE SHEETS STATE IS GONE (2026-08-22), with the tab it served.
+   *
+   * "Sheet" now means OUR sheet, at /sheet — so the copy URL, the master link, the
+   * admin-only Apps Script and manifest boxes, the template-link field and the
+   * enabled/config-error pair all had nothing left to render. The SERVER routes are
+   * untouched: sheets.js still serves the master, still re-formats it, and every sheet
+   * already in a seller's Drive still imports through the File tab.
+   */
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState<{ imported: number; mfAttached: number; mfFailed: string[] } | null>(null)
   // The seller's saved templates, fetched ONLY when a parsed sheet actually names one.
@@ -222,15 +218,6 @@ export function ImportOrdersDialog({
   const [machineFiles, setMachineFiles] = useState<Record<string, MachineFile | null> | null>(null)
   const [machineLookupFailed, setMachineLookupFailed] = useState(false)
 
-  const loadSheetsConfig = useCallback(() => {
-    setConfigErr(false)
-    return getSheetsConfig()
-      .then((c) => {
-        setSheetsEnabled(!!c.enabled)
-        setCopyUrl(c.copyUrl || ""); setMasterUrl(c.templateUrl || ""); setNeedsTemplate(!!c.needsTemplate); setIsTemplateAdmin(!!c.isTemplateAdmin)
-      })
-      .catch(() => { setSheetsEnabled(false); setCopyUrl(""); setMasterUrl(""); setNeedsTemplate(false); setIsTemplateAdmin(false); setConfigErr(true) })
-  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -238,11 +225,9 @@ export function ImportOrdersDialog({
     const id = setTimeout(() => {
       setRecords(null); setError(null); setPaste(""); setDone(null)
       setNotice(null); setCopyFallback(null); setTemplates(null); setTemplatesFailed(false)
-      setTplInput("")
-      loadSheetsConfig()
     }, 0)
     return () => clearTimeout(id)
-  }, [open, loadSheetsConfig])
+  }, [open])
 
   const summary = useMemo(() => {
     const list = records ?? []
@@ -325,6 +310,20 @@ export function ImportOrdersDialog({
       setTemplates(null)
     }
   }
+
+  /**
+   * ROWS FROM THE FULL-PAGE SHEET (/sheet), header row included.
+   *
+   * A second effect rather than a line inside the reset above, because `ingest` is declared
+   * between them — calling it from the earlier effect reads a binding that does not exist
+   * yet, which react-hooks/immutability rejects and which would silently stop updating.
+   * Declaration order settles the sequence: the reset runs, then this fills.
+   */
+  useEffect(() => {
+    if (!open || !initialRows || initialRows.length < 2) return
+    const id = setTimeout(() => ingest(initialRows), 0)
+    return () => clearTimeout(id)
+  }, [open, initialRows])
 
   /**
    * What the Template ID column will actually do, resolved for the preview.
@@ -413,32 +412,6 @@ export function ImportOrdersDialog({
     ingest(parsePasted(paste))
   }
 
-  /**
-   * Get the seller a Google Sheet with our template already in it.
-   *
-   * ONE MECHANISM NOW: Google's own /copy URL for our master template. It opens Google's
-   * Make-a-copy dialog and the copy lands in the SELLER's Drive, owned by them, with every
-   * colour band, frozen row and dropdown intact. Nothing is shared with us and no
-   * permission is involved, which is what makes it work at all.
-   *
-   * The two paths this replaces both dead-ended:
-   * - Server-side create via the service account. Verified against the live credential on
-   *   2026-08-10: POST /v4/spreadsheets → 403 PERMISSION_DENIED, because a standalone
-   *   service account has no Drive storage to create a file in. Not fixable in the Cloud
-   *   Console; it needs domain-wide delegation this deployment doesn't have.
-   * - Open sheets.new and paste the header row off the clipboard. It carries text and
-   *   nothing else — no colours, no dropdowns — and silently gives you nothing at all
-   *   wherever the clipboard is blocked. That is the "blank Google Sheet" report.
-   *
-   * With no master configured there is no third guess: the .xlsx download is offered
-   * instead, which is a real formatted template and drops straight onto the File tab.
-   */
-  const makeSheetCopy = () => {
-    if (!copyUrl) return
-    setError(null); setCopyFallback(null)
-    window.open(copyUrl, "_blank", "noopener")
-    setNotice("Google is asking you to make your own copy — click Make a copy. Fill it in, then File → Download → .xlsx or .csv, and drop that file on the File tab here.")
-  }
 
   const confirm = async () => {
     if (!records) return
@@ -710,28 +683,27 @@ export function ImportOrdersDialog({
               </div>
             </details>
 
-            <Tabs defaultValue="file">
-              <TabsList className={sheetsEnabled || configErr ? "grid w-full grid-cols-4" : "grid w-full grid-cols-3"}>
-                <TabsTrigger value="grid">Grid</TabsTrigger>
+            <Tabs defaultValue="grid">
+              {/* THREE WAYS IN, and the first one is OURS. "Sheet" used to mean a Google
+                  Sheet a seller copied, filled and re-uploaded; it now means the sheet in
+                  this app. The Google tab is gone from here — its server routes are
+                  untouched, so nothing already in someone's Drive stops working. */}
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="grid">Sheet</TabsTrigger>
                 <TabsTrigger value="file">File</TabsTrigger>
                 <TabsTrigger value="paste">Paste</TabsTrigger>
-                {(sheetsEnabled || configErr) && <TabsTrigger value="sheet">Sheet</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="grid" className="mt-3">
-                {/* The grid owns editing only. Rows come back as strings in CSV_COLUMNS order,
-                    which is exactly what the File tab already hands to rowsToRecords — so
-                    Complete walks the same path a dropped .xlsx does. */}
-                <OrderGrid
-                  busy={saving}
-                  onComplete={(gridRows) => {
-                    /* The preview renders below </Tabs>, so it appears without switching
-                       tabs — Complete populates it and the seller reads the result in
-                       place. Same records, same errors, same Import button as a dropped
-                       .xlsx: the grid adds a way IN, not a second way through. */
-                    ingest([TEMPLATE_HEADERS as unknown as string[], ...gridRows])
-                  }}
-                />
+                {/* A DOOR, NOT THE ROOM. The sheet is 21 columns wide and this dialog shows
+                    four of them, so editing here meant scrolling a viewport at a spreadsheet.
+                    It opens as a full page instead, in its own tab, so the seller keeps this
+                    one — and the orders behind it — where they were. */}
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <Button onClick={() => window.open("/sheet", "_blank", "noopener")}>
+                    Open the sheet in a new tab
+                  </Button>
+                </div>
               </TabsContent>
               <TabsContent value="file" className="mt-3">
                 <label
@@ -758,191 +730,6 @@ export function ImportOrdersDialog({
                 <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>Preview rows</Button>
               </TabsContent>
 
-              {(sheetsEnabled || configErr) && (
-                <TabsContent value="sheet" className="mt-3 space-y-3">
-                  {/* COPY → FILL → DOWNLOAD → DROP.
-                      One path, and the seller's Google account does all the work Google will
-                      only let an account do. They copy our master template, fill their copy,
-                      export it, and drop the file on the File tab — the same drop zone that
-                      already accepts .csv/.xlsx, so nothing new has to parse it.
-                      There is deliberately no "paste your sheet's link" field any more: that
-                      route needs the sheet shared with our service account, which is a step
-                      no seller could complete and the source of the 403s. */}
-                  {configErr ? (
-                    /* Couldn't ask the server. Say so — and offer the retry — rather than
-                       showing the not-configured copy, which would blame the setup for what
-                       is actually a dropped request. */
-                    <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4">
-                      <div className="text-xs font-medium">Couldn&apos;t check the Google Sheets setup.</div>
-                      <p className="text-xs text-muted-foreground">
-                        The server didn&apos;t answer — usually a few seconds during a deploy. Nothing has
-                        changed; try again, or use the File tab meanwhile.
-                      </p>
-                      <Button variant="outline" size="sm" onClick={() => loadSheetsConfig()}>Try again</Button>
-                    </div>
-                  ) : copyUrl ? (
-                    <>
-                      <div className="rounded-xl border border-border bg-muted/30 p-4">
-                        <Button onClick={makeSheetCopy}>
-                          Make a copy in Google Sheets
-                        </Button>
-                        {/* FOREWARNING, not a subtitle. Google shows "the attached Apps Script
-                            file and functionality will also be copied" on the copy dialog, and
-                            nothing on our side suppresses it — it fires because the template has
-                            a bound helper script at all. An unexplained security banner at a
-                            seller's first contact with us reads as "is this safe"; the same
-                            banner, expected, reads as "yes, that's the helper". §4 allows a
-                            warning to carry its reason, and no label on this button can. */}
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Google will ask you to confirm a helper script — it narrows the Colour,
-                          Size and Print Type lists to the product you pick, and reads nothing but
-                          your own copy.
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Opens your own copy in your Drive — every column already in place, required
-                          ones blue, dropdowns filled in. It is yours; nothing is shared with us.
-                        </p>
-                      </div>
-                      <ol className="list-inside list-decimal space-y-1 text-xs text-muted-foreground">
-                        <li>Click above, then <span className="font-medium text-foreground">Make a copy</span> in Google&apos;s dialog</li>
-                        <li>Fill in your orders — one line per item, same Order Number groups them</li>
-                        <li>In the sheet: <span className="font-medium text-foreground">File → Download → .xlsx</span> (or .csv)</li>
-                        <li>Drop that file on the <span className="font-medium text-foreground">File</span> tab here</li>
-                      </ol>
-                    </>
-                  ) : (
-                    /* No master configured. Rather than a broken button, the seller gets the
-                       .xlsx — a genuinely formatted template with the same columns, fills and
-                       dropdowns, which lands on the File tab without a round trip. */
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
-                      <div className="text-xs font-medium">The Google Sheets template isn&apos;t set up yet.</div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Use the <span className="font-medium text-foreground">Template (.xlsx)</span> button at the top — same
-                        columns, same colours and dropdowns. Fill it in and drop it on the File tab.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* ADMIN ONLY, and shown in the dialog rather than buried in Settings: this
-                      is the screen where its absence is felt, and the master has to be made by
-                      a real Google account — our service account gets 403 PERMISSION_DENIED
-                      creating a spreadsheet, since it has no Drive of its own. */}
-                  {/* THE ONE STEP GOOGLE WILL NOT LET US DO FOR YOU.
-                      Everything else about the master maintains itself. A dependent dropdown
-                      cannot be written as a validation rule at all — Sheets does not evaluate
-                      INDIRECT in one — so it takes an onEdit trigger, and creating a bound
-                      script needs Drive, which this deployment's service account has none of
-                      (the same 403 that stops it creating a spreadsheet). One paste on the
-                      master, and every copy made afterwards carries it. */}
-                  {isTemplateAdmin && copyUrl && (
-                    <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="eg-label text-muted-foreground">Admin · optional</span>
-                        <span className="text-xs font-medium">Make Colour, Size and Print Type follow the product</span>
-                        <button
-                          type="button"
-                          className="ms-auto text-2xs text-primary hover:underline"
-                          onClick={() => {
-                            setHelperOpen((v) => !v)
-                            if (!helper) getSheetsAppsScript().then((r) => { setHelper(r.script); setManifest(r.manifest || "") }).catch(() => { setHelper(""); setManifest("") })
-                          }}
-                        >
-                          {helperOpen ? "Hide" : "Show me how"}
-                        </button>
-                      </div>
-                      {helperOpen && (
-                        <div className="space-y-2">
-                          {/* THE LINK IS THE FIRST STEP, not a sentence describing it. This panel
-                              carried a paragraph and a four-item list and no way to reach the file
-                              they were about, so the one thing an admin actually needed — the
-                              master's address — was the one thing not on screen. The route lives in
-                              the label; §4 says a control explains itself there or in its title. */}
-                          {masterUrl && (
-                            <a
-                              href={masterUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Opens the master template. Paste the script under Extensions → Apps Script, then Save — the trigger is built in. Copies made afterwards carry it; ones already made do not."
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-2xs font-medium transition-colors hover:bg-accent"
-                            >
-                              Open the master → Extensions → Apps Script
-                            </a>
-                          )}
-                          <textarea
-                            readOnly
-                            value={helper ?? "Loading…"}
-                            onFocus={(e) => e.currentTarget.select()}
-                            className="h-40 w-full rounded-lg border border-border bg-card p-2 font-mono text-[10px] leading-tight"
-                          />
-                          <button
-                            type="button"
-                            disabled={!helper}
-                            onClick={() => {
-                              if (!helper) return
-                              navigator.clipboard?.writeText(helper)
-                                .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
-                                .catch(() => {})
-                            }}
-                            className="rounded-lg border border-border px-2 py-1 text-2xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
-                          >
-                            {copied ? "Copied" : "Copy the script"}
-                          </button>
-                          {manifest && (
-                            <div className="space-y-1 border-t border-border pt-2">
-                              <div className="text-2xs font-medium">
-                                appsscript.json — Project Settings → Show &quot;appsscript.json&quot; manifest file in editor
-                              </div>
-                              <textarea
-                                readOnly
-                                value={manifest}
-                                onFocus={(e) => e.currentTarget.select()}
-                                title="Restricts the script to this one spreadsheet. Without it Apps Script infers a broad, sensitive scope and Google shows the seller an unverified-app warning on first run."
-                                className="h-24 w-full rounded-lg border border-border bg-card p-2 font-mono text-[10px] leading-tight"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {/* THE APPLY BUTTON IS GONE, and so is the row of state around it.
-                      The master keeps itself current: the server fingerprints the catalogue
-                      and the column list, and re-formats the sheet when that changes — see
-                      autoFormat in server/src/routes/sheets.js. A control that has to be
-                      remembered, on a thing that goes stale by itself, is the same failure
-                      as the frozen lists it was pressed to fix. */}
-{needsTemplate && (
-                    <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
-                      <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Admin · one-time setup</div>
-                      <ol className="list-inside list-decimal space-y-0.5 text-2xs text-amber-800/90 dark:text-amber-300/90">
-                        <li>Download <span className="font-medium">Template (.xlsx)</span> above</li>
-                        <li>Upload it to your Google Drive, open it, then <span className="font-medium">File → Save as Google Sheets</span></li>
-                        <li>Share that sheet <span className="font-medium">anyone with the link → Viewer</span>, and paste its link here</li>
-                      </ol>
-                      <div className="flex gap-2">
-                        <Input value={tplInput} onChange={(e) => setTplInput(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" />
-                        <Button
-                          variant="outline"
-                          disabled={tplSaving || !tplInput.trim()}
-                          onClick={async () => {
-                            setTplSaving(true); setError(null)
-                            try {
-                              const r = await setSheetTemplate(tplInput.trim())
-                              setCopyUrl(r.copyUrl || "")
-                              setNeedsTemplate(!r.copyUrl)
-                              setNotice("Template saved — sellers now get a Make a copy button here.")
-                            } catch (e) {
-                              setError(e instanceof Error && e.message ? e.message : "Couldn't save the template link.")
-                            } finally { setTplSaving(false) }
-                          }}
-                        >
-                          {tplSaving ? <CircleNotch size={15} className="animate-spin" /> : "Save"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </TabsContent>
-              )}
             </Tabs>
 
             {notice && (
