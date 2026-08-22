@@ -53,13 +53,18 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // which is why it gets its own entry rather than a tab inside it. The team can draft;
   // only an admin can send, so this is visible to staff and the send button is not.
   { label: "Broadcasts", href: "/broadcasts", icon: EnvelopeSimple, roles: ["operator", "admin"] },
-  // Digitizer — the (planned) Wilcom EWA embroidery page: drag a design in → quote +
-  // TrueView review → edit → export a machine file. Dormant for now (the page is a
-  // placeholder + API-key holder). Currently surfaced to admin ONLY so it can be reviewed;
-  // set roles: [] to hide it again, or widen roles to open it up — same toggle as Campaigns.
-  // Digitizer stays operator/designer/admin — warehouse is excluded server-side too
-  // (requireDesignStaff), since each Wilcom call bills.
-  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: ["operator", "designer", "admin"] },
+  // Digitizer — the Wilcom EWA embroidery page: drag a design in → quote + TrueView review
+  // → edit → export a machine file.
+  //
+  // HIDDEN 2026-08-22, by decision rather than by fault: enough of what Wilcom offers is
+  // going unused that the page is not worth a slot in the nav. Nothing is deleted — the
+  // route, the component, the API keys and /api/wilcom/* are all intact, and the server gate
+  // (requireDesignStaff, which excludes warehouse because each Wilcom call bills) still
+  // stands. Restore it by putting the roles back: ["operator", "designer", "admin"].
+  //
+  // Same toggle as Campaigns above, and hiding rather than removing is deliberate: the entry
+  // is where the reasoning lives, and an entry deleted outright takes the reasoning with it.
+  { label: "Digitizer", href: "/digitizer", icon: Needle, roles: [] },
   // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 
