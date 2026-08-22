@@ -8,11 +8,12 @@ import { MachineFilesPanel } from "@/components/app/machine-files-panel"
 import { DesignLabTabs, useDesignLabTab } from "@/components/app/design-lab-tabs"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { DesignStudioDialog } from "@/components/app/design-studio"
-import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, type LibraryDesign } from "@/lib/api"
+import { DesignStudioDialog, downscale } from "@/components/app/design-studio"
+import { readImageFile } from "@/components/app/design-canvas"
+import { Dropzone } from "@/components/app/dropzone"
+import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, saveDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
 import { getToken } from "@/lib/auth"
-import { EmptyState } from "@/components/app/empty-state"
 
 /**
  * A LIBRARY THUMBNAIL, and what it does when the picture is not there.
@@ -61,6 +62,8 @@ function DesignLab() {
  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
  const [signedOut, setSignedOut] = useState(false)
  const [studioOpen, setStudioOpen] = useState(false)
+ const [uploading, setUploading] = useState<string | null>(null)
+ const [upErr, setUpErr] = useState<string | null>(null)
 
  const load = useCallback(() => {
  if (!getToken()) { setSignedOut(true); setDesigns([]); return }
@@ -75,6 +78,38 @@ function DesignLab() {
  const id = setTimeout(load, 0)
  return () => clearTimeout(id)
   }, [tab, designs, load])
+
+  /**
+   * DROPPING A PICTURE IS THE WHOLE INTERACTION.
+   *
+   * The library's empty state was a mark, a line and a button that opened the studio dialog —
+   * so the one thing everybody arrives here to do, put a picture in, went through a modal
+   * that exists for something else entirely (choosing a blank, placing artwork on it). The
+   * dialog is still here as the second route, under an "or", because placing artwork on a
+   * mockup is a real and different job.
+   *
+   * SEQUENTIAL, not Promise.all. Each file is a base64 body on a 60MB limit; firing ten at
+   * once is how a drop of a folder becomes ten simultaneous multi-megabyte POSTs. The loop
+   * also means one bad file reports itself and the rest still land.
+   */
+ const takeFiles = async (files: FileList) => {
+ setUpErr(null)
+ for (const file of Array.from(files)) {
+ const data = await new Promise<string | null>((resolve) => {
+ readImageFile(file, (url) => resolve(url), (m) => { setUpErr(m); resolve(null) })
+      })
+ if (!data) continue
+ setUploading(file.name)
+ try {
+ const thumb = await downscale(data, 320)
+ const r = await saveDesignLibrary({ name: file.name.replace(/\.[^.]+$/, ""), data, thumb })
+ if (r.error) throw new Error(r.error)
+      } catch (e) {
+ setUpErr(e instanceof Error ? e.message : "Couldn't save that image.")
+      } finally { setUploading(null) }
+    }
+ load()
+  }
 
  const remove = async (id: number | string) => {
  setDesigns((prev) => (prev ?? []).filter((d) => d.id !== id))
@@ -118,8 +153,11 @@ function DesignLab() {
         <SectionCard
  title="Your images"
  actions={
-            <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
-              <Plus size={14} weight="bold" /> Add artwork
+            // Named for what it DOES, now that dropping is how artwork gets added. It was
+            // "Add artwork", which is the zone's job — two controls claiming one verb, and
+            // the one that opened a mockup dialog was the louder of the two.
+            <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)} disabled={signedOut}>
+              <Plus size={14} weight="bold" /> Place on a mockup
             </Button>
           }
         >
@@ -127,19 +165,31 @@ function DesignLab() {
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 animate-pulse rounded-xl bg-muted" />)}
             </div>
-          ) : list.length === 0 ? (
-            <EmptyState
-              icon={PenNib}
-              title={signedOut ? "Sign in to build your image library" : "No images yet"}
-              note={signedOut ? "Your saved artwork lives here." : "Add artwork — a picture you upload is reusable on any order or design."}
-              action={!signedOut && (
-                <Button size="sm" onClick={() => setStudioOpen(true)}>
-                  <Plus size={14} weight="bold" /> Add artwork
-                </Button>
-              )}
-            />
           ) : (
-            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="space-y-4 p-5">
+              {/* Same shape as the machine files tab: the zone IS the empty state, and once
+ there are pictures it becomes one inline row above them. Two tabs of the same
+                  Lab that both take a file should not take it two different ways. */}
+              <Dropzone
+                icon={PenNib}
+                multiple
+                accept="image/*"
+                onFiles={takeFiles}
+                busy={uploading ? `Saving ${uploading}…` : null}
+                disabled={signedOut}
+                slim={list.length > 0}
+                label={signedOut ? "Sign in to build your image library"
+ : list.length > 0 ? "Add another image" : "Drop your artwork here"}
+                hint="PNG, JPG or SVG"
+                action={!signedOut && list.length === 0 && (
+                  <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)}>
+                    <Plus size={14} weight="bold" /> Place it on a mockup
+                  </Button>
+                )}
+              />
+              {upErr && <p className="text-sm text-alert">{upErr}</p>}
+              {list.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {list.map((d) => (
                 <Card key={String(d.id)} className="group flex flex-col gap-0 overflow-hidden p-0">
                   <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
@@ -202,6 +252,8 @@ function DesignLab() {
                   </div>
                 </Card>
               ))}
+            </div>
+              )}
             </div>
           )}
         </SectionCard>
