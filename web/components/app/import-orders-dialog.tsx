@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -191,6 +192,7 @@ export function ImportOrdersDialog({
    */
   initialRows?: string[][]
 }) {
+  const router = useRouter()
   const [records, setRecords] = useState<ImportRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -700,8 +702,11 @@ export function ImportOrdersDialog({
                     It opens as a full page instead, in its own tab, so the seller keeps this
                     one — and the orders behind it — where they were. */}
                 <div className="rounded-xl border border-border bg-muted/30 p-4">
-                  <Button onClick={() => window.open("/sheet", "_blank", "noopener")}>
-                    Open the sheet in a new tab
+                  {/* SAME WINDOW. A new tab would make "Back" mean "close this", which is a
+                      different promise from the one a seller who came from Orders expects —
+                      and it strands the dialog open behind a tab they can no longer see. */}
+                  <Button onClick={() => { onOpenChange(false); router.push("/sheet") }}>
+                    Open Sheet
                   </Button>
                 </div>
               </TabsContent>
