@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react"
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, type Icon } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -10,8 +10,11 @@ import { ProductPickerDialog, type PickedProduct } from "@/components/app/produc
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
 import { Thumb } from "@/components/app/thumb"
-import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate } from "@/lib/api"
+import { TabBar } from "@/components/app/tab-bar"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, getDesignLibrary, getDesignLibraryItem, deleteDesignLibrary, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate, type LibraryDesign } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
+import { proxiedImageSrc } from "@/lib/order-image"
 import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
@@ -168,8 +171,41 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 // looked like a black bar with some art around it. It is a CAPTION now, under the image,
 // where it labels the thumbnail instead of hiding it — and the full-size view with the
 // order number is a click away in the browse dialog.
-function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
- url: string; src?: string; name?: string; badge?: string; title?: string; onPlace: () => void; onDelete?: () => void
+/**
+ * ONE TILE'S WORTH OF ARTWORK, whatever it came from.
+ *
+ * The rail draws four different things — an upload, a saved design, a buyer's file and a
+ * template — and they differ only in what a press does and what the caption says. Folding
+ * them into one shape here is what lets the panel be ONE grid under ONE bar instead of a
+ * stack of groups that each grew their own header and their own browse link.
+ */
+export type RailArt = {
+  key: string
+  /** The value handed to onPlace's closure and to the "can't load" link. */
+  url: string
+  /** What to DISPLAY when that differs — buyer art and marketplace thumbs go via the proxy. */
+  src?: string
+  name?: string
+  badge?: string
+  title?: string
+  /** Newest first, across sources. 0 where the source has no date of its own. */
+  at: number
+  /**
+   * Whether the tile may report the picture's pixel size.
+   *
+   * ONLY WHERE THE TILE IS DRAWING THE ARTWORK ITSELF. A design_library row renders its
+   * 320px THUMBNAIL and fetches the real file on press, and a template renders a 640px
+   * composite of a garment — so measuring what loaded would print "320×320" under a 4500px
+   * design and flag it amber as too small to print. A wrong measurement is worse than none:
+   * it is the quality warning people act on.
+   */
+  measure?: boolean
+  onPlace: () => void
+  onDelete?: () => void
+}
+
+function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onDelete }: {
+ url: string; src?: string; name?: string; badge?: string; title?: string; measure?: boolean; onPlace: () => void; onDelete?: () => void
 }) {
   /**
    * THE SIZE, MEASURED FROM THE PICTURE ITSELF.
@@ -220,7 +256,7 @@ function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
  rule; `broken` above is what this surface adds to it. */}
         <Thumb
  src={src ?? url} alt={name || ""}
- onLoad={(e) => setDim({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+ onLoad={measure ? (e) => setDim({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }) : undefined}
  onBroken={() => setBroken(true)}
  className="aspect-square w-full"
         />
@@ -230,7 +266,7 @@ function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
  is. Amber when it is too small to print large. */}
         <span className={"block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium tabular-nums " +
           (small ? "text-hold" : "text-muted-foreground")}>
-          {dim ? `${dim.w}×${dim.h}` : badge || "…"}
+          {dim ? `${dim.w}×${dim.h}` : badge || (measure ? "…" : name || "")}
         </span>
       </button>
       {onDelete && (
@@ -486,7 +522,24 @@ export function DesignMaker() {
   // Images library: the seller's own reusable uploads + buyer art from their orders.
  const [sellerImages, setSellerImages] = useState<SellerImage[]>([])
  const [orderUploads, setOrderUploads] = useState<OrderUpload[]>([])
+  /**
+   * TWO STORES HOLD THE SAME THING, and the rail is where that stops being visible.
+   *
+   * `seller_images` (uploaded from this rail) and `design_library` (dropped on Design Lab ›
+   * Artwork) are both "a flat picture of mine, kept to reuse" — different tables, different
+   * ids, and neither list could see the other. So an image put in from the Lab was simply
+   * absent from the editor, and one uploaded here never appeared on the Artwork tab. That is
+   * the largest single reason this area reads as scattered.
+   *
+   * Merged HERE rather than migrated: a table migration is a server change with a data move
+   * behind it, and this makes the seller's answer to "where is my picture" correct today.
+   * The two are told apart by `kind`, which is what routes a place and a delete.
+   */
+ const [savedDesigns, setSavedDesigns] = useState<LibraryDesign[]>([])
+ const [railTemplates, setRailTemplates] = useState<ProductTemplate[]>([])
  const [imagesLoading, setImagesLoading] = useState(true)
+  /** Which SOURCE the Artwork panel is showing. See the panel for why it is a bar. */
+ const [source, setSource] = useState<"yours" | "orders" | "templates">("yours")
 
   // Load the catalog once. Opened from a product ("Start designing") → preload that
   // product's mockup as the blank.
@@ -599,6 +652,8 @@ export function DesignMaker() {
   // or delete can refresh it without re-running the mount effect.
  const refreshImages = () => {
  getSellerImages().then((r) => setSellerImages(r.images ?? [])).catch(() => {})
+ getDesignLibrary().then((r) => setSavedDesigns(r ?? [])).catch(() => {})
+ getTemplates().then((r) => setRailTemplates(r ?? [])).catch(() => {})
  getOrderUploads().then((r) => setOrderUploads(r.images ?? [])).catch(() => {}).finally(() => setImagesLoading(false))
   }
  useEffect(() => {
@@ -640,6 +695,20 @@ export function DesignMaker() {
  setSellerImages((prev) => prev.filter((im) => im.id !== id))
  deleteSellerImage(id).catch(() => refreshImages())
   }
+  /** The design_library half of "Yours" — the bytes are behind a second call, and the tile
+   *  only ever held the thumbnail. Placing the THUMB would put a 320px picture on a 4800px
+   *  print, which is the quality bug that never announces itself. */
+ const placeLibraryDesign = async (d: LibraryDesign) => {
+    try {
+ const r = await getDesignLibraryItem(d.id)
+ if (r.data) { placeImage(r.data, d.name); return }
+    } catch { /* fall through to the message below */ }
+ setMsg({ tone: "err", text: "Couldn't open that artwork." })
+  }
+ const removeLibraryDesign = (id: number | string) => {
+ setSavedDesigns((prev) => prev.filter((d) => d.id !== id))
+ deleteDesignLibrary(id).catch(() => refreshImages())
+  }
 
  const updateText = (id: string, patch: Partial<TextLayer>) =>
  setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
@@ -651,14 +720,73 @@ export function DesignMaker() {
  const selText = texts.find((t) => t.id === selected)
 
 
+  /**
+   * "YOURS" IS BOTH STORES, told apart by where a press has to go.
+   *
+   * A seller_images row carries a loadable url, so placing it is one call. A design_library
+   * row carries only a THUMB — its bytes come from getDesignLibraryItem — so placing it is
+   * a fetch first. That difference is the whole reason they were never merged, and it is
+   * two lines of closure, not a reason to show someone two libraries.
+   *
+   * Newest first across both. Interleaving by date rather than concatenating is the point:
+   * a picture added a minute ago is at the front whichever door you came in through.
+   *
+   * The MEMO holds data only, never the handlers. Every callback in this component is
+   * redefined each render, so a memo that closed over them would either go stale or be
+   * listed as a dependency and re-run on every keystroke — which is the same defect either
+   * way. Sorting is the expensive half and it is the half that is pure.
+   */
+ const yoursRows = useMemo(
+    () => [
+      ...sellerImages.map((im) => ({ kind: "seller" as const, im, at: im.ts ?? 0 })),
+      ...savedDesigns.map((d) => ({ kind: "library" as const, d, at: d.created_at ? Date.parse(d.created_at) || 0 : 0 })),
+    ].sort((x, y) => y.at - x.at),
+    [sellerImages, savedDesigns]
+  )
+
+  /** The live source, in the ONE shape the grid draws. */
+ const railList: RailArt[] =
+ source === "yours"
+      ? yoursRows.map((r) =>
+ r.kind === "seller"
+            ? { key: "s" + r.im.id, url: r.im.url, name: r.im.name, at: r.at,
+ onPlace: () => placeImage(r.im.url, r.im.name), onDelete: () => removeImage(r.im.id) }
+            // The THUMB is what the tile draws; the full artwork is fetched on press.
+            : { key: "l" + r.d.id, url: r.d.thumb ?? "", src: r.d.thumb ? proxiedImageSrc(r.d.thumb) : undefined,
+ name: r.d.name ?? "", at: r.at, measure: false, badge: r.d.name ? undefined : `IMG-${r.d.id}`,
+ onPlace: () => placeLibraryDesign(r.d), onDelete: () => removeLibraryDesign(r.d.id) }
+        )
+ : source === "orders"
+        ? orderUploads.map((im, i) => ({
+ key: im.url + i, url: im.url, src: canvasReadableSrc(im.url), name: im.name,
+ badge: orderRefLabel(im.orderRef), title: [im.orderRef, im.name].filter(Boolean).join(" · "),
+ at: 0, onPlace: () => placeImage(im.url, im.name),
+          }))
+        : railTemplates.map((t) => ({
+ key: String(t.id), url: String(t.composite ?? ""), name: t.name ?? "Untitled template",
+ badge: t.seq != null ? `TPL-${t.seq}` : undefined,
+ title: [t.name, (t.data as { blank?: string } | null)?.blank].filter(Boolean).join(" · "),
+ at: 0, measure: false,
+            // A template REPLACES the canvas rather than adding a layer — it is a blank, a
+            // stack and a print area, not a picture. That is the one press in this panel
+            // that is not "place", which is why templates are their own source and not
+            // another group of thumbnails in the same list.
+ onPlace: () => applyTemplate(t),
+          }))
+
   // What the browse dialog shows. Buyer art needs the proxy to DISPLAY (Etsy blocks
   // hotlinking) but the raw url to PLACE — same split the rail thumbnails make.
+  //
+  // "uploads" is the SAME merged list the rail's Yours tab shows, not sellerImages alone.
+  // Browsing all of something has to show all of it, and a Browse that dropped the
+  // design_library half would contradict the count on the tab that opened it.
  const browseItems: ArtItem[] =
  browse === "uploads"
-      ? sellerImages.map((im) => ({ url: im.url, name: im.name }))
+      ? railList.map((it) => ({ url: it.url, src: it.src, name: it.name, badge: it.badge }))
  : browse === "orders"
         ? orderUploads.map((im) => ({ url: im.url, src: canvasReadableSrc(im.url), name: im.name, badge: im.orderRef }))
  : []
+
 
  const saveAsTemplate = async () => {
  if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
@@ -685,6 +813,7 @@ export function DesignMaker() {
       })
  if (r.error) throw new Error(r.error)
  setMsg({ tone: "ok", text: "Saved as a template." })
+ refreshImages()
     } catch (e) {
  setMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't save the template." })
     } finally { setSaving(false) }
@@ -740,9 +869,13 @@ export function DesignMaker() {
  setSaving(true); setMsg(null)
  try {
  const composed = await composeDesign(images, texts, 640)
- const r = await saveDesignLibrary({ name: name.trim() || "Untitled design", data: composed, thumb: composed })
+ const r = await saveDesignLibrary({ name: name.trim() || "Untitled artwork", data: composed, thumb: composed })
  if (r.error) throw new Error(r.error)
- setMsg({ tone: "ok", text: "Saved to your library." })
+ setMsg({ tone: "ok", text: "Saved to Artwork." })
+      // The rail is a list of what you have saved, so it has to include what you JUST saved.
+      // Without this the panel kept showing the state from page load and the save read as
+      // having done nothing.
+ refreshImages()
     } catch (e) {
  setMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't save." })
     } finally { setSaving(false) }
@@ -799,12 +932,43 @@ export function DesignMaker() {
         />
         {msg && <span className={"truncate text-xs " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={saveToLibrary} disabled={saving} title="Save a flattened copy to your library">
-            {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} weight="bold" />} Save
-          </Button>
-          <Button variant="outline" size="sm" onClick={saveAsTemplate} disabled={saving} title="Save the editable pieces, every side, as a template">
-            <Stack size={14} weight="bold" /> Template
-          </Button>
+          {/**
+            * ONE SAVE, TWO DESTINATIONS — which is what these always were.
+            *
+            * `Save` and `Template` were peer buttons, and nothing on screen said they were
+            * the same act aimed at different places: Save writes a FLATTENED png you can
+            * place again, Template writes the layers, the blank and the print area, so it
+            * REOPENS. Two buttons of equal weight read as two unrelated actions, so the
+            * question every time was which one you meant — and pressing the wrong one is
+            * silent, because both say "Saved".
+            *
+            * Every editor that has solved this uses a menu: Figma and Illustrator put Save
+            * / Save a copy / Save as template behind one File item; Canva has no Save at
+            * all and one Share. The variant belongs UNDER the verb, never beside it.
+            *
+            * The labels name the TAB the thing lands on — Artwork, Templates — so the menu
+            * answers "where does it go", which is the part you cannot see from here. What
+            * each one keeps is on the `title`, per §4: a control explains itself in its
+            * label or its title, never in a sentence printed under it.
+            */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" size="sm" disabled={saving}>
+                  {saving ? <CircleNotch size={14} className="animate-spin" /> : <FloppyDisk size={14} weight="bold" />} Save
+                  <CaretDown size={11} weight="bold" className="opacity-60" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={saveToLibrary} title="A flattened picture you can place on anything. Does not reopen.">
+                <ImageSquare size={14} weight="bold" /> Save to Artwork
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={saveAsTemplate} title="The layers, the blank and the print area, every side. Reopens in the editor.">
+                <Stack size={14} weight="bold" /> Save as Template
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" onClick={publishProduct} disabled={!designUrl && texts.length === 0}>
             Publish
           </Button>
@@ -857,49 +1021,66 @@ export function DesignMaker() {
                 <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadImages(e.target.files); e.target.value = "" }} />
               </label>
             </div>
+            {/**
+              * THE SOURCES ARE A BAR, NOT FOUR DIFFERENT CONTROLS.
+              *
+              * This panel had two stacked groups, each with its own inline "all N" link, and
+              * then a full-width outline button under both — so reaching artwork meant
+              * choosing between four controls of three different shapes, named "Your
+              * uploads", "From your orders", "All 12", "Browse All Orders" and "Saved
+              * designs & templates". Two of those words are the same word (designs, uploads,
+              * artwork) and one of them, "Browse All Orders", does not browse orders at all.
+              *
+              * One question — WHERE IS THIS PICTURE FROM — is one bar, which is the house
+              * treatment for exactly that (CLAUDE.md §4: a rule under the live word), and
+              * then ONE grid and ONE "Browse all" that always mean the live source. The
+              * count lives on the tab, so nothing has to say it twice.
+              */}
+            <TabBar
+ size="sm" spacing="none" className="border-b-0" ariaLabel="Artwork source"
+ value={source} onChange={setSource}
+              // NO COUNTS. This bar lives in a 288px column and three labels plus three
+              // badges do not fit in it — and the number is already under the grid, on the
+              // "Browse all N" that acts on it. Saying it twice cost the labels their line.
+ items={[
+                { id: "yours" as const, label: "Yours" },
+                { id: "orders" as const, label: "From orders" },
+                { id: "templates" as const, label: "Templates" },
+              ]}
+            />
             {imagesLoading ? (
               <div className="flex justify-center py-2"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>
-            ) : (sellerImages.length === 0 && orderUploads.length === 0) ? (
-              <p className="px-1 text-2xs text-muted-foreground">Upload an image to reuse it — and buyer art from your connected stores shows up here automatically.</p>
+            ) : railList.length === 0 ? (
+              /* An empty region may carry one sentence, because there is nothing else to
+ read — §4. One per source, saying what puts something here. */
+              <p className="px-1 text-2xs text-muted-foreground">
+                {source === "yours"
+                  ? "Upload an image and it stays here to reuse."
+                  : source === "orders"
+                    ? "Artwork buyers send with an order lands here on its own."
+                    : "Save a design as a template to reopen it on any blank."}
+              </p>
             ) : (
               <>
-                {sellerImages.length > 0 && (
-                  <>
-                    <div className="flex items-baseline justify-between">
-                      <div className="text-2xs font-medium text-muted-foreground">Your uploads</div>
-                      {sellerImages.length > RAIL_LIMIT && (
-                        <button type="button" onClick={() => setBrowse("uploads")} className="text-2xs font-medium text-primary hover:underline">
-                          All {sellerImages.length}
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {sellerImages.slice(0, RAIL_LIMIT).map((im) => <ImageThumb key={im.id} url={im.url} name={im.name} onPlace={() => placeImage(im.url)} onDelete={() => removeImage(im.id)} />)}
-                    </div>
-                  </>
-                )}
-                {orderUploads.length > 0 && (
-                  <>
-                    <div className="mt-1 flex items-baseline justify-between">
-                      <div className="text-2xs font-medium text-muted-foreground">From your orders</div>
-                      {/* ONE way in, not two. "All 74" up here and "Browse order art" below
- the grid opened the same dialog, ten pixels of thumbnails apart —
- two controls for one action, and neither said which orders. The
- link carries it, named for what it opens. */}
-                      {orderUploads.length > RAIL_LIMIT && (
-                        <button type="button" onClick={() => setBrowse("orders")} className="text-2xs font-medium text-primary hover:underline">
-                          Browse All Orders
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {orderUploads.slice(0, RAIL_LIMIT).map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={orderRefLabel(im.orderRef)} title={[im.orderRef, im.name].filter(Boolean).join(" · ")} onPlace={() => placeImage(im.url)} />)}
-                    </div>
-                  </>
+                <div className="grid grid-cols-2 gap-2">
+                  {railList.slice(0, RAIL_LIMIT).map((it) => (
+                    <ImageThumb
+ key={it.key} url={it.url} src={it.src} name={it.name} badge={it.badge} title={it.title}
+ measure={it.measure} onPlace={it.onPlace} onDelete={it.onDelete}
+                    />
+                  ))}
+                </div>
+                {railList.length > RAIL_LIMIT && (
+                  <button
+ type="button"
+ onClick={() => (source === "templates" ? setLibOpen(true) : setBrowse(source === "yours" ? "uploads" : "orders"))}
+ className="w-full text-left text-2xs font-medium text-primary hover:underline"
+                  >
+                    Browse all {railList.length}
+                  </button>
                 )}
               </>
             )}
-            <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setLibOpen(true)}>Saved designs &amp; templates</Button>
           </div>
           )}
 
@@ -1150,7 +1331,9 @@ export function DesignMaker() {
  setSide("front")
  setTool("images")
         }} />
-      <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen}
+      {/* Reached from the Templates source's "Browse all", so it lands on Templates —
+          dropping someone on the other tab is the same click they were avoiding. */}
+      <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} initialSource="templates"
  onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }}
  onPickTemplate={applyTemplate} />
       {/* One dialog for both sources — the rail decides which list it is showing. */}
