@@ -8,7 +8,7 @@ import {
   type Order, type OrderDesign, type ChatEntry, type User,
 } from "@/lib/api"
 import {
-  normalizeStage, units, isOverdue, numOf, platformOf, nextStage, addressLines,
+  normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines,
   STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder,
 } from "@/lib/orders"
 import { F,C, R, LIFT, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
@@ -501,7 +501,12 @@ export default function OrderDetail() {
             {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
             {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
             {o.total != null ? <Row label="Total" value={`$${(Number(o.total) || 0).toFixed(2)}`} /> : null}
-            <Row label="Order id" value={String(o.id)} />
+            {/* THE NUMBER, THEN THE MARKETPLACE. This printed the routing id verbatim —
+                `etsy-4152219958` — which is not what the buyer quotes, not what the seller's
+                Etsy dashboard shows, and not what support asks for. Same formatter the web
+                uses, out of shared/order-rules.ts, so the phone and the browser name an
+                order identically. */}
+            <Row label="Order id" value={orderRefLabel(String(o.id))} />
           </View>
 
           <Section title="ACTIVITY" />

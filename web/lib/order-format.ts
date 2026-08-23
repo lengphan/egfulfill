@@ -108,6 +108,13 @@ export const platformFromId = (id: string) => {
   const raw = (String(id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
   return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
 }
+/**
+ * Re-exported, not re-written. It reads an id and nothing else, so it belongs beside the
+ * prefix table in shared/order-rules.ts where the phone can import it too — this file is
+ * where the WEB looks for a formatter, which is why the name still resolves here.
+ */
+export { orderRefLabel } from "@/shared/order-rules"
+
 /** The platform an order came from, as the platform writes it — "Etsy", "TikTok", "Manual". */
 export const platformOf = (o: OrderRow) => {
   const raw = String(o.source || "").toLowerCase()
