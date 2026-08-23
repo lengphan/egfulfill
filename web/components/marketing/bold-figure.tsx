@@ -184,8 +184,13 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", c
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.8, ease: EASE }}
         >
+          {/* THE COMMENT ABOVE SAID THIS ALREADY. It did not: the img rendered unconditionally,
+              so an empty src drew a broken-image glyph and painted the alt text — which is a
+              marketplace-length sentence — as a paragraph across the fold. Seen live. An
+              <img> with no src is not an empty box, it is a failed one. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={alt} className="max-h-[24rem] w-auto max-w-full object-contain" />
+          {src ? <img src={src} alt={alt} className="max-h-[24rem] w-auto max-w-full object-contain" />
+               : <span className="block h-40" aria-hidden />}
         </motion.div>
       </div>
 

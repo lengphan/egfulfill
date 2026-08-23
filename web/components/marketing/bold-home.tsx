@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, INK, SURFACE, ACID, HAIRLINE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
+import { EditableImage, EditableText, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -21,6 +22,11 @@ import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/
 
 
 export function BoldHome({ content }: { content: SiteContent }) {
+  // Edit mode swaps the ANIMATED text for an editable one. MaskedWords and TypedPhrase
+  // own the DOM they animate, so a contentEditable inside either would be re-mounted mid-
+  // keystroke; the plain string is the honest thing to edit and the animation is what a
+  // visitor sees.
+  const { on: editing } = useEditMode()
   const { hero, stats, features, steps, testimonials, faq, cta } = content
   const reduce = useReducedMotion()
   const heroRef = useRef<HTMLDivElement>(null)
@@ -75,11 +81,15 @@ export function BoldHome({ content }: { content: SiteContent }) {
               style={{ color: INK }}
               >
             <span style={{ fontSize: "clamp(2.6rem, 7.2vw, 6.2rem)" }}>
-            <MaskedWords text={hero.headline} />{" "}
+            {editing
+              ? <EditableText path="hero.headline">{hero.headline}</EditableText>
+              : <MaskedWords text={hero.headline} />}{" "}
             {/* The one hot colour on the page, and now the ONLY place it appears at display
                 size. Violet on paper is 5.33:1 — real type. Lime cannot be used here: on
                 paper it is 1.05:1 and simply disappears. */}
-            <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />
+            {editing
+              ? <EditableText path="hero.accent">{hero.accent}</EditableText>
+              : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
             </span>
           </h1>
 
@@ -89,7 +99,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
           >
-            {hero.subhead}
+            <EditableText path="hero.subhead">{hero.subhead}</EditableText>
           </motion.p>
 
           <motion.div
@@ -126,14 +136,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
           * state — the strip of real figures below follows immediately, so the fold is never
           * blank. A placeholder where a product should be would be worse than the space.
           */}
-        {hero.image && (
+        {/* IN EDIT MODE AN EMPTY FIGURE STILL RENDERS, because otherwise there is nothing on
+            the page to drop a picture onto — the one gesture this whole mode exists for would
+            be the one gesture it cannot offer. A visitor still sees nothing. */}
+        {(hero.image || editing) && (
           <div className="relative z-10 mx-auto max-w-6xl px-6">
-            <CutoutFigure
-              src={hero.image}
-              alt={hero.imageAlt}
-              ghost={hero.ghostWord}
-              callouts={hero.callouts}
-            />
+            <EditableImage path="hero.image">
+              <CutoutFigure
+                src={hero.image}
+                alt={hero.imageAlt}
+                ghost={hero.ghostWord}
+                callouts={hero.callouts}
+              />
+            </EditableImage>
           </div>
         )}
       </section>
