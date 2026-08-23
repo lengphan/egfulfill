@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { getDesignLibrary, getDesignLibraryItem, getTemplates, type LibraryDesign, type ProductTemplate } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
+import { Thumb } from "@/components/app/thumb"
 import { TabBar } from "@/components/app/tab-bar"
 
 type Source = "designs" | "templates"
@@ -164,17 +165,22 @@ export function LibraryPickerDialog({
                   className="group flex flex-col overflow-hidden rounded-xl border border-border text-left transition-colors hover:border-primary hover:bg-accent disabled:opacity-60"
                 >
                   <div className="relative flex aspect-square items-center justify-center bg-muted">
-                    {d.thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      /* Through our origin — the same library rows the Design page draws, so
-                         the same marketplace hotlink and the same broken tile. See
-                         proxiedImageSrc. No onError guard here on purpose: this grid is a
-                         picker, and a row you cannot see is still a row you can press to get
-                         the full artwork, which is fetched separately. */
-                      <img src={proxiedImageSrc(d.thumb)} alt={d.name ?? ""} className="size-full object-contain p-1" />
-                    ) : (
-                      <PenNib size={22} weight="duotone" className="text-muted-foreground/40" />
-                    )}
+                    {/* Through our origin — the same library rows the Design page draws, so
+                        the same marketplace hotlink and the same broken tile. See
+                        proxiedImageSrc.
+
+                        A refused tile is still PRESSABLE — the full artwork is fetched
+                        separately and may well arrive — so the fallback keeps the pen mark
+                        this grid already used for a row with no thumbnail at all. What it
+                        must not do is paint `d.name`, which on a marketplace design is the
+                        listing title. That was the reason given for having no guard here,
+                        and it argued for the wrong thing: the guard is about the ALT, not
+                        about whether the row can be picked. */}
+                    <Thumb
+                      src={d.thumb ? proxiedImageSrc(d.thumb) : ""} alt={d.name ?? ""} fit="contain"
+                      className="size-full bg-transparent p-1"
+                      icon={<PenNib size={22} weight="duotone" className="text-muted-foreground/40" />}
+                    />
                     {loadingId === d.id && <div className="absolute inset-0 flex items-center justify-center bg-background/60"><CircleNotch size={20} className="animate-spin text-primary" /></div>}
                   </div>
                   <div className="truncate p-2 text-xs font-medium">{d.name || "Untitled"}</div>
@@ -189,12 +195,11 @@ export function LibraryPickerDialog({
                       shows the artwork on its blank, which is what tells two templates
                       apart at this size. What gets placed is the artwork underneath it. */}
                   <div className="relative flex aspect-square items-center justify-center bg-muted">
-                    {t.composite || artOf(t) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={t.composite || artOf(t)} alt={t.name ?? ""} className="size-full object-contain p-1" />
-                    ) : (
-                      <Stack size={22} weight="duotone" className="text-muted-foreground/40" />
-                    )}
+                    <Thumb
+                      src={t.composite || artOf(t)} alt={t.name ?? ""} fit="contain"
+                      className="size-full bg-transparent p-1"
+                      icon={<Stack size={22} weight="duotone" className="text-muted-foreground/40" />}
+                    />
                   </div>
                   <div className="flex items-center gap-1.5 p-2">
                     <span className="min-w-0 flex-1 truncate text-xs font-medium">{t.name || "Untitled template"}</span>

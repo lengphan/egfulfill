@@ -172,12 +172,19 @@ export function Dropzone({
          * to put something; the heavy dash reads as a validation error.
          */
         "flex flex-col items-center justify-center border border-dashed transition-colors duration-150",
-        slim ? "gap-2 rounded-lg px-3 py-2" : "gap-3 rounded-xl px-6 py-8 text-center",
+        // AIR IS WHAT SAYS "PUT SOMETHING HERE". px-6 py-8 around a 40px tile left the zone
+        // barely taller than the row of type inside it, so it read as a notice rather than as
+        // a space with room in it. The radius goes up with the box: 12px on something this
+        // large is the corner of a table cell.
+        slim ? "gap-2 rounded-lg px-3 py-2" : "gap-4 rounded-2xl px-6 py-12 text-center",
         disabled ? "cursor-not-allowed border-border bg-muted/40 opacity-60"
           // The drag state is the one moment this control should be loud: a solid edge, so
           // dashed→solid is itself the signal that the file will land here.
           : over ? "border-solid border-primary bg-primary/[0.06]"
-          : "border-border bg-muted/40 hover:border-muted-foreground/40 hover:bg-muted/70",
+          // The resting ground is a HINT of one — the tile inside it is white, and the two
+          // need to read as card-on-ground. bg-muted/40 was close enough to the tile that the
+          // tile stopped lifting off it.
+          : "border-border bg-muted/30 hover:border-muted-foreground/40 hover:bg-muted/60",
         className,
       )}
     >
@@ -190,7 +197,7 @@ export function Dropzone({
         onClick={() => ref.current?.click()}
         className={cn(
           "flex w-full cursor-pointer items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed",
-          slim ? "gap-2" : "flex-col gap-2",
+          slim ? "gap-2" : "flex-col gap-3",
         )}
       >
         {slim ? (
@@ -198,12 +205,12 @@ export function Dropzone({
             ? <CircleNotch size={14} className="animate-spin text-muted-foreground" />
             : <I size={14} weight="bold" className="text-muted-foreground" />
         ) : (
-          <RegionMark icon={I} busy={!!busy} size="sm" />
+          <RegionMark icon={I} busy={!!busy} size="md" />
         )}
-        <span className={slim ? "text-xs font-medium text-muted-foreground" : REGION_LINE}>
+        <span className={slim ? "text-xs font-medium text-muted-foreground" : REGION_LINE.md}>
           {busy ?? label}
         </span>
-        {hint && !slim && !busy && <span className={REGION_NOTE}>{hint}</span>}
+        {hint && !slim && !busy && <span className={cn(REGION_NOTE.md, "-mt-1.5")}>{hint}</span>}
       </button>
 
       {action && !slim && !busy && (

@@ -161,7 +161,47 @@ export const _test = { extractImage, refusalReason, modelById };
  * Throws with .status set, and with .disabled = true when no key is configured, so a
  * caller can say "an admin hasn't switched this on" instead of reporting a broken API.
  */
-export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, model: modelOverride, images = [] } = {}) {
+/**
+ * A BACKDROP THAT CAN ACTUALLY BE CUT OUT AFTERWARDS.
+ *
+ * This is the answer to "remove the background", asked at the only moment it can be answered.
+ * The API returns JPEG and nothing else, so transparency cannot come back from a render at
+ * any price — but a render can be told to produce a backdrop that a colour flood separates
+ * perfectly, and `web/lib/remove-background.ts` then does it in the browser for free.
+ *
+ * Every clause here is one of that flood's failure modes, written as an instruction:
+ *
+ *  - "seamless, perfectly even" — it admits the SPREAD it measures at the border. A gradient
+ *    or a vignette widens that spread until the threshold swallows the subject.
+ *  - "no shadow of any kind, no contact shadow" — a shadow is background the flood cannot
+ *    reach past, so the cut-out keeps a grey smear welded to the subject's feet.
+ *  - "does not touch any edge of the frame" — the flood seeds from the border. A subject
+ *    running off the edge comes back with that side sliced flat.
+ *  - "no props, no reflections, no floor line" — anything else in the picture is a second
+ *    object the flood has no opinion about, and it survives the cut looking deliberate.
+ *
+ * Two colours, because a colour-distance flood cannot separate a white shirt from a white
+ * sweep, and a white shirt is the single most common thing photographed here.
+ */
+const BACKDROPS = {
+  white: '#FFFFFF pure white',
+  grey: '#808080 mid grey',
+};
+function backdropClause(key) {
+  const colour = BACKDROPS[key];
+  if (!colour) return '';
+  return ` The subject must be photographed against a completely seamless, perfectly even, flat matte ${colour} background filling the frame edge to edge.`
+    + ' No shadow of any kind, no contact shadow beneath the subject, no gradient, no vignette, no floor line, no horizon, no visible backdrop seam, no props, no reflections and no texture in the background.'
+    + ' Light the subject evenly from the front so its outline separates cleanly from the background.'
+    + ' The entire subject is inside the frame and does not touch any edge of the frame.';
+}
+
+/**
+ * @param backdrop  'white' | 'grey' to append the cut-out clause above. Anything else, this
+ *                  is left exactly as typed — most renders are lifestyle shots where a flat
+ *                  sweep would be wrong, so it is opt-in and never a default.
+ */
+export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, model: modelOverride, images = [], backdrop } = {}) {
   const cfg = await imageConfig();
   const model = modelById(modelOverride) ? modelOverride : cfg.model;
   const spec = modelById(model);
@@ -170,8 +210,11 @@ export async function generateImage({ prompt, aspectRatio = '1:1', imageSize, mo
     const e = new Error('Image generation is off — an admin can add the Google AI key in Settings › Integrations.');
     e.disabled = true; e.status = 503; throw e;
   }
-  const text = String(prompt || '').trim();
-  if (!text) { const e = new Error('A prompt is required.'); e.status = 400; throw e; }
+  const typed = String(prompt || '').trim();
+  if (!typed) { const e = new Error('A prompt is required.'); e.status = 400; throw e; }
+  // Appended, not prepended: the docs put the subject first, and the backdrop is a condition
+  // on the scene rather than the scene itself.
+  const text = typed + backdropClause(backdrop);
 
   const ratio = ASPECT_RATIOS.includes(aspectRatio) ? aspectRatio : '1:1';
   // Size must be one this model actually offers — asking lite for 4K is a 400 from Google

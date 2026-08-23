@@ -1,103 +1,171 @@
 "use client"
 
-import { PlugsConnected, PenNib, RocketLaunch } from "@phosphor-icons/react"
-import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import type { SiteContent } from "@/lib/site-content"
+import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { LabelRule, CutoutFigure, SpecStrip, NumberedCards, CAPS } from "@/components/marketing/bold-figure"
 
 /**
  * How it works. Three steps, then the seller-facing status flow.
+ *
+ * BUILT ON THE FIGURE KIT (bold-figure.tsx), because this page is the one it was made for:
+ * the reference board's annotated product panel IS a how-it-works diagram. Everything the
+ * page said before it is still here, word for word — what changed is that the words now come
+ * from stored site content instead of two arrays frozen into this file, so changing a step
+ * is an admin edit rather than a deploy.
  *
  * The journey strip keeps the REAL status labels and their real tones (mirroring sellerStatus
  * in lib/order-status.ts) rather than restyling them into the marketing palette. A prospect
  * should recognise these words on their first order — a marketing page that invents a
  * prettier pipeline is a page that lies about the product.
  */
-const steps = [
-  {
- icon: PlugsConnected,
- title: "Connect your stores",
- body: "Sign in to Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
- detail: ["No CSV exports", "Every store, one login", "Existing orders backfilled"],
-  },
-  {
- icon: PenNib,
- title: "Upload your designs",
- body: "Add artwork once and map it to a product. The mini designer sets placement and size, generates the print files, and matches embroidery thread — so every order comes out right.",
- detail: ["Reusable design library", "Print files made for you", "Placement handled"],
-  },
-  {
- icon: RocketLaunch,
- title: "We make and ship it",
- body: "You submit an order; we accept it, produce it on a vetted network, buy the cheapest label, and push tracking back to your shop. You watch orders go out.",
- detail: ["Reviewed before production", "Cheapest-label shipping", "Tracking pushed back"],
-  },
-]
 
-const journey = [
-  { label: "Draft", tone: "bg-black/[0.06] text-black/60", body: "Lands in your queue the moment it syncs. Edit it, add items — nothing is charged yet." },
-  { label: "Pending", tone: "bg-pending/12 text-pending", body: "You submit it and we accept it into production. Still cancellable, for a full refund." },
-  { label: "In process", tone: "bg-working/12 text-working", body: "Being made — printed or stitched, scanned, checked, packed. Nothing for you to do." },
-  { label: "Fulfilled", tone: "bg-shipped/12 text-shipped", body: "Out the door on the cheapest label, with tracking pushed back to your shop." },
-]
+/**
+ * THE TONE IS RESOLVED FROM THE LABEL, NEVER STORED.
+ *
+ * The obvious way to make the journey editable was to store `tone` beside `body`. That would
+ * have handed an admin a Tailwind class to type by hand into a public page — a class that is
+ * either a typo, or arbitrary CSS, or worst of all a WORKING colour that no longer matches
+ * what the seller sees in the app. The status colours are reserved and carry meaning on the
+ * floor (§4); this page borrows them, it does not get to pick them.
+ *
+ * So the label is the key. A label an admin invents that is not a real status falls back to
+ * neutral rather than to nothing, because a strip that loses a row when someone fixes a typo
+ * is worse than one that renders it quietly.
+ */
+const JOURNEY_TONE: Record<string, string> = {
+  draft: "bg-black/[0.06] text-black/60",
+  pending: "bg-pending/12 text-pending",
+  "in process": "bg-working/12 text-working",
+  "in production": "bg-working/12 text-working",
+  fulfilled: "bg-shipped/12 text-shipped",
+  "on hold": "bg-hold/12 text-hold",
+  cancelled: "bg-alert/12 text-alert",
+  refunded: "bg-alert/12 text-alert",
+}
+const toneFor = (label: string) => JOURNEY_TONE[label.trim().toLowerCase()] ?? "bg-black/[0.06] text-black/60"
 
-export function BoldHow() {
- return (
+export function BoldHow({ content }: { content: SiteContent }) {
+  const p = content.howPage
+
+  return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero
- title="Three steps."
- accent="Then it runs."
- sub="Connect, upload, submit. Everything after that happens without you opening a shipping screen."
-      />
+      <PlateHero title={p.title} accent={p.accent} sub={p.sub} />
 
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        <div className="grid gap-4 md:grid-cols-3">
-          {steps.map((s, i) => (
-            <Rise key={s.title} preset="drift" index={i} className="rounded-2xl border border-black/[0.09] bg-white p-8">
-              <div className="font-display font-semibold leading-none tracking-tighter text-black/[0.13]" style={{ fontSize: "clamp(3rem, 6vw, 4.5rem)" }}>
-                {String(i + 1).padStart(2, "0")}
-              </div>
-              {/* No icon plate — the 01/02/03 above already carries the step, and stacking a
- filled accent tile under it repeated the same idea in a louder colour. */}
-              <h2 className="mt-5 text-xl font-bold tracking-tight">{s.title}</h2>
-              <p className="mt-2 text-[15px] leading-relaxed text-black/60">{s.body}</p>
-              <ul className="mt-5 space-y-1.5">
-                {s.detail.map((d) => (
-                  <li key={d} className="text-[13px] text-black/50">— {d}</li>
-                ))}
-              </ul>
-            </Rise>
-          ))}
-        </div>
+      {/*
+        * ── THE BAND OF FIGURES ────────────────────────────────────────────────────
+        *
+        * Directly under the hero, exactly where the reference puts it, and for the reason
+        * given on SpecStrip: a number in a band reads as a specification, a number in a card
+        * reads as a claim somebody made. Every figure here is one we can point at — "2 min"
+        * is the OAuth round trip the copy below describes, "4" is the four statuses the strip
+        * at the bottom of this very page enumerates.
+        *
+        * Emptied in the editor, the whole section goes — same as the homepage.
+        */}
+      {p.stats.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-4">
+          <LabelRule left={p.ruleLeft} right={p.ruleRight} className="mb-10" />
+          <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
+            <SpecStrip items={p.stats} />
+          </div>
+        </section>
+      )}
+
+      {/*
+        * ── THE DIAGRAM ────────────────────────────────────────────────────────────
+        *
+        * The product, cut out, on the dark plate, with the three things that happen to it
+        * labelled around it. This is the annotated panel from the reference board, and on
+        * THIS page it is not decoration: "your artwork → our press → their doorstep" is the
+        * entire product said in one picture, above the three steps that spell it out.
+        *
+        * The whole section is guarded on the image, not just the figure. With no picture
+        * uploaded, CutoutFigure renders nothing — and a heading and a rule sitting over the
+        * space where a diagram should be is precisely the empty-state-that-looks-broken §4
+        * forbids. No picture means no section, and the steps follow the figures directly.
+        */}
+      {p.figure.image && (
+        <section className="mx-auto max-w-6xl px-6 py-14">
+          <CutoutFigure
+            tone="ink"
+            src={p.figure.image}
+            alt={p.figure.imageAlt}
+            ghost={p.figure.ghostWord}
+            callouts={p.figure.callouts}
+          />
+        </section>
+      )}
+
+      {/*
+        * ── THE THREE STEPS ────────────────────────────────────────────────────────
+        *
+        * Was three bordered white cards with a pale numeral on each. NumberedCards is the same
+        * idea with the alternation the reference uses — and it removes three more outlined
+        * boxes from a page that had seven of them, which is the count §4 keeps making.
+        *
+        * The "— No CSV exports" run under each step survived: it moved onto NumberedItem so
+        * the card draws it, rather than being lost or hand-rolled beside the component.
+        */}
+      <section className="mx-auto max-w-6xl px-6 py-14">
+        <NumberedCards items={p.steps} />
       </section>
 
       {/* The real status flow. Tones are the product's own, deliberately not re-tinted. */}
-      <section className="py-16" style={{ background: "rgba(0,0,0,0.03)" }}>
-        <div className="mx-auto max-w-4xl px-6">
-          <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
-            What you&apos;ll actually see.
-          </h2>
-          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/55">
-            These are the exact statuses on your orders — not a simplified version for this page.
-          </p>
-          <div className="mt-12 space-y-3">
-            {journey.map((j, i) => (
-              <Rise key={j.label} preset="cut" index={i} className="flex flex-col gap-2 rounded-xl border border-black/[0.09] bg-white p-5 sm:flex-row sm:items-center sm:gap-6">
-                <span className={"inline-flex w-fit shrink-0 rounded-full px-3 py-1 text-[13px] font-semibold sm:w-28 sm:justify-center " + j.tone}>
-                  {j.label}
-                </span>
-                <span className="text-[15px] leading-relaxed text-black/65">{j.body}</span>
-              </Rise>
-            ))}
+      {p.journey.length > 0 && (
+        <section className="py-16" style={{ background: "rgba(0,0,0,0.03)" }}>
+          <div className="mx-auto max-w-4xl px-6">
+            <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
+              {p.journeyHeading}
+            </h2>
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/55">
+              {p.journeyNote}
+            </p>
+
+            {/*
+              * A DIVIDED BAND, NOT FOUR CARDS.
+              *
+              * Same reasoning as SpecStrip, and the same §4 count: four white boxes on a grey
+              * ground made this read as four unrelated announcements, when it is one sequence.
+              * Rules between them say "these are in order" for free.
+              *
+              * A GRID, because the badge is a different width per row (§4: a variable-width
+              * element followed by anything else belongs in a grid). The old flex row pinned
+              * it with sm:w-28, which worked — a grid track says the same thing once, at the
+              * container, instead of on every child.
+              */}
+            <div className="mt-10 divide-y" style={{ borderColor: HAIRLINE, borderTopWidth: 1, borderBottomWidth: 1 }}>
+              {p.journey.map((j, i) => (
+                <Rise
+                  key={`${j.label}-${i}`}
+                  preset="cut"
+                  index={i}
+                  className="grid gap-2 py-5 sm:grid-cols-[7rem_1fr] sm:items-baseline sm:gap-6"
+                >
+                  <span className={"inline-flex w-fit rounded-full px-3 py-1 text-[13px] font-semibold " + toneFor(j.label)}>
+                    {j.label}
+                  </span>
+                  <span className="text-[15px] leading-relaxed text-black/65">{j.body}</span>
+                </Rise>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="px-6 py-16">
         <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
+          {/* The closing band gets the rule too, in the plate's own foreground — it is the one
+              device that ties the bottom of the page to the top. */}
+          <div className="mx-auto mb-8 flex max-w-sm items-center gap-4 opacity-70">
+            <span className="h-px flex-1" style={{ background: "color-mix(in oklch, var(--mk-accent-ink) 40%, transparent)" }} />
+            <span className={CAPS} style={{ color: ACID }}>EGFULFILL</span>
+            <span className="h-px flex-1" style={{ background: "color-mix(in oklch, var(--mk-accent-ink) 40%, transparent)" }} />
+          </div>
           <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
-            Connect a store and watch it work.
+            {p.cta.heading}
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="ink">Start free</Pill>
+            <Pill href="/signup" tone="ink">{p.cta.button}</Pill>
           </div>
         </Rise>
       </section>

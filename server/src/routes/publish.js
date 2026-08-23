@@ -400,6 +400,9 @@ export function publishRoutes(app, requireAuth) {
     const spec = IMAGE_MODELS.find((m) => m.id === b.model) || null;
     const model = spec ? spec.id : undefined;                       // undefined → gemini.js picks the configured default
     const aspectRatio = ASPECT_RATIOS.includes(b.aspectRatio) ? b.aspectRatio : '1:1';
+    // Opt-in cut-out backdrop — validated in gemini.js, which owns the clause. Passing it
+    // through unchecked here would put two copies of the allow-list in the codebase.
+    const backdrop = b.backdrop;
     const imageSize = spec && spec.sizes.includes(b.imageSize) ? b.imageSize : undefined;
     const count = Math.min(MAX_BATCH, Math.max(1, Math.floor(Number(b.count) || 1)));
 
@@ -426,7 +429,7 @@ export function publishRoutes(app, requireAuth) {
 
       let img;
       try {
-        img = await generateImage({ prompt, aspectRatio, imageSize, model, images: refs });
+        img = await generateImage({ prompt, aspectRatio, imageSize, model, images: refs, backdrop });
       } catch (e) {
         req.log?.warn?.({ err: String(e), detail: e.detail }, 'listing-photo generation failed');
         await refundGeneration(charge, 'image generation failed');

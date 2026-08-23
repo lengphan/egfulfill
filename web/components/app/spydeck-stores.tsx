@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import Image from "next/image"
 import { MagnifyingGlass, Heart, Storefront, Star, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
 import {
  searchSpydeckShops, getSpydeckShop, getSpydeckShopListings, getSpydeckSavedShops, saveSpydeckShop, unsaveSpydeckShop,
@@ -12,6 +11,7 @@ import { ResultCard } from "@/components/app/spydeck-view"
 import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_ICON } from "@/lib/card-actions"
 import { EmptyState } from "@/components/app/empty-state"
+import { ThumbFill } from "@/components/app/thumb"
 
 // Shared listing-level handlers, threaded from SpyDeckView so a competitor's product can be
 // saved or turned into a draft with the exact same flow as any other research card.
@@ -80,7 +80,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
         <div className="flex items-start gap-3">
           <div className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-muted">
             {s.icon
-              ? <Image src={s.icon} alt={s.shop_name || "shop"} fill unoptimized sizes="48px" className="object-cover" />
+              ? <ThumbFill src={s.icon} alt={s.shop_name || "shop"} sizes="48px" />
  : <span className="flex size-full items-center justify-center text-muted-foreground"><Storefront size={20} weight="duotone" /></span>}
           </div>
           <div className="min-w-0 flex-1">
@@ -119,7 +119,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           <div className="flex gap-2">
             {previews.map((l) => (
               <div key={String(l.listing_id)} className="relative aspect-square min-w-0 flex-1 overflow-hidden rounded-lg bg-muted">
-                <Image src={l.thumb || l.image || ""} alt={l.title || ""} fill unoptimized sizes="180px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+                <ThumbFill src={l.thumb || l.image || ""} alt={l.title || ""} sizes="180px" className="transition-transform duration-300 group-hover:scale-105" />
               </div>
             ))}
           </div>
@@ -274,7 +274,7 @@ export function StoresTab(h: Handlers) {
               <a key={l.listing_id} href={l.url} target="_blank" rel="noopener noreferrer" title={l.title}
  className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted transition-shadow hover:shadow-md">
                 {(l.thumb || l.image) ? (
-                  <Image src={l.thumb || l.image || ""} alt={l.title} fill unoptimized sizes="(max-width:640px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+                  <ThumbFill src={l.thumb || l.image || ""} alt={l.title} sizes="(max-width:640px) 50vw, 20vw" className="transition-transform duration-300 group-hover:scale-105" />
                 ) : (
                   <span className="flex size-full items-center justify-center text-muted-foreground"><Package size={20} weight="duotone" /></span>
                 )}

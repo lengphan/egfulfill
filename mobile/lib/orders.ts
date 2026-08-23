@@ -2,7 +2,7 @@ import type { Order } from "./api"
 import {
   PIPELINE, STAGE_LABEL, normalizeStage, isOpenStage, isException,
   nextStage as nextStageOn, stageDenialReason, canSetStage, isFactoryOrder,
-  isOverdueBy, DEFAULT_OVERDUE_DAYS, plainNum, platformFromId, unitsOfItems,
+  isOverdueBy, DEFAULT_OVERDUE_DAYS, plainNum, platformFromId, orderRefLabel, unitsOfItems,
 } from "@shared/order-rules"
 
 /**
@@ -79,6 +79,8 @@ export function ageLabel(o: Order): string {
  * shortens it to its last segment — the part that distinguishes it — and the phone was
  * printing the whole thing, which is why a manual order looked wrong next to an Etsy one.
  */
+export { orderRefLabel }
+
 export const shortOrderRef = (id: string) => {
   const raw = String(id ?? "")
   if (!raw) return ""

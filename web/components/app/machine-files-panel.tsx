@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react"
 import { CircleNotch, DownloadSimple, Needle, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { EmptyState } from "@/components/app/empty-state"
 import { Dropzone, formatBytes } from "@/components/app/dropzone"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -140,14 +139,35 @@ export function MachineFilesPanel() {
 
   return (
     <SectionCard title="Machine files" bodyClassName="space-y-4 p-5">
+      {/*
+        * ONE REGION WHEN THERE IS NOTHING, NOT TWO.
+        *
+        * This drew a full Dropzone and then an EmptyState directly under it, which is the
+        * exact duplication CLAUDE.md §4 warns about: a drop target and an empty list are one
+        * object wearing two hats. On an empty account it rendered the same needle mark twice,
+        * said "drop a file here" twice in different words, and stacked two centred columns of
+        * vertical padding — most of the screen was blank, and neither half explained why the
+        * other one was there.
+        *
+        * So the zone IS the empty state, and its note is the formats and the size cap —
+        * nothing else. The MF- reference used to be explained here in a second sentence,
+        * which is a paragraph on a resting control nobody has asked anything of yet. It is
+        * printed on every file's tile the moment one exists, which is where it can actually
+        * be copied from.
+        *
+        * With files in it the zone goes `slim` — one inline row above the grid, which is what
+        * `slim` was built for. A full-height target above a populated list is asking for a
+        * file that is plainly already there.
+        */}
       <Dropzone
         icon={Needle}
         multiple
         accept=".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus,.sew,.pcs,.vip"
         onFiles={take}
         busy={uploading}
-        label="Drop your stitch files here"
-        hint=".EMB, .PES, .DST and the other machine formats — 50 MB each"
+        slim={list.length > 0}
+        label={list.length > 0 ? "Add another stitch file" : "Drop your stitch files here"}
+        hint=".EMB, .PES, .DST — 50 MB each"
       />
 
       {err && <p className="text-sm text-alert">{err}</p>}
@@ -156,13 +176,7 @@ export function MachineFilesPanel() {
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <CircleNotch size={15} className="animate-spin" /> Loading…
         </div>
-      ) : list.length === 0 ? (
-        <EmptyState
-          icon={Needle}
-          title="No machine files yet"
-          note="Upload one and it gets an MF- reference you can put in a sheet's Machine File ID column."
-        />
-      ) : (
+      ) : list.length === 0 ? null : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((f) => (
             <div key={f.id} className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">

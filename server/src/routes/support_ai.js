@@ -1030,7 +1030,7 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
 
     let img;
     try {
-      img = await generateImage({ prompt, aspectRatio: b.aspectRatio, imageSize: b.imageSize, model: b.model, images: refs });
+      img = await generateImage({ prompt, aspectRatio: b.aspectRatio, imageSize: b.imageSize, model: b.model, images: refs, backdrop: b.backdrop });
     } catch (e) {
       // 200 with a reason, not a 5xx — the chat client renders `error`, and a throw here
       // showed up as a dead spinner with nothing said, which is how the assistant's other

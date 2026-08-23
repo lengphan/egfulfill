@@ -35,23 +35,44 @@ export function RegionMark({
   icon, busy = false, size = "md", className,
 }: { icon: Icon; busy?: boolean; size?: "sm" | "md"; className?: string }) {
   const I = icon
-  const box = size === "sm" ? "size-10" : "size-12"
-  const glyph = size === "sm" ? 18 : 22
+  const box = size === "sm" ? "size-12" : "size-14"
+  const glyph = size === "sm" ? 20 : 24
   return (
+    // THE GLYPH IS INK, NOT GREY. It was `text-muted-foreground`, which put the mark at the
+    // same weight as the note under it — so the tile read as another piece of caption rather
+    // than as the object the region is about. A tile is a white card lifted off the ground:
+    // border, faint shadow, dark glyph. That contrast is the whole reason part 1 exists.
     <span className={cn(
-      "grid place-items-center rounded-xl border border-border bg-background text-muted-foreground",
+      "grid place-items-center rounded-xl border border-border bg-background text-foreground shadow-xs",
       box, className,
     )}>
-      {busy ? <CircleNotch size={glyph} className="animate-spin" /> : <I size={glyph} />}
+      {busy ? <CircleNotch size={glyph} className="animate-spin text-muted-foreground" /> : <I size={glyph} />}
     </span>
   )
 }
 
-/** Part 2. */
-export const REGION_LINE = "text-sm font-medium text-foreground"
-/** Part 3. max-w-xs is the measure: past about 45 characters a centred sentence reads as a
- *  paragraph, and a paragraph in an empty state is an apology. */
-export const REGION_NOTE = "max-w-xs text-xs text-muted-foreground"
+/**
+ * Part 2, and part 3 under it — BOTH KEYED BY SIZE, the way the padding already was.
+ *
+ * They were two flat strings, `text-sm` over `text-xs`, and at 14px over 12px a region that
+ * owns a whole panel whispered: the line asking you to do the thing was the size of a table
+ * cell, and the note under it was the size of a footnote's footnote. The step from line to
+ * note is COLOUR, not size — one is ink and one is grey. Dropping two steps of scale on top
+ * of that is what made these regions read as small print in a large hole.
+ *
+ * `sm` is the old pair, for a region inside a card's own section, where 14px genuinely is the
+ * body size around it. `md` is a step up for a region that IS the panel.
+ */
+export const REGION_LINE = {
+  sm: "text-sm font-medium text-foreground",
+  md: "text-base font-medium text-foreground",
+} as const
+/** Part 3. The measure: past about 45 characters a centred sentence reads as a paragraph,
+ *  and a paragraph in an empty state is an apology. */
+export const REGION_NOTE = {
+  sm: "max-w-xs text-xs text-muted-foreground",
+  md: "max-w-sm text-sm text-muted-foreground",
+} as const
 /** The column every region shares, so the rhythm is one decision rather than fifty-three. */
 export const REGION_STACK = "flex flex-col items-center justify-center gap-2.5 text-center"
 /** Vertical air. ONE scale, two steps — a region inside a card, and a region that IS the card. */

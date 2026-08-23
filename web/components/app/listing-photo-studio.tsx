@@ -5,7 +5,7 @@ import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown, CaretLeft, 
 import { Button } from "@/components/ui/button"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, listListingRenders, deleteListingRender, type DeskImageConfig, type ListingRender, type AiQuote } from "@/lib/api"
+import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, listListingRenders, deleteListingRender, type DeskImageConfig, type ListingRender, type AiQuote, type Backdrop } from "@/lib/api"
 import { promptWarning } from "@/lib/image-gen"
 import { removeBackground } from "@/lib/remove-background"
 import { canvasReadableSrc } from "@/lib/thread-match"
@@ -208,6 +208,9 @@ export function ListingPhotoStudio({
 
   const [model, setModel] = useState("")
   const [size, setSize] = useState("")
+  /** Ask the render for a sweep the Remove background button can actually separate. Empty
+   *  = as described, which stays the default: a listing wants lifestyle shots too. */
+  const [backdrop, setBackdrop] = useState<Backdrop | "">("")
   const [ratio, setRatio] = useState("1:1")
   const [count, setCount] = useState(1)
   /* The four render settings live behind one control — see the note where it renders. */
@@ -432,6 +435,7 @@ export function ListingPhotoStudio({
         prompt: prompt.trim(),
         images: [...picked.map((i) => references[i]), ...usedAsRef].filter(Boolean),
         model, aspectRatio: ratio, imageSize: effSize, count,
+        backdrop: backdrop || undefined,
       })
       // Partial success is the NORMAL shape here, not an edge case: a daily cap or an empty
       // wallet stops the batch part-way, so both halves are shown rather than one winning.
@@ -1003,6 +1007,18 @@ export function ListingPhotoStudio({
                                   {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
                                 </select>
                               </div>
+                            </div>
+                            {/* The cut-out button on a finished render can only separate a flat
+ sweep, and nothing about pressing it afterwards can put one there — so
+                                the choice belongs here, before the money moves. Grey is for white
+ garments, which no colour-distance cut-out can lift off white. */}
+                            <div>
+                              <div className="mb-1 text-2xs text-muted-foreground">Backdrop</div>
+                              <select value={backdrop} onChange={(e) => setBackdrop(e.target.value as Backdrop | "")} className={selectCls}>
+                                <option value="">As described</option>
+                                <option value="white">Flat white — cut-out ready</option>
+                                <option value="grey">Flat grey — cut-out ready, for white garments</option>
+                              </select>
                             </div>
                             {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
                           </div>

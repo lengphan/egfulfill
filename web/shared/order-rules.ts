@@ -302,6 +302,31 @@ export const platformFromId = (id: string) => {
   return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
 }
 
+/**
+ * THE NUMBER, THEN WHO IT CAME FROM — the label for a reference standing on its own.
+ *
+ * `numOfIds` is for a row that has a seq to fall back on. This is for the places that hold
+ * nothing but the id — an artwork tile, a thumbnail caption, a digitiser's library card —
+ * where the raw value was being printed verbatim. That is the worst of both: `etsy-4152219958`
+ * is not the number the buyer or the seller's own Etsy dashboard shows, so it matches nothing
+ * anyone could look up, and because every card in a grid starts with the same six characters
+ * a column of them reads as one repeated string rather than as six different orders.
+ *
+ * The prefix is not dropped and not truncated — truncation turned `etsy-4149084185` into
+ * `etsy-414908418`, a real order number with its last digit silently removed. It is
+ * TRANSLATED: the number stands alone, and the marketplace is named the way the marketplace
+ * names itself, after it.
+ *
+ * Anything with no marketplace prefix passes through untouched — our own `#123` and `FF-…`,
+ * and non-order references like `IMG-12`. Appending "Manual" to those would be noise.
+ */
+export const orderRefLabel = (id: string) => {
+  const raw = String(id ?? "")
+  if (!raw) return ""
+  const plain = plainNum(raw)
+  return plain === raw ? raw : `${plain} · ${platformFromId(raw)}`
+}
+
 /** Pieces on an order. A line with no qty is one piece, not zero. */
 export const unitsOfItems = (items?: ({ qty?: number | null } | null)[] | null) =>
   (items ?? []).reduce((n, it) => n + (Number(it?.qty) || 1), 0)

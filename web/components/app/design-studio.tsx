@@ -10,7 +10,10 @@ import { ProductPickerDialog, type PickedProduct } from "@/components/app/produc
 import { saveDesignLibrary } from "@/lib/api"
 
 // Downscale a data-URL image to a small JPEG thumbnail (data URLs never taint the canvas).
-function downscale(dataUrl: string, max = 320): Promise<string> {
+// EXPORTED because the library's own drop target needs the same thumbnail this dialog makes —
+// two ways in, one shape of row in the grid. A second copy is how the three private
+// re-implementations CLAUDE.md §5 lists got there.
+export function downscale(dataUrl: string, max = 320): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {

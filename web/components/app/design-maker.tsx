@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, type Icon } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
+import { Thumb } from "@/components/app/thumb"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
+import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { designFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
@@ -181,17 +183,46 @@ function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
   /** Under 1200px on its long edge is soft on anything bigger than a pocket print, which is
    * worth saying HERE — the cheapest moment to pick a different file is before placing it. */
  const small = dim != null && Math.max(dim.w, dim.h) > 0 && Math.max(dim.w, dim.h) < 1200
+  /**
+   * THE FILE IS NOT THERE.
+   *
+   * Buyer art is held as a URL and never copied, and Etsy hands us whatever the buyer typed
+   * into a listing variation — so a share page, an expired link or a PDF arrives here looking
+   * exactly like an image. It cannot be placed: a layer whose picture never loads is an
+   * invisible object on the garment, which is worse than not adding it. So the tile stops
+   * being a button and becomes the link to the original, which is the only thing left that
+   * can answer "what did they actually send".
+   */
+ const [broken, setBroken] = useState(false)
+ if (broken) {
+    return (
+      <a
+ href={url} target="_blank" rel="noreferrer"
+ title={[title || [badge, name].filter(Boolean).join(" · "), "Not an image we can load — opens the original"].filter(Boolean).join(" · ")}
+ className="block w-full overflow-hidden rounded-md border border-border transition-colors hover:border-primary/50"
+      >
+        <Thumb className="aspect-square w-full" icon={<LinkSimpleBreak size={18} weight="duotone" />} note="" />
+        <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium text-hold">
+          Can’t load
+        </span>
+      </a>
+    )
+  }
  return (
     <div className="group/thumb relative">
       <button
  type="button" onClick={onPlace} title={[title || [badge, name].filter(Boolean).join(" · "), dim ? `${dim.w} × ${dim.h} px` : null].filter(Boolean).join(" · ") || "Place on the design"}
  className="block w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {/* A picture that fails must not paint its ALT — and the alt here is the marketplace
+ listing title, so a refused buyer upload rendered a paragraph of "Custom Embroidered
+ Apron with Name, Personalized Kitchen Apron, …" down a 130px column. Thumb is the
+ rule; `broken` above is what this surface adds to it. */}
+        <Thumb
  src={src ?? url} alt={name || ""}
  onLoad={(e) => setDim({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
- className="aspect-square w-full object-cover"
+ onBroken={() => setBroken(true)}
+ className="aspect-square w-full"
         />
         {/* THE PIXELS, not a truncated id. This caption used to read "4148231…" — the order
  reference cut off mid-number, which identifies nothing and is on the tooltip
@@ -205,7 +236,7 @@ function ImageThumb({ url, src, name, badge, title, onPlace, onDelete }: {
       {onDelete && (
         <button
  type="button" onClick={onDelete} title="Remove from your library"
- className="absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-red-600 group-hover/thumb:flex"
+ className="absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-alert group-hover/thumb:flex"
         >
           <Trash size={11} weight="bold" />
         </button>
@@ -242,24 +273,6 @@ const TOOLS: { key: ToolKey; label: string; Icon: Icon }[] = [
 ]
 
 const RAIL_LIMIT = 6
-
-/**
- * The order reference, shortened for a 60px caption.
- *
- * A marketplace ref is `etsy-4142313274`, and the rail has room for about ten characters —
- * so the full value truncates to "etsy-4142…" on EVERY tile, which is a label that tells you
- * nothing and looks like a bug. The channel prefix is the part they all share, so it is the
- * part to drop: "4142313274" is what distinguishes one from the next. Manual orders (`FF-…`)
- * and `#123` sequence numbers have no prefix and pass through untouched.
- *
- * The full value still rides on the tile's tooltip and shows in the browse dialog, which has
- * the width for it.
- */
-const shortRef = (ref?: string) => {
- if (!ref) return ref
- const m = /^(etsy|shopify|tiktok|amazon)-(.+)$/i.exec(ref)
- return m ? m[2] : ref
-}
 
 export function DesignMaker() {
  const search = useSearchParams()
@@ -512,11 +525,11 @@ export function DesignMaker() {
    * twenty lines, and the copy that drifts is the one that stops restoring `pos` — which
    * puts the artwork back centred and looks like the template never saved it.
    */
-  const applyTemplate = (t: ProductTemplate) => {
-    const l = (t.layers ?? {}) as { sides?: Record<string, SideStack>; images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
-    const d = (t.data ?? {}) as { blank?: string | null; blankSku?: string | null; printArea?: { w?: number; h?: number } }
-    templateId.current = String(t.id)
-    if (t.name) setName(t.name)
+ const applyTemplate = (t: ProductTemplate) => {
+ const l = (t.layers ?? {}) as { sides?: Record<string, SideStack>; images?: ImageLayer[]; designUrl?: string; pos?: Pos; texts?: TextLayer[] }
+ const d = (t.data ?? {}) as { blank?: string | null; blankSku?: string | null; printArea?: { w?: number; h?: number } }
+ templateId.current = String(t.id)
+ if (t.name) setName(t.name)
     // A template saved BEFORE the stack has one artwork and a position; one saved
     // after has the list. Reading images first means a new template never falls back
     // to its own compatibility fields and loses its upper layers.
@@ -548,21 +561,21 @@ export function DesignMaker() {
     // measured when the template was saved; the size now comes from whichever product this
     // is opened on, so restoring the old number would print the new garment to the old
     // garment's measurements.
-    /*
-     * THE SKU FIRST, THEN THE NAME.
-     *
-     * The save writes both — `blank` is the name, `blankSku` the sku — and this read only
-     * ever looked at the name, so `blankSku` was written by every template and read by
-     * nothing. Rename a product, or hold two that share a name, and reopening the template
-     * found the wrong blank or none at all: the artwork comes back onto a garment nobody
-     * chose.
-     *
-     * A sku is the identity; a name is a label somebody edits. Name stays as the fallback,
-     * for templates saved before blankSku existed.
-     */
-    const byName = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
-    const p = (d.blankSku ? catalogRef.current.find((x) => x.sku === d.blankSku) : null) ?? byName
-    if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
+  /*
+   * THE SKU FIRST, THEN THE NAME.
+   *
+   * The save writes both (`blank` is the name, `blankSku` the sku, see the saveTemplate
+   * call below) and this read only ever looked at the name — so `blankSku` was written by
+   * every template and read by nothing. Rename a product, or hold two that share a name,
+   * and reopening the template found the wrong blank or none at all, which is the artwork
+   * coming back onto a garment nobody chose.
+   *
+   * A sku is the identity; a name is a label somebody edits. Name stays as the fallback
+   * for templates saved before blankSku existed.
+   */
+ const byName = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
+ const p = (d.blankSku ? catalogRef.current.find((x) => x.sku === d.blankSku) : null) ?? byName
+ if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
   }
 
  useEffect(() => {
@@ -880,7 +893,7 @@ export function DesignMaker() {
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      {orderUploads.slice(0, RAIL_LIMIT).map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={shortRef(im.orderRef)} title={[im.orderRef, im.name].filter(Boolean).join(" · ")} onPlace={() => placeImage(im.url)} />)}
+                      {orderUploads.slice(0, RAIL_LIMIT).map((im, i) => <ImageThumb key={im.url + i} url={im.url} src={canvasReadableSrc(im.url)} name={im.name} badge={orderRefLabel(im.orderRef)} title={[im.orderRef, im.name].filter(Boolean).join(" · ")} onPlace={() => placeImage(im.url)} />)}
                     </div>
                   </>
                 )}
@@ -1061,7 +1074,7 @@ export function DesignMaker() {
                   <input type="checkbox" checked={!!selText.bold} onChange={(e) => updateText(selText.id, { bold: e.target.checked })} /> Bold
                 </label>
               </div>
-              <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-red-600 hover:text-red-700">Delete text</Button>
+              <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-alert hover:text-alert">Delete text</Button>
             </div>
           ) : images.length > 0 || texts.length > 0 ? (
             <div className="space-y-3 border-t border-border pt-3">

@@ -1,11 +1,10 @@
 "use client"
 
-import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { motion, useInView, useReducedMotion, useScroll, useSpring, useTransform, animate } from "motion/react"
-import { ArrowUpRight, PlugsConnected, Printer, Truck, Wallet } from "@phosphor-icons/react"
+import { useRef } from "react"
+import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, INK, SURFACE, ACID, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, INK, SURFACE, ACID, HAIRLINE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -21,85 +20,12 @@ import { ACCENT, INK, SURFACE, ACID, MaskedWords, TypedPhrase, Pill } from "@/co
  */
 
 
-/** A number that counts to its value once, when it first arrives. Reads as the figure
- *  settling rather than a slot machine — no loop, no re-run on scroll-back. */
-function CountUp({ value, className }: { value: string; className?: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  /**
-   * A small FIXED bite, not a percentage of the viewport.
-   *
-   * This was -15%, which on a 1000px window puts the trigger line at 850 — and the hero's
-   * three stat cards sit at y=867. Plainly on screen, 17px under the line, so they showed a
-   * static figure and only ever counted if you happened to scroll. A percentage scales the
-   * dead zone with the display, so the taller the monitor the more visible content silently
-   * refuses to animate. 40px means "not clipped at the very edge" at every size.
-   */
-  const inView = useInView(ref, { once: true, margin: "0px 0px -40px 0px" })
-  const reduce = useReducedMotion()
-  const [shown, setShown] = useState(value)
-
-  /**
-   * Split the numeric core from whatever wraps it ("2,400+", "$1.2M", "99.9%") so the
-   * prefix/suffix survive — animating the whole string would print nonsense mid-flight.
-   *
-   * MEMOISED, and that is the whole bug fix. This used to be a bare `regex.exec()` in the
-   * render body, which returns a NEW array every render, and that array was in the effect's
-   * dependency list. So: animate → onUpdate → setShown → re-render → new array → effect
-   * tears the animation down and restarts it from zero. It never got more than a frame in.
-   * Measured before the fix: three counters never moved off their final value at all, and
-   * the fourth emitted 48hrs, 4hrs, 5hrs, 0hrs, 9hrs, 8hrs — scrambled, never ascending.
-   */
-  const parts = useMemo(() => {
-    const m = /^([^\d]*)([\d.,]+)(.*)$/.exec(value)
-    if (!m) return null
-    const target = Number(m[2].replace(/,/g, ""))
-    if (!Number.isFinite(target)) return null
-    const dp = (m[2].split(".")[1] ?? "").length
-    return {
-      pre: m[1], post: m[3], target, dp,
-      /**
-       * Decimals to show WHILE counting, which is not the same as the decimals in the
-       * figure. "2hrs" counting 0 → 2 as integers is three distinct frames in 1.1s and
-       * reads as static — the second half of what was reported here. Small whole numbers
-       * borrow a decimal place in flight and land back on the integer, so the motion is
-       * legible at any magnitude. Big figures already have plenty of digits moving.
-       */
-      flightDp: dp === 0 && target < 100 ? 1 : dp,
-    }
-  }, [value])
-
-  useEffect(() => {
-    if (!inView || reduce || !parts) return
-    const { pre, post, target, dp, flightDp } = parts
-    const fmt = (v: number, d: number) =>
-      `${pre}${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}${post}`
-    const controls = animate(0, target, {
-      duration: 1.1,
-      ease: [0.16, 1, 0.3, 1],
-      onUpdate: (v) => setShown(fmt(v, flightDp)),
-      // Land on the ORIGINAL string, not a re-formatted float — "2.4M+" must not arrive
-      // as "2.40M+" because the flight precision happened to be higher.
-      onComplete: () => setShown(value),
-    })
-    return () => controls.stop()
-  }, [inView, reduce, parts, value])
-
-  return <span ref={ref} className={className}>{parts ? shown : value}</span>
-}
-
-const ICONS = [PlugsConnected, Printer, Wallet, Truck]
-
 export function BoldHome({ content }: { content: SiteContent }) {
   const { hero, stats, features, steps, testimonials, faq, cta } = content
   const reduce = useReducedMotion()
   const heroRef = useRef<HTMLDivElement>(null)
-
-  // Scroll-linked parallax on the product panel. Spring-smoothed so it trails the scroll
-  // slightly instead of tracking it rigidly — that lag is what reads as depth.
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] })
-  const smooth = useSpring(scrollYProgress, { stiffness: 90, damping: 26, mass: 0.4 })
-  const panelY = useTransform(smooth, [0, 1], [0, -70])
-  const panelScale = useTransform(smooth, [0, 1], [1, 0.94])
+  // The scroll-linked parallax went with the panel it moved. Nothing else in the hero
+  // tracked scroll, so the spring was running a MotionValue nobody read.
 
   /** One half of the marquee, repeated until it is long enough to span a wide screen on its
    *  own. Both halves must be identical for the -50% loop to be seamless, so the padding
@@ -133,7 +59,17 @@ export function BoldHome({ content }: { content: SiteContent }) {
           The diagonal went with it: it existed to return the page to paper below the plate,
           and there is no plate to return from. */}
       <section ref={heroRef} className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
-        <div className="mx-auto max-w-6xl px-6 pb-32 pt-16 sm:pt-24">
+        {/* pb-32 is sized for the app PANEL, which hangs past the section on a negative
+            margin. A figure sits in the flow, so the same padding is a hole between the
+            buttons and the product it is meant to be introducing. */}
+        {/* pb-32 was also panel clearance. The figure follows immediately now, and with no
+            figure the strip of numbers does — either way there is something directly under
+            the buttons, so the gap only has to separate them from it. */}
+        <div className={"mx-auto max-w-6xl px-6 pt-14 sm:pt-20 " + (hero.image ? "pb-6" : "pb-10")}>
+          {/* The rule the reference boards open on: who we are at one end, who this is for at
+              the other, a hairline between. It gives the page a top edge without a box, and
+              it says the second thing a visitor needs before the headline says the first. */}
+          <LabelRule left={hero.ruleLeft} right={hero.ruleRight} className="mb-10" />
           <h1 className="max-w-5xl text-center font-display font-semibold leading-[0.92] tracking-[-0.032em] mx-auto"
               // Ink on paper — 17.40:1. The headline is the page; the colour is one phrase.
               style={{ color: INK }}
@@ -170,93 +106,36 @@ export function BoldHome({ content }: { content: SiteContent }) {
           </motion.div>
         </div>
 
-        {/* Floating product panel — the reference's strongest device: a real screen, held
-            slightly off the page, with live figures peeled off it as chips. */}
-        {/* TWO elements, not one. The entrance animates `y`, and the parallax drives `y` from
-            a scroll MotionValue — one element can't own the same property twice, and when it
-            tried, the panel never became visible at all. Outer does the arrival, inner does
-            the scroll. */}
-        <motion.div
-          className="relative z-10 mx-auto -mb-24 max-w-4xl px-6"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 60 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <motion.div
-            className="relative rounded-2xl border border-black/10 bg-white p-4 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.45)]"
-            style={reduce ? undefined : { y: panelY, scale: panelScale }}
-          >
-            <div className="flex items-center gap-1.5 pb-3">
-              {["#ff5f57", "#febc2e", "#28c840"].map((c) => <span key={c} className="size-2.5 rounded-full" style={{ background: c }} />)}
-            </div>
-            {/* The chart from the reference: columns that GROW from the baseline as the panel
-                arrives, left to right. Height is the only thing animated (via scaleY off a
-                bottom origin), which the compositor can do on the GPU — animating the actual
-                height would relayout the panel on every frame. */}
-            <div className="mb-3 rounded-xl border border-black/[0.07] bg-black/[0.03] p-4">
-              <div className="flex items-end justify-between gap-1.5" style={{ height: 92 }}>
-                {[38, 55, 30, 72, 48, 90, 64, 78, 44, 84, 58, 96].map((h, i) => (
-                  <motion.span
-                    key={i}
-                    className="flex-1 rounded-t-[3px]"
-                    style={{ background: i % 3 === 2 ? INK : ACCENT, transformOrigin: "bottom", height: `${h}%` }}
-                    initial={reduce ? { opacity: 0 } : { scaleY: 0 }}
-                    whileInView={reduce ? { opacity: 1 } : { scaleY: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.7 + i * 0.045, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              {stats.slice(0, 3).map((s, i) => (
-                <motion.div
-                  key={s.label}
-                  className="rounded-xl border border-black/[0.07] bg-black/[0.03] p-4"
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 14 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.65 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-widest text-black/45">{s.label}</div>
-                  {/* font-TITLE, not font-display: this panel is a picture OF THE APP, and the
-                      app's face is the sans. A serif figure here would advertise a product that
-                      doesn't look like this. */}
-                  <CountUp value={s.value} className="mt-1.5 block text-2xl font-title font-semibold tracking-tight" />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Figures peeled OFF the panel and floated beside it — the reference's clearest
-                device. They drift in late and from opposite sides, so they read as lifted off
-                the screen rather than drawn on it. Hidden below lg, where they'd overlap the
-                panel they're meant to annotate. */}
-            {stats[3] && (
-              <motion.div
-                className="absolute -left-24 top-1/3 hidden rounded-2xl border border-black/10 bg-white p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] lg:block"
-                initial={reduce ? { opacity: 0 } : { opacity: 0, x: 24, y: 10 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                transition={{ duration: 0.7, delay: 1.05, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-black/45">{stats[3].label}</div>
-                {/* Peeled off the mockup, so it stays on the mockup's face — see above. */}
-                <CountUp value={stats[3].value} className="mt-1 block text-xl font-title font-semibold tracking-tight" />
-              </motion.div>
-            )}
-            {stats[0] && (
-              <motion.div
-                className="absolute -right-20 top-16 hidden rounded-full border border-black/10 bg-white px-4 py-2 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] lg:block"
-                initial={reduce ? { opacity: 0 } : { opacity: 0, x: -24, y: -10 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                transition={{ duration: 0.7, delay: 1.2, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <span className="text-sm font-bold tracking-tight">{stats[0].value}</span>
-                <span className="ml-1.5 text-xs text-black/50">{stats[0].label}</span>
-              </motion.div>
-            )}
-          </motion.div>
-        </motion.div>
+        {/*
+          * THE PRODUCT — and nothing at all when there isn't one.
+          *
+          * THE FLOATING APP PANEL IS GONE. It was a drawn macOS window with a bar chart of
+          * invented columns and three figures peeled off it as chips, and it had two problems
+          * the reference boards make obvious. It showed our ADMIN SCREENS, which is not what a
+          * seller buys — they buy a garment that arrives printed. And the chart underneath was
+          * decoration shaped like data: twelve columns of no measurement, on a page whose own
+          * stats section deliberately carries only numbers we can point at.
+          *
+          * So the object on this page is the product. It is uploaded in Settings › Site
+          * content, from a render the Studio made and the browser cut out, which means the
+          * garment on the homepage is one we actually print and changing it is an upload
+          * rather than a deploy.
+          *
+          * With no picture the hero is TYPE and nothing else, which is the house style stated
+          * plainly (§4: type does the work decoration usually does) and the one honest empty
+          * state — the strip of real figures below follows immediately, so the fold is never
+          * blank. A placeholder where a product should be would be worse than the space.
+          */}
+        {hero.image && (
+          <div className="relative z-10 mx-auto max-w-6xl px-6">
+            <CutoutFigure
+              src={hero.image}
+              alt={hero.imageAlt}
+              ghost={hero.ghostWord}
+              callouts={hero.callouts}
+            />
+          </div>
+        )}
       </section>
 
       {/* ── The channel marquee ────────────────────────────────────────────────
@@ -268,10 +147,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
           The strip is masked to transparent at both ends rather than clipped by the section:
           a name sliced in half at the edge reads as broken layout, a name fading out reads as
           a band that carries on past the screen — which is what it is. */}
-      {/* The top padding is load-bearing, not taste: the hero's app mockup is absolutely
-          positioned and hangs well below the plate's diagonal, so a short gap here puts the
-          names UNDER it. This clears the overhang. */}
-      <section className="overflow-hidden pb-14 pt-36" style={{ background: SURFACE }}>
+      {/* pt-36 — 144px — was clearance for the app mockup, which was absolutely positioned
+          and hung well below the section above, so a short gap here put the channel names
+          UNDER it. Nothing overhangs any more: the figure sits in the flow and the no-image
+          hero is type. What was load-bearing became the single largest hole on the page. */}
+      <section className="overflow-hidden pb-12 pt-10" style={{ background: SURFACE }}>
         <div
           className="relative flex overflow-hidden"
           style={{
@@ -297,6 +177,29 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </div>
       </section>
 
+      {/*
+        * ── THE STRIP OF FIGURES ──────────────────────────────────────────────────
+        *
+        * The stats, said the way a spec sheet says them: a value, what it measures, why it
+        * matters, and a rule between each. No boxes — a number inside a card reads as a claim
+        * somebody made, while a number in a band reads as a specification, which is the whole
+        * reason the reference puts one directly under its hero.
+        *
+        * This briefly had its own `specs` field alongside `stats`, justified on the grounds
+        * that the app panel used one and the strip used the other. The panel is gone, so that
+        * justification is gone with it and there is one list again — the same figures the
+        * Stats tab has always edited, now carrying a note.
+        *
+        * Skipped entirely when the list is empty, which is how an admin removes the section.
+        */}
+      {stats.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-14 pt-4">
+          <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
+            <SpecStrip items={stats} />
+          </div>
+        </section>
+      )}
+
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
@@ -304,32 +207,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </h2>
         <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-black/55">{features.subhead}</p>
 
-        <div className="mt-14 grid gap-4 md:grid-cols-2">
-          {features.cards.slice(0, 4).map((c, i) => {
-            const Icon = ICONS[i % ICONS.length]
-            return (
-              <motion.div
-                key={c.title}
-                className="group relative overflow-hidden rounded-2xl border border-black/[0.09] bg-white p-8 transition-colors duration-200 hover:border-black/25"
-                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 22 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "0px 0px -12% 0px" }}
-                transition={{ duration: 0.55, delay: i * 0.07, ease: [0.16, 1, 0.3, 1] }}
-              >
-                {/* The accent arrives on hover as a wipe from the corner — motion that
-                    tells you the card is interactive, not decoration that always runs. */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
-                  style={{ background: ACCENT }}
-                />
-                <Icon size={26} weight="duotone" className="relative text-[var(--mk-ink)]" />
-                <h3 className="relative mt-6 text-xl font-bold tracking-tight">{c.title}</h3>
-                <p className="relative mt-2 text-[15px] leading-relaxed text-black/55">{c.body}</p>
-              </motion.div>
-            )
-          })}
-        </div>
+        {/*
+          * NUMBERED, AND ALTERNATING LIGHT AND DARK.
+          *
+          * Four identical bordered cards read as a list you skim and forget — and §4 has been
+          * counting those: 490 outlined boxes across the app, which is what makes an outline
+          * stop meaning anything. The reference checkers them instead, and the alternation is
+          * doing real work: it gives the eye somewhere to rest and makes four things read as
+          * four things.
+          *
+          * The hover-wipe accent went with the borders. It was motion that ran on a card that
+          * does not do anything when you click it, which is a promise the card cannot keep.
+          */}
+        <NumberedCards items={features.cards} className="mt-14" />
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ──────────────────── */}

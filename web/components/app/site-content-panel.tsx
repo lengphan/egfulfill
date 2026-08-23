@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getSiteContentAdmin, setSiteContent, uploadHeroImage } from "@/lib/api"
-import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/site-content"
+import { DEFAULT_SITE_CONTENT, type SiteContent, type PageFigure } from "@/lib/site-content"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { MotionEditor } from "@/components/app/motion-editor"
 import { Dropzone } from "@/components/app/dropzone"
@@ -50,11 +50,33 @@ function Intro({ children }: { children: React.ReactNode }) {
  *
  * A phone/DSLR photo is 4–12MB; base64-encoded it blows past Vercel's ~4.5MB proxy body
  * limit, so the upload silently failed on anything but tiny images — which is why "the file
- * is limited". Capping the longest edge and re-encoding as JPEG keeps the payload small
- * (well under the limit) AND stops the homepage shipping a 12MB background. Returns a data
- * URL. Falls back to the original bytes if the canvas isn't available.
+ * is limited". Capping the longest edge and re-encoding keeps the payload small AND stops the
+ * homepage shipping a 12MB background. Returns a data URL. Falls back to the original bytes if
+ * the canvas isn't available.
+ *
+ * ── JPEG WOULD HAVE SILENTLY DESTROYED EVERY CUT-OUT ──────────────────────────────────────
+ *
+ * This re-encoded unconditionally to image/jpeg. JPEG has no alpha channel, so a PNG with a
+ * transparent background came back with that transparency flattened — and canvas flattens to
+ * BLACK, so a garment cut out of its backdrop would have arrived on the homepage in a black
+ * rectangle. There was a guard, `scale === 1 && size < 1.2MB → send as-is`, which is exactly
+ * the case that never applies: a 2K render is over both.
+ *
+ * That is the whole hero figure feature failing as a success, which is the same failure mode
+ * as asking the image model for transparency. So the OUTPUT TYPE FOLLOWS THE INPUT: anything
+ * that can carry alpha keeps it, everything else still becomes a small JPEG.
+ *
+ * PNG compresses far worse than JPEG, so its edge cap is lower. A hero figure renders at most
+ * 26rem tall — 1600px is already more than twice what any screen asks for, and the ceiling
+ * that matters is the ~4.5MB proxy body limit with base64's 33% inflation on top.
  */
+const ALPHA_TYPES = new Set(["image/png", "image/webp", "image/avif"])
 async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<string> {
+  const keepAlpha = ALPHA_TYPES.has(file.type)
+  // PNG is the only alpha format canvas can be relied on to WRITE — toDataURL falls back to
+  // PNG for an unsupported type anyway, so asking for it explicitly is the honest version.
+  const outType = keepAlpha ? "image/png" : "image/jpeg"
+  if (keepAlpha) maxEdge = Math.min(maxEdge, 1600)
  const read = () => new Promise<string>((res, rej) => {
  const fr = new FileReader()
  fr.onload = () => res(String(fr.result))
@@ -70,7 +92,7 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
  i.src = original
     })
  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
-    // Already small in both bytes and dimensions — send as-is (keeps PNG transparency etc.).
+    // Already small in both bytes and dimensions — send the original bytes untouched.
  if (scale === 1 && file.size < 1_200_000) return original
  const w = Math.max(1, Math.round(img.width * scale))
  const h = Math.max(1, Math.round(img.height * scale))
@@ -79,10 +101,142 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
  const ctx = canvas.getContext("2d")
  if (!ctx) return original
  ctx.drawImage(img, 0, 0, w, h)
- return canvas.toDataURL("image/jpeg", quality)
+    // The quality argument is ignored for PNG, which is lossless — passing it is harmless and
+    // keeps this one call site rather than two.
+ return canvas.toDataURL(outType, quality)
   } catch {
  return original
   }
+}
+
+/**
+ * THE FIGURE EDITOR — image, alt text, ghost word, callouts.
+ *
+ * Written ONCE and used three times. Three pages carry a CutoutFigure now, and the hero's
+ * version of this block was 45 lines of JSX; copying it twice is exactly the re-derivation
+ * §4's method section keeps having to undo — by the third copy the alt-text label reads
+ * differently on one page and the Remove button behaves differently on another.
+ *
+ * The upload plumbing stays in the parent because it is one input, one in-flight flag and one
+ * error line shared by all three; what varies is only WHERE the resulting URL is written, so
+ * that is the callback.
+ */
+function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, preview, broken, onBroken, hint }: {
+  figure: PageFigure
+  /** Scoped to this page's figure, so a call site can't write to the wrong one. */
+  edit: (fn: (f: PageFigure) => void) => void
+  /** Hand the chosen bytes up. The parent owns the downscale + upload, because the in-flight
+   *  flag and the error line are shared; only the destination differs. */
+  onPickFile: (file: File | undefined) => void
+  onRemove: () => void
+  uploading: boolean
+  saving: boolean
+  /** A data URL shown instantly while the upload runs — null unless THIS figure is the one
+   *  being uploaded, which is what keeps three editors from showing each other's preview. */
+  preview: string | null
+  broken: boolean
+  onBroken: () => void
+  hint: string
+}) {
+  /* Each editor owns its own input. A single shared ref in the parent would need a second
+     piece of state saying which figure the next change event belongs to — one more thing to
+     get wrong, to save one hidden element. */
+  const fileRef = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onPickFile(e.target.files?.[0]); if (fileRef.current) fileRef.current.value = "" }} />
+      <div>
+        <span className="mb-1 block text-xs font-medium text-muted-foreground">Figure</span>
+        {(preview || figure.image) ? (
+          <div className="space-y-2">
+            {broken && !preview ? (
+              // The stored URL couldn't load. Almost always the object storage / CDN isn't
+              // serving it publicly — say that plainly instead of a broken-image glyph.
+              <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-hold/30 bg-hold/10 px-4 py-8 text-center text-xs text-hold">
+                <Warning size={20} weight="fill" />
+                <span className="font-medium">The saved figure isn&apos;t loading.</span>
+                <span className="max-w-sm">Its URL was saved, but the browser can&apos;t open it — usually the storage bucket / CDN isn&apos;t public. Re-upload, or check <code>SPACES_CDN</code> and public-read on the server.</span>
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview || figure.image} alt="Figure preview" onError={onBroken}
+                className="max-h-44 w-full rounded-lg border border-border object-contain" />
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} />}Replace
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onRemove} disabled={uploading || saving}>Remove</Button>
+            </div>
+          </div>
+        ) : (
+          /* An EMPTY region may carry one sentence (§4), and the hint is the one fact the
+             label cannot carry: where a picture with no background comes from. It lives on
+             this branch only — once a figure is set, the same sentence would be prose
+             under a control, which is the thing §4 keeps having to delete. */
+          <Dropzone
+            icon={ImageIcon}
+            accept="image/*"
+            disabled={uploading}
+            busy={uploading ? "Uploading…" : null}
+            onFiles={(files) => onPickFile(files[0])}
+            label="Drop the figure here"
+            hint={hint}
+          />
+        )}
+      </div>
+
+      <Field label="What the picture is, in words" value={figure.imageAlt} onChange={(v) => edit((f) => { f.imageAlt = v })} />
+      <Field label="Ghost word behind the figure" value={figure.ghostWord} onChange={(v) => edit((f) => { f.ghostWord = v })} />
+
+      <div>
+        <span className="mb-1 block text-xs font-medium text-muted-foreground">Figure callouts</span>
+        <div className="space-y-2">
+          {figure.callouts.map((co, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="flex gap-2">
+                <div className="flex-1"><Field label="Label" value={co.label} onChange={(v) => edit((f) => { f.callouts[i].label = v })} /></div>
+                <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((f) => { f.callouts.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+              <div className="mt-2"><Field label="Note" value={co.note ?? ""} onChange={(v) => edit((f) => { f.callouts[i].note = v })} /></div>
+            </div>
+          ))}
+          {/* Four is what CutoutFigure draws — a fifth would be stored and silently never
+              appear, which is the kind of thing that gets reported as "my edit didn't save". */}
+          {figure.callouts.length < 4 && (
+            <Button variant="outline" size="sm" onClick={() => edit((f) => { f.callouts.push({ label: "", note: "" }) })}><Plus size={13} weight="bold" />Add callout</Button>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/** One numbered item's fields — title, body and the "— specifics" run under it. Shared by the
+ *  how-it-works steps and the features rows, which are the same shape. */
+function NumberedItemFields({ item, edit }: {
+  item: { title: string; body?: string; points?: string[] }
+  edit: (fn: (it: { title: string; body?: string; points?: string[] }) => void) => void
+}) {
+  const points = item.points ?? []
+  return (
+    <>
+      <Field label="Title" value={item.title} onChange={(v) => edit((it) => { it.title = v })} />
+      <Area label="Body" value={item.body ?? ""} onChange={(v) => edit((it) => { it.body = v })} />
+      <div>
+        <span className="mb-1 block text-xs font-medium text-muted-foreground">Specifics</span>
+        <div className="space-y-2">
+          {points.map((pt, j) => (
+            <div key={j} className="flex gap-2">
+              <Input value={pt} onChange={(e) => edit((it) => { if (it.points) it.points[j] = e.target.value })} />
+              <Button variant="ghost" size="sm" onClick={() => edit((it) => { it.points?.splice(j, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => edit((it) => { if (!it.points) it.points = []; it.points.push("") })}><Plus size={13} weight="bold" />Add</Button>
+        </div>
+      </div>
+    </>
+  )
 }
 
 const SUBTABS: { id: string; label: string }[] = [
@@ -93,6 +247,10 @@ const SUBTABS: { id: string; label: string }[] = [
   { id: "testimonials", label: "Testimonials" },
   { id: "faq", label: "FAQ" },
   { id: "cta", label: "Closing CTA" },
+  // The other two converted marketing pages. Their copy used to be arrays inside their
+  // components, so a word change was a deploy.
+  { id: "featuresPage", label: "Features page" },
+  { id: "howPage", label: "How it works" },
   // Not copy, but the same blob, the same audience and the same Save — see the `motion` note
   // in lib/site-content.ts.
   { id: "motion", label: "Motion" },
@@ -119,11 +277,14 @@ export function SiteContentPanel() {
  const [uploading, setUploading] = useState(false)
   // A LOCAL preview of the just-picked image, shown instantly so the banner isn't blank
   // while the upload runs — and stays visible even if the stored URL later fails to load.
- const [localPreview, setLocalPreview] = useState<string | null>(null)
+ // KEYED BY FIGURE, because there are three of them now (hero, features page, how-it-works)
+  // and a bare boolean would have shown the hero's just-picked preview under the features
+  // page's dropzone — the two are on different tabs, so it would have looked like the upload
+  // landed in the wrong place, which in a sense it would have.
+ const [localPreview, setLocalPreview] = useState<{ key: string; url: string } | null>(null)
   // The stored URL didn't load in the <img>: almost always a storage/CDN that isn't public,
   // not a broken editor. Say so instead of showing a broken-image glyph.
- const [imgBroken, setImgBroken] = useState(false)
- const fileRef = useRef<HTMLInputElement>(null)
+ const [imgBroken, setImgBroken] = useState<string | null>(null)
 
  const load = useCallback(() => {
  getSiteContentAdmin()
@@ -152,42 +313,45 @@ export function SiteContentPanel() {
     } finally { setSaving(false) }
   }
 
-  // Remove the banner AND persist it right away — "Remove" that only clears the form and
+  // Remove the figure AND persist it right away — "Remove" that only clears the form and
   // silently comes back on refresh isn't a removal. Saves the current content minus the image,
   // exactly as pressing Save after Remove would.
- const removeBanner = () => {
+ const removeFigure = (key: string, apply: (c: SiteContent) => void) => {
  if (!content) return
  const next = structuredClone(content)
- next.hero.image = ""
- setLocalPreview(null); setImgBroken(false); setContent(next)
+ apply(next)
+ setLocalPreview(null); setImgBroken(null); setContent(next)
  void save(next)
   }
 
- const onPickImage = async (file: File | undefined) => {
+  // `key` identifies WHICH figure is uploading (for the preview), `apply` says where the
+  // resulting URL is written. The route itself is figure-agnostic — it stores bytes and hands
+  // back a URL — so nothing on the server needed to change to support three of these.
+ const onPickImage = async (file: File | undefined, key: string, apply: (c: SiteContent, url: string) => void) => {
  if (!file) return
  if (!file.type.startsWith("image/")) { setErr("That file isn't an image — pick a JPEG, PNG, WebP or AVIF."); return }
     // Generous ceiling only as a sanity check — anything reasonable is downscaled below the
     // proxy limit before it's sent, so a big camera photo is fine.
  if (file.size > 40 * 1024 * 1024) { setErr("That image is over 40MB — pick a smaller one."); return }
- setUploading(true); setErr(null); setImgBroken(false)
+ setUploading(true); setErr(null); setImgBroken(null)
  try {
       // Resize + re-encode in the browser FIRST. A raw photo base64's past Vercel's ~4.5MB
       // proxy body limit and the upload fails; the downscaled data URL comfortably fits.
  const dataUrl = await downscaleImage(file)
       // Instant local preview, so the banner shows immediately and stays visible even if the
       // stored URL later can't load.
- setLocalPreview(dataUrl)
+ setLocalPreview({ key, url: dataUrl })
  const r = await uploadHeroImage(dataUrl)
  if (r.error || !r.url) throw new Error(r.error || "Upload failed")
  const url = r.url
- edit((x) => { x.hero.image = url })
+ edit((x) => { apply(x, url) })
     } catch (e) {
  setErr(e instanceof Error ? e.message : "Upload failed")
     } finally {
  setUploading(false)
- if (fileRef.current) fileRef.current.value = ""
     }
   }
+
 
  const confirm = useConfirm()
  const resetToDefaults = async () => { if (await confirm({ title: "Reset to default copy?", body: "This only fills the editor — nothing saves until you press Save.", confirmLabel: "Reset", destructive: false })) setContent(structuredClone(DEFAULT_SITE_CONTENT)) }
@@ -197,6 +361,22 @@ export function SiteContentPanel() {
   }
 
  const c = content
+
+  /* One call site's worth of plumbing, built from the key and the path. Written here rather
+     than repeated three times in the JSX, so a new page carrying a figure is one line. */
+ const figureProps = (key: string, pick: (c: SiteContent) => PageFigure, hint: string) => ({
+ figure: pick(c),
+ edit: (fn: (f: PageFigure) => void) => edit((x) => { fn(pick(x)) }),
+ onPickFile: (file: File | undefined) => onPickImage(file, key, (x, url) => { pick(x).image = url }),
+ onRemove: () => removeFigure(key, (x) => { pick(x).image = "" }),
+ uploading,
+ saving,
+ preview: localPreview?.key === key ? localPreview.url : null,
+ broken: imgBroken === key,
+ onBroken: () => setImgBroken(key),
+ hint,
+  })
+
  return (
     <SectionCard
  title="Site content"
@@ -228,46 +408,31 @@ export function SiteContentPanel() {
           </div>
           <Field label="'Works with' label" value={c.hero.worksWithLabel} onChange={(v) => edit((x) => { x.hero.worksWithLabel = v })} />
 
-          {/* Hero banner image */}
+          {/* The hero figure — see the note on SiteContent.hero.image. */}
+          <FigureEditor
+            {...figureProps("hero", (x) => x.hero, "A cut-out PNG stands on the page, a JPEG sits on it. Make one in Studio: Backdrop → cut-out ready, then Remove background.")}
+          />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Rule label, left" value={c.hero.ruleLeft} onChange={(v) => edit((x) => { x.hero.ruleLeft = v })} />
+            <Field label="Rule label, right" value={c.hero.ruleRight} onChange={(v) => edit((x) => { x.hero.ruleRight = v })} />
+          </div>
+          <Field label="Ghost word behind the figure" value={c.hero.ghostWord} onChange={(v) => edit((x) => { x.hero.ghostWord = v })} />
+
           <div>
-            <span className="mb-1 block text-xs font-medium text-muted-foreground">Banner image</span>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0])} />
-            {(localPreview || c.hero.image) ? (
-              <div className="space-y-2">
-                {imgBroken && !localPreview ? (
-                  // The stored URL couldn't load. Almost always the object storage / CDN isn't
-                  // serving it publicly — say that plainly instead of a broken-image glyph.
-                  <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-hold/30 bg-hold/10 px-4 py-8 text-center text-xs text-hold">
-                    <Warning size={20} weight="fill" />
-                    <span className="font-medium">The saved banner isn&apos;t loading.</span>
-                    <span className="max-w-sm">Its URL was saved, but the browser can&apos;t open it — usually the storage bucket / CDN isn&apos;t public. Re-upload, or check <code>SPACES_CDN</code> and public-read on the server.</span>
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Figure callouts</span>
+            <div className="space-y-2">
+              {c.hero.callouts.map((co, i) => (
+                <div key={i} className="rounded-lg border border-border p-3">
+                  <div className="flex gap-2">
+                    <div className="flex-1"><Field label="Label" value={co.label} onChange={(v) => edit((x) => { x.hero.callouts[i].label = v })} /></div>
+                    <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.hero.callouts.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
                   </div>
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={localPreview || c.hero.image} alt="Hero banner preview" onError={() => setImgBroken(true)}
- className="max-h-44 w-full rounded-lg border border-border object-cover" />
-                )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} />}Replace
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={removeBanner} disabled={uploading || saving}>Remove</Button>
+                  <div className="mt-2"><Field label="Note" value={co.note ?? ""} onChange={(v) => edit((x) => { x.hero.callouts[i].note = v })} /></div>
                 </div>
-              </div>
-            ) : (
-              <Dropzone
-                icon={ImageIcon}
-                accept="image/*"
-                disabled={uploading}
-                busy={uploading ? "Uploading…" : null}
-                onFiles={(files) => onPickImage(files[0])}
-                label="Drag an image here, or click to choose"
-                hint="JPEG, PNG, WebP or AVIF · big photos are resized automatically"
-              />
-            )}
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Optional. Sits behind the hero under a scrim, so the text stays readable. Landscape works best — around 1600×900 (16:9). Leave empty for the default gradient. Press Save to publish — it&apos;s live within a minute.
-            </span>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => edit((x) => { x.hero.callouts.push({ label: "", note: "" }) })}><Plus size={13} weight="bold" />Add callout</Button>
+            </div>
           </div>
 
           <div>
@@ -286,15 +451,20 @@ export function SiteContentPanel() {
 
         {/* ── Stats ── */}
         <TabsContent value="stats" className="mt-4 space-y-3">
-          <Intro>The row of numbers under the hero.</Intro>
-          {c.stats.map((s, i) => (
-            <div key={i} className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
-              <Field label={i === 0 ? "Value" : ""} value={s.value} onChange={(v) => edit((x) => { x.stats[i].value = v })} />
-              <Field label={i === 0 ? "Label" : ""} value={s.label} onChange={(v) => edit((x) => { x.stats[i].label = v })} />
-              <Button variant="ghost" size="sm" onClick={() => edit((x) => { x.stats.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+          <Intro>The band of figures under the hero, divided by rules. Five is what it fits before it wraps.</Intro>
+          {c.stats.map((st, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="flex gap-2">
+                <div className="w-28"><Field label="Value" value={st.value} onChange={(v) => edit((x) => { x.stats[i].value = v })} /></div>
+                <div className="flex-1"><Field label="Label" value={st.label} onChange={(v) => edit((x) => { x.stats[i].label = v })} /></div>
+                <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.stats.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+              <div className="mt-2"><Field label="Note" value={st.note ?? ""} onChange={(v) => edit((x) => { x.stats[i].note = v })} /></div>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => edit((x) => { x.stats.push({ value: "", label: "" }) })}><Plus size={13} weight="bold" />Add stat</Button>
+          {c.stats.length < 5 && (
+            <Button variant="outline" size="sm" onClick={() => edit((x) => { x.stats.push({ value: "", label: "", note: "" }) })}><Plus size={13} weight="bold" />Add figure</Button>
+          )}
         </TabsContent>
 
         {/* ── Features ── */}
@@ -380,6 +550,135 @@ export function SiteContentPanel() {
           <Field label="Heading" value={c.cta.heading} onChange={(v) => edit((x) => { x.cta.heading = v })} />
           <Area label="Subhead" value={c.cta.subhead} onChange={(v) => edit((x) => { x.cta.subhead = v })} />
           <Field label="Button" value={c.cta.button} onChange={(v) => edit((x) => { x.cta.button = v })} />
+        </TabsContent>
+
+        {/* ── /features ── */}
+        <TabsContent value="featuresPage" className="mt-4 space-y-3">
+          <Intro>The public /features page. Every word on it is here.</Intro>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Headline" value={c.featuresPage.title} onChange={(v) => edit((x) => { x.featuresPage.title = v })} />
+            <Field label="Accent word(s)" value={c.featuresPage.accent} onChange={(v) => edit((x) => { x.featuresPage.accent = v })} />
+          </div>
+          <Area label="Subhead" value={c.featuresPage.sub} onChange={(v) => edit((x) => { x.featuresPage.sub = v })} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Rule label, left" value={c.featuresPage.ruleLeft} onChange={(v) => edit((x) => { x.featuresPage.ruleLeft = v })} />
+            <Field label="Rule label, right" value={c.featuresPage.ruleRight} onChange={(v) => edit((x) => { x.featuresPage.ruleRight = v })} />
+          </div>
+
+          <FigureEditor
+            {...figureProps("featuresPage", (x) => x.featuresPage.figure, "A cut-out PNG floats on the page; a JPEG sits on it as a rectangle. Make one in Studio: Backdrop → cut-out ready, then Remove background.")}
+          />
+
+          <div>
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Figures under the hero</span>
+            <div className="space-y-2">
+              {c.featuresPage.stats.map((st, i) => (
+                <div key={i} className="rounded-lg border border-border p-3">
+                  <div className="flex gap-2">
+                    <div className="w-28"><Field label="Value" value={st.value} onChange={(v) => edit((x) => { x.featuresPage.stats[i].value = v })} /></div>
+                    <div className="flex-1"><Field label="Label" value={st.label} onChange={(v) => edit((x) => { x.featuresPage.stats[i].label = v })} /></div>
+                    <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.featuresPage.stats.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+                  </div>
+                  <div className="mt-2"><Field label="Note" value={st.note ?? ""} onChange={(v) => edit((x) => { x.featuresPage.stats[i].note = v })} /></div>
+                </div>
+              ))}
+              {c.featuresPage.stats.length < 5 && (
+                <Button variant="outline" size="sm" onClick={() => edit((x) => { x.featuresPage.stats.push({ value: "", label: "", note: "" }) })}><Plus size={13} weight="bold" />Add figure</Button>
+              )}
+            </div>
+          </div>
+
+          {c.featuresPage.items.map((it, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
+                <Button variant="ghost" size="sm" onClick={() => edit((x) => { x.featuresPage.items.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+              <div className="space-y-2">
+                <NumberedItemFields item={it} edit={(fn) => edit((x) => { fn(x.featuresPage.items[i]) })} />
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => edit((x) => { x.featuresPage.items.push({ title: "", body: "", points: [] }) })}><Plus size={13} weight="bold" />Add capability</Button>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Closing heading" value={c.featuresPage.cta.heading} onChange={(v) => edit((x) => { x.featuresPage.cta.heading = v })} />
+            <Field label="Closing button" value={c.featuresPage.cta.button} onChange={(v) => edit((x) => { x.featuresPage.cta.button = v })} />
+          </div>
+        </TabsContent>
+
+        {/* ── /how-it-works ── */}
+        <TabsContent value="howPage" className="mt-4 space-y-3">
+          <Intro>The public /how-it-works page. Every word on it is here.</Intro>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Headline" value={c.howPage.title} onChange={(v) => edit((x) => { x.howPage.title = v })} />
+            <Field label="Accent word(s)" value={c.howPage.accent} onChange={(v) => edit((x) => { x.howPage.accent = v })} />
+          </div>
+          <Area label="Subhead" value={c.howPage.sub} onChange={(v) => edit((x) => { x.howPage.sub = v })} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Rule label, left" value={c.howPage.ruleLeft} onChange={(v) => edit((x) => { x.howPage.ruleLeft = v })} />
+            <Field label="Rule label, right" value={c.howPage.ruleRight} onChange={(v) => edit((x) => { x.howPage.ruleRight = v })} />
+          </div>
+
+          <FigureEditor
+            {...figureProps("howPage", (x) => x.howPage.figure, "This one sits on the dark panel, so a cut-out PNG matters more here than anywhere. Studio: Backdrop → cut-out ready, then Remove background.")}
+          />
+
+          <div>
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Figures under the hero</span>
+            <div className="space-y-2">
+              {c.howPage.stats.map((st, i) => (
+                <div key={i} className="rounded-lg border border-border p-3">
+                  <div className="flex gap-2">
+                    <div className="w-28"><Field label="Value" value={st.value} onChange={(v) => edit((x) => { x.howPage.stats[i].value = v })} /></div>
+                    <div className="flex-1"><Field label="Label" value={st.label} onChange={(v) => edit((x) => { x.howPage.stats[i].label = v })} /></div>
+                    <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.howPage.stats.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+                  </div>
+                  <div className="mt-2"><Field label="Note" value={st.note ?? ""} onChange={(v) => edit((x) => { x.howPage.stats[i].note = v })} /></div>
+                </div>
+              ))}
+              {c.howPage.stats.length < 5 && (
+                <Button variant="outline" size="sm" onClick={() => edit((x) => { x.howPage.stats.push({ value: "", label: "", note: "" }) })}><Plus size={13} weight="bold" />Add figure</Button>
+              )}
+            </div>
+          </div>
+
+          {c.howPage.steps.map((it, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Step {String(i + 1).padStart(2, "0")}</span>
+                <Button variant="ghost" size="sm" onClick={() => edit((x) => { x.howPage.steps.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+              <div className="space-y-2">
+                <NumberedItemFields item={it} edit={(fn) => edit((x) => { fn(x.howPage.steps[i]) })} />
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => edit((x) => { x.howPage.steps.push({ title: "", body: "", points: [] }) })}><Plus size={13} weight="bold" />Add step</Button>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Status section heading" value={c.howPage.journeyHeading} onChange={(v) => edit((x) => { x.howPage.journeyHeading = v })} />
+            <Field label="Status section note" value={c.howPage.journeyNote} onChange={(v) => edit((x) => { x.howPage.journeyNote = v })} />
+          </div>
+          {/* An empty region may carry one sentence (§4), and this one is load-bearing: the
+              colour is NOT a field here, and an admin who renames a row needs to know why it
+              went grey. See JOURNEY_TONE in bold-how.tsx. */}
+          <Intro>Status colours come from the label — keep the product&apos;s own words (Draft, Pending, In process, Fulfilled) or the row renders grey.</Intro>
+          {c.howPage.journey.map((j, i) => (
+            <div key={i} className="rounded-lg border border-border p-3">
+              <div className="flex gap-2">
+                <div className="w-40"><Field label="Status" value={j.label} onChange={(v) => edit((x) => { x.howPage.journey[i].label = v })} /></div>
+                <div className="flex-1"><Field label="What it means" value={j.body} onChange={(v) => edit((x) => { x.howPage.journey[i].body = v })} /></div>
+                <Button variant="ghost" size="sm" className="mt-5" onClick={() => edit((x) => { x.howPage.journey.splice(i, 1) })} aria-label="Remove"><Trash size={14} /></Button>
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => edit((x) => { x.howPage.journey.push({ label: "", body: "" }) })}><Plus size={13} weight="bold" />Add status</Button>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Closing heading" value={c.howPage.cta.heading} onChange={(v) => edit((x) => { x.howPage.cta.heading = v })} />
+            <Field label="Closing button" value={c.howPage.cta.button} onChange={(v) => edit((x) => { x.howPage.cta.button = v })} />
+          </div>
         </TabsContent>
 
         {/* ── Motion ──

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { ImageSquare, MagnifyingGlass } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Thumb } from "@/components/app/thumb"
 
 export type ArtItem = {
   /** The value handed back on pick — the RAW url the canvas should place. */
@@ -90,10 +91,11 @@ export function ArtPickerDialog({
                   className="group flex flex-col overflow-hidden rounded-xl border border-border text-left transition-colors hover:border-primary hover:bg-accent"
                 >
                   {/* object-CONTAIN, not cover: the whole artwork, uncropped, is the point of
-                      opening this. The rail crops to fit its column; this does not. */}
+                      opening this. The rail crops to fit its column; this does not.
+                      Through Thumb, because `name` here is the marketplace listing title and
+                      a refused hotlink would paint the whole of it in place of the picture. */}
                   <div className="flex aspect-square items-center justify-center bg-muted p-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={it.src ?? it.url} alt={it.name || ""} className="max-h-full max-w-full object-contain" />
+                    <Thumb src={it.src ?? it.url} alt={it.name || ""} fit="contain" className="max-h-full max-w-full bg-transparent" />
                   </div>
                   <div className="border-t border-border p-2">
                     {it.badge && <div className="text-2xs font-semibold text-primary">{it.badge}</div>}
