@@ -22,6 +22,40 @@ function assetBase() {
   return (process.env.PUBLIC_API_ORIGIN || 'https://egful.store').replace(/\/+$/, '');
 }
 
+/**
+ * LEGACY ASSET URLS, REPAIRED ON THE WAY PAST.
+ *
+ * The hero image used to be stored as the object's RAW address in the storage bucket. The
+ * bucket is private — that is deliberate, and the reason /asset below exists — so every
+ * visitor got a 400 where the garment should be, and the marketing figure painted its alt
+ * text as a paragraph instead. Measured on the live row: the raw URL 400s, the same object
+ * through /asset is 200 and 773KB. The bytes were never the problem.
+ *
+ * The upload route was fixed to hand back the /asset path, but a row saved before that keeps
+ * the dead URL for ever — a fix to the writer does nothing for what is already written. So
+ * the read repairs it, which needs no migration and reaches every field at once: the hero,
+ * the /features and /how-it-works figures, and the email logo, any of which may predate it.
+ *
+ * SCOPED TO THE TWO STORAGE HOSTS THIS PROJECT HAS USED, not to any URL ending /site/<name>.
+ * An admin may legitimately paste an external image address, and rewriting one to point at
+ * our own bucket would turn a working picture into a 404 — the exact failure this is here to
+ * undo. Matching the host means it can only ever act on an object we put there ourselves.
+ */
+const LEGACY_ASSET_URL = /^https?:\/\/[^/]*(?:r2\.cloudflarestorage\.com|digitaloceanspaces\.com)\/site\/([A-Za-z0-9._-]+)$/i;
+function healAssetUrls(v) {
+  if (typeof v === 'string') {
+    const m = LEGACY_ASSET_URL.exec(v);
+    return m ? `${assetBase()}/api/site-content/asset/${m[1]}` : v;
+  }
+  if (Array.isArray(v)) return v.map(healAssetUrls);
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = healAssetUrls(v[k]);
+    return out;
+  }
+  return v;
+}
+
 let _ready = null;
 function ensureTable() {
   if (_ready) return _ready;
@@ -42,7 +76,7 @@ export function siteContentRoutes(app, requireAdmin) {
     const r = await q('select value, updated_at from settings where key = $1', [KEY]);
     // `content: {}` when unset — the page merges over its defaults, so {} renders the
     // baked-in copy rather than an empty homepage.
-    return { content: (r.rows[0] && r.rows[0].value) || {}, updatedAt: r.rows[0] ? r.rows[0].updated_at : null };
+    return { content: healAssetUrls((r.rows[0] && r.rows[0].value) || {}), updatedAt: r.rows[0] ? r.rows[0].updated_at : null };
   });
 
   // ADMIN write. Marketing copy is public-facing brand surface; editing it is not an
@@ -56,11 +90,14 @@ export function siteContentRoutes(app, requireAdmin) {
     if (JSON.stringify(content).length > MAX_BYTES) {
       reply.code(413); return { error: 'content too large' };
     }
+    // Healed on the way in as well, so a row that is edited stops carrying the dead URL at
+    // rest rather than depending on the reader for ever.
+    const healed = healAssetUrls(content);
     await q(
       `insert into settings (key, value, updated_at) values ($1, $2::jsonb, now())
        on conflict (key) do update set value = excluded.value, updated_at = now()`,
-      [KEY, JSON.stringify(content)]);
-    return { ok: true, content };
+      [KEY, JSON.stringify(healed)]);
+    return { ok: true, content: healed };
   });
 
   // ADMIN: upload a hero banner image to object storage, return its public URL. The panel
