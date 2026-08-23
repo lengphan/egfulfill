@@ -31,8 +31,8 @@ export function EmptyState({
   return (
     <div className={cn(REGION_STACK, REGION_PAD[size], className)}>
       <RegionMark icon={icon} size={size} />
-      <div className={REGION_LINE}>{title}</div>
-      {note && <div className={REGION_NOTE}>{note}</div>}
+      <div className={REGION_LINE[size]}>{title}</div>
+      {note && <div className={REGION_NOTE[size]}>{note}</div>}
       {action && <div className="mt-1">{action}</div>}
     </div>
   )
