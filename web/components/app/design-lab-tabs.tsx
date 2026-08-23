@@ -25,7 +25,22 @@ const TABS = [
   // NO search params left useSearchParams() holding the old value, so the hook kept
   // reporting "templates" and clicking Library re-rendered the Templates panel. Both hrefs
   // carrying a param makes it a value change, which the hook does track.
-  { key: "library", label: "Images", href: "/design?tab=library" },
+  /**
+   * ARTWORK, not "Images" — and the same word the editor's rail uses.
+   *
+   * ONE THING HAD FIVE NAMES. This tab said Images, its own header said "Your images", its
+   * cards said "Untitled design", the editor's rail tool said Artwork, that rail's first
+   * group said "Your uploads", and the button under it said "Saved designs & templates".
+   * A seller asking "where is my logo" had six places to look and no way to tell that four
+   * of them were the same place.
+   *
+   * Three nouns now, and each is the SAME word wherever it appears: ARTWORK is a flat
+   * picture, a TEMPLATE is a blank plus artwork plus where it sits, a MACHINE FILE is the
+   * stitch file. "Design" is reserved for the thing on the canvas — which is why the fourth
+   * toggle keeps it — and it is saved AS artwork or AS a template, which is exactly what the
+   * editor's Save menu now says.
+   */
+  { key: "library", label: "Artwork", href: "/design?tab=library" },
   { key: "templates", label: "Templates", href: "/design?tab=templates" },
   // BESIDE Templates, not inside it. A template is a blank plus artwork plus where it sits;
   // a machine file is the cut file, which has no placement to carry and no blank it belongs

@@ -116,7 +116,7 @@ export function LibraryPickerDialog({
           the designer so the pair reads as one tool: pick a design, land back on the
           garment, same footprint. */}
       <DialogContent className="sm:max-w-[min(94vw,720px)]">
-        <DialogHeader><DialogTitle>Choose from your library</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Your artwork and templates</DialogTitle></DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
           {/* The count was loose text after the label — "Designs 12" reads as a name with a
@@ -128,7 +128,7 @@ export function LibraryPickerDialog({
             spacing="none"
             className="border-b-0"
             items={[
-              { id: "designs" as const, label: "Designs", count: designs?.length },
+              { id: "designs" as const, label: "Artwork", count: designs?.length },
               { id: "templates" as const, label: "Templates", count: templates?.length },
             ]}
             value={source}
@@ -149,7 +149,7 @@ export function LibraryPickerDialog({
               {term
                 ? `Nothing here matches “${q.trim()}”.`
                 : source === "designs"
-                  ? "No saved designs yet — create one in the Design Lab."
+                  ? "No saved artwork yet — drop a file on Design Lab › Artwork."
                   : "No templates yet — save one from the Design Lab and it shows up here."}
             </div>
           ) : (

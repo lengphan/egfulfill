@@ -49,7 +49,7 @@ export function DesignStudioDialog({ open, onOpenChange, onSaved }: { open: bool
     setSaving(true); setErr(null)
     try {
       const thumb = await downscale(designUrl, 320)
-      const r = await saveDesignLibrary({ name: name.trim() || "Untitled design", data: designUrl, thumb })
+      const r = await saveDesignLibrary({ name: name.trim() || "Untitled artwork", data: designUrl, thumb })
       if (r.error) throw new Error(r.error)
       reset(); onSaved?.(); onOpenChange(false)
     } catch (e) {

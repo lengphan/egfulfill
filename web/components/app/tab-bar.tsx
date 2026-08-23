@@ -68,7 +68,10 @@ export function TabBar<T extends string>({
   return (
     // `none` keeps -mb-px, so the bar's own rule sits ON the container's rather than one
     // pixel below it. Otherwise the bar owns the space under its own line.
-    <nav aria-label={ariaLabel} className={cn("flex border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap, className)}>
+    // overflow-x-auto is the other half of shrink-0 below: labels that refuse to fold have
+    // to go SOMEWHERE when the column is too narrow, and scrolling the bar is the only
+    // answer that leaves every tab readable. Spilling out of a card is not.
+    <nav aria-label={ariaLabel} className={cn("flex overflow-x-auto border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap, className)}>
       {items.map((t) => {
         const on = value === t.id
         const I = t.icon
@@ -79,7 +82,12 @@ export function TabBar<T extends string>({
             onClick={() => onChange(t.id)}
             aria-current={on ? "page" : undefined}
             className={cn(
-              "eg-tap relative inline-flex items-center gap-1.5 transition-colors", text, pad,
+              // shrink-0 + nowrap: a tab LABEL never wraps. In a narrow column the flex
+              // children were compressing instead, so "From orders" broke onto two lines
+              // and the ::after rule — which spans the button — was drawn under the second
+              // line, half the width of the word above it. A bar that does not fit should
+              // overflow, not fold.
+              "eg-tap relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors", text, pad,
               on
                 // The rule is drawn by ::after rather than a border, so switching tabs never
                 // moves the text by a pixel — a border-bottom on the active one only would.

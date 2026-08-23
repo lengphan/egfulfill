@@ -13,6 +13,7 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { Dropzone } from "@/components/app/dropzone"
 import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, saveDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
+import { Thumb } from "@/components/app/thumb"
 import { getToken } from "@/lib/auth"
 
 /**
@@ -29,24 +30,20 @@ import { getToken } from "@/lib/auth"
  *     state, it is a broken one wearing an empty one's clothes.
  *
  * So the placeholder is the answer to both — the same pen mark a design with no thumbnail
- * gets — and alt stays empty, because the name is already printed under the tile and a
- * screen reader does not need it twice.
- *
- * Module scope, not inside the map: react-hooks/static-components refuses a component
- * defined during render, and this one needs its own broken flag per row.
+ * gets. (2) is now the shared Thumb's whole job, so this is the pen mark plus the proxy and
+ * nothing else; see components/app/thumb.tsx for why a fifth hand-rolled onError was the
+ * wrong shape.
  */
 function LibraryThumb({ thumb, name }: { thumb?: string | null; name?: string | null }) {
-  const [broken, setBroken] = useState(false)
-  const placeholder = <PenNib size={26} weight="duotone" className="text-muted-foreground/40" />
-  if (!thumb || broken) return placeholder
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={proxiedImageSrc(thumb)}
+    <Thumb
+      src={thumb ? proxiedImageSrc(thumb) : ""}
+      // Empty on purpose: the name is already printed under the tile, and a screen reader
+      // does not need it twice.
       alt=""
-      title={name ?? undefined}
-      className="size-full object-cover"
-      onError={() => setBroken(true)}
+      note={name ?? undefined}
+      className="size-full bg-transparent"
+      icon={<PenNib size={26} weight="duotone" className="text-muted-foreground/40" />}
     />
   )
 }
@@ -105,7 +102,7 @@ function DesignLab() {
  const r = await saveDesignLibrary({ name: file.name.replace(/\.[^.]+$/, ""), data, thumb })
  if (r.error) throw new Error(r.error)
       } catch (e) {
- setUpErr(e instanceof Error ? e.message : "Couldn't save that image.")
+ setUpErr(e instanceof Error ? e.message : "Couldn't save that artwork.")
       } finally { setUploading(null) }
     }
  load()
@@ -151,7 +148,7 @@ function DesignLab() {
         */}
       {tab === "library" ? (
         <SectionCard
- title="Your images"
+ title="Your artwork"
  actions={
             // Named for what it DOES, now that dropping is how artwork gets added. It was
             // "Add artwork", which is the zone's job — two controls claiming one verb, and
@@ -178,8 +175,8 @@ function DesignLab() {
                 busy={uploading ? `Saving ${uploading}…` : null}
                 disabled={signedOut}
                 slim={list.length > 0}
-                label={signedOut ? "Sign in to build your image library"
- : list.length > 0 ? "Add another image" : "Drop your artwork here"}
+                label={signedOut ? "Sign in to build your artwork library"
+ : list.length > 0 ? "Add more artwork" : "Drop your artwork here"}
                 hint="PNG, JPG or SVG"
                 action={!signedOut && list.length === 0 && (
                   <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)}>
@@ -201,7 +198,7 @@ function DesignLab() {
                     <button
  onClick={() => remove(d.id)}
  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"
- aria-label="Delete image"
+ aria-label="Delete artwork"
                     >
                       <X size={13} weight="bold" />
                     </button>
@@ -243,7 +240,7 @@ function DesignLab() {
  sheet, so it's shown at a readable size, not a tiny caption. */}
                       <button
  onClick={() => { navigator.clipboard?.writeText(`IMG-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
- title="Copy this image's reference"
+ title="Copy this artwork's reference"
  className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
                         {copied === String(d.id) ? "Copied ✓" : `IMG-${d.id}`}
