@@ -1,3 +1,5 @@
+import { Thumb } from "@/components/app/thumb"
+
 /**
  * ONE PRODUCT THUMBNAIL, for every catalogue surface.
  *
@@ -27,16 +29,14 @@ export function ProductThumb({ src, alt = "", className = "" }: {
 }) {
   return (
     <div className={"size-24 shrink-0 overflow-hidden rounded-lg border border-border bg-white p-1 " + className}>
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} className="size-full object-contain" />
-      ) : (
-        /* "no image" rather than an icon: a product with no photograph is a thing someone
-           has to go and fix, and it should read as missing rather than as styling. */
-        <div className="flex size-full items-center justify-center text-center text-2xs text-muted-foreground">
-          no image
-        </div>
-      )}
+      {/* "no image" rather than an icon: a product with no photograph is a thing someone
+          has to go and fix, and it should read as missing rather than as styling — and a
+          photograph the host REFUSES is the same fact, which is why it gets the same tile
+          instead of a torn-picture glyph and a paragraph of `alt`. */}
+      <Thumb
+        src={src} alt={alt} fit="contain" className="size-full bg-transparent text-center"
+        icon={<span className="text-2xs text-muted-foreground">no image</span>}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerE
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
 import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
+import { orderRefLabel } from "@/lib/order-format"
 import {
  getOrderUploads, getDesignLibrary, getDesignLibraryItem, getThreadPalette,
  wilcomPreview, wilcomDigitize, getWilcomGenerations, createDesignCard,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/api"
 import { PageTitle } from "@/components/app/page-title"
 import { TabLabel } from "@/components/app/tab-label"
+import { Thumb } from "@/components/app/thumb"
 
 type Tab = "create" | "library" | "history"
 type Source = "order" | "library"
@@ -47,12 +49,10 @@ function readFile(file: File): Promise<string> {
 }
 const fmtDate = (s?: string) => { if (!s) return ""; const d = new Date(s); return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
 
-// Uniform square thumbnail with a graceful fallback — a failed load must not resize the card.
-function Thumb({ src, alt, className }: { src: string; alt?: string; className?: string }) {
- const [bad, setBad] = useState(false)
- if (bad || !src) return <div className={"flex items-center justify-center bg-muted text-muted-foreground/30 " + (className ?? "")}><Needle size={24} weight="duotone" /></div>
-  // eslint-disable-next-line @next/next/no-img-element
- return <img src={src} alt={alt ?? ""} className={className} onError={() => setBad(true)} />
+// This studio's tile: the shared Thumb (which is the "a failed load never paints its alt"
+// rule) wearing the needle mark, which is this surface's own vocabulary for "artwork".
+function StudioThumb({ src, alt, className }: { src: string; alt?: string; className?: string }) {
+ return <Thumb src={src} alt={alt} className={className} icon={<Needle size={24} weight="duotone" />} />
 }
 
 // A unifying shape over the three artwork sources.
@@ -163,12 +163,12 @@ function BrowseTab() {
             {list.map((it) => (
               <button key={it.key} onClick={() => setOpen(it)} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow">
                 <div className="relative aspect-square overflow-hidden bg-muted">
-                  <Thumb src={it.thumb} alt={it.name} className="absolute inset-0 size-full object-cover" />
+                  <StudioThumb src={it.thumb} alt={it.name} className="absolute inset-0 size-full" />
                   {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-shipped px-1.5 py-0.5 text-2xs font-semibold text-white">Generated</span>}
                 </div>
                 <div className="p-2.5">
                   <div className="truncate text-sm font-medium">{it.name}</div>
-                  {it.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{it.ref}</div>}
+                  {it.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{orderRefLabel(it.ref)}</div>}
                 </div>
               </button>
             ))}
@@ -305,7 +305,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{item.name}</div>
-            {item.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{item.ref}</div>}
+            {item.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{orderRefLabel(item.ref)}</div>}
           </div>
           <button onClick={onClose} className="ml-auto grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent"><X size={16} /></button>
         </div>
@@ -320,7 +320,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={`data:image/png;base64,${res.trueview}`} alt="embroidery preview" className="absolute inset-0 size-full object-contain" />
               ) : (
-                <Thumb src={item.thumb} alt="original" className="absolute inset-0 size-full object-contain" />
+                <Thumb src={item.thumb} alt="original" fit="contain" className="absolute inset-0 size-full" />
               )}
               <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 eg-label text-muted-foreground">{res?.trueview ? "Embroidery" : "Original"}</span>
             </div>
@@ -505,7 +505,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
             <div>
               <div className="mb-1.5 eg-label text-muted-foreground">Original artwork</div>
-              <div className="size-16 overflow-hidden rounded-lg border border-border bg-muted"><Thumb src={item.thumb} alt="original" className="size-full object-contain" /></div>
+              <div className="size-16 overflow-hidden rounded-lg border border-border bg-muted"><Thumb src={item.thumb} alt="original" fit="contain" className="size-full" /></div>
             </div>
           </div>
         </div>
@@ -1217,7 +1217,7 @@ function HistoryTab() {
                 <tr key={g.id} className="border-b border-border last:border-0 hover:bg-accent/50">
                   <td className="px-4 py-2.5">
                     <button type="button" onClick={() => setZoom(g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? ""))} title="Zoom in" className="relative flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted transition-transform hover:scale-110">
-                      <Thumb src={g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? "")} className="absolute inset-0 size-full object-cover" />
+                      <Thumb src={g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? "")} className="absolute inset-0 size-full" />
                     </button>
                   </td>
                   <td className="px-4 py-2.5 font-medium">{g.name || "Untitled"}</td>

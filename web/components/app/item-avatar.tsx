@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import { Package, ArrowsLeftRight, PencilSimple, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { bestMockup, resolveProduct } from "@/lib/variant-resolve"
@@ -9,6 +8,7 @@ import { designSrc } from "@/lib/order-image"
 import { designForLine } from "@/lib/api"
 import type { CatalogProduct, DesignPos, OrderDesign, OrderItem } from "@/lib/api"
 import { OrderedVariant } from "@/components/app/ordered-variant"
+import { Thumb, ThumbFill } from "@/components/app/thumb"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
 
@@ -281,8 +281,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
                 : { left: 0, width: Math.round(size * SECONDARY), height: Math.round(size * SECONDARY) }
             }
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={listing} alt="Buyer's listing photo" className="size-full object-cover" />
+            <Thumb src={listing} alt="Buyer's listing photo" className="size-full bg-transparent" icon={<Package size={14} />} />
           </button>
         )}
 
@@ -457,11 +456,17 @@ function ArtLayer({ art, pos }: { art: string; pos?: DesignPos | null }) {
 }
 
 function ImgFill({ src, alt, fit = "cover" }: { src: string; alt: string; fit?: "cover" | "contain" }) {
-  // Designs arrive as data: URLs, which next/image can't optimise — so anything that
-  // isn't a plain http(s) URL falls back to a bare <img>.
+  /**
+   * `alt` HERE IS THE LISTING TITLE — item.name, straight off the marketplace, routinely a
+   * hundred and twenty words of SEO. So a picture the host refuses does not leave a grey
+   * square: it paints that title into a 44px avatar and stretches the row it is in until
+   * the queue is unreadable. Both branches go through Thumb, which never paints an alt.
+   *
+   * Designs arrive as data: URLs, which next/image can't optimise — so anything that isn't
+   * a plain http(s) URL takes the bare-<img> branch.
+   */
   if (!src.startsWith("http")) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className={"size-full " + (fit === "contain" ? "object-contain" : "object-cover")} />
+    return <Thumb src={src} alt={alt} fit={fit} className="size-full bg-transparent" icon={<Package size={16} />} />
   }
-  return <Image src={src} alt={alt} fill sizes="96px" className={fit === "contain" ? "object-contain" : "object-cover"} unoptimized />
+  return <ThumbFill src={src} alt={alt} fit={fit} sizes="96px" icon={<Package size={16} />} />
 }

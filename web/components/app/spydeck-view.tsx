@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
 import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
+import { ThumbFill } from "@/components/app/thumb"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -210,7 +211,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
  aria-label="See the full published image"
         >
           {cover ? (
-            <Image src={cover} alt={title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover" />
+            <ThumbFill src={cover} alt={title} sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" />
           ) : (
             <span className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
               <Package size={22} weight="duotone" />
@@ -486,7 +487,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
  every one of 24 tiles. `sizes` keeps it honest if optimisation is ever enabled
               (needs i.etsystatic.com in next.config remotePatterns). */}
           {l.image ? (
-            <Image src={l.thumb || l.image} alt={l.title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+            <ThumbFill src={l.thumb || l.image} alt={l.title} sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="transition-transform duration-300 group-hover:scale-[1.04]" />
           ) : (
             <div className="flex size-full items-center justify-center text-muted-foreground"><Binoculars size={22} weight="duotone" /></div>
           )}
