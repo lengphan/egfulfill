@@ -20,19 +20,14 @@
  * LIMIT, stated rather than implied: this paints on the surfaces that ask for it — the app,
  * the boards and auth, all of which run `useAccent()`. The PUBLIC marketing pages are served
  * to visitors with no session, so they render whichever skin globals.css declares on `:root`
- * — today, `signal`. Changing what the public site defaults to is a one-line CSS change, not
+ * — today, `studio`. Changing what the public site defaults to is a one-line CSS change, not
  * a picker, and pretending otherwise would mean a colour flash on every cold marketing load.
- *
- * That limit is why `signal` was declared on `:root` rather than merely added here: it was
- * asked for on the PUBLIC marketing pages, and a selectable-only skin would have repainted
- * the signed-in app and left those pages exactly as they were.
  *
  * Gate: `node tools/check-skins.mjs`.
  */
-export type SkinKey = "signal" | "studio" | "press"
+export type SkinKey = "studio" | "press"
 
 export const SKINS: { key: SkinKey; label: string; what: string }[] = [
-  { key: "signal", label: "Signal", what: "Cool grey ground, panels on it. Monochrome." },
   { key: "studio", label: "Studio", what: "Ink on white. One bright accent." },
   { key: "press", label: "Press", what: "Violet plate over warm paper." },
 ]

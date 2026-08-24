@@ -71,7 +71,12 @@ export function TabBar<T extends string>({
     // overflow-x-auto is the other half of shrink-0 below: labels that refuse to fold have
     // to go SOMEWHERE when the column is too narrow, and scrolling the bar is the only
     // answer that leaves every tab readable. Spilling out of a card is not.
-    <nav aria-label={ariaLabel} className={cn("flex overflow-x-auto border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap, className)}>
+    //
+    // eg-scroll-none is not cosmetic. `overflow-x: auto` makes the OTHER axis auto as well,
+    // and the active tab's ::after sits at -bottom-px — one pixel of vertical overflow, which
+    // is all macOS needs to park a full-height scrollbar between the last tab and whatever is
+    // beside it. That bar appeared in the library picker, next to Templates.
+    <nav aria-label={ariaLabel} className={cn("eg-scroll-none flex overflow-x-auto border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap, className)}>
       {items.map((t) => {
         const on = value === t.id
         const I = t.icon

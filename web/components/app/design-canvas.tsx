@@ -1261,10 +1261,22 @@ export function DesignCanvasDialog({
   /** Every file on this line, whatever kind — the list under the stage. Carries the id
    *  because a row you cannot open is a row that only tells you something is missing. */
  const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string }[]>([])
-  /** The unsaved artwork on this face is a file ON this line — it is the whole reason the
-   *  receipt exists — so it counts. Same expression drives the badge and the list. */
-  const unsavedArt = !!designUrl && !savedFaces[sideName]
-  const fileCount = lineFiles.length + (unsavedArt ? 1 : 0)
+  /**
+   * THE ARTWORK ON THIS FACE IS A FILE ON THIS LINE — SAVED OR NOT.
+   *
+   * This counted it only while it was UNSAVED, on the reasoning that the server returns it
+   * afterwards. It does not: artwork is written to `order_designs`, and this list comes from
+   * `/api/design_files`, which reads `design_file_data` and nothing else. So pressing Save
+   * did not file the picture anywhere this panel can see — it deleted the only row that
+   * mentioned it, and the badge went DOWN by one at the moment the artwork became permanent.
+   * The image was never lost, but every readout on this window said it had been.
+   *
+   * So the row is about the artwork EXISTING, and `artUnsaved` is only about what its note
+   * says. Same two expressions drive the badge and the list.
+   */
+  const hasArtHere = !!designUrl
+  const artUnsaved = hasArtHere && !savedFaces[sideName]
+  const fileCount = lineFiles.length + (hasArtHere ? 1 : 0)
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
  const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
@@ -1505,10 +1517,11 @@ export function DesignCanvasDialog({
    * so is the whole point of `attached` — without a word, a window that looks identical
    * before and after reads as the upload having failed.
    */
- const attachMachineFile = useCallback(async (f: File) => {
+ /** Returns whether it stuck, so a multi-file intake can tell a real failure from a note. */
+ const attachMachineFile = useCallback(async (f: File): Promise<boolean> => {
     // 50MB: the API body limit is 60MB and base64 inflates by about a third, so anything
     // larger comes back as a confusing server rejection rather than this sentence.
- if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large — 50 MB is the limit.`); return }
+ if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large — 50 MB is the limit.`); return false }
  const designId = `EMB-${item.line_id ?? item.sku ?? "line"}-${f.name.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}`
  try {
  const data = await new Promise<string>((res, rej) => {
@@ -1546,8 +1559,9 @@ export function DesignCanvasDialog({
        */
  setLineFiles((prev) => prev.some((x) => x.designId === designId)
         ? prev
- : [...prev, { designId, kind: "machine", name: f.name }])
-    } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
+ : [...prev, { designId, kind: /\.pes$/i.test(f.name) ? "pes" : "emb", name: f.name }])
+ return true
+    } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`); return false }
   }, [orderId, item.line_id, item.sku])
 
   /**
@@ -1745,29 +1759,65 @@ export function DesignCanvasDialog({
   }
 
   /**
-   * ONE INTAKE FOR ONE WINDOW — dropped or browsed, the same rules.
+   * ONE INTAKE FOR ONE WINDOW — dropped or browsed, the same rules, ANY NUMBER OF FILES.
+   *
+   * A line's two deliverables arrive together. Someone with a print file and the stitch file
+   * cut from it selects both and drops both, and the handler took `files[0]` — so the second
+   * one vanished with no message, which reads as the drop having half worked. There is no
+   * reason to make two gestures out of one: the extension says which slot each file belongs
+   * in, and that is exactly what this routes on.
+   *
+   * ONE ARTWORK PER SIDE, though. The canvas positions a single image on the face being
+   * edited, so a second image is not a second slot — it is a choice nobody made. The first
+   * is placed and the rest are named as left out, rather than silently dropped or, worse,
+   * overwriting each other in whatever order the browser hands them over.
    *
    * A STITCH FILE ONLY FITS AN EMBROIDERED LINE. On a DTG or laser line there is no machine
    * to run it and no check to perform, so filing one there is not a near-miss — it is a fee
    * raised for a file nothing can use. This refusal used to live only in the drop handler,
    * so the file picker beside it would happily accept what the drop refused.
    */
- const takeFile = (f: File | undefined) => {
- if (!f) return
- if (MACHINE_RE.test(f.name)) {
- if (!isEmb) {
- setErr(`${f.name} is an embroidery file, and this line is ${item.print_type || "not embroidered"} — there is no machine to run it. Use a PNG or JPG instead.`)
- return
-      }
- void attachMachineFile(f); return
-    }
- if (!/^image\//.test(f.type)) {
- setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
- return
-    }
- readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setDesignName(f.name); setDesignSize(f.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
-  }
+  const takeFiles = async (list: FileList | File[] | null | undefined) => {
+    const files = Array.from(list ?? [])
+    if (!files.length) return
 
+    const machine: File[] = []
+    const images: File[] = []
+    const other: File[] = []
+    for (const f of files) {
+      if (MACHINE_RE.test(f.name)) machine.push(f)
+      else if (/^image\//.test(f.type)) images.push(f)
+      else other.push(f)
+    }
+
+    const names = (fs: File[]) => fs.map((f) => f.name).join(", ")
+    // Every refusal names the FILE it is about. With one file in hand "that isn't an image"
+    // was unambiguous; with four it has to say which.
+    const notes: string[] = []
+    if (other.length) {
+      notes.push(other.length > 1
+        ? `${names(other)} aren't images or machine files, so there's nothing to do with them here.`
+        : `${names(other)} isn't an image or a machine file, so there's nothing to do with it here.`)
+    }
+    if (machine.length && !isEmb) {
+      notes.push(`${names(machine)} ${machine.length > 1 ? "are embroidery files" : "is an embroidery file"}, and this line is ${item.print_type || "not embroidered"} — there is no machine to run ${machine.length > 1 ? "them" : "it"}. Use a PNG or JPG instead.`)
+    }
+    if (images.length > 1) {
+      notes.push(`One artwork per side: ${images[0].name} went on the ${sideName}, and ${names(images.slice(1))} ${images.length > 2 ? "were" : "was"} left out.`)
+    }
+
+    // Machine files FIRST and awaited, because attaching one clears the error line on
+    // success — running it after the notes were written would wipe them.
+    let failed = false
+    if (isEmb) for (const f of machine) { if (!(await attachMachineFile(f))) failed = true }
+    // A real attach failure outranks the notes: it is the thing that went wrong, and it
+    // already says which file.
+    const settle = () => { if (!failed) setErr(notes.length ? notes.join(" ") : null) }
+
+    const art = images[0]
+    if (!art) { settle(); return }
+    readImageFile(art, (u) => { settle(); setDesignUrl(u); setDesignName(art.name); setDesignSize(art.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
+  }
  const removeArtwork = async () => {
  if (removing) return   // a second click would open a second confirm over the first
  const saved = !!artAtOpen && !!designUrl
@@ -1936,8 +1986,8 @@ export function DesignCanvasDialog({
  onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false) }}
  onDrop={(e) => {
  e.preventDefault(); setOver(false)
- const f = Array.from(e.dataTransfer?.files ?? [])[0]
- if (!f) return
+ const dropped = Array.from(e.dataTransfer?.files ?? [])
+ if (!dropped.length) return
           // A MACHINE FILE dropped here gets ATTACHED, not refused.
           //
           // This designer positions artwork on a mockup and a .pes has nothing to position,
@@ -1957,7 +2007,7 @@ export function DesignCanvasDialog({
             * can use. The seller card has always refused this; this window took the drop and
             * attached it, which is the same mistake with fewer words.
             */
- takeFile(f)
+ void takeFiles(dropped)
         }}
       >
         {/* Dropping anywhere in the window still works — but it no longer outlines the WHOLE
@@ -2224,9 +2274,10 @@ export function DesignCanvasDialog({
                 <Dropzone
                   icon={UploadSimple}
                   accept={"image/*," + MACHINE_EXT_LIST}
-                  label="Drop a file, or click to browse"
-                  hint={isEmb ? "PNG or JPG, or a stitch file — .EMB .PES .DST .EXP .JEF" : "PNG or JPG"}
-                  onFiles={(f) => takeFile(f[0])}
+                  label="Drop your files, or click to browse"
+                  hint={isEmb ? "PNG or JPG, and a stitch file — .EMB .PES .DST .EXP .JEF — together" : "PNG or JPG"}
+                  multiple
+                  onFiles={(f) => void takeFiles(f)}
                   onPick={() => uploadRef.current?.click()}
                   action={
                     <Button size="sm" variant="outline" onClick={() => { setLibSource("designs"); setLibOpen(true) }}>
@@ -2553,11 +2604,12 @@ export function DesignCanvasDialog({
         {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 text-xs font-medium text-foreground">Files</div>
-            {/* THE ARTWORK ON THIS FACE, first, and only while it is UNSAVED. Once saved the
-                server returns it in lineFiles and printing it here as well would put one file
-                on two rows — the fault this list exists to end. Unsaved it is in no list at
-                all, which is precisely the state a receipt is for. */}
-            {unsavedArt && (
+            {/* THE ARTWORK ON THIS FACE, first, whether it is saved or not — it is in NO
+                server list either way (artwork is an order_designs row, and this list is
+                design_file_data), so dropping it once saved left the picture named nowhere.
+                What changes on save is the note, which is the one thing that was ever
+                about being saved. */}
+            {hasArtHere && (
               <div className="mb-1">
                 <FileRow
                   file={{
@@ -2565,7 +2617,7 @@ export function DesignCanvasDialog({
                     size: designSize,
                     thumb: designUrl,
                     status: saving ? "uploading" : "done",
-                    note: "Not saved yet",
+                    note: artUnsaved ? "Not saved yet" : fileRoleLabel("image"),
                     onRemove: () => void removeArtwork(),
                   }}
                 />
@@ -2785,12 +2837,12 @@ export function DesignCanvasDialog({
  dragging and refused by browsing, from one control. Both routes now run the
  same intake, which is also where the "a stitch file only fits an embroidered
  line" refusal lives. */}
-          <input ref={uploadRef} type="file" accept={"image/*," + MACHINE_EXT_LIST} className="hidden"
- onChange={(e) => { takeFile(e.target.files?.[0]); e.target.value = "" }} />
+          <input ref={uploadRef} type="file" accept={"image/*," + MACHINE_EXT_LIST} multiple className="hidden"
+ onChange={(e) => { void takeFiles(e.target.files); e.target.value = "" }} />
         <input ref={mockupRef} type="file" accept="image/*" className="hidden"
  onChange={(e) => { void setOwnMockup(e.target.files?.[0]); e.target.value = "" }} />
-          <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
- onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
+          <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} multiple className="hidden"
+ onChange={(e) => { void takeFiles(e.target.files); e.target.value = "" }} />
 
           {/* TWO things make a print-ready line, and people kept giving only one. So show
  them as two numbered slots — the image (what shows on the mockup) and the
