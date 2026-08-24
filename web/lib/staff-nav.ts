@@ -103,20 +103,18 @@ export const STAFF_TOOLS: StaffNavItem[] = [
   { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   /**
-   * ADMIN ONLY — it always was, and the sidebar was the last to hear.
+   * ADMIN AND OPERATOR — exactly the roles the server's image gate allows (`IMAGE_ROLES` in
+   * `support_ai.js` / `publish.js`), and no more.
    *
-   * The server gate (`support_ai.js`, `publish.js`) answers "Generating images is limited to
-   * admins and sellers", so an operator, a warehouse hand and a designer all had this in
-   * their sidebar and all four tabs opened onto a red refusal over an empty page: a page
-   * that cannot be READ versus one that does not exist, which is the one thing §4 says a
-   * screen must never leave ambiguous.
+   * It was admin-only, and before that it was in every staff sidebar while the server
+   * refused everyone but admins: four tabs opening onto a red refusal over an empty page,
+   * which is the one thing §4 says a screen must never leave ambiguous. Operators make
+   * listing photos, so they get the page AND the gate; warehouse and designer get neither.
    *
-   * It also spends money per press. Narrowing the sidebar is the honest version of a gate
-   * that already existed; the guards themselves are untouched, and an admin can still hide
-   * it from themselves in Settings › Permissions — that matrix builds its rows from THIS
-   * list, so the cell for every other role disappears with the entry.
+   * It spends money per press, so it stays this narrow — and an admin can still hide it in
+   * Settings › Permissions, whose rows are built from THIS list.
    */
-  { label: "Studio", href: "/studio", icon: Sparkle, roles: ["admin"] },
+  { label: "Studio", href: "/studio", icon: Sparkle, roles: ["operator", "admin"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },

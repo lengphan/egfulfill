@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Warning, Sparkle, ImageSquare, FilmSlate, CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getDeskImageConfig, getDeskVideoConfig, type DeskImageConfig, type DeskVideoConfig, type Backdrop } from "@/lib/api"
+import { cheapestImage, cheapestSize, cheapestVideo, cheapestResolution, modelOptionLabel } from "@/lib/ai-cheapest"
 
 /**
  * What the composer is armed to make. Null means the message box behaves normally.
@@ -79,10 +80,14 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
  const isVideo = mode === "video" && allowVideo
  const imgSpec = img?.models.find((m) => m.id === imgModel) || null
  const vidSpec = vid?.models.find((m) => m.id === vidModel) || null
+  // Which row the picker is RECOMMENDING, marked in the list so the default reads as a
+  // choice rather than as whatever happened to be selected.
+ const cheapImgId = cheapestImage(img?.models)?.id ?? null
+ const cheapVidId = cheapestVideo(vid?.models)?.id ?? null
   // A size one variant offers may not exist on another (Lite has no 4K), so switching models
   // can strand an impossible pick — fall through the variant's own default.
- const effImgSize = imgSpec ? (imgSpec.sizes.includes(imgSize) ? imgSize : imgSpec.defaultSize) : imgSize
- const effVidRes = vidSpec ? (vidSpec.resolutions.includes(vidRes) ? vidRes : vidSpec.defaultResolution) : vidRes
+ const effImgSize = imgSpec ? (imgSpec.sizes.includes(imgSize) ? imgSize : cheapestSize(imgSpec)) : imgSize
+ const effVidRes = vidSpec ? (vidSpec.resolutions.includes(vidRes) ? vidRes : cheapestResolution(vidSpec)) : vidRes
 
  const cfg = isVideo ? vid : img
  const ratios = isVideo ? (vid?.ratios ?? []) : (img?.ratios ?? [])
@@ -111,35 +116,21 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
        * first attempt. A draft is the right first render, and moving up is one select away
        * with the price on the pill the whole time.
        *
-       * Chosen by PRICE, never by position. The catalogue is ordered best-first and gains
-       * rows, so `[length - 1]` would silently follow whatever was added last.
+       * The rule itself lives in lib/ai-cheapest — three surfaces were deriving it and one
+       * of them derived it differently.
        */
- const cheapImg = i.models.reduce<{ id: string; size: string; usd: number } | null>((best, m) => {
- for (const sz of m.sizes) {
- const usd = m.usd[sz]
- if (typeof usd !== "number") continue
- if (!best || usd < best.usd) best = { id: m.id, size: sz, usd }
-        }
- return best
-      }, null)
+ const cheapImg = cheapestImage(i.models)
  const imgId = cheapImg?.id || i.model
- const imgSz = cheapImg?.size || i.models.find((m) => m.id === i.model)?.defaultSize || "1K"
+ const imgSz = cheapImg?.size || cheapestSize(i.models.find((m) => m.id === i.model)) || "1K"
  setImgModel(imgId); setImgSize(imgSz)
 
  const v = allowVideo ? await getDeskVideoConfig().catch(() => null) : null
  if (v) {
  setVid(v)
         // Same rule for clips, priced per SECOND — the cheapest resolution on the cheapest model.
- const cheapVid = v.models.reduce<{ id: string; res: string; usd: number } | null>((best, m) => {
- for (const r of m.resolutions) {
- const usd = m.usdPerSec[r]
- if (typeof usd !== "number") continue
- if (!best || usd < best.usd) best = { id: m.id, res: r, usd }
-          }
- return best
-        }, null)
+ const cheapVid = cheapestVideo(v.models)
  setVidModel(cheapVid?.id || v.model)
- setVidRes(cheapVid?.res || v.models.find((m) => m.id === v.model)?.defaultResolution || "1080p")
+ setVidRes(cheapVid?.res || cheapestResolution(v.models.find((m) => m.id === v.model)) || "1080p")
       }
  const iM = i.models.find((m) => m.id === imgId)
  if (i.enabled && iM) {
@@ -188,8 +179,8 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
  const iM = o.imgModel ?? imgModel, vM = o.vidModel ?? vidModel
  const iSpec = img?.models.find((x) => x.id === iM) || null
  const vSpec = vid?.models.find((x) => x.id === vM) || null
- const iSize = iSpec ? (iSpec.sizes.includes(o.imgSize ?? imgSize) ? (o.imgSize ?? imgSize) : iSpec.defaultSize) : (o.imgSize ?? imgSize)
- const vRes = vSpec ? (vSpec.resolutions.includes(o.vidRes ?? vidRes) ? (o.vidRes ?? vidRes) : vSpec.defaultResolution) : (o.vidRes ?? vidRes)
+ const iSize = iSpec ? (iSpec.sizes.includes(o.imgSize ?? imgSize) ? (o.imgSize ?? imgSize) : cheapestSize(iSpec)) : (o.imgSize ?? imgSize)
+ const vRes = vSpec ? (vSpec.resolutions.includes(o.vidRes ?? vidRes) ? (o.vidRes ?? vidRes) : cheapestResolution(vSpec)) : (o.vidRes ?? vidRes)
  const sc = o.secs ?? secs
  const iRatio = o.imgRatio ?? imgRatio, vRatio = o.vidRatio ?? vidRatio
  const bd = o.backdrop ?? backdrop
@@ -287,22 +278,22 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
  onChange={(e) => {
  const id = e.target.value; setVidModel(id)
  const m = vid?.models.find((x) => x.id === id)
- const r = m && !m.resolutions.includes(vidRes) ? m.defaultResolution : vidRes
+ const r = m && !m.resolutions.includes(vidRes) ? cheapestResolution(m) : vidRes
  if (m && r !== vidRes) setVidRes(r)
  armWith({ vidModel: id, vidRes: r })
                       }}>
-                      {vid?.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                      {vid?.models.map((m) => <option key={m.id} value={m.id}>{modelOptionLabel(m, cheapVidId)}</option>)}
                     </select>
                   ) : (
                     <select value={imgModel} className={selectCls}
  onChange={(e) => {
  const id = e.target.value; setImgModel(id)
  const m = img?.models.find((x) => x.id === id)
- const sz = m && !m.sizes.includes(imgSize) ? m.defaultSize : imgSize
+ const sz = m && !m.sizes.includes(imgSize) ? cheapestSize(m) : imgSize
  if (m && sz !== imgSize) setImgSize(sz)
  armWith({ imgModel: id, imgSize: sz })
                       }}>
-                      {img?.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                      {img?.models.map((m) => <option key={m.id} value={m.id}>{modelOptionLabel(m, cheapImgId)}</option>)}
                     </select>
                   )}
                   {(isVideo ? vidSpec?.note : imgSpec?.note) && (

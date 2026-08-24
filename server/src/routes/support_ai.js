@@ -916,22 +916,27 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
    * that is convenience, and this is the boundary.
    */
   /*
-   * IMAGES ARE THE EXCEPTION, and only for sellers who pay for them.
+   * IMAGES ARE THE EXCEPTION — for OPERATORS, and for sellers who pay for them.
    *
-   * A seller spends their OWN wallet, so the money argument above does not apply to them —
-   * it applies to the other staff roles, who spend ours. Hence three outcomes rather than
-   * two: admin generates free, a seller generates if an admin has switched it on and their
-   * balance covers it, and operator/warehouse/designer are still refused.
+   * A seller spends their OWN wallet, so the money argument above does not apply to them.
+   * An operator spends ours, and that is now a deliberate decision rather than an oversight:
+   * listing photos are made on the floor, and an operator who cannot make one has to ask an
+   * admin for every render. The spend is still bounded and still visible — every press books
+   * its Google cost through recordGenerationCost, so it lands in reports like any other
+   * factory cost, and the price is on screen before the press.
+   *
+   * Warehouse and designer are still refused: neither makes listing photos.
    *
    * Video stays admin-only regardless. A clip costs up to fifteen images and is a marketing
    * asset rather than something that becomes a listing.
    */
+  const IMAGE_ROLES = new Set(['admin', 'operator']);
   const imageGate = async (req, reply) => {
     const role = String(req.user?.role || 'seller');
-    if (role === 'admin') return null;
+    if (IMAGE_ROLES.has(role)) return null;
     if (role !== 'seller') {
       reply.code(403);
-      return { error: 'Generating images is limited to admins and sellers.' };
+      return { error: 'Generating images is limited to admins, operators and sellers.' };
     }
     const pricing = await readPricing();
     if (!pricing.sellersEnabled) {

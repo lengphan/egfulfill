@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { cheapestImage, cheapestSize, cheapestVideo } from "@/lib/ai-cheapest"
 import { CircleNotch, Warning, X, DownloadSimple, FilmSlate, ArrowSquareOut, Prohibit } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { EmptyState } from "@/components/app/empty-state"
@@ -36,8 +37,9 @@ import {
  */
 export default function StudioPage() {
   /**
-   * ADMIN ONLY, SAID HERE TOO — the sidebar entry is gone for every other role, and a
-   * removed link is not a guard: the URL still resolves.
+   * ADMINS AND OPERATORS, SAID HERE TOO — the sidebar entry is gone for every other role,
+   * and a removed link is not a guard: the URL still resolves. The pair mirrors the server's
+   * `IMAGE_ROLES` (support_ai.js / publish.js); widen both or neither.
    *
    * What happened before was the worst of the three options. The page rendered in full —
    * title, four tabs, the template grid — and every press came back with the server's
@@ -121,14 +123,10 @@ export default function StudioPage() {
   /** The cheapest clip these settings can buy, derived from the catalogue rather than named:
    *  a hardcoded tier becomes wrong the day a cheaper one ships. */
   const clipSpec = useMemo(() => {
-    if (!vid?.models?.length) return null
-    const priced = vid.models
-      .flatMap((m) => m.resolutions.map((res) => ({ model: m.id, res, rate: m.usdPerSec[res] ?? Infinity })))
-      .sort((a, b) => a.rate - b.rate)
-    const pick = priced[0]
-    if (!pick || !Number.isFinite(pick.rate)) return null
-    const secs = Math.min(...(vid.durations?.length ? vid.durations : [8]))
-    return { ...pick, secs, usd: pick.rate * secs }
+    const pick = cheapestVideo(vid?.models)
+    if (!pick) return null
+    const secs = Math.min(...(vid?.durations?.length ? vid.durations : [8]))
+    return { model: pick.id, res: pick.res, rate: pick.usdPerSec, secs, usd: pick.usdPerSec * secs }
   }, [vid])
 
   useEffect(() => {
@@ -139,16 +137,17 @@ export default function StudioPage() {
     return () => { alive = false }
   }, [])
 
-  /* The cheapest model that can do the job, as the default — the same choice the photo
-     studio makes. A page of one-click buttons must not quietly open on the dearest option. */
-  const model = useMemo(() => {
-    if (!cfg?.models?.length) return ""
-    const cheapest = [...cfg.models].sort((a, b) =>
-      (a.usd[a.defaultSize] ?? 99) - (b.usd[b.defaultSize] ?? 99))[0]
-    return cheapest?.id ?? cfg.model
-  }, [cfg])
+  /* THE CHEAPEST RENDER THE CATALOGUE OFFERS, as the default — the same choice the photo
+     studio and the chat composer make. A page of one-click buttons must not quietly open on
+     the dearest option.
+
+     Priced over every (model, SIZE) pair, not by each model's own default: a model's default
+     size is a quality choice, so ranking models by it can pick a dearer render than the one
+     beside it. The rule is lib/ai-cheapest — shared, because this page had its own. */
+  const cheapest = useMemo(() => cheapestImage(cfg?.models), [cfg])
+  const model = cheapest?.id ?? cfg?.model ?? ""
   const spec = cfg?.models.find((m) => m.id === model) ?? null
-  const size = spec?.defaultSize ?? "1K"
+  const size = cheapest?.size ?? cheapestSize(spec) ?? "1K"
   const each = spec?.usd[size] ?? cfg?.quote?.imagePrice ?? 0
   const total = each * count
 
@@ -246,12 +245,12 @@ export default function StudioPage() {
   // undefined = the role has not been read yet. Rendering the refusal in that frame would
   // flash "not for you" at an admin on every load.
   if (role === undefined) return null
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "operator") {
     return (
       <SectionCard title="Studio" bodyClassName="p-4">
         <EmptyState
           icon={Prohibit}
-          title="Studio is for admins"
+          title="Studio is for admins and operators"
           note="Generating spends from the platform account. Listing photos are made from the publish dialog instead."
         />
       </SectionCard>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { DictateButton } from "@/components/app/dictate-button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { getDeskImageConfig, readPhotosForPrompt, generateListingPhotos, listListingRenders, deleteListingRender, type DeskImageConfig, type ListingRender, type AiQuote, type Backdrop } from "@/lib/api"
+import { cheapestImage, cheapestSize, modelOptionLabel } from "@/lib/ai-cheapest"
 import { promptWarning } from "@/lib/image-gen"
 import { removeBackground } from "@/lib/remove-background"
 import { canvasReadableSrc } from "@/lib/thread-match"
@@ -284,7 +285,10 @@ export function ListingPhotoStudio({
   const spec = cfg?.models.find((m) => m.id === model) || null
   // A size one variant offers may not exist on another (Lite has no 4K), so switching models
   // can strand an impossible pick — fall through the variant's own default.
-  const effSize = spec ? (spec.sizes.includes(size) ? size : spec.defaultSize) : size
+  const effSize = spec ? (spec.sizes.includes(size) ? size : cheapestSize(spec)) : size
+  // The row the picker recommends, marked in the list — the default is a choice, and one
+  // that is invisible is one nobody knows they can move.
+  const cheapestId = cheapestImage(cfg?.models)?.id ?? null
 
   /*
    * WHAT ONE RENDER COSTS, AND WHOSE NUMBER IT IS.
@@ -313,20 +317,13 @@ export function ListingPhotoStudio({
        * still deciding what you want: the first press should be a draft, and moving up to Pro
        * should be a deliberate choice made once the prompt is right.
        *
-       * Cheapest by the PRICE LIST, not by position — the catalogue is ordered best-first and
-       * gains rows over time, so reading `[length - 1]` would silently pick whatever landed
-       * last. Falls back to the configured model when nothing carries a price.
+       * Cheapest by the PRICE LIST, not by position — the rule is lib/ai-cheapest, shared with
+       * the chat composer and the Studio page. Falls back to the configured model when
+       * nothing carries a price.
        */
-      const cheapest = c.models.reduce<{ id: string; size: string; usd: number } | null>((best, m) => {
-        for (const sz of m.sizes) {
-          const usd = m.usd[sz]
-          if (typeof usd !== "number") continue
-          if (!best || usd < best.usd) best = { id: m.id, size: sz, usd }
-        }
-        return best
-      }, null)
+      const cheapest = cheapestImage(c.models)
       setModel(cheapest?.id || c.model)
-      setSize(cheapest?.size || c.models.find((m) => m.id === c.model)?.defaultSize || "1K")
+      setSize(cheapest?.size || cheapestSize(c.models.find((m) => m.id === c.model)) || "1K")
     } catch (e) {
       // Keep the REAL reason. "Couldn't load" alone sends the reader looking in the wrong place.
       setCfgErr(e instanceof Error ? e.message : "Couldn't load the generation settings.")
@@ -983,9 +980,9 @@ export function ListingPhotoStudio({
                                 onChange={(e) => {
                                   const id = e.target.value; setModel(id)
                                   const m = cfg.models.find((x) => x.id === id)
-                                  if (m && !m.sizes.includes(size)) setSize(m.defaultSize)
+                                  if (m && !m.sizes.includes(size)) setSize(cheapestSize(m))
                                 }}>
-                                {cfg.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                                {cfg.models.map((m) => <option key={m.id} value={m.id}>{modelOptionLabel(m, cheapestId)}</option>)}
                               </select>
                             </div>
                             <div>

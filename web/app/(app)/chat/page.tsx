@@ -144,6 +144,16 @@ export default function ChatPage() {
  const isStaffUser = (() => { const r = getUser()?.role; return !!r && r !== "seller" })()
  const isAdmin = getUser()?.role === "admin"
   /*
+   * WHICH STAFF MAY GENERATE — admins and operators, the same pair the server allows
+   * (`IMAGE_ROLES` in support_ai.js / publish.js).
+   *
+   * `enabled` on a staff quote is a seller switch and comes back true for EVERY staff role,
+   * so gating on it alone put the sparkle button in front of warehouse and designer too —
+   * and opening the panel fetched a config route that 403s. That is the red "Couldn't load
+   * the generation settings" box: a control that exists and cannot work.
+   */
+ const isImageStaff = (() => { const r = getUser()?.role; return r === "admin" || r === "operator" })()
+  /*
    * Sellers may generate IMAGES when an admin has switched it on, and they pay for each one
    * from their wallet. The quote is read from the server rather than inferred from the role,
    * because "switched on" is a setting and only the server knows it — and the price shown
@@ -157,7 +167,7 @@ export default function ChatPage() {
  return () => clearTimeout(t)
   }, [])
  const genChannel = aiQuote && !aiQuote.staff && aiQuote.enabled ? aiQuote.genChannel ?? null : null
- const canGenerate = isAdmin || !!aiQuote?.enabled
+ const canGenerate = isImageStaff || (!!aiQuote && !aiQuote.staff && aiQuote.enabled)
   /*
    * WHERE THE CONTROL LIVES HAS TO MATCH WHERE THE IMAGE LANDS.
    *

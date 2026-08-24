@@ -161,17 +161,20 @@ export function publishRoutes(app, requireAuth) {
    */
 
   /*
-   * Same three outcomes as the chat generator's gate, and deliberately the same rule rather
-   * than a second one: admin generates on the factory's account, a seller spends their own
-   * wallet if an admin switched it on, and operator/warehouse/designer are refused because
-   * they would be spending ours from a screen where it looks like any other button.
+   * Same outcomes as the chat generator's gate, and deliberately the same rule rather than a
+   * second one: admin and operator generate on the factory's account, a seller spends their
+   * own wallet if an admin switched it on, and warehouse/designer are refused.
+   *
+   * Kept in step with `IMAGE_ROLES` in support_ai.js by hand — two routes, one rule, and a
+   * role added to one and not the other is a page that half works.
    */
+  const IMAGE_ROLES = new Set(['admin', 'operator']);
   const genGate = async (req, reply) => {
     const role = String(req.user?.role || 'seller');
-    if (role === 'admin') return null;
+    if (IMAGE_ROLES.has(role)) return null;
     if (role !== 'seller') {
       reply.code(403);
-      return { error: 'Generating photos is limited to admins and sellers.' };
+      return { error: 'Generating photos is limited to admins, operators and sellers.' };
     }
     const pricing = await readPricing();
     if (!pricing.sellersEnabled) {
