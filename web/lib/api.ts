@@ -2078,6 +2078,19 @@ export type OrderRow = {
   factory_order?: boolean | null
   total?: number | string | null
   profit?: number | string | null
+  /**
+   * WHAT THIS ORDER COSTS THE SELLER — computed server-side on the list (see attachCost in
+   * orders.js), because `total` is the BUYER's money and answers a different question.
+   *
+   * `cost_estimated` says which claim it is: false = the ledger, money that actually moved;
+   * true = the live ladder for an order nobody has paid for yet, which skips the per-order
+   * side count and volume rate and can therefore be equal or slightly high, never low.
+   * Absent entirely for a viewer who may not see money (warehouse).
+   */
+  cost?: number | null
+  cost_estimated?: boolean | null
+  /** How many lines could not be priced at all — the actionable half of a missing cost. */
+  cost_unpriced?: number | null
   /** Who uploaded it — resolved server-side ONLY when it's the shop owner or one of their
    *  own team members (else null). Never a factory account. Used for the seller's history. */
   created_by_name?: string | null

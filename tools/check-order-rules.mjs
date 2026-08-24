@@ -104,7 +104,13 @@ const spec = require(specPath)
  * real app; here we do the same job with a resolve hook, so the compiled mobile module loads
  * the SAME shared file the app would load rather than a stand-in written for the test.
  */
-const ALIAS = { '@shared/order-rules': specPath }
+/* EVERY shared module mobile pulls in, not just the one under test: orders.ts imports
+   @shared/order-address too (added 2026-08-24), and a missing entry here is not a warning —
+   the require throws and the whole guard stops running. Compile-and-map each. */
+const ALIAS = {
+  '@shared/order-rules': specPath,
+  '@shared/order-address': compile('web/shared/order-address.ts'),
+}
 const resolve = Module._resolveFilename
 Module._resolveFilename = function (request, ...rest) {
   return ALIAS[request] ?? resolve.call(this, request, ...rest)

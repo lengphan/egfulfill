@@ -113,7 +113,8 @@ export const platformFromId = (id: string) => {
  * prefix table in shared/order-rules.ts where the phone can import it too — this file is
  * where the WEB looks for a formatter, which is why the name still resolves here.
  */
-export { orderRefLabel } from "@/shared/order-rules"
+export { orderRefLabel, recordedRevenue } from "@/shared/order-rules"
+import { recordedRevenue } from "@/shared/order-rules"
 
 /** The platform an order came from, as the platform writes it — "Etsy", "TikTok", "Manual". */
 export const platformOf = (o: OrderRow) => {
@@ -121,6 +122,17 @@ export const platformOf = (o: OrderRow) => {
   return raw ? (PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))) : platformFromId(String(o.id))
 }
 export const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
+
+/**
+ * THE BUYER'S MONEY, OR NOTHING — never 0 standing in for "nobody recorded it".
+ *
+ * The rule itself lives in shared/order-rules.ts, where the phone can import it too: this is
+ * asked by the queue, by the order page and by the mobile detail screen, and it had already
+ * been answered differently in two of them — the queue printed "$0.00" for a manual order
+ * while the detail page, three clicks away, said "not recorded" about the same row.
+ */
+export const revenueOf = (o: OrderRow): number | null =>
+  recordedRevenue(o as { id?: string | null; total?: number | string | null; meta?: { retail_set?: boolean } | null })
 export const customerOf = (o: OrderRow) => o.customer?.name || "—"
 export const storeOf = (o: OrderRow) => {
   const s = (o.store || o.source || "manual").toString()

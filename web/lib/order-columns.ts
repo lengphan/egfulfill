@@ -3,17 +3,34 @@
 // the row cells, so a column can be hidden or dragged without touching either.
 // Persisted per browser, like the old app's localStorage-backed layout.
 
-export type OrderColId = "order" | "store" | "customer" | "items" | "status" | "tracking" | "total" | "date"
+export type OrderColId = "order" | "store" | "customer" | "items" | "status" | "tracking" | "cost" | "total" | "date"
 
 export type OrderColDef = {
   id: OrderColId
   label: string
   /** Tailwind width class for the <col>/<th>; omitted = flexible. */
   width?: string
+  /**
+   * The same width as a NUMBER, because the table needs to add them up.
+   *
+   * `table-fixed` inside an `overflow-x-auto` does not overflow on its own — it squeezes the
+   * one flexible column instead, so adding Cost took the width out of Items and cut a listing
+   * name to a single letter. The floor below is computed from the columns actually VISIBLE, so
+   * hiding two columns narrows the table rather than leaving it needlessly scrollable.
+   *
+   * Kept beside the class rather than derived from it: a Tailwind class has to be a literal
+   * for the JIT to emit it, so the class cannot be built from this number — and parsing the
+   * string back out is the kind of cleverness that breaks the day someone writes `w-24`.
+   */
+  px?: number
   align?: "left" | "right"
   /** Columns the seller may not hide — without these a row is unidentifiable. */
   locked?: boolean
 }
+
+/** What the Items column must keep: the 72px photo, its gap, and enough of a listing name to
+ *  recognise the product. Below this the cell stops answering the question it exists for. */
+export const ITEMS_MIN_PX = 260
 
 // Widths are deliberately tight: the table is `table-fixed`, so every pixel spent
 // here is taken from Items — the only flexible column, and the one carrying the
@@ -25,17 +42,29 @@ export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
   // comes off `items`, the only flexible column — which is what the note above says every
   // pixel here costs, and the trade is a listing title losing two characters it was
   // truncating anyway against an order number becoming readable at all.
-  order: { id: "order", label: "Order", width: "w-[104px]", locked: true },
-  store: { id: "store", label: "Store", width: "w-[88px]" },
-  customer: { id: "customer", label: "Customer", width: "w-[136px]" },
+  order: { px: 104, id: "order", label: "Order", width: "w-[104px]", locked: true },
+  store: { px: 88, id: "store", label: "Store", width: "w-[88px]" },
+  customer: { px: 136, id: "customer", label: "Customer", width: "w-[136px]" },
   items: { id: "items", label: "Items" },
-  status: { id: "status", label: "Status", width: "w-[136px]" }, // fits "Order Received"
-  tracking: { id: "tracking", label: "Tracking", width: "w-[128px]" },
-  total: { id: "total", label: "Total", width: "w-[88px]", align: "right" },
-  date: { id: "date", label: "Date", width: "w-[72px]", align: "right" },
+  status: { px: 136, id: "status", label: "Status", width: "w-[136px]" }, // fits "Order Received"
+  tracking: { px: 128, id: "tracking", label: "Tracking", width: "w-[128px]" },
+  /**
+   * WHAT THE ORDER COSTS THE SELLER — the number this board was missing entirely.
+   *
+   * Beside Total on purpose, because they are the two halves of one question and they were
+   * being confused for each other: Total is what the BUYER paid, which on a manual order is
+   * nothing anybody recorded. A seller looking at their own queue wants what it costs them,
+   * and that lived only on the detail page.
+   *
+   * 96px, four more than Total: an estimate reads "$1,204.50" at the widest and the column
+   * is right-aligned, where a truncated figure is unreadable rather than merely short.
+   */
+  cost: { px: 96, id: "cost", label: "Cost", width: "w-[96px]", align: "right" },
+  total: { px: 88, id: "total", label: "Total", width: "w-[88px]", align: "right" },
+  date: { px: 72, id: "date", label: "Date", width: "w-[72px]", align: "right" },
 }
 
-export const DEFAULT_ORDER_COLS: OrderColId[] = ["order", "store", "customer", "items", "status", "tracking", "total", "date"]
+export const DEFAULT_ORDER_COLS: OrderColId[] = ["order", "store", "customer", "items", "status", "tracking", "cost", "total", "date"]
 const ALL_IDS = DEFAULT_ORDER_COLS
 
 const ORDER_KEY = "eg_orders_col_order"
@@ -53,8 +82,24 @@ export function loadColOrder(): OrderColId[] {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return [...DEFAULT_ORDER_COLS]
     const saved = parsed.filter(isColId)
-    const missing = DEFAULT_ORDER_COLS.filter((id) => !saved.includes(id))
-    return [...saved, ...missing]
+    /**
+     * A NEW COLUMN APPEARS WHERE IT BELONGS, not on the far right.
+     *
+     * Appending was fine while the only new columns were end-of-row ones. `cost` belongs
+     * beside `total` — they are the two halves of one question — and a saved layout (which
+     * is everyone who has ever touched the Columns menu) would have got it after Date, where
+     * it reads as having been put in the wrong place. It follows its canonical NEIGHBOUR
+     * wherever that neighbour now sits, which is the same heal the factory board already
+     * does; two loaders, one rule.
+     */
+    const healed = [...saved]
+    for (const id of DEFAULT_ORDER_COLS) {
+      if (healed.includes(id)) continue
+      const canonical = DEFAULT_ORDER_COLS.indexOf(id)
+      const after = healed.indexOf(DEFAULT_ORDER_COLS[canonical - 1])
+      healed.splice(after >= 0 ? after + 1 : Math.min(canonical, healed.length), 0, id)
+    }
+    return healed
   } catch {
     return [...DEFAULT_ORDER_COLS]
   }
