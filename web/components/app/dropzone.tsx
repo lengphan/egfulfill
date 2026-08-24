@@ -144,7 +144,7 @@ export function FileRow({ file, className }: { file: DroppedFile; className?: st
 }
 
 export function Dropzone({
-  onFiles, accept, multiple = false, icon, label, hint, action, files,
+  onFiles, accept, multiple = false, icon, label, hint, action, files, onPick,
   slim = false, busy = null, disabled = false, className,
 }: {
   onFiles: (files: FileList) => void
@@ -159,6 +159,17 @@ export function Dropzone({
   action?: React.ReactNode
   /** THE RECEIPT — what is currently on this zone. See the note at the top of the file. */
   files?: DroppedFile[]
+  /**
+   * BROWSE WITH SOMEONE ELSE'S INPUT.
+   *
+   * The zone owns an <input type="file"> and clicking it opens that. Inside a POPOVER that
+   * is a trap: opening the OS file dialog takes focus off the page, the popover treats it as
+   * an outside interaction and closes — taking the input with it, so the picker never
+   * appears and pressing the zone looks like it does nothing at all. A surface that already
+   * keeps its inputs at dialog level passes the handler that clicks one of those instead,
+   * and the picker survives the panel closing.
+   */
+  onPick?: () => void
   /** One inline row, for a zone under a list that already has files in it. */
   slim?: boolean
   /** Text to show beside a spinner while something is uploading. */
@@ -210,7 +221,7 @@ export function Dropzone({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => ref.current?.click()}
+        onClick={() => (onPick ? onPick() : ref.current?.click())}
         className={cn(
           "flex w-full cursor-pointer items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed",
           slim ? "gap-2" : "flex-col gap-3",

@@ -1,15 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple, ImageSquare, PaperPlaneTilt, Needle} from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { Dropzone, FileRow, fileNameFrom } from "@/components/app/dropzone"
-import { EmptyState } from "@/components/app/empty-state"
-import { TabBar } from "@/components/app/tab-bar"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
@@ -181,6 +179,32 @@ export function DesignStage({
  const managed = !!onSelect
  const sel = managed ? selected ?? null : selfSel
  const select = (id: string | null) => { if (managed) onSelect?.(id); else setSelfSel(id) }
+  /**
+   * TYPE ON THE CANVAS, WHERE THE WORDS ARE.
+   *
+   * The text a layer says was editable only in a field in the side panel, so changing a
+   * word meant looking away from the thing you were changing — and on a stage showing two
+   * text layers, working out which field belonged to which line.
+   *
+   * Opened the way every editor opens one: double-click, or a single click on a layer that
+   * is already selected. Both are deliberate — the first click still SELECTS, or dragging a
+   * layer would drop you into a caret every time you moved one.
+   *
+   * The node is contentEditable rather than an input on top: the layer is already sized in
+   * `cqw` and rotated by the stage, and an overlaid input would have to reproduce both and
+   * would still disagree by a pixel while you typed. Uncontrolled while open — React must
+   * not rewrite a node the caret is inside — so the text is read back on close.
+   */
+ const [editingId, setEditingId] = useState<string | null>(null)
+ const editing = editingId && (texts ?? []).some((t) => t.id === editingId) ? editingId : null
+ const closeEdit = (id: string, el: HTMLElement | null, keep = true) => {
+ setEditingId(null)
+ if (!keep || !el) return
+    // A layer emptied to nothing would be unselectable and invisible — an accidental
+    // delete by backspace. The previous words stay, which is what Escape does elsewhere.
+ const next = (el.textContent ?? "").replace(/\s+/g, " ").trim()
+ if (next) updateText?.(id, { text: next })
+  }
  const aspect = ar && ar.url === designUrl ? ar.a : 1
  const setAspect = (a: number) => setAr({ url: designUrl || "", a })
   // The widest this artwork may be drawn before its own height would run off the bed. A
@@ -667,19 +691,52 @@ export function DesignStage({
         </div>
       )}
 
-      {(texts ?? []).map((t) => (
+      {(texts ?? []).map((t) => {
+ const isEditing = editing === t.id
+ const canEdit = !!updateText && !lockedIds[t.id] && !picking
+ return (
         <div
- key={t.id}
- onPointerDown={lockedIds[t.id]
-            ? (e) => { e.stopPropagation(); select(t.id) }
- : startDrag(t.id, "move")}
+          /* Remounted when editing opens or closes: the node is uncontrolled while the
+             caret is in it, so it has to start from the current text and be given back to
+             React afterwards. */
+ key={t.id + (isEditing ? ":edit" : "")}
+ onPointerDown={isEditing
+            ? (e) => { e.stopPropagation() }   // a click inside places the caret; it must not drag the layer
+ : lockedIds[t.id]
+              ? (e) => { e.stopPropagation(); select(t.id) }
+ : (e) => {
+                  // Already selected → this click is asking to type, not to pick it up.
+ if (canEdit && sel === t.id) { e.stopPropagation(); setEditingId(t.id); return }
+ startDrag(t.id, "move")(e)
+                }}
+ onDoubleClick={canEdit ? (e) => { e.stopPropagation(); select(t.id); setEditingId(t.id) } : undefined}
+ contentEditable={isEditing || undefined}
+ suppressContentEditableWarning
+ spellCheck={false}
+ ref={isEditing ? (el) => {
+ if (!el) return
+            // Focus and select the whole line, so the first keystroke replaces the
+            // placeholder rather than appending to it.
+ el.focus()
+ const r = document.createRange(); r.selectNodeContents(el)
+ const s = window.getSelection(); s?.removeAllRanges(); s?.addRange(r)
+          } : undefined}
+ onBlur={isEditing ? (e) => closeEdit(t.id, e.currentTarget) : undefined}
+ onKeyDown={isEditing ? (e) => {
+ e.stopPropagation()
+            // One line per layer — Enter commits rather than inserting a break the flatten
+            // would not draw.
+ if (e.key === "Enter") { e.preventDefault(); closeEdit(t.id, e.currentTarget) }
+ if (e.key === "Escape") { e.preventDefault(); closeEdit(t.id, e.currentTarget, false) }
+          } : undefined}
  style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%,-50%) rotate(${t.r}deg)`, color: t.color, fontSize: `${t.size}cqw`, fontWeight: t.bold ? 800 : 600, whiteSpace: "nowrap", lineHeight: 1.1 }}
- className={"absolute touch-none " + (lockedIds[t.id] ? "cursor-default" : "cursor-move")}
+ className={"absolute touch-none outline-none " + (isEditing ? "cursor-text" : lockedIds[t.id] ? "cursor-default" : canEdit ? "cursor-move" : "cursor-move")}
+ title={canEdit && !isEditing ? "Double-click to edit" : undefined}
         >
           {t.text || "Text"}
-          {sel === t.id && handles(t.id)}
+          {sel === t.id && !isEditing && handles(t.id)}
         </div>
-      ))}
+      )})}
     </div>
   )
 }
@@ -725,13 +782,6 @@ const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
 /** The same list the regex tests, as an accept attribute. Derived from one source so the
  * picker can't start offering a type the drop handler refuses (or the reverse). */
 const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
-/** The three kinds of thing that can land on a line. Module-level so the array identity
- *  is stable across renders and the bar does not remount under the cursor. */
-const FILE_TABS = [
-  { id: "image" as const, label: "Image" },
-  { id: "templates" as const, label: "Templates" },
-  { id: "machine" as const, label: "Machine files" },
-]
 
 
 /**
@@ -837,10 +887,6 @@ export function DesignCanvasDialog({
    */
  const railBtn = "flex w-14 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
  const railWord = "text-[10px] font-medium leading-none"
-  /** Which kind of file the Files panel is offering. A TAB, not five buttons: the three
-   *  differ only in what they accept, which is a property of the drop target, not five
-   *  separate errands. */
-  const [fileTab, setFileTab] = useState<"image" | "templates" | "machine">("image")
  const [tplBusy, setTplBusy] = useState(false)
   /** null = the box is closed. A string is what is being typed into it. */
  const [tplName, setTplName] = useState<string | null>(null)
@@ -2136,70 +2182,55 @@ export function DesignCanvasDialog({
                 )}
               </PopoverTrigger>
               <PopoverContent align="start" className="w-80 p-3">
-                {/* A DROP TARGET WITH A TAB BAR, not a menu of errands. The three routes take
-                    the same gesture and differ only in WHAT they accept, which is a property
-                    of the target — so the target stays put and the tab says what it eats.
-                    Five stacked text buttons made one act look like five decisions. */}
-                <TabBar
-                  ariaLabel="What to add"
-                  size="sm"
-                  items={FILE_TABS}
-                  value={fileTab}
-                  onChange={setFileTab}
-                  className="mb-3"
+                {/*
+                 * ONE ZONE THAT TAKES EVERYTHING.
+                 *
+                 * This had tabs — Image · Templates · Machine files — which put the print file
+                 * in one place and the stitch file in another, so adding two files to one line
+                 * meant knowing which drawer each belonged in before you could drop it. That is
+                 * our filing system, not the seller's job. It also did not fit: three labels in
+                 * a 320px popover clipped the first tab off the front of the bar.
+                 *
+                 * The intake never needed splitting. `uploadRef` already accepts an image OR a
+                 * machine file, and takeFile already routes by type — including the refusal
+                 * that a stitch file only fits an embroidered line. So one target, one gesture,
+                 * and the file says what it is.
+                 *
+                 * onPick, NOT the zone's own input: opening the OS file dialog takes focus off
+                 * the page, the popover reads that as an outside interaction and closes, taking
+                 * its input with it — so the picker never appeared and pressing the zone looked
+                 * like it did nothing. uploadRef lives at dialog level and survives that.
+                 */}
+                <Dropzone
+                  icon={UploadSimple}
+                  accept={"image/*," + MACHINE_EXT_LIST}
+                  label="Drop a file, or click to browse"
+                  hint={isEmb ? "PNG or JPG, or a stitch file — .EMB .PES .DST .EXP .JEF" : "PNG or JPG"}
+                  onFiles={(f) => takeFile(f[0])}
+                  onPick={() => uploadRef.current?.click()}
+                  action={
+                    <Button size="sm" variant="outline" onClick={() => { setLibSource("designs"); setLibOpen(true) }}>
+                      Pick from your library
+                    </Button>
+                  }
                 />
-                {fileTab === "image" && (
-                  <Dropzone
-                    icon={ImageIcon}
-                    accept="image/*"
-                    label="Drop an image, or click to browse"
-                    hint="PNG or JPG"
-                    onFiles={(f) => takeFile(f[0])}
-                    action={
-                      <Button size="sm" variant="outline" onClick={() => { setLibSource("designs"); setLibOpen(true) }}>
-                        Pick from your library
-                      </Button>
-                    }
-                  />
-                )}
-                {fileTab === "templates" && (
-                  /* NOT A DROP TARGET. A template is not a file you have — it is one you
-                     saved, so the region offers the two things you can actually do with one:
-                     start from it, and (only with artwork on the line) make one. */
-                  <EmptyState
-                    icon={BookmarkSimple}
-                    size="sm"
-                    title="Start from a saved template"
-                    note="A template carries the artwork and where it sits."
-                    action={
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { setLibSource("templates"); setLibOpen(true) }}>
-                          Browse templates
-                        </Button>
-                        {/* PEERS, SO THEY LOOK LIKE PEERS. Browse and Save are the two things
-                            you can do with a template, and one was `outline` beside the
-                            other's `ghost` — a hierarchy where there is none, which reads as
-                            two unrelated controls rather than a pair. The variants are a
-                            hierarchy, not a palette (CLAUDE.md §4). */}
-                        {designUrl && (
-                          <Button size="sm" variant="outline" disabled={tplBusy}
-                            onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}>
-                            Save this placement
-                          </Button>
-                        )}
-                      </div>
-                    }
-                  />
-                )}
-                {fileTab === "machine" && (
-                  <Dropzone
-                    icon={Needle}
-                    accept={MACHINE_EXT_LIST}
-                    label={isEmb ? "Drop a stitch file, or click to browse" : "Embroidered lines only"}
-                    hint={isEmb ? ".EMB .PES .DST .EXP .JEF" : "There is no machine to run a stitch file on this line"}
-                    disabled={!isEmb}
-                    onFiles={(f) => { const x = f[0]; if (x) void attachMachineFile(x) }}
-                  />
+                {/* SAVING a template is not ADDING a file, so it sits under the zone rather
+                    than inside it — and only with artwork on the line, because there is
+                    otherwise nothing to save. The library above opens on its Designs tab and
+                    carries a Templates tab of its own, so starting FROM one needs no second
+                    control here. */}
+                {designUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
+                    disabled={tplBusy}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+                  >
+                    {tplBusy
+                      ? <CircleNotch size={13} className="animate-spin" />
+                      : <BookmarkSimple size={13} weight="bold" />}
+                    Save this placement as a template
+                  </button>
                 )}
               </PopoverContent>
             </Popover>
