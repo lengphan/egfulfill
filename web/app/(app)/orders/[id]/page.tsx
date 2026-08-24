@@ -437,6 +437,18 @@ export default function OrderDetailPage() {
    */
  const stageNow = String(order.factory_status || "").toLowerCase()
  const beforeApproval = ["", "new", "draft", "pending", "in_review"].includes(stageNow)
+ /*
+  * KEPT IN STEP WITH mayEditVariants (shared/order-rules.ts) BY HAND, and it has to be.
+  *
+  * This is the same rule, spelled out: staff up to approval, the seller pre-submit, admin
+  * until the blanks are ordered. It does not CALL the shared predicate because the React
+  * Compiler refuses to compile this component when an imported function is invoked in its
+  * render body ("Existing memoization could not be preserved"), and a component the
+  * compiler skips loses every memo it already had — a worse trade than one hand-kept copy.
+  *
+  * So: if mayEditVariants moves, this moves in the same commit. Same standing arrangement
+  * CLAUDE.md already describes for the stage gate across server/web/mobile.
+  */
  const canEditVariants = preSubmit
     || (isStaff && beforeApproval)
     || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
@@ -669,8 +681,18 @@ export default function OrderDetailPage() {
                 Packing slip
               </Button>
             )}
-            <CancelOrderButton order={order} onDone={reload} />
-            <SubmitOrderButton order={order} quote={quote} onDone={reload} incomplete={orderNeedsSetup(order.items, catalog)} />
+            {/*
+              * reloadAll, NOT reload — these are the two actions that move factory_status.
+              *
+              * `order` resolves as `one ?? the list row`, so the direct fetch WINS (see the
+              * note on reloadAll). Refreshing only the list therefore left `one` holding the
+              * pre-submit order: the stage stayed Draft and "Submit to production" stayed on
+              * screen after the money had already been taken, which reads as a press that did
+              * nothing and invites a second one. Same for Cancel. ApproveOrderButton beside
+              * them already did this correctly, which is what made the other two look right.
+              */}
+            <CancelOrderButton order={order} onDone={reloadAll} />
+            <SubmitOrderButton order={order} quote={quote} onDone={reloadAll} incomplete={orderNeedsSetup(order.items, catalog)} />
             {isStaff && <ApproveOrderButton order={order} catalog={catalog} onDone={reloadAll} onError={setActionErr} />}
             {isStaff && (
               <OrderStageMenu

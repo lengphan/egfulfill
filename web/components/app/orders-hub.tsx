@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { mayEditVariants } from "@/shared/order-rules"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
@@ -2937,7 +2938,7 @@ export function OrdersHub() {
                               * above (OrderedVariant), so the "×1" that used to sit beside the
                               * strip was the same number printed twice on one line.
                               */}
-                            {canPickVariants && NOT_STARTED.includes(stage) ? (
+                            {mayEditVariants(role, stage) ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
                               // Locked, not chipped: the same four fields the editable strip

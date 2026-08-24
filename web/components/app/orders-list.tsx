@@ -1,6 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { mayEditVariants } from "@/shared/order-rules"
 import { designSearchTerms } from "@/lib/design-id"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
@@ -120,7 +121,9 @@ export function OrdersList() {
  const t = setTimeout(() => setRole(getUser()?.role || ""), 0)
  return () => clearTimeout(t)
   }, [])
- const canEditVariants = role === "seller" || role === "admin"
+  // The shared predicate now, not a role list. See mayEditVariants in shared/order-rules.ts:
+  // this board answered "no" for an operator that the staff hub and the SERVER both answered
+  // "yes" for, on the same order.
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [isDemo, setIsDemo] = useState(false)
  const [query, setQuery] = useState("")
@@ -448,7 +451,7 @@ export function OrdersList() {
                                         // this the row had nothing but a name.
  blankSku={stockSkuOf(it, catalog) || undefined}
                                       />
-                                      {canEditVariants && ["", "new", "draft"].includes(String(o.factory_status || "")) ? (
+                                      {mayEditVariants(role, o.factory_status) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (
                                         <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1.5" />

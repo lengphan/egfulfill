@@ -344,3 +344,50 @@ export const orderRefLabel = (id: string) => {
 /** Pieces on an order. A line with no qty is one piece, not zero. */
 export const unitsOfItems = (items?: ({ qty?: number | null } | null)[] | null) =>
   (items ?? []).reduce((n, it) => n + (Number(it?.qty) || 1), 0)
+
+/**
+ * WHO MAY CHANGE WHAT WE MAKE — the blank, colour, size, method and quantity of a line.
+ *
+ * Mirrors the gate in item-setup (server/src/routes/orders.js), which is the one that
+ * actually refuses:
+ *
+ *     beforeApproval = normalizeStage(factory_status) is '' or 'in_review'
+ *     staffMayEdit   = isStaff(user) && beforeApproval
+ *     ...and an ADMIN carve-out that survives the charge until the blanks are ORDERED.
+ *
+ * It exists because the three surfaces that draw the strip had drifted into three different
+ * answers for the same person on the same order:
+ *
+ *   · the order page   — isStaff && beforeApproval          (agreed with the server)
+ *   · the staff hub    — isAdmin || operator, NOT_STARTED   (agreed by accident)
+ *   · the seller board — seller || admin                    (locked the floor out entirely)
+ *
+ * So an operator could correct a colourway on the hub and not on the seller's board, on the
+ * same order, in the same second. The floor is who SPOTS the wrong colour on the way in;
+ * making them find an admin for it is how the wrong garment gets made.
+ *
+ * NOTHING HERE RE-PRICES. unit_cost/ship_fee are frozen on the line at submit, so an edit
+ * changes what we MAKE and never what was billed.
+ *
+ * Approval is the honest boundary: it is where a human has confirmed the blank on every
+ * line, so a change after it contradicts the check rather than being part of it.
+ */
+export function mayEditVariants(
+  role: string | null | undefined,
+  factoryStatus: string | null | undefined,
+  opts: { blanksOrdered?: boolean } = {},
+): boolean {
+  const stage = normalizeStage(factoryStatus)
+  const beforeApproval = stage === "" || stage === "in_review"
+  const r = String(role ?? "").toLowerCase()
+  // The admin correction outlives the charge — the price is frozen either way — and ends
+  // when a purchase order goes out, because after that the wrong garment is already bought
+  // and the fix is a new line, not a new colour.
+  if (r === "admin") return beforeApproval || !opts.blanksOrdered
+  // The seller owns the spec, but only until they hand it over.
+  if (r === "seller") return stage === ""
+  // Every other staff role, up to approval. Deliberately the server's own test rather than
+  // a narrower one: a client stricter than the API hides work people are allowed to do, and
+  // a client looser than it offers controls that 403.
+  return !!r && beforeApproval
+}
