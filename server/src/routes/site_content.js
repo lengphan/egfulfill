@@ -10,8 +10,10 @@
 // stored blob over them. Keeping one source of defaults avoids the two-copies-drift trap —
 // the server would otherwise need its own duplicate of every marketing string.
 
+import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { storageEnabled, putObject, getObject, fromDataUrl } from '../storage.js';
+import { aiComplete } from './support_ai.js';
 
 const KEY = 'site_content';
 
@@ -98,6 +100,99 @@ export function siteContentRoutes(app, requireAdmin) {
        on conflict (key) do update set value = excluded.value, updated_at = now()`,
       [KEY, JSON.stringify(healed)]);
     return { ok: true, content: healed };
+  });
+
+  /*
+   * ADMIN: WRITE ONE FIELD OF MARKETING COPY.
+   *
+   * The inline editor made a headline editable where it is read; this makes it WRITABLE
+   * there. The round trip it removes is the one nobody admits to: open a chat in another
+   * tab, describe the page, paste the answer back, discover it is the wrong length for the
+   * space, do it again. The field already knows what it is and what it currently says, so
+   * the only thing a person should have to supply is what they want changed.
+   *
+   * ONE FIELD, ONE STRING BACK. Not the blob — a route that could rewrite the whole of
+   * `site_content` in one model call is a route that can blank the homepage on a bad
+   * response, and the draft/Save flow in the editor is what makes an edit reviewable. This
+   * returns text to a draft; the existing admin PUT is still the only thing that publishes.
+   *
+   * IT DOES NOT WRITE ANYTHING. Deliberately: the editor holds a draft and the person
+   * presses Save, exactly as when they type. A generator that saved its own output would be
+   * the one edit on this page nobody reviewed.
+   */
+  const COPY_KINDS = {
+    // label → how the model should treat it. The KIND is what carries the length limit,
+    // because "keep it short" in a free-text instruction is advice and this is a constraint:
+    // a 90-character headline does not wrap, it overflows the grid column it sits in.
+    headline: { words: 'at most 8 words', what: 'a marketing headline' },
+    accent: { words: 'at most 4 words', what: 'the accent phrase that completes a headline' },
+    subhead: { words: 'one sentence, at most 25 words', what: 'a subheading under a headline' },
+    label: { words: 'at most 4 words', what: 'a short caps label' },
+    body: { words: 'at most 45 words', what: 'a short paragraph' },
+    button: { words: 'at most 4 words', what: 'a button label' },
+  };
+
+  app.post('/api/site-content/ai-copy', { preHandler: requireAdmin }, async (req, reply) => {
+    const b = req.body || {};
+    const kind = COPY_KINDS[String(b.kind || '')] ? String(b.kind) : 'body';
+    const instruction = String(b.instruction || '').trim();
+    const current = String(b.current || '').trim().slice(0, 600);
+    if (!instruction) { reply.code(400); return { error: 'Say what you want it to say.' }; }
+    if (instruction.length > 600) { reply.code(400); return { error: 'That instruction is too long.' }; }
+
+    const k = COPY_KINDS[kind];
+    /*
+     * THE SUPPLIER RULE REACHES HERE TOO (CLAUDE.md §2.9). This writes text for the PUBLIC
+     * marketing site, which is the most unauthenticated surface we have — so the prompt is
+     * told plainly, rather than relying on the model not to volunteer a blank supplier it
+     * has no way of knowing is commercially sensitive.
+     */
+    const system = [
+      'You write copy for EGFULFILL, a print-on-demand fulfilment platform.',
+      'Sellers connect Etsy, Shopify or TikTok Shop; orders sync into one queue; a factory prints and ships them; tracking is pushed back.',
+      '',
+      `You are writing ${k.what}. Return ${k.words}.`,
+      '',
+      'RULES:',
+      '- Return ONLY the replacement text. No quotes, no preamble, no options, no explanation.',
+      '- Never invent a statistic, a customer name, a price or a guarantee.',
+      '- Never name a garment supplier, brand or wholesaler.',
+      '- Plain sentence case. No emoji. No trailing full stop on a headline, label or button.',
+    ].join('\n');
+
+    const messages = [{
+      role: 'user',
+      content: (current ? `It currently says: "${current}"\n\n` : '') + `What I want: ${instruction}`,
+    }];
+
+    try {
+      // maxTokens is small on purpose — the KIND caps the length, and a ceiling here is the
+      // backstop that stops a misread instruction returning an essay into a headline slot.
+      /*
+       * A UNIQUE REF PER CALL, and this is not a detail.
+       *
+       * costRef becomes the ledger's dedupe key: wallet_ledger has a unique index on
+       * (account, type, ref), so a constant ref here would book the FIRST rewrite anyone
+       * ever asked for and silently drop every one after it — the cost of the feature would
+       * read as a single cent for ever. Retries are new work and new money, so the ref is
+       * new each time; there is no automatic retry on this route for it to protect against.
+       */
+      const ref = 'site-copy-' + crypto.randomBytes(8).toString('hex');
+      const out = await aiComplete({ system, messages, maxTokens: 300, costRef: ref, costNote: `Marketing copy · ${kind}` });
+      // One line. The model occasionally wraps a headline in quotes however plainly it is
+      // told not to, and a stray newline in a jsonb string renders as a literal on the page.
+      const text = String(out || '')
+        .replace(/\s+/g, ' ')
+        .replace(/^["'\u201c\u2018]+|["'\u201d\u2019]+$/g, '')
+        .trim();
+      if (!text) { reply.code(502); return { error: 'Nothing came back — try again.' }; }
+      return { ok: true, text };
+    } catch (e) {
+      // A REFUSAL CARRIES ITS REASON: aiComplete throws a 503 with the words an admin needs
+      // when the key is missing, and that sentence is more useful than "failed".
+      reply.code(e?.status || 502);
+      return { error: e?.message || 'Could not write that.' };
+    }
   });
 
   // ADMIN: upload a hero banner image to object storage, return its public URL. The panel

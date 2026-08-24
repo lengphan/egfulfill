@@ -19,7 +19,13 @@ export type OrderColDef = {
 // here is taken from Items — the only flexible column, and the one carrying the
 // photos + product name. Keep the fixed total low or item names truncate to "Hoodie ·…".
 export const ORDER_COLS: Record<OrderColId, OrderColDef> = {
-  order: { id: "order", label: "Order", width: "w-[76px]", locked: true },
+  // 104px, for the same measured reason as the factory board's `order` track below: an Etsy
+  // number is 100px in this face and 76px cut it to "#4153554…". The seller quotes this
+  // number to a buyer, so it is the one cell on the row that has to be complete. The 28px
+  // comes off `items`, the only flexible column — which is what the note above says every
+  // pixel here costs, and the trade is a listing title losing two characters it was
+  // truncating anyway against an order number becoming readable at all.
+  order: { id: "order", label: "Order", width: "w-[104px]", locked: true },
   store: { id: "store", label: "Store", width: "w-[88px]" },
   customer: { id: "customer", label: "Customer", width: "w-[136px]" },
   items: { id: "items", label: "Items" },
@@ -103,7 +109,23 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // invisible unless you were looking straight at that one row — the seller table gives
   // each its own column, which is most of why it reads more easily.
   status:   { id: "status",   label: "Status",   grid: "6rem" },
-  order:    { id: "order",    label: "Order",    grid: "5.5rem" },
+  // THE WHOLE NUMBER, because half of one identifies nothing.
+  //
+  // 5.5rem (88px) truncated every marketplace order to "#4153554…". That column is the one
+  // thing on the row whose entire job is to say WHICH order this is, and an Etsy receipt
+  // number differs from its neighbours in the last digits — which are exactly the ones the
+  // ellipsis ate. You could not read a row and then find it again in Etsy.
+  //
+  // MEASURED, not estimated (§4: contrast and fit are measured): "#4153521234" renders at
+  // 100px in Inter 14px/600 with tabular-nums, which is what this cell is set in. 6.5rem is
+  // 104px — the number plus a hair, not a round number picked by eye.
+  //
+  // The rem comes off `age` below, which had 25px of permanent air, so the row's MINIMUM is
+  // unchanged. That matters more than it sounds: DEFAULT_HIDDEN_FACTORY_COLS exists purely
+  // because the row minimum once exceeded the container and every board opened mid-scroll
+  // with its primary action off-screen. A wider column paid for out of a narrower one keeps
+  // that sum exactly where it was.
+  order:    { id: "order",    label: "Order",    grid: "6.5rem" },
   // Wide enough for a FULL tracking number rather than an ellipsis. A truncated tracking
   // number cannot be read to a buyer on the phone, which is the only reason it is on the
   // row at all — so it is sized to the longest carrier format, not to the space left over.
@@ -118,7 +140,12 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   //
   // Narrow on purpose: "3d" is the whole content, and it sits beside Order where you are
   // already looking.
-  age:      { id: "age",      label: "Age",      grid: "4rem", align: "right" },
+  //
+  // 3rem, not 4. Measured: "1h" is 15px and the worst case a queue running back years can
+  // produce — "1234d" at 12px/500 — is 39px, against the 64px this used to hold. 25px of
+  // air in the column next to the one that was truncating the order number. 48px keeps 9px
+  // of slack over that worst case; the rem it gives up is the one `order` now spends.
+  age:      { id: "age",      label: "Age",      grid: "3rem", align: "right" },
   // HOW MUCH IS IN THIS ORDER — one unit count, beside Age because that is the other
   // number you scan down a queue for: how old, and how big.
   //

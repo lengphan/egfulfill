@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
-import { numOf, platformOf } from "@/lib/order-format"
+import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X } from "@phosphor-icons/react"
@@ -70,18 +70,13 @@ import { designLabel } from "@/lib/design-id"
 import { TrackingNumber } from "@/components/app/tracking-number"
 import { AddTracking } from "@/components/app/add-tracking"
 
-// Same fallbacks as the boards' toAddrOf — marketplace payloads spell the address a dozen
-// ways, so the ship-to a label uses must read them all. Kept identical on purpose.
+// "Kept identical on purpose" is what this comment used to say, and it was not: this copy
+// read all four street spellings while the Customer card twelve hundred lines down read
+// only `line1`, so the label went to an address the page did not show. One reader now,
+// in lib/order-format.ts, and this just renames its fields for the label payload.
 const toShipAddress = (o: OrderRow): ShipAddress => {
- const a = (o.address ?? {}) as Record<string, string>
- return {
- name: o.customer?.name || a.name || "",
- street: a.street || a.first_line || a.line1 || a.address1 || "",
- street2: a.street2 || a.second_line || a.line2 || a.address2 || "",
- city: a.city || "",
- state: a.state || a.province || "",
- zip: a.zip || a.postal_code || a.postcode || "",
-  }
+ const a = shipAddressOf(o)
+ return { name: a.name, street: a.line1, street2: a.line2, city: a.city, state: a.state, zip: a.zip }
 }
 
 const fmtMsgTime = (ts?: number) => {
@@ -131,6 +126,14 @@ export default function OrderDetailPage() {
   // ask, so it is typed here or it is never known.
  const [editRetail, setEditRetail] = useState(false)
  const [retailDraft, setRetailDraft] = useState("")
+  // The ship-to, while the order has not started. Etsy hands us receipts with the street
+  // lines withheld and the city/zip intact, so an order can look addressed and still have
+  // nowhere to go — this is the only place that gap can be closed before the floor picks
+  // it up. `addrErr` holds the SERVER's refusal, not a guess at one.
+ const [editAddr, setEditAddr] = useState(false)
+ const [addrDraft, setAddrDraft] = useState<Addr>({})
+ const [addrSaving, setAddrSaving] = useState(false)
+ const [addrErr, setAddrErr] = useState<string | null>(null)
  const [messages, setMessages] = useState<ChatEntry[]>([])
  const [msg, setMsg] = useState("")
  const [customize, setCustomize] = useState<OrderItem | null>(null)
@@ -438,11 +441,76 @@ export default function OrderDetailPage() {
     || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
   /** Adding a LINE is staff-only and stops at approval — the server refuses it after. */
  const canAddItem = isStaff && beforeApproval
+  /**
+   * WHO MAY REWRITE THE SHIP-TO — and this mirrors the SERVER'S OWN TEST, not the
+   * `beforeApproval` two lines up.
+   *
+   * server/src/routes/orders.js (PATCH /api/orders/:id) refuses a seller's `address` or
+   * `customer` write once the order has `started`, where started =
+   *   stage is outside ['', 'new', 'draft', 'in_review']  OR  approved_at is set.
+   *
+   * `beforeApproval` differs on both halves: it also counts 'pending', and it never looks
+   * at approved_at — so reusing it here would draw a form for a seller that the API then
+   * answers 403 to, which is the worst of the three possible behaviours. Staff carry no
+   * address gate on that route at all.
+   *
+   * CLAUDE.md's rule about the stage gate living in three files applies to this one too:
+   * if SELLER_ZONE moves in orders.js, it has to move here in the same commit.
+   */
+ const addrUnstarted = ["", "new", "draft", "in_review"].includes(stageNow) && !order.approved_at
+ const canEditAddress = isStaff || addrUnstarted
+ const saveAddress = async () => {
+ setAddrSaving(true)
+ setAddrErr(null)
+    // Send the whole object, not a diff: `address` is a jsonb COLUMN and the patch
+    // replaces it wholesale, so omitting a key deletes it rather than leaving it alone.
+ const next: Record<string, string> = {}
+    for (const k of ["name", "line1", "line2", "city", "state", "zip", "country"] as const) {
+ const v = (addrDraft[k] ?? "").trim()
+      if (v) next[k] = v
+    }
+ const res = await updateOrder(String(id), { address: next }).catch((e: unknown) => ({ error: String((e as Error)?.message || e) }))
+ setAddrSaving(false)
+    // The server's sentence, verbatim — a locked order says why it is locked.
+    if (res && "error" in res && res.error) { setAddrErr(res.error); return }
+ setEditAddr(false)
+ reloadOne()
+  }
   // Was a private copy of numOf, so the detail page still showed the raw "etsy-4120118148"
   // after the boards were stripping the source prefix. Use the shared formatter.
  const num = numOf(order)
  const store = (order.store || order.source || "manual").toString()
- const addr = (order.address ?? {}) as Addr
+  /*
+   * THE SAME READER THE BOARDS USE. This was `(order.address ?? {}) as Addr`, which reads
+   * `line1` and nothing else — so an Etsy order whose street arrived through the Shippo
+   * backfill (stored as `street`) rendered with the street line simply absent, while the
+   * production queue showed it. Same row, two screens, and only one of them right.
+   */
+ const addr = shipAddressOf(order)
+  /**
+   * A street that is ABSENT, told apart from one that is merely WITHHELD.
+   *
+   * Two different facts, and they used to render as the same blank. `masked` is the server
+   * stamping "the factory holds this"; without it, a missing street means we have nothing
+   * to ship against — which is the one thing that stops a label being bought.
+   */
+ const streetMissing = !addr.line1 && !addr.masked && !!(addr.city || addr.zip)
+  // What the FORM edits — the seven address fields, without `masked`, which is the
+  // server's stamp and not a thing anyone types.
+ const addrFields: Addr = {
+ name: addr.name, line1: addr.line1, line2: addr.line2,
+ city: addr.city, state: addr.state, zip: addr.zip, country: addr.country,
+  }
+  /**
+   * A MASKED ADDRESS IS NOT EDITABLE — a data-loss guard, not a permission.
+   *
+   * The server strips street and ZIP out of the SELLER's copy of a marketplace order, so
+   * the form would open with those two fields blank over a row that has them both. And
+   * `saveAddress` writes the whole jsonb object (it must — the patch replaces the column),
+   * so pressing Save on that form would erase the real street. Staff read the unmasked row
+   * and are unaffected.
+   */
+ const addrEditable = canEditAddress && !addr.masked
  const cust = order.customer ?? {}
  const timeline = (Array.isArray(order.timeline) ? order.timeline : []) as TimelineEntry[]
   // (itemsTotal / total were removed with the old Summary fallback. Both were REVENUE —
@@ -1096,18 +1164,73 @@ export default function OrderDetailPage() {
                 <div className="font-medium">{cust.name || "—"}</div>
                 {cust.email && <div className="text-muted-foreground">{cust.email}</div>}
               </div>
-              {(addr.line1 || addr.city) && (
+              {editAddr ? (
+                /* A FIELD IS A FIELD (§4): plain Inputs, one per line of a real address, in
+                   the order they are written on a parcel. Street is first because it is the
+                   one that is usually missing. */
+                <div className="space-y-2 border-t border-border pt-3">
+                  <Input autoFocus placeholder="Name" value={addrDraft.name ?? ""}
+                    onChange={(e) => setAddrDraft({ ...addrDraft, name: e.target.value })} />
+                  <Input placeholder="Street address" value={addrDraft.line1 ?? ""}
+                    onChange={(e) => setAddrDraft({ ...addrDraft, line1: e.target.value })} />
+                  <Input placeholder="Apartment, suite (optional)" value={addrDraft.line2 ?? ""}
+                    onChange={(e) => setAddrDraft({ ...addrDraft, line2: e.target.value })} />
+                  <div className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] gap-2">
+                    <Input placeholder="City" value={addrDraft.city ?? ""}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, city: e.target.value })} />
+                    <Input placeholder="State" value={addrDraft.state ?? ""}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, state: e.target.value })} />
+                    <Input placeholder="ZIP" value={addrDraft.zip ?? ""}
+                      onChange={(e) => setAddrDraft({ ...addrDraft, zip: e.target.value })} />
+                  </div>
+                  <Input placeholder="Country" value={addrDraft.country ?? ""}
+                    onChange={(e) => setAddrDraft({ ...addrDraft, country: e.target.value })} />
+                  {/* A refusal carries its reason — that is the answer, not a subtitle. */}
+                  {addrErr && <div className="text-xs text-destructive">{addrErr}</div>}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button size="sm" onClick={saveAddress} disabled={addrSaving}>
+                      {addrSaving ? "Saving…" : "Save address"}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={addrSaving}
+                      onClick={() => { setEditAddr(false); setAddrErr(null) }}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (addr.line1 || addr.city) ? (
                 <div className="flex items-start gap-2 border-t border-border pt-3 text-muted-foreground">
                   <MapPin size={15} className="mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     {addr.name && <div>{addr.name}</div>}
                     {addr.line1 && <div>{addr.line1}</div>}
                     {addr.line2 && <div>{addr.line2}</div>}
+                    {/* The gap, said out loud. A blank where the street belongs is the one
+                        thing that stops a label being bought, and it used to render as
+                        nothing at all. */}
+                    {/* The two blanks, told apart. Withheld is the factory holding it; the
+                        other is us having nothing to ship against, which is what stops a
+                        label being bought. Same wording as the board's panel. */}
+                    {addr.masked && <div className="select-none tracking-widest">••••••••••</div>}
+                    {streetMissing && <div className="text-destructive">No street address</div>}
                     <div>{[addr.city, addr.state, addr.zip].filter(Boolean).join(", ")}</div>
                     {addr.country && <div>{addr.country}</div>}
                   </div>
+                  {addrEditable && (
+                    <Button size="sm" variant="ghost" className="-my-1 shrink-0"
+                      onClick={() => { setAddrDraft(addrFields); setAddrErr(null); setEditAddr(true) }}>
+                      Edit
+                    </Button>
+                  )}
                 </div>
-              )}
+              ) : addrEditable ? (
+                /* No address at all. One line and one way out — the four parts, minus the
+                   mark, because this sits inside a card that already names itself. */
+                <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                  <span className="text-muted-foreground">No shipping address</span>
+                  <Button size="sm" variant="outline" className="shrink-0"
+                    onClick={() => { setAddrDraft(addrFields); setAddrErr(null); setEditAddr(true) }}>
+                    Add address
+                  </Button>
+                </div>
+              ) : null}
               {/*
                 * WHERE IT CAME FROM, under who it is going to.
                 *

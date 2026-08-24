@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Sparkle, X } from "@phosphor-icons/react"
-import { getDeskImageConfig, generateDeskImage, uploadHeroImage, type Backdrop, type DeskImageConfig } from "@/lib/api"
+import { getDeskImageConfig, generateDeskImage, uploadHeroImage, writeSiteCopy, type Backdrop, type CopyKind, type DeskImageConfig } from "@/lib/api"
 import { removeBackground } from "@/lib/remove-background"
 
 /**
@@ -197,4 +197,109 @@ export function GenerateBubble({ onDone, onClose }: {
       {(err || blockedWhy) && <p className="mt-2 text-2xs leading-snug text-alert">{err || blockedWhy}</p>}
     </div>
   )
+}
+
+/**
+ * ASK FOR THE WORDS WHERE THE WORDS ARE.
+ *
+ * The same argument as the picture, one field smaller. The copy has been editable in place
+ * for a while; what still happened in another tab was the WRITING — describe the page to a
+ * chat, paste the answer back, find it is the wrong length for the space, do it again. The
+ * field already knows what it is and what it currently says, so the only thing left to
+ * supply is what you want changed.
+ *
+ * IT HANDS BACK TEXT, IT DOES NOT SAVE. The editor holds a draft and a person presses Save,
+ * exactly as when they type — a generator that published its own output would be the one
+ * edit on this page nobody reviewed.
+ *
+ * The KIND comes from the path rather than from a prop at every call site (see kindForPath),
+ * because the length limit is a property of the slot and the slot is what the path names.
+ */
+export function CopyBubble({ kind, current, onDone, onClose }: {
+  kind: CopyKind
+  current: string
+  onDone: (text: string) => void
+  onClose: () => void
+}) {
+  const [instruction, setInstruction] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const run = async () => {
+    const text = instruction.trim()
+    if (!text) { setErr("Say what you want it to say."); return }
+    setErr(null); setBusy(true)
+    try {
+      const r = await writeSiteCopy({ kind, current, instruction: text })
+      if (r.error || !r.ok || !r.text) throw new Error(r.error || "Nothing came back.")
+      onDone(r.text)
+      onClose()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not write that.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <span className="block w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background p-3 text-left font-sans text-foreground shadow-xl">
+      <span className="mb-2 flex items-center justify-between gap-2">
+        {/* The slot is named, because "at most 8 words" is the thing the person most needs to
+            know before they write the instruction — and it is not adjustable, so it is a
+            fact about the field rather than a control. */}
+        <span className="text-xs font-semibold normal-case tracking-normal">Rewrite this {kind}</span>
+        <button type="button" onClick={onClose} className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" aria-label="Close">
+          <X size={13} weight="bold" />
+        </button>
+      </span>
+      <textarea
+        value={instruction}
+        onChange={(e) => setInstruction(e.target.value)}
+        rows={3}
+        maxLength={600}
+        disabled={busy}
+        autoFocus
+        placeholder="Say it in plainer words, and lead with the queue"
+        className="eg-control min-h-[4rem] w-full resize-y p-2 text-xs font-normal normal-case leading-relaxed tracking-normal"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.preventDefault(); onClose() }
+          // Enter sends. These are one-line instructions, and a textarea that needs a button
+          // press for a single sentence is a form pretending to be a message box.
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void run() }
+        }}
+      />
+      <span className="mt-2 flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy || !instruction.trim()}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium normal-case tracking-normal text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          {busy && <CircleNotch size={12} className="animate-spin" />}
+          {busy ? "Writing…" : "Rewrite"}
+        </button>
+      </span>
+      {/* A REFUSAL CARRIES ITS REASON — the server says whether the key is missing or the
+          instruction was rejected, and that sentence is the answer. */}
+      {err && <span className="mt-2 block text-2xs font-normal normal-case leading-snug tracking-normal text-alert">{err}</span>}
+    </span>
+  )
+}
+
+/**
+ * THE SLOT, DERIVED FROM THE PATH.
+ *
+ * `hero.headline` is a headline and `cta.button` is a button — the blob's own field names
+ * already say what each string is for, so a `kind` prop at every EditableText call site would
+ * be a second copy of that information, kept by hand, wrong the first time someone adds a
+ * field. The last path segment is the answer; anything unrecognised is prose.
+ */
+export function kindForPath(path: string): CopyKind {
+  const last = path.split(".").pop() ?? ""
+  if (/headline|heading|title/i.test(last)) return "headline"
+  if (/accent/i.test(last)) return "accent"
+  if (/subhead|subtitle/i.test(last)) return "subhead"
+  if (/button|cta/i.test(last)) return "button"
+  if (/label|rule[LR]|ghostWord/i.test(last)) return "label"
+  return "body"
 }

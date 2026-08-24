@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/marketing/site-header"
 import { MotionProvider } from "@/components/marketing/motion-provider"
 import { SupportBubble } from "@/components/marketing/support-bubble"
 import { getSiteContent } from "@/lib/site-content"
+import { getPublicTheme } from "@/lib/public-theme"
 import { EditModeProvider } from "@/components/marketing/edit-mode"
 
 /**
@@ -22,6 +23,10 @@ export default async function MarketingLayout({ children }: { children: React.Re
   // page's own getSiteContent() inside a render, so it is still one fetch.
   const content = await getSiteContent()
   const { motion } = content
+  /* The palette and the display face, as stored KEYS. Read here rather than in each page
+     because this is the one component every public route passes through — and read on the
+     SERVER so there is no first frame painted in the default. See lib/public-theme.ts. */
+  const theme = await getPublicTheme()
 
   // The header moved to components/marketing/site-header.tsx so it can read the route and
   // sit ON a full-bleed hero plate where a page has one. Still ONE component with one set of
@@ -34,12 +39,19 @@ export default async function MarketingLayout({ children }: { children: React.Re
         which is white and belongs to the signed-in product. It went unnoticed while the
         marketing skin was also white; on `signal` the page is a cool grey and the footer was
         the one white band left on it, which reads as a seam rather than as a footer. */}
-    {/* THE DISPLAY FACE IS SWITCHED HERE AND NOWHERE ELSE.
-        `data-mk-face` is the hook for one rule in globals.css that gives every `font-display`
-        call site BELOW this wrapper the marketing face, and leaves the ~100 in the signed-in
-        app on Inter. It is an attribute rather than an inline `--font-display` because the
-        generated utility resolves that token at BUILD time — see the note in globals.css. */}
-    <div data-mk-face className="flex min-h-svh flex-col" style={{ background: "var(--mk-surface)" }}>
+    {/* THE THEME IS APPLIED HERE AND NOWHERE ELSE ON THE PUBLIC SITE.
+        `data-skin` re-points the whole --mk-* palette for this subtree; `data-face` picks the
+        display face via one selector in globals.css. Both are attributes rather than inline
+        variables because the generated `font-display` utility resolves its token at BUILD
+        time — see the note in globals.css, which cost a while to find.
+        Scoped to this wrapper, so the ~100 `font-display` call sites in the signed-in app and
+        its own palette are untouched by a marketing choice. */}
+    <div
+      data-skin={theme.skin}
+      data-face={theme.face}
+      className="flex min-h-svh flex-col"
+      style={{ background: "var(--mk-surface)" }}
+    >
       <SiteHeader />
 
       <main className="flex-1">{children}</main>

@@ -447,13 +447,26 @@
  * reason those pages read as a template. Outfit is wide and geometric — and still a sans, so
  * headline and body are one voice at two weights rather than two voices.
  *
- * `[data-mk-face] .font-display` is (0,2,0) against the generated utility's (0,1,0), so it
+ * `[data-face="…"] .font-display` is (0,2,0) against the generated utility's (0,1,0), so it
  * wins wherever the marketing layout sets the attribute and nowhere else. The attribute is
- * set in app/(marketing)/layout.tsx, on the one wrapper every public route passes through.
+ * set in app/(marketing)/layout.tsx from a stored KEY, so the face is an admin's choice in
+ * Settings › Branding rather than a deploy — same discipline as the skin and the accent.
+ *
+ * `inter` is a real option, not a null one: it is the body sans set heavier, which is the ONE
+ * face the whole site ran on until 2026-08-24 and the correct answer for anyone who thinks a
+ * second alphabet is a mistake. Adding a face means a next/font call in app/layout.tsx, a
+ * line here, and the key in branding.js — no gate, because a typeface has no contrast to
+ * measure, which is exactly why it can be a freer choice than a colour.
  */
 @layer utilities {
-  [data-mk-face] .font-display {
-    font-family: var(--font-marketing);
+  [data-face="outfit"] .font-display {
+    font-family: var(--font-outfit);
+  }
+  [data-face="grotesk"] .font-display {
+    font-family: var(--font-grotesk);
+  }
+  [data-face="inter"] .font-display {
+    font-family: var(--font-sans);
   }
 }
 

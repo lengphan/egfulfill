@@ -7,6 +7,7 @@ import { getUser } from "@/lib/auth"
 import { AllSuppliers } from "@/components/app/all-suppliers"
 import { FavoritesView } from "@/components/app/favorites-view"
 import { PurchaseView } from "@/components/app/purchase-view"
+import { CartReadOnly } from "@/components/app/cart-readonly"
 import { AlibabaOrders } from "@/components/app/alibaba-orders"
 import { PageTitle } from "@/components/app/page-title"
 import { TabBar } from "@/components/app/tab-bar"
@@ -17,13 +18,23 @@ type Tab = "all" | "favorites" | "purchase" | "alibaba"
  * `admin` marks a tab that COMMITS COMPANY MONEY. Operators browse the supplier catalogues
  * and build our own catalogue from them; buying stays with admin, which is the same line the
  * server draws (every /api/purchase* route is requireAdmin).
+ *
+ * THE CART IS NOT ONE OF THEM ANY MORE — reading it isn't spending.
+ *
+ * It was admin-only, and the top bar has always shown the cart button to operator and
+ * warehouse: pressing it landed them on Purchasing with no cart in sight, which is a button
+ * that lies. Worse, the floor's actual question — "is this blank already in the cart?" — had
+ * no answer short of messaging an admin, so shortages got reported twice.
+ *
+ * What they open is CartReadOnly, a list with no price in it and nothing to press. Placing,
+ * editing and every /api/purchase* route stay exactly where they were.
  */
 const TABS = [
   { id: "all", label: "All suppliers", admin: false },
   { id: "favorites", label: "Favorites", admin: false },
   // "Cart", because that is what this tab opens on and what the header cart icon points
   // at. It also holds Ongoing and History as its own tabs — see purchase-view.
-  { id: "purchase", label: "Cart", admin: true },
+  { id: "purchase", label: "Cart", admin: false },
   { id: "alibaba", label: "Sample", admin: true },
 ] as const
 
@@ -159,7 +170,12 @@ export function PurchasingView() {
           {t.id === "all" ? <AllSuppliers refreshKey={shown.all} />
             : t.id === "favorites" ? <FavoritesView refreshKey={shown.favorites} />
             : t.id === "alibaba" ? <AlibabaOrders refreshKey={shown.alibaba} />
-            : <PurchaseView embedded refreshKey={shown.purchase} />}
+            /* The buying tool for the account that may buy; the read-out for everyone else.
+               Two components rather than one with the money hidden — see CartReadOnly, and
+               note that PurchaseView's Ongoing and History tabs read an admin-only route,
+               so a non-admin mounting it would 403 twice before showing them a price. */
+            : isAdmin ? <PurchaseView embedded refreshKey={shown.purchase} />
+            : <CartReadOnly refreshKey={shown.purchase} />}
         </div>
       ))}
     </div>

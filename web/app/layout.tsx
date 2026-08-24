@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Outfit } from "next/font/google"
+import { Geist_Mono, Inter, Outfit, Space_Grotesk } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -23,15 +23,23 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
  * family of shape the reference boards are set in, and (unlike the serif) still a sans, so
  * headline and body are one voice at two weights rather than two voices.
  *
- * IT IS NOT WIRED HERE. Only the variable is loaded; `app/(marketing)/layout.tsx` points
- * `--font-display` at it for its own subtree, which is why ~100 `font-display` call sites in
- * the app keep resolving to Inter and needed no edit. Loading it at the root is only so one
- * `next/font` call owns the preload and the fallback metrics.
+ * NEITHER IS WIRED HERE. Only the variables are loaded; which one a visitor sees is a stored
+ * KEY an admin picks in Settings › Branding, applied as `data-face` on the marketing wrapper
+ * (see app/(marketing)/layout.tsx and the one selector in globals.css). Loading them at the
+ * root is only so `next/font` owns the preload, the self-hosted file and the fallback metrics
+ * — a stored family name would be a string the browser looks up locally and fails to find.
+ *
+ * BOTH ARE ALWAYS DOWNLOADED, which is the honest cost of making the choice runtime rather
+ * than a deploy: two display faces at three weights each. They are subset to latin and only
+ * ever set headlines, so it is a handful of KB — and the alternative is a code change and a
+ * deploy every time someone wants to try a typeface, which is the thing the skin already
+ * refused to be.
  *
  * Display weights only — 500/600/700. A body weight would invite it into body copy, which is
  * exactly the drift the Playfair note warns about.
  */
-const outfit = Outfit({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-marketing" })
+const outfit = Outfit({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-outfit" })
+const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-grotesk" })
 
 /**
  * ONE FACE. Inter, for everything.
@@ -113,7 +121,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, outfit.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, outfit.variable, grotesk.variable)}
     >
       <body>
         {/* Zoom, applied BEFORE first paint.

@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
-import { getFactorySettings, getInventory, saveVariantStock, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
+import { getFactorySettings, setFactorySettings, getInventory, saveVariantStock, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
+import { getUser } from "@/lib/auth"
 import { prettyColorName } from "@/lib/color-name"
 import { shipBandKey } from "@/lib/ship-band"
 import { swatchHex } from "@/lib/color-swatch"
@@ -164,6 +165,9 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
 // Fallback only — the real list is managed in Settings → Platform. Used until settings
 // load, and if the platform has never saved a list.
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
+/** The select's own "make one" row. Not a category: it is never written, and the server
+ *  would trim and de-duplicate it away even if it were. */
+const NEW_TYPE = "__new_type__"
 // The full run we can offer, not just the common six. 4XL/5XL are real apparel sizes and
 // OS/OSFM is how headwear and one-size goods are sized — leaving them out meant a product
 // that needed one couldn't be built here at all. Sizes the SUPPLIER sent are merged in on
@@ -289,6 +293,33 @@ export function ProductEditorDialog({
   // Managed types + their category mockups.
  const [types, setTypes] = useState<ProductType[]>([])
   /**
+   * A CATEGORY YOU CAN MAKE WHILE YOU ARE HOLDING THE PRODUCT THAT NEEDS IT.
+   *
+   * The list is managed in Settings › Platform, which is the right home for it and the wrong
+   * moment: a blank that is a tote and a towel arrives mid-import, and the only way to file
+   * it was to abandon this form, cross the app, add the type, come back and start again — so
+   * in practice everything unusual was filed as "Other" and the list stopped describing the
+   * catalogue.
+   *
+   * `null` = the select is a select. A string is what is being typed into the field that
+   * replaced it, so a half-typed name can never be confused with a chosen one.
+   *
+   * ADMIN AND WAREHOUSE ONLY, because PUT /api/factory/settings is (server: requireAdmin,
+   * then role admin|warehouse). An operator can reach this dialog, so offering them the
+   * control would be offering a 403 — the select simply stays a select for them.
+   */
+ const [newType, setNewType] = useState<string | null>(null)
+ const [typeBusy, setTypeBusy] = useState(false)
+ const [typeErr, setTypeErr] = useState<string | null>(null)
+ const [canAddType, setCanAddType] = useState(false)
+ useEffect(() => {
+ const t = setTimeout(() => {
+ const role = getUser()?.role
+ setCanAddType(role === "admin" || role === "warehouse")
+    }, 0)
+ return () => clearTimeout(t)
+  }, [])
+  /**
    * The product's image gallery. Everything a supplier gave us plus anything uploaded —
    * previously only the hero survived, so extraImages and per-colour images were fetched
    * and thrown away the moment a product was added.
@@ -336,6 +367,34 @@ export function ProductEditorDialog({
  return () => clearTimeout(t)
   }, [])
  const typeNames = types.length ? types.map((t) => t.name) : TYPES
+  /**
+   * Write the new category to the platform list, then select it.
+   *
+   * The whole list goes up, not just the new one: the server replaces `product_types`
+   * wholesale when the key is present, so sending one type would delete every other. Every
+   * other key is omitted, and the handler skips what is absent — so this cannot disturb the
+   * ship-from address, the fees or the thread palette.
+   *
+   * A type must carry at least one side or a product on it cannot be designed; the server
+   * defaults that to `front`, which is what the Settings screen creates too.
+   */
+ const addType = async () => {
+ const name = String(newType ?? "").trim()
+ if (!name) return
+ const clash = typeNames.find((t) => t.toLowerCase() === name.toLowerCase())
+ if (clash) { setType(clash); setNewType(null); setTypeErr(null); return }
+ setTypeBusy(true); setTypeErr(null)
+ try {
+ const next: ProductType[] = [...(types.length ? types : TYPES.map((t) => ({ name: t, sides: ["front"], mockups: {} }))), { name, sides: ["front"], mockups: {} }]
+ const r = await setFactorySettings({ product_types: next })
+ if (r?.error) throw new Error(r.error)
+ const saved = r.product_types ?? next
+ setTypes(saved); setTypeMockups(saved)
+ setType(name); setNewType(null)
+    } catch (e) {
+ setTypeErr(e instanceof Error ? e.message : "Couldn't add that category.")
+    } finally { setTypeBusy(false) }
+  }
   /** The category's stand-in mockup, used when this product has none of its own. */
  const typeMockup = types.find((t) => t.name === type)?.mockup ?? null
  const typeSides = types.find((t) => t.name === type)?.sides ?? []
@@ -1077,7 +1136,45 @@ export function ProductEditorDialog({
  half-column and leaving a blank gap beside Type. */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
-                  <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select eg-control pr-8">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
+                  {/* THE FIELD BECOMES THE FIELD FOR THE NEW ONE. A select and a text input
+                      are both ways of setting the same value, so they take the same slot
+                      rather than the input appearing underneath as a second thing to read.
+                      NEW_TYPE is a sentinel value, never a category anyone can save — the
+                      server trims and de-duplicates names, and nothing would produce this
+                      one. */}
+                  {newType === null ? (
+                    <select
+                      value={type}
+                      onChange={(e) => { const v = e.target.value; if (v === NEW_TYPE) { setNewType(""); setTypeErr(null) } else setType(v) }}
+                      className="eg-select eg-control pr-8"
+                    >
+                      {typeNames.map((t) => <option key={t}>{t}</option>)}
+                      {canAddType && <option value={NEW_TYPE}>+ New category…</option>}
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        autoFocus
+                        value={newType}
+                        onChange={(e) => setNewType(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); void addType() }
+                          if (e.key === "Escape") { e.preventDefault(); setNewType(null); setTypeErr(null) }
+                        }}
+                        placeholder="Category name"
+                        className="h-9"
+                        disabled={typeBusy}
+                      />
+                      <Button size="sm" onClick={() => void addType()} disabled={typeBusy || !newType.trim()}>
+                        {typeBusy ? <CircleNotch size={14} className="animate-spin" /> : "Add"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setNewType(null); setTypeErr(null) }} disabled={typeBusy}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                  {/* A REFUSAL CARRIES ITS REASON — that is the answer, not a subtitle. */}
+                  {typeErr && <span className="text-2xs text-destructive">{typeErr}</span>}
                 </label>
                 {/* STATUS IS THE VISIBILITY SWITCH — it decides who sees the product, and
  there is no second flag to remember. Active reaches the public marketing

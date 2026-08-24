@@ -1051,12 +1051,17 @@ export type Branding = {
   /** The site's PALETTE, on exactly the same terms as `accent`: a key, allow-listed by the
    *  server, whose values live in globals.css under [data-skin="…"]. See lib/skin.ts. */
   skin?: string; skins?: string[]
+  /** The marketing DISPLAY FACE, same terms again: a key, allow-listed by the server, whose
+   *  faces are loaded by next/font in app/layout.tsx and selected by one `data-face` rule in
+   *  globals.css. Headlines on the five public pages only — body copy and the whole
+   *  signed-in product stay on Inter. */
+  face?: string; faces?: string[]
   error?: string
 }
 export function getBranding() {
   return api<Branding>(`/api/branding`)
 }
-export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string; skin?: string }) {
+export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string; skin?: string; face?: string }) {
   return api<Branding & { ok?: boolean }>(`/api/admin/branding`, { method: "PUT", body: JSON.stringify(body) })
 }
 /** `dataUrl` is a base64 data URL read from a file input. Max 2MB, PNG/JPEG/WebP/SVG/ICO. */
@@ -2274,7 +2279,15 @@ export function postItemStatus(id: string, sku: string, status: string, lineId?:
   })
 }
 
-export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; meta?: Record<string, unknown> }) {
+/**
+ * `address` and `customer` have been patchable on the server since the field map was
+ * written (`server/src/routes/orders.js`, PATCH /api/orders/:id) — they were simply
+ * missing from this type, so no caller could reach them without a cast. The server gates
+ * them: a seller may write either only while the order has not started (stage still in
+ * '', new, draft, in_review AND no approved_at); staff are ungated on that route. Both
+ * writes are audited before-and-after, which is what makes them safe to expose.
+ */
+export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(patch),
@@ -5135,6 +5148,23 @@ export function setSiteContent(content: SiteContent) {
 export function uploadHeroImage(dataUrl: string) {
   return api<{ url?: string; error?: string }>(`/api/site-content/hero-image`, {
     method: "POST", body: JSON.stringify({ dataUrl }),
+  })
+}
+
+/**
+ * WHAT KIND OF STRING THIS IS, which is what carries the length limit.
+ *
+ * "Keep it short" inside a free-text instruction is advice; the kind is a constraint. A
+ * 90-character headline does not wrap gracefully, it overflows the grid column it sits in —
+ * so the server caps the words per kind and the caller only has to say which slot it is.
+ */
+export type CopyKind = "headline" | "accent" | "subhead" | "label" | "body" | "button"
+
+/** Rewrites ONE marketing field and returns the text. It does not save: the inline editor
+ *  holds a draft and the person presses Save, exactly as when they type it themselves. */
+export function writeSiteCopy(body: { kind: CopyKind; current?: string; instruction: string }) {
+  return api<{ ok?: boolean; text?: string; error?: string }>(`/api/site-content/ai-copy`, {
+    method: "POST", body: JSON.stringify(body),
   })
 }
 

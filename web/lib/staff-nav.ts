@@ -26,14 +26,19 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   // OPERATORS BROWSE; ONLY ADMIN BUYS. The section was admin-only outright, which also shut
   // operators out of the supplier catalogues — so building the product catalogue meant
   // retyping a blank an operator was already looking at, or asking an admin to do it. The
-  // tabs are split by that line instead (see PurchasingView): All suppliers and Favorites
-  // are open to operators, Cart and Sample are not, and the Order button is not rendered for
+  // tabs are split by that line instead (see PurchasingView): All suppliers, Favorites and a
+  // read-only Cart are open to the floor; Sample is not, and no Order button is rendered for
   // them anywhere.
   //
+  // WAREHOUSE IS HERE FOR THE CART. The top bar has always shown them the cart button, and
+  // it landed on a section their nav didn't list and whose cart tab they couldn't open —
+  // so "is this already on order?" was a question they had to ask somebody else.
+  //
   // The boundary that matters is the server's, and it already draws the same line: every
-  // /api/purchase* route is requireAdmin, while browsing, favourites and add-to-catalog are
-  // requireStaff. Nothing here grants an operator anything the API would not.
-  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["operator", "admin"] },
+  // /api/purchase* route is requireAdmin, while browsing, favourites, add-to-catalog and the
+  // cart blob itself (factory_lists/po_saved) are requireStaff. Nothing here grants an
+  // operator or a warehouse hand anything the API would not.
+  { label: "Purchasing", href: "/purchasing", icon: ShoppingCart, roles: ["operator", "warehouse", "admin"] },
   // Sourcing — the supplier pipeline: where a product could come from, what it lands at, and
   // how far along each supplier is (Saved -> In touch -> Sampling -> Approved, derived from
   // sample orders and recorded messages rather than typed — see SOURCING_STAGES). Its own

@@ -53,6 +53,30 @@ const DEFAULT_ACCENT = 'rose';
  */
 const SKINS = ['studio', 'press'];
 const DEFAULT_SKIN = 'studio';
+
+/**
+ * THE DISPLAY FACE — on exactly the terms the skin and the accent already run on.
+ *
+ * A KEY, never a font name or a URL. The faces are loaded by `next/font` in the app's root
+ * layout, which is what gives them a preload, a self-hosted file and correct fallback metrics;
+ * a stored family name would be a string the browser looks up locally and silently fails to
+ * find, and a stored URL would be a font fetched from wherever the field said.
+ *
+ * SCOPE IS THE MARKETING HEADLINES AND NOTHING ELSE. Body copy stays Inter on every surface,
+ * and so does the whole signed-in product — Playfair was dropped in the first place because
+ * two alphabets ran through the app and mobile, so a seller met different letterforms in the
+ * place they look first (CLAUDE.md §4). This moves display type on five public pages.
+ *
+ *   inter    the body sans, set heavier — one face on the whole site, no second webfont
+ *   outfit   wide and geometric, the reference boards' family of shape
+ *   grotesk  Space Grotesk — narrower, more technical
+ *
+ * Adding one means adding it to app/layout.tsx (the next/font call), globals.css (the one
+ * selector), AND here. There is no gate to run: a typeface has no contrast to measure, which
+ * is exactly why it can be a free-ish choice where a colour cannot.
+ */
+const FACES = ['inter', 'outfit', 'grotesk'];
+const DEFAULT_FACE = 'outfit';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_FAVICON = path.join(HERE, '..', 'assets', 'default-favicon.png');
 
@@ -85,12 +109,13 @@ async function read() {
       // colour by a longer route; returning the default makes the panel agree with the page.
       accent: ACCENTS.includes(o.accent) ? o.accent : DEFAULT_ACCENT,
       skin: SKINS.includes(o.skin) ? o.skin : DEFAULT_SKIN,
+      face: FACES.includes(o.face) ? o.face : DEFAULT_FACE,
     };
   } catch {
     // A settings read that FAILS is not the same as branding that was never set — but for
     // reading marks, defaults are the right answer either way. The admin PUT is where a
     // database problem must surface.
-    return { appName: '', logoUrl: '', faviconUrl: '', faviconKey: '', accent: DEFAULT_ACCENT, skin: DEFAULT_SKIN };
+    return { appName: '', logoUrl: '', faviconUrl: '', faviconKey: '', accent: DEFAULT_ACCENT, skin: DEFAULT_SKIN, face: DEFAULT_FACE };
   }
 }
 
@@ -120,9 +145,34 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
   });
 
   /** What the marks are. Any signed-in surface renders them, so this is auth, not admin. */
+  /*
+   * PUBLIC: THE TWO PRESENTATION KEYS, AND NOTHING ELSE.
+   *
+   * This exists because the marketing pages could not see the theme at all. They are Server
+   * Components rendered for visitors with no session, so `GET /api/branding` above — which is
+   * requireAuth, correctly, since it carries the app name and the logo — was unreachable from
+   * them. The result was a picker in Settings that repainted the signed-in app and left the
+   * public site on whatever `:root` happened to declare. A skin nobody outside the company
+   * could see is not a theme, it is a preference.
+   *
+   * WHY IT IS SAFE TO PUBLISH: both values are allow-listed KEYS, and both are already
+   * legible in the CSS and the font files any visitor downloads. Nothing else from the
+   * branding blob is here — an ALLOW-LIST rather than a redaction, for the same reason the
+   * public catalogue is (CLAUDE.md §2.9): a redaction starts publishing whatever gets added
+   * to the blob upstream.
+   *
+   * Read server-side with a 60-second revalidate, so it costs one request per page per
+   * minute and never a client fetch — which is what avoids the flash of the default palette
+   * that a useEffect-based version would produce on every cold marketing load.
+   */
+  app.get('/api/branding/theme', async () => {
+    const b = await read();
+    return { skin: b.skin, face: b.face };
+  });
+
   app.get('/api/branding', { preHandler: requireAuth }, async () => {
     const b = await read();
-    return { appName: b.appName, logoUrl: b.logoUrl, faviconUrl: b.faviconUrl, accent: b.accent, accents: ACCENTS, skin: b.skin, skins: SKINS };
+    return { appName: b.appName, logoUrl: b.logoUrl, faviconUrl: b.faviconUrl, accent: b.accent, accents: ACCENTS, skin: b.skin, skins: SKINS, face: b.face, faces: FACES };
   });
 
   app.put('/api/admin/branding', { preHandler: requireAdmin }, async (req, reply) => {
@@ -139,6 +189,7 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
       // holding a skin no stylesheet declares renders as whatever :root says while the panel
       // shows it as selected, which is a setting that lies about itself.
       ...(SKINS.includes(body.skin) ? { skin: body.skin } : {}),
+      ...(FACES.includes(body.face) ? { face: body.face } : {}),
     };
     try {
       await ensure();
@@ -150,7 +201,7 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
       reply.code(502);
       return { error: 'Could not save: ' + ((e && e.message) || 'database error') };
     }
-    return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl, accent: next.accent, accents: ACCENTS, skin: next.skin, skins: SKINS };
+    return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl, accent: next.accent, accents: ACCENTS, skin: next.skin, skins: SKINS, face: next.face, faces: FACES };
   });
 
   /** Upload a mark. Stored PRIVATE and re-served through our own origin, like chat art. */
