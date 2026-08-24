@@ -1242,6 +1242,7 @@ export function OrdersHub() {
   /** Measured against what is left AFTER shedding: cards are the last resort, not the second
    *  one. Not circular — shedding is bounded by SHED_ORDER, so this figure stops moving. */
  const fullMinPx = useMemo(() => minPxFor(gridCols), [gridCols])
+
   /*
    * THE ESTIMATE, DELIBERATELY, and not the row's measured scrollWidth.
    *
@@ -1254,6 +1255,24 @@ export function OrdersHub() {
    * 1280 — and leaves the rest to scroll, which is what every dense table does.
    */
  const narrow = viewportNarrow || (listW > 0 && listW < fullMinPx)
+  /**
+   * IS THERE ROOM TO NAME THE PRODUCT?
+   *
+   * `items` is the widest flexible track (minmax(8rem,1.2fr)), so every spare pixel on this
+   * board lands in it. With one photo in that cell a wide screen showed a small picture and a
+   * lot of nothing — a column called Product that did not say which product.
+   *
+   * The name used to sit here and was removed for a real reason: at this column's width it
+   * truncated to "Cust…", which identifies nothing. But that reason is a WIDTH, not a
+   * verdict, so this measures instead of assuming — the slack past the row's own minimum,
+   * which is precisely what the flexible tracks are about to absorb.
+   *
+   * 160px is about where the second line stops being an ellipsis. Below it nothing is drawn,
+   * so a narrow board is exactly as it was; and a layout with columns hidden — which makes
+   * this cell enormous at any viewport — gets the name too, because the room is real either
+   * way. Measured, so it cannot be wrong about a screen nobody tested on.
+   */
+ const roomForName = !narrow && listW > 0 && listW - fullMinPx >= 160
  const rowCols = useMemo(
     () => (narrow ? visibleData.filter((id) => NARROW_COLS.includes(id)) : fittedData),
     // NARROW_COLS is a module-level constant in spirit; listing it would only churn the memo.
@@ -2094,19 +2113,31 @@ export function OrdersHub() {
  every line in full, named. */
  items: (
                   <div className="flex min-w-0 items-center gap-2.5">
-                    {items.length > 0
-                      /* ONE PHOTO PER ORDER ROW, matching the seller board.
-                         Three overlapping 72px thumbs of similar artwork read as one wide
-                         smudge at row height — the stack's only job is telling you where one
-                         tile ends and the next begins, and at this size it cannot. The row
-                         is a PARENT: it says which order this is, and one clear picture does
-                         that better than three unclear ones.
-                         showExtra off because the "+2" is a full-size tile, so keeping it
-                         would leave two tiles in a cell that is meant to hold one. The count
-                         is not lost — the Units column carries it, its tooltip names the
-                         lines, and expanding the row lists every one of them. */
-                      ? <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={1} showExtra={false} />
- : <span className="text-xs text-muted-foreground">—</span>}
+                    {items.length > 0 ? (
+                      <>
+                        {/* ONE PHOTO PER ORDER ROW, matching the seller board. Three
+                            overlapping 72px thumbs of similar artwork read as one wide smudge
+                            at row height — the stack's only job is telling you where one tile
+                            ends and the next begins, and at this size it cannot. */}
+                        <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={1} showExtra={false} />
+                        {/* AND WHAT IT IS, when the column has room to say so — see
+                            roomForName. The first line names the product, the second gives the
+                            variant and how many more lines the photo is not showing: the fact
+                            the "+N" tile used to carry, in words, in space that was empty
+                            anyway. decodeEntities because Etsy stores titles HTML-escaped. */}
+                        {roomForName && (
+                          <div className="min-w-0 leading-tight">
+                            <div className="truncate text-sm font-medium">
+                              {decodeEntities(items[0].name || items[0].sku || "—")}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {[variantOf(items[0]), items.length > 1 ? `+${items.length - 1} more` : ""]
+                                .filter(Boolean).join(" · ") || "No variant chosen"}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
                   </div>
                 ),
  ready: (
