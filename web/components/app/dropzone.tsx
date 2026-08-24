@@ -82,6 +82,49 @@ export function fileNameFrom(url: string | null | undefined): string | null {
 }
 
 /**
+ * WHAT TO CALL A FILE'S FORMAT — the tail it was uploaded with, not the bucket it fell in.
+ *
+ * `kindOf` on the server sorts .emb, .dst, .exp, .jef, .vp3, .xxx and .hus all into `emb`,
+ * because everything downstream only needs to know "this is a stitch file". That is right for
+ * FILTERING and wrong for a LABEL: a .DST shown as "EMB" names a different format from the
+ * one the seller uploaded, and .EMB and .DST are not interchangeable — one is Wilcom's own
+ * working file and the other is what a machine reads. Someone reading "EMB" on a row and
+ * going to look for a .emb finds a .dst.
+ *
+ * So the label comes off the NAME when there is one, and falls back to the kind when there
+ * is not. Capped at four characters because that is every extension this takes.
+ */
+export function fileFormatLabel(name: string | null | undefined, kind?: string | null): string {
+  const tail = String(name ?? "").split(".").pop() ?? ""
+  // Only a real extension — a name with no dot returns the whole name from split().pop(),
+  // and "COMELONES LOGO" is not a format.
+  const ext = /^[A-Za-z0-9]{1,4}$/.test(tail) && String(name ?? "").includes(".") ? tail : ""
+  return (ext || String(kind ?? "")).toUpperCase()
+}
+
+/**
+ * WHAT A FILE IS FOR — the word beside the name, not the format.
+ *
+ * The name already ends in the format: "COMELONES LOGO.DST" says .DST, and repeating "DST"
+ * next to it is the same fact twice. What the row cannot say for itself is the JOB — a .dst
+ * and a .pes are both what the machine reads, a .png is what gets printed, and a .pdf from a
+ * digitiser is neither. That is one word, and it is the same word whatever extension the
+ * file happens to wear.
+ *
+ * Returns "" for a kind we have no word for, so the row prints nothing rather than a bucket
+ * name like "other" that means nothing to the person reading it.
+ */
+export function fileRoleLabel(kind?: string | null): string {
+  switch (String(kind ?? "").toLowerCase()) {
+    case "emb":
+    case "pes": return "MACHINE"
+    case "image": return "ARTWORK"
+    case "sheet": return "WORKSHEET"
+    default: return ""
+  }
+}
+
+/**
  * ONE ROW OF THE RECEIPT, exported so a surface that keeps its own list outside a Dropzone
  * (the designer's stage, where the "zone" is the garment itself) prints the same row rather
  * than inventing a ninth one.

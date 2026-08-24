@@ -1,13 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { Dropzone, FileRow, fileNameFrom } from "@/components/app/dropzone"
+import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app/dropzone"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
@@ -2456,21 +2456,11 @@ export function DesignCanvasDialog({
           * It says SAVED or NOT SAVED, because those are different facts and this window can
           * be closed on either. `savedFaces` is what the server last confirmed.
           */}
-        {designUrl && (
-          <div className="mx-auto w-full max-w-[min(100%,62vh)]">
-            <FileRow
-              file={{
-                name: designName || fileNameFrom(designUrl) || "Untitled artwork",
-                size: designSize,
-                thumb: designUrl,
-                status: saving ? "uploading" : "done",
-                note: savedFaces[sideName] ? "Saved to this line" : "Not saved yet",
-                error: null,
-                onRemove: () => void removeArtwork(),
-              }}
-            />
-          </div>
-        )}
+        {/* THE FACE RECEIPT MOVED INTO "Files".
+            It was its own row above the stage while the machine file sat in a list below, so
+            one line's files were reported in two places in two shapes — and neither of them
+            was the whole set. The facts it carried (the thumbnail, the size, saved or not,
+            and the way to take it off) are on its row in that list now. */}
         </div>
         {/* Right column — controls, in the order you work through them: what the buyer sent,
  the two upload steps, thread match, then the charge. */}
@@ -2540,30 +2530,47 @@ export function DesignCanvasDialog({
             what is attached to this line, not a form. Hidden entirely when the line has
             nothing, which is honest: an empty frame here would read as a list that failed
             to load rather than as a line nobody has sent a file for. */}
-        {lineFiles.length > 0 && (
+        {(lineFiles.length > 0 || designUrl) && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 text-xs font-medium text-foreground">Files</div>
-            <div className="rounded-md border border-border bg-card">
-              <div className="divide-y divide-border">
-                {lineFiles.map((f) => (
-                  <button
-                    key={f.designId}
-                    type="button"
-                    onClick={() => void downloadFile(f.designId, f.name)}
-                    disabled={dlBusy === f.designId}
-                    title={`Open ${f.name || "this file"}`}
-                    className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-accent disabled:opacity-60"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-sm">{f.name || "Untitled file"}</span>
-                    {/* The kind, not a pill. It is a fact about the row, and boxing every one
-                        of them is exactly the chrome the app was counted for. */}
-                    {f.kind && <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{f.kind}</span>}
-                    {dlBusy === f.designId
-                      ? <CircleNotch size={14} className="shrink-0 animate-spin text-muted-foreground" />
-                      : <DownloadSimple size={14} className="shrink-0 text-muted-foreground" />}
-                  </button>
-                ))}
+            {/* THE ARTWORK ON THIS FACE, first, and only while it is UNSAVED. Once saved the
+                server returns it in lineFiles and printing it here as well would put one file
+                on two rows — the fault this list exists to end. Unsaved it is in no list at
+                all, which is precisely the state a receipt is for. */}
+            {designUrl && !savedFaces[sideName] && (
+              <div className="mb-1">
+                <FileRow
+                  file={{
+                    name: designName || fileNameFrom(designUrl) || "Untitled artwork",
+                    size: designSize,
+                    thumb: designUrl,
+                    status: saving ? "uploading" : "done",
+                    note: "Not saved yet",
+                    onRemove: () => void removeArtwork(),
+                  }}
+                />
               </div>
+            )}
+            {/* ONE ROW SHAPE for every file on the line, whatever it is and wherever it came
+                from — the same FileRow the drop zones and the order page print. The artwork
+                above and a stitch file below were two different rows for two files doing the
+                same job of being ON this line. */}
+            <div className="flex flex-col gap-1">
+              {lineFiles.map((f) => (
+                <FileRow
+                  key={f.designId}
+                  file={{
+                    name: f.name || "Untitled file",
+                    /* The format, or what is happening to the row — the sub-line carries
+                       FACTS, and "Downloading…" is one while it is true. */
+                    note: dlBusy === f.designId ? "Downloading…" : fileRoleLabel(f.kind),
+                    /* NO status here. FileRow's "uploading" prints "Uploading…" under the
+                       name, and this row is DOWNLOADING — the same spinner would be saying
+                       the opposite of what is happening. */
+                    onDownload: () => void downloadFile(f.designId, f.name),
+                  }}
+                />
+              ))}
             </div>
             {/* THE ONE PLACE A FILE ERROR IS SAID. It used to sit inside the `isEmb` block,
                 so a failed open on a DTG line set the message and nothing rendered it. */}
