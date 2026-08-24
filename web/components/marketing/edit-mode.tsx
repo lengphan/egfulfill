@@ -7,7 +7,7 @@ import { getUser } from "@/lib/auth"
 import { setSiteContent, uploadHeroImage } from "@/lib/api"
 import { downscaleImage } from "@/lib/image-downscale"
 import type { SiteContent } from "@/lib/site-content"
-import { GenerateBubble } from "@/components/marketing/generate-bubble"
+import { CopyBubble, GenerateBubble, kindForPath } from "@/components/marketing/generate-bubble"
 
 /**
  * EDITING THE MARKETING SITE ON THE MARKETING SITE.
@@ -228,12 +228,22 @@ export function EditModeProvider({ initial, children }: { initial: SiteContent; 
 export function EditableText({ path, children }: { path: ContentPath; children: string }) {
   const { on, read, write } = useEditMode()
   const ref = useRef<HTMLSpanElement>(null)
+  const [asking, setAsking] = useState(false)
   const stored = read(path)
   const value = typeof stored === "string" ? stored : children
 
   if (!on) return <>{value}</>
 
+  /*
+   * A SPAN, NOT A DIV, and the bubble is spans all the way down.
+   *
+   * These sit INSIDE an <h1> and inside <p> — a div in either is invalid nesting, and the
+   * browser's repair for it is to close the paragraph early, which silently drops the rest of
+   * the line. So the wrapper and the bubble are inline elements made to lay out as blocks,
+   * and `relative` on an inline element is still a valid positioning context.
+   */
   return (
+    <span className="relative">
     <span
       ref={ref}
       contentEditable
@@ -255,6 +265,36 @@ export function EditableText({ path, children }: { path: ContentPath; children: 
       className="-mx-1 rounded px-1 outline-none ring-1 ring-inset ring-foreground/15 transition-[box-shadow,background-color] hover:bg-foreground/[0.04] focus:bg-foreground/[0.04] focus:ring-2 focus:ring-foreground/40"
     >
       {value}
+    </span>
+    {/* THE HANDLE IS A SUPERSCRIPT MARK, not a button beside the words.
+        A control on the baseline would push the line it is editing — the headline would
+        re-wrap the moment edit mode came on, so what you are judging is no longer the page a
+        visitor sees. Absolute and tiny keeps the type where it was. */}
+    <button
+      type="button"
+      onClick={() => setAsking((v) => !v)}
+      title={`Rewrite this ${kindForPath(path)}`}
+      className="absolute -top-2 left-full z-10 ml-0.5 grid size-4 place-items-center rounded-full bg-primary text-primary-foreground opacity-40 transition-opacity hover:opacity-100"
+    >
+      <Sparkle size={9} weight="fill" />
+    </button>
+    {asking && (
+      <span className="absolute left-0 top-full z-20 mt-2 block">
+        <CopyBubble
+          kind={kindForPath(path)}
+          current={value}
+          onDone={(text) => {
+            write(path, text)
+            // The contentEditable owns its own DOM (see the note at the top of this file), so
+            // a write to the draft does not reach the text already on screen — React will not
+            // re-render a node it was told to leave alone. Setting it here is what makes the
+            // new words appear where the old ones were, which is the entire point.
+            if (ref.current) ref.current.textContent = text
+          }}
+          onClose={() => setAsking(false)}
+        />
+      </span>
+    )}
     </span>
   )
 }

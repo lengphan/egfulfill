@@ -5146,6 +5146,23 @@ export function uploadHeroImage(dataUrl: string) {
   })
 }
 
+/**
+ * WHAT KIND OF STRING THIS IS, which is what carries the length limit.
+ *
+ * "Keep it short" inside a free-text instruction is advice; the kind is a constraint. A
+ * 90-character headline does not wrap gracefully, it overflows the grid column it sits in —
+ * so the server caps the words per kind and the caller only has to say which slot it is.
+ */
+export type CopyKind = "headline" | "accent" | "subhead" | "label" | "body" | "button"
+
+/** Rewrites ONE marketing field and returns the text. It does not save: the inline editor
+ *  holds a draft and the person presses Save, exactly as when they type it themselves. */
+export function writeSiteCopy(body: { kind: CopyKind; current?: string; instruction: string }) {
+  return api<{ ok?: boolean; text?: string; error?: string }>(`/api/site-content/ai-copy`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+
 // ── Global email branding (broadcasts) ─────────────────────────────────────────
 /** Logo / accent / preset / footer applied to EVERY broadcast email. Read is staff (editor
  *  + preview), write is admin. `logoUrl` reuses the hero-image upload (any public image URL). */
