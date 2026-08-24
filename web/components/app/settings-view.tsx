@@ -27,7 +27,7 @@ import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { VolumeBoard } from "@/components/app/volume-board"
 import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
-import { getUser, updateUser } from "@/lib/auth"
+import { getUser, updateUser, canSeeMoney } from "@/lib/auth"
 import { VolumeTiersPanel } from "@/components/app/volume-tiers-panel"
 import { PlanPackagesPanel } from "@/components/app/plan-packages-panel"
 import { UserAvatar, AVATAR_COLORS, AVATAR_EMOJIS } from "@/components/app/user-avatar"
@@ -3408,11 +3408,13 @@ export function SettingsView() {
         {/* ADMIN ONLY. Warehouse keeps Platform, Suppliers and Usage — this one writes
  users.password_hash, which is account takeover in one call. */}
         {isAdmin && <TabsTrigger value="users"><TabLabel>Users</TabLabel></TabsTrigger>}
-        {/* Supplier ordering defaults. Warehouse/admin, matching who may spend — these
- decide how a purchase order pays and ships. */}
-        {canPlatform && <TabsTrigger value="suppliers"><TabLabel>Suppliers</TabLabel></TabsTrigger>}
-        {/* Integration usage/spend — a cost concern, so warehouse/admin like Platform. */}
-        {canPlatform && <TabsTrigger value="usage"><TabLabel>Usage</TabLabel></TabsTrigger>}
+        {/* Supplier ordering defaults — these decide how a purchase order PAYS and ships,
+            so they follow the money boundary rather than canPlatform alone. Warehouse lost
+            it on 2026-08-24; the floor receives stock, it does not decide the terms. */}
+        {canPlatform && canSeeMoney() && <TabsTrigger value="suppliers"><TabLabel>Suppliers</TabLabel></TabsTrigger>}
+        {/* Integration usage carries an estimated $ per platform — a cost surface, so it
+            takes the same boundary as Suppliers above rather than canPlatform's. */}
+        {canPlatform && canSeeMoney() && <TabsTrigger value="usage"><TabLabel>Usage</TabLabel></TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
         {isAdmin && <TabsTrigger value="site"><TabLabel>Site content</TabLabel></TabsTrigger>}
         {isAdmin && <TabsTrigger value="branding"><TabLabel>Branding</TabLabel></TabsTrigger>}

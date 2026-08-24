@@ -537,7 +537,7 @@ export function designFilesRoutes(app, requireAuth) {
   // Re-price a deliverable. Admin + warehouse only — an operator or designer is
   // staff but has no business setting what a seller pays.
   app.patch('/api/design_files/:designId/price', { preHandler: requireAuth }, async (req, reply) => {
-    if (!canPrice(req.user)) { reply.code(403); return { error: 'Only admin or warehouse can set a file price' }; }
+    if (!canPrice(req.user)) { reply.code(403); return { error: 'Only an admin can set a file price' }; }
     const price = Math.max(0, Number(req.body && req.body.price) || 0);
     const r = await q('update design_file_data set price=$1, updated_at=now() where design_id=$2 returning design_id, price', [price, String(req.params.designId)]);
     if (!r.rows.length) { reply.code(404); return { error: 'not found' }; }

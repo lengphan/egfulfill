@@ -7,6 +7,7 @@
 // a DEBIT (negative delta) instead of a credit, and paying is gated to admin/warehouse
 // because it moves money OUT.
 import { q } from '../db.js';
+import { canMoveMoney } from '../auth.js';
 import { balanceOf } from './wallet.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 
@@ -27,7 +28,11 @@ async function payoutBounds() {
   return { min, max };
 }
 
-const canPay = (u) => ['admin', 'warehouse'].includes(String(u && u.role));
+// The shared predicate, not a copy of it. This WAS a copy — ['admin','warehouse'] spelled
+// out here — so when warehouse lost the money boundary in auth.js on 2026-08-24 every other
+// route moved and paying a seller out did not. That is precisely the drift the comment above
+// canMoveMoney warns about, caught by grepping for the role rather than for the predicate.
+const canPay = canMoveMoney;
 
 // A seller can save details for EACH method (PingPong / LianLian / Bank QR) and have them
 // prefilled next time. Stored as a map keyed by method type. An older single-profile row
@@ -140,7 +145,7 @@ export function payoutsRoutes(app, requireAuth) {
   // here (it may have moved since the request), and the ledger row is idempotent by
   // (account,type,ref) with ref=the request id, so a double-click can't debit twice.
   app.post('/api/payout/requests/:id/pay', { preHandler: requireAuth }, async (req, reply) => {
-    if (!canPay(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    if (!canPay(req.user)) { reply.code(403); return { error: 'Admin only' }; }
     const pre = await q('select * from payout_requests where id=$1', [req.params.id]).then((r) => r.rows[0]).catch(() => null);
     if (!pre) { reply.code(404); return { error: 'Not found' }; }
     if (pre.status !== 'pending') { reply.code(409); return { error: `Already ${pre.status}` }; }
@@ -168,7 +173,7 @@ export function payoutsRoutes(app, requireAuth) {
 
   // Admin/warehouse reject a payout (bad details, etc.) → status flips, NO ledger movement.
   app.post('/api/payout/requests/:id/reject', { preHandler: requireAuth }, async (req, reply) => {
-    if (!canPay(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    if (!canPay(req.user)) { reply.code(403); return { error: 'Admin only' }; }
     const r = await q(
       "update payout_requests set status='rejected', resolved_at=now(), resolved_by=$2 where id=$1 and status='pending' returning *",
       [req.params.id, req.user.sub]

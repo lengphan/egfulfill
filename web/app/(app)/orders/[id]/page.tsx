@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
-import { getUser } from "@/lib/auth"
+import { getUser, canSeeMoney } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
@@ -1327,213 +1327,230 @@ export default function OrderDetailPage() {
             </SectionCard>
           )}
 
-          {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
- we'll charge to produce this); once submitted the price is frozen and it
- falls back to the order's own totals. */}
-          <SectionCard title="Summary">
-            <dl className="space-y-2 p-5 text-sm">
-              {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
- the alternative is a card that looks like an order nobody has priced. */}
-              {quoteErr && submittable && (
-                <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
-                  Couldn&apos;t load this order&apos;s price. Nothing has been charged — reload, and tell us if it keeps failing.
-                </p>
-              )}
-              {quote && !quote.unpriced?.length ? (
-                <>
-                  {/* BASE COST, the same word the product editor uses for this number —
- what the seller is charged for the blank, as against "product cost",
- which is what the blank costs US. Two names for two numbers, and this
- screen had been using the supplier's one for the seller's money. */}
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Base cost</dt>
-                    <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">
-                      Shipping
-                      {quote.units > 1 && <span className="opacity-70"> · {quote.units} items</span>}
-                    </dt>
-                    <dd className="tabular-nums">{usd(quote.shipping)}</dd>
-                  </div>
-                  {/* SHOWN, not folded into the base cost. A discount a seller can't see is
- one they can't check, and the whole point of the programme is that they
- know they earned it. Sits directly under the two numbers it comes off —
- it applies to the goods, never to shipping or to design fees, and a row
- further down would imply it covered those too. */}
-                  {quote.volumeDiscount > 0 && (
+          {/*
+            * NO MONEY ON THE FLOOR (2026-08-24).
+            *
+            * Warehouse produces: print it, pack it, scan it out. What the order was worth
+            * informs none of that, and it is the number most likely to be read over a
+            * shoulder in a workshop. Both sections go, rather than rendering with the
+            * figures blanked — an empty Summary reads as an order nobody priced, which is
+            * the one thing §4 says an empty state must never be mistaken for.
+            *
+            * Not merely hidden: /api/orders/:id/charges answers this role with the withheld
+            * shape, so the amounts never reach the browser. See canSeeMoney in lib/auth.ts
+            * and its mirror in server/src/auth.js.
+            */}
+          {canSeeMoney(role) && (
+            <>
+            {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
+   we'll charge to produce this); once submitted the price is frozen and it
+   falls back to the order's own totals. */}
+            <SectionCard title="Summary">
+              <dl className="space-y-2 p-5 text-sm">
+                {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
+   the alternative is a card that looks like an order nobody has priced. */}
+                {quoteErr && submittable && (
+                  <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
+                    Couldn&apos;t load this order&apos;s price. Nothing has been charged — reload, and tell us if it keeps failing.
+                  </p>
+                )}
+                {quote && !quote.unpriced?.length ? (
+                  <>
+                    {/* BASE COST, the same word the product editor uses for this number —
+   what the seller is charged for the blank, as against "product cost",
+   which is what the blank costs US. Two names for two numbers, and this
+   screen had been using the supplier's one for the seller's money. */}
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Base cost</dt>
+                      <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
+                    </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">
-                        Volume discount<span className="opacity-70"> · {quote.volumePct}%</span>
+                        Shipping
+                        {quote.units > 1 && <span className="opacity-70"> · {quote.units} items</span>}
                       </dt>
-                      <dd className="tabular-nums text-success">−{usd(quote.volumeDiscount)}</dd>
+                      <dd className="tabular-nums">{usd(quote.shipping)}</dd>
                     </div>
-                  )}
-                  {designFees?.items?.map((f, i) => (
-                    <div key={i} className="flex justify-between">
-                      {/**
-                        * THE ITEM'S NUMBER, NOT ITS TITLE.
-                        *
-                        * A marketplace product name is a keyword list — "Custom Embroidered
-                        * Apron with Name, Personalized Kitchen Apron, Cafe Barista Soft
-                        * Uniform, Custom Cooking Aprons, Mom Dad Gift" — and printing it
-                        * beside a $1.00 fee wrapped five lines and buried the money in a
-                        * summary whose whole job is money.
-                        *
-                        * Dropping it entirely would leave two identical "Check fee" rows on
-                        * an order with two designs, so it carries the number instead: the
-                        * same one on the item row and on the file row, and short enough to
-                        * sit on one line. One fee covering several lines names them all.
-                        */}
-                      <dt className="text-muted-foreground">
-                        {f.label}
-                        {(() => {
- const covered = (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
-                            .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
-                            .filter((n) => n >= 0)
-                            .map((n) => n + 1)
- if (!covered.length) return null
- return <span className="opacity-70"> · Item{covered.length > 1 ? "s" : ""} {covered.join(", ")}</span>
-                        })()}
-                      </dt>
-                      {/* STAFF PRICE IT HERE, on the row that already reports it — the
- three-button tier panel that used to sit under the total was a
- second, differently-shaped copy of this same fee. A seller reads
- the figure and cannot change it; the server enforces that. */}
-                      {isStaff
-                        ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
- : <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>}
-                    </div>
-                  ))}
-                  <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                    <dt>Total</dt>
-                    <dd className="tabular-nums">{usd(quote.total + dfTotal)}</dd>
-                  </div>
-                  <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
-                </>
-              ) : feesGated ? (
-                /* A team member whose leader hasn't shared order fees. The server sent no
- amounts at all, so there is nothing here to hide — and this says which,
- rather than rendering an empty card that reads as a broken page. */
-                <p className="text-xs text-muted-foreground">
-                  Order costs aren&apos;t shared with you. Your team leader can turn this on
- under Settings › Team.
-                </p>
-              ) : (
-                <>
-                  {/* Submitted → the price is frozen and the LEDGER is the record of it.
-                      Every part it charged, itemised: production, shipping, and the fees
- the quote can't see (expedited shipping, express, design, files). */}
-                  {chargedParts.map((p) => (
-                    <div key={p.key} className="flex justify-between">
-                      <dt className="text-muted-foreground">{p.label}</dt>
-                      <dd className="tabular-nums">{usd(p.charged)}</dd>
-                    </div>
-                  ))}
-                  {refundedTotal > 0.005 && (
-                    <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Refunded</dt>
-                      <dd className="tabular-nums text-success">−{usd(refundedTotal)}</dd>
-                    </div>
-                  )}
-                  <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                    <dt>You paid</dt>
-                    {/* "$0.00" would claim this order was produced free. Nothing has been
- charged because it hasn't been submitted — a different fact, and the
- one the seller needs before they read a profit figure below. */}
-                    <dd className="tabular-nums">
-                      {netCost != null ? usd(netCost)
- : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
-                    </dd>
-                  </div>
-
-
-                  {/* The buyer's side, kept visually apart from ours. Two different pots of
- money on one card is only safe if the reader can never mistake one
- for the other — which is the bug this replaced. */}
-                  <div className="mt-3 space-y-2 border-t border-border pt-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <dt className="text-muted-foreground">Customer paid</dt>
-                      <dd className="tabular-nums">
-                        {editRetail ? (
-                          <span className="flex items-center gap-1">
-                            <Input
- autoFocus value={retailDraft} inputMode="decimal"
- onChange={(e) => setRetailDraft(e.target.value)}
- onKeyDown={(e) => { if (e.key === "Enter") void saveRetail(); if (e.key === "Escape") setEditRetail(false) }}
- className="h-7 w-24 text-right text-sm"
-                            />
-                            <Button size="sm" variant="ghost" onClick={() => void saveRetail()}>Save</Button>
-                          </span>
-                        ) : (
-                          <button
- onClick={() => { setRetailDraft(revenue ? String(revenue) : ""); setEditRetail(true) }}
- className="underline-offset-2 hover:underline"
-                          >
-                            {hasRevenue ? usd(revenue) : <span className="italic text-muted-foreground">not recorded</span>}
-                          </button>
-                        )}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <dt>Estimated profit</dt>
-                      <dd className={"tabular-nums " + (estProfit != null && estProfit < 0 ? "text-destructive" : "")}>
-                        {estProfit != null ? usd(estProfit) : <span className="font-normal italic text-muted-foreground">—</span>}
-                      </dd>
-                    </div>
-                  </div>
-
-                  {/* OUR SIDE OF THE SAME ORDER — staff only, and physically separated
- from the seller's block above because the two are different pots of
- money. What the blanks cost us is the number a margin is measured
- against; the server strips it from a seller's quote entirely, so this
- renders nothing for them even if the markup were wrong. */}
-                  {isStaff && quote?.supplierTotal != null && (
-                    <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-                      <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Factory · not shown to the seller</div>
-                      <div className="flex justify-between text-sm">
+                    {/* SHOWN, not folded into the base cost. A discount a seller can't see is
+   one they can't check, and the whole point of the programme is that they
+   know they earned it. Sits directly under the two numbers it comes off —
+   it applies to the goods, never to shipping or to design fees, and a row
+   further down would imply it covered those too. */}
+                    {quote.volumeDiscount > 0 && (
+                      <div className="flex justify-between">
                         <dt className="text-muted-foreground">
-                          Product cost
-                          {/* A partial figure says so rather than reading as the total. */}
-                          {quote.supplierKnown != null && quote.lines && quote.supplierKnown < quote.lines.length && (
-                            <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
-                          )}
+                          Volume discount<span className="opacity-70"> · {quote.volumePct}%</span>
                         </dt>
-                        <dd className="tabular-nums">{usd(quote.supplierTotal)}</dd>
+                        <dd className="tabular-nums text-success">−{usd(quote.volumeDiscount)}</dd>
                       </div>
-                      {labelCost > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <dt className="text-muted-foreground">Postage we bought</dt>
-                          <dd className="tabular-nums">{usd(labelCost)}</dd>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
-                        <dt>Factory margin</dt>
-                        <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
-                          {factoryMargin != null ? usd(factoryMargin)
- : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
+                    )}
+                    {designFees?.items?.map((f, i) => (
+                      <div key={i} className="flex justify-between">
+                        {/**
+                          * THE ITEM'S NUMBER, NOT ITS TITLE.
+                          *
+                          * A marketplace product name is a keyword list — "Custom Embroidered
+                          * Apron with Name, Personalized Kitchen Apron, Cafe Barista Soft
+                          * Uniform, Custom Cooking Aprons, Mom Dad Gift" — and printing it
+                          * beside a $1.00 fee wrapped five lines and buried the money in a
+                          * summary whose whole job is money.
+                          *
+                          * Dropping it entirely would leave two identical "Check fee" rows on
+                          * an order with two designs, so it carries the number instead: the
+                          * same one on the item row and on the file row, and short enough to
+                          * sit on one line. One fee covering several lines names them all.
+                          */}
+                        <dt className="text-muted-foreground">
+                          {f.label}
+                          {(() => {
+   const covered = (f.lines?.length ? f.lines : [{ line_id: f.line_id, sku: f.sku }])
+                              .map((l) => items.findIndex((x) => (l.line_id && x.line_id === l.line_id) || (!l.line_id && !!l.sku && x.sku === l.sku)))
+                              .filter((n) => n >= 0)
+                              .map((n) => n + 1)
+   if (!covered.length) return null
+   return <span className="opacity-70"> · Item{covered.length > 1 ? "s" : ""} {covered.join(", ")}</span>
+                          })()}
+                        </dt>
+                        {/* STAFF PRICE IT HERE, on the row that already reports it — the
+   three-button tier panel that used to sit under the total was a
+   second, differently-shaped copy of this same fee. A seller reads
+   the figure and cannot change it; the server enforces that. */}
+                        {isStaff
+                          ? <DesignFeeAmount orderId={id} fee={f} onChanged={reloadAll} />
+   : <dd className="tabular-nums">{f.amount == null ? <span className="italic text-muted-foreground">To Be Determined</span> : usd(f.amount)}</dd>}
+                      </div>
+                    ))}
+                    <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                      <dt>Total</dt>
+                      <dd className="tabular-nums">{usd(quote.total + dfTotal)}</dd>
+                    </div>
+                    <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
+                  </>
+                ) : feesGated ? (
+                  /* A team member whose leader hasn't shared order fees. The server sent no
+   amounts at all, so there is nothing here to hide — and this says which,
+   rather than rendering an empty card that reads as a broken page. */
+                  <p className="text-xs text-muted-foreground">
+                    Order costs aren&apos;t shared with you. Your team leader can turn this on
+   under Settings › Team.
+                  </p>
+                ) : (
+                  <>
+                    {/* Submitted → the price is frozen and the LEDGER is the record of it.
+                        Every part it charged, itemised: production, shipping, and the fees
+   the quote can't see (expedited shipping, express, design, files). */}
+                    {chargedParts.map((p) => (
+                      <div key={p.key} className="flex justify-between">
+                        <dt className="text-muted-foreground">{p.label}</dt>
+                        <dd className="tabular-nums">{usd(p.charged)}</dd>
+                      </div>
+                    ))}
+                    {refundedTotal > 0.005 && (
+                      <div className="flex justify-between">
+                        <dt className="text-muted-foreground">Refunded</dt>
+                        <dd className="tabular-nums text-success">−{usd(refundedTotal)}</dd>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                      <dt>You paid</dt>
+                      {/* "$0.00" would claim this order was produced free. Nothing has been
+   charged because it hasn't been submitted — a different fact, and the
+   one the seller needs before they read a profit figure below. */}
+                      <dd className="tabular-nums">
+                        {netCost != null ? usd(netCost)
+   : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
+                      </dd>
+                    </div>
+
+
+                    {/* The buyer's side, kept visually apart from ours. Two different pots of
+   money on one card is only safe if the reader can never mistake one
+   for the other — which is the bug this replaced. */}
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <dt className="text-muted-foreground">Customer paid</dt>
+                        <dd className="tabular-nums">
+                          {editRetail ? (
+                            <span className="flex items-center gap-1">
+                              <Input
+   autoFocus value={retailDraft} inputMode="decimal"
+   onChange={(e) => setRetailDraft(e.target.value)}
+   onKeyDown={(e) => { if (e.key === "Enter") void saveRetail(); if (e.key === "Escape") setEditRetail(false) }}
+   className="h-7 w-24 text-right text-sm"
+                              />
+                              <Button size="sm" variant="ghost" onClick={() => void saveRetail()}>Save</Button>
+                            </span>
+                          ) : (
+                            <button
+   onClick={() => { setRetailDraft(revenue ? String(revenue) : ""); setEditRetail(true) }}
+   className="underline-offset-2 hover:underline"
+                            >
+                              {hasRevenue ? usd(revenue) : <span className="italic text-muted-foreground">not recorded</span>}
+                            </button>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <dt>Estimated profit</dt>
+                        <dd className={"tabular-nums " + (estProfit != null && estProfit < 0 ? "text-destructive" : "")}>
+                          {estProfit != null ? usd(estProfit) : <span className="font-normal italic text-muted-foreground">—</span>}
                         </dd>
                       </div>
                     </div>
-                  )}
 
-                  {/* The "no retail price recorded" line is gone. It was written for an
- occasional order nobody had typed a sale price on; the manual order
- form no longer asks for one at all, so it appeared under EVERY total —
- a permanent apology for a field that was deliberately removed. The
- dash beside Estimated profit already says there is nothing to work
- out. */}
-                </>
-              )}
-              {/* The unpriced lines say so on the rows themselves ("Not priced · pick a
- blank first"), which is where the fix is. Repeating it in red under the
- total made the same fact an alarm about the total. */}
-            </dl>
-          </SectionCard>
+                    {/* OUR SIDE OF THE SAME ORDER — staff only, and physically separated
+   from the seller's block above because the two are different pots of
+   money. What the blanks cost us is the number a margin is measured
+   against; the server strips it from a seller's quote entirely, so this
+   renders nothing for them even if the markup were wrong. */}
+                    {isStaff && quote?.supplierTotal != null && (
+                      <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                        <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Factory · not shown to the seller</div>
+                        <div className="flex justify-between text-sm">
+                          <dt className="text-muted-foreground">
+                            Product cost
+                            {/* A partial figure says so rather than reading as the total. */}
+                            {quote.supplierKnown != null && quote.lines && quote.supplierKnown < quote.lines.length && (
+                              <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
+                            )}
+                          </dt>
+                          <dd className="tabular-nums">{usd(quote.supplierTotal)}</dd>
+                        </div>
+                        {labelCost > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <dt className="text-muted-foreground">Postage we bought</dt>
+                            <dd className="tabular-nums">{usd(labelCost)}</dd>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                          <dt>Factory margin</dt>
+                          <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
+                            {factoryMargin != null ? usd(factoryMargin)
+   : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
+                          </dd>
+                        </div>
+                      </div>
+                    )}
 
-          {/* Sits under Summary: what was charged, then what can be sent back. Renders
- nothing for sellers and for staff without the permission. */}
-          <OrderRefundPanel orderId={id} />
+                    {/* The "no retail price recorded" line is gone. It was written for an
+   occasional order nobody had typed a sale price on; the manual order
+   form no longer asks for one at all, so it appeared under EVERY total —
+   a permanent apology for a field that was deliberately removed. The
+   dash beside Estimated profit already says there is nothing to work
+   out. */}
+                  </>
+                )}
+                {/* The unpriced lines say so on the rows themselves ("Not priced · pick a
+   blank first"), which is where the fix is. Repeating it in red under the
+   total made the same fact an alarm about the total. */}
+              </dl>
+            </SectionCard>
+
+            {/* Sits under Summary: what was charged, then what can be sent back. Renders
+   nothing for sellers and for staff without the permission. */}
+            <OrderRefundPanel orderId={id} />
+            </>
+          )}
         </div>
       </div>
 

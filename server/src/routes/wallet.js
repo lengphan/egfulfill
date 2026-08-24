@@ -604,7 +604,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
   /** The categories, for a picker. Read from the same object the route validates against,
    *  so a menu can never offer something the server would reject. */
   app.get('/api/wallet/entry-types', { preHandler: requireAuth }, async (req, reply) => {
-    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin only' }; }
     return { types: Object.entries(MANUAL_TYPES).map(([id, label]) => ({ id, label })) };
   });
 
@@ -626,7 +626,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
    * day it is introduced instead of the day someone remembers to add it here.
    */
   app.get('/api/reports/pnl', { preHandler: requireAuth }, async (req, reply) => {
-    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin only' }; }
     const days = Math.max(1, Math.min(365, parseInt(req.query?.days, 10) || 30));
     const r = await q(
       `select type,
@@ -692,7 +692,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
     // hole closed, reopened one role down. Every neighbouring money path already draws
     // the line here (order_refunds canRefund, design_files canPrice, the cancel/refund
     // stages in orders.js), and CLAUDE.md puts wallet-affecting writes at admin/warehouse.
-    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin only' }; }
     const b = req.body || {};
     const account = b.account ? String(b.account) : req.user.sub;
     if (!canAccess(req.user, account)) { reply.code(403); return { error: 'forbidden' }; }
@@ -745,7 +745,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
   app.post('/api/wallet/transfer', { preHandler: requireAuth }, async (req, reply) => {
     // Same narrowing as /ledger above — this moves real money between accounts, including
     // out of `factory`, and an operator or designer has no business doing that.
-    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin only' }; }
     const b = req.body || {};
     const amount = parseFloat(b.amount);
     if (!isFinite(amount) || amount === 0) { reply.code(400); return { error: 'amount must be a non-zero number' }; }

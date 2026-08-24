@@ -189,8 +189,39 @@ export const canManageUsers = (user) => !!user && user.role === 'admin';
  * predicate had already appeared in order_refunds.js (canRefund) and design_files.js
  * (canPrice), while wallet.js gated on the much broader isStaff — which is how operator
  * and designer ended up able to credit any account.
+ *
+ * WAREHOUSE WAS REMOVED (2026-08-24). The floor's job is to PRODUCE — print it, pack it,
+ * scan it out — and none of that requires knowing what an order earns, let alone being able
+ * to send money back to a seller. It had refunds, fee adjustments and four wallet routes
+ * (transfers, ledger writes, payouts) purely because the role predated the split between
+ * "runs the factory" and "runs the business".
+ *
+ * This is the ONE place that decision is written down, which is the point: the refund route,
+ * the fee route and wallet.js all read it, so none of them had to be found and edited, and
+ * none of them can drift back. The client hides the same surfaces, but THIS is the boundary
+ * that refuses — hiding a control that the API would still honour is decoration, not a
+ * permission.
  */
-export const canMoveMoney = (user) => !!user && (user.role === 'admin' || user.role === 'warehouse');
+export const canMoveMoney = (user) => !!user && user.role === 'admin';
+
+/**
+ * Who may SEE money at all — prices, costs, what an order earned, what it can refund.
+ *
+ * Separate from canMoveMoney because reading and moving are different questions for every
+ * role except the one they agree on. An operator reads figures on the boards they work and
+ * cannot move a cent; WAREHOUSE now reads none, which is the point of the role.
+ *
+ * The floor prints, packs and scans. What the order was worth does not inform any of those,
+ * and it is the number most likely to be read over a shoulder on a factory floor — so it is
+ * withheld at the API, not merely hidden on the page. Routes that answer with figures should
+ * return the SAME gated shape a team member gets without the `order_fees` grant: empty
+ * amounts plus `gated: true`, so the client can say "withheld" instead of printing zeros.
+ * Blank and zero look identical and mean opposite things (§4).
+ *
+ * Sellers are not decided here — they see their OWN money, and ownership is resolved
+ * per-route by resolveSeller.
+ */
+export const canSeeMoney = (user) => !!user && user.role !== 'warehouse';
 
 /**
  * Which SELLER account a request acts under, and what that person may see of it.

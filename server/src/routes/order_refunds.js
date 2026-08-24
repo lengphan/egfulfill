@@ -13,7 +13,7 @@
 import { q, withLock } from '../db.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
-import { canMoveMoney, resolveSeller, canSurface } from '../auth.js';
+import { canMoveMoney, canSeeMoney, resolveSeller, canSurface } from '../auth.js';
 import { notify } from './notifications.js';
 import { notifyChannelStillOpen } from './orders.js';
 
@@ -483,6 +483,13 @@ export function orderRefundRoutes(app, requireAuth) {
                  charged: 0, refunded: 0, refundable: 0 };
       }
     }
+    // THE FLOOR IS NOT TOLD WHAT THE ORDER WAS WORTH. Same withheld shape a team member gets
+    // without the order_fees grant, so the page already knows how to say "not shown to you"
+    // rather than printing a row of zeros — which reads as "this order charged nothing".
+    if (!canSeeMoney(req.user)) {
+      return { gated: true, canRefund: false, lines: [], parts: [], refunds: [],
+               charged: 0, refunded: 0, refundable: 0 };
+    }
     const state = await orderCharges(req.params.id);
     return { ...state, canRefund: canRefund(req.user) };
   });
@@ -490,7 +497,7 @@ export function orderRefundRoutes(app, requireAuth) {
   app.post('/api/orders/:id/refund', { preHandler: requireAuth }, async (req, reply) => {
     if (!canRefund(req.user)) {
       reply.code(403);
-      return { error: 'Only admin or warehouse can refund an order.' };
+      return { error: 'Only an admin can refund an order.' };
     }
     const b = req.body || {};
     const before = await orderCharges(req.params.id);
@@ -569,7 +576,7 @@ export function orderRefundRoutes(app, requireAuth) {
   app.post('/api/orders/:id/fee', { preHandler: requireAuth }, async (req, reply) => {
     if (!canRefund(req.user)) {
       reply.code(403);
-      return { error: 'Only admin or warehouse can adjust what an order charges.' };
+      return { error: 'Only an admin can adjust what an order charges.' };
     }
     const b = req.body || {};
     const out = await chargeOrderFee({

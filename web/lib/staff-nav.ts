@@ -127,7 +127,10 @@ export const STAFF_TOOLS: StaffNavItem[] = [
   // Wallet moved into Finance (a STAFF_ITEM) — kept out of Tools to avoid two entries.
   // API keys are a SELLER integration concern — an operator minting live keys is
   // not something the role needs. Warehouse keeps it for connection testing.
-  { label: "Developers", href: "/developers", icon: Code, roles: ["warehouse", "admin"] },
+  // ADMIN ONLY (2026-08-24). Warehouse was here for no reason anyone could point at — an API
+  // playground, keys and webhooks are not part of printing, packing or scanning, and the role
+  // is production-only now. Same sweep that took its money surfaces away.
+  { label: "Developers", href: "/developers", icon: Code, roles: ["admin"] },
 ]
 export function staffTools(role?: string | null): StaffNavItem[] {
   if (!role) return []

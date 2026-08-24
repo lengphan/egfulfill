@@ -66,6 +66,28 @@ export function getUser(): User | null {
  * User it doesn't have, and its remember flag would MOVE the session between localStorage
  * and sessionStorage, quietly converting "don't remember me" into "remember me".
  */
+/**
+ * WHO MAY SEE MONEY — prices, costs, what an order earned, what it can refund.
+ *
+ * Mirrors canSeeMoney() in server/src/auth.js, which is the boundary that actually refuses:
+ * the charges route answers a warehouse hand with the withheld shape (`gated: true`), so
+ * these figures are not merely hidden here, they never arrive. This exists so the page does
+ * not render an empty money panel it will never be able to fill.
+ *
+ * WAREHOUSE SEES NONE (2026-08-24). The floor prints, packs and scans; what the order was
+ * worth informs none of that, and it is the number most likely to be read over a shoulder on
+ * a factory floor. Every other staff role is unchanged.
+ *
+ * ONE PREDICATE, not a role test per panel. There were eight hand-rolled
+ * `role === "admin" || role === "warehouse"` checks across the app and they had already
+ * drifted — payouts.js spelled its own out and would have kept paying after every other
+ * surface moved. Import this; never re-derive it.
+ */
+export function canSeeMoney(role?: string | null): boolean {
+  const r = String(role ?? getUser()?.role ?? "")
+  return !!r && r !== "warehouse"
+}
+
 export function setToken(token: string) {
   try {
     for (const s of stores()) {

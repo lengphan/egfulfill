@@ -298,7 +298,11 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  const [role, setRole] = useState("")
  const confirm = useConfirm()
 
- const canPrice = role === "admin" || role === "warehouse"
+  // ADMIN ONLY, matching design_files.js exactly — its gate is canMoveMoney, which warehouse
+  // lost on 2026-08-24. This read `admin || warehouse`, so a warehouse hand would now be
+  // offered a price field the API answers 403 to, and a control that is always refused is
+  // worse than no control (§4).
+  const canPrice = role === "admin"
   /**
    * Mounted for a LINE → that line's own files, plus the order-wide ones. Mounted for the
    * order → everything.

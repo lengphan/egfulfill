@@ -35,7 +35,9 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   // Admin and warehouse share the factory wallet, and the server already lets ANY staff
   // confirm or reject (topups.js gates on isStaff) — so the admin-only check here was the
   // outlier, hiding a panel from someone the API would happily have served.
- const canReview = ["admin", "warehouse"].includes(getUser()?.role ?? "")
+ // Admin only. Warehouse lost every money surface on 2026-08-24 (canMoveMoney in
+  // server/src/auth.js is the gate that refuses); this pair had its own copy of the rule.
+  const canReview = getUser()?.role === "admin"
  const [topups, setTopups] = useState<TopupRequest[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
  const load = useCallback(() => { if (canReview) getTopups("pending").then((r) => setTopups(r ?? [])).catch(() => setTopups([])) }, [canReview])
@@ -101,7 +103,7 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
 // They pay the seller off-platform using the details shown, then Mark paid to debit the
 // wallet. Gated to admin/warehouse because it moves money OUT (the server enforces it too).
 function AdminPayouts({ onPaid }: { onPaid: () => void }) {
- const canPay = ["admin", "warehouse"].includes(getUser()?.role ?? "")
+   const canPay = getUser()?.role === "admin"
  const [rows, setRows] = useState<PayoutRequest[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
  const [err, setErr] = useState<string | null>(null)
@@ -397,7 +399,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // Admin and warehouse share the FACTORY wallet, which is a pure internal ledger — there
   // is nothing to withdraw from it and no bank/card account to link, so those controls are
   // hidden for them. Sellers keep Withdraw, which now opens the payout flow.
- const isFactoryWallet = ["admin", "warehouse"].includes(getUser()?.role ?? "")
+   const isFactoryWallet = getUser()?.role === "admin"
 
  const refresh = useCallback(() => {
     // Signed in → the real server balance (server-authoritative), or zeros if empty.
