@@ -26,3 +26,19 @@ export function ourSku(sku: string | null | undefined): string {
   const s = String(sku ?? "").trim()
   return /^EG-/i.test(s) ? s : ""
 }
+
+/**
+ * THE CODE TO PRINT: ours if it has one, the supplier's if that is all there is.
+ *
+ * Preferring ours matters exactly where BOTH exist — a product carrying `EG-1005` and
+ * `102-664-001` must be offered, filed and read as EG-1005. Showing the supplier's when ours
+ * is missing beats showing nothing: a catalogue holds near-identical names, and the code is
+ * the half that tells two cuts of the same shirt apart while somebody is picking one.
+ *
+ * A blank where a code should be is also the wrong lesson to teach. The real fix is that every
+ * product HAS one of ours, which is why the editor now says so at the moment a product is
+ * created rather than leaving it to be noticed on a dropdown months later.
+ */
+export function displaySku(p: { sku?: string | null; supplierSku?: string | null } | null | undefined): string {
+  return ourSku(p?.sku) || String(p?.supplierSku ?? "").trim() || String(p?.sku ?? "").trim()
+}

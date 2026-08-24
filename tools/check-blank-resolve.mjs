@@ -178,9 +178,22 @@ for (const c of SKUS) {
   if (v !== want) fail.push(`server ourSku("${c.sku}") → "${v}", expected "${want}"`)
   if (w !== v) fail.push(`DRIFT on ourSku("${c.sku}") — web "${w}", server "${v}"`)
 }
+/* And the PREFERENCE, which is the whole point: ours where both exist, theirs where only
+   theirs does, never a blank where a code should be. */
+const DISPLAY = [
+  { p: { sku: 'EG-1005', supplierSku: '102-664-001' }, want: 'EG-1005' },
+  { p: { sku: '10892', supplierSku: '' }, want: '10892' },
+  { p: { sku: '', supplierSku: '103-713-031753A' }, want: '103-713-031753A' },
+  { p: { sku: '', supplierSku: '' }, want: '' },
+]
+for (const c of DISPLAY) {
+  const got = ours.displaySku(c.p)
+  if (got !== c.want) fail.push(`displaySku(${JSON.stringify(c.p)}) → "${got}", expected "${c.want}"`)
+}
+
 // The label the dropdowns offer, and what a line then carries.
 const LABELS = [
-  { p: { name: 'Adams Headwear LP104', sku: '10892' }, want: 'Adams Headwear LP104' },
+  { p: { name: 'Adams Headwear LP104', sku: '10892' }, want: '10892 - Adams Headwear LP104' },
   { p: { name: 'Gildan Unisex Heavy Blend™ Crewneck Sweatshirt', sku: 'EG-18000' }, want: 'EG-18000 - Gildan Unisex Heavy Blend™ Crewneck Sweatshirt' },
   { p: { name: '', sku: 'EG-1002' }, want: 'EG-1002' },
 ]
@@ -216,5 +229,5 @@ if (fail.length) {
   process.exit(1)
 }
 console.log(`web/lib/variant-resolve.ts and server/src/pricing.js agree across ${CASES.length} resolution cases,`)
-console.log(`${SKUS.length} sku cases and ${LABELS.length} labels — including the composite "SKU - NAME" blank the`)
+console.log(`${SKUS.length} sku cases, ${DISPLAY.length} preferences and ${LABELS.length} labels — including the composite "SKU - NAME" blank the`)
 console.log('order grid and the import sheet write, and the vendor part numbers that must never be printed.')

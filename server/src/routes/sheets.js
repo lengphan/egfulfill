@@ -252,6 +252,9 @@ export async function catalogLists() {
     products.push({
       name,
       sku: String(r.sku || '').trim(),
+      // Carried so the label can prefer OURS and fall back to theirs — it is used to name a
+      // row in a dropdown, never written into the sheet's own columns.
+      supplierSku: String(d.supplierSku || '').trim(),
       colors: clean(productColors(d)),
       sizes: clean(productSizes(d)),
       methods,
@@ -365,9 +368,10 @@ export function buildTemplate(title, lists = null) {
    * The same label is the MATCH key in column A, so the dependent colour/size/method ranges
    * keep resolving — they look the picked cell up in this column by MATCH.
    */
-  /* OUR code, never the supplier's — one rule, imported (see ourSku in pricing.js). This
-     dropdown is the one a seller reads, and it was offering vendor part numbers. */
-  const label = (p) => (ourSku(p.sku) ? `${ourSku(p.sku)} - ${p.name}` : p.name);
+  /* OURS first, the supplier's only when there is nothing of ours — one rule, imported (see
+     ourSku in pricing.js and displaySku on the web side). This dropdown is the one a seller
+     reads, and it was offering a vendor part number even for products that HAVE our code. */
+  const label = (p) => { const c = ourSku(p.sku) || String(p.supplierSku || p.sku || '').trim(); return c ? `${c} - ${p.name}` : p.name; };
   const listCols = [];
   listCols.push(['Product', ...P.map(label)]);
   AXES.forEach(([axis], a) => listCols.push([`All ${axis}`, ...UNIONS[a]]));

@@ -24,6 +24,7 @@ import {
 import { getToken, getUser } from "@/lib/auth"
 import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
 import { nextEgSku } from "@/lib/sku"
+import { ourSku } from "@/lib/our-sku"
 import { EmptyState } from "@/components/app/empty-state"
 
 const PAGE = 30
@@ -338,7 +339,20 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
        *
        * Only when it is missing: whatever the operator typed wins, always.
        */
- const withSku = product.sku ? product : { ...product, sku: nextEgSku(existing) }
+      /**
+       * OURS UNLESS IT ALREADY IS OURS — the hole those eight products came through.
+       *
+       * This read `product.sku ? product : …`, so a builder that had put ANY code in the
+       * field — the supplier's own style number, which is what a supplier feed carries —
+       * kept it, and that number became our sku for the life of the product. Everything that
+       * prints a sku then printed the vendor's part number.
+       *
+       * The supplier's code is not thrown away: it moves to `supplierSku`, which is where it
+       * belongs and which the server strips from a seller's copy.
+       */
+ const withSku = ourSku(product.sku)
+        ? product
+ : { ...product, sku: nextEgSku(existing), supplierSku: product.supplierSku || product.sku || undefined }
  const next = existing.some((p) => p.id === withSku.id) ? existing.map((p) => (p.id === withSku.id ? withSku : p)) : [...existing, withSku]
  await saveCatalogProducts(next)
  if (previewKey) setAdded((prev) => new Set(prev).add(previewKey))
