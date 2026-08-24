@@ -256,6 +256,11 @@ export function EditableText({ path, children }: { path: ContentPath; children: 
         const next = e.currentTarget.textContent ?? ""
         if (next !== value) write(path, next)
       }}
+      /* A LABEL INSIDE A LINK MUST NOT FOLLOW IT while it is being edited. Three of these sit
+         in a CTA pill, so clicking to place the caret navigated to /signup and took the page —
+         and the draft — with it. Only the click is cancelled; mousedown is what places the
+         caret, so the field still behaves like a field. */
+      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
       onKeyDown={(e) => {
         if (e.key === "Escape") { e.currentTarget.textContent = value; e.currentTarget.blur() }
         // Enter commits rather than inserting a newline: these are headlines and labels, and

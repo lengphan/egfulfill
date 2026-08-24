@@ -24,6 +24,7 @@
 import { motion, useReducedMotion } from "motion/react"
 import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
 import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
+import { EditableText } from "@/components/marketing/edit-mode"
 
 /** The caps label these boards use everywhere: small, wide, quiet. One definition, because
  *  four different letter-spacings across a page is what makes labels read as noise. */
@@ -38,9 +39,35 @@ export const CAPS = "text-[11px] font-semibold uppercase tracking-[0.18em]"
  *
  * `right` is optional: one label and a rule running off to the margin is the same device.
  */
-export function LabelRule({ left, right, tone = "ink", className = "" }: {
+
+/**
+ * A STRING THAT CAN BE EDITED WHERE IT SITS — when the caller says where it came from.
+ *
+ * Every component in this kit renders words that live in the stored site content, and until
+ * now only the home page's headline could be edited in place: the kit drew its strings as
+ * plain text, so a heading, a stat, a callout or a card was changeable only through Settings,
+ * which is the round trip the inline editor exists to remove.
+ *
+ * `path` is the dotted address of that string in the content blob. Given one, the words come
+ * through EditableText — which is inert until edit mode is on, so nothing about the public
+ * page changes. Given none (a page that isn't editable yet, or a value with no home in the
+ * blob) it renders the string exactly as before.
+ *
+ * One helper rather than an `editing ?` ternary at forty call sites: EditableText already
+ * decides that for itself, and forty copies of the decision is how half of them come to
+ * disagree.
+ */
+function Words({ path, children }: { path?: string; children: string }) {
+  if (!path) return <>{children}</>
+  return <EditableText path={path}>{children}</EditableText>
+}
+
+export function LabelRule({ left, right, tone = "ink", className = "", leftPath, rightPath }: {
   left: string
   right?: string
+  /** Where each word lives in the content blob, so the rule is editable in place. */
+  leftPath?: string
+  rightPath?: string
   /** Which ground it is drawn on. `light` is the same rule inverted, for a dark panel — a
    *  hairline at HAIRLINE's value simply does not exist against the accent. */
   tone?: "ink" | "light"
@@ -50,9 +77,9 @@ export function LabelRule({ left, right, tone = "ink", className = "" }: {
   const fg = tone === "light" ? ACCENT_INK : INK
   return (
     <div className={`flex items-center gap-4 ${className}`} style={{ color: fg }}>
-      {left && <span className={`${CAPS} shrink-0 opacity-70`}>{left}</span>}
+      {left && <span className={`${CAPS} shrink-0 opacity-70`}><Words path={leftPath}>{left}</Words></span>}
       <span className="h-px flex-1" style={{ background: tone === "light" ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE }} />
-      {right && <span className={`${CAPS} shrink-0 text-right opacity-70`}>{right}</span>}
+      {right && <span className={`${CAPS} shrink-0 text-right opacity-70`}><Words path={rightPath}>{right}</Words></span>}
     </div>
   )
 }
@@ -71,7 +98,8 @@ export function LabelRule({ left, right, tone = "ink", className = "" }: {
  * question. Nothing is measured against it because nothing is ON it.
  */
 export function GhostWord({ children, color = INK, opacity = 0.05, className = "" }: {
-  children: string
+  /** A node, not a string, so the word can arrive wrapped in an editor (see Words). */
+  children: React.ReactNode
   /** The ground decides this, not the caller's taste: ink on paper, paper on the plate. */
   color?: string
   /** Ink on white disappears at 0.05; paper on a dark plate needs more to read as texture
@@ -103,7 +131,11 @@ export function GhostWord({ children, color = INK, opacity = 0.05, className = "
  * `src` empty renders NOTHING — not a placeholder, not a grey box. An unset image on a live
  * marketing page must not look like a broken one (§4), and the caller decides what stands in.
  */
-export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", tall = false, className = "" }: {
+export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", tall = false, className = "", ghostPath, calloutsPath }: {
+  /** Where the ghost word and the callouts live in the content blob, so both are editable
+   *  in place. Absent → drawn exactly as before. */
+  ghostPath?: string
+  calloutsPath?: string
   src: string
   /** What the picture IS. Never "hero image" — it is a garment, and the alt text is the only
    *  version of it some people get. */
@@ -180,7 +212,7 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
         />
         {/* Paper needs 0.05 to stay texture; on the plate the same value is invisible, so the
             word is set in the plate's own foreground at a strength that still reads as ground. */}
-        {ghost && <GhostWord color={fg} opacity={ink ? 0.1 : 0.05}>{ghost}</GhostWord>}
+        {ghost && <GhostWord color={fg} opacity={ink ? 0.1 : 0.05}><Words path={ghostPath}>{ghost}</Words></GhostWord>}
 
         <motion.div
           className="relative flex items-center justify-center py-6"
@@ -208,7 +240,7 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
         * length say the same thing and cannot end up pointing at empty air — which is what
         * fake precision looks like the first time the image is replaced.
         */}
-      <CalloutList items={callouts} tone={tone} className="flex-col justify-center lg:max-w-xs" />
+      <CalloutList items={callouts} path={calloutsPath} tone={tone} className="flex-col justify-center lg:max-w-xs" />
     </div>
   )
 }
@@ -228,8 +260,10 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
  * that changes. A second copy of these eighteen lines is how the dot ends up 1.5px here and
  * 2px there (CLAUDE.md §4).
  */
-export function CalloutList({ items, tone = "paper", className = "" }: {
+export function CalloutList({ items, tone = "paper", className = "", path }: {
   items: Callout[]
+  /** The list's address in the content blob ("hero.callouts"); each item's fields hang off it. */
+  path?: string
   tone?: "paper" | "ink"
   className?: string
 }) {
@@ -255,10 +289,10 @@ export function CalloutList({ items, tone = "paper", className = "" }: {
           <span className="mt-[0.4rem] size-1.5 shrink-0 rounded-full" style={{ background: dot }} />
           <span className="mt-[0.45rem] hidden h-px w-8 shrink-0 lg:block" style={{ background: rule }} />
           <span className="min-w-0">
-            <span className={`${CAPS} block`} style={{ color: fg }}>{c.label}</span>
+            <span className={`${CAPS} block`} style={{ color: fg }}><Words path={path && `${path}.${i}.label`}>{c.label}</Words></span>
             {/* 0.7 on the plate, not 0.55: a note at paper's strength against a dark ground
                 drops below the 4.5:1 floor, and this one is real body copy. */}
-            {c.note && <span className="mt-1 block text-xs leading-snug" style={{ color: fg, opacity: ink ? 0.7 : 0.55 }}>{c.note}</span>}
+            {c.note && <span className="mt-1 block text-xs leading-snug" style={{ color: fg, opacity: ink ? 0.7 : 0.55 }}><Words path={path && `${path}.${i}.note`}>{c.note}</Words></span>}
           </span>
         </motion.div>
       ))}
@@ -277,7 +311,7 @@ export function CalloutList({ items, tone = "paper", className = "" }: {
  * The vertical rules are on the ITEM, not between items, so the strip wraps at any count
  * without a divider ending up dangling at the start of a row.
  */
-export function SpecStrip({ items, className = "" }: { items: Stat[]; className?: string }) {
+export function SpecStrip({ items, className = "", path }: { items: Stat[]; className?: string; path?: string }) {
   const reduce = useReducedMotion()
   if (!items.length) return null
   return (
@@ -305,9 +339,9 @@ export function SpecStrip({ items, className = "" }: { items: Stat[]; className?
         >
           {/* tabular-nums so a row of figures lines up on the decimal — the thing that makes
               a strip read as a spec sheet rather than as five separate sentences. */}
-          <div className="font-title text-2xl font-semibold tabular-nums tracking-tight" style={{ color: INK }}>{s.value}</div>
-          <div className={`${CAPS} mt-2`} style={{ color: INK, opacity: 0.5 }}>{s.label}</div>
-          {s.note && <div className="mt-1.5 text-sm leading-snug" style={{ color: INK, opacity: 0.6 }}>{s.note}</div>}
+          <div className="font-title text-2xl font-semibold tabular-nums tracking-tight" style={{ color: INK }}><Words path={path && `${path}.${i}.value`}>{s.value}</Words></div>
+          <div className={`${CAPS} mt-2`} style={{ color: INK, opacity: 0.5 }}><Words path={path && `${path}.${i}.label`}>{s.label}</Words></div>
+          {s.note && <div className="mt-1.5 text-sm leading-snug" style={{ color: INK, opacity: 0.6 }}><Words path={path && `${path}.${i}.note`}>{s.note}</Words></div>}
         </motion.div>
       ))}
     </div>
@@ -325,7 +359,7 @@ export function SpecStrip({ items, className = "" }: { items: Stat[]; className?
  * have to know which colour keeps the pattern honest, and a stored boolean is a stored
  * mistake waiting for someone to reorder the list.
  */
-export function NumberedCards({ items, className = "" }: { items: NumberedItem[]; className?: string }) {
+export function NumberedCards({ items, className = "", path }: { items: NumberedItem[]; className?: string; path?: string }) {
   const reduce = useReducedMotion()
   if (!items.length) return null
 
@@ -381,8 +415,8 @@ export function NumberedCards({ items, className = "" }: { items: NumberedItem[]
               {String(i + 1).padStart(2, "0")}
             </div>
             <div className="my-4 h-px" style={{ background: dark ? "rgba(255,255,255,0.18)" : HAIRLINE }} />
-            <div className="text-lg font-semibold leading-snug tracking-[-0.01em]">{it.title}</div>
-            {it.body && <p className="mt-2 text-sm leading-relaxed opacity-70">{it.body}</p>}
+            <div className="text-lg font-semibold leading-snug tracking-[-0.01em]"><Words path={path && `${path}.${i}.title`}>{it.title}</Words></div>
+            {it.body && <p className="mt-2 text-sm leading-relaxed opacity-70"><Words path={path && `${path}.${i}.body`}>{it.body}</Words></p>}
             {/*
               * THE SPECIFICS. An em dash and a word, not a bullet glyph and not a tick.
               *
@@ -397,8 +431,8 @@ export function NumberedCards({ items, className = "" }: { items: NumberedItem[]
               */}
             {it.points && it.points.length > 0 && (
               <ul className="mt-4 space-y-1.5">
-                {it.points.map((pt) => (
-                  <li key={pt} className="text-[13px] leading-snug opacity-60">— {pt}</li>
+                {it.points.map((pt, j) => (
+                  <li key={pt} className="text-[13px] leading-snug opacity-60">— <Words path={path && `${path}.${i}.points.${j}`}>{pt}</Words></li>
                 ))}
               </ul>
             )}
