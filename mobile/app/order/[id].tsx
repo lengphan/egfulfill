@@ -351,9 +351,9 @@ export default function OrderDetail() {
           <View style={{
             ...SECTION,
           }}>
-            {addressLines(o.address).length > 0 ? (
+            {addressLines(o).length > 0 ? (
               <>
-                {addressLines(o.address).map((l, i) => (
+                {addressLines(o).map((l, i) => (
                   <Text
                     key={i}
                     selectable

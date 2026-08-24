@@ -55,7 +55,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, customerOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities, shipAddressOf } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -276,16 +276,13 @@ const MAIL_CLASSES: { id: string; label: string }[] = [
 // anyone else and vanished on a different machine. localStorage is now just a warm cache
 // so the field isn't empty on first paint.
 
-// Pull a shippable recipient out of an order's stored address (handles Etsy + manual key shapes).
+// Pull a shippable recipient out of an order's stored address. The spelling fallbacks live
+// in the shared reader; this only renames its fields for the carrier payload.
 const toAddrOf = (o: OrderRow): ShipAddress => {
- const a = (o.address ?? {}) as Record<string, string>
- return {
- name: o.customer?.name || a.name || "",
- street: a.street || a.first_line || a.line1 || a.address1 || "",
- street2: a.street2 || a.second_line || a.line2 || a.address2 || "",
- city: a.city || "",
- state: a.state || a.province || "",
- zip: a.zip || a.postal_code || a.postcode || "",
+  const a = shipAddressOf(o)
+  return {
+    name: a.name, street: a.line1, street2: a.line2,
+    city: a.city, state: a.state, zip: a.zip,
   }
 }
 const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
@@ -2617,14 +2614,16 @@ export function OrdersHub() {
  note. Previously none of this was reachable from a factory board at
  all, so staff had to open the seller's order page to read them. */}
                   {!isCollapsed && (() => {
- const a = (o.address ?? {}) as Record<string, string>
- const street = a.street || a.first_line || a.line1 || a.address1 || ""
                     // The server hides a marketplace buyer's street/ZIP/phone/email from the
                     // seller side and stamps `masked`. Without reading that flag this panel
                     // would say "Not available yet" — which is the OPPOSITE of true and the
-                    // exact confusion Etsy's redacted addresses already caused once.
- const masked = !!(o.address as { masked?: boolean } | null)?.masked
- const notes = (o as { notes?: string | null }).notes
+                    // exact confusion Etsy's redacted addresses already caused once. Both
+                    // come off the shared reader, so this panel and the order page cannot
+                    // disagree about what the address says.
+                    const a = shipAddressOf(o)
+                    const street = a.line1
+                    const masked = a.masked
+                    const notes = (o as { notes?: string | null }).notes
  const personal = (o.items ?? []).map((it) => (it as { personalization?: string | null }).personalization).filter(Boolean)
  if (!street && !masked && !notes && !personal.length) return null
  return (
@@ -2636,9 +2635,7 @@ export function OrdersHub() {
                             // missing. Region is kept so a seller can still recognise the
                             // order and answer "did it go to the right place?".
                             <div className="leading-relaxed">
-                              {(o.customer?.name || a.name) && (
-                                <div className="font-medium text-foreground">{o.customer?.name || a.name}</div>
-                              )}
+                              {a.name && <div className="font-medium text-foreground">{a.name}</div>}
                               <div className="select-none tracking-widest text-muted-foreground">••••••••••</div>
                               <div>{[a.city, a.state].filter(Boolean).join(", ")}</div>
                               {a.country && <div>{a.country}</div>}
@@ -2648,11 +2645,11 @@ export function OrdersHub() {
                             </div>
                           ) : street ? (
                             <div className="leading-relaxed">
-                              {o.customer?.name && <div className="font-medium text-foreground">{o.customer.name}</div>}
+                              {a.name && <div className="font-medium text-foreground">{a.name}</div>}
                               <div>{street}</div>
-                              {(a.street2 || a.second_line || a.line2) && <div>{a.street2 || a.second_line || a.line2}</div>}
-                              <div>{[a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")}</div>
-                              {(a.country || a.country_iso) && <div>{a.country || a.country_iso}</div>}
+                              {a.line2 && <div>{a.line2}</div>}
+                              <div>{[a.city, a.state, a.zip].filter(Boolean).join(", ")}</div>
+                              {a.country && <div>{a.country}</div>}
                             </div>
                           ) : (
                             <div className="text-muted-foreground">{tl("ui", "Not available yet.")}</div>

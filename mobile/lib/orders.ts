@@ -250,24 +250,18 @@ export const STAGE_VERB: Record<string, string> = {
 
 
 /**
- * THE DELIVERY ADDRESS AS LINES, in the order an envelope is read.
+ * THE DELIVERY ADDRESS — read from the shared reader, not from a copy.
  *
- * Returned as an array rather than a joined string because a phone renders it as an
- * address block, and joining with commas here would force the caller to split it again.
- * Empty array means nothing usable — which is a real state on an Etsy order, where the
- * buyer's address is withheld behind Etsy's app-tier PII gate and is NOT our bug.
+ * This function used to read `street1 || street` and nothing else. Those are the two
+ * spellings SHIPPO writes (shipping.js:52); every marketplace sync writes `line1`
+ * (etsy.js:317, shopify.js:210, tiktok.js:358). So the phone showed a buyer's name and
+ * city with no street on the majority of the table, while the web — which had grown a
+ * four-spelling reader — showed the same order in full. It failed silently because the
+ * block still LOOKED like an address.
+ *
+ * Re-exported under the names the screens already use, so no screen import changed and
+ * there is one definition behind them. Same arrangement as the stage rules above, for the
+ * same reason.
  */
-export function addressLines(a?: {
-  name?: string | null; street1?: string | null; street?: string | null; street2?: string | null
-  city?: string | null; state?: string | null; zip?: string | null; country?: string | null
-} | null): string[] {
-  if (!a) return []
-  const cityLine = [a.city, a.state].filter(Boolean).join(", ")
-  return [
-    a.name,
-    a.street1 || a.street,
-    a.street2,
-    [cityLine, a.zip].filter(Boolean).join(" "),
-    a.country,
-  ].map((v) => String(v ?? "").trim()).filter(Boolean)
-}
+export { shipAddressOf, hasStreet, isShippable, addressLines } from "@shared/order-address"
+export type { ShipTo, StoredAddress } from "@shared/order-address"

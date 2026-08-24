@@ -2,7 +2,7 @@ import { useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, Alert, TextInput } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { getShippingRates, buyShippingLabel, type Order, type ShipAddress, type ShippingRate } from "@/lib/api"
-import { addressLines } from "@/lib/orders"
+import { addressLines, shipAddressOf, isShippable } from "@/lib/orders"
 import { F,C, R } from "@/lib/theme"
 
 /**
@@ -48,7 +48,28 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
    * goes.
    */
   const [edit, setEdit] = useState(false)
-  const [form, setFormState] = useState<ShipAddress>(() => ({ ...(order.address ?? {}) }))
+  /*
+   * SEEDED THROUGH THE SHARED READER, not from the raw column.
+   *
+   * This spread `order.address` straight into the form. That column is jsonb whose writers
+   * disagree on the street's name — every marketplace sync writes `line1` — while this form
+   * and the carrier both speak `street1`. So on an Etsy, Shopify or TikTok order the Street
+   * field came up EMPTY, `enough` below went false, and the phone reported "no delivery
+   * address on this order yet" about an order that had one. Staff either retyped an address
+   * we already held, or believed us and did not buy the label.
+   *
+   * Built field by field rather than spread, so `masked`, `source` and `ref` — bookkeeping
+   * that is not part of a destination — never travel to the carrier.
+   */
+  const [form, setFormState] = useState<ShipAddress>(() => {
+    const a = shipAddressOf(order)
+    const raw = (order.address ?? {}) as { phone?: string | null; email?: string | null }
+    return {
+      name: a.name, street1: a.line1, street2: a.line2,
+      city: a.city, state: a.state, zip: a.zip, country: a.country,
+      phone: raw.phone ?? null, email: raw.email ?? null,
+    }
+  })
   /* Any edit drops quoted rates: a price fetched for the previous ZIP is not this
      parcel's price, and leaving it on screen invites buying it. */
   const setForm = (fn: (f: ShipAddress) => ShipAddress) => { setFormState(fn); setRates(null) }
@@ -58,7 +79,9 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
      not enough to buy anything with. Saying so is better than a button that always errors:
      it is a permission, not a failure. */
   const masked = !!order.address?.masked
-  const enough = !!to && !masked && !!(to.street1 || to.street) && !!to.zip
+  /* Read the FORM the same way everything else reads an address, so a street typed in
+     above counts exactly like one that arrived on the order. */
+  const enough = !!to && !masked && isShippable({ address: to })
 
   const load = async () => {
     if (!to) return
@@ -169,7 +192,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
           </View>
         ) : (
           <View>
-            {addressLines(form).map((l, i) => (
+            {addressLines({ address: form }).map((l, i) => (
               <Text key={i} style={{ fontSize: 15, color: i === 0 ? C.fg : C.muted, fontWeight: i === 0 ? "700" : "400" }}>
                 {l}
               </Text>

@@ -1,6 +1,7 @@
 import Constants from "expo-constants"
 import * as SecureStore from "expo-secure-store"
 import { remember } from "@/lib/order-cache"
+import type { StoredAddress } from "@shared/order-address"
 
 /**
  * The ONE place the app talks to the server — same rule the web client follows.
@@ -136,10 +137,15 @@ export type Order = {
   tracking?: string | null
   status?: string | null
   total?: number | string | null
-  /** The buyer's address. STAFF ONLY in full — the server masks it to city/state/country
-   *  for a seller (maskBuyerPII), which is why buying a label is a staff action: the fields
-   *  a carrier needs are the ones a seller is never sent. */
-  address?: ShipAddress | null
+  /** The buyer's address, AS STORED — jsonb whose writers spell the street four different
+   *  ways, which is why it is `StoredAddress` and not `ShipAddress`. Typing it as the latter
+   *  is what let `street1` be read off a column that mostly holds `line1`; read it through
+   *  shipAddressOf(), never field by field.
+   *
+   *  STAFF ONLY in full — the server masks it to city/state/country for a seller
+   *  (maskBuyerPII), which is why buying a label is a staff action: the fields a carrier
+   *  needs are the ones a seller is never sent. */
+  address?: StoredAddress | null
   /** Who the order is for. Masked to a name alone for a seller on a marketplace order. */
   customer?: { name?: string | null; email?: string | null; masked?: boolean } | null
   /** The carrier's label PDF. STAFF ONLY — the server nulls it for a seller, because the

@@ -19,7 +19,7 @@ import { StagedLabelRow, UploadLabelRow, useLabelPullBack, AddLabelButton, PageD
 import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
-import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, unitsOf, addrLine, shipAddressOf } from "@/lib/order-format"
 import { printPackingSlips as printSlips } from "@/lib/packing-slip"
 import { canSetStage, canWalk, stagePath, normalizeStage, isException, orderStage, isFactoryOrder } from "@/lib/factory-status"
 import { TabBar } from "@/components/app/tab-bar"
@@ -53,17 +53,13 @@ const needsScan = (o: OrderRow) => {
  return !!o.tracking && !o.label_scanned_at && fs !== "shipped" && !isException(fs)
 }
 
-// Ship-to for the inline label dialog, read from the order's address with the same loose
-// fallbacks the boards use (marketplace payloads spell the fields a dozen ways).
+// Ship-to for the inline label dialog. The spelling fallbacks live in the shared reader —
+// this only renames its fields for the carrier payload.
 const toShip = (o: OrderRow): ShipAddress => {
- const a = (o.address ?? {}) as Record<string, string>
- return {
- name: o.customer?.name || a.name || "",
- street: a.street || a.first_line || a.line1 || a.address1 || "",
- street2: a.street2 || a.second_line || a.line2 || a.address2 || "",
- city: a.city || "",
- state: a.state || a.province || "",
- zip: a.zip || a.postal_code || a.postcode || "",
+  const a = shipAddressOf(o)
+  return {
+    name: a.name, street: a.line1, street2: a.line2,
+    city: a.city, state: a.state, zip: a.zip,
   }
 }
 // History = every order that ever had a label, and WHAT BECAME OF IT — so a label pulled

@@ -9,6 +9,7 @@
 // states are unchanged, only their home is.
 
 import { designForLine, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
+import { isShippable } from "@/lib/order-format"
 
 export type ReadyState = "todo" | "doing" | "done"
 /** A tag's state plus the sentence that explains it (the popover's subtitle, and the
@@ -41,8 +42,7 @@ export function orderReadiness(
   // A label needs an address, so its absence covers both — the tooltip names the reason
   // rather than spending a second tag on it.
   const hasLabel = !!order.tracking
-  const addr = (order.address ?? {}) as Record<string, string>
-  const hasAddr = !!((addr.street || addr.first_line || addr.line1 || addr.address1) && (addr.zip || addr.postal_code))
+  const hasAddr = isShippable(order)
   const labelStatus = hasLabel
     ? `Label ${order.label_printed_at ? "printed" : "created"} · ${order.tracking}`
     : hasAddr ? "No label bought yet" : "No address yet — a label can't be created without one"

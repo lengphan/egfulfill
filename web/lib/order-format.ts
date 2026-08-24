@@ -159,52 +159,20 @@ export const fmtDate = (s?: string | null) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-// Address key shapes differ by source (Etsy sends first_line/second_line, manual
-// sends street/street2), so every reader must accept both.
-const addrOf = (o: OrderRow) => (o.address ?? {}) as Record<string, string>
-
 /**
- * THE SHIP-TO, READ THE SAME WAY ON EVERY SCREEN.
+ * THE SHIP-TO — one reader, and it is NOT in this file any more.
  *
- * `orders.address` is jsonb and its writers do not agree on what the street is called:
+ * It moved to web/shared/order-address.ts on 2026-08-24, because "every screen" turned out
+ * to mean the web screens only: mobile's addressLines() read `street1 || street` and so
+ * showed no street on every Etsy, Shopify and TikTok order — the majority of the table.
+ * A reader that only the web imports is still a private copy, it just has a longer leash.
  *
- *   · etsy.js · shopify.js · tiktok.js          → `line1` / `line2`
- *   · shipping.js fillBlankAddressesFromShippo  → `street` / `street2`
- *
- * That second writer is not an edge case — it is how an Etsy order gets a street AT ALL.
- * Etsy withholds `first_line` from our app tier, Shippo's Etsy app is not restricted, so
- * the backfill copies the address across under ITS spelling. The orders most likely to be
- * stored under `street` are therefore exactly the ones somebody went looking for.
- *
- * The boards read all four spellings. The order detail page read only `line1` — so it
- * printed a buyer's name and city with the street silently absent, while the queue two
- * clicks away showed the same order in full. One order, two screens, opposite answers, and
- * no way to tell "withheld" from "we can't read our own column". That is the private-copy
- * drift the top of this file exists to stop, so the reader lives here now and nowhere else.
- *
- * `masked` rides along because it is the same question: the server strips a marketplace
- * buyer's street and ZIP from the SELLER's copy and stamps this flag. A blank street with
- * `masked` set means "held by the factory"; a blank street without it means we genuinely
- * do not have one. Rendering them identically is what §4 forbids.
+ * Re-exported here so no web call site changes and there is exactly one definition behind
+ * the name. Add a spelling THERE, never here.
  */
-export type ShipTo = {
-  name: string; line1: string; line2: string
-  city: string; state: string; zip: string; country: string
-  masked: boolean
-}
-export function shipAddressOf(o: OrderRow): ShipTo {
-  const a = addrOf(o) as Record<string, string> & { masked?: boolean }
-  return {
-    name: o.customer?.name || a.name || "",
-    line1: a.street || a.first_line || a.line1 || a.address1 || "",
-    line2: a.street2 || a.second_line || a.line2 || a.address2 || "",
-    city: a.city || "",
-    state: a.state || a.province || "",
-    zip: a.zip || a.postal_code || a.postcode || "",
-    country: a.country || a.country_iso || "",
-    masked: !!a.masked,
-  }
-}
+import { shipAddressOf } from "@/shared/order-address"
+export type { ShipTo, StoredAddress } from "@/shared/order-address"
+export { shipAddressOf, hasStreet, isShippable, addressLines } from "@/shared/order-address"
 
 /** Short "City, ST ZIP" for a row. */
 export const addrLine = (o: OrderRow) => {
@@ -232,6 +200,16 @@ export const trackUrl = (carrier?: string | null, tracking?: string | null) => {
  *  filled in by hand. Etsy withholds buyer addresses from the API, so "how did we get
  *  this" is genuinely useful operational information, not trivia. */
 export type AddressSource = "sync" | "csv" | "email" | "label" | "shippo" | "manual" | "none"
+/*
+ * THE ONE DELIBERATE EXCEPTION to reading through shipAddressOf().
+ *
+ * Everywhere else the spelling of the street is noise to be normalised away. Here it is
+ * the SIGNAL — `first_line`/`line1` is what a marketplace sync writes, and that is how
+ * this function knows the address synced rather than being typed. Normalising first would
+ * throw away the only evidence it has, and every order would read "entered by hand".
+ *
+ * So it reads the raw column ON PURPOSE. Don't route it through the shared reader.
+ */
 export const addressSource = (o: OrderRow): AddressSource => {
   const a = (o.address ?? {}) as Record<string, string>
   const has = !!(a.street || a.first_line || a.line1 || a.address1)

@@ -1,5 +1,5 @@
 import { buyUspsLabel, fetchShipmentLabel, type OrderRow, type ShipAddress } from "@/lib/api"
-import { numOf } from "@/lib/order-format"
+import { numOf, shipAddressOf, isShippable } from "@/lib/order-format"
 import { parcelFromOrder } from "@/lib/parcel-from-order"
 import type { CatalogProduct } from "@/lib/api"
 
@@ -37,24 +37,21 @@ export function labelableOrders(orders: OrderRow[]): { ready: OrderRow[]; blocke
   const ready: OrderRow[] = []
   const blocked: { order: OrderRow; reason: string }[] = []
   for (const o of orders) {
-    const a = (o.address ?? {}) as Record<string, string>
-    const street = a.street || a.first_line || a.line1 || a.address1 || ""
-    const zip = a.zip || a.postal_code || ""
     if (o.tracking) blocked.push({ order: o, reason: "already has a label" })
-    else if (!street || !zip) blocked.push({ order: o, reason: "no shipping address yet" })
+    else if (!isShippable(o)) blocked.push({ order: o, reason: "no shipping address yet" })
     else ready.push(o)
   }
   return { ready, blocked }
 }
 
+/* Through the shared reader, then renamed for the carrier payload. This copy had already
+   drifted: it dropped `line2`/`address2` and `province`/`postcode` entirely, so a Shopify
+   apartment number and every Canadian province were missing from the label it bought. */
 const toShipAddress = (o: OrderRow): ShipAddress => {
-  const a = (o.address ?? {}) as Record<string, string>
+  const a = shipAddressOf(o)
   return {
-    name: a.name || "",
-    street: a.street || a.first_line || a.line1 || a.address1 || "",
-    street2: a.street2 || a.second_line || "",
-    city: a.city || "", state: a.state || "",
-    zip: a.zip || a.postal_code || "",
+    name: a.name, street: a.line1, street2: a.line2,
+    city: a.city, state: a.state, zip: a.zip,
   }
 }
 
