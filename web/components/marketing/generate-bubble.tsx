@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Sparkle, X } from "@phosphor-icons/react"
-import { getDeskImageConfig, generateDeskImage, uploadHeroImage, writeSiteCopy, type Backdrop, type CopyKind, type DeskImageConfig } from "@/lib/api"
+import { getDeskImageConfig, generateDeskImage, getRecentDeskImages, uploadHeroImage, writeSiteCopy, type Backdrop, type CopyKind, type DeskImageConfig, type DeskImageShot } from "@/lib/api"
 import { removeBackground } from "@/lib/remove-background"
+import { downscaleDataUrl, downscaleImage } from "@/lib/image-downscale"
 import { cheapestImage, cheapestSize } from "@/lib/ai-cheapest"
 
 /**
@@ -72,6 +73,8 @@ export function GenerateBubble({ onDone, onClose }: {
   const [busy, setBusy] = useState<null | "render" | "cut" | "upload">(null)
   /** Seconds since the press. See the effect below for why a spinner alone was not enough. */
   const [secs, setSecs] = useState(0)
+  /** Renders this account has already paid for. See the strip at the bottom of the panel. */
+  const [past, setPast] = useState<DeskImageShot[]>([])
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -95,6 +98,11 @@ export function GenerateBubble({ onDone, onClose }: {
           if (c.ratios?.length && !c.ratios.includes("3:4")) setRatio(c.ratios[0])
         })
         .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't reach image generation."))
+      /* THE HISTORY IS A SEPARATE READ, and its failure is silent on purpose: not being able
+         to list what you already have is not a reason to stop you making something new. */
+      getRecentDeskImages()
+        .then((r) => setPast(r.images ?? []))
+        .catch(() => setPast([]))
     }, 0)
     return () => clearTimeout(t)
   }, [])
@@ -134,6 +142,50 @@ export function GenerateBubble({ onDone, onClose }: {
     : !cfg.enabled ? "Image generation is switched off."
     : null
 
+  /**
+   * EVERYTHING AFTER THE RENDER: cut it out if asked, make it the right size, store it, paint it.
+   *
+   * Shared by a fresh render and by re-applying one from the strip below, because a picture
+   * you already paid for must not arrive processed differently from a new one.
+   *
+   * TWO THINGS THAT WERE BROKEN HERE, both of them the upload route's contract:
+   *
+   *   IT WANTS A DATA URL. `POST /api/site-content/hero-image` reads `fromDataUrl(dataUrl)`,
+   *   and the no-cut-out branch handed it the render's https address — so turning the cut-out
+   *   OFF could never work. It is fetched back and re-encoded now (the API answers
+   *   `access-control-allow-origin: *`, so this is allowed and the canvas stays readable).
+   *
+   *   AND IT CAPS AT 8MB. A 4K render cut out to a transparent PNG is comfortably past that,
+   *   which ended the whole flow in "Image is over 8MB — resize it first" — for a hero figure
+   *   that is never drawn above 26rem. Downscaled first, through the one function that knows
+   *   alpha has to survive.
+   */
+  const place = useCallback(async (src: string) => {
+    let dataUrl: string
+    if (cutOut) {
+      setBusy("cut")
+      const cut = await removeBackground(src)
+      if ("error" in cut) throw new Error(cut.error)
+      // A cut that clears almost nothing means the sweep and the subject were the same
+      // value — say so rather than storing a rectangle and calling it a cut-out.
+      if (cut.cleared / Math.max(cut.pixels, 1) < 0.02) {
+        throw new Error("Nothing separated from the background — try the grey sweep, or turn the cut-out off.")
+      }
+      dataUrl = await downscaleDataUrl(cut.url)
+    } else {
+      setBusy("cut")
+      const res = await fetch(src)
+      if (!res.ok) throw new Error("The render couldn't be read back.")
+      const blob = await res.blob()
+      dataUrl = await downscaleImage(new File([blob], "render", { type: blob.type || "image/jpeg" }))
+    }
+    setBusy("upload")
+    const up = await uploadHeroImage(dataUrl)
+    if (up.error || !up.url) throw new Error(up.error || "Upload failed.")
+    onDone(up.url)
+    onClose()
+  }, [cutOut, onDone, onClose])
+
   const run = useCallback(async () => {
     const text = prompt.trim()
     if (!text) { setErr("Describe the picture you want."); return }
@@ -150,37 +202,21 @@ export function GenerateBubble({ onDone, onClose }: {
         backdrop: backdrop || undefined,
       })
       if (r.error || !r.ok || !r.attachment?.url) throw new Error(r.error || "The render didn't come back.")
-
-      // SAME-ORIGIN, which is what makes the next step possible at all: the attachment is a
-      // proxy URL on our own host, so the canvas the cut-out reads is not tainted.
-      let url = r.attachment.url
-      if (cutOut) {
-        setBusy("cut")
-        const cut = await removeBackground(url)
-        if ("error" in cut) throw new Error(cut.error)
-        // A cut that clears almost nothing means the sweep and the subject were the same
-        // value — say so rather than storing a rectangle and calling it a cut-out.
-        if (cut.cleared / Math.max(cut.pixels, 1) < 0.02) {
-          throw new Error("Nothing separated from the background — try the grey sweep, or turn the cut-out off.")
-        }
-        setBusy("upload")
-        const up = await uploadHeroImage(cut.url)
-        if (up.error || !up.url) throw new Error(up.error || "Upload failed.")
-        url = up.url
-      } else {
-        setBusy("upload")
-        const up = await uploadHeroImage(url)
-        if (up.error || !up.url) throw new Error(up.error || "Upload failed.")
-        url = up.url
-      }
-      onDone(url)
-      onClose()
+      await place(r.attachment.url)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "That didn't work.")
     } finally {
       setBusy(null)
     }
-  }, [prompt, ratio, size, modelId, backdrop, cutOut, onDone, onClose])
+  }, [prompt, ratio, size, modelId, backdrop, place])
+
+  /** Re-use a render this account already bought. Nothing is generated, so nothing is charged. */
+  const reuse = useCallback(async (shot: DeskImageShot) => {
+    setErr(null)
+    try { setSecs(0); await place(shot.url) }
+    catch (e) { setErr(e instanceof Error ? e.message : "That picture couldn't be used.") }
+    finally { setBusy(null) }
+  }, [place])
 
   return (
     /* ROOM TO WRITE THE PROMPT. 22rem was a chat popover holding a 4,000-character field: the
@@ -274,6 +310,40 @@ export function GenerateBubble({ onDone, onClose }: {
 
       {/* A REFUSAL CARRIES ITS REASON — that is the answer, not a subtitle. */}
       {(err || blockedWhy) && <p className="mt-2 text-xs leading-snug text-alert">{err || blockedWhy}</p>}
+
+      {/*
+       * WHAT YOU ALREADY PAID FOR.
+       *
+       * Every render is posted into the assistant thread as it is made, so the record has
+       * always existed — in another screen, which is the same round trip this panel was built
+       * to remove. Here it does two jobs: a picture you liked and lost is one press away
+       * instead of one prompt and another 3-24c, and a render whose request timed out is
+       * still reachable, because the server finishes and files it whether or not the browser
+       * was still listening.
+       *
+       * Pressing one costs NOTHING — it goes straight to the cut-out and the upload, which is
+       * why it shares `place()` with a new render rather than having its own path.
+       */}
+      {past.length > 0 && (
+        <div className="mt-3 border-t border-border pt-3">
+          <span className="mb-1.5 block text-2xs text-muted-foreground">Already generated · free to re-use</span>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {past.slice(0, 12).map((shot) => (
+              <button
+                key={shot.url}
+                type="button"
+                onClick={() => void reuse(shot)}
+                disabled={!!busy}
+                title={`${shot.prompt || "Render"}${shot.model ? ` · ${shot.model} · ${shot.size}` : ""}`}
+                className="size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted transition-colors hover:border-foreground/40 disabled:opacity-40"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={shot.url} alt="" className="size-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

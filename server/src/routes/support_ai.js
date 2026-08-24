@@ -15,7 +15,7 @@ import { q } from '../db.js';
 import { egBroadcast } from '../events.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
 import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
-import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost } from '../ai-pricing.js';
+import { readPricing, quoteFor, chargeForGeneration, refundGeneration, recordGenerationCost, effectiveSeller } from '../ai-pricing.js';
 import {
   startVideo, checkVideo, fetchVideo, meterVideo, videoConfig, usdFor,
   VIDEO_MODELS, VIDEO_RATIOS, VIDEO_RATIO_HINTS, VIDEO_DURATIONS,
@@ -971,6 +971,58 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       models: IMAGE_MODELS,
       ratios: ASPECT_RATIOS,
       ratioHints: RATIO_HINTS,
+    };
+  });
+
+  /**
+   * THE RENDERS THIS CALLER HAS ALREADY PAID FOR.
+   *
+   * Every render is posted into a thread as it is made, and that has always been the record —
+   * what was asked, what came back, what it cost. But a thread is a place you have to GO, and
+   * the panels that spend the money had no way to look at it, so a picture somebody already
+   * owns was one prompt away from being bought a second time. It is also the answer when a
+   * client gives up waiting: the server finishes the render and posts it regardless, so the
+   * work is here even when the request that started it is gone.
+   *
+   * Reads the SAME thread the generation path writes to, resolved server-side from the caller
+   * — a team member shares the owner's, and nobody can name somebody else's.
+   *
+   * NOT GATED ON THE IMAGE CONFIG. Looking at what you already have must keep working when
+   * the key is missing or generation is switched off; that gate is about spending money.
+   *
+   * `order by created_at`, never by id: `order_messages.id` is a uuid, so ordering by it is
+   * ordering by random bytes.
+   *
+   * `meta.usd` is what GOOGLE charged US and is staff-only reading, so it is not returned at
+   * all rather than conditionally — the same rule the generation response follows.
+   */
+  app.get('/api/desk/images/recent', { preHandler: requireAuth }, async (req) => {
+    const sellerId = await effectiveSeller(req.user);
+    const threadId = sellerId ? 'gen-' + sellerId : 'support-' + String(req.user.sub || '');
+    let rows = [];
+    try {
+      const r = await q(
+        `select attachment, meta, created_at from order_messages
+           where order_id = $1 and sender_role = 'assistant'
+             and attachment is not null and (meta->>'image') = 'true'
+           order by created_at desc limit 24`, [threadId]);
+      rows = r.rows;
+    } catch (e) {
+      // A history read must never be the thing that breaks the panel it sits in.
+      req.log?.warn?.({ err: String(e) }, 'desk-image history read failed');
+    }
+    return {
+      images: rows
+        .map((x) => ({
+          url: (x.attachment && x.attachment.url) || '',
+          // The attachment's name IS the prompt, trimmed to 80 chars where it was written.
+          prompt: String((x.attachment && x.attachment.name) || ''),
+          model: (x.meta && x.meta.model) || '',
+          size: (x.meta && x.meta.size) || '',
+          aspect: (x.meta && x.meta.aspect) || '',
+          at: x.created_at,
+        }))
+        .filter((x) => x.url),
     };
   });
 
