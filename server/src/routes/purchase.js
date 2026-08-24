@@ -122,7 +122,9 @@ function maskKey(v) {
 // and the list itself shows unit costs across every blank we buy. Receiving stock is NOT
 // here — that's /api/inventory/scan and /api/inventory/item in inventory.js, still on the
 // warehouse gate — so locking this does not stop the floor booking deliveries in.
-export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite) {
+/* `requireStaff` is the fifth argument and the only non-admin guard this module uses: the
+   catalogue FILTERS are browse metadata, not a purchase. Everything else here stays admin. */
+export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite, requireStaff) {
   app.get('/api/purchase', { preHandler: requireAdmin }, async () => {
     await ensure();
     // A failed query used to return [] — "no purchase orders", which is exactly what a
@@ -144,7 +146,21 @@ export function purchaseRoutes(app, requireAuth, requireAdmin, requireAdminWrite
    * DISTINCT over indexed columns rather than loading rows to derive it — the point is to
    * avoid paging through a catalogue, not to page through it server-side instead.
    */
-  app.get('/api/purchase/catalog-filters', { preHandler: requireAdmin }, async () => {
+  /*
+   * requireStaff, NOT requireAdmin (2026-08-24).
+   *
+   * This answers with brands, categories and a price range — BROWSE metadata, and nothing
+   * about buying. It sits under /api/purchase/* where everything else is admin because it
+   * spends money, and it inherited that gate by address rather than by meaning.
+   *
+   * The floor browses: CLAUDE.md's own note on the Purchasing section says All suppliers,
+   * Favorites and a read-only Cart are open to operators and warehouse, and only ordering
+   * is not. So an operator got the grid and an empty set of filters — and silently, because
+   * the caller swallows the failure (`.catch(() => {})`), leaving a 403 in the console and
+   * dropdowns that look merely empty. A filter exists to reach what you cannot already see,
+   * which is exactly what a shorter list needs most.
+   */
+  app.get('/api/purchase/catalog-filters', { preHandler: requireStaff }, async () => {
     const [ssB, ottoB, ssC, ottoC, ssP, ottoP] = await Promise.all([
       softQ('ss brands', "select distinct brand from ss_products where coalesce(brand,'') <> ''"),
       softQ('otto brands', "select distinct brand from otto_products where coalesce(brand,'') <> ''"),
