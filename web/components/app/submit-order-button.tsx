@@ -68,6 +68,10 @@ export function SubmitOrderButton({
  if (!isSubmittable(order)) return null
 
  const q = quote ?? fetched
+  // What the wallet actually loses: production, shipping, and every design/check fee that
+  // has a settled amount. A fee still under review is null and adds nothing.
+ const dueFees = (q?.designFees?.items ?? []).filter((f) => f.status !== "charged" && f.amount != null)
+ const chargeNow = (q?.total ?? 0) + dueFees.reduce((t, f) => t + (f.amount ?? 0), 0)
 
  const openDialog = () => {
  setOpen(true)
@@ -149,9 +153,26 @@ export function SubmitOrderButton({
                   <dd className="tabular-nums text-success">−{money(q.volumeDiscount)}</dd>
                 </div>
               )}
+              {/* THE FEES THIS PRESS ALSO TAKES. Submit charges design and check fees with
+ production now (see the submit block in server/src/routes/orders.js), so
+ they belong on the dialog that confirms the amount — a charge that is
+ larger than the figure on the button is the same defect as a hidden
+ discount, in the direction that costs the seller money.
+                  A complex design is quoted, not fixed, so it is LISTED and not summed:
+ nothing is billed for it until the seller accepts the quote. */}
+              {(q.designFees?.items ?? []).map((f, i) => (
+                <div key={i} className="flex justify-between">
+                  <dt className="text-muted-foreground">{f.label}</dt>
+                  <dd className="tabular-nums">
+                    {f.amount == null
+                      ? <span className="italic text-muted-foreground">To Be Determined</span>
+                      : money(f.amount)}
+                  </dd>
+                </div>
+              ))}
               <div className="flex justify-between border-t border-border pt-2 font-semibold">
                 <dt>Total</dt>
-                <dd className="tabular-nums">{money(q.total)}</dd>
+                <dd className="tabular-nums">{money(chargeNow)}</dd>
               </div>
             </dl>
           ) : loadingQuote ? (
@@ -184,7 +205,7 @@ export function SubmitOrderButton({
             {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Not yet</Button>
             <Button onClick={submit} disabled={busy || loadingQuote || blocked}>
-              {busy ? "Submitting…" : q ? `Charge ${money(q.total)}` : "Submit"}
+              {busy ? "Submitting…" : q ? `Charge ${money(chargeNow)}` : "Submit"}
             </Button>
           </DialogFooter>
         </DialogContent>

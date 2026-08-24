@@ -609,7 +609,15 @@ async function chargedAmount(orderId) {
 // Charge the seller for an order. Returns {ok} or {error, ...} — never throws for an
 // expected refusal (short balance, unpriceable line), so the caller can pass the
 // message straight to the seller.
-async function chargeForSubmit(orderId, sellerId, by, hideMoney = false) {
+/**
+ * `extra` is the design/check fee charged ALONGSIDE production — see the submit block in
+ * PATCH /api/orders/:id. It is not moved here (each design fee is its own ledger row, with
+ * its own ref, so it can be refunded on its own), but it IS part of what the seller is
+ * about to pay, so the balance has to cover both. Testing production alone let an order
+ * through on a wallet that could fund the garment and not the fee, and the fee then failed
+ * silently after the goods were already on the floor.
+ */
+async function chargeForSubmit(orderId, sellerId, by, hideMoney = false, extra = 0) {
   /**
    * ALREADY PAID, OR PAID AND GIVEN BACK? THEY ARE NOT THE SAME ANSWER.
    *
@@ -644,7 +652,8 @@ async function chargeForSubmit(orderId, sellerId, by, hideMoney = false) {
   if (!quote.lines.length) return { error: 'This order has no items to produce.' };
   if (quote.total <= 0) return { error: 'This order prices out at $0 — check the catalog base cost.' };
   const balance = await balanceOf(sellerId);
-  if (balance < quote.total) {
+  const due = Math.round((quote.total + (Number(extra) || 0)) * 100) / 100;
+  if (balance < due) {
     // A team member who can't SEE the wallet mustn't learn its balance from an error
     // message — and telling them to "top up" is a dead end, because only the owner can.
     // They get the fact (it can't go through) and the resolution (the owner funds it),
@@ -655,8 +664,8 @@ async function chargeForSubmit(orderId, sellerId, by, hideMoney = false) {
         needsOwnerTopup: true,
       };
     }
-    return { error: `Not enough balance. This order costs $${quote.total.toFixed(2)} and your wallet has $${balance.toFixed(2)}.`,
-             shortfall: Math.round((quote.total - balance) * 100) / 100, required: quote.total, balance, quote };
+    return { error: `Not enough balance. This order costs $${due.toFixed(2)} and your wallet has $${balance.toFixed(2)}.`,
+             shortfall: Math.round((due - balance) * 100) / 100, required: due, balance, quote };
   }
   await freezeQuote(orderId, quote);
   await moveFunds({ from: sellerId, to: 'factory', amount: quote.total, type: CHARGE_TYPE,
@@ -2020,7 +2029,26 @@ export function ordersRoutes(app, requireAuth) {
         // A member submitting under the owner: hide the figures unless the owner has
         // shared the wallet with them.
         const seesWallet = !sel.member || (Array.isArray(sel.perms) && sel.perms.indexOf('wallet') >= 0);
-        const paid = await chargeForSubmit(req.params.id, sel.id, req.user.sub, !seesWallet);
+        /**
+         * DESIGN AND CHECK FEES ARE CHARGED AT SUBMIT, with everything else.
+         *
+         * They were charged in exactly one place — a staff member setting the tier on the
+         * line — so an order nobody had classified was produced with the check fee shown in
+         * the Summary, added into the Total the seller confirmed, and never taken. After
+         * submit the Summary reads the LEDGER rather than the quote, so the row that had
+         * been on screen the whole time simply disappeared: "the design fees aren't showing
+         * up at all". They weren't missing from the page; they were missing from the money.
+         *
+         * Only fees with a settled amount. A complex design is quoted (`amount: null`) and
+         * charged when the seller accepts it — billing an unquoted figure at submit is the
+         * one thing that flow exists to prevent — and `status: 'charged'` is a group some
+         * earlier action already billed.
+         */
+        const dueFees = await computeDesignFees(req.params.id)
+          .then((d) => (d.items || []).filter((f) => f.status === 'estimated' && Number(f.amount) > 0))
+          .catch(() => []);
+        const dueTotal = dueFees.reduce((t, f) => t + Number(f.amount), 0);
+        const paid = await chargeForSubmit(req.params.id, sel.id, req.user.sub, !seesWallet, dueTotal);
         if (paid.error) {
           // Tell the OWNER, whoever hit the wall. A member can't top up and can't see the
           // balance, so without this the order simply stops with nobody informed.
@@ -2037,6 +2065,33 @@ export function ordersRoutes(app, requireAuth) {
           reply.code(402); return paid;                          // 402 Payment Required
         }
         _charged = paid.charged || 0;
+        /**
+         * AFTER production, and only once it went through — the fee is for work on an order
+         * that is actually being made. Each is its own ledger row (`design-<order>-<line>`),
+         * refundable on its own, and chargeDesign stamps every line the one fee covers so a
+         * sibling line can't bill it twice.
+         *
+         * The tier is WRITTEN, not left inferred. computeDesignFees reads the stored tier
+         * first and falls back to reading the line — so once money has moved on the strength
+         * of that reading, the reading becomes the record. Otherwise attaching a machine
+         * file to an already-charged line would silently re-describe what was paid for.
+         */
+        if (dueFees.length) {
+          const feeCfg = await readAll().catch(() => ({}));
+          for (const f of dueFees) {
+            const got = await chargeDesign(req, req.params.id, f.line_id, f.sku, f.tier, feeCfg,
+                                           f.overridden ? f.amount : undefined)
+              .catch(() => ({ charged: 0 }));
+            if (got.charged > 0) {
+              _charged += got.charged;
+              const ids = (f.lines || []).map((l) => l.line_id).filter(Boolean);
+              const skus = (f.lines || []).filter((l) => !l.line_id).map((l) => l.sku).filter(Boolean);
+              await q(`update order_items set design_tier = coalesce(design_tier, $2)
+                        where order_id=$1 and (line_id = any($3::text[]) or (line_id is null and sku = any($4::text[])))`,
+                [req.params.id, f.tier, ids, skus]).catch(() => {});
+            }
+          }
+        }
       }
       if (want === 'cancelled' && !started) {
         const back = await refundForCancel(req.params.id, sel.id, req.user.sub);
