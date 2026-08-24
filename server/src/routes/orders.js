@@ -2290,12 +2290,33 @@ export function ordersRoutes(app, requireAuth) {
     // The stage's effect on the shelf, whichever stage it is — see applyStockForStage.
     // This was `if working: reserve`, which is why nothing was ever given back when an
     // order moved the other way.
+    let _parked = null;
     if (body.factoryStatus !== undefined || body.status !== undefined) {
       const want = String(body.factoryStatus ?? body.status ?? '');
       await markApproved(req.params.id, want);
       await applyStockForStage(req.params.id, want);
+      /**
+       * WHAT WE HAVEN'T GOT, IN THE CART, AT THE MOMENT WE TOOK THE JOB.
+       *
+       * Shortages were only parked at WORKING — the stage where somebody is already at the
+       * bench and the blank is supposed to be in their hand. Approved is where the factory
+       * accepts the order, and it is the last quiet moment before that: a line whose shelf
+       * reads zero has to be bought, and the person who buys it needs it on their list now,
+       * not when the press stops.
+       *
+       * autoReplenish is idempotent per (order, cart line) — it records the order on the
+       * parked row and skips a second visit — so approving, then working, then bouncing back
+       * cannot double-order. It parks NOTHING when the shelf can cover the line.
+       */
+      const stage = normalizeStage(want);
+      if (stage === 'approved' || stage === 'working') {
+        _parked = await autoReplenish(req.params.id).catch(() => null);
+      }
     }
     egBroadcast({ type: 'orders' });
+    // The cart badge is a live count in every open tab, so a shortage parked here has to
+    // announce itself the same way an order does.
+    if (_parked && _parked.saved) egBroadcast({ type: 'cart' });
     if (_charged || _refunded) egBroadcast({ type: 'wallet' });
     // Tracking arriving IS the shipment as far as a partner is concerned — a label
     // purchase writes tracking and 'shipped' together, so key off that rather than the
@@ -2360,7 +2381,10 @@ export function ordersRoutes(app, requireAuth) {
       else if (stage === 'cancelled' || stage === 'refunded') notifyOrderEvent(req.params.id, 'order.cancelled');
       else if (stage) notifyOrderEvent(req.params.id, 'order.status_changed');
     }
-    return { ok: true, charged: _charged || undefined, refunded: _refunded || undefined };
+    // `parked` — how many cart lines this stage change added, so the caller can move the
+    // cart badge without refetching the list.
+    return { ok: true, parked: (_parked && _parked.saved) || undefined,
+             charged: _charged || undefined, refunded: _refunded || undefined };
   });
 
   // What would this order cost to produce? The seller's Submit button reads this to show
@@ -2541,9 +2565,18 @@ export function ordersRoutes(app, requireAuth) {
         await markApproved(req.params.id, want);
         reserved = await applyStockForStage(req.params.id, want);
       }
-      if (want === 'working') replenish = await autoReplenish(req.params.id).catch(() => null);
+      /**
+       * APPROVED PARKS THE SHORTAGES TOO — see the note on the same call in PATCH above.
+       * Approved is the factory accepting the job; a blank the shelf cannot cover has to
+       * reach the buyer's cart then, not when someone picks the line up to work it.
+       * Idempotent per (order, cart line), so a line arriving at approved and then at
+       * working parks once.
+       */
+      if (want === 'approved' || want === 'working') replenish = await autoReplenish(req.params.id).catch(() => null);
     }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
+    // Same as the order route: a parked shortage moves the cart badge for everyone looking.
+    if (replenish && replenish.saved) egBroadcast({ type: 'cart' });
     return { ok: true, design, replenish, reserved };
   });
 

@@ -105,9 +105,19 @@ function ImageZoom({ img, onClose }: { img: { src: string; label: string } | nul
 
 function SourceTags({ line }: { line: POLine }) {
  const src = Array.isArray(line.sources) ? line.sources : []
- if (!src.length) return null
+ if (!src.length && !line.auto) return null
  return (
     <span className="mt-0.5 flex flex-wrap items-center gap-1">
+      {/* WHY THIS ROW IS HERE. An auto line was not picked by anyone — the shelf read zero
+          when an order was approved and the server filed it (autoReplenish). Beside a row
+          somebody chose deliberately it looked identical, so the buyer had no way to tell
+          "I put this here" from "production is waiting on this". It carries meaning, which
+          is the only thing a pill may do. */}
+      {line.auto && (
+        <span className="rounded bg-alert/10 px-1.5 py-0.5 text-2xs font-medium text-alert" title="The shelf was empty when an order needed this, so it was added for you.">
+          Out of stock
+        </span>
+      )}
       {src.slice(0, 4).map((s, i) => {
         // THE NUMBER, not the internal id. A marketplace order's id is "etsy-3311908445"
         // and its number is "#4099" — the number is what is on the packing slip, the

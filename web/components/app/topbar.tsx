@@ -170,7 +170,15 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
  load()
     // Refresh when anything changes the pool, and on navigation (e.g. leaving the cart).
  window.addEventListener("eg-cart-changed", load)
- return () => { cancelled = true; window.removeEventListener("eg-cart-changed", load) }
+    /**
+     * AND WHEN THE SERVER PARKS ONE. Approving an order files its short blanks in the cart
+     * (autoReplenish, server/src/routes/orders.js) — nothing this tab did, so the window
+     * event above never fires and the badge sat on yesterday's number until someone
+     * navigated. It is also the operator on the next bench doing the approving, which is
+     * exactly the case a live stream is for.
+     */
+ const offLive = onLive("cart", load)
+ return () => { cancelled = true; window.removeEventListener("eg-cart-changed", load); offLive() }
   }, [showCart, pathname])
 
  const title = nl("nav", isStaff ? staffNavTitle(pathname) : navTitle(pathname))
