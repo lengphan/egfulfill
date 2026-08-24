@@ -162,15 +162,59 @@ export const fmtDate = (s?: string | null) => {
 // Address key shapes differ by source (Etsy sends first_line/second_line, manual
 // sends street/street2), so every reader must accept both.
 const addrOf = (o: OrderRow) => (o.address ?? {}) as Record<string, string>
+
+/**
+ * THE SHIP-TO, READ THE SAME WAY ON EVERY SCREEN.
+ *
+ * `orders.address` is jsonb and its writers do not agree on what the street is called:
+ *
+ *   · etsy.js · shopify.js · tiktok.js          → `line1` / `line2`
+ *   · shipping.js fillBlankAddressesFromShippo  → `street` / `street2`
+ *
+ * That second writer is not an edge case — it is how an Etsy order gets a street AT ALL.
+ * Etsy withholds `first_line` from our app tier, Shippo's Etsy app is not restricted, so
+ * the backfill copies the address across under ITS spelling. The orders most likely to be
+ * stored under `street` are therefore exactly the ones somebody went looking for.
+ *
+ * The boards read all four spellings. The order detail page read only `line1` — so it
+ * printed a buyer's name and city with the street silently absent, while the queue two
+ * clicks away showed the same order in full. One order, two screens, opposite answers, and
+ * no way to tell "withheld" from "we can't read our own column". That is the private-copy
+ * drift the top of this file exists to stop, so the reader lives here now and nowhere else.
+ *
+ * `masked` rides along because it is the same question: the server strips a marketplace
+ * buyer's street and ZIP from the SELLER's copy and stamps this flag. A blank street with
+ * `masked` set means "held by the factory"; a blank street without it means we genuinely
+ * do not have one. Rendering them identically is what §4 forbids.
+ */
+export type ShipTo = {
+  name: string; line1: string; line2: string
+  city: string; state: string; zip: string; country: string
+  masked: boolean
+}
+export function shipAddressOf(o: OrderRow): ShipTo {
+  const a = addrOf(o) as Record<string, string> & { masked?: boolean }
+  return {
+    name: o.customer?.name || a.name || "",
+    line1: a.street || a.first_line || a.line1 || a.address1 || "",
+    line2: a.street2 || a.second_line || a.line2 || a.address2 || "",
+    city: a.city || "",
+    state: a.state || a.province || "",
+    zip: a.zip || a.postal_code || a.postcode || "",
+    country: a.country || a.country_iso || "",
+    masked: !!a.masked,
+  }
+}
+
 /** Short "City, ST ZIP" for a row. */
 export const addrLine = (o: OrderRow) => {
-  const a = addrOf(o)
-  return [a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")
+  const a = shipAddressOf(o)
+  return [a.city, a.state, a.zip].filter(Boolean).join(", ")
 }
 /** Full street-level destination. */
 export const shipTo = (o: OrderRow) => {
-  const a = addrOf(o)
-  return [a.street || a.first_line || a.line1 || a.address1, a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")
+  const a = shipAddressOf(o)
+  return [a.line1, a.city, a.state, a.zip].filter(Boolean).join(", ")
 }
 
 /** Public tracking page for a carrier + number, so a number is never a dead end. */
@@ -255,8 +299,8 @@ export type Check = {
 export function orderReadiness(o: OrderRow, opts?: { missingArtwork?: boolean }): Check[] {
   const stage = String(o.factory_status ?? "").toLowerCase()
   const scanned = ["working", "shipped", "printed"].includes(stage)
-  const addr = (o.address ?? {}) as Record<string, string>
-  const hasAddr = !!((addr.street || addr.first_line || addr.line1 || addr.address1) && (addr.zip || addr.postal_code))
+  const addr = shipAddressOf(o)
+  const hasAddr = !!(addr.line1 && addr.zip)
   return [
     { id: "address", label: "Address", met: hasAddr, blocked: "no address", detail: hasAddr ? addrLine(o) : "No address — can't ship" },
     { id: "artwork", label: "Artwork", met: opts?.missingArtwork === undefined ? null : !opts.missingArtwork, blocked: "needs artwork" },

@@ -2274,7 +2274,15 @@ export function postItemStatus(id: string, sku: string, status: string, lineId?:
   })
 }
 
-export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; meta?: Record<string, unknown> }) {
+/**
+ * `address` and `customer` have been patchable on the server since the field map was
+ * written (`server/src/routes/orders.js`, PATCH /api/orders/:id) — they were simply
+ * missing from this type, so no caller could reach them without a cast. The server gates
+ * them: a seller may write either only while the order has not started (stage still in
+ * '', new, draft, in_review AND no approved_at); staff are ungated on that route. Both
+ * writes are audited before-and-after, which is what makes them safe to expose.
+ */
+export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(patch),
