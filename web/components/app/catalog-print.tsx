@@ -591,9 +591,35 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             // opened an empty half-page here. The charts are what keep the column earning
             // its place when there is no shot.
  const twoUp = !!hero || st.sizes.length > 0 || st.specs.length > 0 || editing
-            // Wider cells when the swatches have the whole sheet: three across a full page
-            // would print them at hero size, which is not what a colour grid is for.
- const colCap = twoUp ? 20 : 32
+            /**
+             * THREE ROWS OF SWATCHES, AND THEN A NUMBER.
+             *
+             * The cap used to be a flat count — 20 beside the hero, 32 on a full-width page —
+             * which is not a number the LAYOUT has any opinion about. At five columns, 20 is
+             * four rows; the fourth row landed under the fold on a 210mm sheet, so the last
+             * colourways were clipped by the page bound rather than accounted for. The
+             * remainder line said "+ 0 more" while colours were missing.
+             *
+             * Rows are what the page can actually hold, so rows are what this counts. Three
+             * of them clear the sheet in both layouts and leave the details block its room,
+             * and everything past them is STATED — which is the honest version of the same
+             * page, and the one a buyer can act on ("ask us for the full range").
+             *
+             * Derived from the column count rather than typed twice, so changing the grid
+             * cannot leave the cap describing the old one.
+             */
+ const swatchCols = twoUp ? 5 : 8
+            /**
+             * ...BUT THE COPY IS NOT WHAT YIELDS. Measured on the rendered sheet: the right
+             * column is 510px, three rows of swatches take ~460 of it, and the details block
+             * is 140 — so it ran to 2497 in a column ending at 2372 and was clipped by the
+             * page bound. Silently, which is the exact failure this file keeps having to fix.
+             *
+             * Two rows when there is copy, three when there isn't. Both fit, both fill, and
+             * the colours that come off are COUNTED in the line underneath rather than
+             * disappearing — which is the difference between a shorter list and a wrong one.
+             */
+ const colCap = swatchCols * (st.description ? 2 : 3)
  return (
             // ONE STYLE PER PAGE. A4 LANDSCAPE at 297×210mm with the page break forced after
             // so a colourway grid never starts on one sheet and finishes on the next —
@@ -888,7 +914,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     // the overflow is stated rather than silently dropped.
                     // auto-rows-min keeps swatches their natural height while the column
                     // stretches, so they sit at the top rather than smearing down the page.
-                    <div className={"mt-2 grid auto-rows-min gap-x-3 gap-y-4 " + (twoUp ? "grid-cols-5" : "grid-cols-8")}>
+                    <div className="mt-2 grid auto-rows-min gap-x-3 gap-y-4"
+ style={{ gridTemplateColumns: `repeat(${swatchCols}, minmax(0, 1fr))` }}>
                       {st.colors.slice(0, colCap).map((c) => (
                         <div key={c.name + c.sku} className="flex flex-col items-center">
                           {/* THREE ACROSS, SQUARE. Four columns made each well ~19mm wide, and

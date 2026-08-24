@@ -6,6 +6,7 @@ import { clickableProps } from "@/lib/a11y"
 import { Heart, Plus, CheckCircle, CircleNotch, ArrowsClockwise } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
+import { bySize } from "@/lib/size-order"
 import { cn } from "@/lib/utils"
 import { CARD_ACTION_PRIMARY, CARD_ACTION_SECONDARY } from "@/lib/card-actions"
 
@@ -115,7 +116,9 @@ export function SupplierProductCard({
   const toggleFav = () => { const next = !fav; setFav(next); onFavorite?.(next) }
   // Normalise both colour shapes (bare name | {name, swatch}) to one form the row renders.
   const colors = (data.colors ?? []).map((c) => (typeof c === "string" ? { name: c, swatch: null } : { name: c.name, swatch: c.swatch ?? null }))
-  const sizeNames = (data.sizes ?? []).filter(Boolean)
+  // Sorted: this row is truncated to six with a "+N", so an unsorted list does not just
+  // read oddly — it decides WHICH six a buyer sees, and "S M XL 3XL 4XL 2XL" hides L.
+  const sizeNames = (data.sizes ?? []).filter(Boolean).sort(bySize)
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">

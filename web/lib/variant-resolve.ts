@@ -1,5 +1,6 @@
 import type { CatalogProduct, OrderItem } from "@/lib/api"
 import { normalizeMethods } from "@/lib/print-method"
+import { bySize } from "@/lib/size-order"
 
 // Client mirror of pricing.js matchProduct / eg-design-tools.js chosenProduct: resolve an
 // order line to its catalog product. Picked blank (it.blank) wins; then the SKU matched
@@ -203,13 +204,24 @@ export function bestMockup(p: CatalogProduct | null, color?: string | null, fall
 
 /** Sizes a product offers. Many catalog rows carry no `sizes` array and define their
  *  sizes only as per-size price tiers (sizePrices), which is why a picked product could
- *  fill Colour but leave Size empty. Union both, preserving sizes[] order. */
+ *  fill Colour but leave Size empty. Union both.
+ *
+ *  IN SIZE ORDER. This used to say "preserving sizes[] order", and that order is whatever
+ *  the row happened to be written with — a real product printed "S · M · XL · 3XL · 4XL ·
+ *  2XL", L missing from the middle and 2XL after 4XL. Stored order was never a meaningful
+ *  order anyway once two sources are unioned: sizes[] first, then whatever sizePrices adds,
+ *  which is an artefact of this function rather than a fact about the garment.
+ *
+ *  Fixed HERE because this is the choke point — the catalogue grid, the catalogue list and
+ *  the publish picker all read through it, and a run that is right on one and scrambled on
+ *  the next is worse than all three being wrong. `bySize` is the app's one ladder
+ *  (lib/size-order.ts, mirroring sanmar.js). */
 export function sizesOf(p: CatalogProduct | null): string[] {
   if (!p) return []
   const out = new Set<string>()
   for (const s of p.sizes ?? []) if (s) out.add(String(s))
   for (const t of p.sizePrices ?? []) if (t?.size) out.add(String(t.size))
-  return [...out]
+  return [...out].sort(bySize)
 }
 
 const isSet = (v: unknown) => !!(v != null && String(v).trim())

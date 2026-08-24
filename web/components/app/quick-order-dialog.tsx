@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { bySize } from "@/lib/size-order"
 import { getFactoryList, saveFactoryList, type SavedPOLine } from "@/lib/api"
 
 const num = (v: unknown) => Number(v) || 0
@@ -147,7 +148,7 @@ export function QuickOrderDialog({
                 <p className="mx-auto max-w-sm text-xs text-destructive">{product.loadError}</p>
               )}
             </div>
-          ) : product.sizes.map((s) => (
+          ) : [...product.sizes].sort((a, b) => bySize(a.size, b.size)).map((s) => (
             <div key={s.size} className="flex items-center gap-2 py-1.5">
               {/* The variant's OWN picture. Colour names alone can't be checked — "S.Pnk"
  against "H.Pnk" is a guess until you see them side by side. */}

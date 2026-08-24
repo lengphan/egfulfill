@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { getSsStyle, getOttoStyle, getSanmarCatalogStyle } from "@/lib/api"
 import { colorHex, prettyColorName } from "@/lib/color-name"
 import { descriptionLines } from "@/lib/description"
+import { bySize } from "@/lib/size-order"
 
 /**
  * ONE BLANK, IN FULL — the catalogue tile's picture is a thumbnail of a decision.
@@ -302,7 +303,10 @@ export function SupplierDetailDialog({
                 <Section label={`Sizes${d.sizes.length ? ` (${d.sizes.length})` : ""}`}>
                   {d.sizes.length ? (
                     <span className="flex flex-wrap gap-1.5">
-                      {d.sizes.map((z) => (
+                      {/* Sorted — a supplier hands these back in feed order, and a row of
+                          size buttons that is not a size run is read as a mistake before it
+                          is read as a choice. */}
+                      {[...d.sizes].sort(bySize).map((z) => (
                         <button
  key={z}
  type="button"
