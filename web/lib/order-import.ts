@@ -15,7 +15,7 @@ import { PRODUCT_METHODS } from "@/lib/print-method"
 // the column would fail wholesale. The rule instead is FILL IT OR WE ASSIGN ONE — the row
 // imports, the order takes its platform-assigned FF- number, and rowsToRecords raises a
 // WARNING so the split is stated up front rather than discovered afterwards.
-export const REQUIRED_COLS = ["item_name", "ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
+export const REQUIRED_COLS = ["blank", "ship_name", "ship_address_1", "ship_city", "ship_state", "ship_zip"] as const
 
 // Per-column reference for the import dialog: which headers are required vs optional, and what
 // each does. Drives the legend so a filler knows exactly what they can skip. `key` is the
@@ -60,7 +60,17 @@ export const CSV_COLUMNS: CsvColumn[] = [
   // ── PRODUCT ───────────────────────────────────────────────────────────────
   // The line's NAME, and the only product field a marketplace export always carries. It is
   // what the boards read, so a row without one arrives as the literal word "Item".
-  { header: "Product Title", key: "item_name", required: true, section: "product", help: "What the line is called on the board — the listing's title. Everything else about the product (blank, colour, size, method) can be filled in afterwards." },
+  /**
+   * THE TITLE IS NO LONGER THE REQUIRED ONE — THE BLANK IS.
+   *
+   * A title is what the buyer's listing was called; the blank is what we cut, print and
+   * charge for. Requiring the first and not the second let a row through that was perfectly
+   * named and impossible to make, and then asked somebody to open every line and pick the
+   * garment by hand. Reversed: the row must say WHAT IT IS, and may leave what the seller
+   * calls it to us — a line with no title takes the blank's own name (rowsToOrders), which
+   * is a truer label for the floor than a marketplace keyword list anyway.
+   */
+  { header: "Product Title", key: "item_name", required: false, section: "product", help: "What the line is called on the board. Leave it blank and the line is named after the blank product instead." },
   // TWO different SKUs, and confusing them is the whole reason they are named this way.
   // "Listing SKU" belongs to the SELLER's marketplace listing; "Blank SKU" is OUR catalog
   // product, and it is the one production and pricing key on.
@@ -77,7 +87,7 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * working, and COL_ALIASES still accepts a "Blank SKU" header — a sheet downloaded before
    * today imports exactly as it did.
    */
-  { header: "Blank Product", key: "blank", required: false, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. Needed to cost & barcode the line; without it the line reads “not set up for production” until someone sets it. Can be filled in after import." },
+  { header: "Blank Product", key: "blank", required: true, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. It is what costs, barcodes and produces the line, so a row without one cannot be made." },
   { header: "Template ID", key: "template_id", required: false, section: "product", help: "A SHORTCUT: a saved template already carries the blank, the placement and the artwork, so a row with one ignores Image ID and the variant columns. Leave it blank and the row is built from the columns instead. Type the number — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
   { header: "Image ID", key: "hero_image", required: false, section: "product", help: "THE LINE’S PICTURE — the listing photo, so the order shows what the buyer bought. A URL, not a reference: anything that is not http(s) is dropped. It is NOT the artwork and it does not conflict with a Template ID — a template brings the artwork, its placement and its blank, and this only changes the picture on the line. Fill both, or neither." },
   /**
@@ -426,7 +436,10 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
     const errs: string[] = []
     // item_name reads as "item name" from the key; say the column's own header instead, or the
     // error names a field the seller cannot find in their sheet.
-    if (missing.length) errs.push("Missing: " + missing.map((m) => (m === "item_name" ? "product title" : m.replace(/_/g, " "))).join(", "))
+    // Say the column's own HEADER. `blank` and `item_name` both read as something the seller
+    // cannot find in their sheet — one is a word for "empty", the other is our field name.
+    const HEADER_OF: Record<string, string> = { blank: "Blank Product", item_name: "Product Title" }
+    if (missing.length) errs.push("Missing: " + missing.map((m) => HEADER_OF[m] || m.replace(/_/g, " ")).join(", "))
     rec._valid = !errs.length
     rec._errors = errs.join("; ")
     // Blank order number imports fine — it just can't be grouped, so it becomes its own
@@ -437,6 +450,19 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
   }).filter((r) => !isSampleRow(r as unknown as Record<string, string>))
   if (!records.length) return { records: [], error: "No order rows found — only a header (and maybe the sample row)." }
   return { records }
+}
+
+/**
+ * The readable half of a Blank Product cell.
+ *
+ * The sheet's dropdown offers "SKU - Name" — the sku is there so two near-identical garments
+ * can be told apart while picking, and it is noise once picked. Split on the FIRST " - " so a
+ * sku that contains a dash (PC-54) survives; a cell with no separator is already the name.
+ */
+export function blankName(cell: string): string {
+  const v = String(cell || "").trim()
+  const at = v.indexOf(" - ")
+  return at > 0 ? v.slice(at + 3).trim() : v
 }
 
 export type ImportItem = {
@@ -495,7 +521,12 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
       const hero = S(r.hero_image)
       return {
         sku: S(r.item_sku),
-        name: S(r.product_title) || S(r.item_name) || S(r.item_sku) || "Item",
+        // THE BLANK IS THE FALLBACK NAME, and it sits ahead of the listing SKU because it is
+        // a thing a person can read. The cell arrives as "G5000 - Gildan 5000 Heavy Cotton
+        // Tee"; the name is the half after the dash, so the board shows the garment rather
+        // than a code. "Item" is what is left when a row has nothing at all, which the
+        // required Blank Product now makes unreachable through the template.
+        name: S(r.product_title) || S(r.item_name) || blankName(S(r.blank)) || S(r.item_sku) || "Item",
         img: /^https?:\/\//i.test(hero) ? hero : "",
         qty: Math.max(1, parseInt(S(r.item_quantity)) || 1),
         unitPrice: Number(S(r.item_price).replace(/[^0-9.]/g, "")) || 0,
