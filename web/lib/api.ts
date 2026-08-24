@@ -3115,6 +3115,10 @@ export function updateProfile(patch: { name?: string; username?: string | null; 
  */
 export function createDesignCard(body: {
   title: string; data?: string; type?: string; sku?: string
+  /** The designer's brief, written when the card is SENT rather than after it lands. Stored
+   *  at `specs.description` — the same field the board's card editor patches, so the two are
+   *  one field rather than two that agree by luck. */
+  description?: string
   /** Which lane it lands in. Validated server-side against design_lanes and falling back to
    *  `incoming` — which is the embroidery designers' own pick-up queue, and therefore the
    *  wrong home for work we have already actioned and handed on. */

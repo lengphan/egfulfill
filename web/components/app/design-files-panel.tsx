@@ -12,6 +12,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { VariantField } from "@/components/app/variant-field"
 import { isEmbroidery } from "@/lib/variant-resolve"
 import { Dropzone } from "@/components/app/dropzone"
+import { ImageLightbox } from "@/components/app/image-lightbox"
 
 /**
  * WHICH LINE IS THIS FILE FOR? — guessed from its name, never decided by it.
@@ -172,6 +173,9 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
  onRemove?: (r: PlacedRow) => void
  busy?: string | null
 }) {
+  /** Click the artwork to see it full size. Held HERE rather than at the two call sites, so
+   *  both lists get it and neither can grow its own. The shared lightbox, never a new one. */
+ const [zoom, setZoom] = useState<string | null>(null)
  if (!rows.length) return null
   /**
    * ONE ROW SHAPE FOR EVERY FILE ON AN ORDER — number, picture, name, where it goes, get it.
@@ -187,13 +191,22 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
    */
  return (
     <div className="divide-y divide-border">
+      <ImageLightbox src={zoom} label={rows.find((r) => r.src === zoom)?.name ?? null} onClose={() => setZoom(null)} />
       {rows.map((r) => (
         <div key={r.key} className="relative flex items-center gap-2.5 py-2">
           {r.no != null && <ItemNumberBadge no={r.no} title={`Item ${r.no}${r.item ? ` — ${r.item}` : ""}`} />}
-          {/* The artwork itself, small. A name alone leaves "is that the right one?"
- unanswered, and the picture is already loaded for the mockup above. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={r.src} alt="" className="size-9 shrink-0 rounded-md border border-border bg-white object-contain" />
+          {/* The artwork itself, small — and PRESSABLE, because 36px is enough to tell one
+ design from another and not enough to check one. A name alone leaves "is that
+ the right one?" unanswered; so does a thumbnail you cannot open. */}
+          <button
+ type="button"
+ onClick={() => setZoom(r.src)}
+ title="See it full size"
+ className="size-9 shrink-0 overflow-hidden rounded-md border border-border bg-white"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={r.src} alt="" className="size-full object-contain" />
+          </button>
           {/* NAME, then the face. The blank's title and "placed in the designer" are gone:
  the first repeats the item row this badge already points at, and the second
  describes every row in this list, so it distinguished nothing. */}
@@ -395,6 +408,9 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
     } finally { setBusy(null) }
   }
 
+ /* One computation, two readers — the list and the empty state. Two calls is how they
+     come to disagree about whether anything is there. */
+ const placedLines = placedRows(placedMap ?? undefined, item ? [item] : [], false)
  return (
     <div className="space-y-2">
       <Dropzone
@@ -412,12 +428,27 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  files" for a line that had a design on it. */}
       {/* `false` — this panel is mounted for ONE line, so an index here would number every
  card "1". No number is better than a confident wrong one. */}
-      <PlacedArtworkList rows={placedRows(placedMap ?? undefined, item ? [item] : [], false)} />
+      <PlacedArtworkList rows={placedLines} />
 
       {files === null ? (
         <div className="flex justify-center py-3 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /></div>
       ) : shown.length === 0 ? (
-        <div className="py-2 text-center text-2xs text-muted-foreground">No files yet.</div>
+        /**
+         * "NO FILES YET" ONLY WHEN THERE ARE NONE — counting the placed artwork too.
+         *
+         * `shown` is the design_files table alone, and the placed artwork above comes from a
+         * different one. So a line whose artwork is placed but which has no cut file printed
+         * the artwork, its face and a Download button, and then the words "No files yet."
+         * directly underneath. Seen on screen.
+         *
+         * The comment two blocks up already says this panel "reported 'no files' for a line
+         * that had a design on it" — the fix at the time added the list and left the empty
+         * state judging by half the evidence, so the same sentence became a contradiction
+         * instead of an omission. §4: an empty state must not be readable as a broken one.
+         */
+        placedLines.length ? null : (
+          <div className="py-2 text-center text-2xs text-muted-foreground">No files yet.</div>
+        )
       ) : (
         <div className="divide-y divide-border rounded-xl border border-border">
           {orderFiles(shown).map((f) => {

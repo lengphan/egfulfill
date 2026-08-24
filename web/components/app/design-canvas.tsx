@@ -5,6 +5,8 @@ import { Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounter
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { ImageLightbox } from "@/components/app/image-lightbox"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app/dropzone"
@@ -1371,20 +1373,43 @@ export function DesignCanvasDialog({
   // attached to the item rather than as a loose card someone has to match up by hand.
  const [sending, setSending] = useState(false)
   /**
-   * ASK FIRST, AND SHOW WHAT IS GOING.
+   * WRITE THE CARD HERE, RATHER THAN WARN ABOUT IT.
    *
-   * "Send to Board" fired on the click — no confirmation, nothing shown, and the only sign
-   * it had worked was the button disappearing. Sending artwork to another person's queue is
-   * not an undoable UI action: they see it, they may start on it, and taking it back means
-   * explaining. It is worth one look at the picture that is about to leave.
+   * This was a confirmation: a picture, the lane it lands in, Cancel and Send. It asked the
+   * one question whose answer was always yes — you pressed Send to Board — and the fields
+   * that actually decide whether the card is any use (what it is called, what the designer
+   * is meant to DO) could only be filled in afterwards, by finding the card on the board and
+   * typing there. So the floor sent blanks and someone went back later.
+   *
+   * It is the card editor now, and deliberately the SHORT one: title, note, picture. The
+   * board's own editor is the same three fields plus everything that only makes sense once a
+   * card exists (status, claimer, files, partner push). None of that has an answer yet at the
+   * moment of sending, so none of it is here.
+   *
+   * The confirmation is not replaced by nothing — it is replaced by something better at the
+   * same job. A panel you have to type into shows the artwork for longer than a dialog you
+   * dismiss, which was the whole argument for the warning.
    */
  const [confirmSend, setConfirmSend] = useState(false)
+  /** Seeded from the line, because the line's name is right far more often than not — and a
+   *  field you can correct beats one you must fill. */
+ const [cardTitle, setCardTitle] = useState("")
+ const [cardNote, setCardNote] = useState("")
+  /** Click the artwork to see it big. The shared lightbox, never a seventh hand-rolled one. */
+ const [zoom, setZoom] = useState<string | null>(null)
+ const openSendPanel = () => {
+ setCardTitle(item.name || item.sku || "Design")
+ setCardNote("")
+ setErr(null)
+ setConfirmSend(true)
+  }
  const sendToBoard = async () => {
  setConfirmSend(false)
  setSending(true); setErr(null)
  try {
  const card = await createDesignCard({
- title: item.name || item.sku || "Design",
+ title: cardTitle.trim() || item.name || item.sku || "Design",
+ description: cardNote.trim() || undefined,
  data: designUrl || undefined,
  sku: item.sku || undefined,
         /**
@@ -3016,7 +3041,7 @@ export function DesignCanvasDialog({
  variant={boardCard ? "outline" : "default"}
  disabled={sending || !designUrl || !!boardCard}
  title={boardCard ? "Already on the design board" : designUrl ? undefined : "Add an image first — a designer needs something to work from"}
- onClick={() => setConfirmSend(true)}
+ onClick={openSendPanel}
                   >
                     {boardCard ? "Sent" : sending ? "Sending…" : "Send to Board"}
                   </Button>
@@ -3195,26 +3220,43 @@ export function DesignCanvasDialog({
  onPushed={() => { setPinkOpen(false); void loadCards() }}
         />
 
-        {/* WHAT IS ABOUT TO LEAVE, before it leaves. Sending artwork into someone else's
- queue is not an undoable UI action — they see it and may start on it — so the
- picture, the line it belongs to and the lane it lands in are all shown once. */}
+        {/* THE CARD, BEFORE IT EXISTS. Title, note, picture — see the note on sendToBoard
+            for why this is an editor and not the confirmation it replaced. */}
         <Dialog open={confirmSend} onOpenChange={(v) => { if (!v) setConfirmSend(false) }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Send this to the design board?</DialogTitle></DialogHeader>
-            <div className="flex gap-3">
-              {designUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={designUrl} alt="" className="size-24 shrink-0 rounded-lg border border-border bg-muted object-contain" />
-              )}
-              <div className="min-w-0 space-y-1 text-sm">
-                <div className="font-medium">{item.name || item.sku || "This line"}</div>
-                {/* NAMES THE LANE IT ACTUALLY LANDS IN. This said "In progress" long after
- sendToBoard was changed to file in Incoming (see the note there), so the
- one thing the dialog existed to state was the one thing it got wrong. */}
-                <p className="text-muted-foreground">
-                  It lands in <span className="font-medium text-foreground">Incoming</span>,
- where designers pick up new jobs.
-                </p>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader><DialogTitle>Send to the design board</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="send-card-title" className="mb-1 block text-sm font-medium">Title</label>
+                <Input
+                  id="send-card-title"
+                  value={cardTitle}
+                  onChange={(e) => setCardTitle(e.target.value)}
+                  placeholder={item.name || item.sku || "Design"}
+                />
+              </div>
+              <div className="flex gap-3">
+                {designUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setZoom(designUrl)}
+                    title="See it full size"
+                    className="size-28 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={designUrl} alt="" className="size-full object-contain" />
+                  </button>
+                )}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <label htmlFor="send-card-note" className="mb-1 text-sm font-medium">Description / notes</label>
+                  <textarea
+                    id="send-card-note"
+                    value={cardNote}
+                    onChange={(e) => setCardNote(e.target.value)}
+                    placeholder="Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."
+                    className="min-h-[7rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                  />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -3225,6 +3267,9 @@ export function DesignCanvasDialog({
             </div>
           </DialogContent>
         </Dialog>
+        {/* Above the dialog it opens from — ImageLightbox portals to the body for exactly
+            this case (see its own note). */}
+        <ImageLightbox src={zoom} label={item.name || item.sku || null} onClose={() => setZoom(null)} />
       </DialogContent>
     </Dialog>
   )

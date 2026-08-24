@@ -279,13 +279,27 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // A card carries the SAME number as the artwork on it — issued here too, because a
     // design can reach the board without ever passing through the order upload route.
     const designNo = await designNoFor(artHash, null);
+    /**
+     * THE NOTE, WRITTEN WITH THE CARD.
+     *
+     * The board stores it at `specs.description` (see the card editor's saveDesc), and it was
+     * only reachable by opening the card afterwards and typing there. The floor now writes it
+     * on the way out, so a card arrives already saying what the designer needs — which is the
+     * whole point of asking before the send rather than after it.
+     *
+     * Same key the editor patches, so the two are one field and not two that agree by luck.
+     * Empty stays NULL rather than writing `{"description":""}`: an empty specs object reads
+     * as "someone filled this in and cleared it", which is a different claim from silence.
+     */
+    const description = String(b.description || '').trim();
+    const specs = description ? JSON.stringify({ description }) : null;
     const r = await q(
-      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id)
-       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9)
+      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id, specs)
+       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9,$11::jsonb)
        returning *`,
       [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
        artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || ''),
-       designNo == null ? null : String(designNo), col]
+       designNo == null ? null : String(designNo), col, specs]
     ).catch((e) => { reply.code(500); return { error: e.message }; });
     if (!r || r.error) return r || { error: 'Could not create the card.' };
 
