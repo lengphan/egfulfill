@@ -3197,10 +3197,12 @@ export function DesignCanvasDialog({
               )}
               <div className="min-w-0 space-y-1 text-sm">
                 <div className="font-medium">{item.name || item.sku || "This line"}</div>
+                {/* NAMES THE LANE IT ACTUALLY LANDS IN. This said "In progress" long after
+ sendToBoard was changed to file in Incoming (see the note there), so the
+ one thing the dialog existed to state was the one thing it got wrong. */}
                 <p className="text-muted-foreground">
-                  It lands in <span className="font-medium text-foreground">In progress</span> as
- work already under way — not in Incoming, which is where designers pick up
- new jobs of their own.
+                  It lands in <span className="font-medium text-foreground">Incoming</span>,
+ where designers pick up new jobs.
                 </p>
               </div>
             </div>

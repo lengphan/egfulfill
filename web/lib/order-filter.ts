@@ -36,20 +36,29 @@ export type OrderQuery = {
   store: string
   /** Normalised print-method key from print-method.ts ("emb" / "dtf" / …). "" = any. */
   method: string
-  /** How far back, in days. null = any time; 0 = today only. */
+  /** How far back, in days. null = any time; 0 = today only. One of the presets in
+   *  DATE_RANGES — IGNORED while `from`/`to` carry a custom window, so the two can never
+   *  quietly intersect into a third range nobody chose. */
   days: number | null
+  /** A window the person typed, as LOCAL calendar dates ("YYYY-MM-DD"). "" = that end is
+   *  open, so "since the 3rd" and "up to the 9th" are both sayable with one field.
+   *  `to` includes the whole day it names. */
+  from: string
+  to: string
 }
 
-export const EMPTY_ORDER_QUERY: OrderQuery = { text: "", status: "", ready: "", platform: "", store: "", method: "", days: null }
+export const EMPTY_ORDER_QUERY: OrderQuery = { text: "", status: "", ready: "", platform: "", store: "", method: "", days: null, from: "", to: "" }
 
 /** Is anything actually narrowing the list? Drives whether a "Clear" affordance shows —
  *  and, more importantly, whether an empty result should read "no orders" or "no matches". */
 export const isOrderQueryActive = (q: OrderQuery) =>
-  !!(q.text.trim() || q.status || q.ready || q.platform || q.store || q.method || q.days !== null)
+  !!(q.text.trim() || q.status || q.ready || q.platform || q.store || q.method || hasDateFilter(q))
 
 export const activeFilterCount = (q: OrderQuery) =>
   (q.text.trim() ? 1 : 0) + (q.status ? 1 : 0) + (q.ready ? 1 : 0) +
-  (q.platform ? 1 : 0) + (q.store ? 1 : 0) + (q.method ? 1 : 0) + (q.days !== null ? 1 : 0)
+  // ONE, whether it is a preset or a typed window — a person who set two dates set one
+  // date filter, and counting the halves would report a filter they cannot turn off twice.
+  (q.platform ? 1 : 0) + (q.store ? 1 : 0) + (q.method ? 1 : 0) + (hasDateFilter(q) ? 1 : 0)
 
 /** How a status value reads in a sentence. The two pseudo-values the pills add on top of the
  *  canonical stage ids come first; everything else is looked up in the pipeline itself, so a
@@ -247,6 +256,73 @@ export const DATE_RANGES: { label: string; days: number | null }[] = [
 export const dateRangeLabel = (days: number | null) =>
   DATE_RANGES.find((r) => r.days === days)?.label ?? "Any time"
 
+/** The value the Date picker carries while a typed window is in force. Not a `days` number:
+ *  a custom range is a different KIND of answer, and giving it a fake day count is how the
+ *  two end up intersecting. */
+export const CUSTOM_RANGE = "custom"
+
+export const hasDateFilter = (q: OrderQuery) => q.days !== null || !!q.from || !!q.to
+export const hasCustomRange = (q: OrderQuery) => !!q.from || !!q.to
+
+/** A "YYYY-MM-DD" field value as LOCAL midnight.
+ *
+ *  `new Date("2026-08-03")` is parsed as UTC, so on a US floor it lands at 5pm on the 2nd —
+ *  the window would open half a day early and a whole day's orders would sort into the
+ *  wrong end of it. Built from parts instead, which is local by definition. */
+function localDay(s: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((s || "").trim())
+  if (!m) return null
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return Number.isFinite(d.getTime()) ? d.getTime() : null
+}
+
+/** A Date as the "YYYY-MM-DD" an `<input type="date">` reads, in LOCAL time. `toISOString`
+ *  is UTC, so after 5pm in New York it writes tomorrow — the same half-day slip as above,
+ *  in the other direction. */
+export const isoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
+/** Formats one edge of a window for a sentence — "3 Aug". */
+const fmtDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+
+export type DateWindow = { from?: number; to?: number }
+
+/**
+ * The window a query asks for, in epoch ms, or null for "any time".
+ *
+ * A typed window WINS over the preset — the preset is what the picker falls back to, and an
+ * order that satisfies both is not the same list as an order that satisfies the tighter one.
+ *
+ * `to` runs to the LAST MILLISECOND of the day it names: someone picking 9 Aug means
+ * everything that arrived on the 9th, not everything up to midnight as it began.
+ * A backwards range is swapped rather than returning nothing — an empty table is
+ * indistinguishable from a broken filter, and two dates in the other order is plainly one
+ * range typed the other way round.
+ */
+export function dateWindow(q: OrderQuery): DateWindow | null {
+  let from = localDay(q.from)
+  let to = localDay(q.to)
+  if (from != null || to != null) {
+    if (from != null && to != null && from > to) [from, to] = [to, from]
+    return { from: from ?? undefined, to: to == null ? undefined : to + 86400_000 - 1 }
+  }
+  if (q.days !== null) return { from: cutoffFor(q.days) }
+  return null
+}
+
+/** How the active date filter reads in a sentence, or null when none is set. Presets return
+ *  their catalogue label (so a caller can translate it); a typed window returns dates, which
+ *  no catalogue can hold. */
+export function dateFilterLabel(q: OrderQuery): string | null {
+  const win = dateWindow(q)
+  if (!win) return null
+  if (!hasCustomRange(q)) return dateRangeLabel(q.days)
+  const from = localDay(q.from)
+  const to = localDay(q.to)
+  if (from != null && to != null) return from > to ? `${fmtDay(to)} – ${fmtDay(from)}` : `${fmtDay(from)} – ${fmtDay(to)}`
+  return from != null ? `from ${fmtDay(from)}` : `up to ${fmtDay(to as number)}`
+}
+
 // An order SKU carries a print-method suffix that the blank's own SKU doesn't
 // (…-EMB / -DTG / -DTF / -APL / -LSR / -SUB / -SCR). It's the only method signal on lines
 // imported from a marketplace, where print_type is usually unset — so a method filter that
@@ -317,17 +393,19 @@ function cutoffFor(days: number): number {
   return Date.now() - days * 86400_000
 }
 
-export function matchesOrderQuery(o: OrderRow, q: OrderQuery, cutoff?: number, ctx: FilterContext = {}): boolean {
+export function matchesOrderQuery(o: OrderRow, q: OrderQuery, win?: DateWindow | null, ctx: FilterContext = {}): boolean {
   if (q.status && !matchesStatus(o, q.status, ctx)) return false
   if (q.ready && !matchesReady(o, q.ready, ctx)) return false
   if (q.platform && platformOf(o) !== q.platform) return false
   if (q.store && (o.store || "").trim() !== q.store) return false
   if (q.method && !methodsOfOrder(o).some((m) => m.key === q.method)) return false
-  if (cutoff != null) {
+  if (win) {
     // An order with no date can't be shown to fall inside a window — dropping it is the
     // honest answer to "orders from the last 7 days", not a guess either way.
     const t = o.created_at ? new Date(o.created_at).getTime() : NaN
-    if (!Number.isFinite(t) || t < cutoff) return false
+    if (!Number.isFinite(t)) return false
+    if (win.from != null && t < win.from) return false
+    if (win.to != null && t > win.to) return false
   }
   const term = q.text.trim().toLowerCase()
   if (term) {
@@ -343,6 +421,6 @@ export function matchesOrderQuery(o: OrderRow, q: OrderQuery, cutoff?: number, c
 /** Apply a query to a list. The date cutoff is computed ONCE per pass, not per order. */
 export function filterOrders(orders: OrderRow[], q: OrderQuery, ctx: FilterContext = {}): OrderRow[] {
   if (!isOrderQueryActive(q)) return orders
-  const cutoff = q.days !== null ? cutoffFor(q.days) : undefined
-  return orders.filter((o) => matchesOrderQuery(o, q, cutoff, ctx))
+  const win = dateWindow(q)
+  return orders.filter((o) => matchesOrderQuery(o, q, win, ctx))
 }

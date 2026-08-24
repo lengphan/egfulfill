@@ -389,13 +389,39 @@ export function ProductsCatalog() {
                       </span>
                     </div>
                   )}
-                  {/* NO PILL OVER THE PHOTO. A label pinned to the corner of every tile put a
- coloured chip on the one part of the card that is meant to be the
- product — and the grid's whole job is comparing pictures.
+                  {/* THE STATUS, ON THE PICTURE — FACTORY ONLY. Owner's call, and it
+ reinstates something this file removed on purpose, so both readings
+ are on the record.
 
-                      Nothing is lost: the "On the public site" tile above counts what is
- live and names how many are held back, the editor states the status
- outright, and the card's title still carries the full reason. */}
+                      It came off because a coloured chip on every tile sat on the one part
+ of the card that is meant to be the product, and the grid's job is
+ comparing pictures. That still holds for a SELLER, who has one
+ question here ("what can I order") and gets a clean grid.
+
+                      It does not hold for the floor: staff maintain this catalogue, and
+ "which of these is actually on the site" was answerable only by
+ opening each product's editor one at a time. So the chip is back,
+ gated to staff, and it yields the corner the moment the card's own
+ actions appear rather than stacking under them.
+
+                      Reserved status colours (globals.css): shipped = live, hold = active
+ but unpublishable, draft = deliberately not published. */}
+                  {isStaff && (() => {
+ const st = publicStateOf(p)
+ const tone = st.live ? "text-shipped" : st.label === "No price" ? "text-hold" : "text-draft"
+ return (
+                      <span
+ title={st.why ?? "On the public site."}
+ className="pointer-events-none absolute right-2 top-2 z-[5] inline-flex items-center gap-1.5 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium ring-1 ring-border backdrop-blur-sm transition-opacity group-hover:opacity-0"
+                      >
+                        {/* A DOT, not a filled chip. Over a photo the fill is what turns a
+ grid into bunting; the dot carries the colour and the word carries
+ the meaning, so it reads on a black hoodie and a white mug alike. */}
+                        <span className={"size-1.5 shrink-0 rounded-full bg-current " + tone} />
+                        <span className={tone}>{st.label}</span>
+                      </span>
+                    )
+                  })()}
                 </div>
 
                 {/* body */}

@@ -8,8 +8,9 @@ import { useLabelT } from "@/lib/i18n"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import {
-  DATE_RANGES, dateRangeLabel, orderFacets, isOrderQueryActive, activeFilterCount,
+  DATE_RANGES, dateRangeLabel, dateFilterLabel, orderFacets, isOrderQueryActive, activeFilterCount,
   statusLabel, READY_OPTIONS, readyLabel, EMPTY_ORDER_QUERY,
+  CUSTOM_RANGE, hasCustomRange, hasDateFilter, isoDay,
   type OrderQuery, type FilterContext,
 } from "@/lib/order-filter"
 import { methodByKey } from "@/lib/print-method"
@@ -70,10 +71,16 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
  * The production stage is deliberately NOT here: the stage pills beside this bar already own
  * `query.status`.
  */
-export function OrderFilterBar({ orders, query, onChange, catalog, className = "" }: {
+export function OrderFilterBar({ orders, query, onChange, catalog, count, total, className = "" }: {
   orders: OrderRow[]
   query: OrderQuery
   onChange: (q: OrderQuery) => void
+  /** Rows the filters left standing, and rows loaded. Shown BESIDE the button, not inside
+   *  the panel: the number a narrowed board is missing is the first thing you want after
+   *  setting a filter, and it is unreadable in a popover you have just closed. Both or
+   *  neither — a count with nothing to be a count OF is a number nobody can check. */
+  count?: number
+  total?: number
   /** Whether the board can answer the stock half of List — stock is held against the
    *  resolved BLANK sku, so without a catalog there's nothing to resolve against and those
    *  two options aren't offered. (The lookup itself happens in filterOrders' context.) */
@@ -84,16 +91,44 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
   const facets = orderFacets(orders)
   const set = (patch: Partial<OrderQuery>) => onChange({ ...query, ...patch })
   const active = isOrderQueryActive(query)
-  const count = activeFilterCount(query)
+  const activeCount = activeFilterCount(query)
   const canStock = !!catalog?.length
   const readyOptions = READY_OPTIONS.filter((o) => !o.stock || canStock)
   // What the trigger counts: everything in this panel. The stage pills and the search box
   // are their own visible controls, so counting them here would report a filter the panel
   // can't clear.
   const facetCount = (query.ready ? 1 : 0) + (query.platform ? 1 : 0) + (query.store ? 1 : 0)
-    + (query.method ? 1 : 0) + (query.days !== null ? 1 : 0)
+    + (query.method ? 1 : 0) + (hasDateFilter(query) ? 1 : 0)
+
+  // A typed window and a preset are one control with two shapes. Picking Custom seeds the
+  // fields with the last seven days rather than leaving them blank, so the dates on screen
+  // are always the dates being applied — a filter reading "custom" over an unnarrowed list
+  // is the same lie as a preset that does nothing.
+  const custom = hasCustomRange(query)
+  const pickDate = (v: string) => {
+    if (v === CUSTOM_RANGE) {
+      const to = new Date()
+      const from = new Date()
+      from.setDate(from.getDate() - 6)
+      set({ days: null, from: isoDay(from), to: isoDay(to) })
+      return
+    }
+    set({ days: v === "" ? null : Number(v), from: "", to: "" })
+  }
+
+  // Rows showing, of rows loaded. text-sm and inked, not the 2xs muted print the chips use:
+  // this is the answer to what the filters just did, and it is read at a glance from across
+  // a desk. Equal counts say "orders" instead of "318 of 318", which reads as a filter that
+  // did nothing rather than as no filter at all.
+  const countLabel = count == null || total == null ? null
+    : count === total ? `${total} ${total === 1 ? tl("ui", "order") : tl("ui", "orders")}`
+    : `${count} ${tl("ui", "of")} ${total}`
 
   return (
+    <div className="flex items-center gap-2">
+      {countLabel && (
+        <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">{countLabel}</span>
+      )}
     <Popover>
       {/* ONE button, not five dropdowns in a row.
           Five always-visible triggers plus the pills plus the search made three stacked
@@ -120,7 +155,9 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
         <CaretDown size={11} weight="bold" className="opacity-60" />
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-72 p-3">
+      {/* Wider while the two date fields are out — a native date input has a picker button
+          inside it and clips its own year at the width the dropdowns need. */}
+      <PopoverContent align="end" className={"p-3 " + (custom ? "w-80" : "w-72")}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-semibold">{tl("ui", "Filters")}</span>
           {active && (
@@ -128,7 +165,7 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
               onClick={() => onChange({ ...EMPTY_ORDER_QUERY })}
               className="eg-tap inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <X size={11} weight="bold" /> {tl("ui", "Clear")}{count > 1 ? ` (${count})` : ""}
+              <X size={11} weight="bold" /> {tl("ui", "Clear")}{activeCount > 1 ? ` (${activeCount})` : ""}
             </button>
           )}
         </div>
@@ -161,13 +198,45 @@ export function OrderFilterBar({ orders, query, onChange, catalog, className = "
           {/* Date is always offered — unlike the others it needs no data to be meaningful,
               and "what came in today" is the question a floor asks most. */}
           <FilterRow label={tl("filter", "Date")}>
-            <FilterMenu label={tl("filter", "Date")} anyLabel={tl("filter", "Any time")} value={query.days === null ? "" : String(query.days)}
-              options={DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: tl("daterange", r.label) }))}
-              onPick={(v) => set({ days: v === "" ? null : Number(v) })} />
+            <FilterMenu label={tl("filter", "Date")} anyLabel={tl("filter", "Any time")}
+              value={custom ? CUSTOM_RANGE : query.days === null ? "" : String(query.days)}
+              options={[
+                ...DATE_RANGES.filter((r) => r.days !== null).map((r) => ({ value: String(r.days), label: tl("daterange", r.label) })),
+                // Named by the WINDOW once one is set, so the closed trigger reads
+                // "3 Aug – 9 Aug" rather than the word "Custom" — the dates are the filter.
+                { value: CUSTOM_RANGE, label: custom ? dateFilterLabel(query) ?? tl("filter", "Custom range") : tl("filter", "Custom range") },
+              ]}
+              onPick={pickDate} />
           </FilterRow>
+          {custom && (
+            /* The two ends of the window, side by side under the picker that opened them.
+               `max`/`min` cross-bound the pair so the calendar cannot offer an end before
+               its own start — a backwards range is swapped rather than emptying the table
+               (see dateWindow), but the field should not invite one in the first place. */
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={query.from}
+                max={query.to || undefined}
+                onChange={(e) => set({ from: e.target.value, days: null })}
+                aria-label={tl("filter", "From date")}
+                className="h-8 min-w-0 flex-1 text-sm"
+              />
+              <span className="shrink-0 text-muted-foreground">–</span>
+              <Input
+                type="date"
+                value={query.to}
+                min={query.from || undefined}
+                onChange={(e) => set({ to: e.target.value, days: null })}
+                aria-label={tl("filter", "To date")}
+                className="h-8 min-w-0 flex-1 text-sm"
+              />
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
+    </div>
   )
 }
 
@@ -217,7 +286,10 @@ export function emptyOrdersMessage(
   // methodByKey, not PRODUCT_METHODS: the latter is only what we still OFFER, so a filter
   // pinned to a retired technique would print its bare key back at you.
   if (q.method) bits.push(methodByKey(q.method)?.label ?? q.method.toUpperCase())
-  if (q.days !== null) bits.push(tl("daterange", dateRangeLabel(q.days)).toLowerCase())
+  // A preset has a catalogue entry to translate; a typed window is dates, which no
+  // catalogue can hold — so it goes in as it reads ("3 Aug – 9 Aug").
+  const dateBit = dateFilterLabel(q)
+  if (dateBit) bits.push(q.days !== null ? tl("daterange", dateRangeLabel(q.days)).toLowerCase() : dateBit)
   // A stock filter with no catalog loaded yet can only return nothing, and "no orders match
   // short on stock" would read as a fact about the orders rather than about the page.
   if (q.ready.startsWith("stock:") && !ctx.catalog?.length) return t("ui.stockNotLoaded")
