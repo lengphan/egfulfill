@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
+import { Copy, Lock, LockOpen, Trash, UploadSimple, DownloadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, FolderOpen, BookmarkSimple, ImageSquare, PaperPlaneTilt, Needle} from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import { matchThreadColors, nearestThread, nearestThreads, matchQuality, hexToRg
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Eyedropper } from "@phosphor-icons/react"
 
 export type Pos = { x: number; y: number; w: number; r: number }
@@ -2087,60 +2088,123 @@ export function DesignCanvasDialog({
  collar and the eye had to travel up to reach it; centred, it is where the
  cursor already is when it is on the artwork. */}
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
-            <button
- type="button"
- onClick={() => uploadRef.current?.click()}
-              /* ONE WORD, ALWAYS. "Replace" described the state of the line rather than the
- action, so the tool that puts a file on this garment had two names depending
- on whether you had already used it. The title names every type it takes —
- which is the question actually being asked at the moment of pressing it. */
- title={`Upload — ${isEmb ? "PNG or JPG, or a machine file (.EMB .PES .DST .EXP .JEF …)" : "PNG or JPG"}`}
- aria-label="Upload a file"
- className={railBtn}
-            >
-              <UploadSimple size={18} weight="bold" />
-              <span className={railWord}>Upload</span>
-            </button>
-            <button
- type="button"
- onClick={() => { setLibSource("designs"); setLibOpen(true) }}
- title="Pick from the library — saved designs and templates"
- aria-label="Open the design library"
- className={railBtn}
-            >
-              <FolderOpen size={18} weight="bold" />
-              <span className={railWord}>Library</span>
-            </button>
-            {/* SAVE THIS PLACEMENT AS A TEMPLATE. The library could always hand a template
- back — artwork AND where it sits — and nothing here could put one in, so the
- only way to reuse a placement was to redo it by eye on the next order. */}
-            <button
- type="button"
-              /*
-               * ONE CONTROL THAT MEANS "TEMPLATES", both ways round.
-               *
-               * It was save-only and `disabled={!designUrl}`, so on an empty canvas — which is
-               * exactly when a template is what you want — it was a greyed-out mark whose
-               * tooltip told you to go and do something else first. That reads as broken, and
-               * the only real route to USING a template was the Library button's second tab,
-               * which nothing here said.
-               *
-               * With artwork it still saves the placement. Without, it opens the library ON
-               * the Templates tab, which is what the word promises.
-               */
- onClick={() => {
- if (designUrl) { setTplName((v) => (v === null ? defaultTplName : null)); return }
- setLibSource("templates"); setLibOpen(true)
-              }}
- disabled={tplBusy}
- title={designUrl ? "Save this artwork and its placement as a template" : "Start from a saved template"}
- aria-label={designUrl ? "Save as a template" : "Start from a saved template"}
- aria-expanded={tplName !== null}
- className={railBtn + (tplName !== null ? " bg-primary/10 text-primary" : "")}
-            >
-              {tplBusy ? <CircleNotch size={18} className="animate-spin" /> : <BookmarkSimple size={18} weight="bold" />}
-              <span className={railWord}>Template</span>
-            </button>
+            {/**
+              * ONE DOOR FOR FILES, not three beside each other.
+              *
+              * Upload, Library and Template were separate rail entries doing one job between
+              * them: put a file on this line. Which of the three you needed depended on where
+              * the file already was — on your disk, in the library, or inside a template —
+              * which is a fact about US, not a question anybody has while looking at a
+              * garment. Three narrow words also left no room to say the one thing the rail
+              * could not: whether this line has any files at all.
+              *
+              * So: one entry, a count on it, and the three routes inside — with the FILES
+              * THEMSELVES listed underneath. A panel that offers four ways to add a file and
+              * never names the ones already added is the same defect as a drop target that
+              * looks identical before and after the drop (see the RECEIPT note in
+              * dropzone.tsx); every row here can be downloaded, which is the reason to print
+              * a file name in the first place.
+              */}
+            <Popover>
+              <PopoverTrigger
+                title="Files on this line — add one, or take a copy"
+                aria-label="Files on this line"
+                className={railBtn + " relative"}
+              >
+                <UploadSimple size={18} weight="bold" />
+                <span className={railWord}>Files</span>
+                {/* GENUINELY ROUND, which is what a count badge is allowed to be (CLAUDE.md
+                    §4). It is the only thing on this rail that reports state rather than
+                    offering an action. */}
+                {lineFiles.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-semibold tabular-nums text-primary-foreground">
+                    {lineFiles.length}
+                  </span>
+                )}
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-72 p-2">
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => uploadRef.current?.click()}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
+                  >
+                    <UploadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
+                    Upload an image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setLibSource("templates"); setLibOpen(true) }}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
+                  >
+                    <BookmarkSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
+                    Start from a template
+                  </button>
+                  {/* A STITCH FILE ONLY FITS AN EMBROIDERED LINE — the same refusal the drop
+                      intake carries. Disabled with the reason rather than hidden: an option
+                      that is absent looks the same as one that does not exist. */}
+                  <button
+                    type="button"
+                    onClick={() => machineRef.current?.click()}
+                    disabled={!isEmb}
+                    title={isEmb ? "Attach a machine file to this line" : "Embroidered lines only — there is no machine to run a stitch file on this one"}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Needle size={14} weight="bold" className="shrink-0 text-muted-foreground" />
+                    Attach a machine file
+                  </button>
+                  {/* SAVING one is not the same act as STARTING from one, and only this half
+                      had nowhere else to live: the Design Maker can still save a template,
+                      but the placement you have just set by hand is HERE. Offered only with
+                      artwork on the line, because there is otherwise nothing to save. */}
+                  {designUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
+                      disabled={tplBusy}
+                      aria-expanded={tplName !== null}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent disabled:opacity-40"
+                    >
+                      {tplBusy
+                        ? <CircleNotch size={14} className="shrink-0 animate-spin text-muted-foreground" />
+                        : <BookmarkSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />}
+                      Save this placement as a template
+                    </button>
+                  )}
+                  {/* The saved-designs library, under an "or" as a PEER route rather than a
+                      fourth item — it reaches the same place as Upload, from somewhere else. */}
+                  <button
+                    type="button"
+                    onClick={() => { setLibSource("designs"); setLibOpen(true) }}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
+                  >
+                    <FolderOpen size={14} weight="bold" className="shrink-0 text-muted-foreground" />
+                    Pick from your library
+                  </button>
+                </div>
+
+                {/* THE RECEIPT. Same row the rest of the app prints, so a file reads the same
+                    here as it does on an order line. */}
+                <div className="mt-2 border-t border-border pt-2">
+                  {lineFiles.length === 0 ? (
+                    <p className="px-2 py-1 text-2xs text-muted-foreground">Nothing on this line yet.</p>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {lineFiles.map((f) => (
+                        <FileRow
+                          key={f.designId}
+                          file={{
+                            name: f.name || f.kind,
+                            note: f.kind,
+                            onDownload: () => void downloadFile(f.designId, f.name),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             {/**
               * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the title says
               * in as many words because it is the one thing about this control that can be

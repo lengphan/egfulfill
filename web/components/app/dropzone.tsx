@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { CheckCircle, CircleNotch, UploadSimple, WarningCircle, X, type Icon } from "@phosphor-icons/react"
+import { CheckCircle, CircleNotch, DownloadSimple, UploadSimple, WarningCircle, X, type Icon } from "@phosphor-icons/react"
 import { RegionMark, REGION_LINE, REGION_NOTE } from "@/components/app/region"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +49,11 @@ export type DroppedFile = {
   note?: string | null
   /** Carries its own reason — a refusal is the answer, not a subtitle (CLAUDE.md §4). */
   error?: string | null
+  /** Take a copy of this file. Beside the remove, because a receipt that can only DELETE
+   *  what it lists is half a receipt: the reason to show a file name is so the file can be
+   *  got at, and every surface that listed one was sending people to open something else to
+   *  get it. Optional — a row for a file that is still uploading has nothing to hand over. */
+  onDownload?: () => void
   onRemove?: () => void
 }
 
@@ -112,6 +117,17 @@ export function FileRow({ file, className }: { file: DroppedFile; className?: st
           </span>
         )}
       </span>
+      {file.onDownload && (
+        <button
+          type="button"
+          onClick={file.onDownload}
+          aria-label={`Download ${file.name}`}
+          title={`Download ${file.name}`}
+          className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <DownloadSimple size={12} weight="bold" />
+        </button>
+      )}
       {file.onRemove && (
         <button
           type="button"
