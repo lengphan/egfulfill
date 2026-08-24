@@ -91,6 +91,9 @@ Module._resolveFilename = function (request, ...rest) {
   return resolve.call(this, request, ...rest)
 }
 const web = require(webEntry)
+/* ourSku lives in its own module so the app's boards and the catalogue helpers can both
+   import it without either owning the file. Compiled separately, same alias hook. */
+const ours = require(compileIn('web', 'lib/our-sku.ts', 'web'))
 
 /* pricing.js imports db.js, which constructs a Pool at module load. A Pool does not connect
    until it is queried, so a bogus URL is enough — and it is the same trick the boot test uses
@@ -136,9 +139,54 @@ const CASES = [
   { what: 'sku only, exact', item: { blank: '', sku: 'EG-18000' }, want: 'p2' },
   { what: 'nothing to go on', item: { blank: '', sku: '' }, want: null },
   { what: 'a blank naming no product we hold', item: { blank: 'Something else entirely', sku: '' }, want: null },
+  { what: 'the name a product had BEFORE it was renamed', item: { blank: 'Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
+  { what: 'composite blank written before the rename', item: { blank: 'EG-18009 - Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
+  { what: "the supplier's own style code as the blank", item: { blank: '18500', sku: '' }, want: 'p6' },
 ]
 
+/**
+ * AND THE LABEL, because the same two files write it and it is the string the resolvers read
+ * back. A sku printed here is a sku a seller can paste into a distributor's search box, so
+ * `ourSku` decides — and if the two implementations ever disagree about what "ours" means,
+ * the sheet and the app would offer different strings for one product and each other's rows
+ * would stop resolving.
+ */
+const SKUS = [
+  { sku: 'EG-1002', ours: true },
+  { sku: 'eg-la13', ours: true },       // case is not the point
+  { sku: '10-271-016-SM', ours: false },  // OTTO's part number, live in the sku column
+  { sku: '100-632-120342', ours: false },
+  { sku: '10892', ours: false },
+  { sku: '5000', ours: false },
+  { sku: '', ours: false },
+]
 const fail = []
+for (const c of SKUS) {
+  const w = ours.ourSku(c.sku)
+  const v = srv.ourSku(c.sku)
+  const want = c.ours ? c.sku : ''
+  if (w !== want) fail.push(`web ourSku("${c.sku}") → "${w}", expected "${want}"`)
+  if (v !== want) fail.push(`server ourSku("${c.sku}") → "${v}", expected "${want}"`)
+  if (w !== v) fail.push(`DRIFT on ourSku("${c.sku}") — web "${w}", server "${v}"`)
+}
+// The label the dropdowns offer, and what a line then carries.
+const LABELS = [
+  { p: { name: 'Adams Headwear LP104', sku: '10892' }, want: 'Adams Headwear LP104' },
+  { p: { name: 'Gildan Unisex Heavy Blend™ Crewneck Sweatshirt', sku: 'EG-18000' }, want: 'EG-18000 - Gildan Unisex Heavy Blend™ Crewneck Sweatshirt' },
+  { p: { name: '', sku: 'EG-1002' }, want: 'EG-1002' },
+]
+/* productLabel is checked only when the module exports one. It is being written in another
+   session as this ships; a guard that silently passed would be worse than one that says it
+   skipped, so it says so. */
+if (typeof web.productLabel === 'function') {
+  for (const c of LABELS) {
+    const got = web.productLabel(c.p)
+    if (got !== c.want) fail.push(`productLabel(${JSON.stringify(c.p)}) → "${got}", expected "${c.want}"`)
+  }
+} else {
+  console.log(`(skipped ${LABELS.length} label cases — web/lib/variant-resolve.ts exports no productLabel yet)`)
+}
+
 for (const c of CASES) {
   const w = web.resolveProduct(c.item, webCatalog)
   const s = srv.matchProduct(srvIdx, c.item)
@@ -158,5 +206,6 @@ if (fail.length) {
   console.error('is the failure this guard exists for: the screen looks right and the price is missing.')
   process.exit(1)
 }
-console.log(`web/lib/variant-resolve.ts and server/src/pricing.js agree across ${CASES.length} cases,`)
-console.log('including the composite "SKU - NAME" blank the order grid and the import sheet write.')
+console.log(`web/lib/variant-resolve.ts and server/src/pricing.js agree across ${CASES.length} resolution cases,`)
+console.log(`${SKUS.length} sku cases and ${LABELS.length} labels — including the composite "SKU - NAME" blank the`)
+console.log('order grid and the import sheet write, and the vendor part numbers that must never be printed.')

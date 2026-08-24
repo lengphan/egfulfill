@@ -118,13 +118,46 @@ function blankCandidates(cell) {
   return out.filter(Boolean);
 }
 
+/**
+ * OUR CODE, OR NOTHING — never the supplier's. MIRRORS ourSku() in web/lib/variant-resolve.ts.
+ *
+ * `catalog_products.sku` is meant to hold the code WE assigned (`EG-1002`), with the vendor's
+ * part number kept apart in `supplierSku`. On 8 of 30 live products it does not — a supplier
+ * import wrote the vendor's own code into it, so everything printing a sku was printing
+ * OTTO's and S&S's part numbers: the sheet's Blank Product dropdown, the grid, every variant
+ * strip. §2.9 in its quietest form — not a field called `supplier`, just a number that pastes
+ * into a distributor's search box.
+ *
+ * DISPLAY ONLY. Nothing routes on it: stock is still held against `sku`, matchProduct still
+ * matches on it, and a line already carrying "10892 - Adams Headwear LP104" still resolves,
+ * because both resolvers try the whole string and then each half.
+ */
+export function ourSku(sku) {
+  const s = String(sku == null ? '' : sku).trim();
+  return /^EG-/i.test(s) ? s : '';
+}
+
 export function matchProduct(idx, item) {
   const blank = String(item.blank || '').trim();
   if (blank) {
     for (const cand of blankCandidates(blank.toLowerCase())) {
       const hit = idx.rows.find((r) => {
         const d = r.data || {};
-        return [d.name, r.sku, d.sku, r.id, d.id].some((v) => v != null && String(v).trim().toLowerCase() === cand);
+        /*
+         * THE SUPPLIER'S CODE AND THE FORMER NAMES, because the client matches both and a
+         * line that resolves on the screen must resolve here or it prices at zero.
+         *
+         *   supplierSku — the web resolver has always matched it and this did not, so a
+         *                 blank naming the supplier's style number resolved for DISPLAY and
+         *                 not for PRICE. Same class of bug as the composite blank above.
+         *   nameAliases — what the product used to be called. A rename (the brand split runs
+         *                 one in bulk) otherwise strands every line placed before it.
+         *
+         * MIRRORS resolveProduct in web/lib/variant-resolve.ts — tools/check-blank-resolve.mjs
+         * runs both implementations over the same fixtures for exactly this reason.
+         */
+        return [d.name, r.sku, d.sku, r.id, d.id, r.supplier_sku, d.supplierSku, ...(Array.isArray(d.nameAliases) ? d.nameAliases : [])]
+          .some((v) => v != null && String(v).trim().toLowerCase() === cand);
       });
       if (hit) return hit;
     }
