@@ -787,6 +787,21 @@ td[align="right"] {
   .eg-scroll-slim::-webkit-scrollbar-thumb { background: color-mix(in oklch, currentColor 18%, transparent); }
 }
 
+/* A SCROLL CONTAINER THAT SHOULD NEVER SHOW A BAR — the tab bar above all.
+   ────────────────────────────────────────────────────────────────────────────
+   `overflow-x: auto` is not one axis. CSS resolves the other axis from `visible` to `auto`
+   the moment one of them scrolls, so a bar that only ever needed to scroll SIDEWAYS is a
+   vertical scroll container too — and TabBar's active rule is an absolutely positioned
+   ::after at `-bottom-px`, which is one pixel of vertical overflow. One pixel is enough:
+   with "always show scrollbars" on, macOS drew a full-height vertical bar between the last
+   tab and whatever sat beside it, which is what the library picker's scroller was.
+
+   Hiding the chrome rather than clipping the axis: `overflow-y: hidden` would cut that
+   ::after off and take the underline with it, and the horizontal scroll is still real — a
+   trackpad, a swipe and the keyboard all still move it. */
+.eg-scroll-none { scrollbar-width: none; }
+.eg-scroll-none::-webkit-scrollbar { width: 0; height: 0; }
+
 /* ── THE ACCENT PRESETS ────────────────────────────────────────────────────────
  * An admin picks the pop in Settings › Branding, and that sets data-pop on <html>.
  *
