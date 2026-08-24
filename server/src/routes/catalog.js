@@ -1128,10 +1128,29 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
        updated_by text,
        primary key (source, ref)
      )`).catch(() => {});
+  /**
+   * WHICH COLOURWAYS AND SIZES THIS PAGE SHOWS.
+   *
+   * A separate `alter`, not a change to the `create` above: schema.sql runs on FIRST DB init
+   * only, and this table is created at route load — so an existing deployment would never see
+   * a column added to the create. Same reason every other late column in this codebase arrives
+   * this way.
+   *
+   * jsonb rather than text[]: node-pg hands text[] back as a string on some paths, and this is
+   * read straight into a response.
+   *
+   * NULL means "not curated — show everything the style has", which is what every existing row
+   * already means. An empty selection is normalised to NULL on the way in rather than stored,
+   * because "I unticked them all" is a revert, and a page printing zero colourways is a page
+   * that failed rather than a page that chose.
+   */
+  q(`alter table lookbook_overrides
+       add column if not exists colors jsonb,
+       add column if not exists sizes  jsonb`).catch(() => {});
 
   /** Every override, as source:ref → row. One read per lookbook rather than one per style. */
   const lookbookOverrides = async () => {
-    const r = await q('select source, ref, name, description, image from lookbook_overrides')
+    const r = await q('select source, ref, name, description, image, colors, sizes from lookbook_overrides')
       .catch(() => ({ rows: [] }));
     const m = new Map();
     for (const row of r.rows) m.set(`${row.source}:${row.ref}`, row);
@@ -1144,14 +1163,29 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   const withOverride = (style, ov) => {
     if (!ov) return style;
+    /**
+     * THE PICKS TRAVEL, THE FILTERING DOES NOT HAPPEN HERE.
+     *
+     * The sheet needs both halves: what to PRINT, and what the style actually has so the
+     * editor can offer the rest of it. Filtering server-side would leave the picker able to
+     * show only what was already picked — you could take a colour off the page and never put
+     * it back. So the full lists go out as they always did and the client draws the ones that
+     * are picked, which is also what makes a saved export re-openable: it snapshots the range
+     * AND the choice rather than a range with the choice already burned in.
+     */
+    const list = (v) => (Array.isArray(v) && v.length ? v.map((x) => String(x)) : null);
+    const pickColors = list(ov.colors);
+    const pickSizes = list(ov.sizes);
     return {
       ...style,
       name: ov.name != null && ov.name !== '' ? ov.name : style.name,
       description: ov.description != null ? ov.description : style.description,
       image: ov.image != null && ov.image !== '' ? ov.image : style.image,
+      pickColors,
+      pickSizes,
       // Said out loud so the sheet can mark an edited page and offer to put it back. A
       // document you cannot tell you have altered is one you cannot check.
-      edited: !!(ov.name || ov.description != null || ov.image),
+      edited: !!(ov.name || ov.description != null || ov.image || pickColors || pickSizes),
     };
   };
 
@@ -1434,21 +1468,49 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const name = b.name === undefined ? undefined : (b.name === null ? null : String(b.name).trim().slice(0, 200));
     const description = b.description === undefined ? undefined : (b.description === null ? null : String(b.description).slice(0, 4000));
 
-    if (name !== undefined || description !== undefined || image !== undefined) {
+    /**
+     * WHICH COLOURWAYS / SIZES THIS PAGE PRINTS — a list of names, or null for "all of them".
+     *
+     * NAMES, NOT INDEXES. The sheet's own colours come from the supplier feed and re-sync;
+     * an index would silently point at a different garment the next time the range moved,
+     * which is a document handed to a buyer showing a colour nobody picked. A name that stops
+     * existing upstream simply stops matching, which is the correct failure.
+     *
+     * An empty array is stored as NULL, not as an empty selection — see the column note. And
+     * the list is capped: this is a page, and a thousand strings in a jsonb column is a body
+     * somebody sent on purpose.
+     */
+    const nameList = (v) => {
+      if (v === undefined) return undefined;
+      if (v === null) return null;
+      if (!Array.isArray(v)) return undefined;
+      const out = [...new Set(v.map((x) => String(x == null ? '' : x).trim()).filter(Boolean))].slice(0, 200);
+      return out.length ? out : null;
+    };
+    const colors = nameList(b.colors);
+    const sizes = nameList(b.sizes);
+
+    if (name !== undefined || description !== undefined || image !== undefined
+        || colors !== undefined || sizes !== undefined) {
       // COALESCE ON THE EXISTING ROW so a one-field edit doesn't blank the other two, and an
       // explicit null still clears — that is why the "was it sent" test is done in JS above
       // and only the resolved values reach SQL.
       await q(
-        `insert into lookbook_overrides (source, ref, name, description, image, updated_by)
-         values ($1,$2,$3,$4,$5,$6)
+        `insert into lookbook_overrides (source, ref, name, description, image, colors, sizes, updated_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8)
          on conflict (source, ref) do update set
-           name        = case when $7 then excluded.name        else lookbook_overrides.name end,
-           description = case when $8 then excluded.description else lookbook_overrides.description end,
-           image       = case when $9 then excluded.image       else lookbook_overrides.image end,
+           name        = case when $9  then excluded.name        else lookbook_overrides.name end,
+           description = case when $10 then excluded.description else lookbook_overrides.description end,
+           image       = case when $11 then excluded.image       else lookbook_overrides.image end,
+           colors      = case when $12 then excluded.colors      else lookbook_overrides.colors end,
+           sizes       = case when $13 then excluded.sizes       else lookbook_overrides.sizes end,
            updated_at  = now(), updated_by = excluded.updated_by`,
         [source, ref, name ?? null, description ?? null, image ?? null,
+          colors == null ? null : JSON.stringify(colors),
+          sizes == null ? null : JSON.stringify(sizes),
           String((req.user && req.user.sub) || ''),
-          name !== undefined, description !== undefined, image !== undefined]
+          name !== undefined, description !== undefined, image !== undefined,
+          colors !== undefined, sizes !== undefined]
       );
     }
 

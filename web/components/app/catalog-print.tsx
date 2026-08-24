@@ -11,6 +11,7 @@ import { bySize } from "@/lib/size-order"
 import type { LookbookBrand } from "@/components/app/lookbook-branding-dialog"
 import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
+import { LookbookPickDialog } from "@/components/app/lookbook-pick-dialog"
 import { HEX } from "@/components/marketing/bold-kit"
 
 /**
@@ -261,6 +262,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  const [isAdmin, setIsAdmin] = useState(false)
  useEffect(() => { const t = setTimeout(() => setIsAdmin((getUser()?.role || "") === "admin"), 0); return () => clearTimeout(t) }, [])
  const [editErr, setEditErr] = useState<string | null>(null)
+  /** Which page's colourways or sizes are being chosen. One dialog for every sheet — the
+   *  style travels with the request rather than the dialog being mounted per page. */
+ const [picking, setPicking] = useState<{ st: LookbookStyle; kind: "colors" | "sizes" } | null>(null)
  const canEdit = !exportId
  const fileFor = useRef<LookbookStyle | null>(null)
  const fileInput = useRef<HTMLInputElement | null>(null)
@@ -278,7 +282,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
    */
  const patch = async (
  st: LookbookStyle,
- body: { name?: string | null; description?: string | null; image?: string | null; price?: number | null },
+ body: { name?: string | null; description?: string | null; image?: string | null; price?: number | null
+ colors?: string[] | null; sizes?: string[] | null },
  optimistic: Partial<LookbookStyle>,
   ) => {
  if (!st.source) {
@@ -346,6 +351,28 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     <LookbookBrandingDialog open={brandOpen} onOpenChange={setBrandOpen} brand={brand} onSaved={setBrand} />
   )
 
+  /* ONE dialog for the whole book, driven by which page asked. Mounting it per sheet would
+     put a copy of it behind every style in a fifty-page catalogue. */
+ const pickDialog = picking && (
+    <LookbookPickDialog
+ open
+ onOpenChange={(v) => { if (!v) setPicking(null) }}
+ busy={savingRef === picking.st.ref}
+ title={picking.kind === "colors"
+        ? `Colourways on this page — ${picking.st.name}`
+        : `Sizes on this page — ${picking.st.name}`}
+ options={picking.kind === "colors"
+        ? picking.st.colors.map((c) => ({ value: c.name, image: c.image }))
+        : [...picking.st.sizes].sort(bySize).map((z) => ({ value: z }))}
+ picked={picking.kind === "colors" ? picking.st.pickColors : picking.st.pickSizes}
+ onSave={(next) => {
+ const key = picking.kind === "colors" ? "pickColors" : "pickSizes"
+ patch(picking.st, { [picking.kind]: next }, { [key]: next })
+ setPicking(null)
+      }}
+    />
+  )
+
   // Nothing to portal into until the effect has run — and on the server there is no document.
  if (!host) return null
 
@@ -354,6 +381,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     // `body > *:not(.eg-print-root) { display: none }`, so an overlay without it is hidden
     // and the printer emits a blank sheet.
     <div className="eg-print-root fixed inset-0 z-50 overflow-y-auto bg-neutral-100">
+      {pickDialog}
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
         <span className="text-sm font-medium">
           {title ?? (rows === null ? "Loading…" : `${rows.length} style${rows.length === 1 ? "" : "s"}`)}
@@ -513,8 +541,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  colourways, sizes and decoration methods are what the pages behind it contain,
  so the sheet cannot overstate the catalogue it introduces. */}
           {(() => {
- const colourways = rows.reduce((n, st) => n + st.colors.length, 0)
- const sizes = new Set(rows.flatMap((st) => st.sizes))
+ // COUNTED FROM WHAT THE PAGES PRINT, not from what the styles hold. With colourways
+            // curated per page, counting the full range would put a number on the cover that
+            // no amount of turning pages reaches — which is exactly what this block's own note
+            // says it exists to prevent.
+ const printed = (st: LookbookStyle) => ({
+ colors: st.pickColors?.length ? st.colors.filter((c) => st.pickColors!.includes(c.name)) : st.colors,
+ sizes: st.pickSizes?.length ? st.sizes.filter((z) => st.pickSizes!.includes(z)) : st.sizes,
+            })
+ const colourways = rows.reduce((n, st) => n + printed(st).colors.length, 0)
+ const sizes = new Set(rows.flatMap((st) => printed(st).sizes))
  const priced = rows.filter((st) => sheetPrice(st) != null).length
  const stat = (n: string | number, label: string) => (
               <div key={label}>
@@ -585,12 +621,29 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             // to hold. In EDIT mode it always does — the attach-a-photo and add-a-description
             // affordances are the reason you opened the mode on a page that has neither.
  const hero = heroImage(st)
+            /**
+             * WHAT THIS PAGE PRINTS, out of what the style has.
+             *
+             * `pickColors` / `pickSizes` are names chosen in edit mode; null means the whole
+             * range, which is what every page meant before the picker existed and what a
+             * colourway added upstream next month inherits.
+             *
+             * FILTERED, never mapped. A picked name that has since left the supplier's range
+             * simply stops matching, so the page loses a colourway rather than printing one
+             * under a name that now belongs to a different garment.
+             */
+ const pickedColors = st.pickColors && st.pickColors.length
+      ? st.colors.filter((c) => st.pickColors!.includes(c.name))
+      : st.colors
+ const pickedSizes = st.pickSizes && st.pickSizes.length
+      ? st.sizes.filter((z) => st.pickSizes!.includes(z))
+      : st.sizes
             // The left column is THE PRODUCT AND ITS MEASUREMENTS now — the photo, the size
             // run and the spec table. The description used to justify this column too, and
             // it has moved under the swatches, so a style with copy and no photo would have
             // opened an empty half-page here. The charts are what keep the column earning
             // its place when there is no shot.
- const twoUp = !!hero || st.sizes.length > 0 || st.specs.length > 0 || editing
+ const twoUp = !!hero || pickedSizes.length > 0 || st.specs.length > 0 || editing
             /**
              * THREE ROWS OF SWATCHES, AND THEN A NUMBER.
              *
@@ -810,10 +863,20 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  reads as something failing to render; at the bottom it reads as a page
  with less on it, which is the truth. */}
                   <div className="pt-4">
-                    {st.sizes.length > 0 && (
+                    {(pickedSizes.length > 0 || (editing && st.sizes.length > 0)) && (
                       <div className="mt-5">
-                        <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                          Available sizes
+                        <div className="flex items-baseline gap-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                            Available sizes
+                          </div>
+                          {editing && st.sizes.length > 0 && (
+                            <button
+ type="button" onClick={() => setPicking({ st, kind: "sizes" })}
+ className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 hover:bg-neutral-200 print:hidden"
+                            >
+                              {st.pickSizes?.length ? `${pickedSizes.length} of ${st.sizes.length}` : `All ${st.sizes.length}`}
+                            </button>
+                          )}
                         </div>
                         {/* A CHART, not a row of chips. The chips left a band of white across
  the page; a bordered strip fills it and reads as a spec table,
@@ -826,7 +889,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                             already has (lib/size-order.ts, mirroring sanmar.js) — imported,
                             not re-derived. */}
                         <div className="mt-2 flex overflow-hidden rounded border border-neutral-300">
-                          {[...st.sizes].sort(bySize).map((z) => (
+                          {[...pickedSizes].sort(bySize).map((z) => (
                             <div key={z} className="flex-1 border-r border-neutral-200 px-1 py-2 text-center text-[11px] font-semibold last:border-r-0">
                               {z}
                             </div>
@@ -887,21 +950,37 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
                 {/* RIGHT — every colourway, captioned. */}
                 <div className="flex min-h-0 flex-col">
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                    Available colours
+                  {/* The label, and in edit mode the way to change what sits under it. The
+                      control is print:hidden — a sheet printed mid-edit shows the document as
+                      it will be sent, the same rule the Replace photo button follows. It says
+                      the COUNT rather than the word "Choose", because the count is the thing
+                      you came to check and a page printing 5 of 22 should say so from across
+                      the room. */}
+                  <div className="flex items-baseline gap-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                      Available colours
+                    </div>
+                    {editing && st.colors.length > 0 && (
+                      <button
+ type="button" onClick={() => setPicking({ st, kind: "colors" })}
+ className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 hover:bg-neutral-200 print:hidden"
+                      >
+                        {st.pickColors?.length ? `${pickedColors.length} of ${st.colors.length}` : `All ${st.colors.length}`}
+                      </button>
+                    )}
                   </div>
-                  {st.colors.length === 0 ? (
+                  {pickedColors.length === 0 ? (
                     <p className="mt-2 text-[11px] text-neutral-400">
                       No colourway images on this style.
                     </p>
-                  ) : !st.colors.some((c) => c.image) ? (
+                  ) : !pickedColors.some((c) => c.image) ? (
                     /* NAMES, when there are no pictures of them. A grid of bordered wells
  each holding a colour name in 7px grey is twelve small versions of the
  empty plate this page just stopped printing — the border promises a
  photograph the row cannot deliver. The range is still stated, as a
  list, which is what it actually is. */
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {st.colors.map((c) => (
+                      {pickedColors.map((c) => (
                         <span key={c.name + c.sku}
  className="rounded border border-neutral-200 px-2 py-1 text-[10px] leading-tight text-neutral-700">
                           {c.name}
@@ -916,7 +995,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     // stretches, so they sit at the top rather than smearing down the page.
                     <div className="mt-2 grid auto-rows-min gap-x-3 gap-y-4"
  style={{ gridTemplateColumns: `repeat(${swatchCols}, minmax(0, 1fr))` }}>
-                      {st.colors.slice(0, colCap).map((c) => (
+                      {pickedColors.slice(0, colCap).map((c) => (
                         <div key={c.name + c.sku} className="flex flex-col items-center">
                           {/* THREE ACROSS, SQUARE. Four columns made each well ~19mm wide, and
  since these photos are wider than they are tall the picture was
@@ -949,9 +1028,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       ))}
                     </div>
                   )}
-                  {st.colors.length > colCap && (
+                  {pickedColors.length > colCap && (
                     <p className="mt-2 text-[9px] text-neutral-500">
-                      + {st.colors.length - colCap} more colours — ask us for the full range.
+                      + {pickedColors.length - colCap} more colours — ask us for the full range.
                     </p>
                   )}
 
