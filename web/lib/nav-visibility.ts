@@ -35,7 +35,15 @@ const TAB_SURFACES: VisSurface[] = [
 // role. Mirrors the shipped behaviour: Trending is staff-only; operators also lose Analyzer.
 export const DEFAULT_HIDDEN: Partial<Record<VisRole, string[]>> = {
   seller: ["/spydeck#trending"],
-  operator: ["/spydeck#trending", "/spydeck#account"],
+  /* Studio is default-hidden for operators (2026-08-24). It stays in STAFF_TOOLS with
+     `roles: ["operator","admin"]` — matching the server's IMAGE_ROLES gate, which is what
+     stops the page being a red refusal — so the row still exists in the matrix and an admin
+     can hand it back with one tick. Removing the role instead would have deleted the choice.
+
+     NOTE the shape of this map: a default applies only until an admin saves ANY explicit
+     list for that role. If operator permissions have already been saved once, the stored
+     list wins and Studio has to be un-ticked there by hand. */
+  operator: ["/spydeck#trending", "/spydeck#account", "/studio"],
 }
 
 // Toggleable surface registry, built from the LIVE nav definitions (so it stays in sync) plus

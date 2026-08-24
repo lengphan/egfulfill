@@ -406,7 +406,7 @@ export const unitsOfItems = (items?: ({ qty?: number | null } | null)[] | null) 
 export function mayEditVariants(
   role: string | null | undefined,
   factoryStatus: string | null | undefined,
-  opts: { blanksOrdered?: boolean } = {},
+  opts: { blanksOrdered?: boolean; editAfterApproval?: boolean } = {},
 ): boolean {
   const stage = normalizeStage(factoryStatus)
   const beforeApproval = stage === "" || stage === "in_review"
@@ -417,6 +417,16 @@ export function mayEditVariants(
   if (r === "admin") return beforeApproval || !opts.blanksOrdered
   // The seller owns the spec, but only until they hand it over.
   if (r === "seller") return stage === ""
+  /**
+   * AN OPERATOR, IF AN ADMIN HAS GRANTED IT (Settings › Permissions → Edit an order after
+   * approval). Mirrors the carve-out in server/src/routes/orders.js item-setup, and opens
+   * exactly the admin window above — corrections end when the blanks are ordered, because
+   * that limit is a fact about the world rather than about rank.
+   *
+   * The caller passes the switch rather than this file reading it: order-rules is shared with
+   * the phone and must stay pure. Absent = off, which is the shipped rule.
+   */
+  if (r === "operator" && opts.editAfterApproval) return beforeApproval || !opts.blanksOrdered
   // Every other staff role, up to approval. Deliberately the server's own test rather than
   // a narrower one: a client stricter than the API hides work people are allowed to do, and
   // a client looser than it offers controls that 403.

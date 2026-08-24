@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { mayEditVariants } from "@/shared/order-rules"
+import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { designSearchTerms } from "@/lib/design-id"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
@@ -147,6 +148,9 @@ export function OrdersList() {
    * boundary — and it should not be mistaken for one.
    */
  const [role, setRole] = useState("")
+  // See orders-hub: OFF until the grants load, which is the shipped rule.
+ useRoleGrants()
+ const editAfterApproval = isGrantOn(GRANT_OPERATOR_EDIT_AFTER_APPROVAL)
  useEffect(() => {
  const t = setTimeout(() => setRole(getUser()?.role || ""), 0)
  return () => clearTimeout(t)
@@ -481,7 +485,7 @@ export function OrdersList() {
                                         // this the row had nothing but a name.
  blankSku={stockSkuOf(it, catalog) || undefined}
                                       />
-                                      {mayEditVariants(role, o.factory_status) ? (
+                                      {mayEditVariants(role, o.factory_status, { editAfterApproval }) ? (
                                         <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                                       ) : (
                                         <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1.5" />

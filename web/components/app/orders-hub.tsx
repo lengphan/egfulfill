@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { mayEditVariants } from "@/shared/order-rules"
+import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
@@ -408,6 +409,10 @@ export function OrdersHub() {
  const t = useT()
  const tl = useLabelT()
  const role = getUser()?.role || ""
+  // Re-render once the admin's grants land; until then every grant reads OFF, which is the
+  // shipped rule. See lib/role-grants.ts.
+ useRoleGrants()
+ const editAfterApproval = isGrantOn(GRANT_OPERATOR_EDIT_AFTER_APPROVAL)
  const isAdmin = role === "admin"
   // Any non-seller. Mirrors isStaff() on the server, which is the boundary that actually
   // matters — this only decides whether the control is worth rendering.
@@ -3021,7 +3026,7 @@ export function OrdersHub() {
                               * above (OrderedVariant), so the "×1" that used to sit beside the
                               * strip was the same number printed twice on one line.
                               */}
-                            {mayEditVariants(role, stage) ? (
+                            {mayEditVariants(role, stage, { editAfterApproval }) ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
                               // Locked, not chipped: the same four fields the editable strip

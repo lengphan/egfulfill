@@ -5,6 +5,7 @@ import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
+import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
@@ -159,6 +160,11 @@ export default function OrderDetailPage() {
   // Staff processing controls (stage moves + labels). Gated exactly like the boards:
   // canFulfill = warehouse/admin; the ⋯ menu itself is per-stage/role-gated inside.
  const role = getUser()?.role || "seller"
+  /* The admin's grants. A HOOK, not a call to the shared predicate — see the note on
+     canEditVariants below for why this file keeps its own copy of the rule. Everything reads
+     OFF until they load, which is the rule as shipped. */
+ useRoleGrants()
+ const editAfterApproval = isGrantOn(GRANT_OPERATOR_EDIT_AFTER_APPROVAL)
  const isStaff = role !== "seller"
   /** Board cards for this order, one per line that has been sent to design. Staff only —
    * the route is gated, so a seller just gets nothing rather than a factory lane name. */
@@ -451,6 +457,10 @@ export default function OrderDetailPage() {
  const canEditVariants = preSubmit
     || (isStaff && beforeApproval)
     || (role === "admin" && !(order as { blanks_ordered?: boolean }).blanks_ordered)
+    /* An operator gets the admin window when Settings › Permissions grants it — the same
+       end (blanks ordered), a different WHO. Mirrors mayEditVariants and the server's
+       item-setup carve-out; all three move together. */
+    || (role === "operator" && editAfterApproval && !(order as { blanks_ordered?: boolean }).blanks_ordered)
   /** Adding a LINE is staff-only and stops at approval — the server refuses it after. */
  const canAddItem = isStaff && beforeApproval
   /**

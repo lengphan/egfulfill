@@ -11,6 +11,7 @@ import { aiComplete } from './support_ai.js';
 import { sendMail, mailConfigured } from '../mailer.js';
 import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
+import { isGrantEnabled } from './role_grants.js';
 import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
 import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
@@ -2694,6 +2695,9 @@ export function ordersRoutes(app, requireAuth) {
     const beforeApproval = stageNow === '' || stageNow === 'in_review';
     const staffMayEdit = isStaff(req.user) && beforeApproval;
     const charged = await chargedAmount(req.params.id);
+    /* Declared out here because the AUDIT at the end of this handler records it, and the
+       lock below is a block — a const inside it is not in scope where the row is written. */
+    let grantedOperator = false;
     if (charged > 0 && !staffMayEdit) {
       /**
        * ADMIN MAY STILL CORRECT A LINE UNTIL THE BLANKS ARE ORDERED.
@@ -2705,7 +2709,25 @@ export function ordersRoutes(app, requireAuth) {
        * Everyone else stays locked at submit.
        */
       const isAdmin = req.user && req.user.role === 'admin';
-      const placed = isAdmin ? await q(
+      /**
+       * AND AN OPERATOR MAY, IF AN ADMIN HAS SWITCHED IT ON (Settings › Permissions).
+       *
+       * The window this opens is exactly the admin one above — corrections stop when the
+       * blanks are ordered — because the reason it stops is a fact about the world (the wrong
+       * garment is already bought), not a fact about rank. What the grant changes is WHO may
+       * act inside it, which is the actual problem it exists for: a wrong colour spotted
+       * after approval otherwise waits for an admin to be free.
+       *
+       * It stays outside §2.6 and the money: unit_cost/ship_fee were frozen on the line at
+       * submit, so nothing here re-prices, and cancel/refund are not on this route at all.
+       * The grant reads FAIL CLOSED, so a database that cannot answer leaves the rule exactly
+       * as it is without one.
+       */
+      grantedOperator = !isAdmin
+        && !!req.user && req.user.role === 'operator'
+        && await isGrantEnabled('operator.editAfterApproval');
+      const mayCorrect = isAdmin || grantedOperator;
+      const placed = mayCorrect ? await q(
         `select 1 from purchase_orders po
           where coalesce(po.status,'draft') <> 'draft'
             and exists (
@@ -2713,7 +2735,7 @@ export function ordersRoutes(app, requireAuth) {
                            jsonb_array_elements(coalesce(it->'sources','[]'::jsonb)) src
                where src->>'order' = $1)
           limit 1`, [req.params.id]).then((r) => r.rowCount > 0).catch(() => true) : false;
-      if (!isAdmin || placed) {
+      if (!mayCorrect || placed) {
         reply.code(409);
         return { error: placed ? 'Blanks already ordered — this line is locked.' : 'Order submitted — variants are locked.' };
       }
@@ -2736,7 +2758,12 @@ export function ordersRoutes(app, requireAuth) {
     else { where += ` and sku=$${n++}`; vals.push(sku); }
     const r = await q(`update order_items set ${sets.join(',')} where ${where}`, vals);
     if (!r.rowCount) { reply.code(404); return { error: 'item not found' }; }
-    audit(req, 'item.setup', { entityType: 'order', entityId: req.params.id, after: { line_id: lineId, sku, ...b } });
+    audit(req, 'item.setup', {
+      entityType: 'order', entityId: req.params.id,
+      // `grant` names the permission that allowed a change the role could not otherwise
+      // make. Absent on every ordinary edit, so its presence is the whole signal.
+      after: { line_id: lineId, sku, ...b, ...(grantedOperator ? { grant: 'operator.editAfterApproval' } : null) },
+    });
     egBroadcast({ type: 'orders' });
     return { ok: true };
   });
