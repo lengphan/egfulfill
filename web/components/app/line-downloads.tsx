@@ -4,6 +4,7 @@ import { useState } from "react"
 import { DownloadSimple, CircleNotch } from "@phosphor-icons/react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { downloadDesignFile, filesForLine, type DesignFileRow, type OrderDesign } from "@/lib/api"
+import { fileRoleLabel } from "@/components/app/dropzone"
 import { designSrc } from "@/lib/order-image"
 
 /**
@@ -101,7 +102,7 @@ export function LineDownloads({ design, files, item }: {
             <span className="min-w-0 flex-1 truncate" title={f.name || undefined}>{f.name || "Machine file"}</span>
             {/* The KIND, not the id. The slug this used to print is unreadable and
                 unactionable; "EMB" is the fact somebody is looking for. */}
-            <span className="shrink-0 text-2xs uppercase text-muted-foreground">{f.kind}</span>
+            <span className="shrink-0 text-2xs text-muted-foreground">{fileRoleLabel(f.kind)}</span>
           </button>
         ))}
       </PopoverContent>

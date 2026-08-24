@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { CircleNotch, DownloadSimple, Needle, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { Dropzone, formatBytes } from "@/components/app/dropzone"
+import { Dropzone, fileFormatLabel, formatBytes } from "@/components/app/dropzone"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -180,7 +180,7 @@ export function MachineFilesPanel() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((f) => {
             /** The format, or "" when the displayed name already ends in it. */
-            const ext = (f.fileName?.split(".").pop() || f.kind || "").slice(0, 4)
+            const ext = fileFormatLabel(f.fileName, f.kind)
             const fmt = ext && !f.name.toLowerCase().endsWith("." + ext.toLowerCase()) ? ext : ""
             return (
             <div key={f.id} className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
