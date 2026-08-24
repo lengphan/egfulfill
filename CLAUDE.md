@@ -497,6 +497,28 @@ components/ui/     Base UI primitives   lib/             API client + pure logic
 Private copies of these have been found in three separate files. Import, don't
 re-implement.
 
+**`web/shared/` is shared with the PHONE, and that is the point.** `order-rules.ts` (the
+stage ladder) and `order-address.ts` (the ship-to) live there because both front-ends need
+them and a copy disagrees quietly. Web imports `@/shared/*`, mobile imports `@shared/*`
+(metro.config.js watches the folder; it sits under `web/` because Turbopack cannot import
+across its pinned root). A reader only the web imports is still a private copy.
+
+**Never read `orders.address` field by field — call `shipAddressOf(order)`.** The column is
+jsonb and its writers disagree on the street's name: `line1`/`line2` from every marketplace
+sync (`etsy.js`, `shopify.js`, `tiktok.js`), `street`/`street2` from the Etsy CSV adopt path,
+`street1`/`street` from the Shippo backfill, plus legacy `first_line`/`address1`. Mobile read
+two of those spellings and so showed a buyer's name and city with **no street on the majority
+of orders**, and its label form declared those same orders unshippable. It failed silently
+because the block still reads as an address — only the line that matters was gone.
+
+- `shipAddressOf` · `addressLines` · `isShippable` · `hasStreet` — one reader, one spelling out.
+- **`masked` is not "missing".** The server strips a marketplace buyer's street and ZIP from
+  the SELLER's copy and stamps the flag. Blank + `masked` = held by the factory; blank without
+  it = we have nothing to ship against. §4 forbids rendering those the same.
+- **`addressSource()` is the one deliberate exception** and reads the raw column: there the
+  spelling IS the evidence of where the address came from. Normalising it first would make
+  every order read "entered by hand".
+
 ### Load-bearing data facts
 - **`o.id` ≠ `o.num` for marketplace orders** (`etsy-abc` vs `#4099…`). Manual orders are `FF-*` and `id === num`. Anything keyed by order must handle both.
 - **`line_id` is line identity.** Two lines of the same SKU are different jobs; keying on `sku` alone flips every sibling at once.
