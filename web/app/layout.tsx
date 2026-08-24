@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter } from "next/font/google"
+import { Geist_Mono, Inter, Outfit } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -8,6 +8,30 @@ import { SITE_URL } from "@/lib/site-url"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+/**
+ * A SECOND FACE, AND ITS SCOPE IS THE POINT.
+ *
+ * Playfair was dropped because two alphabets ran through one PRODUCT — it set every screen
+ * title in the app and on mobile, so a seller met different letterforms in the place they
+ * look first. That argument is about the product, and it still holds: nothing below
+ * `app/(app)` or `app/(boards)` gets this, and mobile does not get it at all.
+ *
+ * What it does not cover is the five PUBLIC pages, which have one job — looking like a
+ * company worth buying from — and where Inter's narrow, neutral letterforms are the single
+ * biggest reason those pages read as a template. Outfit is wide and geometric: the same
+ * family of shape the reference boards are set in, and (unlike the serif) still a sans, so
+ * headline and body are one voice at two weights rather than two voices.
+ *
+ * IT IS NOT WIRED HERE. Only the variable is loaded; `app/(marketing)/layout.tsx` points
+ * `--font-display` at it for its own subtree, which is why ~100 `font-display` call sites in
+ * the app keep resolving to Inter and needed no edit. Loading it at the root is only so one
+ * `next/font` call owns the preload and the fallback metrics.
+ *
+ * Display weights only — 500/600/700. A body weight would invite it into body copy, which is
+ * exactly the drift the Playfair note warns about.
+ */
+const outfit = Outfit({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-marketing" })
 
 /**
  * ONE FACE. Inter, for everything.
@@ -89,7 +113,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, outfit.variable)}
     >
       <body>
         {/* Zoom, applied BEFORE first paint.

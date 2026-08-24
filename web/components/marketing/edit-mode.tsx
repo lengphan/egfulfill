@@ -2,11 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CheckCircle, CircleNotch, PencilSimple, X } from "@phosphor-icons/react"
+import { CheckCircle, CircleNotch, PencilSimple, Sparkle, X } from "@phosphor-icons/react"
 import { getUser } from "@/lib/auth"
 import { setSiteContent, uploadHeroImage } from "@/lib/api"
 import { downscaleImage } from "@/lib/image-downscale"
 import type { SiteContent } from "@/lib/site-content"
+import { GenerateBubble } from "@/components/marketing/generate-bubble"
 
 /**
  * EDITING THE MARKETING SITE ON THE MARKETING SITE.
@@ -107,7 +108,21 @@ export function EditModeProvider({ initial, children }: { initial: SiteContent; 
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
-      setAdmin(u?.role === "admin")
+      const isAdmin = u?.role === "admin"
+      setAdmin(isAdmin)
+      /*
+       * ?edit=1 OPENS STRAIGHT INTO EDITING.
+       *
+       * The floating bar has always been here, but it is one pill at the bottom of a long
+       * page that only one person in the company ever sees — which makes it findable only if
+       * you already know it exists. A link is the discoverable half: Settings › Site content
+       * sends you to the page you want ALREADY in edit mode, so the route in is a control on
+       * a screen people open on purpose rather than a thing to notice.
+       *
+       * Still gated on the role, so the parameter grants nothing — it only skips a click for
+       * someone who could already have made it.
+       */
+      if (isAdmin && new URLSearchParams(window.location.search).get("edit") === "1") setOn(true)
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -260,6 +275,9 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [over, setOver] = useState(false)
+  /** The prompt composer, open in place. See generate-bubble.tsx for why it lives here and
+   *  not behind a link to the Studio. */
+  const [asking, setAsking] = useState(false)
   const current = read(path)
 
   const take = async (file: File | undefined) => {
@@ -294,6 +312,17 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
           the Save button, which is the one place they must not be. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end p-3">
         <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-1.5 shadow-md backdrop-blur">
+          {/* GENERATE COMES FIRST, because it is the one that does not need you to already
+              have a file. Upload is the fallback for a picture that exists. */}
+          <button
+            type="button"
+            onClick={() => { setErr(null); setAsking((v) => !v) }}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            <Sparkle size={13} weight="fill" /> Generate
+          </button>
+          <span aria-hidden className="h-4 w-px bg-border" />
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -301,7 +330,7 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
             className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
           >
             {busy ? <CircleNotch size={13} className="animate-spin" /> : <PencilSimple size={13} weight="bold" />}
-            {busy ? "Uploading…" : typeof current === "string" && current ? "Replace picture" : "Add a picture"}
+            {busy ? "Uploading…" : typeof current === "string" && current ? "Replace" : "Upload"}
           </button>
           {typeof current === "string" && current && !busy && (
             <button
@@ -314,6 +343,15 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
           )}
         </div>
       </div>
+      {/* UNDER the control bar and inside the figure, so the prompt sits beside the picture it
+          is about to replace — the whole reason it is not a link to another screen. */}
+      {asking && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-end p-3 pt-14">
+          <div className="pointer-events-auto">
+            <GenerateBubble onDone={(url) => write(path, url)} onClose={() => setAsking(false)} />
+          </div>
+        </div>
+      )}
       {err && <p className="absolute inset-x-0 -bottom-6 text-center text-xs text-alert">{err}</p>}
       <input
         ref={fileRef} type="file" accept="image/*" className="sr-only"

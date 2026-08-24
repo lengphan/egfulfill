@@ -41,6 +41,18 @@ function Area({ label, hint, value, onChange }: {
   )
 }
 
+/** The marketing routes that carry an inline editor. Adding one means adding it here AND
+ *  wrapping that page's copy in EditableText/EditableImage — a link to a page with no
+ *  editable fields opens a toolbar that can save nothing. */
+const EDITABLE_PAGES = [
+  { href: "/", label: "the homepage" },
+] as const
+// ONLY HOME, and this is checked rather than assumed: `grep -c EditableText components/
+// marketing/bold-{features,how}.tsx` returns 0 for both. Their copy comes from the same blob
+// and the tabs below edit it fine — they simply have no on-page fields yet, so linking them
+// here would open a toolbar whose Save button has nothing to collect. Wrap their headings in
+// EditableText and they belong in this list.
+
 // A tab's intro line, so each section still explains itself without the old long-scroll headings.
 function Intro({ children }: { children: React.ReactNode }) {
  return <p className="text-xs text-muted-foreground">{children}</p>
@@ -321,9 +333,26 @@ export function SiteContentPanel() {
  title="Site content"
  bodyClassName="p-5"
  actions={
-        <a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-          View homepage <ArrowSquareOut size={13} />
-        </a>
+        /*
+         * TWO DOORS TO THE SAME CONTENT, and the second is the one that was asked for.
+         *
+         * This form is complete and always was; what it cannot do is show you the thing you
+         * are changing. `?edit=1` opens the live page ALREADY in edit mode, so a headline is
+         * retyped where it is read and a picture is generated where it sits — see
+         * edit-mode.tsx. The parameter grants nothing on its own: the toolbar is still gated
+         * on the admin role, so it only skips a click for someone who could already edit.
+         *
+         * The tabs below stay. A form is faster for a batch of fields, and it is the only
+         * surface that reaches content with no on-page representation (the motion presets).
+         */
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {EDITABLE_PAGES.map((pg) => (
+            <a key={pg.href} href={`${pg.href}?edit=1`} target="_blank" rel="noreferrer"
+               className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline">
+              Edit {pg.label} <ArrowSquareOut size={13} />
+            </a>
+          ))}
+        </div>
       }
     >
       {err && <div className="mb-4 rounded-lg border border-alert/30 bg-alert/12 p-2.5 text-xs text-alert">{err}</div>}

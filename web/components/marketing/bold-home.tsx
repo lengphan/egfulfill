@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
-import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
+import { LabelRule, CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
@@ -52,75 +52,85 @@ export function BoldHome({ content }: { content: SiteContent }) {
           own, and puts an edge between sections that the eye then has to cross. The devices
           worth taking off those boards — the label rule, the ghost word, the numbered
           checker, the ring pill — all work at full width, which is where they are now. */}
-      <section className="mx-auto max-w-[88rem] px-6 pt-12 sm:px-10 sm:pt-16">
+      <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10 sm:pt-14">
         {/* The brand at one end, who this is for at the other, a hairline between. ONCE, at
             the top of the page — the boards repeat it because each slide is a fresh sheet,
             and repeating it down one continuous page is just the same line four times. */}
-        <LabelRule left={hero.ruleLeft} right={hero.ruleRight} className="mb-14" />
+        <LabelRule left={hero.ruleLeft} right={hero.ruleRight} className="mb-12" />
 
-        {/* LEFT, NOT CENTRED. Centred display type on an unbounded page is the arrangement
-            that had this hero reading as a poster. The page's left margin is a real edge —
-            rule, headline, subhead and buttons all start on it. */}
-        {/* A LENGTH, NOT A `ch` COUNT. The display size lives on the SPAN inside, so a `ch` here
-            resolves against the h1's own inherited font-size (~32px) and clamps the headline to
-            ~350px — one word per line at 7rem. Measure the column in rem and it cannot drift
-            from whatever the clamp lands on. */}
-        <h1 className="max-w-[70rem] font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ color: INK }}>
-          <span style={{ fontSize: "clamp(2.6rem, 7.6vw, 7rem)" }}>
-            {editing
-              ? <EditableText path="hero.headline">{hero.headline}</EditableText>
-              : <MaskedWords text={hero.headline} />}{" "}
-            {editing
-              ? <EditableText path="hero.accent">{hero.accent}</EditableText>
-              : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
-          </span>
-        </h1>
+        {/*
+          * TWO COLUMNS — PICTURE LEFT, WORDS RIGHT.
+          *
+          * The single-column version put a 7rem headline across the full 88rem and orphaned
+          * the picture underneath it, which produced the two things that actually looked
+          * wrong: an empty right half beside the headline, and a figure centred under copy
+          * that was hard left, so nothing on the page shared an edge with anything else.
+          *
+          * Side by side, the width is USED, and the headline no longer has to be enormous to
+          * fill a line — it drops from 7rem to 3.9rem, which is what lets the subhead, the
+          * buttons and three facts about the product all sit above the fold together. That
+          * density is most of what separates the reference from a page of big type.
+          *
+          * The picture is FIRST in the DOM and first on the page, which is the same order —
+          * so a screen reader meets the product before the pitch, and nothing needs `order-`
+          * to disagree with the markup.
+          */}
+        <div className="grid items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,44%)_minmax(0,1fr)]">
+          {/* IN EDIT MODE AN EMPTY FIGURE STILL RENDERS, because otherwise there is nothing on
+              the page to drop a picture onto — the one gesture that mode exists for would be
+              the one it cannot offer. A visitor still sees nothing, and with no picture the
+              grid collapses to the copy alone rather than leaving a hole where it would be. */}
+          {(hero.image || editing) && (
+            <EditableImage path="hero.image">
+              <CutoutFigure src={hero.image} alt={hero.imageAlt} ghost={hero.ghostWord} tall />
+            </EditableImage>
+          )}
 
-        <motion.p
-          className="mt-8 max-w-xl text-[17px] leading-relaxed text-[var(--mk-ink)]/62"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
-        >
-          <EditableText path="hero.subhead">{hero.subhead}</EditableText>
-        </motion.p>
+          <div>
+            <h1 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: INK }}>
+              <span style={{ fontSize: "clamp(2.4rem, 4.4vw, 3.9rem)" }}>
+                {editing
+                  ? <EditableText path="hero.headline">{hero.headline}</EditableText>
+                  : <MaskedWords text={hero.headline} />}{" "}
+                {editing
+                  ? <EditableText path="hero.accent">{hero.accent}</EditableText>
+                  : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
+              </span>
+            </h1>
 
-        <motion.div
-          className="mt-10 flex flex-wrap items-center gap-3"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
-        >
-          {/* Filled, then outlined with the ring. Two buttons of identical shape read as one
-              control repeated; the ring separates "the thing to do" from "the thing to read
-              first". */}
-          <Pill href="/signup" tone="accent">{hero.ctaPrimary}</Pill>
-          <Pill href="/how-it-works" tone="ghost" ring>{hero.ctaSecondary}</Pill>
-        </motion.div>
-      </section>
+            <motion.p
+              className="mt-6 max-w-lg text-[17px] leading-relaxed text-[var(--mk-ink)]/62"
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
+            >
+              <EditableText path="hero.subhead">{hero.subhead}</EditableText>
+            </motion.p>
 
-      {/*
-        * THE PRODUCT — and nothing at all when there isn't one.
-        *
-        * The object on this page is the garment, uploaded in Settings › Site content from a
-        * render the Studio made and the browser cut out. With no picture the hero is TYPE and
-        * nothing else, which is the house style stated plainly and the one honest empty state.
-        *
-        * IN EDIT MODE AN EMPTY FIGURE STILL RENDERS, because otherwise there is nothing on the
-        * page to drop a picture onto. A visitor still sees nothing.
-        */}
-      {(hero.image || editing) && (
-        <div className="mx-auto max-w-[88rem] px-6 pt-16 sm:px-10">
-          <EditableImage path="hero.image">
-            <CutoutFigure
-              src={hero.image}
-              alt={hero.imageAlt}
-              ghost={hero.ghostWord}
-              callouts={hero.callouts}
-            />
-          </EditableImage>
+            <motion.div
+              className="mt-8 flex flex-wrap items-center gap-3"
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
+            >
+              {/* Filled, then outlined with the ring. Two buttons of identical shape read as
+                  one control repeated; the ring separates "the thing to do" from "the thing
+                  to read first". */}
+              <Pill href="/signup" tone="accent">{hero.ctaPrimary}</Pill>
+              <Pill href="/how-it-works" tone="ghost" ring>{hero.ctaSecondary}</Pill>
+            </motion.div>
+
+            {/* UNDER THE COPY, not beside the picture — see the CalloutList note. Three facts
+                in a row across the text column, so the fold carries a claim, a subhead, two
+                routes on and the evidence, which is four things instead of one big line. */}
+            {hero.callouts.length > 0 && (
+              <div className="mt-12 border-t pt-8" style={{ borderColor: HAIRLINE }}>
+                <CalloutList items={hero.callouts} className="flex-col gap-6 sm:flex-row sm:gap-8" />
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </section>
 
       {/* ── THE CHANNEL MARQUEE ──────────────────────────────────────────────────
           Edge to edge, and masked to transparent at both ends rather than clipped: a name
