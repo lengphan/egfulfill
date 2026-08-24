@@ -66,6 +66,7 @@ import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { LineDownloads } from "@/components/app/line-downloads"
+import { designLabel } from "@/lib/design-id"
 import { TrackingNumber } from "@/components/app/tracking-number"
 import { AddTracking } from "@/components/app/add-tracking"
 
@@ -751,6 +752,20 @@ export default function OrderDetailPage() {
  first. Now: a dot for the state, one quiet word for where it
  is, and the lane in ink — the only part that changes as the
  job moves. */}
+                            {/* THE DESIGN'S OWN NUMBER, beside the state of the job it belongs
+                                to. It is minted for every piece of artwork, keyed on the
+                                content hash so the same file is one number across every order
+                                printing it — and it was indexed for SEARCH in two places while
+                                appearing on no screen, so the only way to use it was to already
+                                know it. Same number, same spelling, on the board card. */}
+                            {designLabel(it.design_no) && (
+                              <span
+                                title="This artwork's number — the same on the design board, and searchable"
+                                className="mt-1 inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
+                              >
+                                {designLabel(it.design_no)}
+                              </span>
+                            )}
                             {card && (
                               <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
                                 {/* NO DOT — see the note in chat/page.tsx. The lane in ink

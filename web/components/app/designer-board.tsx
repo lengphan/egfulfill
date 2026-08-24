@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
+import { designLabel } from "@/lib/design-id"
 import { shortOrderRef } from "@/lib/order-format"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { getToken, getUser } from "@/lib/auth"
@@ -849,6 +850,16 @@ export function DesignerBoard() {
  a card with no order says "No order" rather than going blank, and the
  file count shows even at 0. Method/product sits between them when set. */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-2xs text-muted-foreground">
+                            {/* THE ARTWORK'S NUMBER, in the spelling the order page uses. The
+                                card stores it BARE — `1143` — because that column is a key,
+                                joined against wilcom_previews and passed to EmbPreview as a
+                                lookup. So the label is put on at display time and the stored
+                                value is left exactly as it is. */}
+                            {designLabel(c.design_id) && (
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-medium tabular-nums" title="This artwork's number — the same on the order">
+                                {designLabel(c.design_id)}
+                              </span>
+                            )}
                             <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
                               {/* shortOrderRef, not slice(0,14). Truncating at a character
  count cut `etsy-4149084185` to `etsy-414908418` — a number

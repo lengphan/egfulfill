@@ -8,6 +8,7 @@
 // make typing depend on the network.
 
 import { type OrderRow, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { designSearchTerms } from "@/lib/design-id"
 import { numOf, platformOf, decodeEntities } from "@/lib/order-format"
 import { normalizeMethods, methodByKey, type PrintMethod } from "@/lib/print-method"
 import { ALL_STATUSES, FACTORY_STAGES, EXCEPTION_STAGES, orderStage, isException } from "@/lib/factory-status"
@@ -303,7 +304,7 @@ function haystack(o: OrderRow): string {
     ...(o.items ?? []).flatMap((it) => [
       it.sku, it.name, it.color, it.size, it.print_type,
       it.design_name,
-      it.design_no != null ? `DSN-${it.design_no} ${it.design_no}` : "",
+      designSearchTerms(it.design_no),
       decodeEntities(it.personalization),
     ]),
   ].filter(Boolean).join(" ").toLowerCase()

@@ -1,6 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { designSearchTerms } from "@/lib/design-id"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
 import { stockSkuOf } from "@/lib/stock-status"
@@ -233,7 +234,7 @@ export function OrdersList() {
       // number — a seller looking for "the octopus one" or DSN-1042 is doing the same job
       // the factory does, and this list was matching on order number and buyer alone.
  const art = (o.items ?? [])
-        .flatMap((it) => [it.design_name || "", it.design_no != null ? `DSN-${it.design_no} ${it.design_no}` : ""])
+        .flatMap((it) => [it.design_name || "", designSearchTerms(it.design_no)])
         .filter(Boolean).join(" ")
  const hay = `${numOf(o)} ${customerOf(o)} ${itemsLabel(o)} ${storeOf(o)} ${art}`.toLowerCase()
  return hay.includes(query.toLowerCase())
