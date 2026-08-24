@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { TShirt, ArrowLeft } from "@phosphor-icons/react"
+import { TShirt, ArrowLeft, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, INK_ON_ACID } from "@/components/marketing/bold-kit"
 import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
@@ -62,6 +62,25 @@ const FILE_GUIDES: { label: string; body: string; methods: string[] }[] = [
   { label: "Not sure?", methods: [], body: "Send what you have. We check every file before it goes on a machine, and we'll tell you if something won't hold up." },
 ]
 
+/** How many swatches show before the row folds — three rows at the widths this column takes. */
+const COLOR_FOLD = 24
+
+/**
+ * THE TECHNIQUES, AS SEPARATE THINGS.
+ *
+ * `methods` arrives as ONE STRING PER ROW — "DTG printing / Embroidery / DTF printing" — because
+ * that is how the catalogue import wrote it, and every reader here has to take it apart before
+ * it means anything. Nothing did, and it was already wrong on the page: `PLACEMENTS` is matched
+ * with `includes`, and its first key is EMB, so a garment we both print and embroider matched
+ * EMB and only ever showed the hooped placements. It also made one pill out of three techniques.
+ *
+ * Split, trimmed, de-duplicated, order kept — the first one named is the one the factory leads
+ * with, and re-sorting it would quietly re-rank them.
+ */
+function techniquesOf(methods: string[]): string[] {
+  return [...new Set(methods.flatMap((m) => m.split("/").map((x) => x.trim()).filter(Boolean)))]
+}
+
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function BoldProduct({ product, shipping }: {
@@ -82,6 +101,21 @@ export function BoldProduct({ product, shipping }: {
    * actually sell costs. A chart of measurements answered a different question entirely.
    */
   const [size, setSize] = useState<string | null>(null)
+  /**
+   * THE TECHNIQUE, AND WHY IT IS A PICKER TOO.
+   *
+   * This was a `Spec` — a row of read-only pills — on the argument that a marketing page has
+   * nowhere to submit a choice to. The sizes broke that rule first, because the price moved
+   * by size and the answer was a fact rather than a submission. The same is true here: two
+   * whole sections of this page ARE the answer to "which technique" — where we can put it,
+   * and what file to send — and they were showing all of them at once, so a shop that only
+   * ever does embroidery read three paragraphs about ink to find the one about stitches.
+   *
+   * Null means "all of them", which is the honest default: nobody has chosen yet.
+   */
+  const [method, setMethod] = useState<string | null>(null)
+  /** How many colourways are shown before the row is folded. See the swatch grid. */
+  const [allColors, setAllColors] = useState(false)
   /** What one costs in a given size. A size with no tier of its own is charged the base —
    *  the same rule the server prices the order by. */
   const priceOfSize = (s: string | null) =>
@@ -89,6 +123,20 @@ export function BoldProduct({ product, shipping }: {
   const shown = priceOfSize(size)
   const chosen = colorIdx == null ? null : product.colors[colorIdx] ?? null
   const hero = chosen?.image ?? product.image
+  /*
+   * THE COLOURWAYS THAT ACTUALLY CARRY A PHOTO — what the arrows step through.
+   *
+   * Not every colour has one, and stepping onto a colour with no image would blank the hero
+   * mid-browse. The rail already only renders the ones with photos; this is the same set,
+   * named once so the two cannot disagree.
+   */
+  const shots = product.colors.map((c, i) => (c.image ? i : -1)).filter((i) => i >= 0)
+  const atShot = colorIdx == null ? -1 : shots.indexOf(colorIdx)
+  const stepShot = (d: number) => {
+    if (!shots.length) return
+    const next = atShot < 0 ? (d > 0 ? 0 : shots.length - 1) : (atShot + d + shots.length) % shots.length
+    setColorIdx(shots[next])
+  }
   // The chart, pivoted from the supplier's flat {size, spec, value} rows into columns.
   const specs = product.specs ?? []
   const specNames = [...new Set(specs.map((x) => x.spec))]
@@ -97,7 +145,11 @@ export function BoldProduct({ product, shipping }: {
   // The guidelines that apply to THIS product: the universal ones (no methods declared) plus
   // any whose technique the product actually names. Hoisted out of the JSX because the COUNT
   // is what decides the track count below.
-  const guides = FILE_GUIDES.filter((g) => g.methods.length === 0 || product.methods.some((m) => g.methods.some((k) => m.toUpperCase().includes(k))))
+  /** Every technique this garment is offered in, one per entry. */
+  const methods = techniquesOf(product.methods)
+  // The techniques in play: the picked one, or all of them while nobody has picked.
+  const inPlay = method && methods.includes(method) ? [method] : methods
+  const guides = FILE_GUIDES.filter((g) => g.methods.length === 0 || inPlay.some((m) => g.methods.some((k) => m.toUpperCase().includes(k))))
   // THREE TRACKS ONLY WHEN THE LIST DIVIDES INTO THEM. Six cards fill three columns exactly;
   // four or five leave a hole under the short track, which is what made the section read as
   // unfinished. Two columns take any even-or-odd count without a visible gap.
@@ -129,7 +181,14 @@ export function BoldProduct({ product, shipping }: {
               track, and the phone layout puts a 6,200px-wide thumbnail strip inside this one:
               the track measured a correct 357px while the item sat at 5,916 and took the page
               with it. The track can only hold what the item agrees to shrink to. */}
-          <Rise preset="settle" className="min-w-0">
+          {/* THE PICTURE STAYS WHILE THE FACTS SCROLL.
+              The photo column is one square; the facts column is price, shipping, colours,
+              sizes and the CTA — so the left half ran out halfway down and the rest of the
+              page was read against an empty white field. Sticky needs the item to size to its
+              own content, hence `self-start`: a grid item stretches by default and a
+              full-height box has nothing to stick to. Below lg the two are stacked and it
+              stays in flow. */}
+          <Rise preset="settle" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
             {/* Rail LEFT of the hero, not under it. A vertical strip is how every product
                 page of this kind is read — thumbnails scanned down the edge while the main
                 shot holds its size — and it stops the hero being pushed up the page by a
@@ -202,6 +261,32 @@ export function BoldProduct({ product, shipping }: {
                     <span className="text-sm font-semibold">Photo coming</span>
                   </div>
                 )}
+                {/* ONE PHOTO AT A TIME, AND A WAY TO THE NEXT ONE.
+                    The rail is the whole navigation today, which means browsing colourways is
+                    a scroll down a 64px strip — fine when you know which colour you want, no
+                    use at all for "show me what this comes in". The arrows step through the
+                    same set the rail holds, so nothing can land on a colour with no picture.
+                    Only when there is more than one: a single arrow pair over one photo is a
+                    control that lies about having somewhere to go. */}
+                {shots.length > 1 && (
+                  <>
+                    {[-1, 1].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => stepShot(d)}
+                        aria-label={d < 0 ? "Previous colour" : "Next colour"}
+                        className={
+                          "absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-black/[0.09] text-[var(--mk-ink)] shadow-sm transition-transform hover:scale-105 " +
+                          (d < 0 ? "left-3" : "right-3")
+                        }
+                        style={{ background: SURFACE }}
+                      >
+                        {d < 0 ? <CaretLeft size={16} weight="bold" /> : <CaretRight size={16} weight="bold" />}
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           </Rise>
@@ -251,7 +336,40 @@ export function BoldProduct({ product, shipping }: {
                 `descriptionLines` stays — the app's product page still uses it, where a
                 spec dump belongs to someone reading specs. */}
 
-            {product.methods.length > 0 && <Spec label="Print method" items={product.methods} />}
+            {methods.length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
+                  <span>Print method <span className="text-black/30">· {methods.length}</span></span>
+                  {method && <span className="normal-case tracking-normal text-black/40">guidelines below follow this</span>}
+                </div>
+                {/* SAME PILL AS THE SIZES, because it is the same kind of choice — and the
+                    house rule is that shape says KIND. A second shape here would say these
+                    two rows do different things when they do not. */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {methods.map((m) => {
+                    const on = method === m
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        // Pressing the chosen one again clears it, exactly as the sizes do,
+                        // so "show me everything again" is one press and not a reload.
+                        onClick={() => setMethod(on ? null : m)}
+                        aria-pressed={on}
+                        className={
+                          "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
+                          (on
+                            ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
+                            : "border-black/[0.14] text-black/70 hover:border-black/50 hover:text-[var(--mk-ink)]")
+                        }
+                      >
+                        {m}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {product.colors.length > 0 && (
               <div className="mt-6">
                 {/* THE NAME OF THE ONE YOU PICKED, not all 82 of them.
@@ -269,25 +387,45 @@ export function BoldProduct({ product, shipping }: {
                     </span>
                   )}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {product.colors.map((c, i) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => setColorIdx(i)}
-                      aria-pressed={colorIdx === i}
-                      aria-label={c.name}
-                      title={c.name}
-                      className={
-                        "size-7 rounded-full border transition-shadow " +
-                        (colorIdx === i
-                          ? "border-black/25 ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-accent-ink)]"
-                          : "border-black/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-accent-ink)]")
-                      }
-                      style={swatchChipStyle(c.name, c.image)}
-                    />
-                  ))}
+                {/* A GRID ON A FIXED TRACK, not a wrapping flex row.
+                    82 swatches in `flex-wrap` gave every row a different number of chips and
+                    a ragged right edge — the same defect a variable-width badge causes in a
+                    table (CLAUDE.md: a variable element followed by anything else belongs in
+                    a grid). `auto-fill` at the swatch's own 1.75rem keeps the columns square
+                    and aligned at any column width, and the tracks do not stretch.
+                    FOLDED AFTER THREE ROWS. Seven rows of colour is a wall between the price
+                    and the sizes, and 24 is enough to see the range this garment comes in. */}
+                <div className="mt-3 grid grid-cols-[repeat(auto-fill,1.75rem)] gap-2.5">
+                  {(allColors ? product.colors : product.colors.slice(0, COLOR_FOLD)).map((c) => {
+                    const i = product.colors.indexOf(c)
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => setColorIdx(i)}
+                        aria-pressed={colorIdx === i}
+                        aria-label={c.name}
+                        title={c.name}
+                        className={
+                          "size-7 rounded-full border transition-shadow " +
+                          (colorIdx === i
+                            ? "border-black/25 ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-accent-ink)]"
+                            : "border-black/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-accent-ink)]")
+                        }
+                        style={swatchChipStyle(c.name, c.image)}
+                      />
+                    )
+                  })}
                 </div>
+                {product.colors.length > COLOR_FOLD && (
+                  <button
+                    type="button"
+                    onClick={() => setAllColors((v) => !v)}
+                    className="mt-3 text-sm font-semibold text-black/70 underline underline-offset-4 transition-colors hover:text-[var(--mk-ink)]"
+                  >
+                    {allColors ? "Show fewer" : `Show all ${product.colors.length}`}
+                  </button>
+                )}
               </div>
             )}
             {product.sizes.length > 0 && (
@@ -413,7 +551,7 @@ export function BoldProduct({ product, shipping }: {
             </Rise>
             )}
 
-            {product.methods.length > 0 && (
+            {methods.length > 0 && (
               <Rise preset="cut" index={1}>
                 <h2 className="font-display text-2xl font-semibold tracking-tight">Where we can print</h2>
                 <p className="mt-1.5 text-sm text-black/50">
@@ -423,7 +561,7 @@ export function BoldProduct({ product, shipping }: {
                     a decoration can go is a fact about OUR machines and jigs, so it is stated
                     per method here rather than pulled from anywhere. */}
                 <div className="mt-5 space-y-5">
-                  {product.methods.map((m) => {
+                  {inPlay.map((m) => {
                     const key = Object.keys(PLACEMENTS).find((k) => m.toUpperCase().includes(k))
                     const spots = key ? PLACEMENTS[key] : PLACEMENTS.DEFAULT
                     return (
@@ -503,7 +641,7 @@ export function BoldProduct({ product, shipping }: {
                 <div className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: ACID }}>
                   {/* The methods, when the product names any. Without them the line still has
                       to say what the section IS, rather than trailing off after a middot. */}
-                  What to send us{product.methods.length > 0 ? ` · ${product.methods.join(" / ")}` : ""}
+                  What to send us{inPlay.length > 0 ? ` · ${inPlay.join(" / ")}` : ""}
                 </div>
                 <h2 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl" style={{ color: ACCENT_INK }}>
                   Artwork guidelines
@@ -535,20 +673,6 @@ export function BoldProduct({ product, shipping }: {
   )
 }
 
-/** A labelled row of read-only facts (method, sizes). Deliberately NOT a picker: there is
- *  nothing on a marketing page to submit a choice to, and a control that looks live but
- *  does nothing is worse than a list that admits what it is. */
-function Spec({ label, items }: { label: string; items: string[] }) {
-  return (
-    <div className="mt-6">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-black/45">{label}</div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {items.map((s) => (
-          <span key={s} className="rounded-full border border-black/[0.14] px-3.5 py-1.5 text-sm font-semibold text-black/70">
-            {s}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
+/* `Spec` — the read-only pill row — is gone. Both of its call sites (sizes, then print
+   method) became pickers once there was something on the page for a choice to change, and a
+   primitive with no call sites is the thing the next session re-derives instead of reading. */
