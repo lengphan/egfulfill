@@ -163,6 +163,14 @@ export function staffCanUseAppPath(role: string | null | undefined, pathname: st
     // pressing "Make product" was bounced to their dashboard, which reads as the button
     // being broken rather than the page being forbidden.
     ...(tools.some((h) => PUBLISH_ENTRY_PATHS.includes(h)) ? ["/publish"] : []),
+    // /sheet is not a nav item either — it is where IMPORT goes. The import flow now hands
+    // you a real page instead of a dialog, and both entry points into it sit on an orders
+    // surface (orders-hub for staff, orders-list for a seller), so it belongs to whoever may
+    // work orders. Without this, pressing Import as an operator or warehouse pushed /sheet,
+    // failed this check and bounced to /overview — the staff dashboard — which reads exactly
+    // like the Import button being broken. Same failure as /publish above, same shape of fix;
+    // an entry point added without a line here is a button that silently goes home.
+    ...(ORDER_ROLES.includes(String(role)) ? ["/sheet"] : []),
   ]
   return allowed.some((p) => pathname === p || pathname.startsWith(p + "/"))
 }
