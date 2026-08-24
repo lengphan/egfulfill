@@ -312,7 +312,22 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  const confirmAdd = async (product: CatalogProduct) => {
  setMsg(null)
  try {
- const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
+      /*
+       * NEVER SAVE A FULL LIST BUILT ON A FAILED READ.
+       *
+       * This was `.catch(() => [])`, and POST /api/catalog_products is a whole-list REPLACE
+       * that PRUNES: `delete from catalog_products where id <> all($1)`. So a read that
+       * failed for any reason — a slow response, a dropped connection, a 502 — turned into
+       * `existing = []`, then a one-item payload, and the other products on the shelf were
+       * deleted. The server's own guards cannot catch it: the list is not empty and every
+       * entry has an id, so it looks exactly like a deliberate "the catalogue is now this
+       * one product".
+       *
+       * Catalogue rows carry base_price, which BILLS ORDERS, so this is the §2.6 case — an
+       * accident here destroys data nobody asked to touch. Failing the add is the safe
+       * outcome and the honest one: nothing was added, and it says so.
+       */
+ const existing = await getCatalogProducts().catch(() => { throw new Error("Couldn't read the current products, so nothing was added — try again.") })
       /**
        * A PRODUCT WITHOUT OUR SKU CAN'T BE STOCKED OR RESOLVED, so one is assigned here —
        * against the catalogue as it is at SAVE time, which is the only moment that answer is

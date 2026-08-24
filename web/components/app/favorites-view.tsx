@@ -55,7 +55,22 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
   const addToCatalog = async (f: FavItem) => {
     setAddingId(keyOf(f))
     try {
-      const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
+      /*
+       * NEVER SAVE A FULL LIST BUILT ON A FAILED READ.
+       *
+       * This was `.catch(() => [])`, and POST /api/catalog_products is a whole-list REPLACE
+       * that PRUNES: `delete from catalog_products where id <> all($1)`. So a read that
+       * failed for any reason — a slow response, a dropped connection, a 502 — turned into
+       * `existing = []`, then a one-item payload, and the other products on the shelf were
+       * deleted. The server's own guards cannot catch it: the list is not empty and every
+       * entry has an id, so it looks exactly like a deliberate "the catalogue is now this
+       * one product".
+       *
+       * Catalogue rows carry base_price, which BILLS ORDERS, so this is the §2.6 case — an
+       * accident here destroys data nobody asked to touch. Failing the add is the safe
+       * outcome and the honest one: nothing was added, and it says so.
+       */
+      const existing = await getCatalogProducts().catch(() => { throw new Error("Couldn't read the current products, so nothing was added — try again.") })
       /**
        * THE SAME BUILDER THE BROWSE GRID USES. This was a private copy, and it had drifted
        * in the two ways a copy always does:
