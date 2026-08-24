@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { FileRow, fileNameFrom } from "@/components/app/dropzone"
+import { Dropzone, FileRow, fileNameFrom } from "@/components/app/dropzone"
+import { EmptyState } from "@/components/app/empty-state"
+import { TabBar } from "@/components/app/tab-bar"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
@@ -723,6 +725,13 @@ const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
 /** The same list the regex tests, as an accept attribute. Derived from one source so the
  * picker can't start offering a type the drop handler refuses (or the reverse). */
 const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
+/** The three kinds of thing that can land on a line. Module-level so the array identity
+ *  is stable across renders and the bar does not remount under the cursor. */
+const FILE_TABS = [
+  { id: "image" as const, label: "Image" },
+  { id: "templates" as const, label: "Templates" },
+  { id: "machine" as const, label: "Machine files" },
+]
 
 
 /**
@@ -828,6 +837,10 @@ export function DesignCanvasDialog({
    */
  const railBtn = "flex w-14 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
  const railWord = "text-[10px] font-medium leading-none"
+  /** Which kind of file the Files panel is offering. A TAB, not five buttons: the three
+   *  differ only in what they accept, which is a property of the drop target, not five
+   *  separate errands. */
+  const [fileTab, setFileTab] = useState<"image" | "templates" | "machine">("image")
  const [tplBusy, setTplBusy] = useState(false)
   /** null = the box is closed. A string is what is being typed into it. */
  const [tplName, setTplName] = useState<string | null>(null)
@@ -2122,74 +2135,67 @@ export function DesignCanvasDialog({
                   </span>
                 )}
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-72 p-2">
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => uploadRef.current?.click()}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
-                  >
-                    <UploadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-                    Upload an image
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setLibSource("templates"); setLibOpen(true) }}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
-                  >
-                    <BookmarkSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-                    Start from a template
-                  </button>
-                  {/* A STITCH FILE ONLY FITS AN EMBROIDERED LINE — the same refusal the drop
-                      intake carries. Disabled with the reason rather than hidden: an option
-                      that is absent looks the same as one that does not exist. */}
-                  <button
-                    type="button"
-                    onClick={() => machineRef.current?.click()}
+              <PopoverContent align="start" className="w-80 p-3">
+                {/* A DROP TARGET WITH A TAB BAR, not a menu of errands. The three routes take
+                    the same gesture and differ only in WHAT they accept, which is a property
+                    of the target — so the target stays put and the tab says what it eats.
+                    Five stacked text buttons made one act look like five decisions. */}
+                <TabBar
+                  ariaLabel="What to add"
+                  size="sm"
+                  items={FILE_TABS}
+                  value={fileTab}
+                  onChange={setFileTab}
+                  className="mb-3"
+                />
+                {fileTab === "image" && (
+                  <Dropzone
+                    icon={ImageIcon}
+                    accept="image/*"
+                    label="Drop an image, or click to browse"
+                    hint="PNG or JPG"
+                    onFiles={(f) => takeFile(f[0])}
+                    action={
+                      <Button size="sm" variant="outline" onClick={() => { setLibSource("designs"); setLibOpen(true) }}>
+                        Pick from your library
+                      </Button>
+                    }
+                  />
+                )}
+                {fileTab === "templates" && (
+                  /* NOT A DROP TARGET. A template is not a file you have — it is one you
+                     saved, so the region offers the two things you can actually do with one:
+                     start from it, and (only with artwork on the line) make one. */
+                  <EmptyState
+                    icon={BookmarkSimple}
+                    size="sm"
+                    title="Start from a saved template"
+                    note="A template carries the artwork and where it sits."
+                    action={
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { setLibSource("templates"); setLibOpen(true) }}>
+                          Browse templates
+                        </Button>
+                        {designUrl && (
+                          <Button size="sm" variant="ghost" disabled={tplBusy}
+                            onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}>
+                            Save this placement
+                          </Button>
+                        )}
+                      </div>
+                    }
+                  />
+                )}
+                {fileTab === "machine" && (
+                  <Dropzone
+                    icon={Needle}
+                    accept={MACHINE_EXT_LIST}
+                    label={isEmb ? "Drop a stitch file, or click to browse" : "Embroidered lines only"}
+                    hint={isEmb ? ".EMB .PES .DST .EXP .JEF" : "There is no machine to run a stitch file on this line"}
                     disabled={!isEmb}
-                    title={isEmb ? "Attach a machine file to this line" : "Embroidered lines only — there is no machine to run a stitch file on this one"}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Needle size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-                    Attach a machine file
-                  </button>
-                  {/* SAVING one is not the same act as STARTING from one, and only this half
-                      had nowhere else to live: the Design Maker can still save a template,
-                      but the placement you have just set by hand is HERE. Offered only with
-                      artwork on the line, because there is otherwise nothing to save. */}
-                  {designUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
-                      disabled={tplBusy}
-                      aria-expanded={tplName !== null}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent disabled:opacity-40"
-                    >
-                      {tplBusy
-                        ? <CircleNotch size={14} className="shrink-0 animate-spin text-muted-foreground" />
-                        : <BookmarkSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />}
-                      Save this placement as a template
-                    </button>
-                  )}
-                  {/* The saved-designs library, under an "or" as a PEER route rather than a
-                      fourth item — it reaches the same place as Upload, from somewhere else. */}
-                  <button
-                    type="button"
-                    onClick={() => { setLibSource("designs"); setLibOpen(true) }}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
-                  >
-                    <FolderOpen size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-                    Pick from your library
-                  </button>
-                </div>
-
-                {/* NO LIST HERE, ON PURPOSE.
-                    "Files on this line · N" already sits under the stage: every name, the
-                    kind, and a download on each row, always visible without opening anything.
-                    Printing them again inside this panel would be two lists of one thing —
-                    which is the fault this panel was made to remove, not one to repeat. The
-                    badge on the trigger is the same count as that heading, so the door agrees
-                    with the list it belongs to. */}
+                    onFiles={(f) => { const x = f[0]; if (x) void attachMachineFile(x) }}
+                  />
+                )}
               </PopoverContent>
             </Popover>
             {/**
@@ -2500,7 +2506,7 @@ export function DesignCanvasDialog({
             to load rather than as a line nobody has sent a file for. */}
         {lineFiles.length > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
-            <div className="mb-1.5 text-xs font-medium text-foreground">Files on this line · {lineFiles.length}</div>
+            <div className="mb-1.5 text-xs font-medium text-foreground">Files</div>
             <div className="rounded-md border border-border bg-card">
               <div className="divide-y divide-border">
                 {lineFiles.map((f) => (
@@ -2658,23 +2664,37 @@ export function DesignCanvasDialog({
  floor couldn't see what the customer actually sent. Shows the file + their
  personalization note, with one click to adopt it as the design to place. */}
         {(item.design_src || item.personalization) && (
-          <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
-            {item.design_src && <CustomerFileThumb src={item.design_src} />}
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-foreground">Customer&apos;s file</div>
-              {/* NO decorative quotes around it. The buyer's text frequently contains its
- own — this one is literally `"MRS. AUSTIN "` — and wrapping it produced
-                  “"MRS. AUSTIN "”, which invites someone to stitch a quotation mark that
- isn't theirs. Personalisation is a literal to reproduce, so it is shown
- exactly, in mono, where a trailing space (this one has one) is visible
- rather than invisibly trimmed by the eye. */}
-              {item.personalization && (
-                <div className="mt-0.5 line-clamp-2 whitespace-pre-wrap break-words tabular-nums text-xs text-foreground">
-                  {decodeEntities(item.personalization)}
-                </div>
-              )}
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {item.design_src && (
+          /**
+           * THE NOTE FIRST, THEN THE FILE.
+           *
+           * This led with the buyer's uploaded picture and put their words underneath it,
+           * which is the wrong way round for the person reading it: the note is the
+           * INSTRUCTION — the text that gets stitched — and the file is one of the things
+           * you might use to carry it out. Leading with a thumbnail also meant the sentence
+           * that decides the job sat below a picture, in the smallest type in the column.
+           *
+           * Same card treatment as the two panels under it, so the column reads as one
+           * column. It keeps its tint because whose it is IS the fact about it.
+           */
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+            <div className="text-xs font-semibold text-foreground">
+              {item.personalization ? "Customer\u2019s note" : "Customer\u2019s file"}
+            </div>
+            {/* NO decorative quotes around it. The buyer's text frequently contains its
+                own — this one is literally `"MRS. AUSTIN "` — and wrapping it produced
+                “"MRS. AUSTIN "”, which invites someone to stitch a quotation mark that
+                isn't theirs. Personalisation is a literal to reproduce, so it is shown
+                exactly, where a trailing space (this one has one) is visible rather than
+                invisibly trimmed by the eye. */}
+            {item.personalization && (
+              <div className="mt-1 whitespace-pre-wrap break-words tabular-nums text-xs text-foreground">
+                {decodeEntities(item.personalization)}
+              </div>
+            )}
+            {item.design_src && (
+              <div className="mt-2 flex items-start gap-3 border-t border-primary/20 pt-2">
+                <CustomerFileThumb src={item.design_src} />
+                <div className="flex min-w-0 flex-1 flex-wrap gap-2">
                   <button onClick={() => {
                     setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS); noteArtSource(sideName, "")
                     /* NAME IT. These three routes in — the buyer's file, the library and a
@@ -2683,16 +2703,14 @@ export function DesignCanvasDialog({
                        the row under the stage would have shown it. */
                     setDesignName(fileNameFrom(item.design_src!) ?? "Customer's file"); setDesignSize(null)
                   }}
- className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90">Use this</button>
-                )}
-                {item.design_src && (
+                    className="h-7 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:opacity-90">Use this</button>
                   <a href={item.design_src} target="_blank" rel="noopener noreferrer"
- className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-accent">
+                    className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium hover:bg-accent">
                     Open <ArrowSquareOut size={11} weight="bold" />
                   </a>
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
         <div className="space-y-3">
