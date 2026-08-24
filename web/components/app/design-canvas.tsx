@@ -11,13 +11,13 @@ import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, getDesignFees, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { TIER_LABEL, TIER_WHY, feeFor } from "@/lib/design-fee"
 import { fileToUploadUrl } from "@/lib/chat-upload"
 import { perceptualHash } from "@/lib/phash"
-import { decodeEntities, usd } from "@/lib/order-format"
+import { decodeEntities } from "@/lib/order-format"
 import { useArtworkSrc } from "@/lib/pdf-preview"
 import { matchThreadColors, nearestThread, nearestThreads, matchQuality, hexToRgb, matchThreadRegions, canvasReadableSrc, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { useBackgroundRemoval } from "@/lib/remove-background"
@@ -1233,20 +1233,8 @@ export function DesignCanvasDialog({
  return () => clearTimeout(t)
   }, [])
 
-  /** What each tier costs the seller. Rendered only once loaded, so a slow fetch never
-   * shows a confident $0 next to a button that moves money. */
- const [fees, setFees] = useState<{ standard: number; complex: number; check: number } | null>(null)
- useEffect(() => {
- if (!open) return
-    // Seller-safe fees read (just the design/check fees, no margin policy), so BOTH the
-    // staff charge picker and the seller's fee estimate can show the real number.
- const t = setTimeout(() => {
- getDesignFees()
-        .then((f) => setFees({ standard: f.standard || 0, complex: f.complex || 0, check: f.check || 0 }))
-        .catch(() => setFees(null))
-    }, 0)
- return () => clearTimeout(t)
-  }, [open])
+  /* The fee read that was here went with the estimate banner — nothing in this window
+     prices anything now, and a request whose only reader has gone is a request. */
 
   /**
    * Does THIS LINE already have a machine file? The only honest input to the suggestion
@@ -1465,6 +1453,17 @@ export function DesignCanvasDialog({
  return () => clearTimeout(t)
   }, [open, orderId, item.sku, item.line_id])
  const hasMachineFile = hasFile || justAttachedFile
+ /**
+   * WHAT SAVE CAN ACT ON — artwork on any face, OR a machine file.
+   *
+   * Not just the visible face: standing on an empty back with a finished front is not a
+   * reason to grey out Save. And not artwork ALONE — a machine file is what the factory
+   * actually stitches, order-readiness.ts already treats one as the design being done, and
+   * demanding a placed image on top of it left every seller who has only a product photo
+   * and a stitch file unable to finish. The mockup is deliberately NOT in here: it saves
+   * the moment it is uploaded, and it is a backdrop, not artwork.
+   */
+  const canSave = anyFaceHasArt || hasMachineFile
   /**
    * SENT IS NOT DONE, AND NOT NOTHING.
    *
@@ -1894,7 +1893,22 @@ export function DesignCanvasDialog({
  const was = savedFaces[sd]
  return !was || was.data !== art.data || !samePos(art.pos, was.pos)
     })
- if (!changed.length && !designUrl) { setErr("Upload artwork first."); return false }
+ /*
+     * A MACHINE FILE IS ENOUGH ON ITS OWN.
+     *
+     * This demanded a placed image before it would save anything, which made the designer
+     * stricter than the rest of the app: order-readiness.ts already counts a machine file as
+     * the design being done (`approved = boardApproved || (hasFile && !onBoard)`), and a lot
+     * of sellers only ever have the two things they can actually produce — a photo of the
+     * product and the stitch file. There was no way for them to end the job.
+     *
+     * With no image there is nothing to post to order_designs, and that is fine: the machine
+     * file and the mockup are both already on the server, each saved when it was uploaded.
+     * What this still does is the part nothing else does — write the matched threads, tell
+     * the parent to re-read, and close. Nothing is cleared: only faces in `changed` are
+     * written, so a face nobody touched keeps what it had.
+     */
+ if (!changed.length && !designUrl && !hasMachineFile) { setErr("Upload artwork or a machine file first."); return false }
     // Artwork attaches to a LINE, keyed line-first (server: coalesce('L:'||line_id,'S:'||sku)).
     // A marketplace line arrives with its variant — and thus SKU — unset, but always carries a
     // line_id. Requiring a SKU here mislabelled a present design as "no artwork" on exactly
@@ -3054,32 +3068,12 @@ export function DesignCanvasDialog({
         {/* The three rows that were here — a question, a button and a note explaining why
  the button was disabled — are one tool on the rail now. See "SEND, on the rail". */}
 
-          {/* SELLER view of the same thing the staff picker above decides — a plain-language
- estimate, never the fee controls (they're being charged; they don't set it):
-                • their own machine file  → no design fee, just the check fee
-                • artwork, few colours    → the standard fee, shown
-                • artwork, many colours   → complex, so the fee is quoted, not fixed yet
-              Only when there's something to say — an empty line shows nothing. */}
-          {!isStaff && (hasMachineFile || designUrl) && (
-            <div className="rounded-lg border border-border px-3 py-2.5 text-xs">
-              {hasMachineFile ? (
-                <span className="text-shipped">
-                  <span className="font-medium">You uploaded your file.</span> No design fee{fees?.check ? ` — just a ${usd(fees.check)} check fee.` : " — just a check fee."}
-                </span>
-              ) : threads.length >= 6 ? (
-                <span className="text-muted-foreground">
-                  <span className="font-medium text-foreground">Design fee being calculated…</span> Your design has a lot of detail ({threads.length} colours), so we&apos;ll send you the price to approve before anything is charged.
-                </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  {/* Explicit {" "}: the leading space of the next text node was being eaten,
- printing "design fee— we'll". */}
-                  <span className="font-medium text-foreground">Standard design fee{fees?.standard ? ` · ${usd(fees.standard)}` : ""}</span>{" "}
-                  — we&apos;ll prepare your design for the machine.
-                </span>
-              )}
-            </div>
-          )}
+          {/* NO FEE ESTIMATE IN THIS WINDOW. A green banner under the artwork said "no
+ design fee — just a $1.00 check fee" while the money for that line lived in
+ the order's Summary, so the one screen that could not act on a charge was
+ the one announcing it, and a seller comparing the two read two prices.
+              The fee is on the Summary, beside the total it is part of, and it is charged
+ with the order (see the submit block in server/src/routes/orders.js). */}
 
         </div>
         {/* The reason sits ABOVE the buttons, not beside them. Inline in a 380px rail it
@@ -3100,14 +3094,13 @@ export function DesignCanvasDialog({
             the bottom corners keep the popup's radius, and what passes behind it stays legible
             under the blur. Same shape the site-content panel uses. */}
         <div className="order-last sticky bottom-0 z-10 -mx-6 space-y-2 rounded-b-[min(var(--radius-4xl),24px)] border-t border-border bg-popover/95 px-6 py-4 backdrop-blur">
-          {/* Say WHY Save is disabled. A machine file without an image is the common case —
- the stitch file is saved, but there's no picture to place on the mockup yet. */}
-          {!designUrl && (
-            <p className="text-xs text-muted-foreground">
-              {hasMachineFile
-                ? "Add an image so we can show where your file sits on the product."
- : "Add your design above, then save."}
-            </p>
+          {/* Say WHY Save is refused — and ONLY when it is. This printed "add an image so we
+              can show where your file sits on the product" whenever no image was placed,
+              including on a line carrying a machine file, which is now saveable. A sentence
+              under an ENABLED button is a subtitle and §4 forbids it; a refusal carries its
+              reason, which is what this is. */}
+          {!canSave && (
+            <p className="text-xs text-muted-foreground">Add your design or a machine file, then save.</p>
           )}
           {/* ONE ACTION BAR. Apply-to-all sat halfway up a column while Save sat at the
  bottom, so the two things you press at the END of the job were in different
@@ -3139,7 +3132,7 @@ export function DesignCanvasDialog({
  and the threads with it. And enabled whenever ANY face carries artwork, not
  just the visible one: standing on an empty back with a finished front is not
  a reason to grey out Save. */}
-            <Button onClick={() => void save()} disabled={saving || !anyFaceHasArt}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save"}</Button>
+            <Button onClick={() => void save()} disabled={saving || !canSave}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save"}</Button>
           </div>
         </div>
         </div>
