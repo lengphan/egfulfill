@@ -2158,7 +2158,15 @@ export function DesignCanvasDialog({
           {/* MIDDLE-LEFT, not top-left. Pinned to the top it sat level with the garment's
  collar and the eye had to travel up to reach it; centred, it is where the
  cursor already is when it is on the artwork. */}
-          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
+          {/* z-20 — ABOVE THE EMPTY-STAGE TARGET.
+              With no artwork on a face, a button covering `absolute inset-0` sits over the
+              whole stage so that clicking the garment anywhere opens the picker. The rail is
+              drawn earlier in the DOM and carried no z-index, so that overlay painted ON TOP
+              of it: pressing Files never reached Files — it hit the overlay and opened the OS
+              file browser instead of the panel. It went unnoticed while the rail's first
+              entry was Upload, because hitting the overlay did the same thing as hitting the
+              button. The moment that entry became a panel, the two stopped agreeing. */}
+          <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
             {/**
               * ONE DOOR FOR FILES, not three beside each other.
               *
