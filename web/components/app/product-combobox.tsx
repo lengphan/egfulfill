@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import Image from "next/image"
 import { CaretDown, Package } from "@phosphor-icons/react"
 import { Input } from "@/components/ui/input"
@@ -13,6 +14,11 @@ const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLo
 // Module-level cache: an order can have many lines, and each one mounting its own
 // combobox shouldn't refetch the whole catalog.
 let cache: CatalogProduct[] | null = null
+
+// useLayoutEffect warns when a component is server-rendered, and this one is (the order
+// form is SSR'd like every app page). useEffect on the server, layout effect in the
+// browser — the panel has to be placed before it paints or it flashes at the top-left.
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect
 
 /**
  * The Product field on an order line: type-ahead over the catalog, but still free text.
@@ -46,6 +52,7 @@ export function ProductCombobox({
   const [cursor, setCursor] = useState(0)
   const boxRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (cache) return
@@ -71,12 +78,15 @@ export function ProductCombobox({
     return () => clearTimeout(id)
   }, [])
 
-  // Close on outside click — the panel is absolutely positioned, so it would otherwise
-  // hang over the next line's fields.
+  // Close on outside click. The panel is a PORTAL on <body>, so it is not inside boxRef —
+  // testing only the field would close the list on mousedown and unmount the row before
+  // its click ever landed, which reads as "clicking a product does nothing".
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (boxRef.current?.contains(t) || panelRef.current?.contains(t)) return
+      setOpen(false)
     }
     document.addEventListener("mousedown", onDown)
     return () => document.removeEventListener("mousedown", onDown)
@@ -106,6 +116,46 @@ export function ProductCombobox({
     if (!open) return
     listRef.current?.querySelector<HTMLElement>(`[data-i="${cursor}"]`)?.scrollIntoView({ block: "nearest" })
   }, [cursor, open])
+
+  // WHERE THE PANEL GOES. It is a portal on <body>, so it carries no position of its own —
+  // it is pinned to the field's rect every time the list opens, the page scrolls or the
+  // window resizes, and flipped above the field when there isn't room below.
+  // Written straight to the node rather than held in state: a rect in state would be one
+  // render behind the scroll it is following.
+  useIsoLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const el = panelRef.current, anchor = boxRef.current
+      if (!el || !anchor) return
+      const r = anchor.getBoundingClientRect()
+      /*
+       * AS WIDE AS THE STRIP IT BELONGS TO, not a fixed 320px.
+       *
+       * A hard width fits nothing: on an order line the Product column bottoms out at
+       * 170px and 320 reached over into Qty and Colour, while on the publish form the same
+       * 320 sat under a field twice that wide. Both were the panel deciding a width from
+       * nothing, and neither matched the row it dropped out of.
+       * A host that has a natural width for it says so with `data-field-strip` — on the
+       * order line that is the whole field grid, Product through Method — and everything
+       * else falls back to the field. It opens BELOW, so the width it spans is the row
+       * underneath, never the controls beside it.
+       */
+      const strip = anchor.closest("[data-field-strip]")
+      const w = Math.max(r.width, Math.min(strip?.getBoundingClientRect().width ?? 0, window.innerWidth - 16))
+      el.style.width = `${w}px`
+      el.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`
+      const below = window.innerHeight - r.bottom - 8
+      const h = el.offsetHeight
+      el.style.top = below < h && r.top - 8 > below ? `${Math.max(8, r.top - h - 4)}px` : `${r.bottom + 4}px`
+    }
+    place()
+    window.addEventListener("scroll", place, true)
+    window.addEventListener("resize", place)
+    return () => {
+      window.removeEventListener("scroll", place, true)
+      window.removeEventListener("resize", place)
+    }
+  }, [open, matches.length, load])
 
   const choose = (p: CatalogProduct) => {
     const picked = toPickedProduct(p)
@@ -159,11 +209,17 @@ export function ProductCombobox({
         <CaretDown size={13} className="text-muted-foreground" />
       </button>
 
-      {/* Panel is wider than the field on purpose — the Product column is narrow, and
-          matching its width truncated every name to "Classic T…". Capped so it can't
-          overrun a phone. */}
-      {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-30 w-[320px] max-w-[80vw] overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+      {/* A PORTAL, not an absolute child. Every surface that hosts this field — the manual
+          order line, the publish form — sits in a SectionCard, and that card is
+          `overflow-hidden`, so the list was clipped to the card's edge: one row visible and
+          the rest cut off inside the panel. No amount of z-index reaches out of a clip;
+          only leaving the subtree does. */}
+      {open && typeof document !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: "fixed", top: 0, left: 0, width: 0 }}
+          className="z-50 overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
+        >
           <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
             {matches.length === 0 ? (
               // Say WHICH of the three it is. A failed load and an empty catalogue lead to
@@ -212,8 +268,8 @@ export function ProductCombobox({
               })
             )}
           </div>
-
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

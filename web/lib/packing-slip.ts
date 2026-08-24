@@ -1,4 +1,4 @@
-import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, unitsOf, addrLine, variantOf } from "@/lib/order-format"
 import type { OrderRow } from "@/lib/api"
 
 /**
@@ -38,8 +38,28 @@ const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&a
 function buildSlips(chosen: OrderRow[]): string {
   return chosen.map((o) => {
     const its = o.items ?? []
+    /**
+     * THE VARIANT, ON THE SLIP — the line that says WHICH ONE to put in the box.
+     *
+     * The slip named the product and the quantity and nothing else, so an order for two
+     * crewnecks in different colours printed as two identical rows and the packer had to
+     * open the order on a screen to tell them apart. Colour, size and technique are the
+     * three facts that decide which garment comes off the shelf.
+     *
+     * variantOf is the same helper the app's own rows use (order-format.ts) — one spelling
+     * of "which variant", so the paper and the screen can never disagree. It returns "" on
+     * a line with nothing picked, which is a real state on a marketplace order, and the row
+     * then simply carries the name as it did before rather than an empty grey line.
+     */
     const rows = its.length
-      ? its.map((it) => `<tr><td>${esc(it.name || it.sku || "Item")}${it.sku && it.name ? `<div class="sku mono">${esc(it.sku)}</div>` : ""}</td><td class="qty">&times;${esc(it.qty ?? 1)}</td></tr>`).join("")
+      ? its.map((it) => {
+        const v = variantOf(it)
+        // NOT mono. A sku is a name, not code (§4) — and on a 4in slip the monospaced form
+        // is both wider and harder to read across the row it belongs to.
+        const sku = it.sku && it.name ? esc(it.sku) : ""
+        const sub = [v ? esc(v) : "", sku].filter(Boolean).join(" &middot; ")
+        return `<tr><td>${esc(it.name || it.sku || "Item")}${sub ? `<div class="sku">${sub}</div>` : ""}</td><td class="qty">&times;${esc(it.qty ?? 1)}</td></tr>`
+      }).join("")
       : `<tr><td colspan="2" class="empty">No items recorded on this order</td></tr>`
     return `<section class="slip">
       <div class="hd"><div class="num mono">${esc(numOf(o))}</div><div class="plat">${esc(platformOf(o))}${o.store ? " &middot; " + esc(o.store) : ""}</div></div>

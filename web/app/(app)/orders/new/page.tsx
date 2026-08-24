@@ -343,7 +343,10 @@ export default function NewOrderPage() {
  than before (652px of track vs 660px): raising them instead would push
  the grid past the card at the breakpoint, which is what was cutting the
  strip off on the right to begin with. */}
-              <div className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.2fr)_60px_78px_minmax(108px,1.1fr)_minmax(70px,0.65fr)_minmax(116px,1.15fr)]">
+              {/* `data-field-strip` — the Product list drops to THIS width rather than a
+ number of its own, so it lines up with the row it came out of instead of
+ ending halfway through Colour. See product-combobox.tsx. */}
+              <div data-field-strip className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.2fr)_60px_78px_minmax(108px,1.1fr)_minmax(70px,0.65fr)_minmax(116px,1.15fr)]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Product</span>
                 <ProductCombobox
