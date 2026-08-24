@@ -782,6 +782,15 @@ export type LookbookStyle = {
    */
   pickColors?: string[] | null
   pickSizes?: string[] | null
+  /**
+   * PER-COLOURWAY FRAMING, keyed by colour name.
+   *
+   * Supplier swatch photography is not uniform — on one style half the range is a photograph
+   * of the garment and the other half a flat crop of the fabric — and there is nothing to do
+   * about that upstream. `zoom` / `focusY` are lib/product-framing's numbers, the same two the
+   * product editor sets; `image` replaces the shot outright.
+   */
+  colorFix?: Record<string, { zoom?: number; focusY?: number; image?: string }> | null
   image: string; price: number | null; sizes: string[]
   colors: { name: string; sku: string; image: string }[]
   /** Garment measurements from S&S, as generic name/value pairs per size — their /specs
@@ -829,6 +838,9 @@ export function saveLookbookStyle(
      *  the route: unticking everything is a revert, not a page with no colourways on it. */
     colors?: string[] | null
     sizes?: string[] | null
+    /** The WHOLE map, not a patch of it — see the route. A colourway back at its defaults is
+     *  simply absent from it, so resetting one needs no separate verb. */
+    colorFix?: Record<string, { zoom?: number; focusY?: number; image?: string }> | null
   },
 ) {
   return api<{ ok?: boolean; error?: string; catalogPrice?: number | null }>(
