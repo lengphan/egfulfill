@@ -35,7 +35,7 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
           rules rather than boxed. Every value is a countable fact — see the note in
           lib/site-content.ts on why none of them is a rate or a total. */}
       {p.stats.length > 0 && (
-        <section className="mx-auto max-w-6xl px-6 pb-4">
+        <section className="mx-auto max-w-[88rem] px-6 sm:px-10 pb-4">
           <LabelRule left={p.ruleLeft} right={p.ruleRight} className="mb-10" />
           <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
             <SpecStrip items={p.stats} />
@@ -54,7 +54,7 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
         * section at all, never a grey box where a garment should be.
         */}
       {p.figure.image && (
-        <section className="mx-auto max-w-6xl px-6 py-12">
+        <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-12">
           <CutoutFigure
             src={p.figure.image}
             alt={p.figure.imageAlt}

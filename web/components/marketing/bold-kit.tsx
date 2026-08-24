@@ -191,17 +191,13 @@ export const AUTH_MUTED = "var(--mk-auth-muted)"
 export const HAIRLINE = "var(--mk-hairline)"
 
 /**
- * A PANEL'S GROUND — the surface a slide is drawn on, as distinct from the page behind it.
+ * A CARD'S FILL — the ground a numbered card or a quote is drawn on, as distinct from the page.
  *
- * The reference boards are not ink-on-white; they are ink on a cool ground with LIGHTER
- * panels floating on it, and the gap between those two greys is the entire reason a section
- * reads as a slide rather than as a stretch of page. That needs a second ground token, because
- * a panel painted `SURFACE` is invisible and a panel painted white is a different design.
- *
- * On `studio` it IS white and on `press` it is the warm paper, so a page that uses it is
- * unchanged on those skins — the hairline goes on doing the separating there, exactly as it
- * did before this token existed. Measured against `--mk-ink` by tools/check-skins.mjs on
- * every skin, because most of the type on a slide sits on this and not on SURFACE.
+ * On `studio` it is white and on `press` the warm paper, so on both it equals SURFACE and the
+ * card's hairline does the separating. It exists as its own token so a skin that wants a card
+ * to sit at a different value from the page can say so in ONE place rather than in every
+ * component that draws one. Measured against `--mk-ink` by tools/check-skins.mjs on every
+ * skin, because card text is text.
  */
 export const CARD = "var(--mk-card)"
 
@@ -221,10 +217,10 @@ export const CARD = "var(--mk-card)"
  * from it, and it is narrow on purpose — a colour that is merely PAINTED never belongs here.
  */
 export const HEX = {
-  accent: "#16181E",
-  ink: "#0B0D12",
-  acid: "#CFD8E6",
-  surface: "#DEE4EE",
+  accent: "#0A0A0A",
+  ink: "#0A0A0A",
+  acid: "#D4F897",
+  surface: "#FFFFFF",
   paper: "#FFFFFF",
 } as const
 

@@ -63,7 +63,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * Emptied in the editor, the whole section goes — same as the homepage.
         */}
       {p.stats.length > 0 && (
-        <section className="mx-auto max-w-6xl px-6 pb-4">
+        <section className="mx-auto max-w-[88rem] px-6 sm:px-10 pb-4">
           <LabelRule left={p.ruleLeft} right={p.ruleRight} className="mb-10" />
           <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
             <SpecStrip items={p.stats} />
@@ -85,7 +85,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * forbids. No picture means no section, and the steps follow the figures directly.
         */}
       {p.figure.image && (
-        <section className="mx-auto max-w-6xl px-6 py-14">
+        <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-14">
           <CutoutFigure
             tone="ink"
             src={p.figure.image}
@@ -106,14 +106,18 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * The "— No CSV exports" run under each step survived: it moved onto NumberedItem so
         * the card draws it, rather than being lost or hand-rolled beside the component.
         */}
-      <section className="mx-auto max-w-6xl px-6 py-14">
+      <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-14">
         <NumberedCards items={p.steps} />
       </section>
 
       {/* The real status flow. Tones are the product's own, deliberately not re-tinted. */}
       {p.journey.length > 0 && (
-        <section className="py-16" style={{ background: "rgba(0,0,0,0.03)" }}>
-          <div className="mx-auto max-w-4xl px-6">
+        <section className="mx-auto max-w-[88rem] px-6 py-16 sm:px-10">
+          {/* A RULE, NOT A TINTED BAND. This section sat in 3% black, which is a second
+              ground laid over the page's own — two near-identical off-whites held apart by
+              nothing, which is what makes a full-width section read as a mistake rather than
+              as a section. The divider does the same job and adds no colour. */}
+          <div className="max-w-4xl border-t pt-16" style={{ borderColor: HAIRLINE }}>
             <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
               {p.journeyHeading}
             </h2>

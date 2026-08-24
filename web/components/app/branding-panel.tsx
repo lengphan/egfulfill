@@ -36,7 +36,7 @@ export function BrandingPanel() {
   const [busy, setBusy] = useState<null | "save" | "favicon" | "logo">(null)
   const [saved, setSaved] = useState(false)
   const [accent, setAccentState] = useState<AccentKey>("rose")
-  const [skin, setSkinState] = useState<SkinKey>("signal")
+  const [skin, setSkinState] = useState<SkinKey>("studio")
   const [err, setErr] = useState<string | null>(null)
   /**
    * A CACHE-BUSTER THAT DOES NOT REPEAT ITSELF.
