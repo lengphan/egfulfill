@@ -22,7 +22,7 @@
  */
 
 import { motion, useReducedMotion } from "motion/react"
-import { ACCENT, ACCENT_INK, ACID, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
 import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
 
 /** The caps label these boards use everywhere: small, wide, quiet. One definition, because
@@ -38,18 +38,94 @@ export const CAPS = "text-[11px] font-semibold uppercase tracking-[0.18em]"
  *
  * `right` is optional: one label and a rule running off to the margin is the same device.
  */
-export function LabelRule({ left, right, className = "" }: {
+export function LabelRule({ left, right, tone = "ink", className = "" }: {
   left: string
   right?: string
+  /** Which ground it is drawn on. `light` is the same rule inverted, for a dark panel — a
+   *  hairline at HAIRLINE's value simply does not exist against the accent. */
+  tone?: "ink" | "light"
   className?: string
 }) {
   if (!left && !right) return null
+  const fg = tone === "light" ? ACCENT_INK : INK
   return (
-    <div className={`flex items-center gap-4 ${className}`} style={{ color: INK }}>
+    <div className={`flex items-center gap-4 ${className}`} style={{ color: fg }}>
       {left && <span className={`${CAPS} shrink-0 opacity-70`}>{left}</span>}
-      <span className="h-px flex-1" style={{ background: HAIRLINE }} />
+      <span className="h-px flex-1" style={{ background: tone === "light" ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE }} />
       {right && <span className={`${CAPS} shrink-0 text-right opacity-70`}>{right}</span>}
     </div>
+  )
+}
+
+/**
+ * A SLIDE — the panel every board in the reference is built out of.
+ *
+ * THIS IS THE PIECE THE PAGES WERE MISSING, and the reason three devices lifted off those
+ * boards (the label rule, the ghost word, the numbered checker) still did not look like them.
+ * The boards are not a continuous page with sections on it. They are a stack of PANELS on a
+ * ground: each one a rounded rectangle a shade lighter than what is behind it, each opening
+ * with its own rule and closing with a position marker. Section-shaped whitespace on one flat
+ * colour cannot produce that no matter which ornaments are dropped into it.
+ *
+ * It carries its own `LabelRule` rather than leaving the caller to add one, because the rule
+ * appearing at the top of EVERY panel is the repetition that makes a stack read as a deck —
+ * and a device that is optional at each call site is a device that is present on some panels
+ * and missing from others.
+ *
+ * THE MARKER AT THE FOOT IS REAL, and it has to be. The board draws a short black bar on a
+ * long thin rule, which on a slide deck means "you are here". Rendered as decoration — a bar
+ * always parked at the right — it would be exactly the thing §4 forbids: a shape that looks
+ * like a measurement and measures nothing, the same defect as the invented bar chart this
+ * page already had removed from it. So it takes `index` and `total` and moves: the thumb sits
+ * where the panel sits in the stack, and a caller that adds a section moves every marker
+ * after it without touching one.
+ */
+export function Slide({ label, labelRight, index, total, tone = "panel", flush = false, children, className = "" }: {
+  /** The left word on the panel's opening rule — usually the brand. */
+  label?: string
+  /** The right word — usually who this is for. */
+  labelRight?: string
+  /** Where this panel sits in the stack, from 0. Drives the marker, which is why it is not
+   *  optional: a marker with nothing behind it is the decoration described above. */
+  index: number
+  total: number
+  /** `panel` is the deck's own light card. `ink` is the same panel filled with the accent —
+   *  for the one closing slide, so the page ends on a block instead of trailing off. It is a
+   *  tone rather than a second component for the reason the figure's is (see CutoutFigure). */
+  tone?: "panel" | "ink"
+  /** Let the content reach the panel's own edge — for a figure that is meant to bleed. The
+   *  rule and the marker keep their inset regardless, or the panel loses its margins. */
+  flush?: boolean
+  children: React.ReactNode
+  className?: string
+}) {
+  const ink = tone === "ink"
+  return (
+    <section
+      className={`relative overflow-hidden rounded-[28px] ${className}`}
+      style={ink ? { background: ACCENT, color: ACCENT_INK } : { background: CARD }}
+    >
+      <div className={`${flush ? "px-0 pt-8" : "px-6 pt-8 sm:px-10"}`}>
+        {(label || labelRight) && (
+          <div className={flush ? "px-6 sm:px-10" : ""}>
+            <LabelRule left={label ?? ""} right={labelRight} tone={ink ? "light" : "ink"} />
+          </div>
+        )}
+        {children}
+      </div>
+      {/* THE POSITION MARKER. The track is the full inset width; the thumb is one slot wide
+          and sits at this panel's slot, so a five-panel page shows a fifth of the track filled
+          and it advances as you go down. */}
+      <div className="px-6 pb-7 pt-10 sm:px-10">
+        <div className="relative h-px w-full" style={{ background: ink ? `color-mix(in oklch, ${ACCENT_INK} 22%, transparent)` : HAIRLINE }}>
+          <span
+            aria-hidden
+            className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full"
+            style={{ background: ink ? ACCENT_INK : INK, width: `${100 / Math.max(total, 1)}%`, left: `${(index / Math.max(total, 1)) * 100}%` }}
+          />
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -316,10 +392,26 @@ export function NumberedCards({ items, className = "" }: { items: NumberedItem[]
         return (
           <motion.div
             key={`${it.title}-${i}`}
-            className="rounded-2xl p-7"
+            /*
+             * ONE CORNER IS CUT, AND WHICH ONE ALTERNATES.
+             *
+             * The board's cards are not plain rounded rectangles — each has a single corner
+             * pulled tight, and the corner moves along the row. It is the cheapest possible
+             * mark of "this is a set, laid out deliberately" and it survives at any card size,
+             * where a badge or a rule would not.
+             *
+             * Done with differential RADII rather than a clip-path chamfer, because a clipped
+             * box loses its border on the clipped edge — and the light cards here are held
+             * together by their border.
+             */
+            className={`p-7 rounded-[22px] ${i % 2 === 0 ? "rounded-tr-[4px]" : "rounded-tl-[4px]"}`}
             style={dark
               ? { background: ACCENT, color: "var(--mk-accent-ink)" }
-              : { border: `1px solid ${HAIRLINE}`, color: INK }}
+              /* A LIGHT CARD LIFTS OFF THE PANEL rather than merely being outlined on it.
+                 On `signal` the panel is grey, so a card mixed toward white separates by tone
+                 the way the board's do; on `studio` the panel is already white and the mix is
+                 a no-op, leaving exactly the bordered card that shipped before. */
+              : { background: `color-mix(in oklch, ${CARD} 55%, white)`, border: `1px solid ${HAIRLINE}`, color: INK }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}

@@ -30,7 +30,11 @@ export default async function MarketingLayout({ children }: { children: React.Re
   return (
     <MotionProvider value={motion}>
     <EditModeProvider initial={content}>
-    <div className="flex min-h-svh flex-col bg-background">
+    {/* THE GROUND IS THE SKIN'S, NOT THE APP'S. This was `bg-background` — the shadcn token,
+        which is white and belongs to the signed-in product. It went unnoticed while the
+        marketing skin was also white; on `signal` the page is a cool grey and the footer was
+        the one white band left on it, which reads as a seam rather than as a footer. */}
+    <div className="flex min-h-svh flex-col" style={{ background: "var(--mk-surface)" }}>
       <SiteHeader />
 
       <main className="flex-1">{children}</main>

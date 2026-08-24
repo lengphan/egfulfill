@@ -1,10 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ImageSquare, MagnifyingGlass } from "@phosphor-icons/react"
+import { ImageSquare, MagnifyingGlass, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Thumb } from "@/components/app/thumb"
+import { useLightbox } from "@/components/app/image-lightbox"
 
 export type ArtItem = {
   /** The value handed back on pick — the RAW url the canvas should place. */
@@ -44,6 +45,7 @@ export function ArtPickerDialog({
   searchPlaceholder?: string
 }) {
   const [qy, setQy] = useState("")
+  const zoom = useLightbox()
 
   const shown = useMemo(() => {
     const needle = qy.trim().toLowerCase()
@@ -56,6 +58,8 @@ export function ArtPickerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
+        {/* Portalled at z-[80], so it opens ABOVE this dialog rather than behind it. */}
+        {zoom.node}
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
 
         <div className="relative">
@@ -94,8 +98,20 @@ export function ArtPickerDialog({
                       opening this. The rail crops to fit its column; this does not.
                       Through Thumb, because `name` here is the marketplace listing title and
                       a refused hotlink would paint the whole of it in place of the picture. */}
-                  <div className="flex aspect-square items-center justify-center bg-muted p-2">
+                  <div className="group/well relative flex aspect-square items-center justify-center bg-muted p-2">
                     <Thumb src={it.src ?? it.url} alt={it.name || ""} fit="contain" className="max-h-full max-w-full bg-transparent" />
+                    {/* Picking is the primary click; looking is a separate, smaller one. A
+                        stopPropagation rather than a nested button, because this well IS
+                        inside the pick button. */}
+                    <span
+                      role="button" tabIndex={0}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); zoom.open(it.src ?? it.url, it.name) }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); zoom.open(it.src ?? it.url, it.name) } }}
+                      title="View full size"
+                      className="absolute left-1.5 top-1.5 hidden size-6 cursor-zoom-in items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/75 group-hover/well:flex"
+                    >
+                      <MagnifyingGlassPlus size={12} weight="bold" />
+                    </span>
                   </div>
                   <div className="border-t border-border p-2">
                     {it.badge && <div className="text-2xs font-semibold text-primary">{it.badge}</div>}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, type Icon } from "@phosphor-icons/react"
+import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, MagnifyingGlassPlus, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -11,6 +11,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
 import { Thumb } from "@/components/app/thumb"
 import { TabBar } from "@/components/app/tab-bar"
+import { useLightbox } from "@/components/app/image-lightbox"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, getDesignLibrary, getDesignLibraryItem, deleteDesignLibrary, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate, type LibraryDesign } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
@@ -204,8 +205,8 @@ export type RailArt = {
   onDelete?: () => void
 }
 
-function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onDelete }: {
- url: string; src?: string; name?: string; badge?: string; title?: string; measure?: boolean; onPlace: () => void; onDelete?: () => void
+function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onDelete, onZoom }: {
+ url: string; src?: string; name?: string; badge?: string; title?: string; measure?: boolean; onPlace: () => void; onDelete?: () => void; onZoom?: () => void
 }) {
   /**
    * THE SIZE, MEASURED FROM THE PICTURE ITSELF.
@@ -269,6 +270,18 @@ function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onD
           {dim ? `${dim.w}×${dim.h}` : badge || (measure ? "…" : name || "")}
         </span>
       </button>
+      {/* LOOKING IS NOT PLACING. The tile's click puts the artwork on the garment, which is
+          the right primary action and the wrong way to answer "what IS this" — at 130px two
+          of a seller's logos are a smudge apart. So the magnifier is its own control, on
+          hover, the same split ItemAvatar already makes between verifying and authoring. */}
+      {onZoom && (
+        <button
+ type="button" onClick={onZoom} title="View full size"
+ className="absolute left-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 group-hover/thumb:flex"
+        >
+          <MagnifyingGlassPlus size={11} weight="bold" />
+        </button>
+      )}
       {onDelete && (
         <button
  type="button" onClick={onDelete} title="Remove from your library"
@@ -540,6 +553,9 @@ export function DesignMaker() {
  const [imagesLoading, setImagesLoading] = useState(true)
   /** Which SOURCE the Artwork panel is showing. See the panel for why it is a bar. */
  const [source, setSource] = useState<"yours" | "orders" | "templates">("yours")
+  /** Looking at a picture full size — a different job from placing it. NOT `zoom`, which is
+   *  already taken by the stage's own scale a hundred lines up. */
+ const lightbox = useLightbox()
 
   // Load the catalog once. Opened from a product ("Start designing") → preload that
   // product's mockup as the blank.
@@ -900,6 +916,8 @@ export function DesignMaker() {
      * one, this has to move out of the shell instead.
      */
     <div className="fixed inset-0 z-40 flex flex-col gap-3 bg-background p-3 md:p-4">
+      {/* z-[80] and portalled, so it clears this editor's own z-40 overlay. */}
+      {lightbox.node}
       {/**
         * ONE TOP BAR: where you are, what it is called, and what you can do with it.
         *
@@ -1067,6 +1085,9 @@ export function DesignMaker() {
                     <ImageThumb
  key={it.key} url={it.url} src={it.src} name={it.name} badge={it.badge} title={it.title}
  measure={it.measure} onPlace={it.onPlace} onDelete={it.onDelete}
+                      // The DISPLAY src, not the raw url: a buyer's hotlink only loads through
+                      // the proxy, and the lightbox is an <img> like any other.
+ onZoom={() => lightbox.open(it.src ?? it.url, it.title || it.name)}
                     />
                   ))}
                 </div>

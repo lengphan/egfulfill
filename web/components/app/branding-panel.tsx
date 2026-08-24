@@ -36,7 +36,7 @@ export function BrandingPanel() {
   const [busy, setBusy] = useState<null | "save" | "favicon" | "logo">(null)
   const [saved, setSaved] = useState(false)
   const [accent, setAccentState] = useState<AccentKey>("rose")
-  const [skin, setSkinState] = useState<SkinKey>("studio")
+  const [skin, setSkinState] = useState<SkinKey>("signal")
   const [err, setErr] = useState<string | null>(null)
   /**
    * A CACHE-BUSTER THAT DOES NOT REPEAT ITSELF.
@@ -60,7 +60,7 @@ export function BrandingPanel() {
       .then((r) => {
         setB(r); setAppName(r.appName ?? "")
         if (r.accent === "rose" || r.accent === "lime") setAccentState(r.accent)
-        if (r.skin === "studio" || r.skin === "press") setSkinState(r.skin)
+        if (SKINS.some((k) => k.key === r.skin)) setSkinState(r.skin as SkinKey)
       })
       .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't load branding."))
   }, [])
