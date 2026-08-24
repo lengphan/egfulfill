@@ -35,9 +35,45 @@ function typeFromName(name: string): string {
   return "Apparel"
 }
 
-type SsFb = { title?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
-type OttoFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
-type SanmarFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null }
+type SsFb = { title?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null; brand?: string | null }
+type OttoFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null; brand?: string | null }
+type SanmarFb = { name?: string | null; price?: number | string | null; image?: string | null; colors?: string[] | null; brand?: string | null }
+
+/**
+ * THE BRAND IS ITS OWN FIELD, AND IT COMES OFF THE FRONT OF THE NAME.
+ *
+ * Suppliers ship the make welded to the title — "Gildan Unisex Heavy Blend™ Crewneck
+ * Sweatshirt" — so every product we imported read as the brand first, the same word led
+ * half the catalogue, and the fact itself was unusable: nothing could group or filter on a
+ * substring. The pair is split once, here, at the only place a supplier style becomes one
+ * of our products.
+ *
+ * Only a LEADING match is removed, and only the brand we are actually storing. "Gildan" in
+ * the middle of a name is part of the name (it is how the garment is described), and a
+ * title that never carried the brand is left exactly as it arrived.
+ *
+ * MIRRORS SUPPLIER_NAMES / notSupplier in server/src/routes/catalog.js. The SanMar and Otto
+ * feeds fall back to the SUPPLIER's own name when a row has no brand, so writing that value
+ * blind would file who supplies us as a product attribute — §2.9 — in exactly the case
+ * where the real brand is missing. The server strips it again on the way to any public
+ * shape; this stops it being stored in the first place.
+ */
+const SUPPLIER_NAMES = new Set(["sanmar", "s&s", "ss", "ssactivewear", "s&s activewear", "otto", "ottocap", "otto cap"])
+export function brandOfSupplierStyle(raw?: string | null): string {
+  const t = String(raw ?? "").trim()
+  return SUPPLIER_NAMES.has(t.toLowerCase()) ? "" : t
+}
+export function stripBrandPrefix(name?: string | null, brand?: string | null): string {
+  const n = String(name ?? "").trim()
+  const b = String(brand ?? "").trim()
+  if (!n || !b) return n
+  // ®/™ and any separator the supplier put between the two, but nothing further: the rest
+  // of the title is the garment.
+  const esc = b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const cut = n.replace(new RegExp(`^${esc}[\\s®™,·|-]*`, "i"), "").trim()
+  // Never leave the field empty — a product whose whole name IS the brand keeps it.
+  return cut || n
+}
 
 // Build a catalog product from a supplier style (fetches its full detail on demand). One
 // place, reused by every "Add to Products" button so the shape never drifts.
@@ -61,7 +97,9 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
   const d = await getSsStyle(styleID)
   if (d.error) throw new Error(d.error)
   return {
-    id: "SS-" + styleID, name: d.title || fb.title || styleID, type: typeFromName(d.title || fb.title || ""), method: "DTG", status: "Active",
+    id: "SS-" + styleID, name: stripBrandPrefix(d.title || fb.title || styleID, brandOfSupplierStyle(d.brand ?? fb.brand)),
+    brand: brandOfSupplierStyle(d.brand ?? fb.brand) || undefined,
+    type: typeFromName(d.title || fb.title || ""), method: "DTG", status: "Active",
     // The supplier's price IS our cost (S&S returns wholesale/net). It belongs in Product
     // cost, NOT Base cost — writing it to Base cost charged the seller our raw cost with no
     // margin. Base is left blank so it derives as productCost + the base_markup setting.
@@ -106,7 +144,11 @@ export async function ottoCatalogProduct(style: string, fb: OttoFb): Promise<Cat
   const colorImages = d && !d.error ? driveMap(d.colorImages) : {}
   if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = driveImg(fb.image)
   return {
-    id: "OTTO-" + style, name: d?.name || fb.name || style, type: "Headwear", method: "Embroidery", status: "Active",
+    id: "OTTO-" + style, name: stripBrandPrefix(d?.name || fb.name || style, brandOfSupplierStyle(fb.brand)),
+    // Otto's style detail carries no brand of its own, so the browse row's is the only one
+    // there is — and it falls back to "Otto Cap", which brandOfSupplierStyle refuses.
+    brand: brandOfSupplierStyle(fb.brand) || undefined,
+    type: "Headwear", method: "Embroidery", status: "Active",
     // Otto's price is our wholesale cost → Product cost, not Base cost (which derives as
     // productCost + markup). See the S&S note above.
     productCost: Number(d?.price ?? fb.price) || undefined,
@@ -126,7 +168,9 @@ export async function sanmarCatalogProduct(style: string, fb: SanmarFb): Promise
   const colorImages = d && !d.error ? { ...d.colorImages } : {}
   if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = fb.image ?? ""
   return {
-    id: "SANMAR-" + style, name: d?.name || fb.name || style, type: typeFromName(d?.name || fb.name || ""), method: "DTG", status: "Active",
+    id: "SANMAR-" + style, name: stripBrandPrefix(d?.name || fb.name || style, brandOfSupplierStyle(d?.brand ?? fb.brand)),
+    brand: brandOfSupplierStyle(d?.brand ?? fb.brand) || undefined,
+    type: typeFromName(d?.name || fb.name || ""), method: "DTG", status: "Active",
     productCost: Number(d?.price ?? fb.price) || undefined,
     sizes: d?.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (fb.colors ?? [])[0],
     /**

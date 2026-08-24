@@ -3,6 +3,7 @@
 // (the backend trusts the client's `total`), so it must be reproduced faithfully:
 // base garment/size price + per-method surcharge, and first-item + additional-item
 // shipping resolved from the catalog product. Do NOT simplify to a naive sum.
+import { blankCandidates } from "@/lib/variant-resolve"
 import type { CatalogProduct } from "./api"
 
 // Global shipping fallbacks (orders.html ODM_SHIP_FIRST / ODM_SHIP_ADDL).
@@ -33,13 +34,23 @@ const num = (v: unknown): number => {
   return isNaN(n) ? NaN : n
 }
 
+/**
+ * THE THIRD COPY OF "WHICH BLANK IS THIS LINE", and the one the split was never applied to.
+ *
+ * `p.name === item.blank` is an exact match against the NAME, and the blank cell has held
+ * `EG-1001 - Classic Tee` since the grid and the import sheet started offering it — so an
+ * imported order estimated at $0 while the same line priced correctly on the server, which
+ * reads as the importer losing the prices. blankCandidates is the same splitter
+ * resolveProduct and matchProduct use: whole string first, then each half.
+ */
 function findProduct(item: PricingItem, catalog: PricedProduct[]): PricedProduct | undefined {
   const base = String(item.sku || "").split("-")[0]
+  const cands = item.blank ? blankCandidates(String(item.blank).trim().toLowerCase()) : []
   return catalog.find(
     (p) =>
       (Array.isArray(p.variantSkus) && p.variantSkus.some((v) => v && (typeof v === "string" ? v : v.sku) === item.sku)) ||
       (p.sku && base && String(p.sku).toUpperCase() === base.toUpperCase()) ||
-      (p.name && item.blank && p.name === item.blank)
+      (cands.length > 0 && [p.name, p.sku].some((v) => v != null && cands.includes(String(v).trim().toLowerCase())))
   )
 }
 

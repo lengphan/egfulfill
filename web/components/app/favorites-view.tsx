@@ -86,8 +86,8 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
        * CLAUDE.md §5: import shared logic, never re-derive it.
        */
       const built: CatalogProduct = f.supplier === "ss"
-        ? await ssCatalogProduct(f.id, { title: f.title, price: f.price, image: f.image, colors: f.colors })
-        : await ottoCatalogProduct(f.id, { name: f.title, price: f.price, image: f.image, colors: f.colors })
+        ? await ssCatalogProduct(f.id, { title: f.title, price: f.price, image: f.image, colors: f.colors, brand: f.brand })
+        : await ottoCatalogProduct(f.id, { name: f.title, price: f.price, image: f.image, colors: f.colors, brand: f.brand })
       // This tab saves straight through with no review step, so the sku the builders leave
       // unset has to be assigned here — a product without one can't be stocked or resolved.
       const product: CatalogProduct = built.sku ? built : { ...built, sku: nextEgSku(existing) }

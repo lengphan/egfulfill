@@ -28,6 +28,7 @@ import {
 } from "@/lib/order-import"
 import { createOrder, getOrders, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
+import { productLabel } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
@@ -105,7 +106,12 @@ async function downloadXlsxTemplate() {
   const live: Record<string, string[]> = {}
   try {
     const cat = await getCatalogProducts()
-    const names = [...new Set((cat ?? []).map((p) => String(p.name || "").trim()).filter(Boolean))].sort()
+    /* "SKU - NAME", the same string the grid writes and the Sheets master offers. The
+       .xlsx offered bare names, so a seller filling the downloaded workbook produced rows
+       in a shape the app's own grid no longer writes — and two garments with the same name
+       were two identical options. resolveProduct matches either half, so old sheets still
+       import exactly as they did. */
+    const names = [...new Set((cat ?? []).map((p) => productLabel(p)).filter(Boolean))].sort()
     const colors = [...new Set((cat ?? []).flatMap((p) => productColors(p)))].sort()
     const sizes = [...new Set((cat ?? []).flatMap((p) => productSizes(p)))]
     /* THE WORDS, NOT THE KEYS — the same change COLUMN_OPTIONS took, and this is the copy

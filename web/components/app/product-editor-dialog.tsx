@@ -17,6 +17,7 @@ import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-meth
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
+import { stripBrandPrefix } from "@/lib/supplier-catalog"
 import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
 import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
 import { printZoneOf, BASE_PRINT_IN, type PrintZone } from "@/lib/print-zone"
@@ -273,6 +274,20 @@ export function ProductEditorDialog({
  stockByColor?: Record<string, number> | null
 }) {
  const [name, setName] = useState("")
+  /**
+   * THE GARMENT'S BRAND — Gildan, Bella+Canvas, Otto — as its OWN field.
+   *
+   * Suppliers ship it welded to the front of the title ("Gildan Unisex Heavy Blend™ Crewneck
+   * Sweatshirt"), so every product read as the brand first and the garment second, and there
+   * was nothing to group, filter or publish on because the fact was buried in a string.
+   *
+   * NOT THE SUPPLIER. Who makes the blank is public (it's on the label); who we BUY it from
+   * is not, and that stays in `supplier` below — staff-only, published nowhere (§2.9). The
+   * import guards the difference: a supplier's name is never written here, because the SanMar
+   * feed does `brand || 'SanMar'` and would otherwise print who supplies us exactly when the
+   * real brand is missing.
+   */
+ const [brand, setBrand] = useState("")
   // OURS and THEIRS — see lib/sku.ts. Only `sku` ever reaches a marketplace or a seller.
  const [sku, setSku] = useState("")
   /**
@@ -509,6 +524,7 @@ export function ProductEditorDialog({
  const p = product
  const id = setTimeout(() => {
  setName(p?.name ?? "")
+ setBrand(String(p?.brand ?? ""))
       // A product that HAS a sku keeps it, always. Anything else is offered the next free
       // number, so the common case is "accept it and move on" rather than "invent one".
       //
@@ -881,6 +897,7 @@ export function ProductEditorDialog({
       ...(product ?? {}),
  id: product?.id ?? genId(newIdSeed),
  name: name.trim(),
+ brand: brand.trim() || undefined,
       // Never blank: an untyped sku falls back to the pre-filled next one, because a
       // product without a sku is one that silently can't be stocked or resolved.
  sku: cleanSku(sku) || cleanSku(nextSku ?? "") || undefined,
@@ -1092,6 +1109,24 @@ export function ProductEditorDialog({
             </div>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
+              {/* UNDER the name, because that is where it was taken FROM: the import lifts a
+ leading brand out of the supplier's title so the name is the garment and this
+ is the make. Both are free text — renaming either changes what the blank
+ READS and nothing about where the line goes (productLabel is a label, never a
+ key; stock is held against the sku and the cart groups by supplier). */}
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Brand</span>
+                {/* ON BLUR, NOT ON EVERY KEYSTROKE. Filling this on a product whose name still
+ leads with the make takes the make off the name — the whole point of the
+ field — but doing it per character would eat "G", then "Gi", and mangle the
+ name while it was being typed. Both fields stay editable, so the move is
+ visible and reversible; nothing is rewritten at save time behind the form. */}
+                <Input
+ value={brand}
+ onChange={(e) => setBrand(e.target.value)}
+ onBlur={(e) => setName((n) => stripBrandPrefix(n, e.target.value))}
+ placeholder="Gildan, Bella+Canvas…" className="h-9"
+                />
+              </label>
               {/* TWO SKUS, and the labels say which is which — the whole point is that one
  of them never leaves the factory. Ours is pre-filled for a new product;
  theirs is optional and only exists for a blank we buy in. */}

@@ -956,6 +956,11 @@ export function clearCatalog() {
 export type CatalogProduct = {
   id?: string | number
   name?: string
+  /** WHO MAKES THE GARMENT — Gildan, Bella+Canvas. Public: it is printed on the neck label.
+   *  NOT who we buy it from, which is `supplier` and is staff-only (§2.9); the importers
+   *  never write a supplier's name here, because `brand || 'SanMar'` would name our supplier
+   *  precisely when the real brand is missing. */
+  brand?: string
   /** Published in the shop-window catalogue, and the price shown there. Distinct from
    *  base_price, which is what an order actually charges. */
   inCatalog?: boolean

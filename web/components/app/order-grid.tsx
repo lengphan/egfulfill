@@ -34,7 +34,7 @@ import {
   type ImportRecord,
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
-import { resolveProduct } from "@/lib/variant-resolve"
+import { resolveProduct, productLabel } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles,
@@ -327,11 +327,9 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    */
   const productNames = useMemo(
     () => catalog
-      .map((c) => {
-        const name = String(c.name || "").trim()
-        const sku = String(c.sku || "").trim()
-        return name ? (sku ? `${sku} - ${name}` : name) : ""
-      })
+      // productLabel is the one spelling of this string — the line strip and the .xlsx
+      // template read the same helper, so the three can no longer drift apart.
+      .map((c) => productLabel(c))
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b)),
     [catalog],

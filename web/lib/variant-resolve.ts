@@ -39,11 +39,34 @@ export function variantSkusOf(p: CatalogProduct): string[] {
  * product whose NAME contains " - " resolving as it always did — splitting first would turn
  * "Adidas - Performance Polo" into a search for a product called "Adidas".
  */
-function blankCandidates(cell: string): string[] {
+export function blankCandidates(cell: string): string[] {
   const out = [cell]
   const at = cell.indexOf(" - ")
   if (at > 0) { out.push(cell.slice(0, at).trim(), cell.slice(at + 3).trim()) }
   return out.filter(Boolean)
+}
+
+/**
+ * HOW A BLANK IS WRITTEN DOWN, everywhere one is offered or shown: `EG-1001 - Classic Tee`.
+ *
+ * One helper because the string is a CONTRACT, not a presentation choice. The order grid
+ * writes it into the sheet column, the sheet's own dropdown offers it back, the line strip
+ * shows it, and both resolvers (resolveProduct here, matchProduct in server/src/pricing.js)
+ * split it to find the product. A second spelling of it anywhere is a line that resolves on
+ * one screen and prices at zero on another — which is exactly the bug the split was added
+ * to fix.
+ *
+ * IT IS A LABEL, NEVER A KEY. Nothing routes on it: stock is held against `p.sku`, the
+ * purchase cart groups by supplier, publish writes `p.sku`. So renaming a product or giving
+ * it a new sku in the editor changes what this reads and nothing about where the line goes —
+ * the old string still resolves through `name`, and the supplier code still resolves through
+ * the alias in variantSkusOf.
+ */
+export function productLabel(p: Pick<CatalogProduct, "name" | "sku"> | null | undefined): string {
+  const name = String(p?.name ?? "").trim()
+  const sku = String(p?.sku ?? "").trim()
+  if (!name) return sku
+  return sku ? `${sku} - ${name}` : name
 }
 
 export function resolveProduct(item: OrderItem, catalog: CatalogProduct[]): CatalogProduct | null {

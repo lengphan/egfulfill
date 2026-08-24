@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
-import { resolveProduct, colorsOf, methodsOf, sizesOf } from "@/lib/variant-resolve"
+import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel } from "@/lib/variant-resolve"
 import { PRODUCT_METHODS } from "@/lib/print-method"
 import { getUser } from "@/lib/auth"
 import { VariantField } from "@/components/app/variant-field"
@@ -41,7 +41,14 @@ export function VariantPicker({
   const isStaff = (getUser()?.role || "seller") !== "seller"
 
   const product = useMemo(() => resolveProduct(item, catalog), [item, catalog])
-  const blankLabel = product?.name || item.blank || ""
+  /**
+   * THE BLANK, AS "SKU - NAME" — the same string the order grid writes and the import
+   * sheet's dropdown offers (productLabel). This field showed the NAME alone, so the one
+   * strip a seller reads on their own order disagreed with the two places the same value is
+   * picked, and a catalogue with three cuts of one shirt showed three identical rows.
+   * The sku half is what tells them apart, and it is the half a seller quotes at us.
+   */
+  const blankLabel = product ? productLabel(product) : item.blank || ""
   // MEMOISED, all four. These were plain calls in the render body, so every keystroke or
   // parent re-render rebuilt them — and one of these pickers is mounted per LINE, on a
   // board that can hold hundreds. colorsOf/sizesOf/methodsOf each walk the product, and
@@ -96,7 +103,7 @@ export function VariantPicker({
 
   // Keep a blank the catalog no longer lists so an existing line can't silently lose it.
   const blankOptions = useMemo(() => {
-    const names = catalog.map((p) => String(p.name ?? "")).filter(Boolean)
+    const names = catalog.map((p) => productLabel(p)).filter(Boolean)
     return blankLabel && !names.includes(blankLabel) ? [blankLabel, ...names] : names
   }, [catalog, blankLabel])
 
@@ -131,7 +138,10 @@ export function VariantPicker({
   // Picking a blank clears colour/size/method that don't exist on the new product, so a
   // stale "Navy" from the previous blank can't linger and mis-price.
   const pickBlank = (name: string) => {
-    const p = catalog.find((x) => String(x.name) === name)
+    // The option is the LABEL now. Matched on the label first and on the bare name second,
+    // so the row kept for a blank the catalogue no longer lists — which is whatever string
+    // the line already carried — still finds its product if one exists.
+    const p = catalog.find((x) => productLabel(x) === name) ?? catalog.find((x) => String(x.name) === name)
     const keep = (v: string | undefined, opts: string[]) => (v && opts.includes(v) ? v : "")
     save({
       blank: name,

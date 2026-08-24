@@ -289,10 +289,12 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  setAddingId(keyOf(it)); setMsg(null)
  try {
  const product = it.supplier === "ss"
-        ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: colorNames(it.ss.colors) })
+        // `brand` travels with the row: it is what the builders lift OUT of the title into
+        // the product's own Brand field, and Otto's style detail carries none of its own.
+        ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: colorNames(it.ss.colors), brand: it.ss.brand })
  : it.supplier === "otto"
-          ? await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
- : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.fullImage || it.sanmar.image, colors: it.sanmar.colors ?? [] })
+          ? await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors, brand: it.otto.brand })
+ : await sanmarCatalogProduct(it.id, { name: it.sanmar.name, price: it.sanmar.price, image: it.sanmar.fullImage || it.sanmar.image, colors: it.sanmar.colors ?? [], brand: it.sanmar.brand })
  setPreview(product); setPreviewKey(keyOf(it))
       // OUR sku, offered in the review step. The builders deliberately leave `sku` unset —
       // the supplier's code belongs in supplierSku, because publish writes `sku` onto the
