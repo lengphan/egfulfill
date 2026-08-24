@@ -1225,9 +1225,13 @@ export function DesignCanvasDialog({
    * only the UI half.
    */
  const [isStaff, setIsStaff] = useState(false)
+  /** Admin is the escape hatch on every zone rule in this app (see the artwork and file
+   *  delete routes), so the window has to know which one it is looking at. */
+ const [isAdmin, setIsAdmin] = useState(false)
  useEffect(() => {
  const t = setTimeout(() => {
  const role = getUser()?.role
+ setIsAdmin(role === "admin")
  setIsStaff(role === "admin" || role === "operator" || role === "warehouse" || role === "designer")
     }, 0)
  return () => clearTimeout(t)
@@ -2684,9 +2688,15 @@ export function DesignCanvasDialog({
                        name, and this row is DOWNLOADING — the same spinner would be saying
                        the opposite of what is happening. */
                     onDownload: () => void downloadFile(f.designId, f.name),
-                    /* The same ✕ the artwork row above has, on the same terms. Undefined
-                       rather than disabled for a seller: the row is still theirs to open. */
-                    onRemove: isStaff && !filesLocked ? () => void removeLineFile(f) : undefined,
+                    /* THE SAME ✕ THE ARTWORK ROW ABOVE HAS, ON THE SAME TERMS — which is what
+                       `filesLocked` already encodes: before submit the files are the SELLER's,
+                       after it they are the factory's, and admin is the escape hatch.
+                       `isStaff &&` was on top of that, and the two together meant NOBODY could
+                       remove a file from an unsubmitted order: a seller failed the staff test,
+                       and staff are locked out pre-submit by the rule itself. The .EMB you just
+                       uploaded by mistake had a download button and no way out.
+                       Undefined rather than disabled: the row is still theirs to open. */
+                    onRemove: !filesLocked || isAdmin ? () => void removeLineFile(f) : undefined,
                   }}
                 />
               ))}

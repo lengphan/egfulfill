@@ -438,11 +438,53 @@ export function designFilesRoutes(app, requireAuth) {
   // removed' row in the tag's history so a file appearing then vanishing is explained, not
   // a mystery. No ledger touch: removing the record is not a refund (charge/refund ride the
   // wallet on purchase/cancel, not on a staff file cleanup).
+  /**
+   * REMOVE A FILE FROM A LINE — the same zones the ARTWORK delete already uses, not a
+   * stricter rule of its own.
+   *
+   * This was `staff only`, and between the two of them nobody could remove a file from an
+   * unsubmitted order at all: a seller failed the staff test, and staff are locked OUT of a
+   * pre-submit order by the zone rule (DELETE /api/orders/:id/designs) because it is still
+   * the seller's draft. So the ✕ was absent on the one file people most often want to swap
+   * — the .EMB they just uploaded by mistake — and the answer was to delete the order.
+   *
+   * The zones, verbatim from the artwork route so the two cannot drift:
+   *   before submit  the order is the SELLER's — they may change their own files; staff
+   *                  keep their hands off, admin excepted
+   *   after submit   it is in production — the FACTORY's, and the seller asks in chat
+   *   admin          the escape hatch, as everywhere else here
+   *
+   * A file with no order (the design library) has no owner to check against and stays
+   * staff-only.
+   *
+   * WHAT IT DOES NOT DO: it does not touch design_charged_at or reverse a charge. If a check
+   * fee was billed, a person opened that file and looked at it; deleting it afterwards does
+   * not give the time back. Same rule, and the same sentence, as the artwork route.
+   */
   app.delete('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const designId = String(req.params.designId || '');
     const row = await q('select order_id, sku, file_name, kind from design_file_data where design_id=$1', [designId]).then((r) => r.rows[0]);
     if (!row) { reply.code(404); return { error: 'File not found.' }; }
+    const staff = isStaff(req.user);
+    const admin = !!req.user && req.user.role === 'admin';
+    if (!row.order_id) {
+      if (!staff) { reply.code(403); return { error: 'staff only' }; }
+    } else if (!admin) {
+      // OWNERSHIP FIRST, so a seller can never reach another seller's file by id.
+      if (!staff) {
+        const mine = await ownerOfOrder(row.order_id, null);
+        const me = await effectiveSeller(req.user);
+        if (!mine || !me || String(mine) !== String(me)) { reply.code(403); return { error: 'forbidden' }; }
+      }
+      const ord = (await q('select factory_status from orders where id=$1', [row.order_id])).rows[0];
+      const preSubmit = ['', 'new', 'draft'].includes(String((ord && ord.factory_status) || ''));
+      if (staff ? preSubmit : !preSubmit) {
+        reply.code(409);
+        return { error: staff
+          ? 'This order is still with the seller — their files are theirs to change until it is submitted.'
+          : 'This order is in production, so its files are settled. Ask us to change them.' };
+      }
+    }
     await q('delete from design_file_data where design_id=$1', [designId]);
     if (row.order_id) {
       audit(req, 'design_file.removed', {
