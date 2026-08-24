@@ -2053,7 +2053,17 @@ export function OrdersHub() {
  items: (
                   <div className="flex min-w-0 items-center gap-2.5">
                     {items.length > 0
-                      ? <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />
+                      /* ONE PHOTO PER ORDER ROW, matching the seller board.
+                         Three overlapping 72px thumbs of similar artwork read as one wide
+                         smudge at row height — the stack's only job is telling you where one
+                         tile ends and the next begins, and at this size it cannot. The row
+                         is a PARENT: it says which order this is, and one clear picture does
+                         that better than three unclear ones.
+                         showExtra off because the "+2" is a full-size tile, so keeping it
+                         would leave two tiles in a cell that is meant to hold one. The count
+                         is not lost — the Units column carries it, its tooltip names the
+                         lines, and expanding the row lists every one of them. */
+                      ? <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={1} showExtra={false} />
  : <span className="text-xs text-muted-foreground">—</span>}
                   </div>
                 ),

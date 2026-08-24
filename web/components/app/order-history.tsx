@@ -1,6 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { CaretDown } from "@phosphor-icons/react"
+import { Button } from "@/components/ui/button"
 import { SectionCard } from "@/components/app/section-card"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { getOrderHistory, type AuditRow, type OrderItem } from "@/lib/api"
@@ -42,7 +44,26 @@ export function OrderHistory({ orderId, items = [] }: { orderId: string; items?:
     if (!orderId || !allowed) return
     getOrderHistory(orderId).then((r) => setRows(r ?? [])).catch(() => setRows([]))
   }, [orderId, allowed])
-  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+
+  /**
+   * COLLAPSED, AND IT DOES NOT FETCH UNTIL IT IS OPENED.
+   *
+   * This is the RECORD — worth having, rarely worth reading. Expanded by default it pushed
+   * the factory note and the activity thread, which are the two things anyone actually works
+   * from, below the fold of a long page.
+   *
+   * The fetch moved onto the toggle rather than into an effect keyed on `open`. §2.8: an
+   * effect must never fetch on a condition its own fetch can satisfy, and the safe way to
+   * say "load this now" is an EVENT — a click cannot recur on its own. It also takes one
+   * audit query off every order page load, since most of them never open this.
+   */
+  const [open, setOpen] = useState(false)
+  const toggle = () => {
+    setOpen((v) => {
+      if (!v && rows === null) load()
+      return !v
+    })
+  }
 
   // A seller gets 403 → empty. Rendering an empty card would imply nothing happened,
   // which is a different claim from "you can't see this", so it renders nothing at all.
@@ -55,7 +76,18 @@ export function OrderHistory({ orderId, items = [] }: { orderId: string; items?:
   return (
     <SectionCard
       title="Order history"
+      actions={
+        /* A control, not a caption: it SAYS which way it will go, and the caret turns so
+           the state is readable without reading the word. Ghost because opening a record
+           is a minor action next to anything else on this page (§4: the variants are a
+           hierarchy). */
+        <Button variant="ghost" size="sm" onClick={toggle} aria-expanded={open}>
+          {open ? "Hide" : "Show"}
+          <CaretDown size={13} weight="bold" className={"transition-transform " + (open ? "rotate-180" : "")} />
+        </Button>
+      }
     >
+      {!open ? null : (
       <div className="max-h-72 overflow-y-auto p-3">
         {/* BARE, because this is already inside a SectionCard. `variant="card"` gave the
             feed its own rounded border, so the panel drew a box, and the list drew another
@@ -68,6 +100,7 @@ export function OrderHistory({ orderId, items = [] }: { orderId: string; items?:
           empty="Nothing recorded for this order yet — changes from here on will appear."
         />
       </div>
+      )}
     </SectionCard>
   )
 }

@@ -1023,9 +1023,6 @@ export default function OrderDetailPage() {
             </SectionCard>
           )}
 
-          {/* The RECORD, distinct from the conversation below it. */}
-          <OrderHistory orderId={String(id)} items={items} />
-
           {/* THE FACTORY NOTE, above the activity thread and deliberately separate from it.
               One field, overwritten, staff-only: "the thing to know about this order".
               The thread below is the sequence of events. Conflating them is how a note
@@ -1573,6 +1570,20 @@ export default function OrderDetailPage() {
             <OrderRefundPanel orderId={id} />
             </>
           )}
+
+          {/*
+            * THE RECORD, at the FOOT of the page and collapsed.
+            *
+            * It used to sit in the left column above the factory note and the activity
+            * thread — so the two panels anyone actually works from were pushed down by a
+            * scrolling audit list nobody reads on most visits. Worth having, rarely worth
+            * looking at: that is a thing you put last and closed, not first and open.
+            *
+            * Under the money rather than beside it because this column already runs
+            * Customer -> Shipping -> Summary -> Refund, which is the order the questions
+            * come in. "What has happened to this order" is the one you ask last.
+            */}
+          <OrderHistory orderId={String(id)} items={items} />
         </div>
       </div>
 
