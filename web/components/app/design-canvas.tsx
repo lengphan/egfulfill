@@ -2183,26 +2183,13 @@ export function DesignCanvasDialog({
                   </button>
                 </div>
 
-                {/* THE RECEIPT. Same row the rest of the app prints, so a file reads the same
-                    here as it does on an order line. */}
-                <div className="mt-2 border-t border-border pt-2">
-                  {lineFiles.length === 0 ? (
-                    <p className="px-2 py-1 text-2xs text-muted-foreground">Nothing on this line yet.</p>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      {lineFiles.map((f) => (
-                        <FileRow
-                          key={f.designId}
-                          file={{
-                            name: f.name || f.kind,
-                            note: f.kind,
-                            onDownload: () => void downloadFile(f.designId, f.name),
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* NO LIST HERE, ON PURPOSE.
+                    "Files on this line · N" already sits under the stage: every name, the
+                    kind, and a download on each row, always visible without opening anything.
+                    Printing them again inside this panel would be two lists of one thing —
+                    which is the fault this panel was made to remove, not one to repeat. The
+                    badge on the trigger is the same count as that heading, so the door agrees
+                    with the list it belongs to. */}
               </PopoverContent>
             </Popover>
             {/**

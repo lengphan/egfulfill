@@ -178,15 +178,12 @@ export function MachineFilesPanel() {
         </div>
       ) : list.length === 0 ? null : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((f) => (
+          {list.map((f) => {
+            /** The format, or "" when the displayed name already ends in it. */
+            const ext = (f.fileName?.split(".").pop() || f.kind || "").slice(0, 4)
+            const fmt = ext && !f.name.toLowerCase().endsWith("." + ext.toLowerCase()) ? ext : ""
+            return (
             <div key={f.id} className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5">
-              {/* A STITCH FILE HAS NO PREVIEW, and pretending otherwise is worse than the
-                  mark. We cannot render an .EMB — that is the whole reason the designer
-                  needed a separate "the file arrived" line — so the tile carries the format
-                  as a word instead of a picture that would be a lie. */}
-              <span className="grid size-11 shrink-0 place-items-center rounded-lg border border-border bg-muted text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {(f.fileName?.split(".").pop() || f.kind).slice(0, 4)}
-              </span>
               <div className="min-w-0 flex-1">
                 {editId === f.id ? (
                   <Input
@@ -212,6 +209,24 @@ export function MachineFilesPanel() {
                   </button>
                 )}
                 <div className="mt-0.5 flex items-center gap-1.5">
+                  {/* NO THUMBNAIL TILE. A stitch file has no preview, so the row carried a
+                      44px bordered well with the word "EMB" in it — sitting immediately left
+                      of a filename ENDING in .EMB. Two statements of one fact, and the one
+                      wearing a frame read as a picture that had failed to load, which is the
+                      thing a placeholder is supposed to prevent.
+
+                      AND ONLY WHEN THE NAME DOES NOT ALREADY SAY IT. Moving the word into
+                      this line was the same duplication one row lower — "jN purple.EMB" above
+                      "EMB · 154 KB". The name usually IS the filename, so the format is
+                      normally silent here; it appears when a rename has dropped the extension,
+                      which is the one case where the row would otherwise not say what the file
+                      is. */}
+                  {fmt && (
+                    <>
+                      <span className="truncate text-2xs uppercase tracking-wide text-muted-foreground">{fmt}</span>
+                      <span className="text-2xs text-muted-foreground/50" aria-hidden>·</span>
+                    </>
+                  )}
                   <span className="truncate text-2xs tabular-nums text-muted-foreground">
                     {formatBytes(f.bytes) ?? "—"}
                   </span>
@@ -246,7 +261,8 @@ export function MachineFilesPanel() {
                 </Button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </SectionCard>
