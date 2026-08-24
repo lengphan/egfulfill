@@ -2176,8 +2176,13 @@ export function DesignCanvasDialog({
                         <Button size="sm" variant="outline" onClick={() => { setLibSource("templates"); setLibOpen(true) }}>
                           Browse templates
                         </Button>
+                        {/* PEERS, SO THEY LOOK LIKE PEERS. Browse and Save are the two things
+                            you can do with a template, and one was `outline` beside the
+                            other's `ghost` — a hierarchy where there is none, which reads as
+                            two unrelated controls rather than a pair. The variants are a
+                            hierarchy, not a palette (CLAUDE.md §4). */}
                         {designUrl && (
-                          <Button size="sm" variant="ghost" disabled={tplBusy}
+                          <Button size="sm" variant="outline" disabled={tplBusy}
                             onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}>
                             Save this placement
                           </Button>
