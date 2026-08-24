@@ -1146,11 +1146,26 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    */
   q(`alter table lookbook_overrides
        add column if not exists colors jsonb,
-       add column if not exists sizes  jsonb`).catch(() => {});
+       add column if not exists sizes  jsonb,
+       add column if not exists color_fix jsonb`).catch(() => {});
+  /*
+   * color_fix — PER COLOURWAY: a replacement photo, a zoom, a vertical nudge.
+   *
+   * `{ "<colour name>": { zoom, focusY, image } }`. Supplier swatch photography is not
+   * uniform: on one style half the range is a photograph of the cap and the other half is a
+   * flat crop of the fabric, and there is nothing to do about that upstream. So the same two
+   * numbers the product editor already uses (lib/product-framing — zoom 100–300, focusY
+   * 0–100, 50 centre) apply per swatch, and a colourway whose shot is unusable can be given
+   * a different one.
+   *
+   * KEYED BY NAME for the same reason the picks are — an index points at a different garment
+   * the next time the range moves. A key that no longer matches a colourway is simply never
+   * read; it is not an error, and it comes back if the colour does.
+   */
 
   /** Every override, as source:ref → row. One read per lookbook rather than one per style. */
   const lookbookOverrides = async () => {
-    const r = await q('select source, ref, name, description, image, colors, sizes from lookbook_overrides')
+    const r = await q('select source, ref, name, description, image, colors, sizes, color_fix from lookbook_overrides')
       .catch(() => ({ rows: [] }));
     const m = new Map();
     for (const row of r.rows) m.set(`${row.source}:${row.ref}`, row);
@@ -1176,6 +1191,8 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const list = (v) => (Array.isArray(v) && v.length ? v.map((x) => String(x)) : null);
     const pickColors = list(ov.colors);
     const pickSizes = list(ov.sizes);
+    const colorFix = ov.color_fix && typeof ov.color_fix === 'object' && Object.keys(ov.color_fix).length
+      ? ov.color_fix : null;
     return {
       ...style,
       name: ov.name != null && ov.name !== '' ? ov.name : style.name,
@@ -1183,9 +1200,10 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       image: ov.image != null && ov.image !== '' ? ov.image : style.image,
       pickColors,
       pickSizes,
+      colorFix,
       // Said out loud so the sheet can mark an edited page and offer to put it back. A
       // document you cannot tell you have altered is one you cannot check.
-      edited: !!(ov.name || ov.description != null || ov.image || pickColors || pickSizes),
+      edited: !!(ov.name || ov.description != null || ov.image || pickColors || pickSizes || colorFix),
     };
   };
 
@@ -1317,7 +1335,9 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
          * price for a method we cannot run is worse than a gap: it is a number a partner can
          * place an order against.
          */
-        priceByMethod: priceByMethodOf({ data: d, base_price: row.base_price }, fees,
+        /* catalog_price travels with the row — see priceByMethodOf. Leaving it out is what
+           made the headline and this table disagree by exactly the markup. */
+        priceByMethod: priceByMethodOf({ data: d, base_price: row.base_price, catalog_price: row.catalog_price }, fees,
           Array.isArray(d.methods) ? d.methods : (d.method ? [d.method] : [])),
         sizes: Array.isArray(d.sizes) ? d.sizes
           : (Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : []),
@@ -1394,6 +1414,19 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       // A picked supplier style has no catalog_products row, so there is no seller price for
       // it — null, not 0, because "we have not priced this" is not "it is free".
       sellerPrice: null,
+      /**
+       * AND IT HAS NO METHODS, so it quotes nothing per technique.
+       *
+       * This field was absent entirely on supplier styles, which sent the price table down a
+       * fallback that printed the BLANK price in the PRINTING column — a decorated-goods
+       * heading over an undecorated number, on the one page a partner orders from. Present
+       * and null is the honest version of the same row: N/A, the way any style we cannot
+       * confirm a technique for reads.
+       *
+       * A picked style earns real figures the moment somebody sets its methods, exactly like
+       * one of our own products.
+       */
+      priceByMethod: priceByMethodOf({ data: {}, catalog_price: p.catalog_price }, fees, []),
       sizes: p.sizes || [],
       colors: coloursByStyle.get(p.ref) || [],
       specs: specsByStyle.get(p.ref) || [],
