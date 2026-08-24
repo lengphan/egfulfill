@@ -4,7 +4,7 @@ import { Check } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import { LabelRule, CutoutFigure, SpecStrip, CAPS } from "@/components/marketing/bold-figure"
-import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * Features, in the house style. The same six capabilities and the same copy — restated as a
@@ -30,6 +30,8 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
   const { on: editing } = useEditMode()
   /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
   const figureSrc = useEditableSrc("featuresPage.figure.image", p.figure.image)
+  const figureScale = useEditableNum("featuresPage.figure.imageScale", p.figure.imageScale)
+  const figureRotate = useEditableNum("featuresPage.figure.imageRotate", p.figure.imageRotate)
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
@@ -69,6 +71,8 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
               alt={p.figure.imageAlt}
               ghost={p.figure.ghostWord}
               ghostPath="featuresPage.figure.ghostWord"
+              scale={figureScale}
+              rotate={figureRotate}
               callouts={p.figure.callouts}
               calloutsPath="featuresPage.figure.callouts"
             />

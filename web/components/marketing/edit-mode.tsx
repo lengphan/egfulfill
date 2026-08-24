@@ -2,11 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CheckCircle, CircleNotch, PencilSimple, Sparkle, X } from "@phosphor-icons/react"
+import { ArrowClockwise, ArrowCounterClockwise, ArrowUUpLeft, CheckCircle, CircleNotch, MagnifyingGlassMinus, MagnifyingGlassPlus, PencilSimple, Sparkle, X } from "@phosphor-icons/react"
 import { getUser } from "@/lib/auth"
 import { setSiteContent, uploadHeroImage } from "@/lib/api"
 import { downscaleImage } from "@/lib/image-downscale"
-import type { SiteContent } from "@/lib/site-content"
+import { FIGURE_SCALE_MAX, FIGURE_SCALE_MIN, type SiteContent } from "@/lib/site-content"
 import { CopyBubble, GenerateBubble, kindForPath } from "@/components/marketing/generate-bubble"
 
 /**
@@ -324,6 +324,31 @@ export function useEditableSrc(path: ContentPath, fallback: string): string {
 }
 
 /**
+ * THE SAME THING FOR A NUMBER — how the picture sits, rather than which picture it is.
+ *
+ * Identical reasoning to useEditableSrc: the page was handed the SERVER's value, so pressing
+ * rotate wrote to the draft and the figure did not move until Save. A control that appears to
+ * do nothing is worse than no control.
+ */
+export function useEditableNum(path: ContentPath, fallback: number): number {
+  const { on, read } = useEditMode()
+  if (!on) return fallback
+  const v = read(path)
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback
+}
+
+/** The two siblings that say how a figure sits. `hero.image` → `hero.imageScale`. Derived
+ *  rather than passed, so a new EditableImage cannot forget to wire them; a path that is not
+ *  a figure's simply gets no transform controls. */
+function transformPaths(path: ContentPath): { scale: ContentPath; rotate: ContentPath } | null {
+  if (!path.endsWith(".image")) return null
+  return { scale: `${path}Scale`, rotate: `${path}Rotate` }
+}
+
+/** Degrees, kept in -180..180 so pressing one way repeatedly never runs off to 7200. */
+function wrapDeg(d: number) { return ((d + 180) % 360 + 360) % 360 - 180 }
+
+/**
  * The figure, replaceable from the page.
  *
  * This is the round trip the whole thing exists to remove, so it accepts a file the two ways
@@ -343,6 +368,21 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
    *  not behind a link to the Studio. */
   const [asking, setAsking] = useState(false)
   const current = read(path)
+  /* How this figure sits. Derived from the path so no call site has to wire it — see
+     transformPaths. A path that is not a figure's yields null and the group is not drawn. */
+  const tp = transformPaths(path)
+  const rawScale = tp ? read(tp.scale) : undefined
+  const rawRotate = tp ? read(tp.rotate) : undefined
+  const scaleV = typeof rawScale === "number" && Number.isFinite(rawScale) ? rawScale : 1
+  const rotateV = typeof rawRotate === "number" && Number.isFinite(rawRotate) ? rawRotate : 0
+  const hasImage = typeof current === "string" && current !== ""
+  const moved = scaleV !== 1 || rotateV !== 0
+  /* Clamped HERE as well as in the normalizer: a disabled button is how the control tells
+     you it is at the end of its range, and 0.1 steps on a float need the rounding or the
+     readout reads 119.99999%. */
+  const zoom = (d: number) => tp && write(tp.scale,
+    Math.round(Math.min(FIGURE_SCALE_MAX, Math.max(FIGURE_SCALE_MIN, scaleV + d)) * 10) / 10)
+  const spin = (d: number) => tp && write(tp.rotate, wrapDeg(rotateV + d))
 
   const take = async (file: File | undefined) => {
     if (!file) return
@@ -404,6 +444,44 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
             >
               Remove
             </button>
+          )}
+          {/* HOW IT SITS — only once there is something to sit. A rotate button over an empty
+              figure is a control for nothing, and the bar is long enough already. Icons with
+              `title`, which §4 names as where a control explains itself; a sentence under any
+              of these would be the defect that section is about. */}
+          {hasImage && tp && !busy && (
+            <>
+              <span aria-hidden className="h-4 w-px bg-border" />
+              <button type="button" onClick={() => spin(-15)} title="Rotate left 15°"
+                className="rounded-full p-1.5 transition-colors hover:bg-accent">
+                <ArrowCounterClockwise size={13} weight="bold" /><span className="sr-only">Rotate left</span>
+              </button>
+              <button type="button" onClick={() => spin(15)} title="Rotate right 15°"
+                className="rounded-full p-1.5 transition-colors hover:bg-accent">
+                <ArrowClockwise size={13} weight="bold" /><span className="sr-only">Rotate right</span>
+              </button>
+              <button type="button" onClick={() => zoom(-0.1)} disabled={scaleV <= FIGURE_SCALE_MIN}
+                title="Smaller" className="rounded-full p-1.5 transition-colors hover:bg-accent disabled:opacity-40">
+                <MagnifyingGlassMinus size={13} weight="bold" /><span className="sr-only">Smaller</span>
+              </button>
+              {/* The value you are setting, not a caption about it. */}
+              <span className="min-w-[2.75rem] text-center text-xs tabular-nums text-muted-foreground">
+                {Math.round(scaleV * 100)}%
+              </span>
+              <button type="button" onClick={() => zoom(0.1)} disabled={scaleV >= FIGURE_SCALE_MAX}
+                title="Bigger" className="rounded-full p-1.5 transition-colors hover:bg-accent disabled:opacity-40">
+                <MagnifyingGlassPlus size={13} weight="bold" /><span className="sr-only">Bigger</span>
+              </button>
+              {/* A rotation has no layout answer, so it can push the figure past its box. The
+                  way back is a button, not a guess at what the original angle was. */}
+              {moved && (
+                <button type="button" onClick={() => { write(tp.scale, 1); write(tp.rotate, 0) }}
+                  title="Back to as generated"
+                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                  <ArrowUUpLeft size={13} weight="bold" /><span className="sr-only">Reset size and rotation</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

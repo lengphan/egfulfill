@@ -3,7 +3,7 @@
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import { LabelRule, CutoutFigure, SpecStrip, NumberedCards, CAPS } from "@/components/marketing/bold-figure"
-import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * How it works. Three steps, then the seller-facing status flow.
@@ -50,6 +50,8 @@ export function BoldHow({ content }: { content: SiteContent }) {
   const { on: editing } = useEditMode()
   /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
   const figureSrc = useEditableSrc("howPage.figure.image", p.figure.image)
+  const figureScale = useEditableNum("howPage.figure.imageScale", p.figure.imageScale)
+  const figureRotate = useEditableNum("howPage.figure.imageRotate", p.figure.imageRotate)
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
@@ -100,6 +102,8 @@ export function BoldHow({ content }: { content: SiteContent }) {
               alt={p.figure.imageAlt}
               ghost={p.figure.ghostWord}
               ghostPath="howPage.figure.ghostWord"
+              scale={figureScale}
+              rotate={figureRotate}
               callouts={p.figure.callouts}
               calloutsPath="howPage.figure.callouts"
             />
