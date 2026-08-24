@@ -166,10 +166,21 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
    * HOW THE PICTURE SITS. Both default to the identity, so every existing call renders
    * byte-identically and nothing had to be passed at the sites that don't offer the control.
    *
-   * `scale` multiplies the HEIGHT CAP rather than applying a CSS transform: a transform
-   * leaves the layout box at the old size, so a scaled-up figure silently overlaps the
-   * callouts beside it while the grid still reserves the smaller space. Multiplying the cap
-   * reflows, which is what "resize" means to the person pressing the button.
+   * `scale` multiplies BOTH CAPS — the height and the width — rather than applying a CSS
+   * transform: a transform leaves the layout box at the old size, so a scaled-up figure
+   * silently overlaps the callouts beside it while the grid still reserves the smaller
+   * space. Multiplying the caps reflows, which is what "resize" means to the person
+   * pressing the button.
+   *
+   * IT HAS TO BE BOTH, and shipping only the height was a real defect. Whichever cap binds
+   * FIRST decides the rendered size: a tall cut-out is height-bound and grew, but a wide one
+   * is pinned by `max-w-full` at 100% of its column, so the height cap rose, nothing moved,
+   * and the readout climbed to 200% over an unchanged picture. A control that reports a
+   * change it did not make is worse than no control. Seen live on a landscape hero.
+   *
+   * Past 100% the picture can therefore extend beyond its column. That is the honest meaning
+   * of "bigger" once the column is already full, it is visible the moment it happens, and
+   * the way back is one press of reset.
    *
    * `rotate` genuinely is a transform — there is no layout answer to an angle — so a rotated
    * figure can extend past its box. That is the honest rendering of the instruction, and the
@@ -246,10 +257,13 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
             <img
               src={src}
               alt={alt}
-              className="w-auto max-w-full object-contain"
+              className="w-auto object-contain"
               /* The cap the class used to carry, multiplied — see the note on `scale`. */
               style={{
                 maxHeight: `${(tall ? 34 : 24) * scale}rem`,
+                /* 100% at scale 1 is exactly what `max-w-full` did, so an unscaled figure is
+                   unchanged; it is only past 1 that this is what makes the press do anything. */
+                maxWidth: `${100 * scale}%`,
                 ...(rotate ? { transform: `rotate(${rotate}deg)` } : null),
               }}
             />
