@@ -841,9 +841,13 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         )}
                       </Editable>
                     </div>
-                    <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                      {decoratedFrom(st) == null ? "not quotable" : "printed, per unit"}
-                    </div>
+                    {/* NO CAPTION UNDER THE FIGURE. It read "PRINTED, PER UNIT" — a line
+                        added to say which question the number answers, back when the headline
+                        was the blank and the price list was the decorated goods and nothing
+                        distinguished them. That ambiguity is gone: the two are computed off
+                        one base now, and FROM already says this is the lowest of several. A
+                        second line restating it is the caption under a control §4 keeps
+                        deleting. The price list is where the breakdown lives. */}
                     {/* A REFUSAL CARRIES ITS REASON — §4. Only in edit mode, and only when
                         there is genuinely nothing to quote: this is the page you opened the
                         mode to fix, and "N/A" on its own does not say what to do about it. */}
