@@ -13,6 +13,8 @@ import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
 import { LookbookPickDialog } from "@/components/app/lookbook-pick-dialog"
 import { HEX } from "@/components/marketing/bold-kit"
+import { framingStyle } from "@/lib/product-framing"
+import { LookbookFrameDialog, type ColorFix } from "@/components/app/lookbook-frame-dialog"
 
 /**
  * THE PRICE THE SHEET PRINTS — the trade rate, or what a seller pays when there isn't one.
@@ -65,7 +67,14 @@ const money = (n: number | null | undefined) =>
  * garment is a picture of this garment, and the page was printing an empty plate while
  * holding twelve photographs of the thing it was describing.
  */
-const heroImage = (st: LookbookStyle) => st.image || st.colors.find((c) => c.image)?.image || ""
+const heroImage = (st: LookbookStyle) => {
+  if (st.image) return st.image
+  // The fallback is a COLOURWAY's photo, so it honours that colourway's replacement. Reading
+  // c.image straight would put the picture somebody rejected on the largest tile of the page,
+  // while the swatch three inches away showed the one they chose instead.
+  const c = st.colors.find((x) => st.colorFix?.[x.name]?.image || x.image)
+  return c ? (st.colorFix?.[c.name]?.image || c.image) : ""
+}
 
 /**
  * A FIELD YOU CAN REWRITE WITHOUT LEAVING THE SHEET.
@@ -292,6 +301,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
   /** Which page's colourways or sizes are being chosen. One dialog for every sheet — the
    *  style travels with the request rather than the dialog being mounted per page. */
  const [picking, setPicking] = useState<{ st: LookbookStyle; kind: "colors" | "sizes" } | null>(null)
+  /** Which colourway's picture is being fixed. `source` is the ORIGINAL photo, so Reset has
+   *  something to go back to after a replacement. */
+ const [framing, setFraming] = useState<{ st: LookbookStyle; color: string; source: string } | null>(null)
  const canEdit = !exportId
  const fileFor = useRef<LookbookStyle | null>(null)
  const fileInput = useRef<HTMLInputElement | null>(null)
@@ -310,7 +322,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  const patch = async (
  st: LookbookStyle,
  body: { name?: string | null; description?: string | null; image?: string | null; price?: number | null
- colors?: string[] | null; sizes?: string[] | null },
+ colors?: string[] | null; sizes?: string[] | null
+ colorFix?: Record<string, ColorFix> | null },
  optimistic: Partial<LookbookStyle>,
   ) => {
  if (!st.source) {
@@ -378,6 +391,30 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     <LookbookBrandingDialog open={brandOpen} onOpenChange={setBrandOpen} brand={brand} onSaved={setBrand} />
   )
 
+  /* One framing dialog for the book, same reason as the picker below it. The map is sent
+     WHOLE — the route replaces rather than merges, so a colour reset to its defaults simply
+     is not in it and leaves nothing behind. */
+ const frameDialog = framing && (
+    <LookbookFrameDialog
+ open
+ onOpenChange={(v) => { if (!v) setFraming(null) }}
+ busy={savingRef === framing.st.ref}
+ colorName={framing.color}
+ styleName={framing.st.name}
+ source={framing.source}
+ maxImageMB={MAX_IMAGE_MB}
+ fix={framing.st.colorFix?.[framing.color]}
+ onSave={(next) => {
+ const map: Record<string, ColorFix> = { ...(framing.st.colorFix ?? {}) }
+ if (next) map[framing.color] = next
+ else delete map[framing.color]
+ const value = Object.keys(map).length ? map : null
+ patch(framing.st, { colorFix: value }, { colorFix: value })
+ setFraming(null)
+      }}
+    />
+  )
+
   /* ONE dialog for the whole book, driven by which page asked. Mounting it per sheet would
      put a copy of it behind every style in a fifty-page catalogue. */
  const pickDialog = picking && (
@@ -409,6 +446,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
     // and the printer emits a blank sheet.
     <div className="eg-print-root fixed inset-0 z-50 overflow-y-auto bg-neutral-100">
       {pickDialog}
+      {frameDialog}
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
         <span className="text-sm font-medium">
           {title ?? (rows === null ? "Loading…" : `${rows.length} style${rows.length === 1 ? "" : "s"}`)}
@@ -1059,13 +1097,42 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                           {/* Same reasoning as the hero: no rule around a cut-out on white.
                               Twelve of these in a grid made twelve boxes, which read as a
  table of frames rather than a set of colourways. */}
-                          <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
+                          {/* THE SWATCH, AND IN EDIT MODE A WAY TO FIX IT.
+                            *
+                            * A supplier's range is not shot to one standard — on the same
+                            * style half the colours arrive as a photograph of the garment and
+                            * half as a flat crop of the fabric, side by side in a grid whose
+                            * whole job is "which colour do you want". Nothing upstream fixes
+                            * that, so the page can: scale it up, nudge it into frame, or
+                            * replace it.
+                            *
+                            * The stored numbers are lib/product-framing's, applied with the
+                            * same framingStyle every other product surface uses — on a WRAPPER
+                            * rather than the img, because object-contain and a transform on one
+                            * element fight over the same box.
+                            */}
+                          <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded p-1"
  style={{ background: PLATE }}>
-                            {c.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={c.image} alt={c.name} className="size-full object-contain" />
-                            ) : (
-                              <span className="px-1 text-center text-[7px] leading-tight text-neutral-400">{c.name}</span>
+                            {(() => {
+                              const fx = st.colorFix?.[c.name]
+                              const src = fx?.image || c.image
+                              if (!src) return <span className="px-1 text-center text-[7px] leading-tight text-neutral-400">{c.name}</span>
+                              return (
+                                <div className="absolute inset-0 p-1" style={framingStyle({ imgZoom: fx?.zoom, imgFocusY: fx?.focusY })}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={src} alt={c.name} className="size-full object-contain" />
+                                </div>
+                              )
+                            })()}
+                            {editing && (
+                              <button
+ type="button"
+ onClick={() => setFraming({ st, color: c.name, source: c.image || "" })}
+ title={`Fix the ${c.name} picture`}
+ className="absolute inset-0 z-10 flex items-end justify-center bg-black/0 pb-1 opacity-0 transition hover:bg-black/25 hover:opacity-100 print:hidden"
+                              >
+                                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-neutral-700">Fix</span>
+                              </button>
                             )}
                           </div>
                           {/* THE NAME, AT A SIZE SOMEONE READS. The sku sat above it in 7px

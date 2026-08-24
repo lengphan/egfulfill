@@ -7,6 +7,7 @@
  * actually renders:
  *
  *   ink        ON surface       4.5:1   body and display type on the page
+ *   ink        ON card          4.5:1   type on a panel — on `signal` that is most of the page
  *   accent-ink ON accent        4.5:1   the plate's own lettering
  *   acid       ON accent        4.5:1   the one bright accent, which only ever sits on the plate
  *   ink        ON acid          4.5:1   ...and the same pair inverted, as a fill carrying ink
@@ -31,7 +32,7 @@ const CSS = fs.readFileSync(new URL('../web/app/globals.css', import.meta.url), 
 const KIT = fs.readFileSync(new URL('../web/components/marketing/bold-kit.tsx', import.meta.url), 'utf8')
 
 /** The skin that a page with no data-skin attribute renders — the `:root` half of the pair. */
-const DEFAULT_SKIN = 'studio'
+const DEFAULT_SKIN = 'signal'
 
 /* ── colour maths ─────────────────────────────────────────────────────────────── */
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
@@ -74,6 +75,7 @@ const EDGE = 3.0   // WCAG 1.4.11, the boundary of a UI component
 
 const PAIRS = [
   ['--mk-ink', '--mk-surface', TEXT, 'body and display type on the page'],
+  ['--mk-ink', '--mk-card', TEXT, 'type on a panel, which on `signal` is most of it'],
   ['--mk-accent-ink', '--mk-accent', TEXT, "the plate's lettering"],
   ['--mk-acid', '--mk-accent', TEXT, 'the accent, on the plate'],
   ['--mk-ink', '--mk-acid', TEXT, 'ink carried by an accent fill'],

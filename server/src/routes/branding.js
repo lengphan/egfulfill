@@ -44,15 +44,16 @@ const DEFAULT_ACCENT = 'rose';
  * measured. A stored hex would mean the next palette is typed into a text field with nothing
  * checking it, which is the free colour picker this route has always refused.
  *
- *   studio  ink on white, one bright accent — the default
- *   press   electric violet plate over warm paper — what the site was before
+ *   signal  cool grey ground, lighter panels on it, monochrome — the default
+ *   studio  ink on white, one bright accent — what the site was before this
+ *   press   electric violet plate over warm paper — and before that
  *
  * A skin CANNOT reach --primary (it inks ~247 pieces of text as well as filling buttons),
  * the floor's status vocabulary, or --pop. Adding one means adding it to globals.css AND
  * here, then running `node tools/check-skins.mjs`.
  */
-const SKINS = ['studio', 'press'];
-const DEFAULT_SKIN = 'studio';
+const SKINS = ['signal', 'studio', 'press'];
+const DEFAULT_SKIN = 'signal';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_FAVICON = path.join(HERE, '..', 'assets', 'default-favicon.png');
 

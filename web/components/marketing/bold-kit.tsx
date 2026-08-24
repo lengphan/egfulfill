@@ -191,6 +191,21 @@ export const AUTH_MUTED = "var(--mk-auth-muted)"
 export const HAIRLINE = "var(--mk-hairline)"
 
 /**
+ * A PANEL'S GROUND — the surface a slide is drawn on, as distinct from the page behind it.
+ *
+ * The reference boards are not ink-on-white; they are ink on a cool ground with LIGHTER
+ * panels floating on it, and the gap between those two greys is the entire reason a section
+ * reads as a slide rather than as a stretch of page. That needs a second ground token, because
+ * a panel painted `SURFACE` is invisible and a panel painted white is a different design.
+ *
+ * On `studio` it IS white and on `press` it is the warm paper, so a page that uses it is
+ * unchanged on those skins — the hairline goes on doing the separating there, exactly as it
+ * did before this token existed. Measured against `--mk-ink` by tools/check-skins.mjs on
+ * every skin, because most of the type on a slide sits on this and not on SURFACE.
+ */
+export const CARD = "var(--mk-card)"
+
+/**
  * THE LITERAL DIGITS — for the places a `var()` legally cannot go.
  *
  * There are exactly two kinds and both are real:
@@ -206,10 +221,10 @@ export const HAIRLINE = "var(--mk-hairline)"
  * from it, and it is narrow on purpose — a colour that is merely PAINTED never belongs here.
  */
 export const HEX = {
-  accent: "#0A0A0A",
-  ink: "#0A0A0A",
-  acid: "#D4F897",
-  surface: "#FFFFFF",
+  accent: "#16181E",
+  ink: "#0B0D12",
+  acid: "#CFD8E6",
+  surface: "#DEE4EE",
   paper: "#FFFFFF",
 } as const
 
@@ -341,8 +356,18 @@ export function TypedPhrase({ text, color = ACCENT_INK, lastWordColor }: { text:
 
 /** Pill button. The arrow travels on hover — a 200ms cue that the thing goes somewhere,
  *  which is the whole reason the arrow is there. */
-export function Pill({ href, children, tone = "ink", className = "" }: {
-  href: string; children: React.ReactNode; tone?: "ink" | "accent" | "acid" | "ghost" | "ghostLight"; className?: string
+export function Pill({ href, children, tone = "ink", ring = false, className = "" }: {
+  href: string; children: React.ReactNode; tone?: "ink" | "accent" | "acid" | "ghost" | "ghostLight"
+  /**
+   * THE ARROW IN A RING — the board's third pill.
+   *
+   * A row of buttons that are all the same shape reads as one control repeated, so the
+   * reference gives the LAST one a circled arrow: same pill, same weight, one extra mark that
+   * says "and there is more this way". It is a variant of this button and not a second
+   * component, so it cannot drift from the pill it sits beside.
+   */
+  ring?: boolean
+  className?: string
 }) {
   const base = "group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
   const tones = {
@@ -366,7 +391,16 @@ export function Pill({ href, children, tone = "ink", className = "" }: {
   return (
     <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "accent" ? { background: ACCENT } : tone === "acid" ? { background: ACID } : undefined}>
       {children}
-      <ArrowUpRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      {ring ? (
+        /* -mr-2.5 pulls the ring back into the pill's own padding: a 28px circle inside a
+           56px pill would otherwise sit a full step further from the label than a bare arrow
+           does, and the two buttons in a row would no longer end on the same rhythm. */
+        <span aria-hidden className="-mr-2.5 grid size-7 shrink-0 place-items-center rounded-full border border-current/40 transition-colors duration-200 group-hover:border-current">
+          <ArrowUpRight size={13} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        </span>
+      ) : (
+        <ArrowUpRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      )}
     </Link>
   )
 }

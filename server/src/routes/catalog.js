@@ -1523,27 +1523,74 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
     const colors = nameList(b.colors);
     const sizes = nameList(b.sizes);
 
+    /**
+     * PER-COLOURWAY FRAMING - `{ "<colour name>": { zoom, focusY, image } }`.
+     *
+     * REPLACES THE WHOLE MAP rather than merging key by key. A merge needs a way to say
+     * "remove this one", which is a second protocol on top of a field that already has one,
+     * and it is how a colourway ends up holding framing nobody can see or delete. The client
+     * knows the whole map - it is drawing from it - so it sends the whole map.
+     *
+     * The bounds are lib/product-framing's, mirrored here because a body is not a UI: zoom
+     * 100-300, focusY 0-100. Out of range is CLAMPED, not refused, so a stale client cannot
+     * 400 an otherwise good save.
+     *
+     * AN IMAGE IS AN UPLOAD OR ONE OF OUR OWN PATHS - the same rule and the same reason as
+     * the hero image above (2.9). The obvious thing to paste at a swatch whose photo is
+     * unusable is the better one on the supplier's own site, and that address would then be
+     * printed into a document we hand to a buyer.
+     */
+    let colorFix;
+    if (b.colorFix !== undefined) {
+      if (b.colorFix === null) colorFix = null;
+      else if (typeof b.colorFix !== 'object' || Array.isArray(b.colorFix)) colorFix = undefined;
+      else {
+        const fixed = {};
+        for (const [rawName, rawVal] of Object.entries(b.colorFix).slice(0, 200)) {
+          const key = String(rawName || '').trim().slice(0, 120);
+          if (!key || !rawVal || typeof rawVal !== 'object') continue;
+          const fix = {};
+          const z = Number(rawVal.zoom);
+          if (Number.isFinite(z) && z !== 100) fix.zoom = Math.min(300, Math.max(100, Math.round(z)));
+          const fy = Number(rawVal.focusY);
+          if (Number.isFinite(fy) && fy !== 50) fix.focusY = Math.min(100, Math.max(0, Math.round(fy)));
+          if (rawVal.image != null && rawVal.image !== '') {
+            const v = String(rawVal.image);
+            if (/^data:image\//i.test(v)) fix.image = await byAddress(v);
+            else if (v.startsWith('/api/')) fix.image = v;
+            else { reply.code(400); return { error: "Attach a file - a link to someone else's image can't go in a catalogue." }; }
+          }
+          // A colourway back at its defaults carries no entry at all, so "reset" needs no
+          // separate verb and the column cannot fill with {} nobody can see.
+          if (Object.keys(fix).length) fixed[key] = fix;
+        }
+        colorFix = Object.keys(fixed).length ? fixed : null;
+      }
+    }
+
     if (name !== undefined || description !== undefined || image !== undefined
-        || colors !== undefined || sizes !== undefined) {
+        || colors !== undefined || sizes !== undefined || colorFix !== undefined) {
       // COALESCE ON THE EXISTING ROW so a one-field edit doesn't blank the other two, and an
       // explicit null still clears — that is why the "was it sent" test is done in JS above
       // and only the resolved values reach SQL.
       await q(
-        `insert into lookbook_overrides (source, ref, name, description, image, colors, sizes, updated_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8)
+        `insert into lookbook_overrides (source, ref, name, description, image, colors, sizes, color_fix, updated_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          on conflict (source, ref) do update set
-           name        = case when $9  then excluded.name        else lookbook_overrides.name end,
-           description = case when $10 then excluded.description else lookbook_overrides.description end,
-           image       = case when $11 then excluded.image       else lookbook_overrides.image end,
-           colors      = case when $12 then excluded.colors      else lookbook_overrides.colors end,
-           sizes       = case when $13 then excluded.sizes       else lookbook_overrides.sizes end,
+           name        = case when $10 then excluded.name        else lookbook_overrides.name end,
+           description = case when $11 then excluded.description else lookbook_overrides.description end,
+           image       = case when $12 then excluded.image       else lookbook_overrides.image end,
+           colors      = case when $13 then excluded.colors      else lookbook_overrides.colors end,
+           sizes       = case when $14 then excluded.sizes       else lookbook_overrides.sizes end,
+           color_fix   = case when $15 then excluded.color_fix   else lookbook_overrides.color_fix end,
            updated_at  = now(), updated_by = excluded.updated_by`,
         [source, ref, name ?? null, description ?? null, image ?? null,
           colors == null ? null : JSON.stringify(colors),
           sizes == null ? null : JSON.stringify(sizes),
+          colorFix == null ? null : JSON.stringify(colorFix),
           String((req.user && req.user.sub) || ''),
           name !== undefined, description !== undefined, image !== undefined,
-          colors !== undefined, sizes !== undefined]
+          colors !== undefined, sizes !== undefined, colorFix !== undefined]
       );
     }
 

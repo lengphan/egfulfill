@@ -14,6 +14,7 @@ import { Dropzone } from "@/components/app/dropzone"
 import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, saveDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
 import { Thumb } from "@/components/app/thumb"
+import { useLightbox } from "@/components/app/image-lightbox"
 import { getToken } from "@/lib/auth"
 
 /**
@@ -113,6 +114,7 @@ function DesignLab() {
  try { await deleteDesignLibrary(id) } catch { load() }
   }
 
+ const zoom = useLightbox()
  const [copied, setCopied] = useState<string | null>(null)
  const [editId, setEditId] = useState<string | number | null>(null)
  const list = designs ?? []
@@ -131,6 +133,8 @@ function DesignLab() {
 
  return (
     <div className="space-y-4">
+      {/* Portalled to the body, so it opens above the shell rather than inside this column. */}
+      {zoom.node}
       <DesignLabTabs />
 
       {/**
@@ -195,6 +199,19 @@ function DesignLab() {
                         size inside the square, floating in grey bands, so a tidy grid read as
                         crooked even though the frames were identical. */}
                     <LibraryThumb thumb={d.thumb} name={d.name} />
+                    {/* THE PICTURE IS THE POINT OF THIS CARD, and it was the one thing you
+                        could not look at. The tile is 200-odd pixels of artwork somebody is
+                        about to put on a garment; the name renames, the ✕ deletes, and the
+                        image itself did nothing at all. Now it opens.
+
+                        Under the ✕ in the DOM, so the delete control keeps its own clicks. */}
+                    <button
+                      type="button"
+                      onClick={() => zoom.open(d.thumb ? proxiedImageSrc(d.thumb) : "", d.name || `IMG-${d.id}`)}
+                      title="View full size"
+                      className="absolute inset-0 cursor-zoom-in"
+                      aria-label={`View ${d.name || "artwork"} full size`}
+                    />
                     <button
  onClick={() => remove(d.id)}
  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"

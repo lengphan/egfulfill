@@ -846,7 +846,11 @@ td[align="right"] {
  * Gate: `node tools/check-skins.mjs` — every pair a skin declares, measured.
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/* ── STUDIO · the default ────────────────────────────────────────────────────
+/* ── STUDIO · ink on white ───────────────────────────────────────────────────
+ *
+ * NO LONGER THE `:root` DEFAULT — `signal` is (see its block below). Studio keeps every
+ * value it was measured with and stays selectable, so this palette is one selector from
+ * being the default again and nothing that imports the kit knows the difference.
  *
  * INK ON WHITE, and the beige is gone.
  *
@@ -874,7 +878,6 @@ td[align="right"] {
  * 1.1:1 and simply disappears. That constraint is unchanged from the violet era; what
  * changed is the plate it sits on.
  */
-:root,
 [data-skin="studio"] {
   --mk-surface: #FFFFFF;
   --mk-ink: #0A0A0A;
@@ -898,6 +901,12 @@ td[align="right"] {
      you are not going to interact with, has no floor, and at 3:1 it draws a box around the
      form loud enough to be the first thing you see. This is the light one. */
   --mk-hairline: #E4E4E7;
+  /* A CARD'S GROUND, which on a white page is the page. Declared anyway rather than left to
+     each skin's discretion: `signal` puts every section on a panel that has to be lighter
+     than the ground behind it, and a token that only exists in one skin is a token every
+     other skin renders as `unset`. Here it is white, the hairline does the separating, and
+     nothing about the studio pages changes. */
+  --mk-card: #FFFFFF;
   /* The app's large-fill brand, moved with the plate so the product and the site are one
      decision. Already near-black in the base palette — this states it as the skin's rather
      than leaving the two to drift apart the next time one of them moves. */
@@ -933,7 +942,70 @@ td[align="right"] {
   --mk-auth-edge: #8A8577;
   --mk-auth-muted: #6B6659;
   --mk-hairline: #DCD8CD;
+  /* Paper, a shade off the page — the warm equivalent of studio's white-on-white. */
+  --mk-card: #FAF8F3;
   /* Violet fill, paper label — 5.68:1, the pair the marketing bands already run. */
   --brand: oklch(0.5305 0.2723 283.5);
   --brand-foreground: #FAF8F3;
 }
+
+/* ── SIGNAL · the default the public site renders ─────────────────────────────
+ *
+ * COOL GREY GROUND, PANELS ON TOP OF IT, MONOCHROME THROUGHOUT.
+ *
+ * Adopted from the reference boards the marketing pages were already borrowing devices from
+ * (the label rule, the ghost word, the numbered checker). Those three landed on a WHITE page,
+ * and white was the reason the pages still read as a different design: the boards are not
+ * ink-on-white, they are ink on a cool ground with lighter panels floating on it, and the
+ * separation between those two greys is what makes a section read as a SLIDE rather than as
+ * a stretch of page. One device cannot supply that; only the palette can.
+ *
+ * THIS IS THE `:root` SKIN, and that is deliberate rather than incidental. Marketing pages
+ * are served with no session, so they render whatever `:root` declares and never what an
+ * admin picked (see the LIMIT note in web/lib/skin.ts) — a skin that is only selectable would
+ * have changed the signed-in app and left the public site exactly as it was, which is the one
+ * surface this was asked for. `studio` keeps its own block and stays selectable, so the white
+ * palette is one line from being the default again and no call site knows the difference.
+ *
+ * MONOCHROME IS THE POINT, not an omission. The boards carry no hue at all — their contrast
+ * is entirely ground-versus-panel-versus-ink — so `--mk-acid` is a pale cool tint rather than
+ * the lime. It still does the acid's job (a light value that can only ever sit ON the dark
+ * fill, carrying or carried by ink) and it still clears the gate; it simply does not shout.
+ *
+ * MEASURED — `node tools/check-skins.mjs`, not eyeballed:
+ *   ink #0B0D12 on ground #DEE4EE      15.4:1   body and display on the page
+ *   ink #0B0D12 on panel  #EFF2F7      17.5:1   ...and on a panel, which is most of the type
+ *   accent-ink #FFFFFF on #16181E      18.3:1   a dark card's lettering
+ *   acid #CFD8E6 on accent #16181E     12.9:1   the pale tint on the dark fill
+ *   auth-edge #6B7385 on white          4.4:1   past the 3:1 boundary floor
+ *   auth-edge #6B7385 on ground         3.3:1   ...and against the ground behind it
+ */
+:root,
+[data-skin="signal"] {
+  /* THE GROUND. Cool, blue-leaning, and darker than the panels that sit on it — that order
+     is the whole system. Inverting it (light ground, darker panels) reads as a table. */
+  --mk-surface: #DEE4EE;
+  /* THE PANEL. ~7% lighter than the ground in luminance, which is enough to separate two
+     large areas without a border and little enough that it never reads as white. A bigger
+     gap here and the panels become paper on a mat; a smaller one and the slides vanish. */
+  --mk-card: #EFF2F7;
+  --mk-ink: #0B0D12;
+  /* Near-black, faintly cool so it belongs to the same family as the ground rather than
+     reading as a foreign black dropped on it. This is the dark card, the filled pill and
+     the CTA band. */
+  --mk-accent: #16181E;
+  --mk-accent-ink: #FFFFFF;
+  /* No lime. See MONOCHROME above — this is the light value that lives on the dark fill. */
+  --mk-plate-accent: #CFD8E6;
+  --mk-acid: #CFD8E6;
+  /* Auth fields stay white: on a grey ground a white field is findable by its FILL, which is
+     the one case where the edge is not doing all the work. */
+  --mk-auth-field: #FFFFFF;
+  --mk-auth-edge: #6B7385;
+  --mk-auth-muted: #4A505E;
+  --mk-hairline: #C3CBD9;
+  /* The large-fill brand follows the accent, so the app and the site are one decision. */
+  --brand: oklch(0.19 0.006 265);
+  --brand-foreground: oklch(1 0 0);
+}
+
