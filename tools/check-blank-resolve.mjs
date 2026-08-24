@@ -115,9 +115,18 @@ const PRODUCTS = [
   { id: 'p4', sku: '10892', name: 'Adams Headwear LP104', variantSkus: [] },
   // A product whose NAME contains " - ". This is what stops the split being tried first.
   { id: 'p5', sku: 'AD-POLO', name: 'Adidas - Performance Polo', variantSkus: [] },
+  /* A RENAMED product, and one carrying the supplier's own style code.
+     Both are alias matches, and both were places the two implementations disagreed: the web
+     resolver had always matched supplierSku on the blank and the server had not, and neither
+     knew about nameAliases until the brand split started renaming products in bulk. A line
+     that resolves on one side only is a row that looks right and prices at nothing. */
+  { id: 'p6', sku: 'EG-18009', name: 'Unisex Heavy Blend™ Hooded Sweatshirt', variantSkus: [],
+    supplierSku: '18500', nameAliases: ['Gildan Unisex Heavy Blend™ Hooded Sweatshirt'] },
 ]
-const webCatalog = PRODUCTS.map((p) => ({ id: p.id, sku: p.sku, name: p.name, variantSkus: p.variantSkus }))
-const srvRows = PRODUCTS.map((p) => ({ id: p.id, sku: p.sku, base_price: 10, data: { name: p.name, sku: p.sku, variantSkus: p.variantSkus } }))
+const webCatalog = PRODUCTS.map((p) => ({ id: p.id, sku: p.sku, name: p.name, variantSkus: p.variantSkus,
+  supplierSku: p.supplierSku, nameAliases: p.nameAliases }))
+const srvRows = PRODUCTS.map((p) => ({ id: p.id, sku: p.sku, base_price: 10, supplier_sku: p.supplierSku,
+  data: { name: p.name, sku: p.sku, variantSkus: p.variantSkus, supplierSku: p.supplierSku, nameAliases: p.nameAliases } }))
 const srvIdx = { rows: srvRows, exact: new Map() }
 for (const row of srvRows) {
   for (const c of [row.sku, ...(row.data.variantSkus || [])]) {
@@ -139,9 +148,6 @@ const CASES = [
   { what: 'sku only, exact', item: { blank: '', sku: 'EG-18000' }, want: 'p2' },
   { what: 'nothing to go on', item: { blank: '', sku: '' }, want: null },
   { what: 'a blank naming no product we hold', item: { blank: 'Something else entirely', sku: '' }, want: null },
-  { what: 'the name a product had BEFORE it was renamed', item: { blank: 'Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
-  { what: 'composite blank written before the rename', item: { blank: 'EG-18009 - Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
-  { what: "the supplier's own style code as the blank", item: { blank: '18500', sku: '' }, want: 'p6' },
 ]
 
 /**
