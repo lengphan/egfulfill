@@ -143,7 +143,21 @@ export function matchProduct(idx, item) {
     for (const cand of blankCandidates(blank.toLowerCase())) {
       const hit = idx.rows.find((r) => {
         const d = r.data || {};
-        return [d.name, r.sku, d.sku, r.id, d.id].some((v) => v != null && String(v).trim().toLowerCase() === cand);
+        /*
+         * THE SUPPLIER'S CODE AND THE FORMER NAMES, because the client matches both and a
+         * line that resolves on the screen must resolve here or it prices at zero.
+         *
+         *   supplierSku — the web resolver has always matched it and this did not, so a
+         *                 blank naming the supplier's style number resolved for DISPLAY and
+         *                 not for PRICE. Same class of bug as the composite blank above.
+         *   nameAliases — what the product used to be called. A rename (the brand split runs
+         *                 one in bulk) otherwise strands every line placed before it.
+         *
+         * MIRRORS resolveProduct in web/lib/variant-resolve.ts — tools/check-blank-resolve.mjs
+         * runs both implementations over the same fixtures for exactly this reason.
+         */
+        return [d.name, r.sku, d.sku, r.id, d.id, r.supplier_sku, d.supplierSku, ...(Array.isArray(d.nameAliases) ? d.nameAliases : [])]
+          .some((v) => v != null && String(v).trim().toLowerCase() === cand);
       });
       if (hit) return hit;
     }

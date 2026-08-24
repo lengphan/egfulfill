@@ -956,6 +956,12 @@ export function clearCatalog() {
 export type CatalogProduct = {
   id?: string | number
   name?: string
+  /** WHAT THIS PRODUCT USED TO BE CALLED. An order line carries the blank as TEXT, and
+   *  resolveProduct matches that text against the name — so a rename strands every older
+   *  line that named it, and a line that doesn't resolve isn't priced. Recorded here on the
+   *  rename (see withRenameAlias) and matched by both resolvers; published nowhere, exactly
+   *  like supplierSku. */
+  nameAliases?: string[]
   /** WHO MAKES THE GARMENT — Gildan, Bella+Canvas. Public: it is printed on the neck label.
    *  NOT who we buy it from, which is `supplier` and is staff-only (§2.9); the importers
    *  never write a supplier's name here, because `brand || 'SanMar'` would name our supplier

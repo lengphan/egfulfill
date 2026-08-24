@@ -74,7 +74,12 @@ export function resolveProduct(item: OrderItem, catalog: CatalogProduct[]): Cata
   if (blank) {
     for (const cand of blankCandidates(blank)) {
       const hit = catalog.find((p) =>
-        [p.name, p.sku, p.supplierSku, p.id].some((v) => v != null && String(v).trim().toLowerCase() === cand))
+        // nameAliases: what it USED to be called. A product can be renamed — the brand split
+        // does it in bulk — and an order line names the blank in text, so without this the
+        // rename silently unprices every line placed before it. MIRRORS matchProduct in
+        // server/src/pricing.js; tools/check-blank-resolve.mjs runs both over the same cases.
+        [p.name, p.sku, p.supplierSku, p.id, ...(p.nameAliases ?? [])]
+          .some((v) => v != null && String(v).trim().toLowerCase() === cand))
       if (hit) return hit
     }
   }

@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning, Tag } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
+import { BrandSplitDialog } from "@/components/app/brand-split-dialog"
+import { planBrandSplit } from "@/lib/brand-split"
 import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
@@ -115,6 +117,7 @@ export function ProductsCatalog() {
  const [isStaff, setIsStaff] = useState(false)
  const [editing, setEditing] = useState<CatalogProduct | null>(null)
  const [editorOpen, setEditorOpen] = useState(false)
+ const [splitOpen, setSplitOpen] = useState(false)
   // The shipping-fee fetch went with the table it fed. It was a request on every visit to
   // this page for a block that is no longer rendered — the detail page loads its own.
 
@@ -146,6 +149,10 @@ export function ProductsCatalog() {
  return persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
   }
  const deleteProduct = (id: CatalogProduct["id"]) => persist((products ?? []).filter((x) => x.id !== id))
+
+  /** How many products still carry their make on the front of the name. Counted here so the
+   *  button can say the number and stay away when there is nothing to do. */
+ const splitCount = useMemo(() => (isDemo ? 0 : planBrandSplit(products ?? []).length), [products, isDemo])
 
  useEffect(() => {
  let alive = true
@@ -295,6 +302,14 @@ export function ProductsCatalog() {
  className="w-52 pl-9"
             />
           </div>
+          {/* SECONDARY, because adding a product is what this screen is for. Only offered
+ when there is something to split — a button that always opens onto "nothing to
+ do" teaches you to stop pressing it. */}
+          {isStaff && splitCount > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setSplitOpen(true)}>
+              <Tag size={14} weight="bold" /> Split brand · {splitCount}
+            </Button>
+          )}
           {isStaff && (
             <Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true) }}>
               <Plus size={14} weight="bold" /> Add product
@@ -513,6 +528,9 @@ export function ProductsCatalog() {
 
       {isStaff && (
         <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={(products?.length ?? 0) + 1000} nextSku={nextEgSku(products ?? [])} />
+      )}
+      {isStaff && (
+        <BrandSplitDialog open={splitOpen} onOpenChange={setSplitOpen} products={products ?? []} onApply={persist} />
       )}
     </div>
   )

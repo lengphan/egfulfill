@@ -18,6 +18,7 @@ import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
 import { cleanSku } from "@/lib/sku"
 import { stripBrandPrefix } from "@/lib/supplier-catalog"
+import { withRenameAlias } from "@/lib/brand-split"
 import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
 import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
 import { printZoneOf, BASE_PRINT_IN, type PrintZone } from "@/lib/print-zone"
@@ -893,8 +894,14 @@ export function ProductEditorDialog({
  const sv = stateVal.trim()
  return sv === "" ? undefined : Number(sv) || 0
     }
+    /**
+     * A RENAME KEEPS THE OLD NAME. An order line names its blank in TEXT, and both resolvers
+     * match that text against the product's name — so renaming one (taking the brand off the
+     * front is a rename) would unprice every line placed before it. withRenameAlias files the
+     * previous name as an alias both resolvers read; see lib/brand-split.ts.
+     */
  const next: CatalogProduct = {
-      ...(product ?? {}),
+      ...withRenameAlias(product ?? {}, name.trim()),
  id: product?.id ?? genId(newIdSeed),
  name: name.trim(),
  brand: brand.trim() || undefined,

@@ -148,6 +148,9 @@ const CASES = [
   { what: 'sku only, exact', item: { blank: '', sku: 'EG-18000' }, want: 'p2' },
   { what: 'nothing to go on', item: { blank: '', sku: '' }, want: null },
   { what: 'a blank naming no product we hold', item: { blank: 'Something else entirely', sku: '' }, want: null },
+  { what: 'the name a product had BEFORE it was renamed', item: { blank: 'Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
+  { what: 'composite blank written before the rename', item: { blank: 'EG-18009 - Gildan Unisex Heavy Blend™ Hooded Sweatshirt', sku: '' }, want: 'p6' },
+  { what: "the supplier's own style code as the blank", item: { blank: '18500', sku: '' }, want: 'p6' },
 ]
 
 /**
