@@ -35,7 +35,9 @@ import {
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
+import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles,
+  getEtsyConnections, getShopifyConnections, getTiktokConnections, type EtsyConnection,
   type CatalogProduct, type ProductTemplate, type LibraryDesign, type MachineFile } from "@/lib/api"
 
 /** Blank rows to open on. Enough that it reads as a sheet rather than as a form. */
@@ -139,12 +141,21 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
   const [templates, setTemplates] = useState<ProductTemplate[]>([])
   const [images, setImages] = useState<LibraryDesign[]>([])
   const [machineFiles, setMachineFiles] = useState<MachineFile[]>([])
+  const [stores, setStores] = useState<EtsyConnection[]>([])
   useEffect(() => {
     let live = true
     getCatalogProducts().then((c) => { if (live) setCatalog(c ?? []) }).catch(() => {})
     getTemplates().then((t) => { if (live) setTemplates(t ?? []) }).catch(() => {})
     getDesignLibrary().then((d) => { if (live) setImages(d ?? []) }).catch(() => {})
     getMachineFiles().then((m) => { if (live) setMachineFiles(m ?? []) }).catch(() => {})
+    /* THE SHOPS THIS ACCOUNT HAS CONNECTED, from all three channels. Settled, not all:
+       a seller with Etsy connected and no TikTok must still get their Etsy shop, and a
+       platform that errors cannot take the other two down with it. */
+    Promise.allSettled([getEtsyConnections(), getShopifyConnections(), getTiktokConnections()])
+      .then((rs) => {
+        if (!live) return
+        setStores(rs.flatMap((r) => (r.status === "fulfilled" ? r.value ?? [] : [])))
+      })
     return () => { live = false }
   }, [])
 
@@ -254,10 +265,26 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     machine_file_id: machineFiles
       .filter((m) => m.ref)
       .map((m) => ({ value: m.ref, label: `${m.ref}${m.name ? ` · ${m.name}` : ""}` })),
+    /* A SUGGESTION, NOT A LIST TO PICK FROM. Store Name is free text and stays that way —
+       a seller may sell somewhere we have no connector for, and the column has always
+       accepted whatever is typed. This only removes the need to remember the spelling of a
+       shop they have already connected. The platform is on the label, not in the value:
+       the importer stores this string as the order's store, and "My Shop · Etsy" would
+       become the store's name. */
+    store_name: Array.from(
+      new Map(
+        stores
+          .filter((c) => (c.shop_name || "").trim())
+          .map((c) => [String(c.shop_name).trim(), {
+            value: String(c.shop_name).trim(),
+            label: `${String(c.shop_name).trim()}${c.platform ? ` · ${platformName(c.platform)}` : ""}`,
+          }] as const),
+      ).values(),
+    ).sort((a, b) => a.value.localeCompare(b.value)),
     hero_image: images
       .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
       .map((d) => ({ value: String(d.thumb), label: String(d.name || `Image ${d.id}`) })),
-  }), [templates, machineFiles, images])
+  }), [templates, machineFiles, images, stores])
 
   const optionsFor = useCallback(
     (colKey: string, row: string[]): Opt[] | null => {
