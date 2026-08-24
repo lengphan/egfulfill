@@ -189,6 +189,21 @@ const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
  * rather than behind a variant picker of its own: a blank is the same garment in the same
  * size with nothing done to it, so it is a column here, not a second dimension. */
 type Tier = { price: string; shipping: string; cost: string; blank: string; weightOz: string }
+/**
+ * ONE EMPTY TIER, because a hand-written literal forgot a field and it cost the save.
+ *
+ * applyBulk fell back to `{ price, shipping, cost, blank }` — no `weightOz` — for any size
+ * that had no row yet. Every bulk apply on a fresh product therefore wrote a PARTIAL tier,
+ * and strToTiers then did `t.weightOz.trim()` on undefined: "Cannot read properties of
+ * undefined (reading 'trim')", thrown from the Add to Products click. The button did
+ * nothing, with the reason only in the console. Typing anything in the bulk row was enough.
+ *
+ * TypeScript did not catch it: `{ ...cur, price, ... }` spreads a union, and the result was
+ * assigned through an index signature, which is checked loosely enough to let it past.
+ *
+ * So the shape lives in ONE place. A field added to Tier lands here and reaches every
+ * construction site, instead of every site needing to remember it. */
+const EMPTY_TIER: Tier = { price: "", shipping: "", cost: "", blank: "", weightOz: "" }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
  const out: Record<string, Tier> = {}
  if (!Array.isArray(v)) return out
@@ -211,8 +226,12 @@ function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
 function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["sizePrices"] {
  const out: NonNullable<CatalogProduct["sizePrices"]> = []
  for (const size of keep) {
- const t = map[size]
- if (!t) continue
+ /* Normalised on the way in. This read six string fields straight off the object and
+    called .trim() on each, so ONE missing field took down the whole save — and this is the
+    function that turns an edit into money. A tier that arrives partial now reads as blank,
+    which is what a missing field means. */
+ const t = { ...EMPTY_TIER, ...(map[size] ?? {}) }
+ if (!map[size]) continue
  const price = Number(t.price)
  const cost = Number(t.cost)
  const hasPrice = t.price.trim() !== "" && isFinite(price) && price > 0
@@ -801,7 +820,7 @@ export function ProductEditorDialog({
  setTiers((prev) => {
  const nextT: Record<string, Tier> = { ...prev }
  for (const s of sizes) {
- const cur = nextT[s] ?? { price: "", shipping: "", cost: "", blank: "" }
+ const cur = nextT[s] ?? EMPTY_TIER
  let price = cur.price
  if (b !== "") {
  const rowCost = num(cur.cost)
@@ -1379,7 +1398,7 @@ export function ProductEditorDialog({
                     // What pricing will actually charge if Base cost is left blank.
  const derived = t?.cost?.trim() && isFinite(costN) && costN > 0 ? (costN + markup).toFixed(2) : ""
  const patch = (k: keyof Tier, v: string) =>
- setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "", blank: "", weightOz: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
+ setTiers((p) => ({ ...p, [s]: { ...EMPTY_TIER, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
  return (
                     <Fragment key={s}>
                     <div className="grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] items-center gap-2">
