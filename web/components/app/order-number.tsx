@@ -1,0 +1,138 @@
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+import { Check, X } from "@phosphor-icons/react/dist/ssr"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { updateOrder, type OrderRow } from "@/lib/api"
+import { getUser } from "@/lib/auth"
+import { numOf } from "@/lib/order-format"
+
+/**
+ * THE ORDER NUMBER, AND THE ONE PLACE IT CAN BE CHANGED.
+ *
+ * `#6` is `orders.seq` — an integer minted per seller as max(seq)+1. It is a LABEL: nothing
+ * joins on it, and it is not `orders.id`, which is the primary key and is referenced by
+ * order_items, order_designs, order_messages, order_threads, design_cards, design_file_data,
+ * shipments, manifests and the wallet ledger. Changing the id is a migration; changing this
+ * is an edit, and that distinction is the whole reason this component only offers the one.
+ *
+ * ONE COMPONENT, not an edit affordance per board. §4: a rule with no primitive is a wish —
+ * the number is rendered on the order page, the staff hub, the dashboard and the staff
+ * dashboard, and four hand-rolled inline editors would be four sets of behaviour for the
+ * same field. Boards pass `editable` (staff only); everywhere else it renders exactly the
+ * span it replaced.
+ *
+ * SHAPE SAYS KIND (§4). Read-only it is type, because that is what it is. Pressed, it becomes
+ * a real `Input` — a field you SET — with its own confirm and cancel. It never wears button
+ * chrome while it is only a label; the hover tint is the whole hint, and the `title` says the
+ * rest so no sentence has to sit underneath it.
+ */
+export function OrderNumber({
+  order,
+  editable = false,
+  onSaved,
+  className = "",
+}: {
+  order: OrderRow
+  /** Staff only. The server refuses a seller regardless — this decides whether to OFFER it. */
+  editable?: boolean
+  /** Re-read the row: the number changed, so every list showing it is now stale. */
+  onSaved?: (seq: number) => void
+  className?: string
+}) {
+  const label = numOf(order)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select()
+  }, [editing])
+
+  /*
+   * THE ROLE GATE LIVES HERE, not at the call site.
+   *
+   * `editable` says whether this SURFACE wants to offer the edit; this says whether the
+   * person may have it. Mirrors isStaff() on the server, which is the boundary that actually
+   * refuses — a seller pressing this would get a 403, and a control that is always refused is
+   * worse than no control (§4). Deriving it in each board is how one board forgets.
+   */
+  const role = getUser()?.role || ""
+  const mayEdit = editable && !!role && role !== "seller"
+
+  if (!mayEdit) return <span className={className}>{label}</span>
+
+  const open = () => {
+    setDraft(order.seq ? String(order.seq) : "")
+    setErr(null)
+    setEditing(true)
+  }
+
+  const commit = async () => {
+    const want = Number(draft.trim())
+    // Refuse locally what the server would refuse anyway, so the common typo costs no round
+    // trip and the reason is the same sentence either way.
+    if (!Number.isInteger(want) || want < 1) { setErr("A whole number above zero."); return }
+    if (want === order.seq) { setEditing(false); return }
+    setBusy(true); setErr(null)
+    try {
+      const r = await updateOrder(String(order.id), { seq: want })
+      // The server owns the collision check — it is the only side that can see every other
+      // order — so its refusal is the one shown, verbatim.
+      if (r?.error) { setErr(r.error); return }
+      setEditing(false)
+      onSaved?.(want)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not change the number.")
+    } finally { setBusy(false) }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        /* These numbers sit inside rows that navigate on click. Without this, pressing the
+           number both opened the editor and left the page it was on. */
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); open() }}
+        title="Change this order's number"
+        className={`-mx-1 rounded px-1 text-left hover:bg-accent ${className}`}
+      >
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <span className="inline-flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+      <span className="inline-flex items-center gap-1">
+        <span className="text-muted-foreground">#</span>
+        <Input
+          ref={inputRef}
+          value={draft}
+          autoFocus
+          inputMode="numeric"
+          disabled={busy}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); void commit() }
+            if (e.key === "Escape") { e.preventDefault(); setEditing(false); setErr(null) }
+          }}
+          className="h-8 w-24 tabular-nums"
+          aria-label="Order number"
+        />
+        <Button size="icon" variant="ghost" className="size-8" disabled={busy} onClick={() => void commit()} aria-label="Save number">
+          <Check size={15} />
+        </Button>
+        <Button size="icon" variant="ghost" className="size-8" disabled={busy}
+          onClick={() => { setEditing(false); setErr(null) }} aria-label="Cancel">
+          <X size={15} />
+        </Button>
+      </span>
+      {/* A refusal carries its reason — that is the answer, not a subtitle (§4). */}
+      {err && <span className="text-xs font-normal text-destructive">{err}</span>}
+    </span>
+  )
+}

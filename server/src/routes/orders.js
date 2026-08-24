@@ -1863,13 +1863,48 @@ export function ordersRoutes(app, requireAuth) {
   // Patch status/tracking/etc. Staff may also replace the line items (used when a
   // factory board picks a base blank → the chosen mockup must reach mobile scan).
   app.patch('/api/orders/:id', { preHandler: requireAuth }, async (req, reply) => {
+    /**
+     * THE ORDER NUMBER IS EDITABLE — carefully, and only by staff.
+     *
+     * `seq` is the `#6` on the header: an integer, minted per seller as max(seq)+1, and the
+     * label everything human-facing uses. It is NOT the primary key — `orders.id` is, and it
+     * is referenced by order_items, order_designs, order_messages, order_threads,
+     * design_cards, design_file_data, shipments, manifests and the wallet ledger's refs, so
+     * that one is a migration and not something a text field may touch.
+     *
+     * Three things have to hold, and none of them are optional:
+     *
+     *  · STAFF ONLY. The number appears in the seller's own emails and in audit entries; a
+     *    seller renumbering their orders to match something else is not an edit anyone can
+     *    reconstruct afterwards.
+     *  · NEVER INTO A COLLISION. Nothing joins on seq, so a duplicate does not corrupt
+     *    anything — it does something worse and quieter: two orders answer to `#6`, and the
+     *    factory picks one. Checked against the same scope the number is MINTED in
+     *    (seller + factory_order), or the check would disagree with the generator.
+     *  · WRITTEN DOWN. It falls through to the normal `map` below, so the before/after
+     *    snapshot and `order.updated` audit cover it exactly like any other field.
+     */
+    if ((req.body || {}).seq !== undefined) {
+      if (!isStaff(req.user)) { reply.code(403); return { error: 'Only staff can change an order number.' }; }
+      const want = Number(req.body.seq);
+      if (!Number.isInteger(want) || want < 1) {
+        reply.code(400); return { error: 'An order number is a whole number above zero.' };
+      }
+      const own = (await q('select seller_id, coalesce(factory_order,false) as fo from orders where id=$1', [req.params.id])).rows[0];
+      if (!own) { reply.code(404); return { error: 'Order not found' }; }
+      const clash = await q(
+        `select id from orders where seller_id=$1 and coalesce(factory_order,false)=$2 and seq=$3 and id <> $4 limit 1`,
+        [own.seller_id, own.fo, want, req.params.id]);
+      if (clash.rowCount) { reply.code(409); return { error: `#${want} already belongs to another order.` }; }
+      req.body.seq = want;   // normalised, so the generic writer below stores an int
+    }
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
                   carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta',
                   address: 'address', customer: 'customer' };
     // Staff-only fields: a seller may PATCH their own order, so the guard is on the FIELD
     // and not only on the route. Without it a seller could write — and by writing, read
     // back — the factory's private note on their own order.
-    if (isStaff(req.user)) map.internalNote = 'internal_note';
+    if (isStaff(req.user)) { map.internalNote = 'internal_note'; map.seq = 'seq'; }
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
     const body = req.body || {};
@@ -2093,7 +2128,12 @@ export function ordersRoutes(app, requireAuth) {
     //
     // Best-effort and last: a notification failing must never fail an edit that has
     // already been written.
-    if (wantsItems && isStaff(req.user)) {
+    // A RENUMBER COUNTS AS A CHANGE. The number is how the seller finds the order and what
+    // their own confirmation email says, so moving it on a settled order is precisely the
+    // kind of edit they must not discover by re-reading the page. Same gate as the lines:
+    // before the money moves this is ordinary setup, after it, it alters a paid record.
+    const renumbered = body.seq !== undefined && before && String(before.seq ?? '') !== String(body.seq);
+    if ((wantsItems || renumbered) && isStaff(req.user)) {
       (async () => {
         const row = (await q('select seller_id, seq from orders where id=$1', [req.params.id])).rows[0];
         if (!row || !row.seller_id) return;
@@ -2103,7 +2143,9 @@ export function ordersRoutes(app, requireAuth) {
           userIds: [String(row.seller_id)],
           type: 'order-edited',
           title: `Order ${num} was changed`,
-          body: 'The factory updated the items on this order after it was submitted. Open it to see what changed.',
+          body: renumbered && !wantsItems
+            ? `This order used to be #${before.seq ?? '—'}. The factory renumbered it; nothing else about it changed.`
+            : 'The factory updated the items on this order after it was submitted. Open it to see what changed.',
           href: `/orders/${encodeURIComponent(req.params.id)}`,
           entityId: req.params.id,
         });

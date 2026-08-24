@@ -2355,7 +2355,9 @@ export function postItemStatus(id: string, sku: string, status: string, lineId?:
  * '', new, draft, in_review AND no approved_at); staff are ungated on that route. Both
  * writes are audited before-and-after, which is what makes them safe to expose.
  */
-export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
+/** `seq` is the `#6` LABEL, not the id — staff only, and the server refuses a duplicate
+ *  within a seller's own numbering. See OrderNumber in components/app/order-number.tsx. */
+export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; seq?: number; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(patch),

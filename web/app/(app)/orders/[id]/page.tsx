@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
+import { OrderNumber } from "@/components/app/order-number"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X } from "@phosphor-icons/react"
@@ -607,7 +608,12 @@ export default function OrderDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <h1 className="font-title text-2xl font-semibold tracking-tight">{num}</h1>
+              {/* The number is a LABEL (orders.seq), and staff can correct it in place —
+                  a mistyped one otherwise had to be lived with. Not the id: that is the key
+                  ten tables join on. See components/app/order-number.tsx. */}
+              <h1 className="font-title text-2xl font-semibold tracking-tight">
+                <OrderNumber order={order} editable={isStaff} onSaved={() => reloadAll()} />
+              </h1>
               {/*
                 * THE FACTORY READS ITS OWN VOCABULARY.
                 *

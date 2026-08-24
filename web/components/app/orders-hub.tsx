@@ -69,6 +69,7 @@ import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { numOf, platformOf, customerOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities, shipAddressOf } from "@/lib/order-format"
+import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -1924,7 +1925,13 @@ export function OrdersHub() {
                    a full Etsy number (order-columns.ts) so it should never fire. The title
                    is what covers the case it does — a longer id from a source we haven't
                    seen yet — instead of leaving an ellipsis with no way to read past it. */
- order: <div className="min-w-0 truncate tabular-nums text-sm font-semibold" title={numOf(o)}>{numOf(o)}</div>,
+ order: (
+                  /* Staff can correct the number in place — it is orders.seq, a label, and a
+                     mistyped one used to be permanent. Not the id: ten tables join on that. */
+                  <div className="min-w-0 truncate tabular-nums text-sm font-semibold" title={numOf(o)}>
+                    <OrderNumber order={o} editable={isStaff} onSaved={() => load()} />
+                  </div>
+                ),
                 /**
                  * HOW LONG THIS HAS BEEN WAITING, from the buyer's purchase.
                  *

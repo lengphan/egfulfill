@@ -20,6 +20,7 @@ import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine, shipAddressOf } from "@/lib/order-format"
+import { OrderNumber } from "@/components/app/order-number"
 import { printPackingSlips as printSlips } from "@/lib/packing-slip"
 import { canSetStage, canWalk, stagePath, normalizeStage, isException, orderStage, isFactoryOrder } from "@/lib/factory-status"
 import { TabBar } from "@/components/app/tab-bar"
@@ -1206,7 +1207,9 @@ export function DispatchBoard() {
                     <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
                       <DispStatus k={d.key} label={d.label} />
-                      <span className="truncate tabular-nums text-sm font-semibold">{numOf(o)}</span>
+                      <span className="truncate tabular-nums text-sm font-semibold">
+                        <OrderNumber order={o} editable onSaved={() => load()} />
+                      </span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
                       <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
                       {(() => {
@@ -1325,7 +1328,9 @@ export function DispatchBoard() {
  type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)}
  className="size-4 shrink-0 accent-primary" aria-label={`Select ${numOf(o)}`}
                   />
-                  <span className="truncate tabular-nums text-sm font-semibold">{numOf(o)}</span>
+                  <span className="truncate tabular-nums text-sm font-semibold">
+                    <OrderNumber order={o} editable onSaved={() => load()} />
+                  </span>
                   <span className="truncate text-sm">{customerOf(o)}</span>
                   <span className="truncate text-xs text-muted-foreground" title={o.store || undefined}>
                     {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}

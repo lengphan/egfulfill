@@ -19,6 +19,7 @@ import {
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { useT, useLabelT } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
+import { OrderNumber } from "@/components/app/order-number"
 import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
@@ -210,7 +211,9 @@ export function DashboardView() {
                   {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), t("dash.openOrder", { num: numOf(o) }))}
  className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
-                  <TableCell className="truncate tabular-nums text-xs font-semibold">{numOf(o)}</TableCell>
+                  <TableCell className="truncate tabular-nums text-xs font-semibold">
+                    <OrderNumber order={o} editable onSaved={() => load()} />
+                  </TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
                   <TableCell className="truncate text-muted-foreground">{itemsLabel(o, t("dash.item"))}</TableCell>
                   <TableCell><SellerStatusBadge order={o} /></TableCell>
