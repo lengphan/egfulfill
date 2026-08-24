@@ -336,22 +336,19 @@ export function SupportBubble() {
           )
         })}
         {/**
-          * WHAT HAPPENS NEXT, instead of a spinner.
+          * NOTHING HERE WHILE THE TEAM IS IN. The thread used to append a sentence after
+          * every message the visitor sent — "Sent. A person will reply right here — usually
+          * within 9:00–18:00 ICT, Mon–Fri." — which is §4's prose-under-a-control defect
+          * wearing a chat bubble: the message is visibly in the thread, so "Sent." reports
+          * what the screen already shows, and the hours were repeated on every single turn.
           *
-          * "thinking…" was the bot composing, and there is no bot — a spinner would say
-          * "wait here, seconds away" when the honest answer might be "we're closed until
-          * tomorrow at 9". So the last thing in the thread, once the visitor has spoken and
-          * nobody has answered yet, is a plain sentence about when someone will.
-          *
-          * The hours are the ones staff configure and the seller chat already quotes; the
-          * widget only ever repeats what the server told it, so it cannot promise
-          * availability it hasn't been given.
+          * The CLOSED case survives, because it is not a subtitle — it is the answer to
+          * "why has nobody replied", and it is the one thing the thread cannot show by
+          * itself. A visitor writing at 2am otherwise waits at a silent window.
           */}
-        {msgs.length > 0 && msgs[msgs.length - 1].role === "user" && !done && (
+        {msgs.length > 0 && msgs[msgs.length - 1].role === "user" && !done && office && office.open === false && (
           <p className="mt-3 text-xs leading-relaxed text-black/45">
-            {office && office.open === false
-              ? `Sent. The team is out of office right now${office.resumesLabel ? ` — back ${office.resumesLabel}` : ""}. Your message is with them; they'll reply right here${email ? `, and email ${email}` : ""}.`
- : `Sent. A person will reply right here${office?.hoursLabel ? ` — usually within ${office.hoursLabel}` : ""}${email ? `, and you'll get it at ${email} if you close this` : ""}.`}
+            {`The team is out of office right now${office.resumesLabel ? ` — back ${office.resumesLabel}` : ""}. Your message is with them${email ? `, and they'll email ${email}` : ""}.`}
           </p>
         )}
         {notice && <p className="mt-3 rounded-lg bg-hold/10 px-3 py-2 text-xs leading-relaxed text-hold">{notice}</p>}
@@ -426,11 +423,10 @@ export function SupportBubble() {
               Talk to support
             </button>
           )}
-          {/* Says who is answering now, in the place the offer used to be — so the space
- does not simply go blank the moment a person arrives. */}
-          {withPerson && !done && (
-            <p className="mt-2 text-xs text-black/45">You&apos;re talking to EGFUL support.</p>
-          )}
+          {/* "You're talking to EGFUL support." used to sit here. It named the thing the
+              visitor had just pressed a button to reach, under the input they were about to
+              type into — a caption on a conversation that is already on screen. The messages
+              say who is answering. */}
         </div>
       )}
     </div>

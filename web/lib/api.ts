@@ -69,9 +69,56 @@ function baseFor(): string {
 const DIRECT_API_ORIGIN = process.env.NEXT_PUBLIC_DIRECT_API_BASE ?? "https://api.egful.store"
 const DIRECT_BODY_BYTES = 1024 * 1024
 
-function originFor(body: BodyInit | null | undefined): string {
+/**
+ * THE OTHER END OF THE SAME PROBLEM: a tiny request whose RESPONSE takes a minute.
+ *
+ * The rule above recognises artwork by its size, and the note explains why that works — what
+ * the proxy gives up on is the RESPONSE, and a big body was a cheap way to spot a request
+ * that would have a slow one. Generation is the case that cheap test cannot see. An image
+ * render is a prompt: a few hundred bytes out, then 20 to 90 seconds of Google before a
+ * single byte comes back — longer on Nano Banana Pro at 4K, longer again when the model is
+ * contended and the server takes its retries. Nothing about that request looks slow.
+ *
+ * Through the `/api/:path*` rewrite the proxy stops waiting first, and its answer is not our
+ * route's: the panel sits on "Rendering…" and no error names the system that hung up. So
+ * these go straight to api.egful.store, which is one Caddy hop to Fastify with nothing in
+ * between — the same escape hatch, chosen by ROUTE because that is what the honest signal is
+ * here.
+ *
+ * Add a route here when its work happens at a provider rather than in our database.
+ */
+/* EXACT, not a prefix, for the two that have neighbours: `/api/desk/image/config` and
+   `/api/desk/images/recent` are quick reads that sit under the same words as the render, and
+   sending a config GET to a second origin buys nothing and costs a preflight. */
+const SLOW_EXACT = new Set([
+  "/api/desk/image",              // one image render
+  "/api/desk/video",              // starts a clip — the START is the slow part
+  "/api/publish/photo-generate",  // the listing studio's batch, same models
+  // Wilcom's own published limit is 90s a job. Named one by one rather than by prefix: its
+  // config and test reads sit under the same word and are quick.
+  "/api/wilcom/digitize",
+  "/api/wilcom/preview",
+  "/api/wilcom/combine",
+  "/api/wilcom/combine-preview",
+  "/api/wilcom/lettering",
+  "/api/wilcom/lettering-preview",
+  "/api/wilcom/design-preview",
+])
+const isSlow = (path: string) => SLOW_EXACT.has(path.split("?")[0])
+
+/**
+ * And a CEILING on them, so a spinner can never be forever.
+ *
+ * Four minutes is past anything the image or video START has ever taken, and the point is not
+ * the number: it is that giving up produces a SENTENCE. A fetch left hanging is the one
+ * failure a UI cannot report, because nothing ever tells it that anything went wrong.
+ */
+const SLOW_TIMEOUT_MS = 240_000
+
+function originFor(body: BodyInit | null | undefined, path: string): string {
   const base = baseFor()
   if (typeof window === "undefined" || base !== "" || !DIRECT_API_ORIGIN) return base
+  if (isSlow(path)) return DIRECT_API_ORIGIN
   // Only a string body has a length we can read without consuming it. Blob/FormData uploads
   // don't come through this client today; if one does, it keeps the normal path.
   if (typeof body === "string" && body.length > DIRECT_BODY_BYTES) return DIRECT_API_ORIGIN
@@ -140,7 +187,28 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json")
   if (token) headers.set("Authorization", `Bearer ${token}`)
 
-  const res = await fetch(`${originFor(init.body)}${path}`, { ...init, headers })
+  /* A LONG ROUTE GETS A DEADLINE, and only if the caller has not brought its own signal —
+     one that is already wired to a Cancel button must not be overridden by a timeout. */
+  const signal = init.signal ?? (isSlow(path) && typeof AbortSignal?.timeout === "function"
+    ? AbortSignal.timeout(SLOW_TIMEOUT_MS)
+    : undefined)
+
+  let res: Response
+  try {
+    res = await fetch(`${originFor(init.body, path)}${path}`, { ...init, headers, signal })
+  } catch (e) {
+    /* NAME THE FAILURE. `fetch` rejects with "Failed to fetch" for a dropped connection and a
+       DOMException for our own deadline, and neither sentence tells anyone what to do. A
+       render is the case that matters: the server keeps going after we stop listening, and it
+       posts the finished picture into the caller's assistant thread either way — so the work
+       is not lost, and saying so is the difference between "try again" and "go and look". */
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new ApiError(504, isSlow(path)
+        ? `This took longer than ${Math.round(SLOW_TIMEOUT_MS / 1000)}s, so we stopped waiting. The server may still finish it — a completed render is posted into your assistant thread.`
+        : "The server did not answer in time.")
+    }
+    throw e
+  }
   // Anything that isn't a GET may have changed what a cached list holds. Clearing on EVERY
   // write — rather than mapping each mutation to the lists it touches — is deliberate: that
   // map would have to be updated by every future route, and the first time someone forgot,
@@ -2805,6 +2873,25 @@ export function generateDeskImage(body: {
 }) {
   return api<{ ok?: boolean; attachment?: ChatAttachment; model?: string; size?: string; aspectRatio?: string; usd?: number; refsUsed?: number; disabled?: boolean; overloaded?: boolean; error?: string }>(
     `/api/desk/image`, { method: "POST", body: JSON.stringify(body) })
+}
+
+/**
+ * THE CALLER'S OWN RECENT RENDERS, newest first.
+ *
+ * Read from the thread every render is posted into, and the thread is resolved SERVER-side
+ * from the caller — a team member shares the owner's, and no client can name somebody else's.
+ * Carries no `usd`: what Google charged us is staff-only reading and the route withholds it
+ * rather than trusting a caller to hide it.
+ */
+export type DeskImageShot = {
+  url: string
+  /** The prompt it was made from, as stored (80 chars). */
+  prompt: string
+  model: string; size: string; aspect: string
+  at: string
+}
+export function getRecentDeskImages() {
+  return api<{ images: DeskImageShot[] }>(`/api/desk/images/recent`)
 }
 
 // ── Video generation (Veo 3.1), same staff-only gate and channel as images ────

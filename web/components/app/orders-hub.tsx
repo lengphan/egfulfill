@@ -39,8 +39,21 @@ import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrd
  * Module scope, not a hook, because it is asked TWICE and of different sets — once of the
  * columns being drawn, and once of the full set, to decide whether the full set even fits.
  */
-function minPxFor(cols: FactoryColId[], dispatchOn: boolean): number {
- const lead = dispatchOn ? 1.25 + 1.5 : 1.5
+function minPxFor(cols: FactoryColId[]): number {
+  /*
+   * TWO LEAD TRACKS, ALWAYS — the checkbox and the caret.
+   *
+   * This read `dispatchOn ? 1.25 + 1.5 : 1.5`, from when the checkbox rendered only on
+   * dispatchable rows. It renders on EVERY row now ("A box on every row, disabled where it
+   * can't be used"), and nothing here followed — so with dispatch off the row drew two lead
+   * children against a template that reserved one track, and every cell sat one column left
+   * of its own header. The order number landed in the 3rem Age track and truncated to
+   * "#41…", and the action cluster overflowed onto a second implicit row.
+   *
+   * That is the same defect as a stale `lead`, so it is fixed in the ONE place the number
+   * comes from rather than at the three call sites.
+   */
+ const lead = 1.25 + 1.5
  const fixed = cols.reduce((n, id) => {
  const g = FACTORY_COLS[id].grid
  const rem = /^([0-9.]+)rem$/.exec(g) ?? /^minmax\(\s*([0-9.]+)rem/.exec(g)
@@ -1108,7 +1121,7 @@ export function OrdersHub() {
 
   /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
    * dispatch is on) precede the data columns; action is pinned last. */
- const gridTmpl = factoryGridTemplate(gridCols, dispatchOn ? 2 : 1)
+ const gridTmpl = factoryGridTemplate(gridCols, 2)
 
   /*
    * PHONE LAYOUT. The desktop row is ten fixed tracks that demand 1224px, so on a 390px
@@ -1184,7 +1197,7 @@ export function OrdersHub() {
    * and treating that as "too narrow" would flash the stacked layout on every desktop load —
    * the same first-frame-at-the-wrong-width problem useIsNarrow's server snapshot avoids.
    */
- const fullMinPx = useMemo(() => minPxFor(visibleData, dispatchOn), [visibleData, dispatchOn])
+ const fullMinPx = useMemo(() => minPxFor(visibleData), [visibleData])
   /*
    * THE ESTIMATE, DELIBERATELY, and not the row's measured scrollWidth.
    *
@@ -1219,7 +1232,7 @@ export function OrdersHub() {
    * table does.
    */
   /** The same sum, for the columns actually being drawn — what pins the row's minWidth. */
- const gridMinPx = useMemo(() => minPxFor(gridCols, dispatchOn), [gridCols, dispatchOn])
+ const gridMinPx = useMemo(() => minPxFor(gridCols), [gridCols])
 
   // No minWidth on a phone: that figure is precisely what forces the sideways scroll, and a
   // stacked row has no need of it.
@@ -1681,6 +1694,11 @@ export function OrdersHub() {
  query={query}
  onChange={setQuery}
  catalog={catalog}
+                /* What the filters left standing, beside the button that set them. The
+ stat cards above count the whole queue, not this view, so without it a
+ narrowed board has no number anywhere on it. */
+ count={filtered.length}
+ total={orders.length}
               />
               <FactoryColumnsMenu
  order={dataColOrder}
@@ -1803,7 +1821,11 @@ export function OrdersHub() {
  className={"items-center gap-x-3 border-b border-border px-5 py-2.5 eg-label text-muted-foreground " + (narrow ? "hidden" : "grid")}
  style={{ gridTemplateColumns: rowTmpl, minWidth: rowMinPx }}
           >
-            {dispatchOn && <span />}
+            {/* TWO SPACERS, matching the row's two lead children (checkbox, caret). The
+                first was `{dispatchOn && <span />}` while the row's checkbox is
+                unconditional — one missing header cell is what shifted every column left of
+                its label. */}
+            <span />
             <span />
             {gridCols.map((id) =>
  id === "action" ? (
@@ -1855,6 +1877,10 @@ export function OrdersHub() {
  const closed = ["cancelled", "refunded"].includes(normalizeStage(stage))
  const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
  const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
+  // The one line the narrow card shows a picture of. A queue row is recognised by its
+  // product before its number is read, and dropping the photo at the width where every
+  // other field is abbreviated takes that away exactly when it helps most.
+ const firstItem = items[0]
  const label = labels[o.id]
  const track = label?.trackingNumber || o.tracking
  const isCollapsed = !expandedIds.has(o.id)
@@ -2141,7 +2167,46 @@ export function OrdersHub() {
                        * do not fit, but their VALUES do, and a queue row that says only
                        * "1h · 1 unit" makes you open every order to find the one you want.
                        */
-                      <div className="flex min-w-0 items-start gap-1">
+                      <div className="flex min-w-0 items-start gap-2">
+                        {/*
+                          * THE CARET LEADS THE ROW, at every width.
+                          *
+                          * It used to be the LAST child here while the wide table draws it
+                          * second — so the one control whose position you learn on a desktop
+                          * moved to the opposite edge on a phone, next to the ⋯ menu it is
+                          * least like. Expanding is an act on the WHOLE row; it belongs at
+                          * the row's start, where the checkbox already is, and the same place
+                          * your eye lands on the table version.
+                          *
+                          * size-8 (32px) not size-6: this is the touch target on a phone.
+                          */}
+                        <button
+ onClick={() => toggleCollapse(o.id)}
+ aria-expanded={!isCollapsed}
+ aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
+ className="-my-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors active:bg-accent"
+                        >
+                          <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
+                        </button>
+                        {/*
+                          * ONE PICTURE, AND IT SURVIVES THE NARROWING.
+                          *
+                          * NARROW_COLS drops `items`, so the product photo — the fastest way
+                          * to recognise a row on a floor — disappeared at exactly the width
+                          * where the text is most abbreviated. It is not a column here; it is
+                          * one 40px thumb of the FIRST line, which is what "just one image"
+                          * means for a row that may hold six.
+                          *
+                          * `readOnly` and `bare`: on a phone this identifies the order, it is
+                          * not a drop target or an edit affordance. Those live in the expanded
+                          * detail, one tap away. A second image would be a gallery, and a
+                          * gallery is not what a queue row is for.
+                          */}
+                        {firstItem && (
+                          <span className="shrink-0">
+                            <ItemAvatar item={firstItem} designs={designs[o.id]} catalog={catalog} size={40} readOnly bare />
+                          </span>
+                        )}
                         <Link
  href={`/orders/${encodeURIComponent(o.id)}`}
  className="-my-1 block min-w-0 flex-1 rounded-lg py-1 transition-colors active:bg-accent/60"
@@ -2164,14 +2229,6 @@ export function OrdersHub() {
                             <span className="shrink-0">{platformOf(o)}</span>
                           </div>
                         </Link>
-                        <button
- onClick={() => toggleCollapse(o.id)}
- aria-expanded={!isCollapsed}
- aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
- className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors active:bg-accent"
-                        >
-                          <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
-                        </button>
                       </div>
                     ) : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 

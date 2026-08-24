@@ -23,7 +23,11 @@ const SWATCH: Record<string, string> = {
  red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e", forest: "#2f5540",
  pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
 }
-const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
+/** The mapped hex, or null when this map has never heard of the colour. The difference
+ *  matters on this page: a colour we cannot draw is shown as its NAME rather than as the
+ *  generic grey every other unmapped colour would also get — forty identical grey dots is
+ *  not a swatch row, it is a picture of a broken one. */
+const knownHex = (name: string): string | null => SWATCH[name.toLowerCase().trim()] ?? null
 
 /**
  * Every PHOTO we can show — colour shots, the gallery, the hero — de-duped.
@@ -69,6 +73,8 @@ export default function ProductDetailPage() {
  const id = decodeURIComponent(String(params?.id ?? ""))
  const [products, setProducts] = useState<CatalogProduct[] | null>(null)
  const [active, setActive] = useState(0)
+  /** The swatch under the cursor (or keyboard focus), named beside the Colors count. */
+ const [hoverColor, setHoverColor] = useState<string | null>(null)
   // The platform's shipping fees — the other half of what a seller pays. Seller-safe read,
   // so this page shows the same two numbers a board or the public site does.
  const [fees, setFees] = useState<DesignFees | null>(null)
@@ -237,10 +243,19 @@ export default function ProductDetailPage() {
           <SectionCard title="Variants">
             <div className="space-y-4 p-5">
               <div>
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Colors ({colors.length})
+                {/* THE NAME LIVES ON THE HEADING, NOT ON EVERY CHIP.
+                    A named pill per colour is fine for six and a wall for sixty — a supplier
+ style carries forty-plus, so this block was taller than the photo and the
+ grid of words had no shape to scan. The swatches are the same object the
+ product CARD uses, at the size a fingertip can hit, and the one you are
+ pointing at names itself up here where the count already is. */}
+                <div className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span>Colors ({colors.length})</span>
+                  {/* min-h-0 not needed: the row is one line high either way, so naming a
+ colour cannot move the swatches under the cursor. */}
+                  <span className="truncate normal-case tracking-normal text-foreground">{hoverColor ?? ""}</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {colors.length ? (
  colors.map((c) => {
                       // Prefer a micro-crop of the REAL garment photo for this colour, so
@@ -249,19 +264,31 @@ export default function ProductDetailPage() {
                       // 18-entry SWATCH map (e.g. "Crystal Sky") fell back to a generic
                       // grey that was simply the wrong colour. Hex stays as the fallback.
  const img = product.colorImages?.[c]
+ const hex = knownHex(c)
+                      // Neither a photo nor a colour we can name in hex: say the word. It
+                      // is wider than a dot, and it is the only honest thing to draw.
+ if (!img && !hex) return (
+                        <span key={c} className="rounded-full border border-border px-2 py-1 text-xs">{c}</span>
+                      )
  return (
-                        <span key={c} className="flex items-center gap-1.5 rounded-full border border-border py-1 pl-1.5 pr-2.5 text-sm">
-                          <span
- className="size-5 shrink-0 rounded-full border border-black/10 bg-muted"
+                        <span
+ key={c}
  title={c}
+ aria-label={c}
+ tabIndex={0}
+                          // Focus as well as hover: forty swatches with the name only on
+                          // mouseover is forty things a keyboard cannot read.
+ onMouseEnter={() => setHoverColor(c)}
+ onMouseLeave={() => setHoverColor(null)}
+ onFocus={() => setHoverColor(c)}
+ onBlur={() => setHoverColor(null)}
+ className="size-7 shrink-0 rounded-full border border-black/10 bg-muted transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
  style={
  img
-                                ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
- : { background: swatchHex(c) }
-                            }
-                          />
-                          {c}
-                        </span>
+                              ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
+ : { background: hex as string }
+                          }
+                        />
                       )
                     })
                   ) : (

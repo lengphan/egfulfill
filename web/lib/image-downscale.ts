@@ -35,19 +35,55 @@
  * that matters is the ~4.5MB proxy body limit with base64's 33% inflation on top.
  */
 export const ALPHA_TYPES = new Set(["image/png", "image/webp", "image/avif"])
+
+/**
+ * The same rule for something that is ALREADY a data URL.
+ *
+ * A generated render arrives as a URL and a browser cut-out comes back as a PNG data URL, and
+ * neither is a `File` — so the inline editor was uploading the cut-out at full size. That is
+ * how a 4K render meets `MAX_IMG_BYTES` on the upload route (8MB) and the whole generate flow
+ * ends in "Image is over 8MB — resize it first": the model was asked for the largest picture
+ * it makes, and nothing between there and the server made it smaller.
+ *
+ * Delegates to the one implementation, so the alpha rule above is not re-derived here — the
+ * type comes off the data URL's own prefix, which is what decides whether transparency
+ * survives.
+ */
+export async function downscaleDataUrl(dataUrl: string, maxEdge = 2400, quality = 0.85): Promise<string> {
+  if (!dataUrl.startsWith("data:")) return dataUrl
+  const mime = (dataUrl.slice(5).split(";")[0] || "image/png").toLowerCase()
+  // A File wants bytes, and `size` is read by the "already small" shortcut — base64 is 4/3 of
+  // the real length, so the payload is estimated rather than decoded twice.
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1)
+  const bytes = Math.round((b64.length * 3) / 4)
+  return downscaleFrom({ type: mime, size: bytes, read: async () => dataUrl }, maxEdge, quality)
+}
+
 export async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<string> {
+  return downscaleFrom({
+    type: file.type,
+    size: file.size,
+    read: () => new Promise<string>((res, rej) => {
+      const fr = new FileReader()
+      fr.onload = () => res(String(fr.result))
+      fr.onerror = () => rej(new Error("Couldn't read the file"))
+      fr.readAsDataURL(file)
+    }),
+  }, maxEdge, quality)
+}
+
+/** One image, one rule. `read()` supplies the original as a data URL however it was held. */
+async function downscaleFrom(
+  file: { type: string; size: number; read: () => Promise<string> },
+  maxEdge: number,
+  quality: number,
+): Promise<string> {
   const keepAlpha = ALPHA_TYPES.has(file.type)
   // PNG is the only alpha format canvas can be relied on to WRITE — toDataURL falls back to
   // PNG for an unsupported type anyway, so asking for it explicitly is the honest version.
   const outType = keepAlpha ? "image/png" : "image/jpeg"
   if (keepAlpha) maxEdge = Math.min(maxEdge, 1600)
- const read = () => new Promise<string>((res, rej) => {
- const fr = new FileReader()
- fr.onload = () => res(String(fr.result))
- fr.onerror = () => rej(new Error("Couldn't read the file"))
- fr.readAsDataURL(file)
-  })
- const original = await read()
+ const original = await file.read()
  try {
  const img = await new Promise<HTMLImageElement>((res, rej) => {
  const i = new Image()

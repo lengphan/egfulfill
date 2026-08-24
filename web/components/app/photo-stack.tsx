@@ -41,6 +41,7 @@ export function PhotoStack({
   size = 72,
   readOnly,
   overlap = true,
+  showExtra = true,
 }: {
   items: OrderItem[]
   designs?: Record<string, OrderDesign> | null
@@ -51,6 +52,10 @@ export function PhotoStack({
   readOnly?: boolean
   /** Tuck each thumb under the previous one. False lays them out edge to edge. */
   overlap?: boolean
+  /** The "+2" chip for the lines that did not fit. False where the row already SAYS how
+   *  many there are — `itemsLabel` prints "Tote +2" and the line under it counts the units,
+   *  so the chip is the third place one row states the same number. */
+  showExtra?: boolean
 }) {
   const shown = items.slice(0, max)
   const extra = items.length - shown.length
@@ -89,7 +94,7 @@ export function PhotoStack({
           />
         </span>
       ))}
-      {extra > 0 && (
+      {extra > 0 && showExtra && (
         <span
           className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground shadow-sm ring-1 ring-black/10"}
           style={{ width: size, height: size }}

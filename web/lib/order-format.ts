@@ -146,11 +146,17 @@ export const lineFactsOf = (it: OrderItem) =>
 export const unitsOf = (o: OrderRow) => (o.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
 export const lineTotal = (it: OrderItem) => (Number(it.unit_price) || 0) * (Number(it.qty) || 1)
 
-export const itemsLabel = (o: OrderRow) => {
+/** The two PARTS of that label, for a cell that must not let the count be truncated away.
+ *  Same rule, one implementation — `itemsLabel` is this joined up. */
+export const itemsParts = (o: OrderRow): { first: string; extra: number } => {
   const items = o.items ?? []
-  if (!items.length) return "—"
-  const first = items[0]?.name || items[0]?.sku || "Item"
-  return items.length > 1 ? `${first} +${items.length - 1}` : first
+  if (!items.length) return { first: "—", extra: 0 }
+  return { first: items[0]?.name || items[0]?.sku || "Item", extra: items.length - 1 }
+}
+
+export const itemsLabel = (o: OrderRow) => {
+  const { first, extra } = itemsParts(o)
+  return extra > 0 ? `${first} +${extra}` : first
 }
 
 export const fmtDate = (s?: string | null) => {

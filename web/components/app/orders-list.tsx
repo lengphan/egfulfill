@@ -30,7 +30,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
+import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
@@ -65,9 +65,24 @@ function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderD
  case "customer": return <span className="font-medium">{customerOf(o)}</span>
  case "items": return (
       <div className="flex min-w-0 items-center gap-2.5">
-        <PhotoStack items={o.items ?? []} designs={designs} catalog={catalog} />
+        {/* ONE PICTURE PER ROW.
+            The strip drew up to three overlapping thumbs, and on a seller's own board that is
+            the same number said three times: `itemsLabel` beside it already prints "Tote +2",
+            the line under that counts the units, and the photos are what a row is SCANNED by
+            — a smudge of two artworks tucked behind each other is worse at that job than one
+            picture of the first item. The factory boards keep the stack: they are reading
+            what is in the parcel, not which of their own orders this is. */}
+        <PhotoStack items={o.items ?? []} designs={designs} catalog={catalog} max={1} showExtra={false} />
         <div className="min-w-0">
-          <div className="truncate text-sm">{itemsLabel(o)}</div>
+          {/* The "+2" SITS OUTSIDE THE TRUNCATION. It is the only place the other lines are
+              counted now that the photo strip is one picture, and a long first name would
+              otherwise cut off the one word that says there are more. */}
+          <div className="flex min-w-0 items-baseline gap-1 text-sm">
+            <span className="truncate">{itemsParts(o).first}</span>
+            {itemsParts(o).extra > 0 && (
+              <span className="shrink-0 text-muted-foreground tabular-nums">+{itemsParts(o).extra}</span>
+            )}
+          </div>
           <div className="truncate text-xs text-muted-foreground">{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</div>
         </div>
       </div>

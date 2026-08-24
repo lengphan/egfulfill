@@ -300,6 +300,25 @@ export function EditableText({ path, children }: { path: ContentPath; children: 
 }
 
 /**
+ * THE DRAFT VALUE FOR A PATH, or what the server rendered.
+ *
+ * `EditableText` renders the draft because it owns the node the words are in. A figure does
+ * not: `EditableImage` wraps whatever the page already draws, and that child was handed
+ * `content.hero.image` — the SERVER's copy — so generating or uploading a picture wrote the
+ * new URL into the draft and the page went on showing the old one. Nothing appeared to
+ * happen until Save, which is the exact round trip this mode exists to remove, and it made a
+ * working generate look like a broken one.
+ *
+ * So the src comes through here. Off, it is the published value and the hook adds nothing.
+ */
+export function useEditableSrc(path: ContentPath, fallback: string): string {
+  const { on, read } = useEditMode()
+  if (!on) return fallback
+  const v = read(path)
+  return typeof v === "string" ? v : fallback
+}
+
+/**
  * The figure, replaceable from the page.
  *
  * This is the round trip the whole thing exists to remove, so it accepts a file the two ways

@@ -1421,10 +1421,16 @@ export function DesignCanvasDialog({
  const [dlBusy, setDlBusy] = useState<string | null>(null)
  const [fileBusy, setFileBusy] = useState(false)
  const [dlErr, setDlErr] = useState<string | null>(null)
- useEffect(() => {
- if (!open) return   // read for sellers too — it drives their "you uploaded your file" status
- const t = setTimeout(() => {
- getDesignFiles(orderId)
+  /**
+   * WHAT THE SERVER HAS ON THIS LINE — the list, and the two flags that hang off it.
+   *
+   * Hoisted out of the effect because a REMOVAL has to leave all three agreeing: `hasFile`
+   * decides the fee tier and `latestMachine` feeds the stitch preview, so dropping a row from
+   * the list alone would leave the window claiming a machine file it no longer has. One
+   * function, called on open and after a delete — two copies of this is how they drift.
+   */
+ const loadLineFiles = useCallback(() => {
+ return getDesignFiles(orderId)
         .then((rows) => {
           // filesForLine, not a sku match. Keying on sku alone meant a file filed against
           // ONE line showed on every sibling of the same SKU — and on a marketplace line,
@@ -1449,9 +1455,46 @@ export function DesignCanvasDialog({
  setLatestMachine(newest ? { designId: newest.designId, name: newest.name || "Machine file" } : null)
         })
         .catch(() => { setHasFile(false); setLatestMachine(null); setLineFiles([]) })
-    }, 0)
+  }, [orderId, item.sku, item.line_id])
+
+ useEffect(() => {
+ if (!open) return   // read for sellers too — it drives their "you uploaded your file" status
+ const t = setTimeout(() => { void loadLineFiles() }, 0)
  return () => clearTimeout(t)
-  }, [open, orderId, item.sku, item.line_id])
+  }, [open, loadLineFiles])
+
+  /**
+   * TAKE A FILE OFF THE LINE.
+   *
+   * These rows have been read-only-with-a-download since they arrived, so a stitch file sent
+   * against the wrong line — or the second copy of one — could be opened and never removed
+   * from the window that shows it. The only way out was the order's own Files panel on
+   * another screen. `deleteDesignFile` was already imported into this file and never called,
+   * which is the shape of a control somebody meant to add.
+   *
+   * STAFF ONLY, because the route is: the server answers 403 for a seller, and a ✕ that is
+   * always refused is worse than no ✕. `filesLocked` hides it too — that is the submitted
+   * seller-side case, where a file underneath a running job is not ours to swap.
+   *
+   * Confirmed, and the sentence is the one design-files-panel already asks, so the two places
+   * that can delete a file ask the same question rather than inventing two.
+   */
+ const removeLineFile = async (f: { designId: string; name: string }) => {
+ if (!(await confirm({ title: `Remove ${f.name || "this file"}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
+ setDlBusy(f.designId); setDlErr(null)
+ try {
+ const r = await deleteDesignFile(f.designId)
+ if (r?.error) throw new Error(r.error)
+      // The row goes at once — the re-read is what makes the flags right, not what makes the
+      // list look right, and waiting for a round trip to drop a row you just deleted reads
+      // as a press that did nothing.
+ setLineFiles((prev) => prev.filter((x) => x.designId !== f.designId))
+ await loadLineFiles()
+ onSaved?.()
+    } catch (e) {
+ setDlErr(e instanceof Error ? e.message : "Could not remove that file.")
+    } finally { setDlBusy(null) }
+  }
  const hasMachineFile = hasFile || justAttachedFile
  /**
    * WHAT SAVE CAN ACT ON — artwork on any face, OR a machine file.
@@ -2649,11 +2692,14 @@ export function DesignCanvasDialog({
                     name: f.name || "Untitled file",
                     /* The format, or what is happening to the row — the sub-line carries
                        FACTS, and "Downloading…" is one while it is true. */
-                    note: dlBusy === f.designId ? "Downloading…" : fileRoleLabel(f.kind),
+                    note: dlBusy === f.designId ? "Working…" : fileRoleLabel(f.kind),
                     /* NO status here. FileRow's "uploading" prints "Uploading…" under the
                        name, and this row is DOWNLOADING — the same spinner would be saying
                        the opposite of what is happening. */
                     onDownload: () => void downloadFile(f.designId, f.name),
+                    /* The same ✕ the artwork row above has, on the same terms. Undefined
+                       rather than disabled for a seller: the row is still theirs to open. */
+                    onRemove: isStaff && !filesLocked ? () => void removeLineFile(f) : undefined,
                   }}
                 />
               ))}
@@ -3190,10 +3236,12 @@ export function DesignCanvasDialog({
               )}
               <div className="min-w-0 space-y-1 text-sm">
                 <div className="font-medium">{item.name || item.sku || "This line"}</div>
+                {/* NAMES THE LANE IT ACTUALLY LANDS IN. This said "In progress" long after
+ sendToBoard was changed to file in Incoming (see the note there), so the
+ one thing the dialog existed to state was the one thing it got wrong. */}
                 <p className="text-muted-foreground">
-                  It lands in <span className="font-medium text-foreground">In progress</span> as
- work already under way — not in Incoming, which is where designers pick up
- new jobs of their own.
+                  It lands in <span className="font-medium text-foreground">Incoming</span>,
+ where designers pick up new jobs.
                 </p>
               </div>
             </div>
