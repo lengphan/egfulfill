@@ -4,6 +4,7 @@ import { Check } from "@phosphor-icons/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import { LabelRule, CutoutFigure, SpecStrip, CAPS } from "@/components/marketing/bold-figure"
+import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * Features, in the house style. The same six capabilities and the same copy — restated as a
@@ -26,19 +27,22 @@ import { LabelRule, CutoutFigure, SpecStrip, CAPS } from "@/components/marketing
  */
 export function BoldFeatures({ content }: { content: SiteContent }) {
   const p = content.featuresPage
+  const { on: editing } = useEditMode()
+  /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
+  const figureSrc = useEditableSrc("featuresPage.figure.image", p.figure.image)
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero title={p.title} accent={p.accent} sub={p.sub} />
+      <PlateHero title={p.title} accent={p.accent} sub={p.sub} path="featuresPage" />
 
       {/* The band of figures, where the reference puts it: directly under the hero, divided by
           rules rather than boxed. Every value is a countable fact — see the note in
           lib/site-content.ts on why none of them is a rate or a total. */}
       {p.stats.length > 0 && (
         <section className="mx-auto max-w-[88rem] px-6 sm:px-10 pb-4">
-          <LabelRule left={p.ruleLeft} right={p.ruleRight} className="mb-10" />
+          <LabelRule left={p.ruleLeft} right={p.ruleRight} leftPath="featuresPage.ruleLeft" rightPath="featuresPage.ruleRight" className="mb-10" />
           <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
-            <SpecStrip items={p.stats} />
+            <SpecStrip items={p.stats} path="featuresPage.stats" />
           </div>
         </section>
       )}
@@ -53,14 +57,22 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
         * Guarded on the image for the same reason as everywhere else — no picture renders no
         * section at all, never a grey box where a garment should be.
         */}
-      {p.figure.image && (
+      {/* THE PAGE'S FIGURE, REPLACEABLE WHERE IT SITS — same overlay the homepage hero has:
+          generate a picture from a prompt, or drop a file on it. In edit mode it renders even
+          when empty, because otherwise there is nothing on the page to drop a picture ONTO —
+          the one gesture the mode exists for would be the one it could not offer. */}
+      {(figureSrc || editing) && (
         <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-12">
-          <CutoutFigure
-            src={p.figure.image}
-            alt={p.figure.imageAlt}
-            ghost={p.figure.ghostWord}
-            callouts={p.figure.callouts}
-          />
+          <EditableImage path="featuresPage.figure.image">
+            <CutoutFigure
+              src={figureSrc}
+              alt={p.figure.imageAlt}
+              ghost={p.figure.ghostWord}
+              ghostPath="featuresPage.figure.ghostWord"
+              callouts={p.figure.callouts}
+              calloutsPath="featuresPage.figure.callouts"
+            />
+          </EditableImage>
         </section>
       )}
 
@@ -89,16 +101,16 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
                     filled accent tile beside the heading said nothing the row wasn't saying —
                     it just put a second coloured object in front of the words. The heading is
                     the thing to read. */}
-                <h2 className="text-2xl font-bold tracking-tight">{f.title}</h2>
-                {f.body && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-black/60">{f.body}</p>}
+                <h2 className="text-2xl font-bold tracking-tight"><EditableText path={`featuresPage.items.${i}.title`}>{f.title}</EditableText></h2>
+                {f.body && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-black/60"><EditableText path={`featuresPage.items.${i}.body`}>{f.body}</EditableText></p>}
               </div>
 
               {f.points && f.points.length > 0 && (
                 <ul className="space-y-2 md:w-56">
-                  {f.points.map((pt) => (
+                  {f.points.map((pt, j) => (
                     <li key={pt} className="flex items-start gap-2 text-[13px] text-black/70">
                       <Check size={13} weight="bold" className="mt-0.5 shrink-0" />
-                      {pt}
+                      <EditableText path={`featuresPage.items.${i}.points.${j}`}>{pt}</EditableText>
                     </li>
                   ))}
                 </ul>
@@ -118,10 +130,10 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
             <span className="h-px flex-1" style={{ background: "color-mix(in oklch, var(--mk-accent-ink) 40%, transparent)" }} />
           </div>
           <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
-            {p.cta.heading}
+            <EditableText path="featuresPage.cta.heading">{p.cta.heading}</EditableText>
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="ink">{p.cta.button}</Pill>
+            <Pill href="/signup" tone="ink"><EditableText path="featuresPage.cta.button">{p.cta.button}</EditableText></Pill>
           </div>
         </Rise>
       </section>

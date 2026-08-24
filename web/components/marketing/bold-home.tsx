@@ -58,7 +58,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
         {/* The brand at one end, who this is for at the other, a hairline between. ONCE, at
             the top of the page — the boards repeat it because each slide is a fresh sheet,
             and repeating it down one continuous page is just the same line four times. */}
-        <LabelRule left={hero.ruleLeft} right={hero.ruleRight} className="mb-12" />
+        <LabelRule left={hero.ruleLeft} right={hero.ruleRight} leftPath="hero.ruleLeft" rightPath="hero.ruleRight" className="mb-12" />
 
         {/*
           * TWO COLUMNS — PICTURE LEFT, WORDS RIGHT.
@@ -120,8 +120,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
               {/* Filled, then outlined with the ring. Two buttons of identical shape read as
                   one control repeated; the ring separates "the thing to do" from "the thing
                   to read first". */}
-              <Pill href="/signup" tone="accent">{hero.ctaPrimary}</Pill>
-              <Pill href="/how-it-works" tone="ghost" ring>{hero.ctaSecondary}</Pill>
+              <Pill href="/signup" tone="accent"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
+              <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
             </motion.div>
 
             {/* UNDER THE COPY, not beside the picture — see the CalloutList note. Three facts
@@ -129,7 +129,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 routes on and the evidence, which is four things instead of one big line. */}
             {hero.callouts.length > 0 && (
               <div className="mt-12 border-t pt-8" style={{ borderColor: HAIRLINE }}>
-                <CalloutList items={hero.callouts} className="flex-col gap-6 sm:flex-row sm:gap-8" />
+                <CalloutList items={hero.callouts} path="hero.callouts" className="flex-col gap-6 sm:flex-row sm:gap-8" />
               </div>
             )}
           </div>
@@ -176,7 +176,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       {stats.length > 0 && (
         <section className="mx-auto max-w-[88rem] px-6 sm:px-10">
           <div className="border-t pt-12" style={{ borderColor: HAIRLINE }}>
-            <SpecStrip items={stats} />
+            <SpecStrip items={stats} path="stats" />
           </div>
         </section>
       )}
@@ -184,9 +184,9 @@ export function BoldHome({ content }: { content: SiteContent }) {
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
         <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
-          {features.heading}
+          <EditableText path="features.heading">{features.heading}</EditableText>
         </h2>
-        <p className="mt-4 max-w-xl text-[17px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}>{features.subhead}</p>
+        <p className="mt-4 max-w-xl text-[17px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}><EditableText path="features.subhead">{features.subhead}</EditableText></p>
 
         {/*
           * NUMBERED, ALTERNATING LIGHT AND DARK, ONE CORNER CUT.
@@ -197,7 +197,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           * those, 490 outlined boxes across the app — so the board's checker does real work
           * here: it makes four things read as four things.
           */}
-        <NumberedCards items={features.cards} className="mt-14" />
+        <NumberedCards items={features.cards} path="features.cards" className="mt-14" />
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ────────────────────
@@ -207,7 +207,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
         <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
           <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
-            {steps.heading}
+            <EditableText path="steps.heading">{steps.heading}</EditableText>
           </h2>
           <div className="mt-14 grid gap-12 md:grid-cols-3">
             {steps.items.slice(0, 3).map((s, i) => (
@@ -221,8 +221,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 <div className="font-display font-semibold leading-none tracking-tighter" style={{ fontSize: "clamp(3.5rem, 7vw, 5.5rem)", color: INK, opacity: 0.13 }}>
                   {String(i + 1).padStart(2, "0")}
                 </div>
-                <h3 className="mt-3 text-xl font-bold tracking-tight">{s.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}>{s.body}</p>
+                <h3 className="mt-3 text-xl font-bold tracking-tight"><EditableText path={`steps.items.${i}.title`}>{s.title}</EditableText></h3>
+                <p className="mt-2 text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}><EditableText path={`steps.items.${i}.body`}>{s.body}</EditableText></p>
               </motion.div>
             ))}
           </div>
@@ -238,7 +238,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
         <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
           <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
             <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
-              {testimonials.heading}
+              <EditableText path="testimonials.heading">{testimonials.heading}</EditableText>
             </h2>
             <div className="mt-14 grid gap-4 md:grid-cols-3">
               {testimonials.items.slice(0, 3).map((t, i) => (
@@ -255,9 +255,9 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   {/* The quote mark is oversized — the one piece of ornament the style allows,
                       because it's type doing it. */}
                   <span aria-hidden className="block text-6xl font-display font-semibold leading-[0.6]" style={{ color: ACCENT }}>&ldquo;</span>
-                  <blockquote className="mt-3 text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.7 }}>{t.quote}</blockquote>
+                  <blockquote className="mt-3 text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.7 }}><EditableText path={`testimonials.items.${i}.quote`}>{t.quote}</EditableText></blockquote>
                   <figcaption className="mt-5 text-sm">
-                    <span className="font-bold">{t.name}</span>
+                    <span className="font-bold"><EditableText path={`testimonials.items.${i}.name`}>{t.name}</EditableText></span>
                     <span style={{ color: INK, opacity: 0.45 }}> · {t.role}</span>
                   </figcaption>
                 </motion.figure>
@@ -272,7 +272,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
       <section className="mx-auto max-w-[88rem] px-6 pb-24 pt-24 sm:px-10">
         <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
           <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
-            {faq.heading}
+            <EditableText path="faq.heading">{faq.heading}</EditableText>
           </h2>
           {/* The answers are a reading column even though the section is full width: a line of
               body copy 1,400px long cannot be read, and full-bleed applies to the SECTION, not
@@ -281,10 +281,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
             {faq.items.map((f, i) => (
               <details key={i} className={`group py-5 ${i > 0 ? "border-t" : ""}`} style={i > 0 ? { borderColor: HAIRLINE } : undefined}>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-left text-lg font-bold tracking-tight [&::-webkit-details-marker]:hidden">
-                  {f.q}
+                  <EditableText path={`faq.items.${i}.q`}>{f.q}</EditableText>
                   <span aria-hidden className="shrink-0 text-2xl font-display font-semibold transition-transform duration-200 group-open:rotate-45">+</span>
                 </summary>
-                <p className="mt-3 max-w-2xl text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.6 }}>{f.a}</p>
+                <p className="mt-3 max-w-2xl text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.6 }}><EditableText path={`faq.items.${i}.a`}>{f.a}</EditableText></p>
               </details>
             ))}
           </div>
@@ -304,15 +304,15 @@ export function BoldHome({ content }: { content: SiteContent }) {
         transition={{ duration: 0.7, ease: EASE }}
       >
         <div className="mx-auto max-w-[88rem]">
-          <LabelRule left={hero.ruleLeft} right={hero.ruleRight} tone="light" className="mb-16" />
+          <LabelRule left={hero.ruleLeft} right={hero.ruleRight} leftPath="hero.ruleLeft" rightPath="hero.ruleRight" tone="light" className="mb-16" />
           {/* ACID on the accent — 16.66:1 on `studio`, 5.07 on `press`. Measured on every skin
               by tools/check-skins.mjs, which is the only reason this line can be written. */}
           <h2 className="max-w-[48rem] font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 5.4vw, 4.4rem)", color: ACID }}>
-            {cta.heading}
+            <EditableText path="cta.heading">{cta.heading}</EditableText>
           </h2>
-          <p className="mt-5 max-w-lg text-[17px] leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.72 }}>{cta.subhead}</p>
+          <p className="mt-5 max-w-lg text-[17px] leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.72 }}><EditableText path="cta.subhead">{cta.subhead}</EditableText></p>
           <div className="mt-10">
-            <Pill href="/signup" tone="acid" ring>{cta.button}</Pill>
+            <Pill href="/signup" tone="acid" ring><EditableText path="cta.button">{cta.button}</EditableText></Pill>
           </div>
         </div>
       </motion.section>

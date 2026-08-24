@@ -3,6 +3,7 @@
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import { LabelRule, CutoutFigure, SpecStrip, NumberedCards, CAPS } from "@/components/marketing/bold-figure"
+import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * How it works. Three steps, then the seller-facing status flow.
@@ -46,10 +47,13 @@ const toneFor = (label: string) => JOURNEY_TONE[label.trim().toLowerCase()] ?? "
 
 export function BoldHow({ content }: { content: SiteContent }) {
   const p = content.howPage
+  const { on: editing } = useEditMode()
+  /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
+  const figureSrc = useEditableSrc("howPage.figure.image", p.figure.image)
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero title={p.title} accent={p.accent} sub={p.sub} />
+      <PlateHero title={p.title} accent={p.accent} sub={p.sub} path="howPage" />
 
       {/*
         * ── THE BAND OF FIGURES ────────────────────────────────────────────────────
@@ -64,9 +68,9 @@ export function BoldHow({ content }: { content: SiteContent }) {
         */}
       {p.stats.length > 0 && (
         <section className="mx-auto max-w-[88rem] px-6 sm:px-10 pb-4">
-          <LabelRule left={p.ruleLeft} right={p.ruleRight} className="mb-10" />
+          <LabelRule left={p.ruleLeft} right={p.ruleRight} leftPath="howPage.ruleLeft" rightPath="howPage.ruleRight" className="mb-10" />
           <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
-            <SpecStrip items={p.stats} />
+            <SpecStrip items={p.stats} path="howPage.stats" />
           </div>
         </section>
       )}
@@ -84,15 +88,22 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * space where a diagram should be is precisely the empty-state-that-looks-broken §4
         * forbids. No picture means no section, and the steps follow the figures directly.
         */}
-      {p.figure.image && (
+      {/* REPLACEABLE WHERE IT SITS — the same overlay the homepage hero has. In edit mode the
+          section renders with no picture too, because otherwise there is nothing to drop one
+          ONTO; a visitor still sees nothing. */}
+      {(figureSrc || editing) && (
         <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-14">
-          <CutoutFigure
-            tone="ink"
-            src={p.figure.image}
-            alt={p.figure.imageAlt}
-            ghost={p.figure.ghostWord}
-            callouts={p.figure.callouts}
-          />
+          <EditableImage path="howPage.figure.image">
+            <CutoutFigure
+              tone="ink"
+              src={figureSrc}
+              alt={p.figure.imageAlt}
+              ghost={p.figure.ghostWord}
+              ghostPath="howPage.figure.ghostWord"
+              callouts={p.figure.callouts}
+              calloutsPath="howPage.figure.callouts"
+            />
+          </EditableImage>
         </section>
       )}
 
@@ -107,7 +118,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * the card draws it, rather than being lost or hand-rolled beside the component.
         */}
       <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-14">
-        <NumberedCards items={p.steps} />
+        <NumberedCards items={p.steps} path="howPage.steps" />
       </section>
 
       {/* The real status flow. Tones are the product's own, deliberately not re-tinted. */}
@@ -119,10 +130,10 @@ export function BoldHow({ content }: { content: SiteContent }) {
               as a section. The divider does the same job and adds no colour. */}
           <div className="max-w-4xl border-t pt-16" style={{ borderColor: HAIRLINE }}>
             <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
-              {p.journeyHeading}
+              <EditableText path="howPage.journeyHeading">{p.journeyHeading}</EditableText>
             </h2>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/55">
-              {p.journeyNote}
+              <EditableText path="howPage.journeyNote">{p.journeyNote}</EditableText>
             </p>
 
             {/*
@@ -146,9 +157,9 @@ export function BoldHow({ content }: { content: SiteContent }) {
                   className="grid gap-2 py-5 sm:grid-cols-[7rem_1fr] sm:items-baseline sm:gap-6"
                 >
                   <span className={"inline-flex w-fit rounded-full px-3 py-1 text-[13px] font-semibold " + toneFor(j.label)}>
-                    {j.label}
+                    <EditableText path={`howPage.journey.${i}.label`}>{j.label}</EditableText>
                   </span>
-                  <span className="text-[15px] leading-relaxed text-black/65">{j.body}</span>
+                  <span className="text-[15px] leading-relaxed text-black/65"><EditableText path={`howPage.journey.${i}.body`}>{j.body}</EditableText></span>
                 </Rise>
               ))}
             </div>
@@ -166,10 +177,10 @@ export function BoldHow({ content }: { content: SiteContent }) {
             <span className="h-px flex-1" style={{ background: "color-mix(in oklch, var(--mk-accent-ink) 40%, transparent)" }} />
           </div>
           <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
-            {p.cta.heading}
+            <EditableText path="howPage.cta.heading">{p.cta.heading}</EditableText>
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="ink">{p.cta.button}</Pill>
+            <Pill href="/signup" tone="ink"><EditableText path="howPage.cta.button">{p.cta.button}</EditableText></Pill>
           </div>
         </Rise>
       </section>

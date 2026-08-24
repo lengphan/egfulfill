@@ -118,6 +118,25 @@ function blankCandidates(cell) {
   return out.filter(Boolean);
 }
 
+/**
+ * OUR CODE, OR NOTHING — never the supplier's. MIRRORS ourSku() in web/lib/variant-resolve.ts.
+ *
+ * `catalog_products.sku` is meant to hold the code WE assigned (`EG-1002`), with the vendor's
+ * part number kept apart in `supplierSku`. On 8 of 30 live products it does not — a supplier
+ * import wrote the vendor's own code into it, so everything printing a sku was printing
+ * OTTO's and S&S's part numbers: the sheet's Blank Product dropdown, the grid, every variant
+ * strip. §2.9 in its quietest form — not a field called `supplier`, just a number that pastes
+ * into a distributor's search box.
+ *
+ * DISPLAY ONLY. Nothing routes on it: stock is still held against `sku`, matchProduct still
+ * matches on it, and a line already carrying "10892 - Adams Headwear LP104" still resolves,
+ * because both resolvers try the whole string and then each half.
+ */
+export function ourSku(sku) {
+  const s = String(sku == null ? '' : sku).trim();
+  return /^EG-/i.test(s) ? s : '';
+}
+
 export function matchProduct(idx, item) {
   const blank = String(item.blank || '').trim();
   if (blank) {

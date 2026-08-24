@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight } from "@phosphor-icons/react"
 import { entrance, type PresetName } from "@/lib/motion"
 import { useMotionPreset } from "./motion-provider"
+import { EditableText, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * The marketing style kit — every primitive the bold pages share.
@@ -449,10 +450,21 @@ export function Rise({ children, preset = "rise", index = 0, delay = 0, classNam
  * the window; the header goes transparent on these routes (site-header.tsx). Add the route to
  * PLATE_ROUTES there or the header will sit on a white bar above the plate.
  */
-export function PlateHero({ title, accent, sub, children }: {
+export function PlateHero({ title, accent, sub, children, path }: {
   title: string; accent?: string; sub?: string; children?: React.ReactNode
+  /**
+   * Where these three strings live in the content blob ("featuresPage", "howPage"), so the
+   * page's own headline is editable where it is read. Without it the hero renders exactly as
+   * before — which is every page whose copy is not stored yet.
+   *
+   * The ANIMATED forms are swapped for plain editable ones while editing, the same trade the
+   * home page's headline makes: MaskedWords and TypedPhrase own the DOM they animate, so a
+   * contentEditable inside either is re-mounted mid-keystroke.
+   */
+  path?: string
 }) {
   const reduce = useReducedMotion()
+  const { on: editing } = useEditMode()
   // PAPER, not a plate. The full-bleed violet was 76% of the viewport at chroma 0.272 —
   // near the maximum sRGB can express at that hue — which is why it read as "too bright"
   // whichever bright colour it was. The login page uses the SAME violet at 0.9% coverage and
@@ -467,7 +479,12 @@ export function PlateHero({ title, accent, sub, children }: {
     <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
       <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
         <h1 className="mx-auto max-w-5xl text-center font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ ...DISPLAY, color: INK }}>
-          <MaskedWords text={title} />{accent ? <> <TypedPhrase text={accent} color={ACCENT} /></> : null}
+          {path && editing
+            ? <EditableText path={`${path}.title`}>{title}</EditableText>
+            : <MaskedWords text={title} />}
+          {accent ? <> {path && editing
+            ? <EditableText path={`${path}.accent`}>{accent}</EditableText>
+            : <TypedPhrase text={accent} color={ACCENT} />}</> : null}
         </h1>
         {sub && (
           <motion.p
@@ -477,7 +494,7 @@ export function PlateHero({ title, accent, sub, children }: {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
           >
-            {sub}
+            {path ? <EditableText path={`${path}.sub`}>{sub}</EditableText> : sub}
           </motion.p>
         )}
         {children}

@@ -12,6 +12,7 @@
 // Optionally set SHEETS_TEMPLATE_URL to a master template sheet sellers copy.
 
 import crypto from 'crypto';
+import { ourSku } from '../pricing.js';
 import { q } from '../db.js';
 import { productSizes, productColors } from '../variant-sku.js';
 import { methodCode, methodLabel } from '../print-route.js';
@@ -364,7 +365,9 @@ export function buildTemplate(title, lists = null) {
    * The same label is the MATCH key in column A, so the dependent colour/size/method ranges
    * keep resolving — they look the picked cell up in this column by MATCH.
    */
-  const label = (p) => (p.sku ? `${p.sku} - ${p.name}` : p.name);
+  /* OUR code, never the supplier's — one rule, imported (see ourSku in pricing.js). This
+     dropdown is the one a seller reads, and it was offering vendor part numbers. */
+  const label = (p) => (ourSku(p.sku) ? `${ourSku(p.sku)} - ${p.name}` : p.name);
   const listCols = [];
   listCols.push(['Product', ...P.map(label)]);
   AXES.forEach(([axis], a) => listCols.push([`All ${axis}`, ...UNIONS[a]]));
