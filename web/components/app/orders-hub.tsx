@@ -67,6 +67,7 @@ import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip, CHIP_TONE } from "@/components/app/readiness-dots"
 import { useT, useLabelT } from "@/lib/i18n"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
+import { consumeImportOpen } from "@/lib/sheet-return"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
@@ -451,6 +452,19 @@ export function OrdersHub() {
   // Non-error feedback from an action (what the auto-push did), cleared on the next one.
  const [note, setNote] = useState<string | null>(null)
  const [importOpen, setImportOpen] = useState(false)
+
+  /**
+   * REOPEN IMPORT when a sheet sent you back here. Without this "Back to import" lands on the
+   * board with the dialog shut, which is the same screen as pressing nothing — the button
+   * would look like it did nothing at all.
+   *
+   * Deferred by a tick and read-once: consumeImportOpen clears the flag as it reads it, so
+   * the dialog cannot reappear on every later visit to this board in the same tab.
+   */
+  useEffect(() => {
+    const id = setTimeout(() => { if (consumeImportOpen()) setImportOpen(true) }, 0)
+    return () => clearTimeout(id)
+  }, [])
   // Per-order production detail the floor needs but the board never showed: matched
   // thread cones, machine files, and how much of the blank we actually have. Fetched
   // lazily per order (on expand) so a 50-order page doesn't make 150 requests.

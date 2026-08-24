@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
+import { consumeImportOpen } from "@/lib/sheet-return"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { ColumnsMenu } from "@/components/app/columns-menu"
 import { Button } from "@/components/ui/button"
@@ -109,6 +110,19 @@ export function OrdersList() {
  const [query, setQuery] = useState("")
  const [filter, setFilter] = useState<SellerFilter>("All")
  const [importOpen, setImportOpen] = useState(false)
+
+  /**
+   * REOPEN IMPORT when a sheet sent you back here. Without this "Back to import" lands on the
+   * board with the dialog shut, which is the same screen as pressing nothing — the button
+   * would look like it did nothing at all.
+   *
+   * Deferred by a tick and read-once: consumeImportOpen clears the flag as it reads it, so
+   * the dialog cannot reappear on every later visit to this board in the same tab.
+   */
+  useEffect(() => {
+    const id = setTimeout(() => { if (consumeImportOpen()) setImportOpen(true) }, 0)
+    return () => clearTimeout(id)
+  }, [])
  const [expanded, setExpanded] = useState<string | null>(null)
   // Placed artwork per order. Fetched only when a row is opened: pulling designs for
   // every row on load would be a request per order for imagery most sellers never expand.
