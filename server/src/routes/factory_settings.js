@@ -20,7 +20,13 @@ const KEYS = [
   // line, and which one applies is decided by where the machine file comes from:
   //   we digitise it, ordinary          -> design_fee_standard
   //   we digitise it, intricate         -> design_fee_complex   (quoted and accepted first)
-  //   the seller brought their own file -> check_fee            (we verify it, not cut it)
+  //   the seller brought their own file -> NOTHING
+  //
+  // `check_fee` is RETIRED (2026-08-24) — a seller who brings their own machine file is no
+  // longer billed for us opening it. The key stays allowed and readable so an order that was
+  // already charged one can still name the amount on the seller's statement; nothing quotes
+  // or charges it any more (see computeDesignFees / chargeDesign in orders.js). Do not wire
+  // it to a new field: the default below is 0 and removing the key would break history.
   // Then the file itself is bought separately: emb_price, or emb_price_complex when the
   // work was complex. Charging and downloading are different transactions — a seller can
   // pay to have a file made and never download it.
@@ -123,7 +129,7 @@ export const SETTING_DEFAULTS = {
   // number that looks deliberate is harder to spot than one that looks unset.
   design_fee_standard: 2,   // we digitise an ordinary design
   design_fee_complex: 15,   // we digitise an intricate one — quoted, and accepted, first
-  check_fee: 1,             // the seller brought their own file and we verify it
+  check_fee: 0,             // RETIRED — see the note above; kept at 0 so nothing bills it
   emb_price_complex: 30,    // download price when the work was complex
   ship_cap: 5.99,      // caps / hats
   ship_heavy: 9.99,    // sweatshirts / hoodies / jackets

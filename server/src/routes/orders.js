@@ -3013,12 +3013,23 @@ export function ordersRoutes(app, requireAuth) {
      * Zero is a legitimate override (waive the fee) and must not fall through to the list
      * price, which is why this tests for null rather than for truthiness.
      */
+    /*
+     * THE CHECK FEE IS RETIRED (2026-08-24). A seller who brings their own machine file is
+     * not billed for us opening it.
+     *
+     * Zero rather than a deleted branch, and BEFORE the override is applied — so a typed
+     * figure cannot put the fee back by the side door. `supplied` survives as a TIER because
+     * it is a true fact about the job (this line came with its own stitch file) and it is
+     * what design_charged_at rows already recorded; only its price is gone.
+     */
     const listed = tier === 'supplied'
-      ? Number(fees.check_fee) || 0
+      ? 0
       : tier === 'complex'
         ? Number(fees.design_fee_complex) || 0
         : Number(fees.design_fee_standard) || 0;
-    const amount = (override != null && isFinite(Number(override))) ? Number(override) : listed;
+    const amount = tier === 'supplied'
+      ? 0
+      : (override != null && isFinite(Number(override))) ? Number(override) : listed;
     if (!(amount > 0)) return { charged: 0, reason: 'no-fee-set' };
     const key = lineId ? 'line_id' : 'sku';
     const row = await q(
@@ -3212,6 +3223,14 @@ export function ordersRoutes(app, requireAuth) {
     const items = []; let total = 0;
     for (const g of groups.values()) {
       const first = g.lines[0];
+      /*
+       * RETIRED, BUT NOT ERASED. The check fee is no longer quoted or charged, so a supplied
+       * line contributes nothing to this list — unless one was ALREADY taken, in which case
+       * the row stays and still names its amount. wallet_ledger is append-only and a seller
+       * who paid it is entitled to see what the payment was for; dropping the row would leave
+       * money in their statement that the order could not explain.
+       */
+      if (g.tier === 'supplied' && !g.charged) continue;
       let label, amount;
       if (g.tier === 'supplied') { label = 'Check fee'; amount = CHECK; }
       else if (g.tier === 'complex') {

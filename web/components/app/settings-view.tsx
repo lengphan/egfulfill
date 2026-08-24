@@ -1100,7 +1100,6 @@ function PlatformPanel() {
  const [designFee, setDesignFee] = useState("")
  const [designStd, setDesignStd] = useState("")
  const [designCx, setDesignCx] = useState("")
- const [checkFee, setCheckFee] = useState("")
  const [embCx, setEmbCx] = useState("")
   // base cost = supplier product cost + this. Lets a supplier sync fill in only what a
   // blank COSTS us, and the sell price follows from one number instead of a hand-typed
@@ -1185,7 +1184,6 @@ function PlatformPanel() {
  setDesignFee(r.designer_payout != null ? String(r.designer_payout) : "")
  setDesignStd(r.design_fee_standard != null ? String(r.design_fee_standard) : "")
  setDesignCx(r.design_fee_complex != null ? String(r.design_fee_complex) : "")
- setCheckFee(r.check_fee != null ? String(r.check_fee) : "")
  setEmbCx(r.emb_price_complex != null ? String(r.emb_price_complex) : "")
  setBaseMarkup(r.base_markup != null ? String(r.base_markup) : "")
  setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
@@ -1266,7 +1264,6 @@ function PlatformPanel() {
  designer_payout: designFee === "" ? undefined : Number(designFee),
  design_fee_standard: designStd === "" ? undefined : Number(designStd),
  design_fee_complex: designCx === "" ? undefined : Number(designCx),
- check_fee: checkFee === "" ? undefined : Number(checkFee),
  emb_price_complex: embCx === "" ? undefined : Number(embCx),
  base_markup: baseMarkup === "" ? undefined : Number(baseMarkup),
  expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
@@ -1443,7 +1440,12 @@ function PlatformPanel() {
         >
           <MoneyField label="Standard" value={designStd} onChange={setDesignStd} />
           <MoneyField label="Complex" value={designCx} onChange={setDesignCx} />
-          <MoneyField label="Their own file" value={checkFee} onChange={setCheckFee} />
+          {/* "Their own file" (the check fee) was here. RETIRED 2026-08-24 — a seller who
+              brings their own machine file is not billed for us opening it, so there is no
+              longer a price to set. The stored key survives so an order already charged one
+              can still name the amount; nothing quotes or charges it. Both fees above stay
+              editable here as the LIST price, and staff can still override either on the
+              order itself (DesignFeeAmount on the Summary row). */}
         </FeeGroup>
 
         <FeeGroup
