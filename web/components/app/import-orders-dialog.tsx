@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { markCameFromImport } from "@/lib/sheet-return"
 import { useRouter } from "next/navigation"
 import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -705,7 +706,7 @@ export function ImportOrdersDialog({
                   {/* SAME WINDOW. A new tab would make "Back" mean "close this", which is a
                       different promise from the one a seller who came from Orders expects —
                       and it strands the dialog open behind a tab they can no longer see. */}
-                  <Button onClick={() => { onOpenChange(false); router.push("/sheet") }}>
+                  <Button onClick={() => { markCameFromImport(); onOpenChange(false); router.push("/sheet") }}>
                     Open Sheet
                   </Button>
                 </div>

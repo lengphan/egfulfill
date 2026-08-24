@@ -55,7 +55,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities } from "@/lib/order-format"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
 import { canFetchTiktokLabel, openTiktokLabelFor } from "@/lib/tiktok-label"
@@ -67,6 +67,7 @@ import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip, CHIP_TONE } from "@/components/app/readiness-dots"
 import { useT, useLabelT } from "@/lib/i18n"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
+import { consumeImportOpen } from "@/lib/sheet-return"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
@@ -451,6 +452,19 @@ export function OrdersHub() {
   // Non-error feedback from an action (what the auto-push did), cleared on the next one.
  const [note, setNote] = useState<string | null>(null)
  const [importOpen, setImportOpen] = useState(false)
+
+  /**
+   * REOPEN IMPORT when a sheet sent you back here. Without this "Back to import" lands on the
+   * board with the dialog shut, which is the same screen as pressing nothing — the button
+   * would look like it did nothing at all.
+   *
+   * Deferred by a tick and read-once: consumeImportOpen clears the flag as it reads it, so
+   * the dialog cannot reappear on every later visit to this board in the same tab.
+   */
+  useEffect(() => {
+    const id = setTimeout(() => { if (consumeImportOpen()) setImportOpen(true) }, 0)
+    return () => clearTimeout(id)
+  }, [])
   // Per-order production detail the floor needs but the board never showed: matched
   // thread cones, machine files, and how much of the blank we actually have. Fetched
   // lazily per order (on expand) so a 50-order page doesn't make 150 requests.
@@ -2109,25 +2123,54 @@ export function OrdersHub() {
                        * opposite it, and everything else is one quiet line underneath.
                        * Same `cell` renders as the table; only the arrangement differs.
                        */
-                      <Link
+                      /*
+                       * TWO TARGETS, because the row answers two different questions.
+                       *
+                       * The identity block still opens the order. The chevron beside it
+                       * EXPANDS IN PLACE, and it was `!narrow` — rendered on a wide screen
+                       * and on no other, while nothing else on the row called
+                       * toggleCollapse. So a narrow screen had no way to open a row at all:
+                       * not a smaller affordance, an absent one. The lines, the artwork and
+                       * the readiness detail below are not gated on width and never were —
+                       * only the control that reveals them was.
+                       *
+                       * The quiet line carries WHO and WHERE as well as when and how many.
+                       * Three tracks is not a reason to print less: the wide table's columns
+                       * do not fit, but their VALUES do, and a queue row that says only
+                       * "1h · 1 unit" makes you open every order to find the one you want.
+                       */
+                      <div className="flex min-w-0 items-start gap-1">
+                        <Link
  href={`/orders/${encodeURIComponent(o.id)}`}
- className="-my-1 block min-w-0 rounded-lg py-1 transition-colors active:bg-accent/60"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="min-w-0 truncate">{cell.order}</span>
-                          <span className="shrink-0">{cell.status}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-                          {cell.age}
-                          <span aria-hidden>·</span>
-                          {cell.units}
-                          {/* `units` is the summed QUANTITY, not the number of lines — the
+ className="-my-1 block min-w-0 flex-1 rounded-lg py-1 transition-colors active:bg-accent/60"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate">{cell.order}</span>
+                            <span className="shrink-0">{cell.status}</span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                            {cell.age}
+                            <span aria-hidden>·</span>
+                            {cell.units}
+                            {/* `units` is the summed QUANTITY, not the number of lines — the
  column's own tooltip already draws that distinction ("1 line ·
-                              2 units"), and pluralising on the line count printed "2 item". */}
-                          <span>{units === 1 ? "unit" : "units"}</span>
-                          <CaretRight size={11} weight="bold" className="ml-auto shrink-0 text-muted-foreground/50" />
-                        </div>
-                      </Link>
+                                2 units"), and pluralising on the line count printed "2 item". */}
+                            <span>{units === 1 ? "unit" : "units"}</span>
+                            <span aria-hidden>·</span>
+                            <span className="min-w-0 truncate">{customerOf(o)}</span>
+                            <span aria-hidden>·</span>
+                            <span className="shrink-0">{platformOf(o)}</span>
+                          </div>
+                        </Link>
+                        <button
+ onClick={() => toggleCollapse(o.id)}
+ aria-expanded={!isCollapsed}
+ aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
+ className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors active:bg-accent"
+                        >
+                          <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
+                        </button>
+                      </div>
                     ) : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 
                     {/* One PRIMARY action for the current stage/role; everything rarer

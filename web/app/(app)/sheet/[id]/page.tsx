@@ -23,6 +23,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { cameFromImport, clearCameFromImport, requestImportOpen } from "@/lib/sheet-return"
+import { ordersHomeFor } from "@/lib/staff-nav"
+import { getUser } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { OrderGrid } from "@/components/app/order-grid"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
@@ -36,6 +39,28 @@ import {
 const AUTOSAVE_MS = 1200
 
 export default function SheetPage() {
+
+  /**
+   * WHERE BACK GOES, decided by where you came from.
+   *
+   * Read after mount, never during render: sessionStorage does not exist on the server, so
+   * deciding the label while rendering means the server says "Back" and the browser says
+   * "Back to import" — a hydration mismatch, and React throws the tree away. Deferred, the
+   * label is simply correct by the time anyone can read it.
+   */
+  const [fromImport, setFromImport] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setFromImport(cameFromImport()), 0)
+    return () => clearTimeout(id)
+  }, [])
+  const goBack = () => {
+    if (!fromImport) { clearCameFromImport(); router.push("/sheet"); return }
+    // The journey ends here, so the origin is cleared BEFORE the board is asked to reopen the
+    // dialog — otherwise the next sheet opened from the list still claims an import origin.
+    clearCameFromImport()
+    requestImportOpen()
+    router.push(ordersHomeFor(getUser()?.role))
+  }
   const router = useRouter()
   const id = String(useParams()?.id ?? "")
 
@@ -99,7 +124,7 @@ export default function SheetPage() {
       <div className="p-6">
         <div className="rounded-xl border border-border p-8 text-center">
           <div className="text-sm font-medium">That sheet isn&apos;t here</div>
-          <Button className="mt-4" variant="outline" onClick={() => router.push("/sheet")}>All sheets</Button>
+          <Button className="mt-4" variant="outline" onClick={goBack}>{fromImport ? "Back to import" : "All sheets"}</Button>
         </div>
       </div>
     )
@@ -136,7 +161,7 @@ export default function SheetPage() {
         )}
 
         <div className="ms-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => router.push("/sheet")}>Back</Button>
+          <Button variant="outline" size="sm" onClick={goBack}>{fromImport ? "Back to import" : "Back"}</Button>
           {done && <Button size="sm" onClick={copy} disabled={busy}>Duplicate to edit</Button>}
         </div>
       </div>

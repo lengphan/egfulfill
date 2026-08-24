@@ -14,6 +14,10 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { ArrowLeft } from "@phosphor-icons/react"
+import { cameFromImport, clearCameFromImport, requestImportOpen } from "@/lib/sheet-return"
+import { ordersHomeFor } from "@/lib/staff-nav"
+import { getUser } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import {
   getOrderSheets, createOrderSheet, duplicateOrderSheet, deleteOrderSheet,
@@ -25,6 +29,18 @@ const defaultName = () =>
   `Sheet · ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
 
 export default function SheetsPage() {
+
+  /**
+   * IMPORT LANDS HERE FIRST — "Open Sheet" pushes /sheet, not a sheet — and this page had no
+   * way back at all: no Back, no breadcrumb, just a list and a New sheet button. So the one
+   * step between deciding to import and having a sheet was also the step you could not undo.
+   * Read after mount for the same hydration reason as the sheet page itself.
+   */
+  const [fromImport, setFromImport] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setFromImport(cameFromImport()), 0)
+    return () => clearTimeout(id)
+  }, [])
   const router = useRouter()
   const [sheets, setSheets] = useState<OrderSheet[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -66,6 +82,16 @@ export default function SheetsPage() {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center gap-3">
+        {fromImport && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ms-2"
+            onClick={() => { clearCameFromImport(); requestImportOpen(); router.push(ordersHomeFor(getUser()?.role)) }}
+          >
+            <ArrowLeft size={14} weight="bold" /> Back to import
+          </Button>
+        )}
         <h1 className="text-xl font-semibold tracking-tight">Sheets</h1>
         <Button className="ms-auto" onClick={start} disabled={busy}>New sheet</Button>
       </div>

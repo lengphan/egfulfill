@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/marketing/site-header"
 import { MotionProvider } from "@/components/marketing/motion-provider"
 import { SupportBubble } from "@/components/marketing/support-bubble"
 import { getSiteContent } from "@/lib/site-content"
+import { EditModeProvider } from "@/components/marketing/edit-mode"
 
 /**
  * Async so the motion presets can be read HERE rather than per page.
@@ -16,7 +17,11 @@ import { getSiteContent } from "@/lib/site-content"
  * house values rather than not animating.
  */
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
-  const { motion } = await getSiteContent()
+  // The WHOLE blob, not just the presets: the inline editor seeds its draft from it, and the
+  // layout is the one place every marketing route passes through. React dedupes this with the
+  // page's own getSiteContent() inside a render, so it is still one fetch.
+  const content = await getSiteContent()
+  const { motion } = content
 
   // The header moved to components/marketing/site-header.tsx so it can read the route and
   // sit ON a full-bleed hero plate where a page has one. Still ONE component with one set of
@@ -24,6 +29,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
   // not a background that varies.
   return (
     <MotionProvider value={motion}>
+    <EditModeProvider initial={content}>
     <div className="flex min-h-svh flex-col bg-background">
       <SiteHeader />
 
@@ -94,6 +100,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
           which is authenticated, per-seller and rate-limited — is untouched. */}
       <SupportBubble />
     </div>
+    </EditModeProvider>
     </MotionProvider>
   )
 }
