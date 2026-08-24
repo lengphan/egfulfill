@@ -70,6 +70,7 @@ import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { consumeImportOpen } from "@/lib/sheet-return"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
+import { LineDownloads } from "@/components/app/line-downloads"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
@@ -2690,6 +2691,13 @@ export function OrdersHub() {
  overlays the image corner on hover (below), so it costs no
  space and stays where the image already is. */}
                           <div className="group/art relative shrink-0 self-start">
+                          {/* THE SAME CONTROL THE OPEN ORDER HAS. The board is where the floor
+                              actually stands, and the artwork and stitch file were reachable
+                              only by opening the order first — one line at a time. Both pieces
+                              it needs are already loaded here for the readiness strip, so this
+                              is the same data, not another fetch. It renders nothing on a line
+                              with no files, so a row without artwork is unchanged. */}
+                          <LineDownloads design={designForLine(designs[o.id], it)} files={dfiles[o.id]} item={it} />
                           {/* size: tall enough to span the whole identity block when the
  variant picker is open — title, the BLANK/COLOUR/SIZE/METHOD
  strip and its hint — instead of a small square floating beside
