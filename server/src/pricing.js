@@ -250,9 +250,23 @@ function unitCostOf(row, item, fees, sides = 1) {
  * Exported so the catalogue does not re-derive it. methodAddOn already handles a product's own
  * override (methodPrices) before falling back to the platform rate, and a second copy of that
  * ladder is how the sheet and the invoice come to disagree.
+ *
+ * THE TRADE RATE IS THE BASE WHEN THERE IS ONE, and this is what it got wrong.
+ *
+ * This built on sellerBaseCostOf alone, while the lookbook's headline preferred catalog_price
+ * — the rate a partner is quoted, set by hand or by the markup run on the Catalogue page. So
+ * the two halves of one document were computed off different bases and drifted by whatever
+ * the markup was. Measured on a product costing $3 with a trade rate of $7.59: the page said
+ * $7.59 and the price list said $4.40 for printing, i.e. the headline was HIGHER than the
+ * decorated price. Take the trade rate away and both read $4.40 — they agreed only on the
+ * styles nobody had priced.
+ *
+ * `row.catalog_price` is that rate. The seller cost stays as the fallback, so a style with no
+ * trade price is quoted exactly as it was.
  */
 export function priceByMethodOf(row, fees, methods) {
-  const base = sellerBaseCostOf(row, fees);
+  const trade = num(row && row.catalog_price);
+  const base = (trade != null && trade > 0) ? trade : sellerBaseCostOf(row, fees);
   if (base == null) return { print: null, embroidery: null };
   const list = (Array.isArray(methods) ? methods : []).map((m) => String(m || '').toUpperCase());
   const has = (re) => list.some((m) => re.test(m));

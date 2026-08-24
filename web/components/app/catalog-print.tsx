@@ -32,6 +32,29 @@ const sheetPrice = (st: LookbookStyle): number | null =>
  : (st.sellerPrice != null && st.sellerPrice > 0) ? st.sellerPrice
  : null
 
+/**
+ * WHAT THE PAGE QUOTES — the cheapest technique this style can actually be made in.
+ *
+ * The headline used to be sheetPrice: the BLANK. The price list beside it quotes blank +
+ * decoration. Two different questions under the same dollar sign, and nothing on the page
+ * saying which was which — so a style read "$7.59 PER UNIT" in the largest type on the sheet
+ * while its own row in the table said $15.65 for printing.
+ *
+ * A lookbook page sells a decorated garment, so it quotes one: the lowest of the methods the
+ * style offers, drawn from the SAME priceByMethod the table prints, which is what makes them
+ * agree by construction rather than by both being maintained.
+ *
+ * NULL when the style offers no technique we can price. That is a real answer — the table has
+ * always printed N/A there for the same reason, and a page cannot quote a garment we have not
+ * said we can decorate. It shows as a dash, and in edit mode the sheet says why.
+ */
+const decoratedFrom = (st: LookbookStyle): number | null => {
+  const m = st.priceByMethod
+  if (!m) return null
+  const xs = [m.print, m.embroidery].filter((n): n is number => n != null && n > 0)
+  return xs.length ? Math.min(...xs) : null
+}
+
 const money = (n: number | null | undefined) =>
  n == null ? "" : `$${(Number(n) || 0).toFixed(2)}`
 
@@ -58,7 +81,7 @@ const heroImage = (st: LookbookStyle) => st.image || st.colors.find((c) => c.ima
  * back into a value.
  */
 function Editable({
- editing, value, onSave, placeholder, multiline, className, inputClassName, children,
+ editing, value, onSave, placeholder, multiline, className, inputClassName, title, children,
 }: {
  editing: boolean
  value: string
@@ -67,6 +90,10 @@ function Editable({
  multiline?: boolean
  className?: string
  inputClassName?: string
+  /** What this field IS, when the displayed text does not say it — the price block shows the
+   *  decorated quote and edits the blank's trade rate, so it has to. §4: a control explains
+   *  itself in its label or its title, never in a sentence printed underneath. */
+ title?: string
  children: ReactNode
 }) {
  const [open, setOpen] = useState(false)
@@ -76,7 +103,7 @@ function Editable({
  return (
       <button
  type="button" onClick={() => setOpen(true)}
- title="Click to edit — this changes the catalogue, not the product"
+ title={title ?? "Click to edit — this changes the catalogue, not the product"}
  className={"text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:decoration-neutral-500 " + (className ?? "")}
       >
         {value ? children : <span className="text-neutral-400">{placeholder ?? "Add"}</span>}
@@ -727,7 +754,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     In edit mode it shows even when there ISN'T one: an unpriced style is
  exactly the page you opened this to fix, and it can't be fixed if the
  block it lives in only appears once a price exists. */}
-                {(sheetPrice(st) != null || editing) && (
+                {(decoratedFrom(st) != null || sheetPrice(st) != null || editing) && (
                   /* NO PILL. A filled lime lozenge is a badge, and a badge is what you put on
  a thing to draw attention to it — on a page with one number, the number
  already has the attention. It also pinned the sheet to a colour that has
@@ -740,14 +767,23 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  second stroke over the price was the pill's ghost — a container drawn
  around a number that does not need one. The figure alone is the loudest
  thing on the sheet because nothing else is set at that size. */
+                  /* THE NUMBER SHOWN AND THE NUMBER TYPED ARE DIFFERENT NUMBERS, on purpose.
+                     What a buyer reads is the DECORATED price, because that is what this page
+                     sells and what the price list quotes. What an editor sets is the trade
+                     rate for the blank — catalog_price, the one field the Catalogue page and
+                     the markup run also write. Showing the decorated figure in the input would
+                     invite someone to type a decorated number into a blank's field, so the
+                     Editable carries the rate and the display carries the quote, and the title
+                     says which is which rather than a sentence under the control. */
                   <div className="shrink-0 text-right" style={{ color: HOUSE.ink }}>
-                    <div className={sheetPrice(st) != null
+                    <div className={decoratedFrom(st) != null
                       ? "font-title text-4xl font-bold leading-none tabular-nums"
  : "py-2 text-sm font-medium leading-none"}>
                       <Editable
  editing={editing}
  value={sheetPrice(st) == null ? "" : String(sheetPrice(st))}
  placeholder="Set price"
+ title="The trade rate for the blank. Printing and embroidery are added on top of it."
  className="font-title text-4xl font-bold leading-none tabular-nums"
  inputClassName="w-28 text-right font-title text-2xl font-bold tabular-nums"
  onSave={(v) => {
@@ -759,10 +795,25 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  patch(st, { price: n }, { price: n })
                         }}
                       >
-                        {money(sheetPrice(st))}
+                        {decoratedFrom(st) == null ? "—" : (
+                          <>
+                            <span className="mr-1.5 align-middle text-sm font-semibold uppercase tracking-[0.14em] text-neutral-400">from</span>
+                            {money(decoratedFrom(st))}
+                          </>
+                        )}
                       </Editable>
                     </div>
-                    <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500">per unit</div>
+                    <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                      {decoratedFrom(st) == null ? "not quotable" : "printed, per unit"}
+                    </div>
+                    {/* A REFUSAL CARRIES ITS REASON — §4. Only in edit mode, and only when
+                        there is genuinely nothing to quote: this is the page you opened the
+                        mode to fix, and "N/A" on its own does not say what to do about it. */}
+                    {editing && decoratedFrom(st) == null && (
+                      <div className="mt-1 text-[9px] text-neutral-400 print:hidden">
+                        No decoration methods set on this style
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
