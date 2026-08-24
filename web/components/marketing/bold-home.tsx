@@ -2,8 +2,8 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
-import { LabelRule, CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
+import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, FIELD, HAIRLINE, EASE, MaskedWords, Pill } from "@/components/marketing/bold-kit"
+import { LabelRule, CalloutList, Chip, ArrowBadge, ObjectSlot, StatOrbs, Bento } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
 
 /**
@@ -58,55 +58,90 @@ export function BoldHome({ content }: { content: SiteContent }) {
           worth taking off those boards — the label rule, the ghost word, the numbered
           checker, the ring pill — all work at full width, which is where they are now. */}
       <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10 sm:pt-14">
-        {/* The brand at one end, who this is for at the other, a hairline between. ONCE, at
-            the top of the page — the boards repeat it because each slide is a fresh sheet,
-            and repeating it down one continuous page is just the same line four times. */}
-        <LabelRule left={hero.ruleLeft} right={hero.ruleRight} leftPath="hero.ruleLeft" rightPath="hero.ruleRight" className="mb-12" />
+        {/* A CHIP AND A MARK, on one line above the word.
+            Every reference opens with these two before the display element — a named chip on
+            a colour ground at the left, an arrow mark at the right. They give the page a top
+            edge that is not a heading, and they are the first colour a visitor meets.
+
+            THE LabelRule THAT USED TO SIT HERE IS GONE. It named the brand at the left and
+            what we do at the right — and directly beneath it the word says the brand at 184px
+            while this chip says what we do. Three lines, two facts. The rule is the one that
+            loses: a hairline with the same words on it is the weakest of the three. */}
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <Chip tone="lime" path="hero.ruleRight">{hero.ruleRight}</Chip>
+          {/* No second line under the mark, for the same reason — it was repeating the chip
+              two inches to its right. */}
+          <ArrowBadge label={hero.ctaSecondary} href="/how-it-works" labelPath="hero.ctaSecondary" />
+        </div>
 
         {/*
-          * TWO COLUMNS — PICTURE LEFT, WORDS RIGHT.
+          * ── THE WORD ────────────────────────────────────────────────────────────────
           *
-          * The single-column version put a 7rem headline across the full 88rem and orphaned
-          * the picture underneath it, which produced the two things that actually looked
-          * wrong: an empty right half beside the headline, and a figure centred under copy
-          * that was hard left, so nothing on the page shared an edge with anything else.
+          * ONE WORD, AT POSTER SCALE, WITH THE OBJECT CROSSING IT.
           *
-          * Side by side, the width is USED, and the headline no longer has to be enormous to
-          * fill a line — it drops from 7rem to 3.9rem, which is what lets the subhead, the
-          * buttons and three facts about the product all sit above the fold together. That
-          * density is most of what separates the reference from a page of big type.
+          * This replaces a two-column hero whose left half was a cut-out garment and whose
+          * right half was a 3.9rem sentence. Three things were wrong with that and all three
+          * are structural rather than cosmetic:
           *
-          * The picture is FIRST in the DOM and first on the page, which is the same order —
-          * so a screen reader meets the product before the pitch, and nothing needs `order-`
-          * to disagree with the markup.
+          *   · a SENTENCE cannot be large — a clause needs two lines and a subhead under it,
+          *     which caps the type at about 4rem, which is not a display size on a 1400px page
+          *   · the figure sat in its OWN grid column, so it touched nothing; the references
+          *     all put the object ACROSS the type, and that overlap is the only depth on the
+          *     page
+          *   · the brand appeared as a pale ghost watermark BEHIND the figure — decoration
+          *     standing in for a display element. It is the display element now.
+          *
+          * The stack is deliberate: word at the back, object over it, and nothing else inside
+          * this block. Anything more and the object has no clear ground to cross.
           */}
-        <div className="grid items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,44%)_minmax(0,1fr)]">
-          {/* IN EDIT MODE AN EMPTY FIGURE STILL RENDERS, because otherwise there is nothing on
-              the page to drop a picture onto — the one gesture that mode exists for would be
-              the one it cannot offer. A visitor still sees nothing, and with no picture the
-              grid collapses to the copy alone rather than leaving a hole where it would be. */}
-          {(heroImage || editing) && (
-            <EditableImage path="hero.image">
-              {/* The DRAFT's picture, not the published one — see useEditableSrc. A generated
-                  or uploaded figure has to appear where the old one was, immediately. */}
-              <CutoutFigure src={heroImage} alt={hero.imageAlt} ghost={hero.ghostWord} scale={heroScale} rotate={heroRotate} tall />
-            </EditableImage>
-          )}
+        <div className="relative mt-6 sm:mt-8">
+          <h1
+            className="font-display font-bold leading-[0.82] tracking-[-0.045em]"
+            style={{ fontSize: "clamp(3.2rem, 13vw, 11.5rem)", color: INK }}
+          >
+            {editing
+              ? <EditableText path="hero.word">{hero.word || hero.headline}</EditableText>
+              : <MaskedWords text={hero.word || hero.headline} />}
+          </h1>
 
+          {/* THE OBJECT, when there is one — see ObjectSlot. Sized and placed HERE rather
+              than inside the component, because where a shape should cross the word is a
+              decision about this layout, not about every layout. Right of centre and pulled
+              up over the word's cap height, which is where all four references sit theirs.
+
+              IN EDIT MODE THE BOX RENDERS EVEN WHEN EMPTY, because it is the drop target —
+              the one gesture that mode exists for would otherwise have nothing to land on.
+              A visitor with no object set sees nothing at all: §4, an empty state must never
+              be mistakable for a broken one, and a dashed rectangle in a hero is worse than
+              no object. */}
+          {(heroImage || editing) && (
+            <div className="absolute right-[4%] top-1/2 h-[clamp(13rem,26vw,24rem)] w-[clamp(13rem,26vw,24rem)] -translate-y-[58%]">
+              <EditableImage path="hero.image">
+                <ObjectSlot src={heroImage} alt={hero.imageAlt} scale={heroScale} rotate={heroRotate} />
+              </EditableImage>
+            </div>
+          )}
+        </div>
+
+        {/*
+          * ── WHAT THE WORD DOESN'T SAY ───────────────────────────────────────────────
+          *
+          * The proposition, the routes on, and the evidence — in a band under the word rather
+          * than beside it. Two columns, and the facts are RIGHT-aligned to the page edge so
+          * the band has an outer edge on both sides instead of trailing off.
+          */}
+        <div className="mt-10 grid gap-x-14 gap-y-10 border-t pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]" style={{ borderColor: HAIRLINE }}>
           <div>
-            <h1 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: INK }}>
-              <span style={{ fontSize: "clamp(2.4rem, 4.4vw, 3.9rem)" }}>
-                {editing
-                  ? <EditableText path="hero.headline">{hero.headline}</EditableText>
-                  : <MaskedWords text={hero.headline} />}{" "}
-                {editing
-                  ? <EditableText path="hero.accent">{hero.accent}</EditableText>
-                  : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
-              </span>
-            </h1>
+            <h2
+              className="max-w-[20ch] font-display font-semibold leading-[1.02] tracking-[-0.03em]"
+              style={{ fontSize: "clamp(1.75rem, 3.4vw, 2.9rem)", color: INK }}
+            >
+              <EditableText path="hero.headline">{hero.headline}</EditableText>{" "}
+              <EditableText path="hero.accent">{hero.accent}</EditableText>
+            </h2>
 
             <motion.p
-              className="mt-6 max-w-lg text-[17px] leading-relaxed text-[var(--mk-ink)]/62"
+              className="mt-5 max-w-xl text-[17px] leading-relaxed text-[var(--mk-ink)]/62"
               initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
@@ -126,16 +161,15 @@ export function BoldHome({ content }: { content: SiteContent }) {
               <Pill href="/signup" tone="accent"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
               <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
             </motion.div>
-
-            {/* UNDER THE COPY, not beside the picture — see the CalloutList note. Three facts
-                in a row across the text column, so the fold carries a claim, a subhead, two
-                routes on and the evidence, which is four things instead of one big line. */}
-            {hero.callouts.length > 0 && (
-              <div className="mt-12 border-t pt-8" style={{ borderColor: HAIRLINE }}>
-                <CalloutList items={hero.callouts} path="hero.callouts" className="flex-col gap-6 sm:flex-row sm:gap-8" />
-              </div>
-            )}
           </div>
+
+          {/* The evidence, stacked in its own column on a panel — a different SURFACE from
+              the page, which is what separates it without drawing a box round it. */}
+          {hero.callouts.length > 0 && (
+            <div className="rounded-[26px] p-7" style={{ background: FIELD }}>
+              <CalloutList items={hero.callouts} path="hero.callouts" className="flex-col gap-6" />
+            </div>
+          )}
         </div>
       </section>
 
@@ -178,29 +212,39 @@ export function BoldHome({ content }: { content: SiteContent }) {
         */}
       {stats.length > 0 && (
         <section className="mx-auto max-w-[88rem] px-6 sm:px-10">
-          <div className="border-t pt-12" style={{ borderColor: HAIRLINE }}>
-            <SpecStrip items={stats} path="stats" />
+          {/* DISCS, NOT A SPEC BAND. The same four figures under rules read as a footnote to
+              the hero — a row of small numbers you skim. Sized discs on the palette's grounds
+              are OBJECTS, so they hold the page the way the hero object does, and they are the
+              second place colour lands as an area. SpecStrip is still the right device on the
+              product and how-it-works pages, where the figures ARE specifications. */}
+          <div className="border-t pt-14" style={{ borderColor: HAIRLINE }}>
+            <StatOrbs items={stats} path="stats" />
           </div>
         </section>
       )}
 
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
-        <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+        <Chip tone="lilac">What it does</Chip>
+        <h2 className="mt-5 max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           <EditableText path="features.heading">{features.heading}</EditableText>
         </h2>
         <p className="mt-4 max-w-xl text-[17px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}><EditableText path="features.subhead">{features.subhead}</EditableText></p>
 
         {/*
-          * NUMBERED, ALTERNATING LIGHT AND DARK, ONE CORNER CUT.
+          * TILES ON MIXED GROUNDS, not four numbered boxes.
           *
-          * These ARE cards, and they are the one place on the page that should be: they are
-          * four discrete things you compare, not a container drawn round a section. Four
-          * identical bordered boxes read as a list you skim and forget — §4 has been counting
-          * those, 490 outlined boxes across the app — so the board's checker does real work
-          * here: it makes four things read as four things.
+          * The numbered checker alternated light and dark, which is one variation applied
+          * uniformly — four cards still read as four of the same thing. The bento cycles four
+          * grounds and promotes one tile to double width, so the grid has a rhythm. It also
+          * carries no border on any coloured tile: a different SURFACE separates harder than a
+          * 1px rule, and §4 has been counting the 490 outlined boxes this product already has.
           */}
-        <NumberedCards items={features.cards} path="features.cards" className="mt-14" />
+        <Bento
+          items={features.cards.map((c, i) => ({ ...c, wide: i === 0 }))}
+          path="features.cards"
+          className="mt-12"
+        />
       </section>
 
       {/* ── STEPS — numbers oversized, the way the style wants ────────────────────
@@ -209,7 +253,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
           thing that made a full-width section look like a mistake. */}
       <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
         <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
-          <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+          <Chip tone="field">How it runs</Chip>
+          <h2 className="mt-5 font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             <EditableText path="steps.heading">{steps.heading}</EditableText>
           </h2>
           <div className="mt-14 grid gap-12 md:grid-cols-3">
@@ -274,7 +319,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
               and no state to get wrong. ─────────────────────────────────────────────── */}
       <section className="mx-auto max-w-[88rem] px-6 pb-24 pt-24 sm:px-10">
         <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
-          <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
+          <Chip tone="field">Questions</Chip>
+          <h2 className="mt-5 font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             <EditableText path="faq.heading">{faq.heading}</EditableText>
           </h2>
           {/* The answers are a reading column even though the section is full width: a line of

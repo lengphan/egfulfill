@@ -967,6 +967,27 @@ td[align="right"] {
      page says so in ONE place rather than in every component that draws one. Measured
      against the ink by tools/check-skins.mjs, because card text is text. */
   --mk-card: #FFFFFF;
+
+  /* ── GROUNDS · colour is a FIELD, never a letterform ────────────────────────
+   *
+   * THIS REVERSES THE OLD RULE, deliberately. The kit used to say the acid was "a fill on
+   * the plate, never on white (1.1:1)" — which is true of acid as TYPE and was then applied
+   * to acid as a GROUND, so the one bright thing the palette owns could never be more than
+   * a word inside a black band. Measured across the whole marketing site, the acid appeared
+   * 14 times and all but a handful were small text on black. That is why the page read as
+   * white with a black box at the bottom.
+   *
+   * Black ON acid is 16.7:1. So the acid is a PANEL, a chip, a nav bar, a circle — anything
+   * that carries ink on top of it — and it is never itself ink on white. Same for the lilac.
+   * The pairing (lime + lilac + near-black on white) is the one the references all run.
+   *
+   * All four are measured against --mk-ink by tools/check-skins.mjs. */
+  --mk-lilac: #D3CBF5;
+  --mk-lilac-deep: #B4A8F0;
+  /* The neutral panel — a card that is a different SURFACE from the page rather than the
+     same white held apart by a hairline. This is what lets a bento read as tiles. */
+  --mk-field: #F1F1EF;
+
   /* The app's large-fill brand, moved with the plate so the product and the site are one
      decision. Already near-black in the base palette — this states it as the skin's rather
      than leaving the two to drift apart the next time one of them moves. */
@@ -974,37 +995,3 @@ td[align="right"] {
   --brand-foreground: oklch(1 0 0);
 }
 
-/* ── PRESS · what the site looked like before ─────────────────────────────────
- *
- * Kept, in full, and not as sentiment. Every value below was measured when it was the
- * default and the notes in bold-kit.tsx are its notes — dropping it would have thrown away
- * a working, contrast-checked palette to save nine lines, and left the picker with one
- * option, which is not a picker.
- *
- * Electric violet plate over warm paper: the banner reads modern, the page reads printed,
- * and the contrast between the two was the whole look.
- *   ink on paper 18.5:1 · paper on plate 5.68:1 · acid on plate 5.07:1 · edge on paper 3.26:1
- */
-[data-skin="press"] {
-  --mk-surface: #F2F1EC;
-  --mk-ink: #0B0B0C;
-  --mk-accent: #6633FF;
-  --mk-accent-ink: #FAF8F3;
-  /* THE ACID, not the old #1E2A78 — which check-skins.mjs caught measuring 2.10:1.
-     That value was chosen when the plate was the LIGHT periwinkle #A5B7FF, where a deep
-     navy was 6.53:1 and the kit's note still says so. The plate went to electric violet
-     #6633FF and this never moved with it: a "deeper shade of the plate's own hue" is only
-     an accent while the plate is light, and on a dark plate it is a smudge. Nothing
-     rendered it, so nobody saw it — the gate is the only reason it is known at all. */
-  --mk-plate-accent: #D4F897;
-  --mk-acid: #D4F897;
-  --mk-auth-field: #FFFFFF;
-  --mk-auth-edge: #8A8577;
-  --mk-auth-muted: #6B6659;
-  --mk-hairline: #DCD8CD;
-  /* Paper, a shade off the page — the warm equivalent of studio's white-on-white. */
-  --mk-card: #FAF8F3;
-  /* Violet fill, paper label — 5.68:1, the pair the marketing bands already run. */
-  --brand: oklch(0.5305 0.2723 283.5);
-  --brand-foreground: #FAF8F3;
-}

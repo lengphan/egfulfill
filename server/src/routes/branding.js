@@ -44,14 +44,18 @@ const DEFAULT_ACCENT = 'rose';
  * measured. A stored hex would mean the next palette is typed into a text field with nothing
  * checking it, which is the free colour picker this route has always refused.
  *
- *   studio  ink on white, one bright accent — the default
- *   press   electric violet plate over warm paper — what the site was before
+ *   studio  ink on white, lime and lilac as GROUNDS — the only skin
+ *
+ * `press` (electric violet over warm beige) was REMOVED 2026-08-24 with its CSS, at the
+ * owner's instruction. It stays out of this list deliberately: a key here whose
+ * [data-skin] block no longer exists is selectable in Settings and then silently renders the
+ * default, which is a picker that lies about what it did.
  *
  * A skin CANNOT reach --primary (it inks ~247 pieces of text as well as filling buttons),
  * the floor's status vocabulary, or --pop. Adding one means adding it to globals.css AND
  * here, then running `node tools/check-skins.mjs`.
  */
-const SKINS = ['studio', 'press'];
+const SKINS = ['studio'];
 const DEFAULT_SKIN = 'studio';
 
 /**

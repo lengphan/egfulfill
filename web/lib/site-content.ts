@@ -103,6 +103,21 @@ export type HowPage = PageHead & RuleLabels & {
 
 export type SiteContent = {
   hero: {
+    /**
+     * THE DISPLAY WORD — the hero's largest element, and the only one set at poster scale.
+     *
+     * The page used to open with a SENTENCE ("What if every order printed itself?"), which
+     * caps the type at about 3.9rem because a clause has to fit on two lines and still leave
+     * room for a subhead. Every reference opens with a WORD instead — SAPFORCE., Ascend,
+     * TESTIMONIAL — and that is what lets the type be 9rem and carry the page on its own.
+     *
+     * It replaces the ghost watermark rather than joining it. `ghostWord` set the brand
+     * enormous and pale BEHIND the figure, which is decoration standing in for a display
+     * element; the same word at full strength, with the object crossing it, is the thing the
+     * watermark was imitating. Empty falls back to the headline, so a site that never sets
+     * one still renders.
+     */
+    word: string
     /** The plain lead of the headline. */
     headline: string
     /** The italic, violet-accented tail of the headline — the brand's one flourish. */
@@ -162,10 +177,18 @@ export type SiteContent = {
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
   hero: {
-    headline: "What if every order",
-    accent: "printed itself?",
+    word: "EGFULFILL",
+    /**
+     * A STATEMENT, NOT A RHETORICAL QUESTION.
+     *
+     * "What if every order printed itself?" is the most-used opener in SaaS, and it promises
+     * magic — which actively fights what is being sold: a real factory, with people at
+     * presses, that you can watch work. The replacement says what happens and who does it.
+     */
+    headline: "Your orders,",
+    accent: "printed and shipped.",
     subhead:
-      "Etsy, Shopify & TikTok orders sync into one queue, print on a vetted network, and ship with tracking pushed back — completely hands off.",
+      "Etsy, Shopify & TikTok orders sync into one queue, print on a vetted network, and ship with tracking pushed back to the buyer.",
     ctaPrimary: "Start for free",
     ctaSecondary: "See how it works",
     worksWithLabel: "Works with",
@@ -447,6 +470,7 @@ export function mergeSiteContent(stored: unknown): SiteContent {
 
   return {
     hero: {
+      word: str(hero.word, d.hero.word),
       headline: str(hero.headline, d.hero.headline),
       accent: str(hero.accent, d.hero.accent),
       subhead: str(hero.subhead, d.hero.subhead),

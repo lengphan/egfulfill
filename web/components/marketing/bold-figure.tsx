@@ -22,7 +22,7 @@
  */
 
 import { motion, useReducedMotion } from "motion/react"
-import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE, LILAC, FIELD, TILES } from "@/components/marketing/bold-kit"
 import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
 import { EditableText } from "@/components/marketing/edit-mode"
 
@@ -476,6 +476,263 @@ export function NumberedCards({ items, className = "", path }: { items: Numbered
                 ))}
               </ul>
             )}
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+ * THE SECOND GRAMMAR — what the reference boards do that the first pass missed.
+ *
+ * The devices above put a PRODUCT on the page. These put a LAYOUT under it. Measured
+ * against four references (AIYA, Already, SAPFORCE, Ascend), the recurring moves are:
+ *
+ *   · colour as a GROUND — a chip, a nav bar, a tile, a circle — never as a letterform
+ *   · a display WORD rather than a display SENTENCE, with an object crossing it
+ *   · a small named chip above every heading, so a section announces what it is
+ *   · figures as sized discs wired to their captions by a hairline
+ *   · tiles on MIXED grounds, in a repeating rhythm, rather than one bordered box ×9
+ *
+ * The old page had one rhythm — max-w, border-t, heading, grid — eight times in a row on
+ * white, with a single black band at the end. Nothing below changes what the page SAYS; it
+ * changes whether the page has more than one kind of thing on it.
+ * ═══════════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A NAMED CHIP — the small pill that sits above a heading and says what this section is.
+ *
+ * Every reference has one and the old page had none, which is why its sections all opened
+ * the same way: straight into a 3.6rem heading with nothing to distinguish one from the
+ * next. The chip is the cheapest possible section identity, and it is the first place the
+ * palette's colour lands as an AREA rather than as type.
+ *
+ * `tone` picks a ground, and every ground here carries ink at 9:1 or better (check-skins).
+ */
+export function Chip({ children, tone = "lime", className = "", path }: {
+  children: string
+  tone?: "lime" | "lilac" | "field" | "ink"
+  className?: string
+  path?: string
+}) {
+  const ground = tone === "lime" ? ACID : tone === "lilac" ? LILAC : tone === "ink" ? ACCENT : FIELD
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-3.5 py-1.5 ${CAPS} ${className}`}
+      style={{ background: ground, color: tone === "ink" ? ACCENT_INK : INK }}
+    >
+      <Words path={path}>{children}</Words>
+    </span>
+  )
+}
+
+/**
+ * AN ARROW IN A CIRCLE, optionally with a line or two beside it.
+ *
+ * Ascend opens with exactly this: a filled disc carrying a ↗, and two small lines of text to
+ * its right. It reads as a mark rather than as a button, which is the point — it labels the
+ * page without asking to be pressed. Rendered as a link only when given an href.
+ */
+export function ArrowBadge({ label, sub, href, tone = "ink", className = "", labelPath }: {
+  label?: string
+  sub?: string
+  href?: string
+  tone?: "ink" | "lime" | "lilac"
+  className?: string
+  labelPath?: string
+}) {
+  const ground = tone === "lime" ? ACID : tone === "lilac" ? LILAC : ACCENT
+  const mark = (
+    <span
+      aria-hidden
+      className="grid size-11 shrink-0 place-items-center rounded-full text-lg"
+      style={{ background: ground, color: tone === "ink" ? ACCENT_INK : INK }}
+    >
+      ↗
+    </span>
+  )
+  const body = (
+    <span className="flex items-center gap-3">
+      {mark}
+      {(label || sub) && (
+        <span className="flex flex-col leading-tight">
+          {label && <span className="text-sm font-semibold tracking-tight"><Words path={labelPath}>{label}</Words></span>}
+          {sub && <span className="text-sm" style={{ color: INK, opacity: 0.55 }}>{sub}</span>}
+        </span>
+      )}
+    </span>
+  )
+  if (!href) return <span className={className}>{body}</span>
+  return <a href={href} className={`transition-opacity hover:opacity-70 ${className}`}>{body}</a>
+}
+
+/**
+ * THE SLOT THE OBJECT DROPS INTO.
+ *
+ * The hero object is supplied later and separately — a rendered shape, a photograph, a
+ * cut-out garment. What the layout owes it is a PLACE: a defined box, at a defined size, in a
+ * defined relationship to the type it crosses. Get that wrong and every future object has to
+ * be re-fitted by hand; get it right and dropping a new one in is one field.
+ *
+ * IT FILLS ITS CONTAINER AND THE CALLER PLACES IT. Where a shape should cross the word is a
+ * fact about one layout, not about every layout — and the placement has to be a real box with
+ * real height, because in edit mode EditableImage wraps this in a `relative` div to hang the
+ * upload controls off. An absolutely-positioned child would collapse that wrapper to zero and
+ * the admin's drop target would be unhittable while looking perfectly fine to a visitor.
+ *
+ * What matters is that the caller's box OVERLAPS the type. That overlap is the single thing
+ * separating the references from the old hero, where a flat cut-out sat politely beside the
+ * words in its own grid column and touched nothing.
+ *
+ * WITH NO OBJECT IT RENDERS NOTHING — no dashed box, no placeholder, no grey rectangle. §4:
+ * an empty state must never look like a broken feature, and a marketing page has no business
+ * showing a visitor the shape of a hole. The layout is built so the word carries the hero on
+ * its own; the object is an addition to it, never a dependency.
+ */
+export function ObjectSlot({ src, alt = "", scale = 1, rotate = 0, className = "", style }: {
+  src?: string
+  alt?: string
+  scale?: number
+  rotate?: number
+  className?: string
+  style?: React.CSSProperties
+}) {
+  const reduce = useReducedMotion()
+  if (!src) return null
+  return (
+    <motion.div
+      aria-hidden={alt ? undefined : true}
+      className={`h-full w-full ${className}`}
+      style={style}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 18 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.9, delay: 0.15, ease: EASE }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="h-full w-full object-contain"
+        style={{ transform: `scale(${scale}) rotate(${rotate}deg)` }}
+      />
+    </motion.div>
+  )
+}
+
+/**
+ * FIGURES AS DISCS, wired to their captions.
+ *
+ * Already Agency's stat block is three overlapping circles — lime, lilac, near-black — each
+ * sized to its own weight, each joined to a short caption by a hairline. It is the same
+ * information as a row of numbers under rules (SpecStrip, above) and it reads completely
+ * differently: the discs are OBJECTS, so they occupy the page the way the hero object does,
+ * and the eye lands on them instead of skimming past.
+ *
+ * Sizes descend with the list so the first figure is the biggest; the grounds cycle so three
+ * discs are three colours and a fourth starts the rhythm again rather than inventing one.
+ */
+export function StatOrbs({ items, className = "", path }: { items: Stat[]; className?: string; path?: string }) {
+  const reduce = useReducedMotion()
+  const grounds = [LILAC, ACID, ACCENT, FIELD]
+  const sizes = ["clamp(9rem, 15vw, 13rem)", "clamp(7.5rem, 12vw, 10.5rem)", "clamp(6.5rem, 10vw, 9rem)", "clamp(6rem, 9vw, 8rem)"]
+  return (
+    <div className={`flex flex-wrap items-center gap-x-10 gap-y-12 ${className}`}>
+      {items.map((s, i) => {
+        const ground = grounds[i % grounds.length]
+        const onInk = ground === ACCENT
+        return (
+          <motion.div
+            key={`${s.value}-${i}`}
+            className="flex items-center gap-5"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.88 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "0px 0px -12% 0px" }}
+            transition={{ duration: 0.6, delay: i * 0.08, ease: EASE }}
+          >
+            <div
+              className="grid shrink-0 place-items-center rounded-full text-center"
+              style={{ background: ground, width: sizes[i % sizes.length], height: sizes[i % sizes.length] }}
+            >
+              <span
+                className="font-display font-semibold leading-none tracking-[-0.03em] tabular-nums"
+                style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.2rem)", color: onInk ? ACCENT_INK : INK }}
+              >
+                <Words path={path ? `${path}.${i}.value` : undefined}>{s.value}</Words>
+              </span>
+            </div>
+            {/* The hairline is the wire. Without it a disc and a caption are two things near
+                each other; with it they are one statement. */}
+            <span aria-hidden className="hidden h-px w-8 shrink-0 sm:block" style={{ background: INK, opacity: 0.25 }} />
+            <div className="max-w-[13rem]">
+              <div className={CAPS} style={{ color: INK }}>
+                <Words path={path ? `${path}.${i}.label` : undefined}>{s.label}</Words>
+              </div>
+              {s.note && (
+                <div className="mt-1.5 text-[13px] leading-snug" style={{ color: INK, opacity: 0.55 }}>
+                  <Words path={path ? `${path}.${i}.note` : undefined}>{s.note}</Words>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * TILES ON MIXED GROUNDS — the bento.
+ *
+ * Ascend's services grid is the clearest version: same card shape throughout, but the GROUND
+ * changes — grey, white, lime — and one tile spans two columns. That variation is doing the
+ * work nine identical bordered boxes cannot, and it costs nothing but a cycling index.
+ *
+ * §4 has been counting outlined boxes across this product (490 of them). A tile here has NO
+ * border at all: it is a different surface from the page, which is a stronger separation than
+ * a 1px rule and adds no line to the page. `wide` promotes a tile to two columns so the grid
+ * has a rhythm rather than a uniform tick.
+ */
+export function Bento({ items, className = "", path }: {
+  items: { title: string; body: string; meta?: string; wide?: boolean }[]
+  className?: string
+  path?: string
+}) {
+  const reduce = useReducedMotion()
+  return (
+    <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${className}`}>
+      {items.map((it, i) => {
+        const ground = TILES[i % TILES.length]
+        const plain = ground === "var(--mk-surface)"
+        return (
+          <motion.div
+            key={`${it.title}-${i}`}
+            className={`flex flex-col rounded-[26px] p-7 ${it.wide ? "sm:col-span-2" : ""}`}
+            /* A white tile in a run of coloured ones would vanish into the page, so it — and
+               only it — keeps a hairline. Every other ground separates itself. */
+            style={{ background: ground, border: plain ? `1px solid ${HAIRLINE}` : "none" }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+            transition={{ duration: 0.5, delay: (i % 3) * 0.07, ease: EASE }}
+          >
+            <h3 className="text-lg font-semibold tracking-tight" style={{ color: INK }}>
+              <Words path={path ? `${path}.${i}.title` : undefined}>{it.title}</Words>
+            </h3>
+            {it.meta && (
+              /* The small duration/meta pill inside a card — Ascend puts "2–3 недели" here.
+                 It is a FACT about the item, which is why it may be a pill at all: §4 allows
+                 one only when it carries meaning. */
+              <span
+                className="mt-3 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
+                style={{ background: plain ? FIELD : "rgba(255,255,255,0.55)", color: INK }}
+              >
+                <Words path={path ? `${path}.${i}.meta` : undefined}>{it.meta}</Words>
+              </span>
+            )}
+            <p className="mt-4 text-[14px] leading-relaxed" style={{ color: INK, opacity: 0.62 }}>
+              <Words path={path ? `${path}.${i}.body` : undefined}>{it.body}</Words>
+            </p>
           </motion.div>
         )
       })}

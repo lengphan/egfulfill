@@ -157,6 +157,34 @@ export const ACID = "var(--mk-acid)"
 export const INK_ON_ACID = "bg-[var(--mk-ink)] text-[var(--mk-acid)]"
 
 /**
+ * ── THE GROUNDS ──────────────────────────────────────────────────────────────
+ *
+ * A colour here is a FIELD that carries ink, not a letterform. That is the whole reversal:
+ * the acid was previously allowed only as a word inside the black plate, which is why one
+ * bright colour was on the page 14 times and never once as an area. Ink on each of these is
+ * measured by tools/check-skins.mjs — lime 16.66:1, lilac 12.85:1, deep lilac 9.24:1,
+ * panel 17.51:1 — so any of them can hold a heading, a paragraph or a caption.
+ *
+ * LIME is the same value as ACID and deliberately a second name: ACID is "the accent word
+ * on the plate", LIME is "a panel on the page". Same hex, opposite jobs, and a call site
+ * reads as one or the other.
+ */
+export const LIME = "var(--mk-acid)"
+export const LILAC = "var(--mk-lilac)"
+export const LILAC_DEEP = "var(--mk-lilac-deep)"
+/** The neutral tile — a different SURFACE from the page, not white held apart by a rule. */
+export const FIELD = "var(--mk-field)"
+
+/**
+ * THE GROUNDS A TILE MAY USE, in the order a bento should cycle them.
+ *
+ * Exported as a list rather than left to each call site to pick, because the thing that makes
+ * a grid of mixed tiles read as designed is that the same few grounds recur in a rhythm —
+ * and the thing that makes it read as noise is nine tiles each choosing for themselves.
+ */
+export const TILES = [FIELD, LIME, "var(--mk-surface)", LILAC, FIELD, "var(--mk-surface)"] as const
+
+/**
  * THE AUTH GROUND — login, signup, forgot, reset.
  *
  * The marketing pages' own section tint: SURFACE under rgba(0,0,0,0.03), which computes to

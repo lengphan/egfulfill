@@ -79,6 +79,12 @@ const PAIRS = [
   ['--mk-accent-ink', '--mk-accent', TEXT, "the plate's lettering"],
   ['--mk-acid', '--mk-accent', TEXT, 'the accent, on the plate'],
   ['--mk-ink', '--mk-acid', TEXT, 'ink carried by an accent fill'],
+  // THE OTHER GROUNDS. Colour is a field here, not a letterform (see globals.css), so every
+  // one of them carries body copy and headings and is measured as text — the reason the acid
+  // could be promoted from "a word on the plate" to "a panel on the page" at all.
+  ['--mk-ink', '--mk-lilac', TEXT, 'ink carried by the lilac ground'],
+  ['--mk-ink', '--mk-lilac-deep', TEXT, 'ink carried by the deep lilac ground'],
+  ['--mk-ink', '--mk-field', TEXT, 'ink carried by the neutral panel'],
   ['--mk-plate-accent', '--mk-accent', TEXT, 'the accent word in a plate headline'],
   ['--mk-auth-muted', '--mk-surface', TEXT, 'secondary type on the auth page'],
   ['--mk-auth-edge', '--mk-auth-field', EDGE, 'the field border against the field'],

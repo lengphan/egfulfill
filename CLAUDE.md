@@ -242,9 +242,46 @@ No backend test suite. USPS smoke test: `node --env-file=.env check-usps.mjs`.
 
 ### Marketing + auth (`web/app/(marketing)/`, `/login`, `/signup`)
 
-**Ink on white, one accent.** Type does the work decoration usually does. Kit:
-[web/components/marketing/bold-kit.tsx](web/components/marketing/bold-kit.tsx) — import from
-it, never re-declare a colour or a primitive in a page.
+**REWRITTEN 2026-08-24, because the rules that stood here produced a page the owner hated.**
+Read this before the table; it is why the table changed.
+
+The old direction was *"ink on white, one accent, type does the work decoration usually
+does"*, plus a rule that the acid may be **"a fill on the plate, never on white"**. Each
+sentence is defensible; together they made a certain page impossible. Measured before the
+rewrite: the acid appeared **14 times across the whole marketing site, almost every one small
+text inside a black box.** Colour could never be an AREA. What remains once you remove colour,
+decoration and weight is white with a black band at the bottom — which is what shipped,
+repeatedly, from sessions that had read and obeyed this section.
+
+Two lessons worth keeping, because they generalise past this page:
+
+1. **A style written only as prohibitions converges on plain.** Every rule here came from a
+   real correction — no dither, no fake mockup, no mono SKUs, no subtitles — and they
+   accumulated into a list of things not to do. A blank white page satisfies all of them. A
+   house style needs a POSITIVE grammar: what a page is made of, not only what it may not be.
+2. **Verifying against the rules is not verifying the work.** §7 says to screenshot and read
+   the image back against a reference. There was no reference, so each session compared its
+   output to this file, passed, and shipped. Compliance was measured; quality was not.
+
+**The grammar now** — from four references the owner supplied (AIYA, Already, SAPFORCE,
+Ascend), which all run the same moves:
+
+- **Colour is a GROUND, not a letterform.** A chip, a nav bar, a tile, a disc — anything that
+  carries ink on top. Black on the lime is 16.7:1, on the lilac 12.9:1. The old rule measured
+  the acid as TYPE on white (1.1:1) — correct — then applied that verdict to it as a FIELD.
+- **Two hues, not one.** Lime and lilac on white, with near-black. Every reference pairs them.
+- **The display element is a WORD, not a sentence.** A clause needs two lines and a subhead
+  under it, which caps the type near 4rem — not a display size on a 1400px page. One word runs
+  at 11.5rem and carries the hero alone.
+- **The object CROSSES the type.** A figure in its own grid column touches nothing and adds no
+  depth. The overlap is the whole effect.
+- **Density is not clutter.** Corner meta, a named chip over every heading, figures as sized
+  discs wired to captions, tiles on mixed grounds. The old page had one rhythm — `max-w`,
+  `border-t`, heading, grid — eight times in a row.
+
+Kit: [bold-kit.tsx](web/components/marketing/bold-kit.tsx) and
+[bold-figure.tsx](web/components/marketing/bold-figure.tsx) — import from them, never
+re-declare a colour or a primitive in a page.
 
 **THE VALUES ARE NOT IN THE KIT ANY MORE (2026-08-21).** Every constant it exports holds a
 `var(--mk-…)` reference, and the values live in [web/app/globals.css](web/app/globals.css)
@@ -260,17 +297,25 @@ never a hex typed into a field.**
 | `ACCENT_INK` | `#FFFFFF` | what sits ON the plate |
 | `INK` | `#0A0A0A` | all display and body type |
 | `SURFACE` | `#FFFFFF` | the page |
-| `ACID` | `#D4F897` | the one bright thing — a fill on the plate, never on white (1.1:1) |
+| `ACID` | `#D4F897` | the accent WORD, on the plate only — as type on white it is 1.1:1 |
+| `LIME` | `#D4F897` | the SAME hex as a GROUND — chip, tile, disc. Ink on it is 16.7:1 |
+| `LILAC` / `LILAC_DEEP` | `#D3CBF5` / `#B4A8F0` | the second ground. 12.9:1 / 9.2:1 |
+| `FIELD` | `#F1F1EF` | the neutral tile — a different SURFACE, so it needs no border |
+| `TILES` | — | the ground rotation a bento cycles, so tiles carry a rhythm |
 | `HAIRLINE` | `#E4E4E7` | a card's rule — NOT `AUTH_EDGE`, which is a control's, at a 3:1 floor |
 
-The other skin is `press`: the electric-violet plate over warm paper `#F2F1EC` this site ran
-until 2026-08-21. It is kept in full and still measured — a picker with one option is not a
-picker — but **`studio` is the house style now**; the beige was dropped deliberately, because
-a warm off-white is the loudest signal of printed rather than made.
+`ACID` and `LIME` are one value under two names ON PURPOSE. `ACID` means "the accent word on
+the plate"; `LIME` means "a panel on the page". Same hex, opposite jobs — and a call site then
+reads as one or the other instead of leaving the reader to guess which rule applies.
 
-- **Display type is `font-semibold`, not `font-black`.** 31 uses of black at 90px were the
-  last thing on these pages reading as a poster. Tracking is `-0.03em`: a lighter weight
-  needs less of it, or the counters close.
+**There is ONE skin.** `press` — electric violet over warm beige — was removed 2026-08-24 at
+the owner's instruction. The `--mk-*` variables stay (120 call sites, including login/signup
+and the catalogue), but they are now one palette rather than a themeable layer.
+
+- **A display WORD is `font-bold` at `clamp(3.2rem, 13vw, 11.5rem)`, tracking `-0.045em`.**
+  Section headings stay `font-semibold` at `-0.03em`. The blanket "semibold, never black" was
+  aimed at 31 uses of weight 900 at 90px in running headings and was right about those; it was
+  wrong applied to the one word that is meant to be a poster.
 - **`HEX` is the escape hatch and it is narrow.** Two cases only — an `<input type="color">`,
   which resolves a variable name to `#000000` without complaining, and a colour that gets
   PERSISTED (the lookbook stores a seller's brand accent). A colour that is merely painted
