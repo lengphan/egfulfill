@@ -34,11 +34,34 @@ export type NumberedItem = { title: string; body?: string; points?: string[] }
  * tie them to, are both half a figure. Every page that can carry one carries the same shape,
  * so the editor panel for it is written once.
  */
+/**
+ * THE RANGE A FIGURE MAY BE RESIZED THROUGH — exported because the normalizer and the
+ * on-page control both enforce it, and two copies of a limit is how they come to disagree.
+ * Half size still reads as a product; past double, a cut-out at the resolution these are
+ * generated at is visibly soft.
+ */
+export const FIGURE_SCALE_MIN = 0.5
+export const FIGURE_SCALE_MAX = 2
+
 export type PageFigure = {
   /** Public URL. Wants a PNG with real alpha — see the note on hero.image. Empty renders
    *  NOTHING, which is a real answer: no placeholder where a product should be. */
   image: string
   imageAlt: string
+  /**
+   * HOW THE PICTURE SITS, not which picture it is.
+   *
+   * A generated cut-out arrives at whatever size and angle the model felt like, and the only
+   * remedy was to generate again and hope. These two are the adjustment: `imageScale`
+   * multiplies the figure's height cap, so it is a REAL resize that reflows the column rather
+   * than a transform that overlaps whatever is beside it, and `imageRotate` is degrees.
+   *
+   * Defaults are the identity — 1 and 0 — so stored content written before these existed
+   * renders exactly as it did.
+   */
+  imageScale: number
+  /** Degrees, positive clockwise. */
+  imageRotate: number
   ghostWord: string
   callouts: Callout[]
 }
@@ -104,6 +127,9 @@ export type SiteContent = {
     /** What the picture IS, for the people who don't get the picture. Falls back to something
      *  honest rather than to "hero image". */
     imageAlt: string
+    /** How the picture sits — see the note on PageFigure. 1 and 0 are "as generated". */
+    imageScale: number
+    imageRotate: number
     /** The word set huge and pale behind the figure. Empty = no ghost. */
     ghostWord: string
     /** The rule across the top of the hero: a word at each end. */
@@ -149,6 +175,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     integrations: ["Etsy", "Shopify", "TikTok Shop"],
     image: "",
     imageAlt: "A printed garment made through EGFULFILL",
+    imageScale: 1,
+    imageRotate: 0,
     ghostWord: "EGFUL",
     ruleLeft: "EGFULFILL",
     ruleRight: "PRINT ON DEMAND, FULFILLED",
@@ -244,6 +272,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     figure: {
       image: "",
       imageAlt: "A printed garment made through EGFULFILL",
+      imageScale: 1,
+      imageRotate: 0,
       ghostWord: "EGFUL",
       callouts: [
         { label: "Printed on demand", note: "Nothing is made until it sells" },
@@ -312,6 +342,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     figure: {
       image: "",
       imageAlt: "A printed garment made through EGFULFILL",
+      imageScale: 1,
+      imageRotate: 0,
       ghostWord: "EGFUL",
       /* What HAPPENS to the object, in order — which is what makes this figure a diagram of
          the process rather than a photograph with adjectives stuck to it. */
@@ -375,6 +407,12 @@ export function mergeSiteContent(stored: unknown): SiteContent {
     typeof v === "string" && v.trim() !== "" ? v : fallback
   const arr = <T,>(v: unknown, fallback: T[]) => (Array.isArray(v) && v.length ? (v as T[]) : fallback)
   const obj = (k: string) => (s[k] && typeof s[k] === "object" ? (s[k] as Record<string, unknown>) : {})
+  /* A CLAMPED NUMBER, because these two reach the DOM as a height and a rotation. Anything
+     that is not a finite number — a string from a hand-edited blob, a NaN from an empty
+     field, null from an older record — falls back rather than rendering `NaNrem`, and the
+     range is enforced here as well as in the control: the control is not the only writer. */
+  const num = (v: unknown, fallback: number, min: number, max: number) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
 
   const hero = obj("hero")
   const features = obj("features")
@@ -397,6 +435,8 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   const figureOf = (stored: Record<string, unknown>, dflt: PageFigure): PageFigure => ({
     image: typeof stored.image === "string" ? stored.image : dflt.image,
     imageAlt: str(stored.imageAlt, dflt.imageAlt),
+    imageScale: num(stored.imageScale, dflt.imageScale, FIGURE_SCALE_MIN, FIGURE_SCALE_MAX),
+    imageRotate: num(stored.imageRotate, dflt.imageRotate, -180, 180),
     ghostWord: typeof stored.ghostWord === "string" ? stored.ghostWord : dflt.ghostWord,
     callouts: Array.isArray(stored.callouts) ? (stored.callouts as Callout[]) : dflt.callouts,
   })
@@ -418,6 +458,8 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       // blank here stays blank rather than resurrecting a default image.
       image: typeof hero.image === "string" ? hero.image : d.hero.image,
       imageAlt: str(hero.imageAlt, d.hero.imageAlt),
+      imageScale: num(hero.imageScale, d.hero.imageScale, FIGURE_SCALE_MIN, FIGURE_SCALE_MAX),
+      imageRotate: num(hero.imageRotate, d.hero.imageRotate, -180, 180),
       // Blank is a real choice for all three of these — no ghost word, no rule label — so
       // they are kept as typed rather than run through `str`, which would resurrect a
       // default the admin had deliberately cleared.

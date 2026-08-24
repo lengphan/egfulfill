@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 import { LabelRule, CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
-import { EditableImage, EditableText, useEditMode, useEditableSrc } from "@/components/marketing/edit-mode"
+import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -29,6 +29,9 @@ export function BoldHome({ content }: { content: SiteContent }) {
   const { hero, stats, features, steps, testimonials, faq, cta } = content
   /** The hero figure as the DRAFT has it, so a replacement shows up before Save. */
   const heroImage = useEditableSrc("hero.image", hero.image)
+  /** How it sits, from the draft, so the rotate and resize buttons move the figure now. */
+  const heroScale = useEditableNum("hero.imageScale", hero.imageScale)
+  const heroRotate = useEditableNum("hero.imageRotate", hero.imageRotate)
   const reduce = useReducedMotion()
   // The scroll-linked parallax went with the app panel it moved. Nothing on this page
   // tracks scroll any more.
@@ -86,7 +89,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
             <EditableImage path="hero.image">
               {/* The DRAFT's picture, not the published one — see useEditableSrc. A generated
                   or uploaded figure has to appear where the old one was, immediately. */}
-              <CutoutFigure src={heroImage} alt={hero.imageAlt} ghost={hero.ghostWord} tall />
+              <CutoutFigure src={heroImage} alt={hero.imageAlt} ghost={hero.ghostWord} scale={heroScale} rotate={heroRotate} tall />
             </EditableImage>
           )}
 

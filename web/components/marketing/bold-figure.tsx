@@ -131,7 +131,7 @@ export function GhostWord({ children, color = INK, opacity = 0.05, className = "
  * `src` empty renders NOTHING — not a placeholder, not a grey box. An unset image on a live
  * marketing page must not look like a broken one (§4), and the caller decides what stands in.
  */
-export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", tall = false, className = "", ghostPath, calloutsPath }: {
+export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", tall = false, className = "", ghostPath, calloutsPath, scale = 1, rotate = 0 }: {
   /** Where the ghost word and the callouts live in the content blob, so both are editable
    *  in place. Absent → drawn exactly as before. */
   ghostPath?: string
@@ -162,6 +162,22 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
    *  24rem cap it floats in the middle of its own column and the two halves stop reading as
    *  one composition. */
   tall?: boolean
+  /**
+   * HOW THE PICTURE SITS. Both default to the identity, so every existing call renders
+   * byte-identically and nothing had to be passed at the sites that don't offer the control.
+   *
+   * `scale` multiplies the HEIGHT CAP rather than applying a CSS transform: a transform
+   * leaves the layout box at the old size, so a scaled-up figure silently overlaps the
+   * callouts beside it while the grid still reserves the smaller space. Multiplying the cap
+   * reflows, which is what "resize" means to the person pressing the button.
+   *
+   * `rotate` genuinely is a transform — there is no layout answer to an angle — so a rotated
+   * figure can extend past its box. That is the honest rendering of the instruction, and the
+   * reason the control offers a way back to 0.
+   */
+  scale?: number
+  /** Degrees, positive clockwise. */
+  rotate?: number
   className?: string
 }) {
   const reduce = useReducedMotion()
@@ -225,9 +241,19 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", t
               so an empty src drew a broken-image glyph and painted the alt text — which is a
               marketplace-length sentence — as a paragraph across the fold. Seen live. An
               <img> with no src is not an empty box, it is a failed one. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {src ? <img src={src} alt={alt} className={(tall ? "max-h-[34rem]" : "max-h-[24rem]") + " w-auto max-w-full object-contain"} />
-               : <span className="block h-40" aria-hidden />}
+          {src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt={alt}
+              className="w-auto max-w-full object-contain"
+              /* The cap the class used to carry, multiplied — see the note on `scale`. */
+              style={{
+                maxHeight: `${(tall ? 34 : 24) * scale}rem`,
+                ...(rotate ? { transform: `rotate(${rotate}deg)` } : null),
+              }}
+            />
+          ) : <span className="block h-40" aria-hidden />}
         </motion.div>
       </div>
 
