@@ -772,6 +772,16 @@ export type LookbookStyle = {
   /** True when this page's copy or photo has been overridden for the lookbook. Shown, and
    *  revertible — a document you can't tell you've altered is one you can't check. */
   edited?: boolean
+  /**
+   * WHICH colourways / sizes this PAGE prints — names, or null for "all of them".
+   *
+   * The full range still arrives in `colors` / `sizes`; these say what was chosen out of it.
+   * Kept as a separate field rather than a pre-filtered list so the editor can offer the rest
+   * of the range back — a filtered list would let you take a colour off the page and never put
+   * it there again. A name that no longer exists upstream simply stops matching.
+   */
+  pickColors?: string[] | null
+  pickSizes?: string[] | null
   image: string; price: number | null; sizes: string[]
   colors: { name: string; sku: string; image: string }[]
   /** Garment measurements from S&S, as generic name/value pairs per size — their /specs
@@ -812,7 +822,14 @@ export function getLookbook() {
  */
 export function saveLookbookStyle(
   source: "mine" | "ss", ref: string,
-  body: { name?: string | null; description?: string | null; image?: string | null; price?: number | null; reset?: boolean },
+  body: {
+    name?: string | null; description?: string | null; image?: string | null
+    price?: number | null; reset?: boolean
+    /** Names to print, or null for the whole range. An empty array is stored as null — see
+     *  the route: unticking everything is a revert, not a page with no colourways on it. */
+    colors?: string[] | null
+    sizes?: string[] | null
+  },
 ) {
   return api<{ ok?: boolean; error?: string; catalogPrice?: number | null }>(
     `/api/catalog/lookbook/${source}/${encodeURIComponent(ref)}`,
