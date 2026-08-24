@@ -35,7 +35,8 @@ import {
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
 import { normalizeMethods } from "@/lib/print-method"
-import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles,
+  type CatalogProduct, type ProductTemplate, type LibraryDesign, type MachineFile } from "@/lib/api"
 
 /** Blank rows to open on. Enough that it reads as a sheet rather than as a form. */
 const OPEN_ROWS = 8
@@ -70,6 +71,18 @@ const blankRow = () => CSV_COLUMNS.map(() => "")
  * So each column names its own source. A key absent here has no fixed list and stays free
  * text until a product narrows it.
  */
+/**
+ * AN OPTION THAT SHOWS ONE THING AND WRITES ANOTHER.
+ *
+ * A blank product is its own label — the cell wants the name and the list shows the name. A
+ * reference is not: `MF-12` in the cell is what the importer resolves, and `MF-12` in the
+ * list is twelve of these telling you nothing about which stitch file each one is. So an
+ * option may carry a label; the cell still gets the value.
+ */
+type Opt = string | { value: string; label: string }
+const optValue = (o: Opt) => (typeof o === "string" ? o : o.value)
+const optLabel = (o: Opt) => (typeof o === "string" ? o : o.label)
+
 const FIXED_OPTIONS: Record<string, string[]> = {
   item_size: ITEM_SIZES,
   ship_state: US_STATES,
@@ -112,9 +125,26 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * machine down. There is no condition here: it runs once and never again.
    */
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+  /**
+   * THE ACCOUNT'S OWN REFERENCES — templates, library images, machine files.
+   *
+   * Three ID columns asked you to type a reference and offered no way to see what you had,
+   * so the only route was to open Design Lab in another tab, read `MF-12` off a card, come
+   * back and type it from memory. The sheet already knows how to suggest; it simply had
+   * nothing to suggest from for these.
+   *
+   * Each is allowed to fail on its own. A seller with no machine files still gets template
+   * suggestions, and a 500 on one list must not blank the other two.
+   */
+  const [templates, setTemplates] = useState<ProductTemplate[]>([])
+  const [images, setImages] = useState<LibraryDesign[]>([])
+  const [machineFiles, setMachineFiles] = useState<MachineFile[]>([])
   useEffect(() => {
     let live = true
     getCatalogProducts().then((c) => { if (live) setCatalog(c ?? []) }).catch(() => {})
+    getTemplates().then((t) => { if (live) setTemplates(t ?? []) }).catch(() => {})
+    getDesignLibrary().then((d) => { if (live) setImages(d ?? []) }).catch(() => {})
+    getMachineFiles().then((m) => { if (live) setMachineFiles(m ?? []) }).catch(() => {})
     return () => { live = false }
   }, [])
 
@@ -205,8 +235,34 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * columns did — an empty dropdown would read as "this product has no colours" rather than
    * as "pick a product first".
    */
+  /**
+   * WHAT EACH ID COLUMN WILL ACCEPT, which is not the same answer three times.
+   *
+   * Template ID and Machine File ID take a REFERENCE — `TPL-12`, `MF-12` — so the value is
+   * the reference and the label carries the name that tells two of them apart.
+   *
+   * Image ID does NOT. The importer reads it as `/^https?:\/\//.test(hero) ? hero : ""`, so
+   * despite the column's name it wants a URL and silently drops anything else. Offering
+   * `IMG-12` here would have looked right, matched the other two columns, and quietly
+   * imported nothing — so the value is the image's address and the label is its name.
+   * Entries without an http(s) address are left out rather than offered and dropped.
+   */
+  const refOptions = useMemo<Record<string, Opt[]>>(() => ({
+    template_id: templates
+      .filter((t) => t.seq != null)
+      .map((t) => ({ value: `TPL-${t.seq}`, label: `TPL-${t.seq}${t.name ? ` · ${t.name}` : ""}` })),
+    machine_file_id: machineFiles
+      .filter((m) => m.ref)
+      .map((m) => ({ value: m.ref, label: `${m.ref}${m.name ? ` · ${m.name}` : ""}` })),
+    hero_image: images
+      .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
+      .map((d) => ({ value: String(d.thumb), label: String(d.name || `Image ${d.id}`) })),
+  }), [templates, machineFiles, images])
+
   const optionsFor = useCallback(
-    (colKey: string, row: string[]): string[] | null => {
+    (colKey: string, row: string[]): Opt[] | null => {
+      const refs = refOptions[colKey]
+      if (refs) return refs.length ? refs : null
       const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type"
       if (!dependent) return FIXED_OPTIONS[colKey] ?? null
       const name = (row[IDX.blank] || "").trim().toLowerCase()
@@ -214,9 +270,17 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
       if (!p) return FIXED_OPTIONS[colKey] ?? null
       if (colKey === "item_color") return productColors(p as never)
       if (colKey === "item_size") return productSizes(p as never)
-      return normalizeMethods([(p as { method?: string }).method]).map((m) => m.label)
+      /* BOTH FIELDS, NOT ONE. This read `method` alone, and CatalogProduct's own note on
+         `methods` says to read it alongside — "or a product that has both loses half its
+         options". A product carrying its techniques as a LIST (which is every imported one)
+         offered nothing here, so the column fell back to all seven print methods and the
+         one thing this cell is for — narrowing to what this garment can actually take —
+         did not happen. Anything that resolves to no method at all still falls back, since
+         an empty list would be worse than an unfiltered one. */
+      const own = normalizeMethods([p.method, ...(p.methods ?? [])]).map((m) => m.label)
+      return own.length ? own : FIXED_OPTIONS[colKey] ?? null
     },
-    [catalog],
+    [catalog, refOptions],
   )
 
   const productNames = useMemo(
@@ -474,7 +538,10 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
         const col = CSV_COLUMNS[mc]
         const all = col.key === "blank" ? productNames : optionsFor(col.key, rows[mr] ?? [])
         const typed = (rows[mr]?.[mc] ?? "").trim().toLowerCase()
-        const matched = (all ?? []).filter((o) => !typed || o.toLowerCase().includes(typed))
+        /* Matched on BOTH halves: a machine file is found by its reference (MF-12) and by
+           its name (logo.emb), and which of the two you remember is not ours to decide. */
+        const matched = (all ?? []).filter((o) =>
+          !typed || optLabel(o).toLowerCase().includes(typed) || optValue(o).toLowerCase().includes(typed))
         const shown = matched.slice(0, 50)
         if (!shown.length) return null
         return (
@@ -485,14 +552,15 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
           >
             {shown.map((o) => (
               <button
-                key={o}
+                key={optValue(o)}
                 type="button"
+                title={optValue(o)}
                 /* mousedown, not click: the input blurs first and would close this menu
                    before a click ever landed. preventDefault keeps the caret where it is. */
-                onMouseDown={(e) => { e.preventDefault(); setCell(mr, mc, o); setMenu(null) }}
+                onMouseDown={(e) => { e.preventDefault(); setCell(mr, mc, optValue(o)); setMenu(null) }}
                 className="block w-full truncate px-2.5 py-1.5 text-left hover:bg-accent"
               >
-                {o}
+                {optLabel(o)}
               </button>
             ))}
             {/* THE CAP, SAID OUT LOUD. 50 of several hundred blanks were rendered and the
