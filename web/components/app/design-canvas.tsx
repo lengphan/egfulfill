@@ -887,6 +887,14 @@ export function DesignCanvasDialog({
    */
  const railBtn = "flex w-14 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-foreground/80 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
  const railWord = "text-[10px] font-medium leading-none"
+  /**
+   * WHAT THE BADGE COUNTS — exactly the rows the Files list draws.
+   *
+   * It counted `lineFiles`, which is what the SERVER has returned, so a file you had just
+   * dropped and not yet saved was in the list and not in the number: the panel said 1 while
+   * showing 2. The unsaved artwork is a file that is on this line — it is the whole reason
+   * the receipt exists — so it counts, and the same expression drives both.
+   */
  const [tplBusy, setTplBusy] = useState(false)
   /** null = the box is closed. A string is what is being typed into it. */
  const [tplName, setTplName] = useState<string | null>(null)
@@ -1253,6 +1261,10 @@ export function DesignCanvasDialog({
   /** Every file on this line, whatever kind — the list under the stage. Carries the id
    *  because a row you cannot open is a row that only tells you something is missing. */
  const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string }[]>([])
+  /** The unsaved artwork on this face is a file ON this line — it is the whole reason the
+   *  receipt exists — so it counts. Same expression drives the badge and the list. */
+  const unsavedArt = !!designUrl && !savedFaces[sideName]
+  const fileCount = lineFiles.length + (unsavedArt ? 1 : 0)
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
  const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
@@ -2175,9 +2187,9 @@ export function DesignCanvasDialog({
                 {/* GENUINELY ROUND, which is what a count badge is allowed to be (CLAUDE.md
                     §4). It is the only thing on this rail that reports state rather than
                     offering an action. */}
-                {lineFiles.length > 0 && (
+                {fileCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-semibold tabular-nums text-primary-foreground">
-                    {lineFiles.length}
+                    {fileCount}
                   </span>
                 )}
               </PopoverTrigger>
@@ -2530,14 +2542,14 @@ export function DesignCanvasDialog({
             what is attached to this line, not a form. Hidden entirely when the line has
             nothing, which is honest: an empty frame here would read as a list that failed
             to load rather than as a line nobody has sent a file for. */}
-        {(lineFiles.length > 0 || designUrl) && (
+        {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 text-xs font-medium text-foreground">Files</div>
             {/* THE ARTWORK ON THIS FACE, first, and only while it is UNSAVED. Once saved the
                 server returns it in lineFiles and printing it here as well would put one file
                 on two rows — the fault this list exists to end. Unsaved it is in no list at
                 all, which is precisely the state a receipt is for. */}
-            {designUrl && !savedFaces[sideName] && (
+            {unsavedArt && (
               <div className="mb-1">
                 <FileRow
                   file={{
