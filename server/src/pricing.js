@@ -233,7 +233,26 @@ function costPartsOf(row, item, fees) {
   }
   if (base == null && tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
   if (base == null && tier && tier.cost != null) { const c = num(tier.cost); if (c != null && c > 0) base = c + markup; }
-  if (base == null) base = num(d.basePrice ?? d.base_price ?? row.base_price);
+  /**
+   * ZERO IS NOT A PRICE — it is an empty field, and this rung was the one place that forgot.
+   *
+   * Every other rung in this ladder already requires `> 0`; this one took whatever `base_price`
+   * held. A supplier sync writes the row with `productCost` filled in and `base_price` left at
+   * 0 until somebody prices it, so 0 came through as a real base of zero, the productCost rung
+   * underneath it never ran, and the line quoted — and would have CHARGED — $0.00 for a garment
+   * we pay $6.08 for.
+   *
+   * Measured on production 2026-08-24: 6 of 30 catalogue products sit at base_price 0 with a
+   * real productCost, and every one of them quoted zero. Nothing had been billed at zero yet
+   * only because those lines could not be quoted at all until the blank-resolution fix earlier
+   * today — which means this was armed, not dormant, the moment that shipped.
+   *
+   * With 0 treated as unset, the ladder falls through to productCost + base_markup, which is
+   * exactly what that rung exists for. A product with NOTHING priced still ends at base = null,
+   * so the line lands in `unpriced` and the submit button refuses it — a visible "price this
+   * blank first" instead of a silent free order.
+   */
+  if (base == null) { const b = num(d.basePrice ?? d.base_price ?? row.base_price); if (b != null && b > 0) base = b; }
   if (base == null) { const c = num(d.productCost ?? d.product_cost); if (c != null && c > 0) base = c + markup; }
   // No base, no surcharge to report: a method fee on a line we can't price is a number
   // with nothing to sit on top of.
