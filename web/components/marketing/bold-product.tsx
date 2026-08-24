@@ -8,7 +8,6 @@ import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, INK_ON_ACID } f
 import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
-import { descriptionLines } from "@/lib/description"
 import { framingStyle } from "@/lib/product-framing"
 
 /**
@@ -106,7 +105,11 @@ export function BoldProduct({ product, shipping }: {
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <div className="mx-auto max-w-6xl px-6 pb-20 pt-10">
+      {/* AS WIDE AS THE GRID IT CAME FROM. This was max-w-6xl (1152px) while the catalogue,
+          the homepage and every other marketing section run max-w-[88rem] with a 40px gutter —
+          so clicking a product stepped the page IN by 256px and the hero photo, the one thing
+          the page is for, came out smaller than the card that linked to it. */}
+      <div className="mx-auto max-w-[88rem] px-6 pb-20 pt-10 sm:px-10">
         <Link
           href="/catalog"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-black/55 transition-colors hover:text-[var(--mk-ink)]"
@@ -114,7 +117,10 @@ export function BoldProduct({ product, shipping }: {
           <ArrowLeft size={14} weight="bold" /> All products
         </Link>
 
-        <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-16">
+        {/* The picture takes the extra width, not the column of facts: a 1.2/0.8 split on the
+            wider container grows the hero and holds the reading measure where it was — text
+            past ~600px is harder to read, a garment photo is not. */}
+        <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-16">
           {/* ── The picture ──────────────────────────────────────────────── */}
           {/* The two hero columns arrive from DIFFERENT directions — the picture settles down
               into place, the copy drifts in from the side. Both rising together is one slab
@@ -235,24 +241,15 @@ export function BoldProduct({ product, shipping }: {
               {shipping && <ShippingFees first={product.ship} extra={shipping.extra} tone="marketing" className="mt-4" />}
             </div>
 
-            {/* The garment described in the manufacturer's own words. It was synced all
-                along and simply never published, and it is most of what the page was
-                missing — everything else here is a chip. */}
-            {/* ONE FACT PER ROW. What suppliers send is a list wearing a paragraph's
-                clothes — "LIMITED EDITION • 5 oz./yd² • Regular fit • Side vents …" — and
-                as prose it becomes a wall that hides the one line a buyer is looking for.
-                Same split the app's product page uses, so the two never disagree about
-                what this garment says about itself. */}
-            {descriptionLines(product.description).length > 0 && (
-              <ul className="mt-6 space-y-1.5 text-[15px] leading-relaxed text-black/70">
-                {descriptionLines(product.description).map((line, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="mt-[0.55em] size-1 shrink-0 rounded-full bg-black/30" />
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* THE SUPPLIER'S DESCRIPTION IS NOT PUBLISHED HERE ANY MORE (2026-08-24).
+                It was the manufacturer's own bullet list, and read on the page it was a wall
+                of fabric arithmetic between the price and the thing a buyer came to do:
+                "5.3 oz./yd² (US), 8.8 oz./L yd (CA), 100% U.S. cotton, 20 singles" followed
+                by every colourway that is a different blend, in one 82-name run. It pushed
+                the colours and sizes below the fold, and the swatches underneath already say
+                what the colour list was trying to.
+                `descriptionLines` stays — the app's product page still uses it, where a
+                spec dump belongs to someone reading specs. */}
 
             {product.methods.length > 0 && <Spec label="Print method" items={product.methods} />}
             {product.colors.length > 0 && (
@@ -497,7 +494,7 @@ export function BoldProduct({ product, shipping }: {
              page, so that padding was 80px of cream hanging under the colour with nothing in
              it — the plate should end where the page ends. */
           <div className="relative left-1/2 mt-20 -mb-20 w-screen -translate-x-1/2" style={{ background: ACCENT }}>
-            <div className="mx-auto max-w-6xl px-6 py-16">
+            <div className="mx-auto max-w-[88rem] px-6 py-16 sm:px-10">
               <Rise preset="cut">
                 {/* ACID, not dimmed cream. The kit measures it at 5.07:1 on this plate and
                     calls it "type rather than a glow" — this is the one ground it works on

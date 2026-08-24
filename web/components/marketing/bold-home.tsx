@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
 import { LabelRule, CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
-import { EditableImage, EditableText, useEditMode } from "@/components/marketing/edit-mode"
+import { EditableImage, EditableText, useEditMode, useEditableSrc } from "@/components/marketing/edit-mode"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -27,6 +27,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
   // visitor sees.
   const { on: editing } = useEditMode()
   const { hero, stats, features, steps, testimonials, faq, cta } = content
+  /** The hero figure as the DRAFT has it, so a replacement shows up before Save. */
+  const heroImage = useEditableSrc("hero.image", hero.image)
   const reduce = useReducedMotion()
   // The scroll-linked parallax went with the app panel it moved. Nothing on this page
   // tracks scroll any more.
@@ -80,9 +82,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
               the page to drop a picture onto — the one gesture that mode exists for would be
               the one it cannot offer. A visitor still sees nothing, and with no picture the
               grid collapses to the copy alone rather than leaving a hole where it would be. */}
-          {(hero.image || editing) && (
+          {(heroImage || editing) && (
             <EditableImage path="hero.image">
-              <CutoutFigure src={hero.image} alt={hero.imageAlt} ghost={hero.ghostWord} tall />
+              {/* The DRAFT's picture, not the published one — see useEditableSrc. A generated
+                  or uploaded figure has to appear where the old one was, immediately. */}
+              <CutoutFigure src={heroImage} alt={hero.imageAlt} ghost={hero.ghostWord} tall />
             </EditableImage>
           )}
 
