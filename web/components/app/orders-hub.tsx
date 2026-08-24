@@ -1897,7 +1897,11 @@ export function OrdersHub() {
                     </span>
                   )
                 })(),
- order: <div className="min-w-0 truncate tabular-nums text-sm font-semibold">{numOf(o)}</div>,
+                /* `truncate` stays as the safety net, but the track is now measured to hold
+                   a full Etsy number (order-columns.ts) so it should never fire. The title
+                   is what covers the case it does — a longer id from a source we haven't
+                   seen yet — instead of leaving an ellipsis with no way to read past it. */
+ order: <div className="min-w-0 truncate tabular-nums text-sm font-semibold" title={numOf(o)}>{numOf(o)}</div>,
                 /**
                  * HOW LONG THIS HAS BEEN WAITING, from the buyer's purchase.
                  *
