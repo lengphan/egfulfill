@@ -164,6 +164,9 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * on the last visible row was otherwise cut in half by the scroll container.
    */
   const [menu, setMenu] = useState<{ key: string; left: number; top: number; width: number } | null>(null)
+  /** The popup's own node, so the close-on-scroll listener can tell the sheet scrolling
+   *  (which must close it) from the LIST scrolling (which must not). */
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -300,10 +303,25 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
 
   /* The menu is fixed, so it does not travel with the cell — anything that MOVES the cell
      has to close it, or it hangs over the sheet pointing at nothing. Capture phase, because
-     the scroll happens on the table container rather than on the window. */
+     the scroll happens on the table container rather than on the window.
+
+     BUT THE LIST IS A SCROLLING THING TOO. `scroll` does not bubble, so this had to be a
+     capture listener on window to see the table container — and a capture listener on window
+     sees EVERY scroll in the document, the menu's own `overflow-auto` included. So opening a
+     column with more options than fit and turning the wheel emitted a scroll event, which
+     closed the menu on the first notch: the list could be looked at and never scrolled. It
+     was worst exactly where it mattered most, on Blank Product, which is the one column with
+     hundreds of options.
+
+     The cell moving is still what closes it. A scroll that STARTED inside the menu is the
+     list doing its job, and is ignored by target. */
   useEffect(() => {
     if (!menu) return
-    const close = () => setMenu(null)
+    const close = (e?: Event) => {
+      const t = e?.target as Node | null
+      if (t && menuRef.current && (t === menuRef.current || menuRef.current.contains(t))) return
+      setMenu(null)
+    }
     window.addEventListener("scroll", close, true)
     window.addEventListener("resize", close)
     return () => {
@@ -456,10 +474,12 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
         const col = CSV_COLUMNS[mc]
         const all = col.key === "blank" ? productNames : optionsFor(col.key, rows[mr] ?? [])
         const typed = (rows[mr]?.[mc] ?? "").trim().toLowerCase()
-        const shown = (all ?? []).filter((o) => !typed || o.toLowerCase().includes(typed)).slice(0, 50)
+        const matched = (all ?? []).filter((o) => !typed || o.toLowerCase().includes(typed))
+        const shown = matched.slice(0, 50)
         if (!shown.length) return null
         return (
           <div
+            ref={menuRef}
             style={{ position: "fixed", left: menu.left, top: menu.top, minWidth: Math.max(menu.width, 180), maxWidth: 320 }}
             className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-xs shadow-lg"
           >
@@ -475,6 +495,16 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                 {o}
               </button>
             ))}
+            {/* THE CAP, SAID OUT LOUD. 50 of several hundred blanks were rendered and the
+                other few hundred simply were not there — so scrolling to the bottom of the
+                list looked like the bottom of the catalogue, and a product that exists read
+                as one we do not carry. A count, not a sentence: it is a FACT about the list,
+                and it is the thing that tells you to keep typing. */}
+            {matched.length > shown.length && (
+              <div className="border-t border-border px-2.5 py-1.5 text-2xs tabular-nums text-muted-foreground">
+                {shown.length} of {matched.length}
+              </div>
+            )}
           </div>
         )
       })()}
