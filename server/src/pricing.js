@@ -86,15 +86,48 @@ export async function catalogIndex() {
 /** Exported so replenishment can put the product's NAME and its colourway PHOTO on a parked
  *  line. A cart row that reads "EG-1009-2XL-BLACK" with an empty tile is a sku, not a thing
  *  somebody can recognise before spending money on it. */
+/**
+ * THE BLANK CELL ARRIVES AS "SKU - NAME", AND THIS IS WHY NOTHING COULD BE PRICED.
+ *
+ * The order grid and the import sheet both offer `5000 - Gildan Unisex Heavy Cotton™ T-Shirt`
+ * as one string, deliberately: a catalogue holds near-identical names and the sku is the half
+ * that tells them apart while you are picking, and Google Sheets validation has no
+ * label-vs-value at all — the cell holds the option text. So that is what reaches
+ * `order_items.blank`, and those lines carry NO sku of their own.
+ *
+ * web/lib/variant-resolve.ts learned to split it. This did not. The line therefore resolved
+ * for DISPLAY — right picture, right name, right variant strip — and matched nothing here, so
+ * quoteOrder filed it under `unpriced: no-product` and every figure downstream went missing at
+ * once: "Not priced · pick a blank first" on the row, "not charged yet" in the Summary, $0.00
+ * in the queue, and no stock sku for replenishment. Measured on production: three of the four
+ * most recent manual orders carry a composite blank and a null unit_cost, while the older rows
+ * with a bare name and a sku price normally.
+ *
+ * THE WHOLE STRING IS TRIED FIRST and the split is only a fallback, which is what keeps a
+ * product whose NAME contains " - " resolving as it always did — splitting first would turn
+ * "Adidas - Performance Polo" into a search for a product called "Adidas".
+ *
+ * MIRRORS blankCandidates in web/lib/variant-resolve.ts. tools/check-blank-resolve.mjs runs
+ * both against the same fixtures, because this pair has now drifted once and reading them
+ * side by side is exactly what missed it.
+ */
+function blankCandidates(cell) {
+  const out = [cell];
+  const at = cell.indexOf(' - ');
+  if (at > 0) { out.push(cell.slice(0, at).trim(), cell.slice(at + 3).trim()); }
+  return out.filter(Boolean);
+}
+
 export function matchProduct(idx, item) {
   const blank = String(item.blank || '').trim();
   if (blank) {
-    const want = blank.toLowerCase();
-    const hit = idx.rows.find((r) => {
-      const d = r.data || {};
-      return [d.name, r.sku, d.sku, r.id, d.id].some((v) => v != null && String(v).trim().toLowerCase() === want);
-    });
-    if (hit) return hit;
+    for (const cand of blankCandidates(blank.toLowerCase())) {
+      const hit = idx.rows.find((r) => {
+        const d = r.data || {};
+        return [d.name, r.sku, d.sku, r.id, d.id].some((v) => v != null && String(v).trim().toLowerCase() === cand);
+      });
+      if (hit) return hit;
+    }
   }
   const s = String(item.sku || '').toUpperCase().trim();
   if (!s) return null;
