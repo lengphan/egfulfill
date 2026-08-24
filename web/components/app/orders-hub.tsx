@@ -709,11 +709,33 @@ export function OrdersHub() {
  load()
     } finally { setBusy(null) }
   }
- const advanceOrder = async (order: OrderRow) => {
- for (const it of order.items ?? []) {
- const to = nextStage(it.factory_status)
- if (to && to !== "shipped") await advanceItem(order, it, to)
-    }
+  /**
+   * MOVE THE ORDER ONE STAGE — to the stage the MENU SAID, which is why `to` is a parameter.
+   *
+   * It recomputed the target itself, from each LINE, with `nextStage(it.factory_status)` and
+   * no `isFactory` — so a factory order walked SELLER_LINE. The row's menu is labelled from
+   * `nextStage(stage, fac)` on FACTORY_LINE, which skips Pending, so the label read "Move to
+   * Approved" and the click sent every line to Pending; pressing it again then reached
+   * Approved. A control that names its destination and goes somewhere else is the worst of
+   * the three ways this could have been wrong, because the label looks like proof. Reported
+   * from the boards; the phone had it right (mobile/lib/orders.ts wraps the flag in).
+   *
+   * ONE REQUEST, like startOrder and the ⋯ menu. The order PATCH moves every line in a
+   * single statement server-side under the gate that authorised the order, so the loop this
+   * replaces could also stop halfway — and because it only ever wrote LINES, the order's own
+   * column stayed put, which is exactly the case startOrder's note describes: the hub looked
+   * right (it derives from items) and Dispatch, which filters on the column, never saw it.
+   * `advanceItem`'s design reporting is not lost with the loop — autoPushDesigns is dormant
+   * server-side and that response field is deliberately always null.
+   */
+ const advanceOrder = async (order: OrderRow, to: string) => {
+ setBusy(`ord:${order.id}`)
+ try {
+ await updateOrder(order.id, { factoryStatus: to })
+ setActionErr(null)
+    } catch (e) {
+ setActionErr(e instanceof Error ? e.message : "Couldn't move that order on.")
+    } finally { setBusy(null); load() }
   }
   /**
    * START — the one move that puts an order into production, whoever it belongs to.
@@ -2612,7 +2634,7 @@ export function OrdersHub() {
  in a list of stages "next" is the only one that doesn't say
  where it goes. */}
                               {canAdvance && next && (
-                                <DropdownMenuItem onClick={() => advanceOrder(o)}>
+                                <DropdownMenuItem onClick={() => advanceOrder(o, next)}>
                                   {tl("ui", "Move to")} {stageMeta(next)?.label ?? next}
                                 </DropdownMenuItem>
                               )}
