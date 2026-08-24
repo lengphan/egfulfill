@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { PermissionsMatrix } from "@/components/app/permissions-matrix"
+import { RoleGrantsPanel } from "@/components/app/role-grants-panel"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -3515,6 +3516,7 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="permissions">
           <PermissionsMatrix />
+          <RoleGrantsPanel />
         </TabsContent>
       )}
       {isAdmin && (

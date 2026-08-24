@@ -3862,6 +3862,22 @@ export function rebuildSpydeckTrending(seed = 0) {
 }
 // Admin-editable nav visibility (HIDE-only): role -> hidden surface keys. Readable by any
 // signed-in user (so their nav filters); writable admin-only (enforced server-side).
+/**
+ * THE GRANT HALF OF PERMISSIONS. Separate from NavVisibility because the two have opposite
+ * safety properties — see server/src/routes/role_grants.js. A grant WIDENS what a role may
+ * do, so its keys are a closed registry and every read fails closed.
+ */
+export type RoleGrants = Record<string, boolean>
+export type RoleGrantDef = { key: string; role: string; label: string; note: string }
+export function getRoleGrants() {
+  return api<{ grants: RoleGrants; registry: RoleGrantDef[] }>(`/api/role_grants`)
+}
+export function putRoleGrants(grants: RoleGrants) {
+  return api<{ ok?: boolean; grants?: RoleGrants; error?: string }>(`/api/role_grants`, {
+    method: "PUT", body: JSON.stringify({ grants }),
+  })
+}
+
 export type NavVisibilityMap = Partial<Record<string, string[]>>
 export function getNavVisibility() {
   return api<{ hidden: NavVisibilityMap }>(`/api/nav_visibility`)
