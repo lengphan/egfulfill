@@ -14,7 +14,6 @@ import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/c
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
-import { TrueViewTile } from "@/components/app/true-view-tile"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
@@ -820,7 +819,6 @@ export default function OrderDetailPage() {
                           </span>
                         )}
                       </div>
-                      {isStaff && <TrueViewTile orderId={id} item={it} files={dfiles} size={144} />}
                       </div>
                       {/* One column holding three stacked zones — identity+price, then
  the variant fields, then the design action. Previously the

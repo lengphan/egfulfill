@@ -34,7 +34,9 @@ export const SECRET_NAMES = [
   'SANMAR_CUSTOMER_NUMBER', 'SANMAR_USERNAME', 'SANMAR_PASSWORD',
   'GOOGLE_SHEETS_API_KEY', 'ANTHROPIC_API_KEY',
   'BYEASTSIDE_API_KEY', 'PINKDESIGN_API_KEY', 'PINKDESIGN_BOARD_ID', 'PINKDESIGN_WEBHOOK_SECRET',
-  'WILCOM_APP_ID', 'WILCOM_APP_KEY',
+  // 'WILCOM_APP_ID', 'WILCOM_APP_KEY' — REMOVED 2026-08-24. Off the allow-list on purpose:
+  // this list is what setSecret() will WRITE, so leaving the names here would let the key be
+  // put back by anything that can reach the endpoint, field or no field.
   // Alibaba was the only integration whose credentials lived exclusively in the .env file,
   // so rotating them meant editing the box and restarting — while every other supplier and
   // channel could be rotated from Settings. alibaba.js already reads both inside creds()

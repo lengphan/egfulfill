@@ -11,7 +11,7 @@ import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getEmbPreview, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { TIER_LABEL, TIER_WHY, feeFor } from "@/lib/design-fee"
@@ -1276,9 +1276,6 @@ export function DesignCanvasDialog({
  const lockedWhy = getUser()?.role === "seller"
     ? "The order is submitted — ask the factory in chat to change this file"
  : "Not submitted yet — this is still the seller's draft"
- const [stitchPng, setStitchPng] = useState<string | null>(null)
- const [stitchState, setStitchState] = useState<"idle" | "loading" | "none">("idle")
- const [showStitch, setShowStitch] = useState(false)
   // Fetching the bytes. Per-file busy/error so a paywalled or missing file says so HERE
   // rather than failing silently under the cursor.
   /**
@@ -1616,16 +1613,6 @@ export function DesignCanvasDialog({
    * Counts what it would OVERWRITE and says so first. This is one click and it can replace
    * artwork on lines nobody is currently looking at.
    */
-  /** Swap the stage between the artwork and the stitch preview of the attached file. */
- const toggleStitch = useCallback(async () => {
- if (showStitch) { setShowStitch(false); return }
- if (stitchPng) { setShowStitch(true); return }
- if (!latestMachine) return
- setStitchState("loading")
- const r = await getEmbPreview({ designId: latestMachine.designId }).catch(() => null)
- if (r?.ok && r.png) { setStitchPng(r.png); setShowStitch(true); setStitchState("idle") }
- else setStitchState("none")
-  }, [showStitch, stitchPng, latestMachine])
 
   /** Open ONE of this line's files, by id. 402 is the paywall, not a fault — say which.
    *  It took no argument and always fetched `latestMachine`, which is fine for a button that
@@ -2221,7 +2208,7 @@ export function DesignCanvasDialog({
         <div className="relative mx-auto w-full max-w-[min(100%,62vh)]">
           <DesignStage
  className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
- designUrl={showStitch && stitchPng ? `data:image/png;base64,${stitchPng}` : designUrl}
+ designUrl={designUrl}
  pos={pos} setPos={setPos}
  onRemove={() => void removeArtwork()}
             /* ON THE LAYER, WITH THE REST. This was a labelled button parked in the corner of
@@ -2986,31 +2973,6 @@ export function DesignCanvasDialog({
  twice and a status line restating a status line. What is left is what the
  summary cannot do: the button, and the stitch toggle when there is one. */}
               <div className="flex min-w-0 items-baseline gap-2">
-                {/**
-                  * SHOW STITCHES — and NOTHING when there are none to show.
-                  *
-                  * This was a chip on the garment reading "No stitch preview", disabled,
-                  * beside the side pills — so the row under the stage held a dead control
-                  * saying what the product could NOT do, next to four live ones that change
-                  * which face you are looking at. A disabled button that names an absent
-                  * feature is worse than no button: it is read as something broken.
-                  *
-                  * It renders only when a file exists AND EWA could read it. When it cannot,
-                  * there is simply nothing here — the file card above already says the file
-                  * is attached, which is the fact that matters.
-                  */}
-                {latestMachine && stitchState !== "none" && (
-                  <button
- type="button"
- onClick={() => void toggleStitch()}
- disabled={stitchState === "loading"}
- title="Show the stitches instead of the image"
- className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-2xs font-medium transition-colors hover:bg-accent disabled:opacity-60"
-                  >
-                    {stitchState === "loading" ? <CircleNotch size={12} className="animate-spin" /> : <Eyedropper size={12} weight="bold" />}
-                    {stitchState === "loading" ? "Rendering…" : showStitch ? "Show image" : "Show stitches"}
-                  </button>
-                )}
                 {/* WHERE THE CARD WENT, and only that. The file's own name went with the
  heading — the drawer summary carries it — but "Sent · Incoming · Hai Anh"
  is a fact about somebody else's queue that nothing else on this screen

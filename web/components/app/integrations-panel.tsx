@@ -321,16 +321,11 @@ const INTEGRATIONS: Integration[] = [
  return { level: "off" }
     },
   },
-  // Status via config ONLY — a live EWA round-trip runs behind the Digitizer's "Test
-  // connection" button, not on every Settings load. The /test call hits EWA's `api/info`,
-  // which is flaky/unreliable and was FALSE-reporting Error on a key that digitizes fine,
-  // so the status row reflects "key present" and leaves the live check to the on-demand
-  // Test button. `key` must match the server's SECRET_DEFS `integration` value so the
-  // WILCOM_APP_ID/KEY edit fields attach here.
-  {
- key: "wilcom", name: "Wilcom EWA", blurb: "Embroidery digitizing engine", group: "Embroidery",
- check: configOnly("/api/wilcom/config", "configured"),
-  },
+  // WILCOM EWA REMOVED (2026-08-24). The card went with the credential: the owner does not
+  // use the digitizing engine, the key was deleted from app_secrets, and WILCOM_APP_ID/KEY
+  // came off the secrets allow-list so nothing can write them back. A card whose whole job
+  // is reporting "key present" has nothing left to report, and one that offered to add a key
+  // again would undo the point of removing it.
   // Alibaba was the one integration with no card here, so its app key and secret could only
   // be rotated by editing the .env on the box and restarting. `key` must match the server's
   // SECRET_DEFS `integration` value or the edit fields attach to nothing.

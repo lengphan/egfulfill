@@ -80,8 +80,9 @@ const SECRET_DEFS = [
   { name: 'GOOGLE_ADS_LOGIN_CUSTOMER_ID', label: 'Manager (MCC) ID', integration: 'google_ads' },
   { name: 'ALIBABA_APP_KEY',       label: 'App key',          integration: 'alibaba' },
   { name: 'ALIBABA_APP_SECRET',    label: 'App secret',       integration: 'alibaba' },
-  { name: 'WILCOM_APP_ID',         label: 'Application ID',   integration: 'wilcom' },
-  { name: 'WILCOM_APP_KEY',        label: 'Application key',  integration: 'wilcom' },
+  // WILCOM REMOVED (2026-08-24) — the owner does not use EWA and asked for the key gone.
+  // The fields go so no key can be entered again; the stored values were deleted from
+  // app_secrets separately, because taking the field away does not remove what it wrote.
 ];
 
 /**
