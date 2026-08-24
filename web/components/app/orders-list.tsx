@@ -31,9 +31,9 @@ import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
-import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
+import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
+import { ORDER_COLS, ITEMS_MIN_PX, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { EmptyState } from "@/components/app/empty-state"
@@ -92,7 +92,37 @@ function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderD
  case "tracking": return o.tracking
       ? <span className="truncate text-xs tabular-nums text-muted-foreground">{o.tracking}</span>
  : <span className="text-xs text-muted-foreground/60">—</span>
- case "total": return <span className="font-medium tabular-nums">{usd(totalOf(o))}</span>
+ case "cost": {
+      /* WHAT IT COSTS YOU. Two different claims share this cell and they must not read the
+         same: a CHARGE is money that moved, an estimate is arithmetic on today's catalogue.
+         Weight says which — the charge is inked and medium, the estimate is muted — and the
+         title carries the sentence, because a column is not the place for one.
+         No tabular-nums: the column is right-aligned and globals.css already gives every
+         right-aligned cell tabular figures (CLAUDE.md §4). */
+ const c = o.cost == null ? null : Number(o.cost)
+ if (c == null) {
+ return (
+        <span className="text-muted-foreground/60"
+ title={o.cost_unpriced ? `${o.cost_unpriced} line${o.cost_unpriced === 1 ? "" : "s"} can't be priced yet — pick a blank on them` : "Not priced yet"}>
+          —
+        </span>
+      )
+    }
+ return (
+      <span className={o.cost_estimated ? "text-muted-foreground" : "font-medium"}
+ title={o.cost_estimated ? "Estimated from today's prices — this order hasn't been charged yet" : "Charged to your wallet"}>
+        {usd(c)}
+      </span>
+    )
+  }
+  /* THE BUYER'S MONEY, OR A DASH. This printed `$0.00` on every manual order, which is the
+     one number it definitely was not — see revenueOf. */
+ case "total": {
+ const r = revenueOf(o)
+ return r == null
+      ? <span className="text-muted-foreground/60" title="No retail price recorded for this order">—</span>
+      : <span className="font-medium">{usd(r)}</span>
+  }
  case "date": return <span className="text-muted-foreground">{fmtDate(o.created_at)}</span>
   }
 }

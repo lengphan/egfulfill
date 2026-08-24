@@ -137,6 +137,12 @@ export type Order = {
   tracking?: string | null
   status?: string | null
   total?: number | string | null
+  /** What the order costs the SELLER, computed server-side on the list (attachCost in
+   *  orders.js). `cost_estimated` false = the ledger, money that moved; true = the live
+   *  ladder for an order nobody has paid for yet. Absent for a viewer who may not see money.
+   *  `total` is the BUYER's money and answers a different question — see the detail screen. */
+  cost?: number | null
+  cost_estimated?: boolean | null
   /** The buyer's address, AS STORED — jsonb whose writers spell the street four different
    *  ways, which is why it is `StoredAddress` and not `ShipAddress`. Typing it as the latter
    *  is what let `street1` be read off a column that mostly holds `line1`; read it through

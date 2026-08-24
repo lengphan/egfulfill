@@ -3,6 +3,7 @@ import {
   PIPELINE, STAGE_LABEL, normalizeStage, isOpenStage, isException,
   nextStage as nextStageOn, stageDenialReason, canSetStage, isFactoryOrder,
   isOverdueBy, DEFAULT_OVERDUE_DAYS, plainNum, platformFromId, orderRefLabel, unitsOfItems,
+  recordedRevenue,
 } from "@shared/order-rules"
 
 /**
@@ -24,7 +25,7 @@ import {
  */
 export {
   PIPELINE, STAGE_LABEL, normalizeStage, isException, stageDenialReason, canSetStage,
-  isFactoryOrder, plainNum,
+  isFactoryOrder, plainNum, recordedRevenue,
 }
 /** The stage as a person reads it. Raw ids ("working", "in_review") were being printed
  *  straight onto rows, which is why the phone and the boards disagreed on wording. */

@@ -515,27 +515,24 @@ export async function quoteSpec({ blank, sku, size, printType }) {
 // Quote one order. Returns every line priced, the totals, and anything unpriceable.
 // `unpriced` is the caller's cue to refuse: an item with no catalog match has no cost,
 // and charging 0 for it would fulfil it for free — silently, forever.
-export async function quoteOrder(orderId) {
-  const [items, fees, idx, sideRows] = await Promise.all([
-    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
-    feeSettings(),
-    catalogIndex(),
-    /**
-     * HOW MANY FACES EACH LINE PRINTS, counted from the artwork itself rather than from a
-     * number somebody typed. A side exists when there is a design on it; nothing else can
-     * make one true.
-     *
-     * Keyed exactly the way order_designs is — line first, sku only for rows written before
-     * line_id existed — so a line and its same-sku sibling are counted apart. Best-effort:
-     * a deployment that has not run the side migration yet answers nothing, and a missing
-     * count must charge for ONE side, never for none and never for more.
-     */
-    q(`select coalesce('L:' || line_id, 'S:' || sku) as key, count(distinct coalesce(side,'front'))::int as sides
-          from order_designs where order_id=$1 group by 1`, [orderId])
-      .then((r) => r.rows).catch(() => []),
-  ]);
-  const sidesByKey = new Map(sideRows.map((r) => [r.key, r.sides]));
-  const sidesOf = (it) => sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`) ?? 1;
+/**
+ * THE LADDER, WITH NO QUERIES OF ITS OWN — one implementation, two callers.
+ *
+ * `quoteOrder` wraps this with the two per-order reads it needs (how many sides each line
+ * prints, and the volume rate). The ORDER LIST cannot afford either: it prices hundreds of
+ * orders in one request, so it loads the catalogue and the fee table ONCE and calls this
+ * directly with one side per line and no volume discount — which makes its figure an estimate
+ * that can only ever be equal or slightly high, never low, and it is labelled as one.
+ *
+ * Extracted rather than copied. A third hand-written copy of this ladder is exactly how the
+ * $0.00 base price and the unsplit blank survived — see tools/check-price-floor.mjs.
+ *
+ * @param items   order_items rows (or the list aggregate's projection of them)
+ * @param idx     catalogIndex()
+ * @param fees    feeSettings()
+ * @param sidesOf how many faces a line prints; defaults to one
+ */
+export function priceLines(items, idx, fees, sidesOf = () => 1) {
   const lines = [];
   const unpriced = [];
   for (const it of items) {
@@ -575,6 +572,31 @@ export async function quoteOrder(orderId) {
                  sides, sideFee: money(sideAddOn(sides, fees)),
                  supplierCost: supplier == null ? null : money(supplier) });
   }
+  return { lines, unpriced };
+}
+
+export async function quoteOrder(orderId) {
+  const [items, fees, idx, sideRows] = await Promise.all([
+    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
+    feeSettings(),
+    catalogIndex(),
+    /**
+     * HOW MANY FACES EACH LINE PRINTS, counted from the artwork itself rather than from a
+     * number somebody typed. A side exists when there is a design on it; nothing else can
+     * make one true.
+     *
+     * Keyed exactly the way order_designs is — line first, sku only for rows written before
+     * line_id existed — so a line and its same-sku sibling are counted apart. Best-effort:
+     * a deployment that has not run the side migration yet answers nothing, and a missing
+     * count must charge for ONE side, never for none and never for more.
+     */
+    q(`select coalesce('L:' || line_id, 'S:' || sku) as key, count(distinct coalesce(side,'front'))::int as sides
+          from order_designs where order_id=$1 group by 1`, [orderId])
+      .then((r) => r.rows).catch(() => []),
+  ]);
+  const sidesByKey = new Map(sideRows.map((r) => [r.key, r.sides]));
+  const sidesOf = (it) => sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`) ?? 1;
+  const { lines, unpriced } = priceLines(items, idx, fees, sidesOf);
   const volume = await volumeRateFor(orderId);
   const totals = computeTotals(lines, fees, volume.pct);
   // Null when NOTHING is known — "$0.00 of blanks" and "we don't know" are different

@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { hashOf, isPhash } from '../fingerprint.js';
-import { isStaff, resolveSeller as _resolveSeller, canSurface } from '../auth.js';
+import { isStaff, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
 import { aiComplete } from './support_ai.js';
@@ -12,7 +12,7 @@ import { sendMail, mailConfigured } from '../mailer.js';
 import { supportReplyEmail } from '../emails.js';
 import { audit } from '../audit.js';
 import { designNoFor, designLabel, ensureDesignIds } from '../design-id.js';
-import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName } from '../pricing.js';
+import { quoteOrder, freezeQuote, catalogIndex, resolveBlankName, priceLines, computeTotals, feeSettings } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll } from './factory_settings.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
@@ -1378,6 +1378,58 @@ export function ordersRoutes(app, requireAuth) {
     return v;
   }
 
+  /**
+   * WHAT EACH ORDER COSTS, ON THE LIST.
+   *
+   * The queue showed a Total column holding `orders.total` — the BUYER's money — so a manual
+   * order with no retail price recorded read "$0.00", which is the one thing it definitely
+   * did not cost. What a seller wants from their own board is what the order costs THEM, and
+   * that number was only ever on the detail page.
+   *
+   * TWO SOURCES, AND THEY ARE NOT THE SAME CLAIM:
+   *   charged   the ledger — money that actually moved. Exact, and it is the answer whenever
+   *             it exists, because a frozen order's price is history.
+   *   estimate  the live ladder, for an order nobody has paid for yet.
+   *
+   * `cost_estimated` says which, so the column can render an estimate differently instead of
+   * asserting a charge that has not happened.
+   *
+   * IT COSTS TWO QUERIES FOR THE WHOLE REQUEST, not two per order: the catalogue and the fee
+   * table are read once and the ladder runs in memory over items the aggregate already
+   * returned. The two per-order reads a full quote makes — how many faces each line prints,
+   * and the volume rate — are deliberately skipped, which is exactly why this is an estimate
+   * and can only be equal or slightly HIGH, never low.
+   *
+   * WITHHELD FROM ANYONE WHO MAY NOT SEE MONEY. `canSeeMoney` is the same predicate the
+   * charges route gates on; a warehouse hand gets no cost field at all rather than a blank
+   * column they will ask about.
+   */
+  async function attachCost(rows, user) {
+    if (!rows.length || !canSeeMoney(user)) return rows;
+    const ids = rows.map((r) => String(r.id));
+    const [idx, fees, chargedRows] = await Promise.all([
+      catalogIndex().catch(() => ({ exact: new Map(), rows: [] })),
+      feeSettings().catch(() => ({})),
+      q(`select ref, coalesce(sum(delta),0) as amt from wallet_ledger
+          where type=$1 and ref = any($2::text[]) group by ref`, [CHARGE_TYPE + '-in', ids])
+        .then((r) => r.rows).catch(() => []),
+    ]);
+    const charged = new Map(chargedRows.map((r) => [String(r.ref), parseFloat(r.amt) || 0]));
+    for (const o of rows) {
+      const paid = charged.get(String(o.id)) || 0;
+      if (paid > 0) { o.cost = paid; o.cost_estimated = false; continue; }
+      const items = Array.isArray(o.items) ? o.items : [];
+      if (!items.length) continue;
+      const { lines, unpriced } = priceLines(items, idx, fees);
+      // No priced line means no answer — NOT zero. The column prints nothing and the row
+      // still says how many lines could not be priced, which is the actionable half.
+      o.cost = lines.length ? computeTotals(lines, fees, 0).total : null;
+      o.cost_estimated = true;
+      if (unpriced.length) o.cost_unpriced = unpriced.length;
+    }
+    return rows;
+  }
+
   function stripStaffOnly(row) {
     if (!row) return row;
     // seller_name goes too: it is only ever the reader's own name, and shipping a field
@@ -1629,6 +1681,7 @@ export function ordersRoutes(app, requireAuth) {
             or exists (select 1 from users u where u.id = o.seller_id and u.role <> 'seller'))
          group by o.id order by o.created_at desc`);
       await Promise.all(r.rows.map(healOrphanLines));
+      await attachCost(r.rows, req.user);
       return r.rows.map(compact);
     }
     // Sellers only see their OWN orders, never the admin/factory-synced ones. A team member sees
@@ -1650,6 +1703,7 @@ export function ordersRoutes(app, requireAuth) {
       [sel.id]
     );
     await Promise.all(r.rows.map(healOrphanLines));
+    await attachCost(r.rows, req.user);
     return r.rows.map((x) => compact(stripStaffOnly(maskBuyerPII(x))));
   });
 

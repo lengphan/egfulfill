@@ -317,6 +317,37 @@ export const platformFromId = (id: string) => {
 }
 
 /**
+ * WHAT THE BUYER PAID — or null, which is not the same as zero.
+ *
+ * `orders.total` only holds revenue when something actually put a buyer's price in it. A
+ * marketplace receipt does: etsy/shopify/tiktok write the grandtotal. A MANUAL order does
+ * not — the create form computes the field as Σ(price typed × qty) plus our shipping fees, so
+ * an order created with the price column untouched still carries a figure, and that figure is
+ * postage. Read as revenue it says the customer paid $9.00 for two beanies that cost $44.99 to
+ * make, and a profit line built on it reports a loss that never happened.
+ *
+ * So it counts only when a marketplace wrote it, or when a human deliberately recorded a
+ * retail price (`meta.retail_set`, set by the order Summary card and by the sheet import).
+ *
+ * HERE, in the shared module, because three surfaces ask it: the seller's queue, the order
+ * page and the phone. It is exactly the shape of rule that had already been copied into two
+ * places and disagreed — the queue printed "$0.00" for years while the detail page, three
+ * clicks away, said "not recorded" about the same order.
+ */
+export const recordedRevenue = (o: {
+  id?: string | null
+  total?: number | string | null
+  meta?: { retail_set?: boolean } | null
+}): number | null => {
+  const fromMarketplace = platformFromId(String(o?.id ?? "")) !== "Manual"
+  const retailSet = !!o?.meta?.retail_set
+  if (!fromMarketplace && !retailSet) return null
+  const n = Number(o?.total ?? 0) || 0
+  return n > 0 ? n : null
+}
+
+
+/**
  * THE NUMBER, THEN WHO IT CAME FROM — the label for a reference standing on its own.
  *
  * `numOfIds` is for a row that has a seq to fall back on. This is for the places that hold

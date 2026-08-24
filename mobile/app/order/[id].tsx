@@ -9,7 +9,7 @@ import {
 } from "@/lib/api"
 import {
   normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines,
-  STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder,
+  STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue,
 } from "@/lib/orders"
 import { F,C, R, LIFT, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
@@ -500,7 +500,15 @@ export default function OrderDetail() {
             {o.status ? <Row label="Status" value={String(o.status)} /> : null}
             {o.ship_by ? <Row label="Ship by" value={new Date(o.ship_by).toLocaleDateString()} /> : null}
             {o.created_at ? <Row label="Placed" value={new Date(o.created_at).toLocaleDateString()} /> : null}
-            {o.total != null ? <Row label="Total" value={`$${(Number(o.total) || 0).toFixed(2)}`} /> : null}
+            {/* WHAT IT COSTS YOU, above what the buyer paid — the phone had only the second
+                one, and on a manual order that is $0.00, which is the one number it is not.
+                "Est." says the charge has not happened; the web board says the same thing by
+                weight, which it can and a Row cannot. Both are omitted rather than zeroed
+                when nothing is recorded: see revenueOf on the web. */}
+            {o.cost != null
+              ? <Row label={o.cost_estimated ? "Cost (est.)" : "Cost"} value={`$${(Number(o.cost) || 0).toFixed(2)}`} />
+              : null}
+            {recordedRevenue(o) != null ? <Row label="Customer paid" value={`$${(recordedRevenue(o) ?? 0).toFixed(2)}`} /> : null}
             {/* THE NUMBER, THEN THE MARKETPLACE. This printed the routing id verbatim —
                 `etsy-4152219958` — which is not what the buyer quotes, not what the seller's
                 Etsy dashboard shows, and not what support asks for. Same formatter the web
