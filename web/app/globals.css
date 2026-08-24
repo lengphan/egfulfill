@@ -419,14 +419,42 @@
  scrollbar-gutter: stable;
     }
 
-  /* `.font-display` now resolves to the body sans like everything else. It keeps its own
- rule rather than being deleted, because ~100 call sites name it and a class that exists
- is cheaper than a sweep — and because display type still wants tighter tracking than
- body, which is a property of SIZE, not of the typeface that was dropped. */
+  /* `.font-display` keeps its own rule rather than being deleted, because ~100 call sites
+ name it and a class that exists is cheaper than a sweep — and because display type wants
+ tighter tracking than body, which is a property of SIZE, not of a typeface.
+
+ NO font-family HERE, AND IT WOULD NOT WORK IF THERE WERE. Tailwind generates the utility
+ from the `--font-display` entry in @theme and RESOLVES the value at build time, so what
+ ships is `.font-display, .font-heading { font-family: var(--font-sans) }` in @layer
+ utilities — a literal, not a reference to the token. Re-pointing `--font-display` on an
+ element therefore changes nothing, which cost a while to find. The scoped override below
+ wins on SPECIFICITY instead, which is the only lever left. */
   .font-display {
  font-optical-sizing: auto;
  letter-spacing: -0.022em;
     }
+}
+
+/* ── THE MARKETING DISPLAY FACE ─────────────────────────────────────────────────
+ *
+ * ONE SELECTOR, and its scope is the whole argument for it. Playfair was dropped because two
+ * alphabets ran through one PRODUCT — it set every screen title in the app and on mobile, so
+ * a seller met different letterforms in the place they look first. That still holds, and
+ * nothing under app/(app) or app/(boards) is touched here, nor is mobile.
+ *
+ * What it does not cover is the five PUBLIC pages, whose one job is looking like a company
+ * worth buying from, and where Inter's narrow neutral letterforms are the biggest single
+ * reason those pages read as a template. Outfit is wide and geometric — and still a sans, so
+ * headline and body are one voice at two weights rather than two voices.
+ *
+ * `[data-mk-face] .font-display` is (0,2,0) against the generated utility's (0,1,0), so it
+ * wins wherever the marketing layout sets the attribute and nowhere else. The attribute is
+ * set in app/(marketing)/layout.tsx, on the one wrapper every public route passes through.
+ */
+@layer utilities {
+  [data-mk-face] .font-display {
+    font-family: var(--font-marketing);
+  }
 }
 
 /* ── ALIGNMENT, ONCE, INSTEAD OF PER CELL ───────────────────────────────────────

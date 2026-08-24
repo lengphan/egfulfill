@@ -34,6 +34,7 @@ import {
   type ImportRecord,
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
+import { resolveProduct } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles,
@@ -292,8 +293,12 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
       if (refs) return refs.length ? refs : null
       const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type"
       if (!dependent) return FIXED_OPTIONS[colKey] ?? null
-      const name = (row[IDX.blank] || "").trim().toLowerCase()
-      const p = name ? catalog.find((c) => String(c.name || "").trim().toLowerCase() === name) : null
+      // resolveProduct, not a private name match — it is the canonical matcher and it is what
+      // knows the cell may be "SKU - Name" (CLAUDE.md §5: import, don't re-implement). A
+      // hand-rolled equality here is exactly why the labelled option would have narrowed
+      // nothing: every colour cell would have fallen back to the fixed list.
+      const cell = (row[IDX.blank] || "").trim()
+      const p = cell ? resolveProduct({ blank: cell } as never, catalog) : null
       if (!p) return FIXED_OPTIONS[colKey] ?? null
       if (colKey === "item_color") return productColors(p as never)
       if (colKey === "item_size") return productSizes(p as never)
@@ -310,8 +315,25 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     [catalog, refOptions],
   )
 
+  /**
+   * THE BLANK, AS "SKU - NAME" — the same string the Google Sheet's dropdown offers.
+   *
+   * Two reasons it is one string rather than a label over a hidden value. A catalogue has
+   * near-identical names in it ("Adidas Men's Blended T-Shirt" against three cuts of the
+   * same shirt), and the sku is the half that tells them apart while you are picking. And
+   * Sheets data validation has no label-vs-value at all — the cell holds the option text —
+   * so anything this grid wrote in a different shape would import differently from the
+   * sheet the same rows can be pasted into. resolveProduct matches either half.
+   */
   const productNames = useMemo(
-    () => catalog.map((c) => String(c.name || "").trim()).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+    () => catalog
+      .map((c) => {
+        const name = String(c.name || "").trim()
+        const sku = String(c.sku || "").trim()
+        return name ? (sku ? `${sku} - ${name}` : name) : ""
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b)),
     [catalog],
   )
 

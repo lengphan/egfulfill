@@ -27,12 +27,33 @@ export function variantSkusOf(p: CatalogProduct): string[] {
   return out.filter(Boolean)
 }
 
+/**
+ * THE BLANK CELL, WHICH NOW ARRIVES AS "SKU - NAME".
+ *
+ * The import sheet's Blank Product dropdown offers `G5000 - Gildan 5000 Heavy Cotton Tee`,
+ * because a name alone is not enough to tell two near-identical garments apart at the moment
+ * of picking one. Google Sheets validation has no label-vs-value: the cell holds exactly the
+ * option text, so the combined form is what reaches an order line.
+ *
+ * The WHOLE string is matched first and the split is only a fallback, which is what keeps a
+ * product whose NAME contains " - " resolving as it always did — splitting first would turn
+ * "Adidas - Performance Polo" into a search for a product called "Adidas".
+ */
+function blankCandidates(cell: string): string[] {
+  const out = [cell]
+  const at = cell.indexOf(" - ")
+  if (at > 0) { out.push(cell.slice(0, at).trim(), cell.slice(at + 3).trim()) }
+  return out.filter(Boolean)
+}
+
 export function resolveProduct(item: OrderItem, catalog: CatalogProduct[]): CatalogProduct | null {
   const blank = String(item.blank || "").trim().toLowerCase()
   if (blank) {
-    const hit = catalog.find((p) =>
-      [p.name, p.sku, p.supplierSku, p.id].some((v) => v != null && String(v).trim().toLowerCase() === blank))
-    if (hit) return hit
+    for (const cand of blankCandidates(blank)) {
+      const hit = catalog.find((p) =>
+        [p.name, p.sku, p.supplierSku, p.id].some((v) => v != null && String(v).trim().toLowerCase() === cand))
+      if (hit) return hit
+    }
   }
   const s = String(item.sku || "").toUpperCase().trim()
   if (!s) return null

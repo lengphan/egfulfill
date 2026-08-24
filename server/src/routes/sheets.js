@@ -75,7 +75,10 @@ const T_COLUMNS = [
   { h: 'Ship State', g: 'ship', duty: 'req', sample: 'OR', opts: 'states' },
   { h: 'Ship Zip', g: 'ship', duty: 'req', sample: '97201' },
   { h: 'Ship Email', g: 'ship', duty: '', sample: 'jane@example.com' },
-  { h: 'Product Title', g: 'product', duty: 'req', sample: 'Custom Embroidered Tee with Name' },
+  // OPTIONAL, and the Blank Product below is what took its asterisk. A title is what the
+  // buyer's listing was called; the blank is what we actually cut and print. Mirrors
+  // CSV_COLUMNS in web/lib/order-import.ts — a row with no title is named after its blank.
+  { h: 'Product Title', g: 'product', duty: '', sample: 'Custom Embroidered Tee with Name' },
   { h: 'Listing SKU', g: 'product', duty: '', sample: 'TEE-EMB-NAME-01' },
   /**
    * THE BLANK, BY NAME — and the three columns after it narrow to whatever it offers.
@@ -88,7 +91,7 @@ const T_COLUMNS = [
    * Old sheets keep working — the importer still reads a 'Blank SKU' column when one is
    * there, see COL_ALIASES in web/lib/order-import.ts.
    */
-  { h: 'Blank Product', g: 'product', duty: '', sample: 'Gildan 5000 Heavy Cotton Tee', opts: 'products' },
+  { h: 'Blank Product', g: 'product', duty: 'req', sample: 'EG-1001 - Gildan 5000 Heavy Cotton Tee', opts: 'products' },
   /**
    * THE SHORTCUT, THEN THE RAW MATERIAL — and they sit together because they answer the
    * same question two ways.
@@ -344,11 +347,29 @@ export function buildTemplate(title, lists = null) {
   const union = (axis) => [...new Set(P.flatMap((p) => p[axis] || []))];
   const UNIONS = AXES.map(([axis]) => union(axis));
 
+  /**
+   * THE OPTION TEXT IS "SKU - NAME", AND IT IS ONE STRING ON PURPOSE.
+   *
+   * A catalogue has near-identical names in it — three cuts of the same Adidas shirt read
+   * the same in a dropdown — and OUR sku is the half that tells them apart at the moment of
+   * picking. Sheets data validation has no label-vs-value: whatever is picked IS the cell,
+   * so this text is what reaches the importer. resolveProduct (web/lib/variant-resolve.ts)
+   * matches the whole string first and either half after, so both spellings resolve and a
+   * sheet filled in before today still imports.
+   *
+   * OUR sku, never `supplierSku` — that names who makes our blanks, and it is withheld from
+   * every surface (CLAUDE.md §2.9). catalogLists() selects `sku` from catalog_products,
+   * which is ours; the supplier's code is not read here at all.
+   *
+   * The same label is the MATCH key in column A, so the dependent colour/size/method ranges
+   * keep resolving — they look the picked cell up in this column by MATCH.
+   */
+  const label = (p) => (p.sku ? `${p.sku} - ${p.name}` : p.name);
   const listCols = [];
-  listCols.push(['Product', ...P.map((p) => p.name)]);
+  listCols.push(['Product', ...P.map(label)]);
   AXES.forEach(([axis], a) => listCols.push([`All ${axis}`, ...UNIONS[a]]));
   for (let i = 0; i < P.length; i++) {
-    for (const [axis] of AXES) listCols.push([P[i].name, ...(P[i][axis] || [])]);
+    for (const [axis] of AXES) listCols.push([label(P[i]), ...(P[i][axis] || [])]);
   }
   const listRowCount = Math.max(2, ...listCols.map((c) => c.length));
   const listRows = [];

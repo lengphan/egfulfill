@@ -103,7 +103,7 @@ export function GhostWord({ children, color = INK, opacity = 0.05, className = "
  * `src` empty renders NOTHING — not a placeholder, not a grey box. An unset image on a live
  * marketing page must not look like a broken one (§4), and the caller decides what stands in.
  */
-export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", className = "" }: {
+export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", tall = false, className = "" }: {
   src: string
   /** What the picture IS. Never "hero image" — it is a garment, and the alt text is the only
    *  version of it some people get. */
@@ -125,6 +125,11 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", c
    * how-it-works uses it and the hero does not.
    */
   tone?: "paper" | "ink"
+  /** Let the picture fill a column rather than sit at its natural height. The two-column hero
+   *  needs the figure to hold the full height of the block beside the copy — at the default
+   *  24rem cap it floats in the middle of its own column and the two halves stop reading as
+   *  one composition. */
+  tall?: boolean
   className?: string
 }) {
   const reduce = useReducedMotion()
@@ -135,10 +140,6 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", c
      fills its dark cards with, so it is measured by tools/check-skins.mjs on every skin and
      cannot be a hand-picked value that goes unreadable when the palette moves. */
   const fg = ink ? ACCENT_INK : INK
-  const rule = ink ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE
-  /* ACID is allowed here and ONLY here: §4 permits it as a fill ON the plate, never on white.
-     On paper the dot stays the accent. */
-  const dot = ink ? ACID : ACCENT
 
   return (
     /*
@@ -193,7 +194,7 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", c
               marketplace-length sentence — as a paragraph across the fold. Seen live. An
               <img> with no src is not an empty box, it is a failed one. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {src ? <img src={src} alt={alt} className="max-h-[24rem] w-auto max-w-full object-contain" />
+          {src ? <img src={src} alt={alt} className={(tall ? "max-h-[34rem]" : "max-h-[24rem]") + " w-auto max-w-full object-contain"} />
                : <span className="block h-40" aria-hidden />}
         </motion.div>
       </div>
@@ -207,31 +208,60 @@ export function CutoutFigure({ src, alt, ghost, callouts = [], tone = "paper", c
         * length say the same thing and cannot end up pointing at empty air — which is what
         * fake precision looks like the first time the image is replaced.
         */}
-      {callouts.length > 0 && (
-        <div className="flex flex-col justify-center gap-7 lg:max-w-xs">
-          {callouts.slice(0, 4).map((c, i) => (
-            <motion.div
-              key={`${c.label}-${i}`}
-              className="flex items-start gap-3"
-              initial={reduce ? { opacity: 0 } : { opacity: 0, x: 18 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.35 + i * 0.1, ease: EASE }}
-            >
-              {/* mt-[0.4rem] lands the dot on the CAP HEIGHT of the label beside it rather
-                  than on its line box, which is what makes a row of them look aligned. */}
-              <span className="mt-[0.4rem] size-1.5 shrink-0 rounded-full" style={{ background: dot }} />
-              <span className="mt-[0.45rem] hidden h-px w-8 shrink-0 lg:block" style={{ background: rule }} />
-              <span className="min-w-0">
-                <span className={`${CAPS} block`} style={{ color: fg }}>{c.label}</span>
-                {/* 0.7 on the plate, not 0.55: a note at paper's strength against a dark ground
-                    drops below the 4.5:1 floor, and this one is real body copy. */}
-                {c.note && <span className="mt-1 block text-xs leading-snug" style={{ color: fg, opacity: ink ? 0.7 : 0.55 }}>{c.note}</span>}
-              </span>
-            </motion.div>
-          ))}
-        </div>
-      )}
+      <CalloutList items={callouts} tone={tone} className="flex-col justify-center lg:max-w-xs" />
+    </div>
+  )
+}
+
+/**
+ * THE CALLOUTS — a caps label, a hairline running to a dot.
+ *
+ * The reference points its lines at specific joints of the subject. That precision needs the
+ * label to know where the shoulder IS, which nothing here can know: the picture is whatever
+ * was uploaded this morning. Labels tied to the figure by rules of EQUAL length say the same
+ * thing and cannot end up pointing at empty air — which is what fake precision looks like the
+ * first time the image is replaced.
+ *
+ * ITS OWN EXPORT because the hero wants the same list somewhere else. In the two-column hero
+ * the picture holds the left half, so callouts beside it would be a third column in the
+ * space the text needs; they sit under the copy instead, and `direction` is the only thing
+ * that changes. A second copy of these eighteen lines is how the dot ends up 1.5px here and
+ * 2px there (CLAUDE.md §4).
+ */
+export function CalloutList({ items, tone = "paper", className = "" }: {
+  items: Callout[]
+  tone?: "paper" | "ink"
+  className?: string
+}) {
+  const reduce = useReducedMotion()
+  if (!items.length) return null
+  const ink = tone === "ink"
+  const fg = ink ? ACCENT_INK : INK
+  const rule = ink ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE
+  const dot = ink ? ACID : ACCENT
+  return (
+    <div className={`flex gap-7 ${className}`}>
+      {items.slice(0, 4).map((c, i) => (
+        <motion.div
+          key={`${c.label}-${i}`}
+          className="flex min-w-0 items-start gap-3"
+          initial={reduce ? { opacity: 0 } : { opacity: 0, x: 18 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.35 + i * 0.1, ease: EASE }}
+        >
+          {/* mt-[0.4rem] lands the dot on the CAP HEIGHT of the label beside it rather than on
+              its line box, which is what makes a row of them look aligned. */}
+          <span className="mt-[0.4rem] size-1.5 shrink-0 rounded-full" style={{ background: dot }} />
+          <span className="mt-[0.45rem] hidden h-px w-8 shrink-0 lg:block" style={{ background: rule }} />
+          <span className="min-w-0">
+            <span className={`${CAPS} block`} style={{ color: fg }}>{c.label}</span>
+            {/* 0.7 on the plate, not 0.55: a note at paper's strength against a dark ground
+                drops below the 4.5:1 floor, and this one is real body copy. */}
+            {c.note && <span className="mt-1 block text-xs leading-snug" style={{ color: fg, opacity: ink ? 0.7 : 0.55 }}>{c.note}</span>}
+          </span>
+        </motion.div>
+      ))}
     </div>
   )
 }
