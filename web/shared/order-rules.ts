@@ -297,9 +297,23 @@ export const numOfIds = (seq: number | null | undefined, id: string) => {
   const p = plainNum(String(id))
   return /^\d+$/.test(p) ? `#${p}` : p
 }
+/**
+ * A BARE PLATFORM KEY, as the platform writes itself — "etsy" → "Etsy", "tiktok" → "TikTok".
+ *
+ * platformFromId reads the key off an ORDER ID, which is the common case and the reason this
+ * table exists. It is not the only case: a store connection carries its platform as a plain
+ * column, and calling platformFromId("etsy") returns "Manual" because the regex wants a
+ * trailing dash. Two of these brands are title-cased wrong by the obvious fallback, which is
+ * exactly why the table is not something a call site should re-derive.
+ */
+export const platformName = (raw: string | null | undefined) => {
+  const k = String(raw ?? "").toLowerCase()
+  if (!k) return ""
+  return PLATFORM_NAMES[k] ?? (k.charAt(0).toUpperCase() + k.slice(1))
+}
 export const platformFromId = (id: string) => {
   const raw = (String(id ?? "").match(SOURCE_PREFIX)?.[1] ?? "manual").toLowerCase()
-  return PLATFORM_NAMES[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
+  return platformName(raw)
 }
 
 /**
