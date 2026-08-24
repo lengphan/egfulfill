@@ -17,11 +17,12 @@
  * ~247 pieces of text as well as filling buttons), not the floor's status vocabulary, not
  * `--pop`. See the SCOPE note in globals.css.
  *
- * LIMIT, stated rather than implied: this paints on the surfaces that ask for it — the app,
- * the boards and auth, all of which run `useAccent()`. The PUBLIC marketing pages are served
- * to visitors with no session, so they render whichever skin globals.css declares on `:root`
- * — today, `studio`. Changing what the public site defaults to is a one-line CSS change, not
- * a picker, and pretending otherwise would mean a colour flash on every cold marketing load.
+ * SCOPE: this module paints the surfaces that run `useAccent()` — the app, the boards and
+ * auth. The PUBLIC marketing pages do NOT go through here and never should: they are Server
+ * Components rendered for visitors with no session, so a client paint would flash the default
+ * palette on every cold load. They read the same stored key on the server instead and render
+ * `data-skin` into the markup — see lib/public-theme.ts. Both halves therefore honour one
+ * admin choice, by two routes, for the same reason: whichever avoids a wrong first frame.
  *
  * Gate: `node tools/check-skins.mjs`.
  */
@@ -30,6 +31,26 @@ export type SkinKey = "studio" | "press"
 export const SKINS: { key: SkinKey; label: string; what: string }[] = [
   { key: "studio", label: "Studio", what: "Ink on white. One bright accent." },
   { key: "press", label: "Press", what: "Violet plate over warm paper." },
+]
+
+/**
+ * THE MARKETING DISPLAY FACE — the same shape as the skin, and NOT painted by this module.
+ *
+ * A skin has to be applied on the client for the signed-in app, which is why `applySkin`
+ * exists. The face is a MARKETING-only choice, and the marketing pages are Server Components:
+ * `app/(marketing)/layout.tsx` renders `data-face` into the markup from the stored key (see
+ * lib/public-theme.ts), so nothing has to paint it after hydration and there is no first frame
+ * in the wrong typeface. This list is only here so the picker and the type live together.
+ *
+ * Mirrors FACES in server/src/routes/branding.js — that file is the allow-list, this is the
+ * label. Adding one means a next/font call in app/layout.tsx and a line in globals.css too.
+ */
+export type FaceKey = "inter" | "outfit" | "grotesk"
+
+export const FACES: { key: FaceKey; label: string; what: string }[] = [
+  { key: "outfit", label: "Outfit", what: "Wide, geometric. The default." },
+  { key: "grotesk", label: "Space Grotesk", what: "Narrower, more technical." },
+  { key: "inter", label: "Inter", what: "The body sans, set heavier. One face everywhere." },
 ]
 
 const STORE_KEY = "eg_skin"

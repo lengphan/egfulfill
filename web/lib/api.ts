@@ -1051,12 +1051,17 @@ export type Branding = {
   /** The site's PALETTE, on exactly the same terms as `accent`: a key, allow-listed by the
    *  server, whose values live in globals.css under [data-skin="…"]. See lib/skin.ts. */
   skin?: string; skins?: string[]
+  /** The marketing DISPLAY FACE, same terms again: a key, allow-listed by the server, whose
+   *  faces are loaded by next/font in app/layout.tsx and selected by one `data-face` rule in
+   *  globals.css. Headlines on the five public pages only — body copy and the whole
+   *  signed-in product stay on Inter. */
+  face?: string; faces?: string[]
   error?: string
 }
 export function getBranding() {
   return api<Branding>(`/api/branding`)
 }
-export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string; skin?: string }) {
+export function setBranding(body: { appName?: string; logoUrl?: string; accent?: string; skin?: string; face?: string }) {
   return api<Branding & { ok?: boolean }>(`/api/admin/branding`, { method: "PUT", body: JSON.stringify(body) })
 }
 /** `dataUrl` is a base64 data URL read from a file input. Max 2MB, PNG/JPEG/WebP/SVG/ICO. */

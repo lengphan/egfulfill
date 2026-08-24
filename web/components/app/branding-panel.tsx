@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getBranding, setBranding, uploadBrandingAsset, type Branding } from "@/lib/api"
 import { ACCENTS, rememberAccent, type AccentKey } from "@/lib/accent"
-import { SKINS, rememberSkin, type SkinKey } from "@/lib/skin"
+import { FACES, SKINS, rememberSkin, type FaceKey, type SkinKey } from "@/lib/skin"
 
 /**
  * BRANDING — the marks and the name, changeable without a deploy.
@@ -37,6 +37,7 @@ export function BrandingPanel() {
   const [saved, setSaved] = useState(false)
   const [accent, setAccentState] = useState<AccentKey>("rose")
   const [skin, setSkinState] = useState<SkinKey>("studio")
+  const [face, setFaceState] = useState<FaceKey>("outfit")
   const [err, setErr] = useState<string | null>(null)
   /**
    * A CACHE-BUSTER THAT DOES NOT REPEAT ITSELF.
@@ -61,6 +62,7 @@ export function BrandingPanel() {
         setB(r); setAppName(r.appName ?? "")
         if (r.accent === "rose" || r.accent === "lime") setAccentState(r.accent)
         if (SKINS.some((k) => k.key === r.skin)) setSkinState(r.skin as SkinKey)
+        if (FACES.some((k) => k.key === r.face)) setFaceState(r.face as FaceKey)
       })
       .catch((e) => setErr(e instanceof Error ? e.message : "Couldn't load branding."))
   }, [])
@@ -108,6 +110,26 @@ export function BrandingPanel() {
     } catch (e) {
       setSkinState(before); rememberSkin(before)
       setErr(e instanceof Error ? e.message : "Couldn't save the palette.")
+    }
+  }
+
+  /**
+   * Same optimistic shape as the two above, with one difference: NOTHING IS PAINTED HERE.
+   *
+   * The face only applies to the public marketing pages, which are server-rendered from the
+   * stored key — so unlike the skin there is no local surface to repaint, and calling a
+   * `rememberFace` would be a client cache for a value no client reads. The change shows up
+   * on the next marketing page load, inside the 60-second revalidate window.
+   */
+  const pickFace = async (key: FaceKey) => {
+    const before = face
+    setFaceState(key); setErr(null)
+    try {
+      const r = await setBranding({ face: key })
+      if (r.error) throw new Error(r.error)
+    } catch (e) {
+      setFaceState(before)
+      setErr(e instanceof Error ? e.message : "Couldn't save the typeface.")
     }
   }
 
@@ -241,10 +263,51 @@ export function BrandingPanel() {
               </button>
             ))}
           </div>
-          {/* THE LIMIT, SAID PLAINLY rather than discovered. The public marketing pages are
-              served to people with no session, so they render whatever globals.css declares
-              on :root — this choice reaches the app, the boards and sign-in. */}
-          <p className="mt-2 text-xs text-muted-foreground">Applies to the app, the boards and sign-in. The public pages use the built-in default.</p>
+          {/* THIS LINE USED TO SAY the public pages ignored the choice, and it was true: the
+              skin was painted by useAccent(), which the app shell and the boards layout call
+              and the marketing layout does not. The public pages now read the same stored key
+              on the SERVER (lib/public-theme.ts), so one choice reaches both halves. */}
+        </div>
+
+        <div>
+          <p className="text-sm font-medium">Marketing typeface</p>
+          {/**
+            * THE DISPLAY FACE, on exactly the terms the palette runs on: a stored KEY, an
+            * allow-list on the server, and the faces themselves loaded by next/font so each
+            * one is self-hosted with a preload and correct fallback metrics.
+            *
+            * HEADLINES ON THE PUBLIC PAGES ONLY. Playfair was dropped on 2026-08-21 because a
+            * second face ran through the PRODUCT — it set every screen title in the app and on
+            * mobile, so a seller met different letterforms in the place they look first. That
+            * still holds; this cannot reach either.
+            *
+            * Each option is previewed IN ITS OWN FACE, through the same `data-face` attribute
+            * the marketing wrapper uses — so the panel cannot show one typeface and apply
+            * another, which is the same rule the palette swatches follow.
+            */}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {FACES.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => void pickFace(f.key)}
+                aria-pressed={face === f.key}
+                className={"flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors " +
+                  (face === f.key ? "border-foreground" : "border-border hover:border-foreground/30")}
+              >
+                <span data-face={f.key} className="grid size-8 shrink-0 place-items-center rounded-md border border-border">
+                  {/* Aa, because the thing a person is choosing is the letterforms — a swatch
+                      of colour tells you nothing about a typeface. */}
+                  <span className="font-display text-base font-semibold leading-none">Aa</span>
+                </span>
+                <span>
+                  <span className="block text-sm font-medium">{f.label}</span>
+                  <span className="block text-xs text-muted-foreground">{f.what}</span>
+                </span>
+                {face === f.key && <Check size={14} weight="bold" className="ml-1 shrink-0" />}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
