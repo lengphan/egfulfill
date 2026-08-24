@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, CaretDown } from "@phosphor-icons/react"
+import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, CaretDown, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,9 @@ import { extractDominant, hexToRgb, rgbToOklab } from "@/lib/thread-match"
 import { normalizeMethods, methodByKey, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 import { packagingHint } from "@/lib/dim-weight"
-import { cleanSku } from "@/lib/sku"
+import { cleanSku, EG_SKU } from "@/lib/sku"
+import { stripBrandPrefix } from "@/lib/supplier-catalog"
+import { withRenameAlias } from "@/lib/brand-split"
 import { variantSku, variantLabel, variantPairs } from "@/lib/variant-sku"
 import { framingStyle, FOCUS_MIN, FOCUS_MAX, ZOOM_MIN, ZOOM_MAX } from "@/lib/product-framing"
 import { printZoneOf, BASE_PRINT_IN, type PrintZone } from "@/lib/print-zone"
@@ -1101,7 +1103,36 @@ export function ProductEditorDialog({
                   {/* The placeholder is the number this product would ACTUALLY get, not a
  hardcoded example — "EG-1005" over an empty field reads as filled. */}
                   <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? "EG-1005"} className="h-9 tabular-nums" />
-                  <span className="text-2xs text-muted-foreground">Stock is held against this, and the seller sees it on their listing.</span>
+                  {/*
+                    * SAY IT HERE, WHERE IT CAN STILL BE FIXED.
+                    *
+                    * Eight of thirty live products carry a supplier's part number in this
+                    * field — `10-271-016-SM`, `10892` — because a code was typed or imported
+                    * and nobody was told it was not ours. The consequence surfaces months
+                    * later and somewhere else: the blank dropdown, the sheet a seller fills
+                    * in and every variant strip print that number, which is a code anyone can
+                    * paste into a distributor's search box (§2.9).
+                    *
+                    * So the moment it is typed, not on a report afterwards — and with the fix
+                    * attached, because a warning that leaves you to work out the next free
+                    * number is a warning people learn to click past. It never BLOCKS: a
+                    * product whose code came from somewhere else is a real thing, and the
+                    * supplier's own code is still better on screen than a blank.
+                    */}
+                  {sku.trim() && !EG_SKU.test(cleanSku(sku)) ? (
+                    <span className="flex flex-wrap items-center gap-1.5 text-2xs text-amber-700 dark:text-amber-500">
+                      <Warning size={12} weight="fill" className="shrink-0" />
+                      That is not one of ours — it looks like a supplier code.
+                      {nextSku && (
+                        <button type="button" onClick={() => { setSupplierSku((v) => v || cleanSku(sku)); setSku(nextSku) }}
+                          className="font-medium underline underline-offset-2">
+                          Use {nextSku} and keep this as the supplier SKU
+                        </button>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-2xs text-muted-foreground">Stock is held against this, and the seller sees it on their listing.</span>
+                  )}
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-muted-foreground">Supplier SKU</span>

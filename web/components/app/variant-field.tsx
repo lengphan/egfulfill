@@ -9,7 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ourSku } from "@/lib/our-sku"
 import { cn } from "@/lib/utils"
 import { useLabelT } from "@/lib/i18n"
 
@@ -210,9 +209,11 @@ export function VariantStrip({
 }) {
  const tl = useLabelT()
  const chips = [
-    /* OUR code, never the supplier's — see ourSku. Eight live products carry a vendor part
-       number in the sku field, and this chip was printing it on every board. */
- ourSku(sku) ? { key: "sku", label: ourSku(sku), mono: true } : null,
+    /* WHATEVER CODE THE CALLER RESOLVED. It passes resolveProduct(it)?.sku, which is OURS
+       whenever the product has one; a bare string cannot be preferred over anything, and an
+       empty chip tells the floor less than a supplier's code does. The preference is made
+       where both codes exist — see displaySku. */
+ sku ? { key: "sku", label: sku, mono: true } : null,
  blank ? { key: "blank", label: blank } : null,
  color ? { key: "color", label: color, swatch: true } : null,
  size ? { key: "size", label: size } : null,
