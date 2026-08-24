@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { getLookbook, saveCatalogExport, getCatalogExport, getFactorySettings, saveLookbookStyle, type LookbookStyle } from "@/lib/api"
 import { descriptionLines } from "@/lib/description"
 import { PRODUCT_METHODS } from "@/lib/print-method"
+import { bySize } from "@/lib/size-order"
 import type { LookbookBrand } from "@/components/app/lookbook-branding-dialog"
 import { getUser } from "@/lib/auth"
 import { LookbookBrandingDialog } from "@/components/app/lookbook-branding-dialog"
@@ -584,7 +585,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             // to hold. In EDIT mode it always does — the attach-a-photo and add-a-description
             // affordances are the reason you opened the mode on a page that has neither.
  const hero = heroImage(st)
- const twoUp = !!hero || !!st.description || editing
+            // The left column is THE PRODUCT AND ITS MEASUREMENTS now — the photo, the size
+            // run and the spec table. The description used to justify this column too, and
+            // it has moved under the swatches, so a style with copy and no photo would have
+            // opened an empty half-page here. The charts are what keep the column earning
+            // its place when there is no shot.
+ const twoUp = !!hero || st.sizes.length > 0 || st.specs.length > 0 || editing
             // Wider cells when the swatches have the whole sheet: three across a full page
             // would print them at hero size, which is not what a colour grid is for.
  const colCap = twoUp ? 20 : 32
@@ -732,12 +738,17 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  way too long". A square is the shape these shots are framed in
  everywhere else in the app, so the same photo reads the same here, and
  the height it stops taking goes to the copy underneath it. */
-                    /* THE HERO YIELDS, THE COPY DOES NOT. A fixed square took half the column
- whatever else was on the page, so a style with seven bullets had five of
- them clipped away by the page bound — silently, which is worse than the
- overflow it replaced. The photo is object-contain, so capping its height
- just makes the garment smaller; the description keeps what is left. */
-                    <div className="group relative flex max-h-[46%] w-full flex-1 items-center justify-center overflow-hidden rounded-lg p-3"
+                    /* THE HERO TAKES THE COLUMN. It was capped at 46% of it, because the
+ description sat underneath and the two were fighting over the same
+ 92mm strip — so the one photograph on a page whose job is selling a
+ garment printed at about half the size of the page's white space, and
+ the sheet read as mostly margin.
+                       The copy is not underneath any more; it is under the colourways, in
+ the wide column that was ending in a band of empty paper. So there is
+ nothing left here to yield to, and the cap comes off: the photo takes
+ everything above the size charts. object-contain, so it grows to the
+ column and stops — a portrait shot gets taller, never wider than 92mm. */
+                    <div className="group relative flex w-full flex-1 items-center justify-center overflow-hidden rounded-lg p-3"
  style={{ background: PLATE }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={hero} alt={st.name} className="size-full object-contain" />
@@ -761,36 +772,6 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     </button>
                   ) : null}
 
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                  <Editable
- editing={editing} value={st.description} multiline
- placeholder="Add a description"
- className={hero ? "mt-4 block text-[11px] text-neutral-500" : "block text-[11px] text-neutral-500"}
- onSave={(v) => patch(st, { description: v.trim() === "" ? null : v }, { description: v })}
-                  >
-                    {st.description
-                      ? (
-                        // Same split as every other surface — a printed lookbook page is the
-                        // one place a wall of run-together specs is hardest to skim.
-                        /* CAPPED. A supplier description runs to a dozen bullets — the sheet is
- fixed at one page now, so an uncapped list does not make the page
- longer, it makes the bottom of it disappear silently. Eight lines is
- what the column holds beside a square hero and the size charts. */
-                        <ul className={(hero ? "mt-4 " : "") + "space-y-0.5 text-[11px] leading-relaxed text-neutral-600"}>
-                          {descriptionLines(st.description).slice(0, 8).map((line, i) => (
-                            <li key={i} className="flex items-start gap-1.5">
-                              <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
-                              <span className="line-clamp-4">{line}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )
-                      // No description on most supplier styles, and an empty column reads as
-                      // an unfinished page. The size run fills it as a chart instead, which
-                      // is the thing a buyer would otherwise have to ask for.
- : null}
-                  </Editable>
-                  </div>
 
                   {/* The size run and the chart sit UNDER THE HERO, in the left column.
  swatches. On the left they left the bottom-right of every sheet
@@ -811,8 +792,15 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         {/* A CHART, not a row of chips. The chips left a band of white across
  the page; a bordered strip fills it and reads as a spec table,
  which is what a buyer is looking for anyway. */}
+                        {/* IN SIZE ORDER, not in the order the row happens to store them.
+                            This printed the array as it came off `data.sizes`, so a real sheet
+                            read "S · M · XL · 3XL · 4XL · 2XL" — L missing from the middle and
+                            2XL after 4XL. On a document a buyer orders from, a size run that
+                            is not a run is worse than no chart. `bySize` is the ladder the app
+                            already has (lib/size-order.ts, mirroring sanmar.js) — imported,
+                            not re-derived. */}
                         <div className="mt-2 flex overflow-hidden rounded border border-neutral-300">
-                          {st.sizes.map((z) => (
+                          {[...st.sizes].sort(bySize).map((z) => (
                             <div key={z} className="flex-1 border-r border-neutral-200 px-1 py-2 text-center text-[11px] font-semibold last:border-r-0">
                               {z}
                             </div>
@@ -938,6 +926,60 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     <p className="mt-2 text-[9px] text-neutral-500">
                       + {st.colors.length - colCap} more colours — ask us for the full range.
                     </p>
+                  )}
+
+                  {/* THE COPY, UNDER THE COLOURWAYS.
+                    *
+                    * It used to sit in the left column beneath the photo, which cost twice.
+                    * The hero was capped at 46% of a 92mm strip to make room for it — so the
+                    * one photograph on the page printed small — and the bullets then ran down
+                    * a 92mm measure, wrapping every line two or three times. Meanwhile the
+                    * right column stopped dead under the last row of swatches and left a band
+                    * of white across the bottom third of every sheet.
+                    *
+                    * One move fixes both: the photo gets its column back, and the copy gets
+                    * the width it was always better set at.
+                    *
+                    * TWO COLUMNS, because this one is ~175mm wide. A single measure that long
+                    * is past what an eye tracks comfortably, and these are specs — short,
+                    * parallel, read by scanning rather than by sentence. break-inside-avoid so
+                    * a bullet never splits across the fold.
+                    *
+                    * mt-auto: the slack belongs BETWEEN the swatches and the copy, not under
+                    * the copy. Trailing white at the foot of a column is what made the page
+                    * read as unfinished; white above a block that is clearly the last thing on
+                    * the page reads as layout.
+                    */}
+                  {(st.description || editing) && (
+                    <div className="mt-auto min-h-0 shrink-0 overflow-hidden pt-6">
+                      {/* Labelled, like the two sections above it. Unlabelled prose directly
+                          under a grid of photographs reads as a caption for the photographs. */}
+                      <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                        Details
+                      </div>
+                      <Editable
+ editing={editing} value={st.description} multiline
+ placeholder="Add a description"
+ className="mt-2 block text-[11px] text-neutral-500"
+ onSave={(v) => patch(st, { description: v.trim() === "" ? null : v }, { description: v })}
+                      >
+                        {st.description ? (
+                          /* Ten rather than eight. The cap exists because the sheet is a fixed
+ 210mm and an uncapped list makes the bottom of the page disappear
+ silently rather than making the page longer — but at this width each
+ bullet is one line instead of three, so ten of them cost less room
+ than eight did before. */
+                          <ul className="mt-2 grid grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] leading-relaxed text-neutral-600">
+                            {descriptionLines(st.description).slice(0, 10).map((line, i) => (
+                              <li key={i} className="flex break-inside-avoid items-start gap-1.5">
+                                <span className="mt-[0.6em] size-[3px] shrink-0 rounded-full bg-neutral-400" />
+                                <span className="line-clamp-3">{line}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </Editable>
+                    </div>
                   )}
                 </div>
               </div>
