@@ -224,7 +224,21 @@ export const FACTORY_COLS: Record<FactoryColId, FactoryColDef> = {
   // above); two headers reading "Items", one of them a paragraph of title text, would be
   // the worse of the two problems. The ID stays `items`: it is the localStorage key for
   // saved column layouts, and renaming it would silently reset everyone's board.
-  items:    { id: "items",    label: "Product",  grid: "minmax(0,1.2fr)" },
+  /*
+   * A FLOOR, because a 0-floor track COLLAPSES and takes the photo with it.
+   *
+   * This was minmax(0,1.2fr). With List (minmax(12rem,1fr)) beside it there is no free space
+   * to share on anything short of a very wide monitor, so the Product column resolved to
+   * 0–17px: the header still read "Product" and the picture underneath was a sliver. That is
+   * the "listing image is super small" report, and it is also why this column has spent its
+   * life hidden by default — it never had a width to lose.
+   *
+   * 8rem is a photo and the first words of a name. The narrowing logic in orders-hub reads
+   * this floor (minPxFor takes the minmax minimum), so with a real floor the row can tell
+   * that Product does not fit and drop a column that matters less — instead of "fitting" by
+   * squeezing the one cell that is a picture down to nothing.
+   */
+  items:    { id: "items",    label: "Product",  grid: "minmax(8rem,1.2fr)" },
   // Four solid coloured pills — Label · Scan · Design + the Stock chip, all tinted by state.
   //
   // Titled "List". Earlier names each failed differently: "Ready" claimed a verdict four
@@ -273,11 +287,26 @@ export const DEFAULT_FACTORY_COLS: FactoryColId[] = ["status", "order", "age", "
  */
 export const DEFAULT_HIDDEN_FACTORY_COLS: FactoryColId[] = ["items"]
 
+/** The two columns that absorb slack — List, then Product. Losing BOTH leaves a row of
+ *  capped tracks and a hole before the actions, which is what SOAK_UP below repairs. */
+const FLEX_COLS: FactoryColId[] = ["ready", "items"]
 export function factoryGridTemplate(ids: FactoryColId[], lead: number): string {
   // Lead tracks are fixed for the same reason: the header renders empty spacers there.
   // 1.25rem is the checkbox, 1.5rem the caret — declared widest-first to match the row.
   const leads = lead === 2 ? ["1.25rem", "1.5rem"] : ["1.5rem"]
-  return [...leads, ...ids.map((id) => FACTORY_COLS[id].grid)].join(" ")
+  /*
+   * SOMETHING HAS TO TAKE THE SPARE WIDTH.
+   *
+   * Customer is capped at 11rem on purpose — as the only 1fr track it used to swallow the
+   * board and leave "Philipp Bumb" in a field of white. But that cap assumed List was there
+   * to soak up the slack, and a narrowed board sheds List first (SHED_ORDER in orders-hub),
+   * so every track became fixed and the row ended in a gap with the ⋯ menu marooned past it.
+   *
+   * When neither flexible column is being drawn, Customer takes the job back. It is the
+   * longest free text left on the row, so it is where extra width is worth the most.
+   */
+  const soak = !ids.some((id) => FLEX_COLS.includes(id))
+  return [...leads, ...ids.map((id) => (soak && id === "customer" ? "minmax(5rem,1fr)" : FACTORY_COLS[id].grid))].join(" ")
 }
 
 // ── Factory column layout: user-reorderable + hide/show, persisted per browser ──────

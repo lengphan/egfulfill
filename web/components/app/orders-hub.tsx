@@ -1108,8 +1108,6 @@ export function OrdersHub() {
  return () => clearTimeout(id)
   }, [])
  const visibleData = useMemo(() => dataColOrder.filter((id) => !hiddenCols.includes(id)), [dataColOrder, hiddenCols])
-  // The full ordered column set for the grid/header: visible data columns, then the pinned action.
- const gridCols = useMemo<FactoryColId[]>(() => [...visibleData, "action"], [visibleData])
 
  const onColDrop = (target: FactoryColId) => {
  const src = dragCol.current
@@ -1121,9 +1119,6 @@ export function OrdersHub() {
   // (Show/hide now lives in FactoryColumnsMenu on the toolbar, which owns the locked-column
   // rule and persistence via the onOrder/onHidden callbacks below.)
 
-  /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
-   * dispatch is on) precede the data columns; action is pinned last. */
- const gridTmpl = factoryGridTemplate(gridCols, 2)
 
   /*
    * PHONE LAYOUT. The desktop row is ten fixed tracks that demand 1224px, so on a 390px
@@ -1199,7 +1194,54 @@ export function OrdersHub() {
    * and treating that as "too narrow" would flash the stacked layout on every desktop load —
    * the same first-frame-at-the-wrong-width problem useIsNarrow's server snapshot avoids.
    */
- const fullMinPx = useMemo(() => minPxFor(visibleData), [visibleData])
+  /**
+   * WHAT GETS GIVEN UP FIRST when the box is too small for every column — before the row
+   * folds into a card, which is a much bigger change.
+   *
+   * It used to be all-or-nothing: the full table until it didn't fit, then stacked cards.
+   * Between those two lies every laptop at a wide zoom and every half-screen window, where
+   * the honest move is to drop the one or two columns you can read after opening the row and
+   * keep the ones you SCAN by.
+   *
+   * The order is the order of least loss:
+   *   ready    — four preparation chips. The user's own call, and the right one: they answer
+   *              "what is left to do on this", which is a question you ask of ONE order.
+   *   tracking — meaningful on shipped rows only, and repeated on the order itself.
+   *
+   * AND NOTHING ELSE — `items` is deliberately NOT on this list even though it is the widest
+   * and most squeezable track. It carries the PHOTO, which is how a row is recognised on a
+   * floor; shedding it would take the picture away at exactly the width where every label is
+   * already abbreviated, which is the same mistake the card layout had to fix. Everything
+   * else (status, order, age, units, store, customer) is what the queue is read WITH. So if
+   * dropping these two is not enough, the row folds into a card — where the photo is the
+   * first thing on it.
+   */
+ const SHED_ORDER: FactoryColId[] = ["ready", "tracking"]
+  /**
+   * The columns that actually fit, measured — never a breakpoint. `listW` is the SCROLLER's
+   * width, set by the page and not by the grid inside it, so shedding a column cannot change
+   * the number this decides against and there is no loop (CLAUDE.md 2.8).
+   */
+ const fittedData = useMemo(() => {
+ if (!listW) return visibleData
+ let cols = visibleData
+ for (const id of SHED_ORDER) {
+ if (minPxFor([...cols, "action"]) <= listW) break
+ cols = cols.filter((c) => c !== id)
+    }
+ return cols
+    // SHED_ORDER is a module-level constant in spirit; listing it would only churn the memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleData, listW])
+  // The full ordered column set for the grid/header: the data columns that fit, then the
+  // pinned action.
+ const gridCols = useMemo<FactoryColId[]>(() => [...fittedData, "action"], [fittedData])
+  /** One grid template for the header and every row. Lead tracks (caret, + checkbox when
+   * dispatch is on) precede the data columns; action is pinned last. */
+ const gridTmpl = factoryGridTemplate(gridCols, 2)
+  /** Measured against what is left AFTER shedding: cards are the last resort, not the second
+   *  one. Not circular — shedding is bounded by SHED_ORDER, so this figure stops moving. */
+ const fullMinPx = useMemo(() => minPxFor(gridCols), [gridCols])
   /*
    * THE ESTIMATE, DELIBERATELY, and not the row's measured scrollWidth.
    *
@@ -1213,10 +1255,10 @@ export function OrdersHub() {
    */
  const narrow = viewportNarrow || (listW > 0 && listW < fullMinPx)
  const rowCols = useMemo(
-    () => (narrow ? visibleData.filter((id) => NARROW_COLS.includes(id)) : visibleData),
+    () => (narrow ? visibleData.filter((id) => NARROW_COLS.includes(id)) : fittedData),
     // NARROW_COLS is a module-level constant in spirit; listing it would only churn the memo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
- [narrow, visibleData],
+ [narrow, visibleData, fittedData],
   )
  const rowTmpl = narrow ? "auto minmax(0,1fr) auto" : gridTmpl
   /**
@@ -2222,7 +2264,7 @@ export function OrdersHub() {
                           */}
                         {firstItem && (
                           <span className="shrink-0">
-                            <ItemAvatar item={firstItem} designs={designs[o.id]} catalog={catalog} size={40} readOnly bare />
+                            <ItemAvatar item={firstItem} designs={designs[o.id]} catalog={catalog} size={56} readOnly bare />
                           </span>
                         )}
                         <Link
@@ -2248,7 +2290,7 @@ export function OrdersHub() {
                           </div>
                         </Link>
                       </div>
-                    ) : visibleData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
+                    ) : fittedData.map((id) => <Fragment key={id}>{cell[id]}</Fragment>)}
 
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
