@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Plus, Trash, CircleNotch, Copy, Check, Warning, ClockCounterClockwise, CheckCircle, Broadcast } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -32,6 +33,7 @@ function outcomeOf(d: WebhookDelivery) {
  * endpoint "ID". The list knows its own ids, so nothing has to be typed twice.
  */
 export function WebhooksPanel() {
+  const tl = useLabelT()
  const [rows, setRows] = useState<WebhookEndpoint[] | null>(null)
  const [url, setUrl] = useState("")
  const [events, setEvents] = useState<string[]>([...WEBHOOK_EVENTS])
@@ -96,14 +98,14 @@ export function WebhooksPanel() {
 
  return (
     <SectionCard
- title="Webhooks"
+ title={tl("webhooks", "Webhooks")}
     >
       <div className="space-y-4 p-5">
         {/* One-time secret. Loud on purpose: there is no second chance to read it. */}
         {secret && (
           <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <Warning size={15} weight="fill" className="text-primary" /> Copy this secret now — it is never shown again
+              <Warning size={15} weight="fill" className="text-primary" /> {tl("webhooks", "Copy this secret now — it is never shown again")}
             </div>
             <div className="flex items-center gap-2">
               <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1.5 font-mono text-xs">{secret}</code>
@@ -112,25 +114,24 @@ export function WebhooksPanel() {
  variant="outline"
  onClick={() => { navigator.clipboard?.writeText(secret); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
               >
-                {copied ? <><Check size={13} weight="bold" /> Copied</> : <><Copy size={13} weight="bold" /> Copy</>}
+                {copied ? <><Check size={13} weight="bold" /> {tl("webhooks", "Copied")}</> : <><Copy size={13} weight="bold" /> {tl("webhooks", "Copy")}</>}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSecret(null)}>Done</Button>
+              <Button size="sm" variant="ghost" onClick={() => setSecret(null)}>{tl("webhooks", "Done")}</Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Verify each delivery by computing HMAC-SHA256 over the <strong>raw</strong> request body with this secret
- and comparing it to the <code className="font-mono">X-EG-Signature</code> header.
+              {tl("webhooks", "Verify each delivery by computing HMAC-SHA256 over the")} <strong>raw</strong> {tl("webhooks", "request body with this secret and comparing it to the")} <code className="font-mono">{tl("webhooks", "X-EG-Signature")}</code> header.
             </p>
           </div>
         )}
 
         {/* Add */}
         <div className="space-y-2 rounded-lg border border-border p-4">
-          <div className="text-sm font-medium">Add an endpoint</div>
+          <div className="text-sm font-medium">{tl("webhooks", "Add an endpoint")}</div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
  value={url}
  onChange={(e) => setUrl(e.target.value)}
- placeholder="https://your-app.example.com/hooks/egful"
+ placeholder={tl("webhooks", "https://your-app.example.com/hooks/egful")}
  className="flex-1"
             />
             <Button onClick={add} disabled={busy === "add"}>
@@ -157,7 +158,7 @@ export function WebhooksPanel() {
             })}
           </div>
           <p className="text-xs text-muted-foreground">
-            Must be public <strong>https</strong> — localhost and private addresses are refused. Testing locally? Use an ngrok or Cloudflare tunnel.
+            {tl("webhooks", "Must be public")} <strong>https</strong> {tl("webhooks", "— localhost and private addresses are refused. Testing locally? Use an ngrok or Cloudflare tunnel.")}
           </p>
           {err && <p className="text-xs text-destructive">{err}</p>}
         </div>
@@ -165,14 +166,14 @@ export function WebhooksPanel() {
         {/* List */}
         {rows === null ? (
           <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-            <CircleNotch size={15} className="animate-spin" /> Loading…
+            <CircleNotch size={15} className="animate-spin" /> {tl("webhooks", "Loading…")}
           </div>
         ) : list.length === 0 ? (
           <EmptyState
             icon={Broadcast}
             size="sm"
-            title="No endpoints yet"
-            note="Add one above, then send a test event to check your wiring."
+            title={tl("webhooks", "No endpoints yet")}
+            note={tl("webhooks", "Add one above, then send a test event to check your wiring.")}
           />
         ) : (
           <div className="space-y-2">
@@ -186,7 +187,7 @@ export function WebhooksPanel() {
                     <Button size="sm" variant="outline" onClick={() => fire(w.id)} disabled={busy === `test:${w.id}`}>
                       {busy === `test:${w.id}` ? <CircleNotch size={13} className="animate-spin" /> : null} Send test
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => openLog(w.id)} title="Delivery history">
+                    <Button size="sm" variant="ghost" onClick={() => openLog(w.id)} title={tl("webhooks", "Delivery history")}>
                       <ClockCounterClockwise size={13} weight="bold" />
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => remove(w.id)} disabled={busy === `del:${w.id}`}
@@ -195,7 +196,7 @@ export function WebhooksPanel() {
                     </Button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
-                    {(w.events?.length ? w.events : ["all events"]).map((e) => (
+                    {(w.events?.length ? w.events : [tl("webhooks", "all events")]).map((e) => (
                       <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">{e}</span>
                     ))}
                   </div>
@@ -216,9 +217,9 @@ export function WebhooksPanel() {
                   {log?.id === w.id && (
                     <div className="mt-2 border-t border-border pt-2">
                       {log.rows === null ? (
-                        <div className="text-xs text-muted-foreground">Loading history…</div>
+                        <div className="text-xs text-muted-foreground">{tl("webhooks", "Loading history…")}</div>
                       ) : log.rows.length === 0 ? (
-                        <div className="text-xs text-muted-foreground">Nothing delivered yet.</div>
+                        <div className="text-xs text-muted-foreground">{tl("webhooks", "Nothing delivered yet.")}</div>
                       ) : (
                         <table className="w-full text-xs">
                           <tbody>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, Heart, Storefront, Star, ArrowSquareOut, CircleNotch, Package } from "@phosphor-icons/react"
 import {
@@ -57,6 +58,7 @@ const stripOf = (ls: EtsyListing[]) => ls.filter((l) => l.thumb || l.image).slic
 // Each row lazily fetches a dozen of its own listings, STAGGERED by its position so a page
 // never bursts all its calls in the same second.
 function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: number; saved: boolean; onToggle: (s: SpyShop) => void; onOpen: (s: SpyShop) => void }) {
+  const tl = useLabelT()
   // Read the cache at mount (the row remounts per shop — key={shop_id}), so a cached strip
   // shows with no fetch and no setState-in-effect.
  const [previews, setPreviews] = useState<EtsyListing[] | null>(() => { const c = listingsCache.get(s.shop_id); return c ? stripOf(c) : null })
@@ -96,15 +98,15 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           </button>
         </div>
         <div className="grid grid-cols-3 gap-1.5 text-center">
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-2xs text-muted-foreground">Products</div></div>
-          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-2xs text-muted-foreground">Sales</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.listings)}</div><div className="text-2xs text-muted-foreground">{tl("spydeckStores", "Products")}</div></div>
+          <div className="rounded-lg bg-muted/50 py-1.5"><div className="text-sm font-semibold tabular-nums">{fmtK(s.sales)}</div><div className="text-2xs text-muted-foreground">{tl("spydeckStores", "Sales")}</div></div>
           <div className="rounded-lg bg-muted/50 py-1.5"><div className="flex items-center justify-center gap-0.5 text-sm font-semibold tabular-nums">{s.rating != null ? <>{s.rating.toFixed(1)}<Star size={11} weight="fill" className="text-hold" /></> : "—"}</div><div className="text-2xs text-muted-foreground">{fmtK(s.reviews)} reviews</div></div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onOpen(s)} className={cn(CARD_ACTION_PRIMARY, "flex-1")}>
-            Go to store
+            {tl("spydeckStores", "Go to store")}
           </button>
-          {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_ICON, "text-muted-foreground hover:text-foreground")} title="Open on Etsy"><ArrowSquareOut size={15} /></a>}
+          {s.url && <a href={s.url} target="_blank" rel="noopener noreferrer" className={cn(CARD_ACTION_ICON, "text-muted-foreground hover:text-foreground")} title={tl("spydeckStores", "Open on Etsy")}><ArrowSquareOut size={15} /></a>}
         </div>
       </div>
 
@@ -114,7 +116,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
         {previews === null ? (
           <div className="flex gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="aspect-square flex-1 animate-pulse rounded-lg bg-muted" />)}</div>
         ) : previews.length === 0 ? (
-          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">No product images to preview</div>
+          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">{tl("spydeckStores", "No product images to preview")}</div>
         ) : (
           <div className="flex gap-2">
             {previews.map((l) => (
@@ -130,6 +132,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
 }
 
 export function StoresTab(h: Handlers) {
+  const tl = useLabelT()
  const [query, setQuery] = useState("")
  const [shops, setShops] = useState<SpyShop[] | null>(null)
  const [loading, setLoading] = useState(false)
@@ -243,7 +246,7 @@ export function StoresTab(h: Handlers) {
       <div>
         <div className="flex flex-wrap items-center gap-3 px-5 pt-4">
           <button type="button" onClick={() => { setOpen(null); setCatalog(null) }} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent">
-            Back
+            {tl("spydeckStores", "Back")}
           </button>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{open.shop_name}</span>
@@ -254,18 +257,18 @@ export function StoresTab(h: Handlers) {
             {(["gallery", "cards"] as const).map((v) => (
               <button key={v} type="button" onClick={() => setCatView(v)}
  className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (catView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-                {v === "gallery" ? "Gallery" : "Details"}
+                {v === "gallery" ? tl("spydeckStores", "Gallery") : tl("spydeckStores", "Details")}
               </button>
             ))}
           </div>
-          {open.url && <a href={open.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Open on Etsy <ArrowSquareOut size={12} /></a>}
+          {open.url && <a href={open.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">{tl("spydeckStores", "Open on Etsy")} <ArrowSquareOut size={12} /></a>}
         </div>
         {catLoading ? (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[320px] animate-pulse rounded-2xl bg-muted" />)}
           </div>
         ) : !(catalog && catalog.length) ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">No active listings returned for this shop.</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">{tl("spydeckStores", "No active listings returned for this shop.")}</div>
         ) : catView === "gallery" ? (
           // Image-only: just the photo with a price overlay (title lives in the alt + the
           // click-through). A pure wall of images to scan the shop's look fast.
@@ -309,21 +312,21 @@ export function StoresTab(h: Handlers) {
           <input
  value={query} onChange={(e) => setQuery(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") run() }}
- placeholder="Search competitor stores by name…"
+ placeholder={tl("spydeckStores", "Search competitor stores by name…")}
  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <button type="button" onClick={run} disabled={loading || !query.trim()} className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">
-            {loading ? <CircleNotch size={14} className="animate-spin" /> : "Search"}
+            {loading ? <CircleNotch size={14} className="animate-spin" /> : tl("spydeckStores", "Search")}
           </button>
         </div>
         {categories.length > 0 && (
           <select
  value={catId}
  onChange={(e) => byCategory(e.target.value)}
- title="Discover shops selling in a category"
+ title={tl("spydeckStores", "Discover shops selling in a category")}
  className="rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            <option value="">Browse by category…</option>
+            <option value="">{tl("spydeckStores", "Browse by category…")}</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
@@ -331,7 +334,7 @@ export function StoresTab(h: Handlers) {
           {(["search", "saved"] as const).map((t) => (
             <button key={t} type="button" onClick={() => { setTab(t); setPage(0) }}
  className={"rounded-full px-3 py-1 text-xs font-medium transition-colors " + (tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              {t === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : "Results"}
+              {t === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : tl("spydeckStores", "Results")}
             </button>
           ))}
         </div>
@@ -342,8 +345,8 @@ export function StoresTab(h: Handlers) {
       {tab === "search" && shops === null ? (
         <EmptyState
           icon={Storefront}
-          title="Research a competitor"
-          note="Search any Etsy shop by name to see its product count, sales and reviews — then open its full catalog."
+          title={tl("spydeckStores", "Research a competitor")}
+          note={tl("spydeckStores", "Search any Etsy shop by name to see its product count, sales and reviews — then open its full catalog.")}
         />
       ) : list && list.length === 0 ? (
         /* This one had no mark at all — a line of grey text in the middle of a panel, which
@@ -367,9 +370,9 @@ export function StoresTab(h: Handlers) {
                 ))}
                 {pages > 1 && (
                   <div className="flex items-center justify-center gap-2 pt-2">
-                    <button type="button" onClick={() => setPage(Math.max(0, cur - 1))} disabled={cur === 0} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">Prev</button>
+                    <button type="button" onClick={() => setPage(Math.max(0, cur - 1))} disabled={cur === 0} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">{tl("spydeckStores", "Prev")}</button>
                     <span className="px-1 text-xs text-muted-foreground">Page {cur + 1} of {pages} · {all.length} stores</span>
-                    <button type="button" onClick={() => setPage(Math.min(pages - 1, cur + 1))} disabled={cur >= pages - 1} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">Next</button>
+                    <button type="button" onClick={() => setPage(Math.min(pages - 1, cur + 1))} disabled={cur >= pages - 1} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">{tl("spydeckStores", "Next")}</button>
                   </div>
                 )}
               </>

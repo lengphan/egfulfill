@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, CheckCircle, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
  onOpenChange: (v: boolean) => void
  onDone?: () => void
 }) {
+  const tl = useLabelT()
   // null = not loaded yet, [] = the load FAILED. Both are "no categories", and they must
   // not be conflated: an empty <select> with a state default still submits that default, so
   // a failed load would have booked "manual-expense" under a dropdown showing nothing.
@@ -102,10 +104,9 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v) }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add a ledger entry</DialogTitle>
+          <DialogTitle>{tl("ledger", "Add a ledger entry")}</DialogTitle>
           <DialogDescription>
-            For money that moved without an integration behind it. This cannot be edited or
- deleted afterwards — a mistake is fixed by entering its opposite.
+            {tl("ledger", "For money that moved without an integration behind it. This cannot be edited or deleted afterwards — a mistake is fixed by entering its opposite.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -118,54 +119,54 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
             {/* Direction first and as two large buttons, not a +/- typed into the amount.
                 It is the field most costly to get wrong and the easiest to skim past. */}
             <div>
-              <span className="mb-1 block text-xs font-medium">Direction</span>
+              <span className="mb-1 block text-xs font-medium">{tl("ledger", "Direction")}</span>
               <div className="grid grid-cols-2 gap-2">
                 <button
  type="button" onClick={() => { setDir(-1); setConfirming(false) }}
  className={"flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
                     (dir === -1 ? "border-rose-300 bg-rose-50 text-rose-700" : "border-border text-muted-foreground hover:bg-accent")}
                 >
-                  Money out
+                  {tl("ledger", "Money out")}
                 </button>
                 <button
  type="button" onClick={() => { setDir(1); setConfirming(false) }}
  className={"flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
                     (dir === 1 ? "border-shipped/30 bg-shipped/12 text-shipped" : "border-border text-muted-foreground hover:bg-accent")}
                 >
-                  <Plus size={14} weight="bold" /> Money in
+                  <Plus size={14} weight="bold" /> {tl("ledger", "Money in")}
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="le-amt" className="mb-1 block text-xs font-medium">Amount</label>
+                <label htmlFor="le-amt" className="mb-1 block text-xs font-medium">{tl("ledger", "Amount")}</label>
                 <Input id="le-amt" inputMode="decimal" value={amount}
  onChange={(e) => { setAmount(e.target.value.replace(/[^\d.]/g, "")); setConfirming(false) }}
  placeholder="0.00" className="h-9" />
               </div>
               <div>
-                <label htmlFor="le-type" className="mb-1 block text-xs font-medium">Category</label>
+                <label htmlFor="le-type" className="mb-1 block text-xs font-medium">{tl("ledger", "Category")}</label>
                 <select id="le-type" value={type}
  onChange={(e) => { setType(e.target.value); setConfirming(false) }}
  disabled={!types?.length}
  className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-60">
-                  {types === null && <option>Loading…</option>}
-                  {typesErr && <option>Couldn&apos;t load</option>}
+                  {types === null && <option>{tl("ledger", "Loading…")}</option>}
+                  {typesErr && <option>{tl("ledger", "Couldn’t load")}</option>}
                   {(types ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                 </select>
               </div>
             </div>
 
             <div>
-              <label htmlFor="le-acct" className="mb-1 block text-xs font-medium">Account</label>
+              <label htmlFor="le-acct" className="mb-1 block text-xs font-medium">{tl("ledger", "Account")}</label>
               <select id="le-acct" value={account}
  onChange={(e) => { setAccount(e.target.value); setConfirming(false) }}
  className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm">
-                <option value="factory">House wallet (the factory)</option>
-                <option value="designer">Designer pool</option>
+                <option value="factory">{tl("ledger", "House wallet (the factory)")}</option>
+                <option value="designer">{tl("ledger", "Designer pool")}</option>
                 {users.length > 0 && (
-                  <optgroup label="Sellers">
+                  <optgroup label={tl("ledger", "Sellers")}>
                     {users.map((u) => (
                       <option key={String(u.id)} value={String(u.id)}>{u.email}{u.name ? ` — ${u.name}` : ""}</option>
                     ))}
@@ -176,27 +177,26 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
                 // Naming the consequence, because crediting a seller is not an internal
                 // bookkeeping move — they can withdraw it.
                 <p className="mt-1 text-2xs text-hold">
-                  This changes a seller&apos;s spendable balance, not just our books.
+                  {tl("ledger", "This changes a seller’s spendable balance, not just our books.")}
                 </p>
               )}
             </div>
 
             <div>
-              <label htmlFor="le-note" className="mb-1 block text-xs font-medium">Reason</label>
+              <label htmlFor="le-note" className="mb-1 block text-xs font-medium">{tl("ledger", "Reason")}</label>
               <Input id="le-note" value={note}
  onChange={(e) => { setNote(e.target.value); setConfirming(false) }}
- placeholder="Pink Design invoice #4471, paid by transfer" className="h-9" />
+ placeholder={tl("ledger", "Pink Design invoice #4471, paid by transfer")} className="h-9" />
             </div>
 
             <div>
               <label htmlFor="le-ref" className="mb-1 block text-xs font-medium">
-                Reference <span className="font-normal text-muted-foreground">(optional)</span>
+                {tl("ledger", "Reference")} <span className="font-normal text-muted-foreground">{tl("ledger", "(optional)")}</span>
               </label>
               <Input id="le-ref" value={ref} onChange={(e) => setRef(e.target.value)}
- placeholder="INV-4471" className="h-9" />
+ placeholder={tl("ledger", "INV-4471")} className="h-9" />
               <p className="mt-1 text-2xs text-muted-foreground">
-                An invoice or PO number. Entering the same one twice records once, so a
- re-entered invoice can&apos;t double-count.
+                {tl("ledger", "An invoice or PO number. Entering the same one twice records once, so a re-entered invoice can’t double-count.")}
               </p>
             </div>
 
@@ -205,7 +205,7 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
               // what was typed catches a misplaced decimal or a wrong direction in a way
               // re-reading the fields you just filled does not.
               <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-sm text-hold">
-                <strong>{dir === 1 ? "Add" : "Take"} {money(delta)}</strong>{" "}
+                <strong>{dir === 1 ? tl("ledger", "Add") : tl("ledger", "Take")} {money(delta)}</strong>{" "}
                 {dir === 1 ? "to" : "from"} <strong>{accountLabel}</strong>, filed as{" "}
                 {types?.find((t) => t.id === type)?.label ?? type}. This is permanent — press again to confirm.
               </div>
@@ -220,10 +220,10 @@ export function LedgerEntryDialog({ open, onOpenChange, onDone }: {
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{done ? "Done" : "Cancel"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{done ? tl("ledger", "Done") : tl("ledger", "Cancel")}</Button>
           {!done && (
             <Button onClick={submit} disabled={busy || !amt || !types?.length}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : confirming ? "Confirm and record" : "Review"}
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : confirming ? tl("ledger", "Confirm and record") : tl("ledger", "Review")}
             </Button>
           )}
         </DialogFooter>

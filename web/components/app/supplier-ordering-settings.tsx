@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, ArrowSquareOut } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -43,6 +44,7 @@ const selectCls =
  * of the nightly dump. See lib/otto-card.ts.
  */
 export function SupplierOrderingSettings() {
+  const tl = useLabelT()
  const [opts, setOpts] = useState<SupplierOptions | null>(null)
  const [form, setForm] = useState<Record<string, string>>({})
  const [busy, setBusy] = useState(false)
@@ -89,7 +91,7 @@ export function SupplierOrderingSettings() {
  if (!opts) {
  return (
       <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
-        <CircleNotch size={15} className="animate-spin" /> Loading supplier options…
+        <CircleNotch size={15} className="animate-spin" /> {tl("supplierSettings", "Loading supplier options…")}
       </div>
     )
   }
@@ -107,36 +109,36 @@ export function SupplierOrderingSettings() {
  return (
     <div className="space-y-6 p-5">
       <p className="text-sm text-muted-foreground">
-        Chosen once here and applied to every purchase order, so the ordering dialog stops asking.
+        {tl("supplierSettings", "Chosen once here and applied to every purchase order, so the ordering dialog stops asking.")}
       </p>
 
       {/* ── S&S ─────────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold">S&amp;S Activewear</h3>
+        <h3 className="text-sm font-semibold">{tl("supplierSettings", "S&S Activewear")}</h3>
 
-        <Row label="Ordering email">
+        <Row label={tl("supplierSettings", "Ordering email")}>
           <Input value={form.ss_order_email ?? ""} onChange={(e) => set("ss_order_email", e.target.value)}
- placeholder="buyer@yourcompany.com" />
+ placeholder={tl("supplierSettings", "buyer@yourcompany.com")} />
         </Row>
 
-        <Row label="Pays with">
+        <Row label={tl("supplierSettings", "Pays with")}>
           {ssProfiles?.available ? (
             <select value={form.ss_payment_profile ?? ""} onChange={(e) => set("ss_payment_profile", e.target.value)} className={selectCls}>
-              <option value="">Account terms (no card)</option>
+              <option value="">{tl("supplierSettings", "Account terms (no card)")}</option>
               {ssProfiles.profiles.map((p) => (
                 <option key={p.id} value={p.id}>{maskCard(p.name)}{p.type ? ` · ${p.type}` : ""}</option>
               ))}
             </select>
           ) : (
             <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-              {ssProfiles?.reason ?? "No saved payment methods for that email — S&S will bill the account on file."}
+              {ssProfiles?.reason ?? tl("supplierSettings", "No saved payment methods for that email — S&S will bill the account on file.")}
             </p>
           )}
         </Row>
 
-        <Row label="Ships with">
+        <Row label={tl("supplierSettings", "Ships with")}>
           <select value={form.ss_shipping_method ?? ""} onChange={(e) => set("ss_shipping_method", e.target.value)} className={selectCls}>
-            <option value="">— use the account default —</option>
+            <option value="">{tl("supplierSettings", "— use the account default —")}</option>
             {(opts.suppliers.ss.shippingMethods ?? []).map((m) => (
               <option key={m.id} value={m.id}>{m.label}</option>
             ))}
@@ -146,23 +148,23 @@ export function SupplierOrderingSettings() {
 
       {/* ── Otto ────────────────────────────────────────────────────────────── */}
       <section className="space-y-3 border-t border-border pt-5">
-        <h3 className="text-sm font-semibold">Otto Cap</h3>
+        <h3 className="text-sm font-semibold">{tl("supplierSettings", "Otto Cap")}</h3>
 
         {!opts.suppliers.otto.available ? (
           <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
             <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-            <span>{opts.suppliers.otto.reason ?? "Otto Cap isn't connected."}</span>
+            <span>{opts.suppliers.otto.reason ?? tl("supplierSettings", "Otto Cap isn't connected.")}</span>
           </div>
         ) : (
           <>
-            <Row label="Ordering email">
+            <Row label={tl("supplierSettings", "Ordering email")}>
               <Input value={form.otto_order_email ?? ""} onChange={(e) => set("otto_order_email", e.target.value)}
- placeholder="buyer@yourcompany.com" />
+ placeholder={tl("supplierSettings", "buyer@yourcompany.com")} />
             </Row>
 
-            <Row label="Pays with">
+            <Row label={tl("supplierSettings", "Pays with")}>
               <select value={form.otto_payment_method ?? ""} onChange={(e) => set("otto_payment_method", e.target.value)} className={selectCls}>
-                <option value="">— choose —</option>
+                <option value="">{tl("supplierSettings", "— choose —")}</option>
                 {asOptions(opts.suppliers.otto.paymentMethods).map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -177,24 +179,24 @@ export function SupplierOrderingSettings() {
               <OttoCardOnFile />
             </div>
 
-            <Row label="Order as">
+            <Row label={tl("supplierSettings", "Order as")}>
               <select value={form.otto_customer ?? ""} onChange={(e) => set("otto_customer", e.target.value)} className={selectCls}>
-                <option value="">— choose a customer —</option>
+                <option value="">{tl("supplierSettings", "— choose a customer —")}</option>
                 {(opts.ottoCustomers ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Row>
 
-            <Row label="Contact">
+            <Row label={tl("supplierSettings", "Contact")}>
               <select value={form.otto_contact ?? ""} onChange={(e) => set("otto_contact", e.target.value)}
  disabled={!ottoCustomer} className={selectCls}>
-                <option value="">{ottoCustomer ? "— choose a contact —" : "Pick a customer first"}</option>
+                <option value="">{ottoCustomer ? tl("supplierSettings", "— choose a contact —") : tl("supplierSettings", "Pick a customer first")}</option>
                 {(ottoCustomer?.contacts ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </Row>
 
-            <Row label="Ships with">
+            <Row label={tl("supplierSettings", "Ships with")}>
               <select value={form.otto_shipping_method ?? ""} onChange={(e) => set("otto_shipping_method", e.target.value)} className={selectCls}>
-                <option value="">— choose —</option>
+                <option value="">{tl("supplierSettings", "— choose —")}</option>
                 {asOptions(opts.suppliers.otto.shippingMethods).map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -208,10 +210,10 @@ export function SupplierOrderingSettings() {
         <Button onClick={save} disabled={busy}>
           {busy ? <CircleNotch size={15} className="animate-spin" /> : null} Save defaults
         </Button>
-        {saved && <span className="text-sm text-success">Saved — purchases will use these.</span>}
+        {saved && <span className="text-sm text-success">{tl("supplierSettings", "Saved — purchases will use these.")}</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}
         <a href="/purchasing?tab=purchase" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-          Purchasing <ArrowSquareOut size={11} weight="bold" />
+          {tl("supplierSettings", "Purchasing")} <ArrowSquareOut size={11} weight="bold" />
         </a>
       </div>
     </div>

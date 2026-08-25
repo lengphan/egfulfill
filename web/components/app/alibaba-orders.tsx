@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, CaretRight, Package, ArrowSquareOut, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -58,6 +59,7 @@ const PILL: Record<Exclude<Filter, "all">, string> = {
  * mounted between visits. Alibaba's own statuses move on their side, so re-reading on
  * each visit is what the remount used to do; the list is replaced in place. */
 export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
+  const tl = useLabelT()
  const [orders, setOrders] = useState<AlibabaOrderSummary[] | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [filter, setFilter] = useState<Filter>("all")
@@ -110,7 +112,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
  return (
     // No description: the count it carried is already on the "All 4" pill directly below
     // it, so it restated the next line down and cost the header its calm.
-    <SectionCard title="Alibaba orders">
+    <SectionCard title={tl("alibaba", "Alibaba orders")}>
       {orders === null ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
       ) : err ? (
@@ -121,12 +123,12 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
           <p className="max-w-md text-muted-foreground">
             Couldn&apos;t read your Alibaba orders — {err}
           </p>
-          <Button size="sm" variant="outline" onClick={load}>Try again</Button>
+          <Button size="sm" variant="outline" onClick={load}>{tl("alibaba", "Try again")}</Button>
         </div>
       ) : orders.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
           <Package size={22} />
-          No orders on the connected Alibaba account yet.
+          {tl("alibaba", "No orders on the connected Alibaba account yet.")}
         </div>
       ) : (
         <>
@@ -146,7 +148,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
           </div>
 
           {rows.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">No orders with that status.</div>
+            <div className="py-10 text-center text-sm text-muted-foreground">{tl("alibaba", "No orders with that status.")}</div>
           ) : (
             <div className="divide-y divide-border">
               {rows.map((o) => {
@@ -170,7 +172,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                         </span>
                       </button>
                       <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + PILL[bucket]}>
-                        {o.statusLabel || o.status || "Unknown"}
+                        {o.statusLabel || o.status || tl("alibaba", "Unknown")}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {/* Chat needs the supplier's encrypted id, and that only arrives with
@@ -179,16 +181,16 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                         {loaded?.sellerEid && (
                           <a href={chatUrl(loaded.sellerEid) ?? "#"} target="_blank" rel="noopener noreferrer"
  title={`Message ${loaded.sellerName ?? "this supplier"} on Alibaba`}>
-                            <Button size="sm" variant="outline">Chat</Button>
+                            <Button size="sm" variant="outline">{tl("alibaba", "Chat")}</Button>
                           </a>
                         )}
                         <a href={orderUrl(o.tradeId) ?? "#"} target="_blank" rel="noopener noreferrer"
- title="Open this order on Alibaba, where payment happens">
-                          <Button size="sm" variant="outline"><ArrowSquareOut size={13} weight="bold" /> Pay on Alibaba</Button>
+ title={tl("alibaba", "Open this order on Alibaba, where payment happens")}>
+                          <Button size="sm" variant="outline"><ArrowSquareOut size={13} weight="bold" /> {tl("alibaba", "Pay on Alibaba")}</Button>
                         </a>
                         <Button size="sm" variant="outline" onClick={() => setSampling(o.tradeId)}
- title="Record this as a sourcing sample and book its cost to the factory wallet">
-                          Record as sample
+ title={tl("alibaba", "Record this as a sourcing sample and book its cost to the factory wallet")}>
+                          {tl("alibaba", "Record as sample")}
                         </Button>
                         {/* Bringing it into stock needs the LINES, and those arrive with the
  detail — so like Chat, this appears once the row is open rather
@@ -200,8 +202,8 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                           </span>
                         ) : loaded && (
                           <Button size="sm" variant="outline" onClick={() => setReceiving(loaded)}
- title="Create a purchase order from this, so the goods can be received into inventory">
-                            Into stock
+ title={tl("alibaba", "Create a purchase order from this, so the goods can be received into inventory")}>
+                            {tl("alibaba", "Into stock")}
                           </Button>
                         )}
                       </div>
@@ -211,7 +213,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                       <div className="border-t border-border bg-muted/20 px-4 py-3">
                         {d === "loading" || d === undefined ? (
                           <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                            <CircleNotch size={15} className="animate-spin" /> Reading the order from Alibaba…
+                            <CircleNotch size={15} className="animate-spin" /> {tl("alibaba", "Reading the order from Alibaba…")}
                           </div>
                         ) : "error" in d ? (
                           <div className="flex items-center gap-2 py-3 text-sm text-destructive">
@@ -223,15 +225,15 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                               <table className="w-full text-sm">
                                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
                                   <tr>
-                                    <th className="py-1.5 pr-3">Item</th>
-                                    <th className="py-1.5 pr-3">Variant</th>
-                                    <th className="py-1.5 pr-3 text-right">Qty</th>
-                                    <th className="py-1.5 text-right">Unit</th>
+                                    <th className="py-1.5 pr-3">{tl("alibaba", "Item")}</th>
+                                    <th className="py-1.5 pr-3">{tl("alibaba", "Variant")}</th>
+                                    <th className="py-1.5 pr-3 text-right">{tl("alibaba", "Qty")}</th>
+                                    <th className="py-1.5 text-right">{tl("alibaba", "Unit")}</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                   {d.items.length === 0 ? (
-                                    <tr><td colSpan={4} className="py-3 text-muted-foreground">Alibaba returned no lines for this order.</td></tr>
+                                    <tr><td colSpan={4} className="py-3 text-muted-foreground">{tl("alibaba", "Alibaba returned no lines for this order.")}</td></tr>
                                   ) : d.items.map((it, i) => (
                                     <tr key={`${it.productId ?? "x"}-${it.skuId ?? i}`}>
                                       <td className="py-1.5 pr-3">
@@ -255,11 +257,11 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
  a sourcing decision turns on: a $2 cap with $18 of shipping is
  a different supplier from a $6 cap delivered. */}
                             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                              <span>Goods <span className="font-medium text-foreground">{usd(d.productTotal)}</span></span>
-                              <span>Freight <span className="font-medium text-foreground">{usd(d.shipmentFee)}</span></span>
-                              <span>Total <span className="font-medium text-foreground">{usd(d.total)}</span></span>
-                              {d.tradeTerm && <span>Terms <span className="font-medium text-foreground">{d.tradeTerm}</span></span>}
-                              {d.remark && <span>Note <span className="font-medium text-foreground">{d.remark}</span></span>}
+                              <span>{tl("alibaba", "Goods")} <span className="font-medium text-foreground">{usd(d.productTotal)}</span></span>
+                              <span>{tl("alibaba", "Freight")} <span className="font-medium text-foreground">{usd(d.shipmentFee)}</span></span>
+                              <span>{tl("alibaba", "Total")} <span className="font-medium text-foreground">{usd(d.total)}</span></span>
+                              {d.tradeTerm && <span>{tl("alibaba", "Terms")} <span className="font-medium text-foreground">{d.tradeTerm}</span></span>}
+                              {d.remark && <span>{tl("alibaba", "Note")} <span className="font-medium text-foreground">{d.remark}</span></span>}
                             </div>
                           </div>
                         )}

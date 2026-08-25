@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Plus, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ const prevPeriod = (key: string) => {
 const TIER_ROW = "grid grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_4.5rem_2.25rem] items-center gap-x-3 px-5"
 
 export function VolumeTiersPanel() {
+  const tl = useLabelT()
   const [rows, setRows] = useState<VolumeTier[]>([])
   const [period, setPeriod] = useState(() => prevPeriod(periodOf(new Date())))
   const [sellers, setSellers] = useState<VolumeSeller[] | null>(null)
@@ -128,10 +130,10 @@ export function VolumeTiersPanel() {
 
   return (
     <SectionCard
-      title="Volume tiers"
+      title={tl("volumeTiers", "Volume tiers")}
       actions={
         <Button size="sm" onClick={save} disabled={busy}>
-          Save ladder
+          {tl("volumeTiers", "Save ladder")}
         </Button>
       }
     >
@@ -152,7 +154,7 @@ export function VolumeTiersPanel() {
         <div>
           {rows.length === 0 ? (
             <div className="mx-5 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-              No tiers. An empty ladder means the programme is off and every seller earns 0%.
+              {tl("volumeTiers", "No tiers. An empty ladder means the programme is off and every seller earns 0%.")}
             </div>
           ) : (
             /* FULL WIDTH, no box. A bordered table inset inside a bordered card drew two
@@ -161,14 +163,14 @@ export function VolumeTiersPanel() {
                above it, because these two cards sit on one screen. */
             <div className="divide-y divide-border border-b border-border">
               <div className={TIER_ROW + " py-2 eg-label text-muted-foreground"}>
-                <span>Name</span>
-                <span className="text-right">From (units)</span>
+                <span>{tl("volumeTiers", "Name")}</span>
+                <span className="text-right">{tl("volumeTiers", "From (units)")}</span>
                 {/* The rung's upper bound. It was only ever implied by the NEXT row's
                     threshold, so reading "what does tier 2 cover" meant reading tier 3 — and
                     the top rung's "and up" was implied by nothing at all. */}
-                <span className="text-right">To</span>
-                <span className="text-right">Discount</span>
-                <span className="text-right">Sellers</span>
+                <span className="text-right">{tl("volumeTiers", "To")}</span>
+                <span className="text-right">{tl("volumeTiers", "Discount")}</span>
+                <span className="text-right">{tl("volumeTiers", "Sellers")}</span>
                 <span />
               </div>
               <div className="divide-y divide-border">
@@ -227,7 +229,7 @@ export function VolumeTiersPanel() {
           )}
           <div className="px-5 pt-4">
             <Button size="sm" variant="outline" onClick={() => setRows((r) => [...r, { minUnits: NaN, pct: NaN, name: "" }])}>
-              <Plus size={14} weight="bold" /> Add tier
+              <Plus size={14} weight="bold" /> {tl("volumeTiers", "Add tier")}
             </Button>
           </div>
         </div>
@@ -239,19 +241,19 @@ export function VolumeTiersPanel() {
         <div className="border-t border-border px-5 pt-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="eg-label text-muted-foreground">
-              Who lands where
+              {tl("volumeTiers", "Who lands where")}
             </span>
             <Input
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              placeholder="YYYY-MM"
-              aria-label="Period to report on"
+              placeholder={tl("volumeTiers", "YYYY-MM")}
+              aria-label={tl("volumeTiers", "Period to report on")}
               className="h-7 w-28 tabular-nums"
             />
           </div>
 
           {sellers === null ? (
-            <div className="mt-3 text-sm text-muted-foreground">Loading…</div>
+            <div className="mt-3 text-sm text-muted-foreground">{tl("volumeTiers", "Loading…")}</div>
           ) : sellers.length === 0 ? (
             <div className="mt-3 text-sm text-muted-foreground">
               No seller shipped anything in {period}. Volume counts orders with a shipped date — an
@@ -262,13 +264,13 @@ export function VolumeTiersPanel() {
               <table className="w-full min-w-[26rem] text-sm">
                 <thead>
                   <tr className="eg-label text-muted-foreground">
-                    <th className="py-1.5 pr-3 text-left">Seller</th>
-                    <th className="py-1.5 pr-3 text-right">Orders</th>
-                    <th className="py-1.5 pr-3 text-right">Units</th>
+                    <th className="py-1.5 pr-3 text-left">{tl("volumeTiers", "Seller")}</th>
+                    <th className="py-1.5 pr-3 text-right">{tl("volumeTiers", "Orders")}</th>
+                    <th className="py-1.5 pr-3 text-right">{tl("volumeTiers", "Units")}</th>
                     {/* "Would earn" while the ladder priced nothing. It does now, and these
                         units are what set the rate being charged — a conditional heading over
                         a real number is the same overclaim in reverse. */}
-                    <th className="py-1.5 text-right">Earns</th>
+                    <th className="py-1.5 text-right">{tl("volumeTiers", "Earns")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -309,11 +311,11 @@ export function VolumeTiersPanel() {
           {preview && (
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
               <div className="mb-3 eg-label text-muted-foreground">
-                Seller&apos;s view · <span className="tabular-nums normal-case">{preview.slice(0, 8)}…</span>
+                {tl("volumeTiers", "Seller’s view ·")} <span className="tabular-nums normal-case">{preview.slice(0, 8)}…</span>
               </div>
               {previewData
                 ? <VolumeRail data={previewData} />
-                : <p className="text-sm text-muted-foreground">Loading…</p>}
+                : <p className="text-sm text-muted-foreground">{tl("volumeTiers", "Loading…")}</p>}
             </div>
           )}
         </div>

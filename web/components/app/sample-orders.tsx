@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, X, Package, Warning, ChatCircleDots, ArrowSquareOut, DownloadSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -75,6 +76,7 @@ export function SampleOrderDialog({
  tradeId?: string
  onPlaced?: () => void
 }) {
+  const tl = useLabelT()
  const [orderNo, setOrderNo] = useState("")
  const [amount, setAmount] = useState("")
  const [qty, setQty] = useState("")
@@ -163,22 +165,22 @@ export function SampleOrderDialog({
             </div>
           )}
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Supplier&apos;s order number</span>
-            <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="ALI-88213-7" className="h-9 tabular-nums" />
+            <span className="text-xs text-muted-foreground">{tl("samples", "Supplier’s order number")}</span>
+            <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder={tl("samples", "ALI-88213-7")} className="h-9 tabular-nums" />
           </label>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Cost (USD)</span>
+              <span className="text-xs text-muted-foreground">{tl("samples", "Cost (USD)")}</span>
               <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="42.50" inputMode="decimal" className="h-9" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Units</span>
+              <span className="text-xs text-muted-foreground">{tl("samples", "Units")}</span>
               <Input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ""))} placeholder="3" inputMode="numeric" className="h-9" />
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Note</span>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="two colourways, express freight" className="h-9" />
+            <span className="text-xs text-muted-foreground">{tl("samples", "Note")}</span>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tl("samples", "two colourways, express freight")} className="h-9" />
           </label>
           <p className="text-xs text-muted-foreground">
             The cost books to the <span className="font-medium text-foreground">factory</span>{" "}wallet now, not when the parcel
@@ -186,8 +188,8 @@ export function SampleOrderDialog({
           </p>
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : "Record + book cost"}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("samples", "Cancel")}</Button>
+            <Button onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : tl("samples", "Record + book cost")}</Button>
           </div>
         </div>
       </DialogContent>
@@ -197,6 +199,7 @@ export function SampleOrderDialog({
 
 /** Every sample placed, newest first, with the two things that can happen to one. */
 export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
+  const tl = useLabelT()
  const confirm = useConfirm()
  const [items, setItems] = useState<SampleOrder[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
@@ -209,7 +212,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
  const act = async (s: SampleOrder, action: "received" | "cancel") => {
  if (action === "cancel") {
  const ok = await confirm({
- title: "Cancel this sample?",
+ title: tl("samples", "Cancel this sample?"),
  body: `The ${usd(s.amount)} already charged stays on the ledger and a refund row is added alongside it — both facts are kept.`,
  confirmLabel: "Cancel sample",
       })
@@ -226,7 +229,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
 
  return (
     <SectionCard
- title="Sample orders"
+ title={tl("samples", "Sample orders")}
  description={items?.length ? `${usd(total)} booked to the factory wallet` : undefined}
     >
       {items === null ? (
@@ -235,20 +238,20 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
         <EmptyState
           icon={Package}
           size="sm"
-          title="No samples recorded yet"
-          note="Record one from a supplier’s row and its cost books straight to the factory wallet."
+          title={tl("samples", "No samples recorded yet")}
+          note={tl("samples", "Record one from a supplier’s row and its cost books straight to the factory wallet.")}
         />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-border text-left eg-label text-muted-foreground">
               <tr>
-                <th className="px-4 py-2.5">Order no.</th>
-                <th className="px-4 py-2.5">Supplier</th>
-                <th className="px-4 py-2.5 text-right">Cost</th>
-                <th className="px-4 py-2.5 text-right">Units</th>
-                <th className="px-4 py-2.5">Placed</th>
-                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">{tl("samples", "Order no.")}</th>
+                <th className="px-4 py-2.5">{tl("samples", "Supplier")}</th>
+                <th className="px-4 py-2.5 text-right">{tl("samples", "Cost")}</th>
+                <th className="px-4 py-2.5 text-right">{tl("samples", "Units")}</th>
+                <th className="px-4 py-2.5">{tl("samples", "Placed")}</th>
+                <th className="px-4 py-2.5">{tl("samples", "Status")}</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -263,14 +266,14 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
                           <a href={chatUrl(s.sellerEid)!} target="_blank" rel="noopener noreferrer"
  title={`Open the Alibaba chat with ${s.sellerName || "this supplier"} — you'll need to be signed in there`}
  className="inline-flex items-center gap-1 text-primary hover:underline">
-                            <ChatCircleDots size={12} weight="bold" /> Chat
+                            <ChatCircleDots size={12} weight="bold" /> {tl("samples", "Chat")}
                           </a>
                         )}
                         {orderUrl(s.tradeId) && (
                           <a href={orderUrl(s.tradeId)!} target="_blank" rel="noopener noreferrer"
- title="Open this order on Alibaba — where you pay it"
+ title={tl("samples", "Open this order on Alibaba — where you pay it")}
  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline">
-                            <ArrowSquareOut size={12} /> Order
+                            <ArrowSquareOut size={12} /> {tl("samples", "Order")}
                           </a>
                         )}
                       </div>
@@ -292,13 +295,13 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
                     <div className="flex justify-end gap-1">
                       {s.status === "placed" && (
                         <>
-                          <button onClick={() => act(s, "received")} disabled={busy === s.id} title="Mark arrived"
+                          <button onClick={() => act(s, "received")} disabled={busy === s.id} title={tl("samples", "Mark arrived")}
  className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">
-                            Arrived
+                            {tl("samples", "Arrived")}
                           </button>
-                          <button onClick={() => act(s, "cancel")} disabled={busy === s.id} title="Cancel and credit the cost back"
+                          <button onClick={() => act(s, "cancel")} disabled={busy === s.id} title={tl("samples", "Cancel and credit the cost back")}
  className="inline-flex h-7 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:bg-accent hover:text-destructive disabled:opacity-50">
-                            <X size={13} weight="bold" /> Cancel
+                            <X size={13} weight="bold" /> {tl("samples", "Cancel")}
                           </button>
                         </>
                       )}
@@ -312,9 +315,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
       )}
       <div className="flex items-start gap-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
         <Warning size={14} weight="fill" className="mt-0.5 shrink-0 text-hold" />
-        Booked at place time, so a sample that never arrives still shows as spent — which it is.
-        It appears in Finance under <span className="font-medium text-foreground">Sample</span>, and in the
- suppliers partner statement.
+        {tl("samples", "Booked at place time, so a sample that never arrives still shows as spent — which it is. It appears in Finance under")} <span className="font-medium text-foreground">{tl("samples", "Sample")}</span>{tl("samples", ", and in the suppliers partner statement.")}
       </div>
     </SectionCard>
   )

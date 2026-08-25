@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { MagnifyingGlass, CircleNotch, Package, DownloadSimple, Plus } from "@phosphor-icons/react"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
@@ -112,6 +113,7 @@ const REFUND_TONE: Record<string, string> = {
 }
 
 export function ShipmentsView() {
+  const tl = useLabelT()
  const [rows, setRows] = useState<ShipmentRow[] | null>(null)
  const [spend, setSpend] = useState(0)
  const [refunded, setRefunded] = useState(0)
@@ -242,22 +244,22 @@ export function ShipmentsView() {
  names a slice of the table below it still filters to that slice when clicked. */}
     <StatGrid>
       <StatCard
- label="Labels bought"
+ label={tl("shipments", "Labels bought")}
  value={String(tally.bought)}
       />
       <StatCard
- label="Label spend"
+ label={tl("shipments", "Label spend")}
  value={money(realSpend)}
       />
       <StatCard
- label="Refunded"
+ label={tl("shipments", "Refunded")}
  value={money(refunded)}
  tone={refunded > 0 ? "pos" : "mut"}
  onClick={tally.voided ? () => setStatus("refunded") : undefined}
  active={status === "refunded"}
       />
       <StatCard
- label="Test labels"
+ label={tl("shipments", "Test labels")}
  value={String(tally.test)}
  onClick={tally.test ? () => setStatus("test") : undefined}
  active={status === "test"}
@@ -265,14 +267,14 @@ export function ShipmentsView() {
     </StatGrid>
 
     <SectionCard
- title="Shipments"
+ title={tl("shipments", "Shipments")}
  actions={
         <div className="flex items-center gap-3">
           {busy && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
           <span className="text-xs text-muted-foreground">
             {/* Says which number it is. "12 shown" under an active filter, next to a total
  of 200, otherwise reads as the whole list having shrunk. */}
-            {err ? "count unknown" : status === "all" ? `${counts.total} shown` : `${shown.length} of ${counts.total}`}
+            {err ? tl("shipments", "count unknown") : status === "all" ? `${counts.total} shown` : `${shown.length} of ${counts.total}`}
             {/* Only surfaced when non-zero. A row of zeroes reads as a dashboard; these are
  here to be acted on, and "0 need attention" is noise. */}
             {counts.stuck > 0 && ` · ${counts.stuck} not collected`}
@@ -282,14 +284,14 @@ export function ShipmentsView() {
  how a figure someone checks daily ended up smaller than the search placeholder.
               It has its own tiles above the table now. */}
           <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows || rows.length === 0}>
-            <DownloadSimple size={14} weight="bold" /> Export CSV
+            <DownloadSimple size={14} weight="bold" /> {tl("shipments", "Export CSV")}
           </Button>
           <Button size="sm" variant="outline" onClick={() => setRateCheckOpen(true)}>
-            Rate check
+            {tl("shipments", "Rate check")}
           </Button>
           {canVoid && (
             <Button size="sm" onClick={() => setNewLabelOpen(true)}>
-              <Plus size={14} weight="bold" /> New label
+              <Plus size={14} weight="bold" /> {tl("shipments", "New label")}
             </Button>
           )}
         </div>
@@ -301,7 +303,7 @@ export function ShipmentsView() {
           <Input
  value={q}
  onChange={(e) => setQ(e.target.value)}
- placeholder="Tracking, order, customer or carrier…"
+ placeholder={tl("shipments", "Tracking, order, customer or carrier…")}
  className="h-9 w-80 pl-8"
           />
         </div>
@@ -331,7 +333,7 @@ export function ShipmentsView() {
             )
           })}
         </div>
-        {q && <Button size="sm" variant="ghost" onClick={() => setQ("")}>Clear</Button>}
+        {q && <Button size="sm" variant="ghost" onClick={() => setQ("")}>{tl("shipments", "Clear")}</Button>}
       </div>
 
       {err && (
@@ -340,7 +342,7 @@ export function ShipmentsView() {
 
       {rows === null ? (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <CircleNotch size={16} className="animate-spin" /> Loading shipments…
+          <CircleNotch size={16} className="animate-spin" /> {tl("shipments", "Loading shipments…")}
         </div>
       ) : shown.length === 0 ? (
         // FOUR different nothings, and they must not look alike: the read failed, the search
@@ -353,16 +355,16 @@ export function ShipmentsView() {
           <Package size={26} weight="duotone" className="opacity-50" />
           <p className="text-sm">
             {err
-              ? "Couldn't read shipments, so this list isn't empty — it's unknown."
+              ? tl("shipments", "Couldn't read shipments, so this list isn't empty — it's unknown.")
  : rows.length > 0
                 ? `None of the ${rows.length} shipments here are ${(FILTERS.find((f) => f.key === status)?.label ?? "").toLowerCase()}.`
  : q ? `Nothing matches “${q}”.`
- : "No parcel has a tracking number yet."}
+ : tl("shipments", "No parcel has a tracking number yet.")}
           </p>
           {err
-            ? <Button size="sm" variant="outline" onClick={() => load(q)}>Try again</Button>
- : rows.length > 0 ? <Button size="sm" variant="outline" onClick={() => setStatus("all")}>Show all statuses</Button>
- : q ? <Button size="sm" variant="outline" onClick={() => setQ("")}>Show all</Button>
+            ? <Button size="sm" variant="outline" onClick={() => load(q)}>{tl("shipments", "Try again")}</Button>
+ : rows.length > 0 ? <Button size="sm" variant="outline" onClick={() => setStatus("all")}>{tl("shipments", "Show all statuses")}</Button>
+ : q ? <Button size="sm" variant="outline" onClick={() => setQ("")}>{tl("shipments", "Show all")}</Button>
  : null}
         </div>
       ) : (
@@ -370,15 +372,15 @@ export function ShipmentsView() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                <th className="px-5 py-2">Order</th>
-                <th className="px-3 py-2">Customer</th>
-                <th className="px-3 py-2">Tracking</th>
-                <th className="px-3 py-2 text-right">Price</th>
+                <th className="px-5 py-2">{tl("shipments", "Order")}</th>
+                <th className="px-3 py-2">{tl("shipments", "Customer")}</th>
+                <th className="px-3 py-2">{tl("shipments", "Tracking")}</th>
+                <th className="px-3 py-2 text-right">{tl("shipments", "Price")}</th>
                 {/* "Carrier says" was written to keep it distinct from the floor's own
  stage — a real distinction, but the column header is the wrong place to
  argue it, and it read as a sentence fragment. The badge below already
  says whose claim it is by being the carrier's vocabulary. */}
-                <th className="whitespace-nowrap px-4 py-2">Delivery status</th>
+                <th className="whitespace-nowrap px-4 py-2">{tl("shipments", "Delivery status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -477,7 +479,7 @@ export function ShipmentsView() {
                         // underneath where it can be matched against their dashboard.
                         <>
                           <Badge variant="secondary" className={REFUND_TONE[refundState(s)] ?? REFUND_TONE.pending}>
-                            {REFUND_LABEL[refundState(s)] ?? "Refund pending"}
+                            {REFUND_LABEL[refundState(s)] ?? tl("shipments", "Refund pending")}
                           </Badge>
                         </>
                       ) : d ? (
@@ -489,7 +491,7 @@ export function ShipmentsView() {
                         // polled in the background, twelve rows a page load, so this clears
                         // itself. "Not asked yet" and "asked, nothing yet" are different
                         // facts, and the difference decides whether to chase.
-                        <span className="text-xs text-muted-foreground">Not asked yet</span>
+                        <span className="text-xs text-muted-foreground">{tl("shipments", "Not asked yet")}</span>
                       )}
                       {s.deliveryCheckedAt && (s.refunded ?? 0) === 0 && (
                         <div className="mt-1 text-2xs text-muted-foreground">checked {when(s.deliveryCheckedAt)}</div>
@@ -506,12 +508,12 @@ export function ShipmentsView() {
         // Never silently truncate. Search reaches the whole table server-side, so the fix
         // is to search — but only if you know you're looking at a window.
         <div className="border-t border-border px-5 py-2.5 text-xs text-muted-foreground">
-          Showing the 300 most recent. Search to reach older parcels — it queries all of them, not just these.
+          {tl("shipments", "Showing the 300 most recent. Search to reach older parcels — it queries all of them, not just these.")}
         </div>
       )}
       {role === "operator" && (
         <div className="border-t border-border px-5 py-2.5 text-xs text-muted-foreground">
-          Read-only for operators: re-checking a carrier status is fine, but nothing here changes a scan.
+          {tl("shipments", "Read-only for operators: re-checking a carrier status is fine, but nothing here changes a scan.")}
         </div>
       )}
     </SectionCard>

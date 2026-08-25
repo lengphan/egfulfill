@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, CheckCircle, Warning, UploadSimple, X } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -27,6 +28,7 @@ const firstSavedType = (m: Record<string, PayoutMethod>) => ["bank", "pingpong",
  * live in one dialog so a first-time withdrawal is a single pass.
  */
 export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
+  const tl = useLabelT()
  const [info, setInfo] = useState<PayoutMethod>({ ...BLANK })
   // Saved details per method, so switching the dropdown prefills the right one.
  const [saved, setSaved] = useState<Record<string, PayoutMethod>>({})
@@ -112,53 +114,53 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Request a payout</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tl("payout", "Request a payout")}</DialogTitle></DialogHeader>
 
         {done ? (
           <div className="space-y-3 py-2 text-center">
             <CheckCircle size={40} weight="fill" className="mx-auto text-shipped" />
-            <div className="font-medium">Payout requested</div>
-            <p className="text-sm text-muted-foreground">Admin will review your details and pay it out. You&apos;ll see it in your wallet history once paid.</p>
-            <Button className="w-full" onClick={() => onOpenChange(false)}>Done</Button>
+            <div className="font-medium">{tl("payout", "Payout requested")}</div>
+            <p className="text-sm text-muted-foreground">{tl("payout", "Admin will review your details and pay it out. You’ll see it in your wallet history once paid.")}</p>
+            <Button className="w-full" onClick={() => onOpenChange(false)}>{tl("payout", "Done")}</Button>
           </div>
         ) : (
           <div className="space-y-4 py-1">
             {/* Payout details */}
             <div className="space-y-2.5">
-              <div className="eg-label text-muted-foreground">Your payout details</div>
+              <div className="eg-label text-muted-foreground">{tl("payout", "Your payout details")}</div>
               <label className="flex flex-col gap-1">
-                <span className="text-2xs text-muted-foreground">Method</span>
+                <span className="text-2xs text-muted-foreground">{tl("payout", "Method")}</span>
                 <select value={type} onChange={(e) => changeMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}{saved[m.id] ? " · saved" : ""}</option>)}
+                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}{saved[m.id] ? tl("payout", " · saved") : ""}</option>)}
                 </select>
               </label>
-              <Input placeholder="Account holder name" value={info.account_name || ""} onChange={(e) => set("account_name", e.target.value)} className="h-9" />
+              <Input placeholder={tl("payout", "Account holder name")} value={info.account_name || ""} onChange={(e) => set("account_name", e.target.value)} className="h-9" />
 
               {type === "bank" ? (
                 <>
                   <div className="flex gap-2">
-                    <Input placeholder="Account number" value={info.account_number || ""} onChange={(e) => set("account_number", e.target.value)} className="h-9 flex-1" />
-                    <Input placeholder="Bank name" value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
+                    <Input placeholder={tl("payout", "Account number")} value={info.account_number || ""} onChange={(e) => set("account_number", e.target.value)} className="h-9 flex-1" />
+                    <Input placeholder={tl("payout", "Bank name")} value={info.bank_name || ""} onChange={(e) => set("bank_name", e.target.value)} className="h-9 flex-1" />
                   </div>
                   <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">Bank QR code (optional)</div>
+                    <div className="mb-1 text-2xs text-muted-foreground">{tl("payout", "Bank QR code (optional)")}</div>
                     {info.qr ? (
                       <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
                         {/* Click to enlarge — a QR scanned off a phone is unreadable at thumbnail size. */}
-                        <button type="button" onClick={() => setZoom(true)} className="group relative overflow-hidden rounded-lg" title="Click to enlarge">
+                        <button type="button" onClick={() => setZoom(true)} className="group relative overflow-hidden rounded-lg" title={tl("payout", "Click to enlarge")}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={info.qr} alt="Your bank QR code" className="size-40 rounded-lg border border-border bg-white object-contain" />
+                          <img src={info.qr} alt={tl("payout", "Your bank QR code")} className="size-40 rounded-lg border border-border bg-white object-contain" />
                           <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 text-2xs font-medium text-transparent transition group-hover:bg-black/45 group-hover:text-white">
-                            Enlarge
+                            {tl("payout", "Enlarge")}
                           </span>
                         </button>
-                        <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> Remove</Button>
+                        <Button variant="outline" size="sm" onClick={() => set("qr", "")}><X size={14} /> {tl("payout", "Remove")}</Button>
                       </div>
                     ) : (
                       <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
                         <UploadSimple size={20} weight="bold" />
-                        Upload your bank QR code
-                        <span className="text-2xs">PNG or JPG · up to 2 MB</span>
+                        {tl("payout", "Upload your bank QR code")}
+                        <span className="text-2xs">{tl("payout", "PNG or JPG · up to 2 MB")}</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
                       </label>
                     )}
@@ -168,19 +170,19 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                 <Input placeholder={type === "pingpong" ? "PingPong email or ID" : "LianLian email or ID"} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
               )}
 
-              <Input placeholder="Note (optional)" value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />
+              <Input placeholder={tl("payout", "Note (optional)")} value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />
             </div>
 
             <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="size-4 accent-[var(--primary)]" />
-              Save these details for next time
+              {tl("payout", "Save these details for next time")}
             </label>
 
             {/* Amount */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="eg-label text-muted-foreground">Amount</div>
-                <button onClick={() => setAmount(String(Math.max(0, Math.floor(ceiling))))} disabled={ceiling < bounds.min} className="text-xs font-medium text-primary hover:underline disabled:opacity-40">Withdraw all</button>
+                <div className="eg-label text-muted-foreground">{tl("payout", "Amount")}</div>
+                <button onClick={() => setAmount(String(Math.max(0, Math.floor(ceiling))))} disabled={ceiling < bounds.min} className="text-xs font-medium text-primary hover:underline disabled:opacity-40">{tl("payout", "Withdraw all")}</button>
               </div>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
@@ -192,7 +194,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
 
             {err && <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"><Warning size={13} weight="fill" className="mt-0.5 shrink-0" /> {err}</div>}
             <Button className="w-full" onClick={submit} disabled={busy || !detailsOk || amt < bounds.min || !!amountErr}>
-              {busy ? <><CircleNotch size={14} className="animate-spin" /> Submitting…</> : `Request ${amt >= bounds.min ? usd(amt) : "payout"}`}
+              {busy ? <><CircleNotch size={14} className="animate-spin" /> {tl("payout", "Submitting…")}</> : `Request ${amt >= bounds.min ? usd(amt) : "payout"}`}
             </Button>
           </div>
         )}
@@ -201,7 +203,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
         {zoom && info.qr && (
           <div onClick={() => setZoom(false)} className="fixed inset-0 z-[70] flex cursor-zoom-out items-center justify-center bg-black/70 p-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={info.qr} alt="Bank QR code" className="max-h-[80vh] max-w-[90vw] rounded-xl border border-white/10 bg-white object-contain p-2" />
+            <img src={info.qr} alt={tl("payout", "Bank QR code")} className="max-h-[80vh] max-w-[90vw] rounded-xl border border-white/10 bg-white object-contain p-2" />
           </div>
         )}
       </DialogContent>

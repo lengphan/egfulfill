@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Trash, UploadSimple, Warning, CheckCircle } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -75,6 +76,7 @@ function PushToPartnerPanel({
  orderId, sku, cardId, itemName, qty, printType, artworkUrl, lineImage, initialDescription, presetExtras,
  compact = false, active = true, onPushed, onCancel,
 }: PushProps & { compact?: boolean; active?: boolean; onCancel?: () => void }) {
+  const tl = useLabelT()
  const [status, setStatus] = useState<{ configured: boolean; ok?: boolean; error?: string } | null>(null)
  const [productTypes, setProductTypes] = useState<Opt[]>([])
  const [boards, setBoards] = useState<Opt[]>([])
@@ -251,7 +253,7 @@ function PushToPartnerPanel({
       {notReady && (
         <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
           <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-          <span>{status?.error || "The design partner isn't connected — add PINKDESIGN_API_KEY in Settings › Integrations."}</span>
+          <span>{status?.error || tl("pushPartner", "The design partner isn't connected — add PINKDESIGN_API_KEY in Settings › Integrations.")}</span>
         </div>
       )}
 
@@ -263,20 +265,20 @@ function PushToPartnerPanel({
             {sendableArt
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={sendableArt} alt="" className="size-full object-contain" />
- : <div className="flex size-full items-center justify-center px-2 text-center text-2xs text-muted-foreground">No artwork on this line</div>}
+ : <div className="flex size-full items-center justify-center px-2 text-center text-2xs text-muted-foreground">{tl("pushPartner", "No artwork on this line")}</div>}
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-sm">
-            <div className="truncate font-medium">{itemName || sku || "Untitled design"}</div>
+            <div className="truncate font-medium">{itemName || sku || tl("pushPartner", "Untitled design")}</div>
             <div className="truncate text-xs text-muted-foreground">
-              {sku || (orderId ? "" : "No order — speculative work")}{printType ? ` · ${printType}` : ""}
+              {sku || (orderId ? "" : tl("pushPartner", "No order — speculative work"))}{printType ? ` · ${printType}` : ""}
             </div>
             {!artworkUrl && (
               <p className="text-xs text-muted-foreground">
                 {lineImage
-                  ? "The image above will be uploaded and sent as the design."
+                  ? tl("pushPartner", "The image above will be uploaded and sent as the design.")
  : extras.length
-                    ? "No stored artwork — the image you attached below will be sent as the design."
- : "No stored artwork here. Attach an image under Reference files below and it'll be sent as the design."}
+                    ? tl("pushPartner", "No stored artwork — the image you attached below will be sent as the design.")
+ : tl("pushPartner", "No stored artwork here. Attach an image under Reference files below and it'll be sent as the design.")}
               </p>
             )}
           </div>
@@ -285,7 +287,7 @@ function PushToPartnerPanel({
 
       <div className="space-y-3">
         {!compact && (
-          <Field label="Title">
+          <Field label={tl("pushPartner", "Title")}>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} className="h-9" />
           </Field>
         )}
@@ -295,17 +297,17 @@ function PushToPartnerPanel({
         {/* Product type picker — hidden once a default is set in Settings › Integrations, since
  a single-type shop shouldn't re-pick it every send (the default is applied server-side). */}
         {!defaultType && (
-          <Field label="Product type">
+          <Field label={tl("pushPartner", "Product type")}>
             {/* min-w-0 lets the select shrink so a long option label can't push the box wider. */}
             <select value={productType} onChange={(e) => setProductType(e.target.value)} disabled={busy}
  className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
-              <option value="">— not set —</option>
+              <option value="">{tl("pushPartner", "— not set —")}</option>
               {productTypes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </Field>
         )}
         {boards.length > 1 && (
-          <Field label="Board">
+          <Field label={tl("pushPartner", "Board")}>
             <select value={board} onChange={(e) => setBoard(e.target.value)} disabled={busy}
  className="h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
               {boards.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -313,7 +315,7 @@ function PushToPartnerPanel({
           </Field>
         )}
         {!compact && (
-          <Field label="Description">
+          <Field label={tl("pushPartner", "Description")}>
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} disabled={busy} rows={3}
  className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
           </Field>
@@ -325,7 +327,7 @@ function PushToPartnerPanel({
       {!compact && (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Reference files</span>
+          <span className="text-sm font-medium">{tl("pushPartner", "Reference files")}</span>
           <label className={"inline-flex cursor-pointer items-center gap-1.5 text-xs " + (uploading ? "opacity-60" : "text-primary hover:underline")}>
             {uploading ? <CircleNotch size={13} className="animate-spin" /> : <UploadSimple size={13} weight="bold" />}
             Add files
@@ -334,14 +336,13 @@ function PushToPartnerPanel({
           </label>
         </div>
         <p className="text-xs text-muted-foreground">
-          Mockups, spec sheets, a marked-up screenshot — anything that tells their designer what you want.
-          Sent alongside the artwork; if there&apos;s no stored artwork, the first image here is sent as the design.
+          {tl("pushPartner", "Mockups, spec sheets, a marked-up screenshot — anything that tells their designer what you want. Sent alongside the artwork; if there’s no stored artwork, the first image here is sent as the design.")}
         </p>
         {extras.map((f, i) => (
           <div key={f.url} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
             <span className="min-w-0 flex-1 truncate">{f.name}</span>
             <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} disabled={busy}
- className="text-muted-foreground hover:text-alert" title="Remove">
+ className="text-muted-foreground hover:text-alert" title={tl("pushPartner", "Remove")}>
               <Trash size={13} />
             </button>
           </div>
@@ -355,7 +356,7 @@ function PushToPartnerPanel({
         <p className="text-xs text-muted-foreground">
           {effExtras.length
             ? `${effExtras.length} reference file${effExtras.length === 1 ? "" : "s"} from the card will be attached.`
- : "No reference files on the card yet — add them above; the artwork still sends."}
+ : tl("pushPartner", "No reference files on the card yet — add them above; the artwork still sends.")}
         </p>
       )}
 
@@ -368,7 +369,7 @@ function PushToPartnerPanel({
       )}
 
       <div className="flex items-center justify-end gap-2 pt-1">
-        {onCancel && <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>Cancel</Button>}
+        {onCancel && <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>{tl("pushPartner", "Cancel")}</Button>}
         <Button size="sm" onClick={send} disabled={busy || uploading || notReady || noArtwork}>
           {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
           Send to Pink Design
@@ -388,13 +389,14 @@ function PushToPartnerPanel({
 export function PushToPartnerDialog({
  open, onOpenChange, ...props
 }: PushProps & { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const tl = useLabelT()
  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Send to design partner</DialogTitle>
+          <DialogTitle>{tl("pushPartner", "Send to design partner")}</DialogTitle>
           <DialogDescription>
-            Opens a task on Pink Design&apos;s board. They return finished files to this card.
+            {tl("pushPartner", "Opens a task on Pink Design’s board. They return finished files to this card.")}
           </DialogDescription>
         </DialogHeader>
         <PushToPartnerPanel {...props} active={open} onCancel={() => onOpenChange(false)} />

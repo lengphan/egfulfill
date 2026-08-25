@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Warning, Sparkle, ImageSquare, FilmSlate, CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -59,6 +60,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
    * price is visible BEFORE the button is pressed, not discovered on the wallet after. */
  priceNote?: string | null
 }) {
+  const tl = useLabelT()
  const [open, setOpen] = useState(false)
  const [mode, setMode] = useState<Mode>("image")
  const [backdrop, setBackdrop] = useState<Backdrop | "">("")
@@ -220,7 +222,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
       ) : (
         <Button
  variant="ghost" size="icon" className="size-9"
- onClick={openMenu} disabled={disabled} aria-label="Choose what to generate"
+ onClick={openMenu} disabled={disabled} aria-label={tl("generate", "Choose what to generate")}
         >
           <Sparkle size={18} />
         </Button>
@@ -230,7 +232,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
         <>
           <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
           <div className="absolute bottom-full left-0 z-20 mb-1 max-h-[70vh] w-[23rem] overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-lg">
-            <div className="mb-2 eg-label text-muted-foreground">Generate</div>
+            <div className="mb-2 eg-label text-muted-foreground">{tl("generate", "Generate")}</div>
 
             {loading && <div className="py-6 text-center"><CircleNotch size={16} className="mx-auto animate-spin text-muted-foreground" /></div>}
 
@@ -240,11 +242,11 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
               <div className="space-y-2 py-2">
                 <div className="flex items-start gap-2 text-xs text-destructive">
                   <Warning size={14} className="mt-0.5 shrink-0" />
-                  <span>{err || "Couldn't load the generation settings."}</span>
+                  <span>{err || tl("generate", "Couldn't load the generation settings.")}</span>
                 </div>
                 <Button size="sm" variant="outline" className="h-8 w-full"
  onClick={() => { setErr(null); setOpen(false); setTimeout(openMenu, 0) }}>
-                  Try again
+                  {tl("generate", "Try again")}
                 </Button>
               </div>
             )}
@@ -253,8 +255,8 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
               <div className="flex items-start gap-2 rounded-md bg-hold/10 p-2 text-xs text-hold">
                 <Warning size={14} className="mt-0.5 shrink-0" />
                 <span>{!cfg.keySet
-                  ? "No Google AI key is set. An admin can add one in Settings › Integrations."
- : "File storage isn't configured, so what's generated couldn't be kept."}</span>
+                  ? tl("generate", "No Google AI key is set. An admin can add one in Settings › Integrations.")
+ : tl("generate", "File storage isn't configured, so what's generated couldn't be kept.")}</span>
               </div>
             )}
 
@@ -264,15 +266,15 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                   <div className="rounded-md px-2 py-1.5 text-2xs text-muted-foreground">{priceNote}</div>
                 )}
                 <div className={allowVideo ? undefined : "hidden"}>
-                  <div className="mb-1 text-2xs text-muted-foreground">What are we making?</div>
+                  <div className="mb-1 text-2xs text-muted-foreground">{tl("generate", "What are we making?")}</div>
                   <select value={mode} onChange={(e) => { const m = e.target.value as Mode; setMode(m); setErr(null); armWith({ mode: m }) }} className={selectCls}>
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
+                    <option value="image">{tl("generate", "Image")}</option>
+                    <option value="video">{tl("generate", "Video")}</option>
                   </select>
                 </div>
 
                 <div>
-                  <div className="mb-1 text-2xs text-muted-foreground">Model</div>
+                  <div className="mb-1 text-2xs text-muted-foreground">{tl("generate", "Model")}</div>
                   {isVideo ? (
                     <select value={vidModel} className={selectCls}
  onChange={(e) => {
@@ -303,7 +305,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
 
                 <div className={"grid gap-2 " + (isVideo ? "grid-cols-3" : "grid-cols-2")}>
                   <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
+                    <div className="mb-1 text-2xs text-muted-foreground">{tl("generate", "Shape")}</div>
                     <select value={isVideo ? vidRatio : imgRatio} className={selectCls}
  onChange={(e) => {
  const v = e.target.value
@@ -313,7 +315,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                     </select>
                   </div>
                   <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">{isVideo ? "Quality" : "Size"}</div>
+                    <div className="mb-1 text-2xs text-muted-foreground">{isVideo ? tl("generate", "Quality") : tl("generate", "Size")}</div>
                     {isVideo ? (
                       <select value={effVidRes} onChange={(e) => { setVidRes(e.target.value); armWith({ vidRes: e.target.value }) }} className={selectCls}>
                         {(vidSpec?.resolutions || []).map((r) => <option key={r} value={r}>{r}</option>)}
@@ -326,7 +328,7 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                   </div>
                   {isVideo && (
                     <div>
-                      <div className="mb-1 text-2xs text-muted-foreground">Length</div>
+                      <div className="mb-1 text-2xs text-muted-foreground">{tl("generate", "Length")}</div>
                       <select value={secs} onChange={(e) => { setSecs(Number(e.target.value)); armWith({ secs: Number(e.target.value) }) }} className={selectCls}>
                         {(vid?.durations || [8]).map((d) => <option key={d} value={d}>{d}s</option>)}
                       </select>
@@ -349,12 +351,12 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                   */}
                 {!isVideo && (
                   <div>
-                    <div className="mb-1 text-2xs text-muted-foreground">Backdrop</div>
+                    <div className="mb-1 text-2xs text-muted-foreground">{tl("generate", "Backdrop")}</div>
                     <select value={backdrop} className={selectCls}
  onChange={(e) => { const v = e.target.value as Backdrop | ""; setBackdrop(v); armWith({ backdrop: v }) }}>
-                      <option value="">As described</option>
-                      <option value="white">Flat white — cut-out ready</option>
-                      <option value="grey">Flat grey — cut-out ready, for white garments</option>
+                      <option value="">{tl("generate", "As described")}</option>
+                      <option value="white">{tl("generate", "Flat white — cut-out ready")}</option>
+                      <option value="grey">{tl("generate", "Flat grey — cut-out ready, for white garments")}</option>
                     </select>
                   </div>
                 )}
@@ -362,19 +364,19 @@ export function GenerateButton({ disabled, armed, onArm, allowVideo = true, pric
                 {/* Arms the composer; it does not spend anything yet. The price rides onto the
  pill so it stays visible while you type, not only at the moment of choosing. */}
                 <div className="flex gap-2">
-                  <Button variant="outline" className="h-9 flex-1" onClick={() => setOpen(false)}>Done</Button>
+                  <Button variant="outline" className="h-9 flex-1" onClick={() => setOpen(false)}>{tl("generate", "Done")}</Button>
                   {/* The pill above the composer used to carry the ✕ that turned this off.
                       With the pill gone (it repeated what the Send button already says), the
  way back to a plain chat box has to live here instead. */}
                   {armed && (
                     <Button variant="ghost" className="h-9 flex-1 text-muted-foreground"
  onClick={() => { onArm(null); setOpen(false) }}>
-                      Back to chat
+                      {tl("generate", "Back to chat")}
                     </Button>
                   )}
                 </div>
                 <p className="text-2xs text-muted-foreground">
-                  Type in the message box and press Enter — the Send button now says Generate.
+                  {tl("generate", "Type in the message box and press Enter — the Send button now says Generate.")}
                 </p>
               </div>
             )}
@@ -422,6 +424,7 @@ export function EditImageButton({ imageName, imageUrl, armed, onArm, onPick }: {
   onArm: (g: GenSettings) => void
   onPick: (p: { name: string; url: string }) => void
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState(false)
 
   const pick = async (e: React.MouseEvent) => {
@@ -448,7 +451,7 @@ export function EditImageButton({ imageName, imageUrl, armed, onArm, onPick }: {
   }
 
   return (
-    <button type="button" onClick={pick} aria-label="Edit this image" className={IMG_CHIP}>
+    <button type="button" onClick={pick} aria-label={tl("generate", "Edit this image")} className={IMG_CHIP}>
       {busy ? <CircleNotch size={12} className="animate-spin" /> : null}
       Edit
     </button>
@@ -460,6 +463,7 @@ export function AnimateImageButton({ imageName, imageUrl, onArm }: {
  imageUrl: string
  onArm: (g: GenSettings) => void
 }) {
+  const tl = useLabelT()
  const [busy, setBusy] = useState(false)
 
  const arm = async (e: React.MouseEvent) => {
@@ -495,7 +499,7 @@ export function AnimateImageButton({ imageName, imageUrl, onArm }: {
   }
 
  return (
-    <button type="button" onClick={arm} aria-label="Animate this image" className={IMG_CHIP}>
+    <button type="button" onClick={arm} aria-label={tl("generate", "Animate this image")} className={IMG_CHIP}>
       {busy ? <CircleNotch size={12} className="animate-spin" /> : null}
       Animate
     </button>

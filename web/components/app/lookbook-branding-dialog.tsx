@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -43,6 +44,7 @@ export function LookbookBrandingDialog({
   brand: LookbookBrand
   onSaved: (b: LookbookBrand) => void
 }) {
+  const tl = useLabelT()
   const [title, setTitle] = useState(brand.title)
   const [headline, setHeadline] = useState(brand.headline)
   const [tagline, setTagline] = useState(brand.tagline)
@@ -111,35 +113,34 @@ export function LookbookBrandingDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Lookbook branding</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tl("lookbook", "Lookbook branding")}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Name on the cover</span>
+            <span className="text-sm font-medium">{tl("lookbook", "Name on the cover")}</span>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="EGFUL" className="h-9" />
-            <span className="block text-2xs text-muted-foreground">Also the wordmark in each page footer.</span>
+            <span className="block text-2xs text-muted-foreground">{tl("lookbook", "Also the wordmark in each page footer.")}</span>
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Lookbook name</span>
-            <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="The catalogue" className="h-9" />
+            <span className="text-sm font-medium">{tl("lookbook", "Lookbook name")}</span>
+            <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder={tl("lookbook", "The catalogue")} className="h-9" />
             {/* Said because the cover sets it in 72px and breaks it before the last word: a
                 long name is a small name. */}
             <span className="block text-2xs text-muted-foreground">
-              The big words on the cover. Two or three words print best — the last one drops to
-              its own line.
+              {tl("lookbook", "The big words on the cover. Two or three words print best — the last one drops to its own line.")}
             </span>
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Cover tagline</span>
-            <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Print-on-demand, made to order" className="h-9" />
+            <span className="text-sm font-medium">{tl("lookbook", "Cover tagline")}</span>
+            <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder={tl("lookbook", "Print-on-demand, made to order")} className="h-9" />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Accent colour</span>
+            <span className="text-sm font-medium">{tl("lookbook", "Accent colour")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={/^#[0-9a-f]{6}$/i.test(accent) ? accent : HOUSE_ACCENT}
                 onChange={(e) => setAccent(e.target.value)}
-                aria-label="Lookbook accent colour"
+                aria-label={tl("lookbook", "Lookbook accent colour")}
                 className="h-9 w-12 cursor-pointer rounded-md border border-input bg-transparent p-1"
               />
               <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder={HOUSE_ACCENT} className="h-9 flex-1 tabular-nums" />
@@ -147,29 +148,29 @@ export function LookbookBrandingDialog({
             {/* Stated rather than discovered at the printer: the covers reverse cream type out
                 of this colour, so a light value makes the title vanish. */}
             <span className="block text-2xs text-muted-foreground">
-              Prints full-bleed on the covers with the title reversed out — keep it dark.
+              {tl("lookbook", "Prints full-bleed on the covers with the title reversed out — keep it dark.")}
             </span>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Email</span>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="orders@egful.store" className="h-9" />
+              <span className="text-sm font-medium">{tl("lookbook", "Email")}</span>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tl("lookbook", "orders@egful.store")} className="h-9" />
             </label>
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Phone</span>
+              <span className="text-sm font-medium">{tl("lookbook", "Phone")}</span>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 …" className="h-9" />
             </label>
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Online</span>
+              <span className="text-sm font-medium">{tl("lookbook", "Online")}</span>
               <Input value={site} onChange={(e) => setSite(e.target.value)} placeholder="egful.store" className="h-9" />
             </label>
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Address</span>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="City, country" className="h-9" />
+              <span className="text-sm font-medium">{tl("lookbook", "Address")}</span>
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={tl("lookbook", "City, country")} className="h-9" />
             </label>
           </div>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Anything else on the back cover</span>
+            <span className="text-sm font-medium">{tl("lookbook", "Anything else on the back cover")}</span>
             <textarea
               value={contact}
               onChange={(e) => setContact(e.target.value)}
@@ -177,13 +178,13 @@ export function LookbookBrandingDialog({
               placeholder={"orders@egful.store\negful.store"}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             />
-            <span className="block text-2xs text-muted-foreground">Left blank, the block is omitted rather than printed empty.</span>
+            <span className="block text-2xs text-muted-foreground">{tl("lookbook", "Left blank, the block is omitted rather than printed empty.")}</span>
           </label>
           {err && <p className="text-sm text-destructive">{err}</p>}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : "Save branding"}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{tl("lookbook", "Cancel")}</Button>
+          <Button onClick={() => void save()} disabled={busy}>{busy ? tl("lookbook", "Saving…") : tl("lookbook", "Save branding")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

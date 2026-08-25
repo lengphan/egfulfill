@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -79,6 +80,7 @@ const WEIGHT_PRESETS: { label: string; oz: number }[] = [
  * buyer uses, so what it shows is what a label would actually cost.
  */
 export function RateCalculatorView() {
+  const tl = useLabelT()
  const [fromZip, setFromZip] = useState("")
  const [toZip, setToZip] = useState("")
  const [lb, setLb] = useState("0")
@@ -175,7 +177,7 @@ export function RateCalculatorView() {
     <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
       {/* ── THE PARCEL ─────────────────────────────────────────────────────── */}
       <div className="space-y-4 xl:sticky xl:top-20">
-        <SectionCard title="Parcel" bodyClassName="space-y-3 p-4">
+        <SectionCard title={tl("rates", "Parcel")} bodyClassName="space-y-3 p-4">
           {/* THREE CONTROLS, not six rows of pills.
               Chips read as clutter once there are eleven cities and eight weights — the
  same choice as a select, spending five times the height. The select is also
@@ -183,11 +185,11 @@ export function RateCalculatorView() {
  ask the question the same way. */}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">From ZIP</span>
+              <span className="text-xs text-muted-foreground">{tl("rates", "From ZIP")}</span>
               <Input value={fromZip} onChange={(e) => setFromZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="90638" className="h-9 tabular-nums" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">To ZIP</span>
+              <span className="text-xs text-muted-foreground">{tl("rates", "To ZIP")}</span>
               <Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="10118" className="h-9 tabular-nums" />
             </label>
           </div>
@@ -195,7 +197,7 @@ export function RateCalculatorView() {
           {/* The city list fills the ZIP beside it — a quote is zone-based, so the ZIP is
  the only part of a destination that changes the price. */}
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Or pick a city</span>
+            <span className="text-xs text-muted-foreground">{tl("rates", "Or pick a city")}</span>
             <select
  value={DEST_PRESETS.find((d) => d.zip === toZip) ? toZip : "custom"}
  onChange={(e) => { if (e.target.value !== "custom") setToZip(e.target.value) }}
@@ -204,7 +206,7 @@ export function RateCalculatorView() {
               {/* Reads "Select" until there IS something, then says what was typed — a
  dropdown showing a city name while the ZIP beside it is somewhere else
  is the one thing this control must never do. */}
-              <option value="custom">{/^\d{5}$/.test(toZip) ? `Typed · ${toZip}` : "Select"}</option>
+              <option value="custom">{/^\d{5}$/.test(toZip) ? `Typed · ${toZip}` : tl("rates", "Select")}</option>
               {DEST_PRESETS.map((d) => <option key={d.zip} value={d.zip}>{d.label}</option>)}
             </select>
           </label>
@@ -219,7 +221,7 @@ export function RateCalculatorView() {
               <Input value={oz} onChange={(e) => setOz(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-9 tabular-nums" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Common</span>
+              <span className="text-xs text-muted-foreground">{tl("rates", "Common")}</span>
               <select
  value={WEIGHT_PRESETS.find((w) => w.oz === weightOz)?.oz ?? ""}
  onChange={(e) => {
@@ -229,7 +231,7 @@ export function RateCalculatorView() {
                 }}
  className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
               >
-                <option value="">Typed</option>
+                <option value="">{tl("rates", "Typed")}</option>
                 {WEIGHT_PRESETS.map((w) => <option key={w.oz} value={w.oz}>{w.label}</option>)}
               </select>
             </label>
@@ -238,7 +240,7 @@ export function RateCalculatorView() {
           {/* Size, and the three boxes only when they're yours to fill — same control and
  same "Custom size…" escape hatch as the label dialog. */}
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Package</span>
+            <span className="text-xs text-muted-foreground">{tl("rates", "Package")}</span>
             <select
               /* `custom` wins over a coincidental match. Picking "Custom size…" while the
  boxes still held 13/10/1 snapped the label straight back to "10 × 13 poly
@@ -253,7 +255,7 @@ export function RateCalculatorView() {
  className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
             >
               {allSizes.map((z) => <option key={sizeKey(z)} value={sizeKey(z)}>{z.label}</option>)}
-              <option value="custom">Custom size…</option>
+              <option value="custom">{tl("rates", "Custom size…")}</option>
             </select>
           </label>
 
@@ -277,29 +279,29 @@ export function RateCalculatorView() {
         {/* ── HOW IT'S BILLED ──────────────────────────────────────────────
             The arithmetic and nothing else. The prose that used to sit around it
  explained the rule three times over; the numbers say it once. */}
-        <SectionCard title="How it's billed" bodyClassName="space-y-2 p-4 text-xs">
+        <SectionCard title={tl("rates", "How it's billed")} bodyClassName="space-y-2 p-4 text-xs">
           <div className="rounded-lg bg-muted/40 p-2 text-center tabular-nums text-2xs">
             {dims.l} × {dims.w} × {dims.h} = <strong>{cuIn.toLocaleString()}</strong> cu in
           </div>
           <dl className="space-y-1">
-            <div className="flex justify-between"><dt className="text-muted-foreground">On the scale</dt><dd className="tabular-nums">{actualLb.toFixed(2)} lb</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">{tl("rates", "On the scale")}</dt><dd className="tabular-nums">{actualLb.toFixed(2)} lb</dd></div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">UPS dim ({cuIn.toLocaleString()} ÷ {UPS_DAILY_DIVISOR})</dt>
               <dd className={"tabular-nums " + (billing.upsSizeDriven ? "font-semibold text-hold" : "")}>{billing.upsDim.toFixed(2)} lb</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">USPS dim</dt>
+              <dt className="text-muted-foreground">{tl("rates", "USPS dim")}</dt>
               <dd className="tabular-nums">{billing.uspsDimApplies ? `${billing.uspsDim.toFixed(2)} lb` : "n/a"}</dd>
             </div>
             <div className="flex justify-between border-t border-border pt-1 font-semibold">
-              <dt>Billed as</dt>
+              <dt>{tl("rates", "Billed as")}</dt>
               <dd className="tabular-nums">UPS {Math.ceil(billing.upsBillable)} lb · USPS {Math.ceil(billing.uspsBillable)} lb</dd>
             </div>
           </dl>
           {billing.upsSizeDriven && (
             <p className="flex items-start gap-1.5 text-hold">
               <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-              <span>The box sets the UPS price, not the scale.</span>
+              <span>{tl("rates", "The box sets the UPS price, not the scale.")}</span>
             </p>
           )}
         </SectionCard>
@@ -308,14 +310,14 @@ export function RateCalculatorView() {
       {/* ── RESULTS ────────────────────────────────────────────────────────── */}
       <div className="space-y-4">
         <SectionCard
- title="Rates"
+ title={tl("rates", "Rates")}
  description={rates ? `${rates.length} live quotes — nothing is bought` : "Every service both carriers will run for this parcel"}
  bodyClassName="p-0"
         >
           {!rates ? (
-            <p className="p-4 text-sm text-muted-foreground">Fill in the parcel and press <strong>Get rates</strong>.</p>
+            <p className="p-4 text-sm text-muted-foreground">{tl("rates", "Fill in the parcel and press")} <strong>{tl("rates", "Get rates")}</strong>.</p>
           ) : rates.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">No rates came back for that parcel.</p>
+            <p className="p-4 text-sm text-muted-foreground">{tl("rates", "No rates came back for that parcel.")}</p>
           ) : (
             <div className="divide-y divide-border">
               {rates.map((r, i) => (

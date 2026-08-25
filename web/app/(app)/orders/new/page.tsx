@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { VariantField } from "@/components/app/variant-field"
 import { PRODUCT_METHODS } from "@/lib/print-method"
@@ -50,6 +51,7 @@ const METHOD_LABELS = PRODUCT_METHODS.map((m) => m.label)
 
 
 export default function NewOrderPage() {
+  const tl = useLabelT()
  const router = useRouter()
  const [block, setBlock] = useState("")
  const [email, setEmail] = useState("")
@@ -226,15 +228,15 @@ export default function NewOrderPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="text-muted-foreground">
-          <CaretLeft size={14} weight="bold" /> Orders
+          <CaretLeft size={14} weight="bold" /> {tl("newOrder", "Orders")}
         </Button>
-        <h1 className="font-title text-2xl font-semibold tracking-tight">New order</h1>
+        <h1 className="font-title text-2xl font-semibold tracking-tight">{tl("newOrder", "New order")}</h1>
       </div>
 
-      <SectionCard title="Shipping">
+      <SectionCard title={tl("newOrder", "Shipping")}>
         <div className="space-y-4 p-5">
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Name &amp; Address</span>
+            <span className="text-sm font-medium">{tl("newOrder", "Name & Address")}</span>
             {/* One paste box, validated live. The status sits INSIDE the box, bottom-right —
  extra bottom padding keeps the last address line clear of it. */}
             <div className="relative">
@@ -248,40 +250,40 @@ export default function NewOrderPage() {
               <div className="pointer-events-none absolute bottom-2 right-2.5">
                 {valid.kind === "checking" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs text-muted-foreground">
-                    <CircleNotch size={12} className="animate-spin" /> Checking…
+                    <CircleNotch size={12} className="animate-spin" /> {tl("newOrder", "Checking…")}
                   </span>
                 )}
                 {valid.kind === "ok" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs font-medium text-success">
-                    <CheckCircle size={12} weight="fill" /> Validated
+                    <CheckCircle size={12} weight="fill" /> {tl("newOrder", "Validated")}
                   </span>
                 )}
                 {valid.kind === "bad" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={valid.msg}>
-                    <WarningCircle size={12} weight="fill" /> Not validated
+                    <WarningCircle size={12} weight="fill" /> {tl("newOrder", "Not validated")}
                   </span>
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">First line is the customer name, then the shipping address (street, then City, ST ZIP).</p>
+            <p className="text-xs text-muted-foreground">{tl("newOrder", "First line is the customer name, then the shipping address (street, then City, ST ZIP).")}</p>
           </div>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Email (optional)</span>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="customer@email.com" className="max-w-sm" />
+            <span className="text-sm font-medium">{tl("newOrder", "Email (optional)")}</span>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tl("newOrder", "customer@email.com")} className="max-w-sm" />
           </label>
         </div>
       </SectionCard>
 
       <SectionCard
- title="Items"
+ title={tl("newOrder", "Items")}
  actions={
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => openPicker(null)}>
-              Add from catalog
+              {tl("newOrder", "Add from catalog")}
             </Button>
             <Button size="sm" variant="outline" onClick={addLine}>
-              <Plus size={14} weight="bold" /> Blank item
+              <Plus size={14} weight="bold" /> {tl("newOrder", "Blank item")}
             </Button>
           </div>
         }
@@ -298,8 +300,8 @@ export default function NewOrderPage() {
  type="button"
  onClick={() => removeLine(i)}
  disabled={lines.length === 1}
- aria-label="Remove item"
- title="Remove item"
+ aria-label={tl("newOrder", "Remove item")}
+ title={tl("newOrder", "Remove item")}
  className="absolute right-3 top-1.5 flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-alert disabled:pointer-events-none disabled:opacity-30"
               >
                 <X size={13} weight="bold" />
@@ -309,7 +311,7 @@ export default function NewOrderPage() {
  onDragOver={(e) => { e.preventDefault(); setDragLine(i) }}
  onDragLeave={() => setDragLine((d) => (d === i ? null : d))}
  onDrop={(e) => { e.preventDefault(); setDragLine(null); setLineImage(i, e.dataTransfer.files?.[0]) }}
- title="Drop or click to add an image"
+ title={tl("newOrder", "Drop or click to add an image")}
  className={
                   "group relative flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border text-muted-foreground transition-colors " +
                   (dragLine === i ? "border-primary bg-primary/5" : "border-dashed border-border hover:bg-accent")
@@ -322,7 +324,7 @@ export default function NewOrderPage() {
  type="button"
  onClick={(e) => { e.preventDefault(); setLine(i, { img: "" }) }}
  className="absolute right-0.5 top-0.5 z-10 flex size-4 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity group-hover:opacity-100"
- aria-label="Remove image"
+ aria-label={tl("newOrder", "Remove image")}
                     >
                       <X size={9} weight="bold" />
                     </button>
@@ -348,7 +350,7 @@ export default function NewOrderPage() {
  ending halfway through Colour. See product-combobox.tsx. */}
               <div data-field-strip className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.2fr)_60px_78px_minmax(108px,1.1fr)_minmax(70px,0.65fr)_minmax(116px,1.15fr)]">
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Product</span>
+                <span className="text-xs text-muted-foreground">{tl("newOrder", "Product")}</span>
                 <ProductCombobox
  value={l.name}
  onText={(v) => setLine(i, { name: v })}
@@ -373,31 +375,31 @@ export default function NewOrderPage() {
  method: (p.methods ?? []).length === 1 ? p.methods[0] : "",
                   })}
  onBrowse={() => openPicker(i)}
- placeholder="e.g. Classic Tee"
+ placeholder={tl("newOrder", "e.g. Classic Tee")}
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Qty</span>
+                <span className="text-xs text-muted-foreground">{tl("newOrder", "Qty")}</span>
                 <Input value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value.replace(/[^0-9]/g, "") })} className="h-9" inputMode="numeric" />
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
-                <span className="text-xs text-muted-foreground">Color</span>
+                <span className="text-xs text-muted-foreground">{tl("newOrder", "Color")}</span>
                 {l.colors.length > 0 ? (
-                  <VariantField compact swatches className="h-9 text-xs" label="Color" value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v })} placeholder="Color" />
+                  <VariantField compact swatches className="h-9 text-xs" label={tl("newOrder", "Color")} value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v })} placeholder={tl("newOrder", "Color")} />
                 ) : (
-                  <Input value={l.color} onChange={(e) => setLine(i, { color: e.target.value })} className="h-9" placeholder="Color" />
+                  <Input value={l.color} onChange={(e) => setLine(i, { color: e.target.value })} className="h-9" placeholder={tl("newOrder", "Color")} />
                 )}
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
-                <span className="text-xs text-muted-foreground">Size</span>
+                <span className="text-xs text-muted-foreground">{tl("newOrder", "Size")}</span>
                 {l.sizes.length > 0 ? (
-                  <VariantField compact className="h-9 text-xs" label="Size" value={l.size} options={l.sizes} onChange={(v) => setLine(i, { size: v })} placeholder="Size" />
+                  <VariantField compact className="h-9 text-xs" label={tl("newOrder", "Size")} value={l.size} options={l.sizes} onChange={(v) => setLine(i, { size: v })} placeholder={tl("newOrder", "Size")} />
                 ) : (
-                  <Input value={l.size} onChange={(e) => setLine(i, { size: e.target.value })} className="h-9" placeholder="Size" />
+                  <Input value={l.size} onChange={(e) => setLine(i, { size: e.target.value })} className="h-9" placeholder={tl("newOrder", "Size")} />
                 )}
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
-                <span className="text-xs text-muted-foreground">Method</span>
+                <span className="text-xs text-muted-foreground">{tl("newOrder", "Method")}</span>
                 {/* EXACTLY WHAT THE BLANK OFFERS, once a blank has been picked.
                     It used to fall back to the full standard list whenever the product
  declared none, so a blank that supports embroidery only could be ordered
@@ -409,10 +411,10 @@ export default function NewOrderPage() {
  there is no product to contradict — the same rule Colour and Size follow
  by falling back to free text. */}
                 <VariantField
- compact className="h-9 text-xs" label="Method" value={l.method}
+ compact className="h-9 text-xs" label={tl("newOrder", "Method")} value={l.method}
  options={l.blank ? l.methods : METHOD_LABELS}
  emptyLabel="None on this blank"
- onChange={(v) => setLine(i, { method: v })} placeholder="Method"
+ onChange={(v) => setLine(i, { method: v })} placeholder={tl("newOrder", "Method")}
                 />
               </label>
               </div>
@@ -436,10 +438,10 @@ export default function NewOrderPage() {
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => router.push("/orders")}>
-          Cancel
+          {tl("newOrder", "Cancel")}
         </Button>
         <Button onClick={onSubmit} disabled={saving || !canSave}>
-          {saving ? "Creating…" : "Create order"}
+          {saving ? tl("newOrder", "Creating…") : tl("newOrder", "Create order")}
         </Button>
       </div>
 
