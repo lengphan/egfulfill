@@ -745,19 +745,6 @@ export default function ChatPage() {
   }
  const send = () => submit(input)
 
-  // Seller escalation → post a request for a human (no AI); staff see it in the inbox.
- const escalate = async () => {
- if (!activeId) return
- const clientId = `c-${cidBase.current}-${cidSeq.current++}`
- const text = "I'd like to talk to a human — please have someone follow up."
- setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
- setAiNote(queueNote(office))
-    // escalated:true is what actually raises the flag — it writes meta.escalated, sends
-    // staff a distinct notification, and pins the thread to the top of their inbox until
-    // one of them replies. Without it this was just another message.
- try { await postOrderMessage(activeId, text, { clientId, by: myName, escalated: true }); await load() } catch {}
-  }
-
   // Staff: draft a reply with AI for the open seller thread → fill the composer to edit.
  const draftWithAi = async () => {
  if (!activeId) return
@@ -1133,13 +1120,6 @@ export default function ChatPage() {
                         })()}
                       </div>
                       <span className="mt-0.5 flex items-center gap-1.5 px-1 text-2xs text-muted-foreground">
-                        {m.orderRef && (
-                          // Which order this is about — the context the per-order
-                          // channels used to carry in their name.
-                          <a href={`/orders/${m.orderRef}`} className="rounded-full bg-muted px-1.5 py-0.5 font-medium hover:underline">
-                            <Package size={9} weight="duotone" className="mr-0.5 inline" />{m.orderRef}
-                          </a>
-                        )}
                         <span>
                           {!mine ? `${m.by || (isAi ? "EGFUL Assistant" : isSupport ? "Support" : "Factory")} · ` : ""}
                           {fmtTime(m.ts)}
@@ -1201,16 +1181,6 @@ export default function ChatPage() {
           </div>
 
         </div>
-
-        {/* seller: escalate to a human on the support thread */}
-        {isSupport && !isStaffUser && !signedOut && (
-          <div className="flex items-center justify-center gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-            <span>Not what you needed?</span>
-            <button onClick={escalate} className="inline-flex items-center gap-1 font-medium text-foreground hover:underline">
-              Talk to a human
-            </button>
-          </div>
-        )}
 
         {/* THE OVERLAY COVERS WHAT ACCEPTS THE DROP — the whole panel, matching the handlers
  above rather than the reading area alone. It was over the thread while the
