@@ -35,7 +35,7 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
  const on = !!s.value && s.value !== "0" && s.value.toLowerCase() !== "false"
  return (
       <label className="flex items-center justify-between gap-3 py-0.5 text-sm">
-        <span className="text-muted-foreground">{s.label}</span>
+        <span className="text-muted-foreground">{tl("integrations", s.label)}</span>
         <span className="flex items-center gap-2">
           {busy && <CircleNotch size={12} className="animate-spin text-muted-foreground" />}
           <input
@@ -51,7 +51,7 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
  if (s.kind === "choice") {
  return (
       <div className="space-y-1.5 py-0.5">
-        <span className="text-sm text-muted-foreground">{s.label}</span>
+        <span className="text-sm text-muted-foreground">{tl("integrations", s.label)}</span>
         <div className="flex flex-col gap-1">
           {(s.options ?? []).map((o) => (
             <label key={o.value} className="flex cursor-pointer items-center gap-2 text-sm">
@@ -59,7 +59,7 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
  type="radio" name={s.name} checked={s.value === o.value} disabled={busy || !s.editable}
  onChange={() => commit(o.value)} className="size-3.5 shrink-0 accent-primary"
               />
-              <span className={s.value === o.value ? "text-foreground" : "text-muted-foreground"}>{o.label}</span>
+              <span className={s.value === o.value ? "text-foreground" : "text-muted-foreground"}>{tl("integrations", o.label)}</span>
             </label>
           ))}
         </div>
@@ -70,7 +70,7 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
   // Plain text — readable, because an identifier you cannot read is one you cannot check.
  return (
     <div className="flex items-center justify-between gap-2 py-0.5 text-sm">
-      <span className="shrink-0 text-muted-foreground">{s.label}</span>
+      <span className="shrink-0 text-muted-foreground">{tl("integrations", s.label)}</span>
       {editing ? (
         <span className="flex flex-1 items-center gap-1.5">
           <Input value={draft} onChange={(e) => setDraft(e.target.value)} className="h-8 flex-1 text-sm" autoFocus />
@@ -114,7 +114,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
  if (editing) {
  return (
       <div className="flex items-center gap-1.5">
-        <span className="w-28 shrink-0 truncate text-sm text-muted-foreground">{s.label}</span>
+        <span className="w-28 shrink-0 truncate text-sm text-muted-foreground">{tl("integrations", s.label)}</span>
         <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder={tl("integrations", "Paste new value")} className="h-8 flex-1 font-mono text-sm" autoFocus />
         <Button size="sm" className="h-7 px-2" disabled={busy || !val.trim()} onClick={() => save(false)}>{busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}</Button>
         {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-alert" title={tl("integrations", "Clear")} disabled={busy} onClick={() => save(true)}>{tl("integrations", "Clear")}</Button>}
@@ -125,7 +125,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
  return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">{s.label}</span>
+        <span className="text-muted-foreground">{tl("integrations", s.label)}</span>
         <span className="flex items-center gap-1.5 font-mono">
           {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">{tl("integrations", "not set")}</span>}
           {s.editable && (
@@ -572,7 +572,7 @@ export function IntegrationsPanel() {
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 eg-label text-muted-foreground">{active.group}</span>
                 </span>
                 <span className={"inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-2xs font-medium " + activeMeta.pill}>
-                  {activeMeta.label}
+                  {tl("integrations", activeMeta.label)}
                 </span>
               </div>
 
@@ -758,7 +758,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
           >
             {models.length === 0 && <option value={model}>{model || "—"}</option>}
             {models.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
+              <option key={m.id} value={m.id}>{tl("integrations", m.label)}</option>
             ))}
           </select>
         </label>
@@ -906,7 +906,7 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
           >
             {models.length === 0 && <option value={model}>{model || "—"}</option>}
             {models.map((m) => (
-              <option key={m.id} value={m.id}>{m.label} — ${m.usd[m.defaultSize]?.toFixed(3)}/image</option>
+              <option key={m.id} value={m.id}>{tl("integrations", m.label)} — ${m.usd[m.defaultSize]?.toFixed(3)}/image</option>
             ))}
           </select>
         </label>

@@ -211,7 +211,7 @@ export function LabelSheet({
               onChange={(e) => setStock(e.target.value as StockId)}
               className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
-              {STOCKS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              {STOCKS.map((s) => <option key={s.id} value={s.id}>{tl("labelSheet", s.label)}</option>)}
             </select>
           </label>
           <Button className="w-full" onClick={() => window.print()} disabled={!sheet.length}>{tl("labelSheet", "Print")}</Button>

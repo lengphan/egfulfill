@@ -142,7 +142,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
  className={"eg-tap rounded-full px-3 py-1 text-xs font-medium transition-colors "
                   + (filter === f.id ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground")}
               >
-                {f.label} <span className="opacity-70">{counts[f.id]}</span>
+                {tl("alibaba", f.label)} <span className="opacity-70">{counts[f.id]}</span>
               </button>
             ))}
           </div>

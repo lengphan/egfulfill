@@ -591,7 +591,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
           {detail && (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <Badge className={detail.tone} variant="secondary">{detail.label}</Badge>
+                <Badge className={detail.tone} variant="secondary">{tl("wallet", detail.label)}</Badge>
                 <span className={"text-lg font-semibold tabular-nums " + (detail.rejected ? "text-muted-foreground line-through" : detail.amount >= 0 ? "text-success" : "text-foreground")}>
                   {usd(detail.amount, !detail.rejected)}
                 </span>
@@ -623,7 +623,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         {kpis.map((k) => (
           <Card key={k.label} className="gap-0 p-5">
             <div className="eg-label text-muted-foreground">
-              {k.label}
+              {tl("wallet", k.label)}
             </div>
             <div className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{k.value}</div>
             <div
@@ -737,7 +737,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                     <span className="grid grid-cols-[8.5rem_auto] items-center gap-1.5">
                       <span className="flex min-w-0 items-center gap-1.5">
                         <Badge className={t.tone + " truncate"} variant="secondary">
-                          {t.label}
+                          {tl("wallet", t.label)}
                         </Badge>
                         {t.isTest && (
                           <Badge variant="secondary" className="bg-muted text-muted-foreground">{tl("wallet", "Test")}</Badge>

@@ -258,7 +258,7 @@ export function PartnerSheets() {
                       <span className="text-xs text-muted-foreground">{block.columns.length} columns</span>
                       <select className={`${SELECT} ml-auto`} value={m.mode}
                         onChange={(e) => patchBlock(block.id, { mode: e.target.value as BlockMode })}>
-                        {MODES.map((o) => <option key={o.value} value={o.value} title={o.hint}>{o.label}</option>)}
+                        {MODES.map((o) => <option key={o.value} value={o.value} title={o.hint}>{tl("partnerSheets", o.label)}</option>)}
                       </select>
                     </div>
 
@@ -281,7 +281,7 @@ export function PartnerSheets() {
                             const value = rule.kind === "const" ? "const" : rule.kind === "field" ? rule.field : ""
                             return (
                               <tr key={col.index} className="border-b border-border/60 last:border-0">
-                                <td className="whitespace-nowrap px-3 py-1.5 font-medium">{col.label}</td>
+                                <td className="whitespace-nowrap px-3 py-1.5 font-medium">{tl("partnerSheets", col.label)}</td>
                                 <td className="px-3 py-1.5">
                                   <div className="flex items-center gap-2">
                                     <select className={SELECT} value={value}
@@ -320,7 +320,7 @@ export function PartnerSheets() {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                              {block.columns.map((c) => <th key={c.index} className="px-1 py-2 font-medium">{c.label}</th>)}
+                              {block.columns.map((c) => <th key={c.index} className="px-1 py-2 font-medium">{tl("partnerSheets", c.label)}</th>)}
                               <th className="w-8" />
                             </tr>
                           </thead>

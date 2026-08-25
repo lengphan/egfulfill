@@ -76,6 +76,7 @@ function MiniStat({
  icon: ElementType
  tone?: "pos" | "neg"
 }) {
+  const tl = useLabelT()
  return (
     <div className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm">
       <div className="flex items-start gap-3">
@@ -88,7 +89,7 @@ function MiniStat({
         <Icon size={18} weight="bold" className="mt-0.5 shrink-0 text-primary dark:bg-brand/15 dark:text-brand" />
         <div className="min-w-0">
           <div className="text-2xl font-black leading-none tracking-tight tabular-nums">{value}</div>
-          <div className="mt-2 truncate eg-label text-muted-foreground">{label}</div>
+          <div className="mt-2 truncate eg-label text-muted-foreground">{tl("kpi", label)}</div>
           {/* NO CAPTION. These read as explanations of the figure above them ("we earned",
               "after $73 costs", "per order") and the owner's call is that the figure and its
  label carry it. Dropped here rather than at each call site so nothing can
@@ -414,7 +415,7 @@ export function StaffDashboard() {
                 {moneySide.map((c) => (
                   <div key={c.label} title={c.sub}>
                     <div className="text-xl font-bold tabular-nums">{c.value}</div>
-                    <div className="mt-1 eg-label text-muted-foreground">{c.label}</div>
+                    <div className="mt-1 eg-label text-muted-foreground">{tl("kpi", c.label)}</div>
                   </div>
                 ))}
               </div>

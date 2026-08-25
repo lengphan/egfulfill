@@ -435,7 +435,7 @@ export function ProductsCatalog() {
  grid into bunting; the dot carries the colour and the word carries
  the meaning, so it reads on a black hoodie and a white mug alike. */}
                         <span className={"size-1.5 shrink-0 rounded-full bg-current " + tone} />
-                        <span className={tone}>{st.label}</span>
+                        <span className={tone}>{tl("products", st.label)}</span>
                       </span>
                     )
                   })()}

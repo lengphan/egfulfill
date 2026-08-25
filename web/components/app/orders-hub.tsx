@@ -3527,7 +3527,7 @@ export function OrdersHub() {
       <Dialog open={!!catchUp} onOpenChange={(v) => { if (!v && !catchingUp) setCatchUp(null) }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Catch up to {catchUp?.label}?</DialogTitle>
+            <DialogTitle>Catch up to {catchUp?.label ? tl("ui", catchUp.label) : ""}?</DialogTitle>
           </DialogHeader>
           {catchUp && (() => {
  const from = catchUp.order.factory_status ?? orderStage(catchUp.order.items ?? [])

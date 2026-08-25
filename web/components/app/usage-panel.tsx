@@ -35,7 +35,7 @@ function PlatformCard({ p, isAdmin, onSaved }: { p: UsagePlatform; isAdmin: bool
     <div className={"rounded-xl border p-3 " + (p.over ? "border-alert/30 bg-alert/50" : "border-border bg-card")}>
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{p.label}</div>
+          <div className="truncate text-sm font-semibold">{tl("usage", p.label)}</div>
           <div className="text-2xs text-muted-foreground">
             {p.calls.toLocaleString()} call{p.calls === 1 ? "" : "s"}
             {p.errors > 0 && <span className="text-alert"> · {p.errors} failed</span>}
@@ -108,7 +108,7 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
             {WINDOWS.map((w) => (
               <button key={w.d} onClick={() => setDays(w.d)}
  className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (days === w.d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
-                {w.label}
+                {tl("usage", w.label)}
               </button>
             ))}
           </div>
@@ -160,7 +160,7 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
                 {data.ledgered.map((c) => (
                   <div key={c.type} className="rounded-lg border border-border bg-muted/20 p-2.5 text-center">
                     <div className="text-sm font-semibold tabular-nums">{money(c.dollars)}</div>
-                    <div className="text-2xs text-muted-foreground">{c.label}{c.count ? ` · ${c.count}` : ""}</div>
+                    <div className="text-2xs text-muted-foreground">{tl("usage", c.label)}{c.count ? ` · ${c.count}` : ""}</div>
                   </div>
                 ))}
               </div>

@@ -779,7 +779,7 @@ function TeamPanel() {
                             ? "bg-primary text-primary-foreground hover:bg-primary/90"
  : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground")}
                       >
-                        {s.label}
+                        {tl("settings", s.label)}
                       </button>
                     )
                   })}
@@ -1571,7 +1571,7 @@ function PlatformPanel() {
           <select value={pinkProductType} onChange={(e) => setPinkProductType(e.target.value)}
  className="h-9 w-full max-w-sm min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
             <option value="">{tl("settings", "— No default (pick per card) —")}</option>
-            {pinkTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {pinkTypeOptions.map((o) => <option key={o.value} value={o.value}>{tl("settings", o.label)}</option>)}
             {/* Keep a saved value selectable even if Pink's list didn't load or dropped it. */}
             {pinkProductType && !pinkTypeOptions.some((o) => o.value === pinkProductType) && (
               <option value={pinkProductType}>{pinkProductType}</option>
@@ -2000,6 +2000,7 @@ function LimitCell({
  saving: boolean
  onSave: (val: number | null) => void
 }) {
+  const tl = useLabelT()
  const [editing, setEditing] = useState(false)
  const limit = user.order_limit
  const today = user.orders_today ?? 0
@@ -2036,10 +2037,10 @@ function LimitCell({
  return canEdit ? (
     <button onClick={() => setEditing(true)} disabled={saving} title={`${title} · click to change`}
  className={"text-sm tabular-nums underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground " + cls}>
-      {label}
+      {tl("settings", label)}
     </button>
   ) : (
-    <span title={title} className={"text-sm tabular-nums " + cls}>{label}</span>
+    <span title={title} className={"text-sm tabular-nums " + cls}>{tl("settings", label)}</span>
   )
 }
 
@@ -2059,9 +2060,10 @@ function LimitCell({
  * underneath; a real 0 prints 0.
  */
 function UserStat({ label, value }: { label: string; value?: number }) {
+  const tl = useLabelT()
  return (
     <div className="min-w-0">
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground">{tl("settings", label)}</div>
       <div className="text-lg font-medium tabular-nums">
         {value == null ? <span className="text-muted-foreground/50">—</span> : value.toLocaleString("en-US")}
       </div>
@@ -2351,7 +2353,7 @@ function UsersPanel() {
             className="eg-control h-9 text-xs"
           >
             {[["all", tl("settings", "All")], ["staff", tl("settings", "Staff")], ["seller", tl("settings", "Sellers")], ["operator", tl("settings", "Operator")], ["warehouse", tl("settings", "Warehouse")], ["designer", tl("settings", "Designer")], ["admin", tl("settings", "Admin")]].map(([id, label]) => (
-              <option key={id} value={id}>{label} ({roleCount(id)})</option>
+              <option key={id} value={id}>{tl("settings", label)} ({roleCount(id)})</option>
             ))}
           </select>
           {/* Sort: newest account first (default) vs busiest by recent volume — so after
@@ -2721,7 +2723,7 @@ function ActivityPanel() {
  : "border-input bg-card text-muted-foreground hover:text-foreground")
                 }
               >
-                {c.label}
+                {tl("settings", c.label)}
               </button>
             )
           })}
@@ -2741,7 +2743,7 @@ function ActivityPanel() {
  onChange={(e) => setRange(e.target.value)}
  className="h-8 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
-            {ACTIVITY_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+            {ACTIVITY_RANGES.map((r) => <option key={r.key} value={r.key}>{tl("settings", r.label)}</option>)}
           </select>
           {audit && (
             <span className="ml-auto text-xs tabular-nums text-muted-foreground">
@@ -2946,9 +2948,10 @@ function freqLabel(days: number): string {
  return days === 1 ? "every day" : days === 7 ? "every week" : `every ${days} days`
 }
 function BackupStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  const tl = useLabelT()
  return (
     <div className="rounded-lg border bg-card px-3 py-2.5">
-      <div className="eg-label text-muted-foreground">{label}</div>
+      <div className="eg-label text-muted-foreground">{tl("settings", label)}</div>
       <div className="mt-0.5 text-lg font-semibold leading-tight tabular-nums">{value}</div>
       {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div> : null}
     </div>

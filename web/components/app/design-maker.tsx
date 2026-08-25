@@ -1009,7 +1009,7 @@ export function DesignMaker() {
                 (tool === key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
             >
               <Icon size={19} weight={tool === key ? "fill" : "regular"} />
-              {label}
+              {tl("designMaker", label)}
             </button>
           ))}
         </nav>
@@ -1252,7 +1252,7 @@ export function DesignMaker() {
               <div className={"flex items-start gap-1.5 text-2xs " + QUALITY_TONE[quality.tone]} role="status">
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
                 <span>
-                  {quality.label}
+                  {tl("designMaker", quality.label)}
                   {worstDpi != null && <span className="tabular-nums"> · {Math.round(worstDpi)} DPI</span>}
                   {quality.tone === "bad" && <> {tl("designMaker", "— scale it down, or send a larger file.")}</>}
                   {quality.tone === "warn" && <> {tl("designMaker", "— fine for DTG and DTF; embroidery wants 300.")}</>}

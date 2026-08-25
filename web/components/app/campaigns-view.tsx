@@ -221,7 +221,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
             {(["meta", "google"] as const).map((c) => (
               <button key={c} onClick={() => setChannel(c)} disabled={c === "meta" ? !cfg?.meta?.enabled : !cfg?.google?.enabled}
  className={"flex-1 rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors disabled:opacity-40 " + (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {CHANNEL[c].label}
+                {tl("campaigns", CHANNEL[c].label)}
               </button>
             ))}
           </div>
@@ -235,7 +235,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
           </label>
 
           <div className="rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-xs text-hold">
-            Creates the campaign <b>paused</b>. Add targeting and creative in {CHANNEL[channel].label} Ads Manager, then resume it here or there — nothing spends until you do.
+            Creates the campaign <b>paused</b>. Add targeting and creative in {tl("campaigns", CHANNEL[channel].label)} Ads Manager, then resume it here or there — nothing spends until you do.
           </div>
 
           {err && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {err}</div>}

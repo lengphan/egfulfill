@@ -67,10 +67,11 @@ function Slider({ label, unit, value, min, max, step, onChange }: {
  label: string; unit: string; value: number
  min: number; max: number; step: number; onChange: (n: number) => void
 }) {
+  const tl = useLabelT()
  return (
     <label className="block">
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-medium">{label}</span>
+        <span className="text-xs font-medium">{tl("motionEditor", label)}</span>
         <span className="tabular-nums text-xs tabular-nums text-muted-foreground">
           {step < 0.01 ? value.toFixed(3) : step < 1 ? value.toFixed(2) : Math.round(value)}{unit}
         </span>
@@ -135,13 +136,13 @@ export function MotionEditor({ value, onChange }: {
  : "border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
             }
           >
-            {ABOUT[p].title}
+            {tl("motionEditor", ABOUT[p].title)}
           </button>
         ))}
       </div>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        <span className="font-medium text-foreground">{ABOUT[name].title}</span> — {ABOUT[name].use}{" "}
+        <span className="font-medium text-foreground">{tl("motionEditor", ABOUT[name].title)}</span> — {ABOUT[name].use}{" "}
         Which sections use it is set in the page code, not here; this is how it feels.
       </p>
 
@@ -176,7 +177,7 @@ export function MotionEditor({ value, onChange }: {
  if (found) set("ease", [...found.value])
               }}
             >
-              {CURVES.map((c) => <option key={c.label} value={curveKey(c.value)}>{c.label}</option>)}
+              {CURVES.map((c) => <option key={c.label} value={curveKey(c.value)}>{tl("motionEditor", c.label)}</option>)}
               {/* A stored curve that matches no entry stays selectable and stays saved rather
  than being silently snapped to the nearest preset on load. */}
               {!CURVES.some((c) => curveKey(c.value) === curveKey(preset.ease)) && (

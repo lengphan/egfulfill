@@ -168,7 +168,7 @@ function EmailBrandingCard() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Theme")}</label>
             <select value={b.preset} onChange={(e) => patch({ preset: e.target.value })}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
-              {EMAIL_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              {EMAIL_PRESETS.map((p) => <option key={p.id} value={p.id}>{tl("broadcasts", p.label)}</option>)}
             </select>
             <span className="mt-1 block text-xs text-muted-foreground">{preset.hint}</span>
           </div>
@@ -619,7 +619,7 @@ export function BroadcastsView() {
                         ) : null}
                       </td>
                       <td className="py-2.5 pr-3">
-                        <Badge className={st.cls}>{st.label}</Badge>
+                        <Badge className={st.cls}>{tl("broadcasts", st.label)}</Badge>
                       </td>
                       <td className="py-2.5 pr-3 text-right tabular-nums">
                         {/* A draft has no count and says so, rather than showing 0 — which

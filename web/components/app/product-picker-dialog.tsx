@@ -28,6 +28,14 @@ export type PickedProduct = {
   /** Print methods the blank supports, split into individual options — a line needs one
    *  to be produced or priced. */
   methods: string[]
+  /** THE CATALOG ROW THE PICK CAME FROM.
+   *
+   *  `img` above is the listing/hero shot, which is the wrong picture for a line that is
+   *  going to be MADE — and it does not follow the colourway. A caller that cares (the
+   *  manual order form) resolves imagery through `bestMockup(product, color)` instead,
+   *  and re-resolves it when the colour changes. Carried here rather than re-fetched
+   *  because the picker already had the row in hand. */
+  product?: CatalogProduct
 }
 
 /** Catalog product → order-line prefill. Shared by the picker dialog and the inline
@@ -44,6 +52,7 @@ export function toPickedProduct(p: CatalogProduct): PickedProduct {
     colors: Array.from(new Set([p.mainColor, ...Object.keys(p.colorImages ?? {})].filter((c): c is string => !!c))),
     sizes: sizesOf(p),
     methods: methodsOf(p),
+    product: p,
   }
 }
 

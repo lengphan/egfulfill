@@ -155,6 +155,7 @@ function methodOf(o: OrderRow): { label: string; icon: Icon } | null {
  * declared during render is remounted every frame and the lint rule that forbids it exists
  * because that has bitten this codebase before. */
 function DispStatus({ k, label }: { k: DispKey; label: string }) {
+  const tl = useLabelT()
   /**
    * THE WORD, IN THE STATUS COLOUR. No glyph beside it.
    *
@@ -168,7 +169,7 @@ function DispStatus({ k, label }: { k: DispKey; label: string }) {
    * decoration around it.
    */
  const m = DISP_MARK[k]
- return <span className={"block max-w-full truncate text-xs font-medium " + m.cls}>{label}</span>
+ return <span className={"block max-w-full truncate text-xs font-medium " + m.cls}>{tl("dispatch", label)}</span>
 }
 
 // Shared column template for the history table — the header and every row use it so the
@@ -1055,7 +1056,7 @@ export function DispatchBoard() {
  onClick={() => setHistFilter(f.key)}
  className={"rounded-md px-2 py-1 text-xs font-medium transition-colors " + (histFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
-                  {f.label}
+                  {tl("dispatch", f.label)}
                 </button>
               ))}
             </div>
@@ -1073,7 +1074,7 @@ export function DispatchBoard() {
  className={"rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
                     (qFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
-                  {f.label}{filterCounts[f.key] ? ` · ${filterCounts[f.key]}` : ""}
+                  {tl("dispatch", f.label)}{filterCounts[f.key] ? ` · ${filterCounts[f.key]}` : ""}
                 </button>
               ))}
             </div>
@@ -1221,7 +1222,7 @@ export function DispatchBoard() {
  return (
                           <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                             <I size={12} className="shrink-0 opacity-70" />
-                            <span className="truncate">{m.label}</span>
+                            <span className="truncate">{tl("dispatch", m.label)}</span>
                           </span>
                         )
                       })()}

@@ -111,7 +111,7 @@ export function DigitizerStudio() {
               className={"eg-tap relative inline-flex items-center gap-1.5 pb-2 text-sm transition-colors " + (tab === t.id
                 ? "font-medium text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-foreground"
                 : "text-muted-foreground hover:text-foreground")}>
-              <Icon size={15} /> <TabLabel>{t.label}</TabLabel>
+              <Icon size={15} /> <TabLabel>{tl("digitizer", t.label)}</TabLabel>
             </button>
           )
         })}
@@ -360,7 +360,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
  className={"eg-tap rounded-md border px-2 py-1 text-2xs font-medium transition-colors " +
                         (on ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
                     >
-                      {pl.label}
+                      {tl("digitizer", pl.label)}
                     </button>
                   )
                 })}
@@ -1094,7 +1094,7 @@ function CreateTab() {
                     onClick={() => { setWDraft(null); resizeTo(Math.min(pl.w, pl.h * (footprint.w / footprint.h))) }}
                     className="eg-tap rounded-md border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
-                    {pl.label}
+                    {tl("digitizer", pl.label)}
                   </button>
                 ))}
               </div>

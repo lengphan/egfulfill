@@ -207,7 +207,7 @@ export function RateCalculatorView() {
  dropdown showing a city name while the ZIP beside it is somewhere else
  is the one thing this control must never do. */}
               <option value="custom">{/^\d{5}$/.test(toZip) ? `Typed · ${toZip}` : tl("rates", "Select")}</option>
-              {DEST_PRESETS.map((d) => <option key={d.zip} value={d.zip}>{d.label}</option>)}
+              {DEST_PRESETS.map((d) => <option key={d.zip} value={d.zip}>{tl("rates", d.label)}</option>)}
             </select>
           </label>
 
@@ -232,7 +232,7 @@ export function RateCalculatorView() {
  className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
               >
                 <option value="">{tl("rates", "Typed")}</option>
-                {WEIGHT_PRESETS.map((w) => <option key={w.oz} value={w.oz}>{w.label}</option>)}
+                {WEIGHT_PRESETS.map((w) => <option key={w.oz} value={w.oz}>{tl("rates", w.label)}</option>)}
               </select>
             </label>
           </div>
@@ -254,7 +254,7 @@ export function RateCalculatorView() {
               }}
  className="eg-select h-9 rounded-lg border border-border bg-card px-2.5 text-sm"
             >
-              {allSizes.map((z) => <option key={sizeKey(z)} value={sizeKey(z)}>{z.label}</option>)}
+              {allSizes.map((z) => <option key={sizeKey(z)} value={sizeKey(z)}>{tl("rates", z.label)}</option>)}
               <option value="custom">{tl("rates", "Custom size…")}</option>
             </select>
           </label>

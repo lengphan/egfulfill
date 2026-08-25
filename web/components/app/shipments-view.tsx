@@ -327,7 +327,7 @@ export function ShipmentsView() {
  : "border-border bg-card text-muted-foreground hover:text-foreground")
                 }
               >
-                {f.label}
+                {tl("shipments", f.label)}
                 <span className={"ml-1.5 tabular-nums " + (on ? "opacity-80" : "opacity-60")}>{n}</span>
               </button>
             )
@@ -483,7 +483,7 @@ export function ShipmentsView() {
                           </Badge>
                         </>
                       ) : d ? (
-                        <span className={"text-xs font-medium " + d.cls}>{d.label}</span>
+                        <span className={"text-xs font-medium " + d.cls}>{tl("shipments", d.label)}</span>
                       ) : (
                         // Never blank, and it names WHO hasn't acted. "Not checked" was read
                         // as a claim about the parcel — something wrong with it — when it is

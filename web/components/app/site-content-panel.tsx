@@ -23,9 +23,10 @@ const AREA_CLS =
 function Field({ label, hint, value, onChange, mono }: {
  label: string; hint?: string; value: string; onChange: (v: string) => void; mono?: boolean
 }) {
+  const tl = useLabelT()
  return (
     <label className="block">
-      {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
+      {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("siteContent", label)}</span>}
       <Input value={value} onChange={(e) => onChange(e.target.value)} className={mono ? "tabular-nums" : ""} />
     </label>
   )
@@ -34,9 +35,10 @@ function Field({ label, hint, value, onChange, mono }: {
 function Area({ label, hint, value, onChange }: {
  label: string; hint?: string; value: string; onChange: (v: string) => void
 }) {
+  const tl = useLabelT()
  return (
     <label className="block">
-      {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>}
+      {label && <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("siteContent", label)}</span>}
       <textarea className={AREA_CLS} value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
   )
@@ -353,7 +355,7 @@ export function SiteContentPanel() {
           {EDITABLE_PAGES.map((pg) => (
             <a key={pg.href} href={`${pg.href}?edit=1`} target="_blank" rel="noreferrer"
                className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline">
-              Edit {pg.label} <ArrowSquareOut size={13} />
+              Edit {tl("siteContent", pg.label)} <ArrowSquareOut size={13} />
             </a>
           ))}
         </div>
@@ -363,7 +365,7 @@ export function SiteContentPanel() {
 
       <Tabs value={sub} onValueChange={setSub}>
         <TabsList className="flex flex-wrap">
-          {SUBTABS.map((t) => <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>)}
+          {SUBTABS.map((t) => <TabsTrigger key={t.id} value={t.id}>{tl("siteContent", t.label)}</TabsTrigger>)}
         </TabsList>
 
         {/* ── Hero ── */}

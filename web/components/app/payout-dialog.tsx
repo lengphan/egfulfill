@@ -131,7 +131,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
               <label className="flex flex-col gap-1">
                 <span className="text-2xs text-muted-foreground">{tl("payout", "Method")}</span>
                 <select value={type} onChange={(e) => changeMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                  {METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}{saved[m.id] ? tl("payout", " · saved") : ""}</option>)}
+                  {METHODS.map((m) => <option key={m.id} value={m.id}>{tl("payout", m.label)}{saved[m.id] ? tl("payout", " · saved") : ""}</option>)}
                 </select>
               </label>
               <Input placeholder={tl("payout", "Account holder name")} value={info.account_name || ""} onChange={(e) => set("account_name", e.target.value)} className="h-9" />

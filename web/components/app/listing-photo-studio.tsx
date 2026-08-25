@@ -920,7 +920,7 @@ export function ListingPhotoStudio({
                     {PRESETS.map((p) => (
                       <Button key={p.key} size="sm" variant={preset === p.key ? "secondary" : "ghost"}
                         className="h-7 shrink-0 text-xs font-normal" onClick={() => applyPreset(p.key)} title={p.text}>
-                        {p.label}
+                        {tl("photoStudio", p.label)}
                       </Button>
                     ))}
                   </div>

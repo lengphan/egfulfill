@@ -1262,7 +1262,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               )}
             </DialogTitle>
             <span className={"mt-0.5 inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium " + lanePill(laneMeta(col, lanes).accent)}>
-              {laneMeta(col, lanes).label}
+              {tl("designer", laneMeta(col, lanes).label)}
             </span>
           </div>
         </DialogHeader>

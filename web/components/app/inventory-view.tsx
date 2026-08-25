@@ -406,7 +406,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
  className="eg-select eg-control pr-8"
           >
             <option value="">{tl("inventory", "All visibility")}</option>
-            {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            {VIS.map((v) => <option key={v.id} value={v.id}>{tl("inventory", v.label)}</option>)}
           </select>
           {/* FILTERS LEFT, ACTIONS RIGHT. They were one undifferentiated run, so "Add item"
  sat in the middle of the things that narrow the list — and the eye has no way
@@ -672,7 +672,7 @@ function ProductSheet({
                 {/* A product whose variants disagree shows that rather than the first one's
  setting — picking any option then makes them agree, which is the fix. */}
                 {!visSame && <option value="">{tl("inventory", "Mixed — pick one to settle it")}</option>}
-                {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+                {VIS.map((v) => <option key={v.id} value={v.id}>{tl("inventory", v.label)}</option>)}
               </select>
             </label>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2">
@@ -1159,7 +1159,7 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
         </DialogHeader>
         <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
           <span className="truncate text-xs font-medium">
-            <span className={many ? "" : "tabular-nums"}>{target?.label}</span>
+            <span className={many ? "" : "tabular-nums"}>{target?.label ? tl("inventory", target.label) : ""}</span>
             {many && <span className="text-muted-foreground"> · {target?.skus.length} variants</span>}
           </span>
           {data && (
@@ -1509,7 +1509,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
  onChange={(e) => setVisibility(e.target.value as SkuVisibility)}
  className="eg-select eg-control pr-8"
             >
-              {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+              {VIS.map((v) => <option key={v.id} value={v.id}>{tl("inventory", v.label)}</option>)}
             </select>
             <span className="text-2xs text-muted-foreground">
               {visibility === "factory" ? tl("inventory", "Internal only — nothing outside the factory sees this SKU.")

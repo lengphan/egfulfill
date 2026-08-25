@@ -430,7 +430,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
             <span className={"min-w-0 text-xs font-medium " + TONE[p.tone]} title={p.title}>
               <span className="flex items-center gap-1.5">
                 <PI size={13} weight="bold" className="shrink-0" />
-                <span className="truncate">{p.label}</span>
+                <span className="truncate">{tl("externalLabels", p.label)}</span>
               </span>
               {/* Their own word for the state, kept verbatim beside ours — it is what
  their dashboard shows, so the two can be matched up. */}

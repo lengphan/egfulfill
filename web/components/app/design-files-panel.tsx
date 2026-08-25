@@ -459,7 +459,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  const k = KIND_META[f.kind || "other"] ?? KIND_META.other
  return (
               <div key={f.designId} className="relative flex items-center gap-2 p-2">
-                <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-bold " + k.cls}>{k.icon} {k.label}</span>
+                <span className={"flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-bold " + k.cls}>{k.icon} {tl("designFiles", k.label)}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-xs font-medium">{f.name}</span>
