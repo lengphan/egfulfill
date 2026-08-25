@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT, useT } from "@/lib/i18n"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone, Moon, User, Smiley, Paperclip, X, FileText, ImageSquare, FilmSlate } from "@phosphor-icons/react"
 import { DictateButton } from "@/components/app/dictate-button"
@@ -58,6 +59,8 @@ const convoIcon = (kind: Convo["kind"] | undefined, size = 16) => {
 }
 
 export default function ChatPage() {
+  const tl = useLabelT()
+  const t = useT()
  const [supportId, setSupportId] = useState<string | null>(null)
  const [signedOut, setSignedOut] = useState(false)
  const [inbox, setInbox] = useState<SupportThread[]>([]) // staff: seller support threads
@@ -225,7 +228,7 @@ export default function ChatPage() {
     // line beside a title reads as a row that failed to load rather than one nobody has used.
  const pin = (c: Convo): Convo => {
  const m = chanMeta[c.id]
- return { ...c, sub: m?.last || "No messages yet", count: m?.unread || 0 }
+ return { ...c, sub: m?.last || tl("chat", "No messages yet"), count: m?.unread || 0 }
     }
     /*
      * A PINNED ROW READS LIKE EVERY OTHER ROW.
@@ -237,8 +240,8 @@ export default function ChatPage() {
      * happened. `pin()` gives them the same two facts a seller row carries: what was said
      * last, and how much of it you haven't seen (see chanMeta).
      */
- if (isStaffUser) list.push(pin({ id: STAFF_CHANNEL, kind: "staff", title: "EG Channel", sub: "" }))
- if (supportId) list.push(pin({ id: supportId, kind: "support", title: isStaffUser ? "My Assistant" : "EGFUL Support", sub: "" }))
+ if (isStaffUser) list.push(pin({ id: STAFF_CHANNEL, kind: "staff", title: tl("chat", "EG Channel"), sub: "" }))
+ if (supportId) list.push(pin({ id: supportId, kind: "support", title: isStaffUser ? tl("chat", "My Assistant") : tl("chat", "EGFUL Support"), sub: "" }))
     /*
      * GENERATIONS — the account's own channel, so AI images stop arriving in the middle of a
      * support conversation staff are reading. Listed only when the server says this account
@@ -246,7 +249,7 @@ export default function ChatPage() {
      */
 
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
- if (!isDesigner) list.push(pin({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: "" }))
+ if (!isDesigner) list.push(pin({ id: ANNOUNCE_CHANNEL, kind: "announce", title: tl("chat", "Announcements"), sub: "" }))
     /**
      * NEWEST MESSAGE FIRST, under the pinned channels.
      *
@@ -264,14 +267,14 @@ export default function ChatPage() {
  if (t.order_id === supportId) continue // don't list my own thread twice
  list.push({
  id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
- sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated, count: t.unanswered ?? 0,
+ sub: t.last ? t.last.slice(0, 40) : tl("chat", "Support request"), escalated: !!t.escalated, count: t.unanswered ?? 0,
       })
     }
     // Channels opened from the directory that have no messages yet, so they don't
     // vanish from the rail the moment you click one.
  for (const c of opened) if (!list.some((x) => x.id === c.id)) list.push(c)
  return list
-  }, [isStaffUser, isDesigner, supportId, inbox, opened, chanMeta])
+  }, [isStaffUser, isDesigner, supportId, inbox, opened, chanMeta, tl])
 
   // Filtered rail. Searching only narrows what's already there; sellers who have
   // never written in come from the directory below, not from this list.
@@ -780,17 +783,17 @@ export default function ChatPage() {
           page and was the first thing to lose by it. */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <span className="font-semibold">Conversations</span>
+          <span className="font-semibold">{tl("chat", "Conversations")}</span>
           {/* Support team (not designers, who don't handle seller support): live hours
  status, click to view/edit. Matches the inbox carve-out above. */}
           {isStaffUser && !isDesigner && (
-            <button onClick={() => setHoursOpen(true)} title="Support hours"
+            <button onClick={() => setHoursOpen(true)} title={tl("chat", "Support hours")}
  className={"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent " +
                 (office ? (office.open ? "border-shipped/30 text-shipped" : "border-hold/30 text-hold") : "border-border text-muted-foreground")}>
               {/* NO DOT. The pill is already the colour the dot was — the border and the
  word both carry it — so a 6px disc of the same hue is the state said a
  third time, at the one size nobody can read it. */}
-              {office ? (office.open ? "Open" : "Closed") : "Hours"}
+              {office ? (office.open ? tl("chat", "Open") : tl("chat", "Closed")) : tl("chat", "Hours")}
             </button>
           )}
         </div>
@@ -799,15 +802,15 @@ export default function ChatPage() {
             <Input
  value={search}
  onChange={(e) => setSearch(e.target.value)}
- placeholder={isStaffUser && !isDesigner ? "Search or find a seller…" : "Search conversations…"}
+ placeholder={isStaffUser && !isDesigner ? tl("chat", "Search or find a seller…") : tl("chat", "Search conversations…")}
  className="h-9"
- aria-label="Search conversations"
+ aria-label={tl("chat", "Search conversations")}
             />
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {signedOut ? (
-            <div className="p-4 text-sm text-muted-foreground">Sign in to see your conversations.</div>
+            <div className="p-4 text-sm text-muted-foreground">{tl("chat", "Sign in to see your conversations.")}</div>
           ) : convos.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
           ) : (
@@ -862,7 +865,7 @@ export default function ChatPage() {
           {!signedOut && found.filter((s) => !shown.some((c) => c.id === s.channel)).length > 0 && (
             <>
               <div className="border-b border-border bg-muted/40 px-4 py-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Start a conversation
+                {tl("chat", "Start a conversation")}
               </div>
               {found.filter((s) => !shown.some((c) => c.id === s.channel)).map((s) => (
                 <button
@@ -885,7 +888,7 @@ export default function ChatPage() {
           {/* A search that finds nothing must not look like a broken rail. */}
           {!signedOut && search.trim() && shown.length === 0 && found.length === 0 && (
             <div className="p-4 text-sm text-muted-foreground">
-              No conversations{isStaffUser && !isDesigner ? " or sellers" : ""} match “{search.trim()}”.
+              {t(isStaffUser && !isDesigner ? "chat.noMatchStaff" : "chat.noMatch", { query: search.trim() })}
             </div>
           )}
         </div>
@@ -936,12 +939,12 @@ export default function ChatPage() {
  value={activeId ?? ""}
  onChange={(e) => setActiveId(e.target.value)}
  className="eg-select h-9 min-w-0 flex-1 rounded-lg border border-border bg-card px-2 text-sm font-semibold transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
- aria-label="Switch conversation"
+ aria-label={tl("chat", "Switch conversation")}
             >
               {convos.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
             </select>
           ) : (
-            <div className="min-w-0 flex-1 truncate font-semibold">{active?.title || "Chat"}</div>
+            <div className="min-w-0 flex-1 truncate font-semibold">{active?.title || tl("chat", "Chat")}</div>
           )}
         </div>
 
@@ -952,8 +955,9 @@ export default function ChatPage() {
           <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
             <Moon size={14} weight="fill" className="mt-0.5 shrink-0" />
             <span>
-              <strong>Our team is out of office.</strong>{office.resumesLabel ? ` We&apos;re back ${office.resumesLabel}.` : ""}{" "}
-              Leave a message — a teammate will reply here, and email you, when we return. The assistant can still look up your orders now.
+              <strong>{tl("chat", "Our team is out of office.")}</strong>
+              {office.resumesLabel ? " " + t("chat.backAt", { when: office.resumesLabel }) : ""}{" "}
+              {t("chat.leaveAMessage")}
             </span>
           </div>
         )}
@@ -965,7 +969,7 @@ export default function ChatPage() {
         <div className="relative min-h-0 flex-1">
           <div ref={scrollRef} className="h-full space-y-3 overflow-y-auto p-5">
           {signedOut ? (
-            <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Sign in to chat.</div>
+            <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">{tl("chat", "Sign in to chat.")}</div>
           ) : messages === null ? (
             <div className="flex h-full items-center justify-center text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
           ) : messages.length === 0 ? (
@@ -973,19 +977,21 @@ export default function ChatPage() {
               <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 {convoIcon(active?.kind, 21)}
               </span>
-              <div className="font-medium">{isSupport ? "How can we help?" : active?.kind === "staff" ? "EG Channel" : active?.kind === "announce" ? "Announcements" : `Chat with ${active?.title ?? "this seller"}`}</div>
+              <div className="font-medium">{isSupport ? tl("chat", "How can we help?") : active?.kind === "staff" ? tl("chat", "EG Channel") : active?.kind === "announce" ? tl("chat", "Announcements") : `Chat with ${active?.title ?? tl("chat", "this seller")}`}</div>
               <div className="max-w-xs text-sm text-muted-foreground">
-                {isSupport ? "Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed."
- : active?.kind === "staff" ? "Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in."
- : active?.kind === "announce" ? "Product news and service updates from EGFUL."
- : active?.kind === "gen" ? "Describe what you want and press Generate. Images you make appear here."
- : "Everything this seller has asked about, in one thread."}
+                {isSupport ? tl("chat", "Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed.")
+ : active?.kind === "staff" ? tl("chat", "Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in.")
+ : active?.kind === "announce" ? tl("chat", "Product news and service updates from EGFUL.")
+ : active?.kind === "gen" ? tl("chat", "Describe what you want and press Generate. Images you make appear here.")
+ : tl("chat", "Everything this seller has asked about, in one thread.")}
               </div>
               {isSupport && (
                 <div className="mt-1 flex max-w-md flex-wrap justify-center gap-2">
                   {SUGGESTIONS.map((s) => (
-                    <button key={s} onClick={() => submit(s)} disabled={!activeId || sending} className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50">
-                      {s}
+                    /* Sent in the language it is READ in: the chip is the seller's own
+                       words, and the assistant already mirrors the language it is asked in. */
+                    <button key={s} onClick={() => submit(tl("chat", s))} disabled={!activeId || sending} className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                      {tl("chat", s)}
                     </button>
                   ))}
                 </div>
@@ -1015,8 +1021,8 @@ export default function ChatPage() {
                   <div key={String(m.id)} className="rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] p-3">
                     <div className="mb-1.5 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-primary">
                       <Sparkle size={12} weight="fill" />
-                      {m.by || "Order brief"}
-                      <span className="ml-auto font-normal normal-case tracking-normal text-muted-foreground">Staff only — not shown to the seller</span>
+                      {m.by || tl("chat", "Order brief")}
+                      <span className="ml-auto font-normal normal-case tracking-normal text-muted-foreground">{tl("chat", "Staff only — not shown to the seller")}</span>
                     </div>
                     <div className="text-sm [&_ul]:my-0 [&_ul]:pl-4"><Markdown>{m.text ?? ""}</Markdown></div>
                   </div>
@@ -1027,7 +1033,7 @@ export default function ChatPage() {
                       <div className="my-1.5 flex items-center gap-2 px-1 text-2xs font-medium text-muted-foreground">
                         <span className="h-px flex-1 bg-border" />
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
-                          <Headset size={12} weight="fill" /> {joined} joined the conversation
+                          <Headset size={12} weight="fill" /> {t("chat.joinedConversation", { name: joined })}
                         </span>
                         <span className="h-px flex-1 bg-border" />
                       </div>
@@ -1074,7 +1080,7 @@ export default function ChatPage() {
                                 />
                                 <a href={att.url} target="_blank" rel="noreferrer"
  className="mt-1 inline-block text-2xs text-muted-foreground underline-offset-2 hover:underline">
-                                  Open full size
+                                  {tl("chat", "Open full size")}
                                 </a>
                               </div>
                             )
@@ -1113,7 +1119,7 @@ export default function ChatPage() {
                       </div>
                       <span className="mt-0.5 flex items-center gap-1.5 px-1 text-2xs text-muted-foreground">
                         <span>
-                          {!mine ? `${m.by || (isAi ? "EGFUL Assistant" : isSupport ? "Support" : "Factory")} · ` : ""}
+                          {!mine ? `${m.by || (isAi ? tl("chat", "EGFUL Assistant") : isSupport ? tl("chat", "Support") : tl("chat", "Factory"))} · ` : ""}
                           {fmtTime(m.ts)}
                         </span>
                       </span>
@@ -1130,7 +1136,7 @@ export default function ChatPage() {
                       <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {videoWorking ? "Making your clip — this takes 1–3 minutes…" : "Making your image…"}
+                      {videoWorking ? tl("chat", "Making your clip — this takes 1–3 minutes…") : tl("chat", "Making your image…")}
                     </span>
                   </div>
                 </div>
@@ -1189,14 +1195,14 @@ export default function ChatPage() {
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-background p-6">
             <div className="flex w-full max-w-sm flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/40 px-8 py-12 text-center">
               <Paperclip size={24} weight="duotone" className="text-primary" />
-              <span className="text-sm font-medium text-foreground">Drop to attach</span>
+              <span className="text-sm font-medium text-foreground">{tl("chat", "Drop to attach")}</span>
               {/* SAY WHAT IT WILL BE USED FOR. In the AI channel a dropped picture is not a
  file being sent, it is a reference frame, and which of the two it becomes
  depends on the mode that is armed. */}
               <span className="text-xs text-muted-foreground">
-                {gen?.mode === "image" ? "It goes in as a reference for the image"
- : gen?.mode === "video" ? "It becomes the still the clip animates"
- : "Image or PDF, up to 25MB"}
+                {gen?.mode === "image" ? tl("chat", "It goes in as a reference for the image")
+ : gen?.mode === "video" ? tl("chat", "It becomes the still the clip animates")
+ : tl("chat", "Image or PDF, up to 25MB")}
               </span>
             </div>
           </div>
@@ -1221,13 +1227,13 @@ export default function ChatPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={gen.imageUrl} alt="" className="size-16 rounded-lg border border-border object-cover" />
                   <button
- onClick={() => setGen(null)} aria-label="Don't animate this"
+ onClick={() => setGen(null)} aria-label={tl("chat", "Don't animate this")}
  className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
                   </button>
                 </div>
-                <span className="text-2xs text-muted-foreground">animating this still</span>
+                <span className="text-2xs text-muted-foreground">{tl("chat", "animating this still")}</span>
               </div>
             )}
             {/* CONTINUING FROM a picture: the same pill, for the same reason.
@@ -1243,14 +1249,14 @@ export default function ChatPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={carried.url} alt="" className="size-16 rounded-lg border border-border object-cover" />
                   <button
- onClick={() => setCont({ kind: "none" })} aria-label="Start from a blank page instead"
- title="Start from a blank page instead"
+ onClick={() => setCont({ kind: "none" })} aria-label={tl("chat", "Start from a blank page instead")}
+ title={tl("chat", "Start from a blank page instead")}
  className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
                   </button>
                 </div>
-                <span className="text-2xs text-muted-foreground">editing this</span>
+                <span className="text-2xs text-muted-foreground">{tl("chat", "editing this")}</span>
               </div>
             )}
             {pendingAtt && (
@@ -1266,7 +1272,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   <button
- onClick={() => setPendingAtt(null)} aria-label="Remove attachment"
+ onClick={() => setPendingAtt(null)} aria-label={tl("chat", "Remove attachment")}
  className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
@@ -1279,9 +1285,9 @@ export default function ChatPage() {
  say so rather than implying this attachment is the frame. */}
                 {gen && (
                   <span className="self-end pb-1 text-2xs text-muted-foreground">
-                    {gen.mode === "image" ? "used as a reference"
- : gen.imageName ? "not used — a still is already armed"
- : "the still to animate"}
+                    {gen.mode === "image" ? tl("chat", "used as a reference")
+ : gen.imageName ? tl("chat", "not used — a still is already armed")
+ : tl("chat", "the still to animate")}
                   </span>
                 )}
               </div>
@@ -1292,7 +1298,7 @@ export default function ChatPage() {
  number/name, and pick one — a person gets notified, an order gets tagged. */}
               {mention && mentionMatches.length > 0 && (
                 <div className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg">
-                  <div className="border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">Mention a teammate or tag an order</div>
+                  <div className="border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">{tl("chat", "Mention a teammate or tag an order")}</div>
                   {mentionMatches.map((it, i) => (
                     <button
  key={it.kind === "person" ? `p-${it.p.id}` : `o-${it.o.id}`}
@@ -1334,12 +1340,12 @@ export default function ChatPage() {
                   }
  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
                 }}
- placeholder={signedOut ? "Sign in to send a message"
- : readOnly ? "Only EGFUL can post announcements"
- : gen ? (gen.mode === "image" ? "Describe the image…"
- : gen.imageName ? "Describe the motion for this still…"
- : "Describe the video to make…")
- : "Type a message…  @ to tag an order"}
+ placeholder={signedOut ? tl("chat", "Sign in to send a message")
+ : readOnly ? tl("chat", "Only EGFUL can post announcements")
+ : gen ? (gen.mode === "image" ? tl("chat", "Describe the image…")
+ : gen.imageName ? tl("chat", "Describe the motion for this still…")
+ : tl("chat", "Describe the video to make…"))
+ : tl("chat", "Type a message…  @ to tag an order")}
  disabled={signedOut || !activeId || readOnly}
                 // Borderless: the CONTAINER is the control now, so a second border inside it
                 // would draw a box within a box.
@@ -1366,7 +1372,7 @@ export default function ChatPage() {
               )}
               <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
               <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={() => attachRef.current?.click()}
- disabled={signedOut || !activeId || readOnly || attaching} aria-label="Attach a file">
+ disabled={signedOut || !activeId || readOnly || attaching} aria-label={tl("chat", "Attach a file")}>
                 {attaching ? <CircleNotch size={16} className="animate-spin" /> : <Paperclip size={17} />}
               </Button>
               {/* SPEAK IT. Beside the paperclip and the emoji, because those are the other two
@@ -1381,7 +1387,7 @@ export default function ChatPage() {
               />
               <div className="relative shrink-0">
                 <Button variant="ghost" size="icon" className="size-9" onClick={() => setEmojiOpen((o) => !o)}
- disabled={signedOut || !activeId || readOnly} aria-label="Emoji">
+ disabled={signedOut || !activeId || readOnly} aria-label={tl("chat", "Emoji")}>
                   <Smiley size={17} />
                 </Button>
                 {emojiOpen && (
@@ -1400,7 +1406,7 @@ export default function ChatPage() {
               {isInbox && (
                 <Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5 text-muted-foreground" onClick={draftWithAi} disabled={drafting}>
                   {drafting ? <CircleNotch size={14} className="animate-spin" /> : null}
-                  Draft with AI
+                  {tl("chat", "Draft with AI")}
                 </Button>
               )}
 
@@ -1417,7 +1423,7 @@ export default function ChatPage() {
                 {sending && gen ? <CircleNotch size={15} className="animate-spin" />
  : gen ? (gen.mode === "image" ? <ImageSquare size={15} weight="fill" /> : <FilmSlate size={15} weight="fill" />)
  : <PaperPlaneTilt size={15} weight="fill" />}
-                {gen && <span className="text-xs font-medium">Generate · ~${gen.usd.toFixed(gen.usd < 1 ? 3 : 2)}</span>}
+                {gen && <span className="text-xs font-medium">{t("chat.generateCost", { usd: gen.usd.toFixed(gen.usd < 1 ? 3 : 2) })}</span>}
               </Button>
             </div>
           </div>

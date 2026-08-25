@@ -128,6 +128,18 @@ const en: Dict = {
   "help.related": "Related",
   "help.allTopics": "All help topics",
   "help.email": "Email",
+
+  // ── Chat: the interpolated lines ──────────────────────────────────────────
+  // These carry a VALUE, so they are keyed (useT) rather than value-keyed: a sentence
+  // split around {query} forces Vietnamese into English word order, and the halves are
+  // not separately translatable. English MUST be listed — useT falls back en → key, so a
+  // missing English entry renders "chat.noMatch" to the user.
+  "chat.noMatch": "No conversations match \u201c{query}\u201d.",
+  "chat.noMatchStaff": "No conversations or sellers match \u201c{query}\u201d.",
+  "chat.backAt": "We\u2019re back {when}.",
+  "chat.leaveAMessage": "Leave a message \u2014 a teammate will reply here, and email you, when we return. The assistant can still look up your orders now.",
+  "chat.joinedConversation": "{name} joined the conversation",
+  "chat.generateCost": "Generate \u00b7 ~${usd}",
 }
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
@@ -828,6 +840,95 @@ const vi: Dict = {
   "helpAction.Manage API keys": "Quản lý khoá API",
 
   "nav.SpyDeck": "SpyDeck",
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  // Keyed by the English string (useLabelT), so English needs no side here.
+  // Product names are left alone: EGFUL, EG Channel, PDF, AI.
+  "chat.Conversations": "Cuộc trò chuyện",
+  "chat.Search conversations": "Tìm cuộc trò chuyện",
+  "chat.Sign in to see your conversations.": "Đăng nhập để xem các cuộc trò chuyện của bạn.",
+  "chat.Sign in to chat.": "Đăng nhập để trò chuyện.",
+  "chat.Start a conversation": "Bắt đầu cuộc trò chuyện",
+  "chat.Switch conversation": "Chuyển cuộc trò chuyện",
+  "chat.Chat": "Trò chuyện",
+  "chat.Support": "Hỗ trợ",
+  "chat.Support hours": "Giờ hỗ trợ",
+  "chat.Hours": "Giờ làm việc",
+  "chat.Open": "Đang mở",
+  "chat.Closed": "Đã đóng",
+  "chat.Our team is out of office.": "Đội ngũ của chúng tôi đang ngoài giờ làm việc.",
+  "chat.How can we help?": "Chúng tôi có thể giúp gì?",
+  "chat.Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed.":
+    "Hỏi về đơn hàng, thanh toán, tích hợp — gõ @ để gắn một đơn hàng vào. Trợ lý trả lời dựa trên tài khoản của bạn, và một nhân viên sẽ theo dõi khi cần.",
+  "chat.Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in.":
+    "Kênh nội bộ — sản xuất, thiết kế và đơn hàng trong cùng một phòng. Gõ @ để gắn một đơn hàng vào.",
+  "chat.Announcements": "Thông báo",
+  "chat.Product news and service updates from EGFUL.": "Tin sản phẩm và cập nhật dịch vụ từ EGFUL.",
+  "chat.Describe what you want and press Generate. Images you make appear here.":
+    "Mô tả điều bạn muốn rồi nhấn Tạo ảnh. Ảnh bạn tạo sẽ hiện ở đây.",
+  "chat.Everything this seller has asked about, in one thread.": "Mọi câu hỏi của người bán này, trong một luồng.",
+  "chat.EG Channel": "Kênh EG",
+  "chat.EGFUL Assistant": "Trợ lý EGFUL",
+  "chat.Factory": "Xưởng sản xuất",
+  "chat.this seller": "người bán này",
+  "chat.Order brief": "Tóm tắt đơn hàng",
+  "chat.Staff only — not shown to the seller": "Chỉ nhân viên — không hiển thị cho người bán",
+  "chat.Open full size": "Xem kích thước đầy đủ",
+  "chat.Making your image…": "Đang tạo ảnh của bạn…",
+  "chat.Making your clip — this takes 1–3 minutes…": "Đang tạo video của bạn — mất khoảng 1–3 phút…",
+  "chat.Drop to attach": "Thả để đính kèm",
+  "chat.Image or PDF, up to 25MB": "Ảnh hoặc PDF, tối đa 25MB",
+  "chat.Attach a file": "Đính kèm tệp",
+  "chat.Remove attachment": "Bỏ tệp đính kèm",
+  "chat.Emoji": "Biểu tượng cảm xúc",
+  "chat.Mention a teammate or tag an order": "Nhắc một đồng nghiệp hoặc gắn một đơn hàng",
+  "chat.Don't animate this": "Không tạo chuyển động cho ảnh này",
+  "chat.Start from a blank page instead": "Bắt đầu từ trang trắng",
+  "chat.It goes in as a reference for the image": "Dùng làm ảnh tham chiếu",
+  "chat.It becomes the still the clip animates": "Dùng làm ảnh tĩnh để tạo chuyển động",
+  "chat.not used — a still is already armed": "không dùng — đã chọn một ảnh tĩnh",
+  "chat.used as a reference": "dùng làm tham chiếu",
+  "chat.the still to animate": "ảnh tĩnh để tạo chuyển động",
+  "chat.editing this": "đang sửa ảnh này",
+  "chat.animating this still": "đang tạo chuyển động cho ảnh này",
+  "chat.Draft with AI": "Soạn bằng AI",
+  "chat.No messages yet": "Chưa có tin nhắn",
+  "chat.EGFUL Support": "Hỗ trợ EGFUL",
+  "chat.My Assistant": "Trợ lý của tôi",
+  "chat.Support request": "Yêu cầu hỗ trợ",
+  "chat.Search or find a seller…": "Tìm hoặc tra cứu người bán…",
+  "chat.Search conversations…": "Tìm cuộc trò chuyện…",
+  "chat.Sign in to send a message": "Đăng nhập để gửi tin nhắn",
+  "chat.Only EGFUL can post announcements": "Chỉ EGFUL mới đăng được thông báo",
+  "chat.Describe the image…": "Mô tả ảnh bạn muốn…",
+  "chat.Describe the motion for this still…": "Mô tả chuyển động cho ảnh này…",
+  "chat.Describe the video to make…": "Mô tả video bạn muốn tạo…",
+  "chat.Type a message…  @ to tag an order": "Nhập tin nhắn…  gõ @ để gắn đơn hàng",
+  // The four starter chips. Sent in the language they are read in, so these are what the
+  // assistant actually receives from a Vietnamese seller.
+  "chat.Where's my latest order?": "Đơn hàng mới nhất của tôi đang ở đâu?",
+  "chat.What's my wallet balance?": "Số dư ví của tôi là bao nhiêu?",
+  "chat.How do I top up my wallet?": "Làm sao để nạp tiền vào ví?",
+  "chat.How do I connect my Etsy shop?": "Làm sao để kết nối cửa hàng Etsy?",
+  "chat. or sellers": " hoặc người bán",
+  "chat.noMatch": "Không có cuộc trò chuyện nào khớp với \u201c{query}\u201d.",
+  "chat.noMatchStaff": "Không có cuộc trò chuyện hoặc người bán nào khớp với \u201c{query}\u201d.",
+  "chat.backAt": "Chúng tôi làm việc lại {when}.",
+  "chat.leaveAMessage": "Hãy để lại lời nhắn — một nhân viên sẽ trả lời tại đây và gửi email cho bạn khi chúng tôi quay lại. Trợ lý vẫn có thể tra cứu đơn hàng của bạn ngay bây giờ.",
+  "chat.joinedConversation": "{name} đã tham gia cuộc trò chuyện",
+  "chat.generateCost": "Tạo ảnh · ~${usd}",
+
+  // Gaps the coverage gate found (tools/check-i18n.mjs) — call sites that were wrapped
+  // but never given a Vietnamese side, so they rendered English inside a Vietnamese row.
+  "filter.Custom range": "Khoảng tuỳ chọn",
+  "filter.From date": "Từ ngày",
+  "filter.To date": "Đến ngày",
+  "ui.Click to sort · drag to reorder": "Nhấn để sắp xếp · kéo để đổi thứ tự",
+  "ui.Copying…": "Đang sao chép…",
+  "ui.Reorder": "Đổi thứ tự",
+  "ui.of": "trên",
+  "ui.order": "đơn hàng",
+  "ui.orders": "đơn hàng",
+
 }
 
 export const messages: Record<Locale, Dict> = { en, vi }
