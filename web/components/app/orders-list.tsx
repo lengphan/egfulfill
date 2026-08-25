@@ -6,6 +6,7 @@ import { mayEditVariants } from "@/shared/order-rules"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { designSearchTerms } from "@/lib/design-id"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
+import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
 import { stockSkuOf } from "@/lib/stock-status"
 import { useRouter } from "next/navigation"
@@ -161,6 +162,9 @@ export function OrdersList() {
   // this board answered "no" for an operator that the staff hub and the SERVER both answered
   // "yes" for, on the same order.
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  /** A refused stage change says why. The board had no error surface at all, so an Approve
+   *  the server declined would have looked like a button that does nothing. */
+ const [actionErr, setActionErr] = useState("")
  const [isDemo, setIsDemo] = useState(false)
  const [query, setQuery] = useState("")
  const [filter, setFilter] = useState<SellerFilter>("All")
@@ -343,6 +347,10 @@ export function OrdersList() {
           </div>
         }
       >
+        {/* A refusal carries its reason — the one sentence this board is allowed. */}
+        {actionErr && (
+          <div className="border-b border-border bg-destructive/10 px-5 py-2 text-sm text-destructive">{actionErr}</div>
+        )}
         {/* toolbar */}
         <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-1.5">
@@ -538,6 +546,22 @@ export function OrdersList() {
  alarms rather than one thing to do. */}
                               <span className="ml-auto flex items-center gap-2">
                                 <SubmitOrderButton order={o} onDone={load} label={tl("ordersList", "Submit to production")} incomplete={orderNeedsSetup(o.items, catalog)} />
+                                {/* THE FACTORY'S OWN ORDERS HAD NO ACTION IN THIS LIST.
+                                    Submit is the seller's paid act and returns null on a
+                                    factory order — one synced from OUR marketplace
+                                    connections has no seller to charge — so a draft that
+                                    arrived from Etsy or TikTok on the factory's own shop
+                                    sat in the list with nothing to press, and the only way
+                                    to start it was to open it. Approve is that order's
+                                    equivalent step: it confirms the blank on every line and
+                                    moves the order (and its lines) to Approved, which is
+                                    where the warehouse picks work up. Same component the
+                                    order page uses, so the two cannot drift; it renders
+                                    nothing when the order isn't approvable or this role
+                                    can't set the stage. */}
+                                {role && role !== "seller" && (
+                                  <ApproveOrderButton order={o} catalog={catalog} onDone={load} onError={setActionErr} />
+                                )}
                                 <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${encodeURIComponent(o.id)}`) }}>
                                   {tl("ordersList", "Open order")} <CaretRight size={12} weight="bold" />
                                 </Button>

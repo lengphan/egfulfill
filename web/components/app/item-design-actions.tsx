@@ -2,13 +2,13 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
-import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock } from "@phosphor-icons/react"
+import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock, CircleNotch, Kanban } from "@phosphor-icons/react"
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import { getPinkStatus, type OrderDesignStatus } from "@/lib/api"
+import { assignDesignCard, createDesignCard, getPinkStatus, type OrderDesignStatus } from "@/lib/api"
 
 type CardState = OrderDesignStatus["bySku"][string]
 
@@ -26,26 +26,33 @@ const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
 const vendorLabel = (v?: string | null) => (v ? VENDOR_NAMES[v] ?? v : "")
 
 /**
- * The design-partner chip + action for ONE line item, for use on any factory board row.
+ * The design chip + actions for ONE line item, for use on any factory board row.
  *
- * Two states, and the distinction is the point:
+ * TWO DESTINATIONS, AND OUR OWN BOARD IS THE DEFAULT ONE.
  *
- *   • nothing sent  → no chip at all, and the action lives under a "…" menu. Most artwork
- * arrives print-ready and never goes out, so a permanent button on every row would be
- * noise on the majority of lines to serve the minority.
- *   • sent          → a chip naming WHO has it and where it is, always visible. Once a
- * line's artwork is on someone else's board that's load-bearing information: it says
- * why the line isn't moving and who to chase.
+ * This offered exactly one action — "Send to design partner" — which posted the line
+ * straight out to Pink Design. That is the rare route: the common one is an embroidered
+ * line that arrives as a PNG and has to be DIGITISED, and digitising is what our own
+ * designer board exists for. Sending it outside instead means paying a third party for
+ * work the digitising queue was about to pick up, and the line then reads "with Pink
+ * Design" on every board while nobody here is watching it.
  *
- * The chip tracks the same board column the partner's webhook writes, so when work comes
- * back it reads "In review" here and lands in the review lane on the board — one state,
- * shown in both places, never two that can disagree.
+ * So the menu now names both, in the order they are actually used: Send to Board (ours),
+ * then the partner, named for WHO it is rather than as a generic "partner" — the choice
+ * is between two places, and "partner" only tells you it is the one that isn't us.
+ *
+ * The chip follows the same split. It used to render only when a VENDOR held the line, so
+ * a card sitting in our own Incoming lane showed nothing at all here and the row looked
+ * untouched — which is how a line gets sent twice.
  */
 export function ItemDesignActions({
- orderId, sku, itemName, qty, printType, artworkUrl, lineImage, state, onChanged,
+ orderId, sku, lineId, itemName, qty, printType, artworkUrl, lineImage, state, onChanged,
 }: {
  orderId: string
  sku: string
+  /** The line, not the sku — two lines of the same sku are two jobs, and a card assigned
+   *  by sku alone lands on whichever of them the server sees first. */
+ lineId?: string | null
  itemName?: string | null
  qty?: number | null
  printType?: string | null
@@ -57,7 +64,12 @@ export function ItemDesignActions({
 }) {
   const tl = useLabelT()
  const [pushOpen, setPushOpen] = useState(false)
- const sent = !!state?.vendor
+ const [sending, setSending] = useState(false)
+ const [err, setErr] = useState<string | null>(null)
+  /** Held by an OUTSIDE vendor, versus sitting on our own board. Both are "a card exists
+   *  for this line"; only one of them is somebody else's queue. */
+ const withVendor = !!state?.vendor
+ const onBoard = !!state?.cardId && !withVendor
  const lane = state?.col ? LANE[state.col] : undefined
  const Icon = lane?.icon
 
@@ -83,32 +95,73 @@ export function ItemDesignActions({
  return () => { live = false; clearTimeout(t) }
   }, [])
 
-  /* Artwork is what Pink work ON. A line with no stored design and no picture of its own
- has nothing to send, and the dialog's own message for this asked the person to attach
+  /* Artwork is what a designer works ON. A line with no stored design and no picture of its
+ own has nothing to send, and the dialog's own message for this asked the person to attach
  the file they were already looking at. */
  const hasArtwork = !!(artworkUrl || lineImage)
-  /* An embroidered line goes to Pink to be DIGITISED, so having no machine file is the
- reason to send it, not a reason to refuse. A print line needs artwork and nothing else.
-     Either way the block below is about what is missing, never about the method. */
- const blocker =
- sent ? `Already with ${vendorLabel(state?.vendor)}`
+  /* An embroidered line is sent to be DIGITISED, so having no machine file is the reason to
+ send it, not a reason to refuse. A print line needs artwork and nothing else. Either way
+ the blocks below are about what is missing, never about the method. */
+ const boardBlocker =
+ onBoard ? `Already on the board${lane ? ` · ${lane.label}` : ""}`
+ : withVendor ? `Already with ${vendorLabel(state?.vendor)}`
  : !hasArtwork ? "No artwork on this line yet"
- : pinkOk === false ? "Design partner isn't set up"
- : pinkOk === null ? "Checking the design partner…"
  : null
+ const partnerBlocker =
+ withVendor ? `Already with ${vendorLabel(state?.vendor)}`
+ : onBoard ? "Already on the board"
+ : !hasArtwork ? "No artwork on this line yet"
+ : pinkOk === false ? "Pink Design isn't set up"
+ : pinkOk === null ? "Checking Pink Design…"
+ : null
+
+  /**
+   * OUR OWN BOARD, in the two calls the designer window already uses.
+   *
+   * Create then assign, never one call: a card that exists but is attached to nothing shows
+   * on the board with no order behind it, which is worse than no card. It lands in
+   * `incoming` because that is where a designer LOOKS for new work — a card filed straight
+   * into "in progress" starts in a lane nobody is watching, already claimed by no one.
+   */
+ const sendToBoard = async () => {
+ setSending(true); setErr(null)
+ try {
+ const card = await createDesignCard({
+ title: itemName || sku || "Design",
+ data: artworkUrl || lineImage || undefined,
+ sku: sku || undefined,
+ col: "incoming",
+      })
+ if (card.error) throw new Error(card.error)
+ if (card.id) {
+ const a = await assignDesignCard(String(card.id), { orderId, sku, lineId: lineId || undefined })
+ if ((a as { error?: string })?.error) throw new Error(String((a as { error?: string }).error))
+      }
+ onChanged?.()
+    } catch (e) {
+ setErr(e instanceof Error ? e.message : "Couldn't send this line to the board.")
+    } finally { setSending(false) }
+  }
 
  return (
     <>
       <div className="flex items-center gap-1.5">
-        {sent && (
+        {/* WHO HAS IT, once anyone does. Named differently for the two destinations because
+            they are chased differently: one is a lane on a board down the hall, the other is
+            an invoice and an email. */}
+        {(onBoard || withVendor) && (
           <span
  className={"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " + (lane?.tone ?? "bg-muted text-muted-foreground")}
- title={`${vendorLabel(state?.vendor)}${state?.vendorRef ? ` · task ${state.vendorRef}` : ""}`}
+ title={withVendor
+              ? `${vendorLabel(state?.vendor)}${state?.vendorRef ? ` · task ${state.vendorRef}` : ""}`
+ : tl("itemDesignActions", "On our design board")}
           >
             {Icon && <Icon size={11} weight="fill" />}
-            {vendorLabel(state?.vendor)}{lane ? ` · ${lane.label}` : ""}
+            {withVendor ? vendorLabel(state?.vendor) : tl("itemDesignActions", "Design board")}{lane ? ` · ${lane.label}` : ""}
           </span>
         )}
+        {/* A refusal carries its reason; nothing else here writes a sentence. */}
+        {err && <span className="text-xs text-alert">{err}</span>}
         {/* Tucked away, not on the row. The overwhelming majority of lines never need
  this, and a button that's usually wrong to press is worse than one click. */}
         <DropdownMenu>
@@ -116,17 +169,23 @@ export function ItemDesignActions({
  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
  aria-label={tl("itemDesignActions", "Design actions")}
           >
-            <DotsThree size={16} weight="bold" />
+            {sending ? <CircleNotch size={16} className="animate-spin" /> : <DotsThree size={16} weight="bold" />}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuGroup>
               <DropdownMenuLabel>{tl("itemDesignActions", "Design")}</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={!!blocker}>
+              {/* OURS FIRST. An embroidered line that arrived as an image is digitising
+ work, and digitising is this board's whole job. */}
+              <DropdownMenuItem onClick={() => void sendToBoard()} disabled={!!boardBlocker || sending}>
+                <Kanban size={14} />
+                {/* The blocker IS the label. A greyed item says it cannot be pressed and
+ not one word about why, which on a row that looks identical to the one
+ above it is the most annoying kind of disabled. */}
+                {boardBlocker ?? tl("itemDesignActions", "Send to Board")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={!!partnerBlocker || sending}>
                 <PaperPlaneTilt size={14} />
-                {/* The blocker IS the label. A greyed "Send to design partner" says it
- cannot be pressed and not one word about why, which on a row that looks
- identical to the one above it is the most annoying kind of disabled. */}
-                {blocker ?? tl("itemDesignActions", "Send to design partner")}
+                {partnerBlocker ?? tl("itemDesignActions", "Send to Pink Design")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

@@ -10,10 +10,10 @@ import { Plus, CheckCircle, WarningCircle, CircleNotch, Package, X, CaretLeft } 
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
+import { bestMockup } from "@/lib/variant-resolve"
 import { parseBlock } from "@/lib/address-paste"
 import { ProductCombobox } from "@/components/app/product-combobox"
-import { createOrder, getOrders, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
+import { createOrder, getOrders, validateAddress, type CatalogProduct, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 
 // Best-effort parse of a pasted US address block → structured fields.
@@ -40,7 +40,12 @@ type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: Valid
 // (name/sku/id), so persisting it is what makes the picked product survive to the order
 // detail even when the listing sku isn't a catalog VARIANT sku. Without it, only products
 // whose sku happens to be a variant sku resolved — the rest lost their blank on save.
-type Line = { name: string; sku: string; blank: string; img: string; qty: string; price: string; color: string; size: string; method: string; colors: string[]; sizes: string[]; methods: string[] }
+// `product` is the catalog row the blank was picked from. It is what makes the picture
+// AUTOMATIC: the line's image is resolved from the blank (bestMockup — the mockup for the
+// chosen colourway, then the category outline), never uploaded and never waited for. A
+// manual order used to open with an empty dashed tile that only a file drop could fill,
+// so an order raised without one reached the floor with no picture at all.
+type Line = { name: string; sku: string; blank: string; img: string; qty: string; price: string; color: string; size: string; method: string; colors: string[]; sizes: string[]; methods: string[]; product?: CatalogProduct }
 const emptyLine = (): Line => ({ name: "", sku: "", blank: "", img: "", qty: "1", price: "", color: "", size: "", method: "", colors: [], sizes: [], methods: [] })
 
 // Variant controls reuse the app's VariantField — the same swatched dropdown the order
@@ -115,47 +120,16 @@ export default function NewOrderPage() {
 
  const setLine = (i: number, patch: Partial<Line>) =>
  setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
+  // The blank's own picture for a colourway, falling back to the catalogue's listing shot.
+  // Colour is passed in rather than read off the line because it changes in the same patch.
+ const blankImage = (product: CatalogProduct | undefined, color: string, fallback: string) =>
+ bestMockup(product ?? null, color, fallback)
  const addLine = () => setLines((prev) => [...prev, emptyLine()])
  const removeLine = (i: number) => setLines((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev))
 
-  // Catalog picker — pickerTarget is the line index to fill, or null to append a new line.
- const [pickerOpen, setPickerOpen] = useState(false)
- const [pickerTarget, setPickerTarget] = useState<number | null>(null)
- const openPicker = (target: number | null) => {
- setPickerTarget(target)
- setPickerOpen(true)
-  }
- const applyPick = (p: PickedProduct) => {
- const patch: Partial<Line> = {
- name: p.name,
- sku: p.sku,
- blank: p.name,
- img: p.img,
-      // No price prefill — see the note on the inline combobox's onPick. This column is
-      // the buyer's money; the blank's base cost is ours to quote.
- color: p.color,
- size: p.sizes[0] ?? "",
- colors: p.colors,
- sizes: p.sizes,
- methods: p.methods ?? [],
- method: (p.methods ?? []).length === 1 ? p.methods[0] : "",
-    }
- if (pickerTarget == null) setLines((prev) => [...prev, { ...emptyLine(), ...patch }])
- else setLine(pickerTarget, patch)
-  }
-
-  // Drop / choose an image for a line (optional — can be added later on the order detail).
- const setLineImage = (i: number, file?: File | null) => {
- if (!file || !file.type.startsWith("image/")) return
- if (file.size > 8 * 1024 * 1024) {
- setError("Image is over 8MB — please compress it.")
- return
-    }
- const reader = new FileReader()
- reader.onload = () => setLine(i, { img: String(reader.result || "") })
- reader.readAsDataURL(file)
-  }
- const [dragLine, setDragLine] = useState<number | null>(null)
+  // ONE WAY IN: the Product field's own dropdown. The full-page "Add from catalog" dialog
+  // was a second route to the same pick — a modal covering the form you are filling in,
+  // to choose the thing the field beside it already chooses inline.
 
  const canSave = parsed.name.trim() && lines.some((l) => l.name.trim())
 
@@ -278,14 +252,9 @@ export default function NewOrderPage() {
       <SectionCard
  title={tl("newOrder", "Items")}
  actions={
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => openPicker(null)}>
-              {tl("newOrder", "Add from catalog")}
-            </Button>
-            <Button size="sm" variant="outline" onClick={addLine}>
-              <Plus size={14} weight="bold" /> {tl("newOrder", "Blank item")}
-            </Button>
-          </div>
+          <Button size="sm" variant="outline" onClick={addLine}>
+            <Plus size={14} weight="bold" /> {tl("newOrder", "Add item")}
+          </Button>
         }
       >
         <div className="divide-y divide-border">
@@ -306,62 +275,54 @@ export default function NewOrderPage() {
               >
                 <X size={13} weight="bold" />
               </button>
-              {/* Image slot — drag-drop / click to upload, or pick from catalog. Optional. */}
-              <label
- onDragOver={(e) => { e.preventDefault(); setDragLine(i) }}
- onDragLeave={() => setDragLine((d) => (d === i ? null : d))}
- onDrop={(e) => { e.preventDefault(); setDragLine(null); setLineImage(i, e.dataTransfer.files?.[0]) }}
- title={tl("newOrder", "Drop or click to add an image")}
- className={
-                  "group relative flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border text-muted-foreground transition-colors " +
-                  (dragLine === i ? "border-primary bg-primary/5" : "border-dashed border-border hover:bg-accent")
-                }
-              >
+              {/* THE PRODUCT'S OWN PICTURE, and nothing else to do here.
+                  This was an upload slot — drag a file in, or click to browse — which put a
+ dashed empty square at the head of every line and made the artwork the
+ seller's job before the order could look complete. It is the BLANK that
+ belongs in this position: the line already knows which one it is, so the
+ picture is resolved from it (and re-resolved when the colour changes) and
+ the order can be created straight after picking a product. Artwork is
+ attached on the order detail, where the placement tools are. */}
+              <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30 text-muted-foreground">
                 {l.img ? (
-                  <>
-                    <Image src={l.img} alt="" fill unoptimized sizes="64px" className="object-cover" />
-                    <button
- type="button"
- onClick={(e) => { e.preventDefault(); setLine(i, { img: "" }) }}
- className="absolute right-0.5 top-0.5 z-10 flex size-4 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity group-hover:opacity-100"
- aria-label={tl("newOrder", "Remove image")}
-                    >
-                      <X size={9} weight="bold" />
-                    </button>
-                  </>
+                  <Image src={l.img} alt="" fill unoptimized sizes="64px" className="object-cover" />
                 ) : (
                   <Package size={20} weight="duotone" className="text-muted-foreground/50" />
                 )}
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => setLineImage(i, e.target.files?.[0])} />
-              </label>
+              </div>
 
-              {/* The blank is the most important control on the line — it drives price,
- production and the stock barcode — so it gets the flexible column and
- everything else is sized to its content. Method was as wide as Product
- while holding one short word.
-                  The trailing `auto` track was the delete button; with it lifted to the
- row's corner that width goes back to Colour, Size and Method — the three
- that were clipping ("DTG printi…"). The MINIMUMS still add up to less
- than before (652px of track vs 660px): raising them instead would push
- the grid past the card at the breakpoint, which is what was cutting the
- strip off on the right to begin with. */}
+              {/* ONE TRACK PER FIELD. There were SIX for five controls — a dead
+ 78px column left behind by the removed price field, and a third mobile
+ track for a second field that isn't there either. Nothing occupied them,
+ so they took their share of the row and parked it as blank space at the
+ right-hand end: the strip stopped short of the card while Colour showed
+ "Ar…" and Method showed "DT…" a few pixels to its left.
+                  Now the five fr tracks divide the whole strip. Product keeps the largest
+ share (it holds a full product name), Qty is fixed because a quantity is
+ two or three digits at any width, and Colour, Size and Method take the
+ rest in proportion — with minimums that still add up to less than the
+ narrowest card, so the row never overflows at the breakpoint. */}
               {/* `data-field-strip` — the Product list drops to THIS width rather than a
  number of its own, so it lines up with the row it came out of instead of
  ending halfway through Colour. See product-combobox.tsx. */}
-              <div data-field-strip className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px] items-end gap-2.5 sm:grid-cols-[minmax(170px,1.2fr)_60px_78px_minmax(108px,1.1fr)_minmax(70px,0.65fr)_minmax(116px,1.15fr)]">
+              <div data-field-strip className="grid flex-1 grid-cols-[minmax(0,1fr)_60px] items-end gap-2.5 sm:grid-cols-[minmax(150px,1.35fr)_60px_minmax(96px,1fr)_minmax(80px,0.75fr)_minmax(108px,1.05fr)]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">{tl("newOrder", "Product")}</span>
                 <ProductCombobox
  value={l.name}
  onText={(v) => setLine(i, { name: v })}
-                  // Picking here and picking from "Add from catalog" must land the SAME
-                  // line. This one dropped `methods`, so choosing a blank in the row set
-                  // `blank` — which switches the Method field from the standard list to the
-                  // product's own — while leaving that list empty. The result read "None on
-                  // this blank" for a product whose catalogue entry plainly says DTG, and
-                  // the identical product picked through the dialog offered it fine.
+                  // THE ONE PICK. A blank chosen here has to fill the whole line, because
+                  // there is no second route to it any more: name, sku, picture, the colour
+                  // and size options, and the techniques the blank actually supports.
+                  // Dropping `methods` here once left the Method field switched to the
+                  // product's own list and that list empty — "None on this blank" for a
+                  // product whose catalogue entry plainly says DTG.
  onPick={(p) => setLine(i, {
- name: p.name, sku: p.sku, blank: p.name, img: p.img,
+ name: p.name, sku: p.sku, blank: p.name, product: p.product,
+                    // THE PICTURE COMES WITH THE BLANK. `p.img` is the catalogue's listing
+                    // shot; the mockup for the colourway we are about to make is the better
+                    // one, so bestMockup is asked first and p.img is only its fallback.
+ img: blankImage(p.product, p.color, p.img),
                     // NO PRICE PREFILL. This column is what the BUYER paid (order_items.
                     // unit_price — the same field the CSV template calls "Item Price" and
                     // documents as "records only; it does NOT set the fulfilment charge").
@@ -374,7 +335,6 @@ export default function NewOrderPage() {
                     // One technique is not a choice — pre-select it, as applyPick does.
  method: (p.methods ?? []).length === 1 ? p.methods[0] : "",
                   })}
- onBrowse={() => openPicker(i)}
  placeholder={tl("newOrder", "e.g. Classic Tee")}
                 />
               </label>
@@ -385,7 +345,8 @@ export default function NewOrderPage() {
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">{tl("newOrder", "Color")}</span>
                 {l.colors.length > 0 ? (
-                  <VariantField compact swatches className="h-9 text-xs" label={tl("newOrder", "Color")} value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v })} placeholder={tl("newOrder", "Color")} />
+                  // The mockup is per-colourway, so the picture follows the choice.
+                  <VariantField compact swatches className="h-9 text-xs" label={tl("newOrder", "Color")} value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v, img: blankImage(l.product, v, l.img) })} placeholder={tl("newOrder", "Color")} />
                 ) : (
                   <Input value={l.color} onChange={(e) => setLine(i, { color: e.target.value })} className="h-9" placeholder={tl("newOrder", "Color")} />
                 )}
@@ -445,7 +406,6 @@ export default function NewOrderPage() {
         </Button>
       </div>
 
-      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={applyPick} />
     </div>
   )
 }

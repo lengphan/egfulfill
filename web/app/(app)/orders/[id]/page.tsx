@@ -980,6 +980,7 @@ export default function OrderDetailPage() {
                                 <ItemDesignActions
  orderId={id}
  sku={String(it.sku)}
+ lineId={it.line_id ?? undefined}
  itemName={it.name}
  qty={qty}
  printType={it.print_type}
