@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -65,6 +66,7 @@ export function useDesignLabTab(): DesignLabTab {
 }
 
 export function DesignLabTabs({ className }: { className?: string }) {
+  const tl = useLabelT()
   const active = useDesignLabTab()
   // Read after mount — getToken() touches localStorage, which the prerender doesn't have.
   // Deferred rather than set inline, matching how every other page here reads the session.
@@ -75,7 +77,7 @@ export function DesignLabTabs({ className }: { className?: string }) {
   }, [])
 
   return (
-    <nav aria-label="Design Lab sections" className={cn(tabsListVariants(), "h-8", className)}>
+    <nav aria-label={tl("designLab", "Design Lab sections")} className={cn(tabsListVariants(), "h-8", className)}>
       {TABS.map(({ key, label, href }) => {
         const on = key === active
         // The maker is the only surface that needs a session — it loads the catalog and

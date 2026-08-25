@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { ShoppingCart } from "@phosphor-icons/react"
 import { getFactoryList } from "@/lib/api"
@@ -66,6 +67,7 @@ const TABS = [
  * arrive, which is the point.
  */
 export function PurchasingView() {
+  const tl = useLabelT()
   // Read once on mount rather than during render: getUser() reads the session store, which
   // isn't there during SSR. Until it resolves nothing admin-only renders, which is the safe
   // direction to be wrong in.
@@ -138,8 +140,8 @@ export function PurchasingView() {
       <div className="flex items-center gap-3 md:hidden">
         <ShoppingCart size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
-          <PageTitle>Purchasing</PageTitle>
-          <p className="truncate text-sm text-muted-foreground">Browse suppliers, build a cart, and track orders.</p>
+          <PageTitle>{tl("purchasing", "Purchasing")}</PageTitle>
+          <p className="truncate text-sm text-muted-foreground">{tl("purchasing", "Browse suppliers, build a cart, and track orders.")}</p>
         </div>
       </div>
       {/* Alibaba sits beside Orders rather than inside it: those are OUR purchase orders

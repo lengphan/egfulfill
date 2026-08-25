@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Megaphone, CircleNotch, Warning, Plus, Play, Pause, ArrowSquareOut } from "@phosphor-icons/react"
 import Link from "next/link"
@@ -25,6 +26,7 @@ const CHANNEL: Record<string, { label: string; cls: string }> = {
 // Meta + Google campaign performance for the team. Read is the point; create makes
 // the campaign shell (paused) — targeting/creative stay in the providers' tools.
 export function CampaignsView() {
+  const tl = useLabelT()
  const [cfg, setCfg] = useState<AdsConfig | null>(null)
  const [conns, setConns] = useState<AdConnection[]>([])
  const [data, setData] = useState<AdsResponse | null>(null)
@@ -70,7 +72,7 @@ export function CampaignsView() {
         <div className="flex items-center gap-3 md:hidden">
           <Megaphone size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
-            <PageTitle>Campaigns</PageTitle>
+            <PageTitle>{tl("campaigns", "Campaigns")}</PageTitle>
             <p className="text-sm text-muted-foreground">Facebook &amp; Google ad performance{data ? ` · ${data.since} → ${data.until}` : ""}</p>
           </div>
         </div>
@@ -80,37 +82,37 @@ export function CampaignsView() {
               <button key={d} onClick={() => setDays(d)} className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + (days === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{d}d</button>
             ))}
           </div>
-          {connected && <Button size="sm" onClick={() => setNewOpen(true)}><Plus size={14} weight="bold" /> New campaign</Button>}
+          {connected && <Button size="sm" onClick={() => setNewOpen(true)}><Plus size={14} weight="bold" /> {tl("campaigns", "New campaign")}</Button>}
         </div>
       </div>
 
       {/* Not configured → this is an admin/keys problem, say so plainly. */}
       {!loading && !anyEnabled && (
-        <SectionCard title="Ads are not configured">
+        <SectionCard title={tl("campaigns", "Ads are not configured")}>
           <div className="space-y-3 p-5 text-sm">
-            <p className="text-muted-foreground">No ad platform keys are set yet, so there is nothing to read.</p>
+            <p className="text-muted-foreground">{tl("campaigns", "No ad platform keys are set yet, so there is nothing to read.")}</p>
             <ul className="space-y-1.5 text-muted-foreground">
-              <li>· <b className="text-foreground">Meta</b> — needs META_APP_ID + META_APP_SECRET. Listing spend needs <code className="rounded bg-muted px-1 text-xs">ads_read</code>; creating campaigns needs <code className="rounded bg-muted px-1 text-xs">ads_management</code>, which requires Business Verification + App Review.</li>
-              <li>· <b className="text-foreground">Google Ads</b> — needs a client id/secret <i>and</i> a developer token from a Google Ads Manager (MCC) account.</li>
+              <li>· <b className="text-foreground">{tl("campaigns", "Meta")}</b> {tl("campaigns", "— needs META_APP_ID + META_APP_SECRET. Listing spend needs")} <code className="rounded bg-muted px-1 text-xs">ads_read</code>{tl("campaigns", "; creating campaigns needs")} <code className="rounded bg-muted px-1 text-xs">ads_management</code>{tl("campaigns", ", which requires Business Verification + App Review.")}</li>
+              <li>· <b className="text-foreground">{tl("campaigns", "Google Ads")}</b> {tl("campaigns", "— needs a client id/secret")} <i>and</i> {tl("campaigns", "a developer token from a Google Ads Manager (MCC) account.")}</li>
             </ul>
             {role === "admin" ? (
-              <Link href="/settings"><Button size="sm" variant="outline">Add keys in Settings › Integrations</Button></Link>
+              <Link href="/settings"><Button size="sm" variant="outline">{tl("campaigns", "Add keys in Settings › Integrations")}</Button></Link>
             ) : (
-              <p className="text-xs text-muted-foreground">An admin can add these in Settings › Integrations.</p>
+              <p className="text-xs text-muted-foreground">{tl("campaigns", "An admin can add these in Settings › Integrations.")}</p>
             )}
           </div>
         </SectionCard>
       )}
 
       {!loading && anyEnabled && !connected && (
-        <SectionCard title="Connect an ad account">
+        <SectionCard title={tl("campaigns", "Connect an ad account")}>
           <div className="space-y-3 p-5 text-sm">
-            <p className="text-muted-foreground">Keys are set. Connect an ad account to pull its campaigns.</p>
+            <p className="text-muted-foreground">{tl("campaigns", "Keys are set. Connect an ad account to pull its campaigns.")}</p>
             <div className="flex flex-wrap gap-2">
-              {cfg?.meta?.enabled && <Button size="sm" variant="outline" disabled title="Meta OAuth — connect from Settings once App Review is granted">Connect Meta</Button>}
-              {cfg?.google?.enabled && <Button size="sm" variant="outline" disabled title="Google OAuth — connect once your developer token is approved">Connect Google Ads</Button>}
+              {cfg?.meta?.enabled && <Button size="sm" variant="outline" disabled title={tl("campaigns", "Meta OAuth — connect from Settings once App Review is granted")}>{tl("campaigns", "Connect Meta")}</Button>}
+              {cfg?.google?.enabled && <Button size="sm" variant="outline" disabled title={tl("campaigns", "Google OAuth — connect once your developer token is approved")}>{tl("campaigns", "Connect Google Ads")}</Button>}
             </div>
-            <p className="text-xs text-muted-foreground">Connect buttons activate once the provider approvals land — the OAuth exchange is wired and waiting.</p>
+            <p className="text-xs text-muted-foreground">{tl("campaigns", "Connect buttons activate once the provider approvals land — the OAuth exchange is wired and waiting.")}</p>
           </div>
         </SectionCard>
       )}
@@ -132,24 +134,24 @@ export function CampaignsView() {
       ) : data && data.campaigns.length > 0 ? (
         <>
           <StatGrid>
-            <StatCard label="Spend" value={usd(data.totals.spend)} sub={`last ${data.days}d`} />
-            <StatCard label="Revenue" value={usd(data.totals.revenue)} sub="attributed" tone={data.totals.revenue ? "pos" : undefined} />
-            <StatCard label="ROAS" value={data.totals.roas != null ? `${data.totals.roas}x` : "—"} sub="revenue / spend" tone={(data.totals.roas ?? 0) >= 1 ? "pos" : "neg"} />
-            <StatCard label="Clicks" value={int(data.totals.clicks)} sub={`${int(data.totals.impressions)} impressions`} />
+            <StatCard label={tl("campaigns", "Spend")} value={usd(data.totals.spend)} sub={`last ${data.days}d`} />
+            <StatCard label={tl("campaigns", "Revenue")} value={usd(data.totals.revenue)} sub="attributed" tone={data.totals.revenue ? "pos" : undefined} />
+            <StatCard label="ROAS" value={data.totals.roas != null ? `${data.totals.roas}x` : "—"} sub={tl("campaigns", "revenue / spend")} tone={(data.totals.roas ?? 0) >= 1 ? "pos" : "neg"} />
+            <StatCard label={tl("campaigns", "Clicks")} value={int(data.totals.clicks)} sub={`${int(data.totals.impressions)} impressions`} />
           </StatGrid>
 
-          <SectionCard title="Campaigns">
+          <SectionCard title={tl("campaigns", "Campaigns")}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5">Campaign</th>
-                    <th className="px-4 py-2.5">Channel</th>
-                    <th className="px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5 text-right">Budget/day</th>
-                    <th className="px-4 py-2.5 text-right">Spend</th>
-                    <th className="px-4 py-2.5 text-right">Clicks</th>
-                    <th className="px-4 py-2.5 text-right">Conv.</th>
+                    <th className="px-4 py-2.5">{tl("campaigns", "Campaign")}</th>
+                    <th className="px-4 py-2.5">{tl("campaigns", "Channel")}</th>
+                    <th className="px-4 py-2.5">{tl("campaigns", "Status")}</th>
+                    <th className="px-4 py-2.5 text-right">{tl("campaigns", "Budget/day")}</th>
+                    <th className="px-4 py-2.5 text-right">{tl("campaigns", "Spend")}</th>
+                    <th className="px-4 py-2.5 text-right">{tl("campaigns", "Clicks")}</th>
+                    <th className="px-4 py-2.5 text-right">{tl("campaigns", "Conv.")}</th>
                     <th className="px-4 py-2.5 text-right">ROAS</th>
                     <th className="px-4 py-2.5" />
                   </tr>
@@ -180,7 +182,7 @@ export function CampaignsView() {
           </SectionCard>
         </>
       ) : !loading && connected ? (
-        <EmptyState icon={Megaphone} title="No campaigns in this window" />
+        <EmptyState icon={Megaphone} title={tl("campaigns", "No campaigns in this window")} />
       ) : null}
 
       <NewCampaignDialog open={newOpen} onOpenChange={setNewOpen} cfg={cfg} onCreated={() => load(days)} />
@@ -189,6 +191,7 @@ export function CampaignsView() {
 }
 
 function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boolean; onOpenChange: (v: boolean) => void; cfg: AdsConfig | null; onCreated: () => void }) {
+  const tl = useLabelT()
  const [channel, setChannel] = useState<"meta" | "google">("meta")
  const [name, setName] = useState("")
  const [budget, setBudget] = useState("25")
@@ -212,7 +215,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>New campaign</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tl("campaigns", "New campaign")}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="flex rounded-lg border border-border p-0.5">
             {(["meta", "google"] as const).map((c) => (
@@ -223,11 +226,11 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
             ))}
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Campaign name</span>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Pet portrait — US" />
+            <span className="text-sm font-medium">{tl("campaigns", "Campaign name")}</span>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tl("campaigns", "e.g. Pet portrait — US")} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Daily budget (USD)</span>
+            <span className="text-sm font-medium">{tl("campaigns", "Daily budget (USD)")}</span>
             <Input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="max-w-[120px]" />
           </label>
 
@@ -239,7 +242,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
           {done && <div className="flex items-center gap-1.5 text-sm text-success"><ArrowSquareOut size={14} weight="bold" /> {done}</div>}
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Close</Button>
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>{tl("campaigns", "Close")}</Button>
             <Button size="sm" onClick={submit} disabled={saving || !name.trim() || !(Number(budget) > 0)}>
               {saving ? <CircleNotch size={14} className="animate-spin" /> : <Plus size={14} weight="bold" />} Create paused
             </Button>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree, Warning } from "@phosphor-icons/react"
@@ -69,6 +70,7 @@ const isLow = (it: InventoryItem) => !isOut(it) && num(it.in_stock) <= (it.reord
 
 // `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
 export function InventoryView({ embedded = false, pool }: { embedded?: boolean; pool?: "own" | "consigned" }) {
+  const tl = useLabelT()
  const [items, setItems] = useState<InventoryItem[] | null>(null)
  const [search, setSearch] = useState("")
   /** Restocking asks one question — what is short — so the Low and Out counts are a filter,
@@ -319,12 +321,12 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         {!embedded && (<>
           <Package size={18} weight="regular" className="shrink-0 text-primary md:hidden" />
           <div className="min-w-0 md:hidden">
-            <PageTitle>Inventory</PageTitle>
-            <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
+            <PageTitle>{tl("inventory", "Inventory")}</PageTitle>
+            <p className="truncate text-sm text-muted-foreground">{tl("inventory", "Track stock per variant, flag low/out, and print SKU barcodes.")}</p>
           </div>
         </>)}
         <div className="ml-auto flex items-center gap-2">
-          {saving ? <span className="text-xs text-muted-foreground"><CircleNotch size={13} className="inline animate-spin" /> Saving…</span> : saved ? <span className="inline-flex items-center gap-1 text-xs text-success"><Check size={13} weight="bold" /> Saved</span> : null}
+          {saving ? <span className="text-xs text-muted-foreground"><CircleNotch size={13} className="inline animate-spin" /> {tl("inventory", "Saving…")}</span> : saved ? <span className="inline-flex items-center gap-1 text-xs text-success"><Check size={13} weight="bold" /> {tl("inventory", "Saved")}</span> : null}
         </div>
       </div>
 
@@ -334,7 +336,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       {!pool && (
         <TabBar
           ariaLabel="Stock pools"
-          items={[{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }]}
+          items={[{ id: "own", label: tl("inventory", "Our stock") }, { id: "consigned", label: tl("inventory", "Incoming stock") }]}
           value={tab}
           onChange={setOwnTab}
         />
@@ -351,7 +353,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
       ) : (
       <>
       <StatGrid>
-        <StatCard label="SKUs" value={String(stats.total)} sub="variants tracked" />
+        <StatCard label={tl("inventory", "SKUs")} value={String(stats.total)} sub={tl("inventory", "variants tracked")} />
         {/**
           * THE COUNTS ARE THE FILTER.
           *
@@ -361,25 +363,25 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           * the figure that names the job was the one thing on the page you could not press.
           */}
         <button type="button" onClick={() => setNeeds(needs === "low" ? null : "low")} className="text-left">
-          <StatCard label="Low stock" value={String(stats.low)} sub={needs === "low" ? "showing these" : "at/below reorder"}
+          <StatCard label={tl("inventory", "Low stock")} value={String(stats.low)} sub={needs === "low" ? "showing these" : "at/below reorder"}
  tone={stats.low ? "neg" : undefined} />
         </button>
         <button type="button" onClick={() => setNeeds(needs === "out" ? null : "out")} className="text-left">
-          <StatCard label="Out of stock" value={String(stats.out)} sub={needs === "out" ? "showing these" : "need reorder"}
+          <StatCard label={tl("inventory", "Out of stock")} value={String(stats.out)} sub={needs === "out" ? "showing these" : "need reorder"}
  tone={stats.out ? "neg" : undefined} />
         </button>
-        <StatCard label="Reserved" value={String(stats.reserved)} sub="on open orders" />
+        <StatCard label={tl("inventory", "Reserved")} value={String(stats.reserved)} sub={tl("inventory", "on open orders")} />
       </StatGrid>
 
-      <SectionCard title="Stock">
+      <SectionCard title={tl("inventory", "Stock")}>
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-4">
           <div className="relative max-w-md flex-1">
             <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, name, variant…" className="h-9 pl-9" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tl("inventory", "Search SKU, name, variant…")} className="h-9 pl-9" />
           </div>
           {cats.length > 0 && (
             <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
-              <option value="">All categories</option>
+              <option value="">{tl("inventory", "All categories")}</option>
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
@@ -395,15 +397,15 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               The box goes, the tick stays. */}
           <label className="inline-flex h-8 cursor-pointer items-center gap-2 whitespace-nowrap px-1 text-sm">
             <input type="checkbox" checked={onlyUnavailable} onChange={(e) => setOnlyUnavailable(e.target.checked)} className="size-3.5 accent-[var(--primary)]" />
-            <span className={onlyUnavailable ? "text-foreground" : "text-muted-foreground"}>No longer stocked</span>
+            <span className={onlyUnavailable ? "text-foreground" : "text-muted-foreground"}>{tl("inventory", "No longer stocked")}</span>
           </label>
           <select
  value={vis}
  onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
- aria-label="Filter by visibility"
+ aria-label={tl("inventory", "Filter by visibility")}
  className="eg-select eg-control pr-8"
           >
-            <option value="">All visibility</option>
+            <option value="">{tl("inventory", "All visibility")}</option>
             {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
           </select>
           {/* FILTERS LEFT, ACTIONS RIGHT. They were one undifferentiated run, so "Add item"
@@ -424,7 +426,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
             <label className="inline-flex h-8 cursor-pointer items-center gap-2 whitespace-nowrap px-1 text-sm">
               <input
  type="checkbox"
- aria-label="Select every variant on this page"
+ aria-label={tl("inventory", "Select every variant on this page")}
  checked={pageSkus.length > 0 && pageSkus.every((k) => sel.has(k))}
  onChange={(e) => {
  const next = new Set(sel)
@@ -433,7 +435,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
                 }}
  className="size-3.5 accent-[var(--primary)]"
               />
-              <span className={sel.size > 0 ? "text-foreground" : "text-muted-foreground"}>Select page</span>
+              <span className={sel.size > 0 ? "text-foreground" : "text-muted-foreground"}>{tl("inventory", "Select page")}</span>
             </label>
             {sel.size > 0 && (
               <Button variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
@@ -450,13 +452,13 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               */}
             {sel.size > 0 && (
               <Button variant="outline" disabled={queuing} onClick={() => void queueForPurchase()}>
-                {queuing ? "Adding…" : `Add ${sel.size} to purchase`}
+                {queuing ? tl("inventory", "Adding…") : `Add ${sel.size} to purchase`}
               </Button>
             )}
             <Button variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
-              {sel.size ? `Print ${sel.size} selected` : "Print labels"}
+              {sel.size ? `Print ${sel.size} selected` : tl("inventory", "Print labels")}
             </Button>
-            <Button onClick={() => setAddOpen(true)}>Add item</Button>
+            <Button onClick={() => setAddOpen(true)}>{tl("inventory", "Add item")}</Button>
           </div>
         </div>
 
@@ -587,6 +589,7 @@ function ProductSheet({
  onZoom: (sku: string) => void
  onOrder: Record<string, number>
 }) {
+  const tl = useLabelT()
   // Second press arms the removal — the count is the warning, so it is in the label.
  const [killing, setKilling] = useState(false)
  const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
@@ -629,13 +632,13 @@ function ProductSheet({
         >
           <div className="text-sm font-semibold tabular-nums leading-none">{stock}</div>
           <div className="mt-0.5 text-2xs text-muted-foreground">
-            {out === group.rows.length ? "none on the shelf" : out ? `${out} out` : "on the shelf"}
+            {out === group.rows.length ? tl("inventory", "none on the shelf") : out ? `${out} out` : tl("inventory", "on the shelf")}
           </div>
         </div>
         <Popover>
           <PopoverTrigger
  aria-label={`Actions for ${group.name}`}
- title="Reorder point, visibility, history, remove"
+ title={tl("inventory", "Reorder point, visibility, history, remove")}
  className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <DotsThree size={18} weight="bold" />
@@ -645,7 +648,7 @@ function ProductSheet({
               {one ? group.rows[0].sku : `${group.rows.length} variants · applies to all`}
             </div>
             <label className="flex items-center justify-between gap-3">
-              <span className="text-xs font-medium">Reorder at</span>
+              <span className="text-xs font-medium">{tl("inventory", "Reorder at")}</span>
               <Input
  value={String(reorderAt)}
  onChange={(e) => {
@@ -658,7 +661,7 @@ function ProductSheet({
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-xs font-medium">Visibility</span>
+              <span className="text-xs font-medium">{tl("inventory", "Visibility")}</span>
               <select
  value={visSame ? visOf(group.rows[0]) : ""}
  onChange={(e) => { const v = e.target.value as SkuVisibility; group.rows.forEach((r) => setVisibility(r.sku, v)) }}
@@ -667,7 +670,7 @@ function ProductSheet({
               >
                 {/* A product whose variants disagree shows that rather than the first one's
  setting — picking any option then makes them agree, which is the fix. */}
-                {!visSame && <option value="">Mixed — pick one to settle it</option>}
+                {!visSame && <option value="">{tl("inventory", "Mixed — pick one to settle it")}</option>}
                 {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             </label>
@@ -677,7 +680,7 @@ function ProductSheet({
  onClick={() => onProductHistory(group.name, group.rows.map((r) => r.sku))}
  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
-                <ClockCounterClockwise size={14} /> Stock history
+                <ClockCounterClockwise size={14} /> {tl("inventory", "Stock history")}
               </button>
               {/* Barcode is a fact about ONE sku — you hold a gun to the screen and scan it.
                   Offered only when the product IS one sku; otherwise the label printer is
@@ -688,7 +691,7 @@ function ProductSheet({
  onClick={() => onZoom(group.rows[0].sku)}
  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  <QrCodeIcon size={14} /> Barcode
+                  <QrCodeIcon size={14} /> {tl("inventory", "Barcode")}
                 </button>
               )}
               <button
@@ -697,7 +700,7 @@ function ProductSheet({
  className={"inline-flex items-center gap-1.5 text-xs transition-colors hover:text-alert "
                   + (killing ? "font-medium text-alert" : "text-muted-foreground")}
               >
-                <Trash size={14} /> {killing ? (one ? "Remove?" : `Remove all ${group.rows.length}?`) : "Remove"}
+                <Trash size={14} /> {killing ? (one ? tl("inventory", "Remove?") : `Remove all ${group.rows.length}?`) : tl("inventory", "Remove")}
               </button>
             </div>
           </PopoverContent>
@@ -750,6 +753,7 @@ function cellTone(it: InventoryItem, lowAt: (x: InventoryItem) => number) {
 
 /** The variants a grid could not place — named, never dropped. */
 function LeftoverNote({ rows }: { rows: InventoryItem[] }) {
+  const tl = useLabelT()
  return (
     <p className="text-2xs text-muted-foreground">
       {rows.length} variant{rows.length === 1 ? "" : "s"}{" "}not on this grid — the sku doesn&apos;t match the
@@ -775,13 +779,14 @@ function PlainStock({ rows, edit, lowAt, sel, setSel, onOrder }: {
  setSel: (s: Set<string>) => void
  onOrder: Record<string, number>
 }) {
+  const tl = useLabelT()
  return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
           <tr className="text-muted-foreground">
-            <th className={`${LABEL_W} ${GUTTER} whitespace-nowrap py-1 pe-2 text-left font-medium`}>Variant</th>
-            <th className={`${SIZE_W} px-1 py-1 text-center font-medium`}>Stock</th>
+            <th className={`${LABEL_W} ${GUTTER} whitespace-nowrap py-1 pe-2 text-left font-medium`}>{tl("inventory", "Variant")}</th>
+            <th className={`${SIZE_W} px-1 py-1 text-center font-medium`}>{tl("inventory", "Stock")}</th>
             <th className="w-auto pe-4" />
           </tr>
         </thead>
@@ -858,6 +863,7 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
   /** How many of each sku a purchase order already covers — see the cell's title. */
  onOrder: Record<string, number>
 }) {
+  const tl = useLabelT()
  const p = group.product
   // No catalogue product = no declared sizes or colours to build axes from. Same panel,
   // one column. See PlainStock.
@@ -993,7 +999,7 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
  colour was heading its own name column "Colour" and printing a size under
  it. */}
               <th className={`${LABEL_W} ${GUTTER} whitespace-nowrap py-1 pe-2 text-left font-medium`}>
-                {hasColorAxis ? "Colour" : "Variant"}
+                {hasColorAxis ? tl("inventory", "Colour") : tl("inventory", "Variant")}
               </th>
               {sizeCols.map((z) => (
                 <th key={z || "one"} className={`${SIZE_W} px-1 py-1 text-center font-medium`}>{sizeHeader(z)}</th>
@@ -1024,7 +1030,7 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
                     }}
  className="absolute left-4 top-1/2 size-3.5 -translate-y-1/2"
                   />
-                  {c ? prettyColorName(c) : (p.name || group.rows[0]?.name || "Stock")}
+                  {c ? prettyColorName(c) : (p.name || group.rows[0]?.name || tl("inventory", "Stock"))}
                 </td>
                 {sizeCols.map((z) => (
                   <td key={(c || "one") + (z || "one")} className={`${SIZE_W} px-1 py-1 text-center`}>{cell(at(z, c), c + z)}</td>
@@ -1058,10 +1064,11 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
  * black void.
  */
 function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void }) {
+  const tl = useLabelT()
  return (
     <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="border-none bg-[oklch(0.19_0.05_280)] sm:max-w-xl">
-        <DialogHeader><DialogTitle className="text-white">Scan this code</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="text-white">{tl("inventory", "Scan this code")}</DialogTitle></DialogHeader>
         {sku && (
           <div className="space-y-3 pb-2">
             {/* Generous white padding IS the quiet zone — Code-128 needs a clear margin
@@ -1080,8 +1087,7 @@ function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void
             </div>
             <p className="text-center tabular-nums text-sm text-white/70">{sku}</p>
             <p className="text-center text-xs text-white/50">
-              Phone camera: use the square code. Handheld gun: either. Hold 15–25cm away and
- turn screen brightness up if it won&apos;t read.
+              {tl("inventory", "Phone camera: use the square code. Handheld gun: either. Hold 15–25cm away and turn screen brightness up if it won’t read.")}
             </p>
           </div>
         )}
@@ -1115,6 +1121,7 @@ const MOVE_WORD: Record<string, string> = {
 }
 
 function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus: string[] } | null; onClose: () => void }) {
+  const tl = useLabelT()
  const [data, setData] = useState<StockHistory | null>(null)
  const [failed, setFailed] = useState(false)
   // The set, as a stable string — an array literal is a new object every render, so
@@ -1147,7 +1154,7 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
     <Dialog open={!!target} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> Stock history</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> {tl("inventory", "Stock history")}</DialogTitle>
         </DialogHeader>
         <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
           <span className="truncate text-xs font-medium">
@@ -1171,11 +1178,11 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
           </p>
         )}
         {failed ? (
-          <EmptyState icon={Warning} size="sm" title="Couldn't read this SKU's history" note="This is a problem reaching the server, not an empty history." />
+          <EmptyState icon={Warning} size="sm" title={tl("inventory", "Couldn't read this SKU's history")} note={tl("inventory", "This is a problem reaching the server, not an empty history.")} />
         ) : rows === null ? (
           <div className="flex justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
         ) : rows.length === 0 ? (
-          <EmptyState icon={ClockCounterClockwise} size="sm" title="Nothing has moved this SKU yet" />
+          <EmptyState icon={ClockCounterClockwise} size="sm" title={tl("inventory", "Nothing has moved this SKU yet")} />
         ) : (
           <div className="max-h-80 divide-y divide-border overflow-auto">
             {rows.map((r) => {
@@ -1239,6 +1246,7 @@ function ScanHistoryDialog({ target, onClose }: { target: { label: string; skus:
  * nothing must not silently add the wrong blank.
  */
 export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, seedQuery }: { open: boolean; onOpenChange: (v: boolean) => void; onAdd: (items: InventoryItem[]) => void; existing: string[]; catalog: CatalogProduct[]; seedQuery?: string }) {
+  const tl = useLabelT()
  const [mode, setMode] = useState<"catalog" | "manual">("catalog")
  const [sku, setSku] = useState("")
  const [name, setName] = useState("")
@@ -1358,13 +1366,13 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Add inventory item</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tl("inventory", "Add inventory item")}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           {catalog.length > 0 && (
             <TabBar
               size="sm"
               ariaLabel="How to add this item"
-              items={[{ id: "catalog", label: "From catalogue" }, { id: "manual", label: "By hand" }]}
+              items={[{ id: "catalog", label: tl("inventory", "From catalogue") }, { id: "manual", label: tl("inventory", "By hand") }]}
               value={mode}
               onChange={(id) => { setMode(id); setErr(null) }}
             />
@@ -1376,12 +1384,12 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                 <>
                   <div className="relative">
                     <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the catalogue…" className="h-9 pl-9" autoFocus />
+                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("inventory", "Search the catalogue…")} className="h-9 pl-9" autoFocus />
                   </div>
                   <div className="max-h-72 divide-y divide-border overflow-auto rounded-lg border border-border">
                     {matches.length === 0 ? (
                       <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                        {withSku.length === 0 ? "No catalogue product has a SKU yet — stock is held against it, so add one on the product first." : "No product matches."}
+                        {withSku.length === 0 ? tl("inventory", "No catalogue product has a SKU yet — stock is held against it, so add one on the product first.") : tl("inventory", "No product matches.")}
                       </div>
                     ) : matches.map((p) => (
                       <button
@@ -1392,7 +1400,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                       >
                         <Thumb src={imageFor(p, null)} name={p.name ?? "?"} size={34} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{p.name || "Untitled"}</span>
+                          <span className="block truncate text-sm font-medium">{p.name || tl("inventory", "Untitled")}</span>
                           <span className="block truncate tabular-nums text-xs text-muted-foreground">{p.sku}</span>
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground">{productColors(p).length || 1} × {productSizes(p).length || 1}</span>
@@ -1408,7 +1416,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                       <div className="truncate text-sm font-medium">{picked.name}</div>
                       <div className="truncate tabular-nums text-xs text-muted-foreground">{picked.sku}</div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => { setPickedId(null); setChosen(new Set()) }}>Change</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setPickedId(null); setChosen(new Set()) }}>{tl("inventory", "Change")}</Button>
                   </div>
                   {/* GROUPED BY COLOURWAY, sizes inside it. A flat list of 66 variants is a
  scroll; the question anyone actually has is "which colours are we
@@ -1421,7 +1429,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
  className="font-medium text-primary hover:underline"
  onClick={() => setChosen(chosen.size ? new Set() : new Set(rows.filter((r) => !r.exists).map((r) => r.sku)))}
                       >
-                        {chosen.size ? "Clear" : "Select all"}
+                        {chosen.size ? tl("inventory", "Clear") : tl("inventory", "Select all")}
                       </button>
                     </div>
                     <div className="max-h-56 space-y-2 overflow-auto rounded-lg border border-border p-2">
@@ -1445,7 +1453,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
                                 })}
  className="size-3.5 accent-[var(--primary)]"
                               />
-                              <span className="text-xs font-medium">{color ? prettyColorName(color) : "All sizes"}</span>
+                              <span className="text-xs font-medium">{color ? prettyColorName(color) : tl("inventory", "All sizes")}</span>
                             </div>
                             <div className="flex flex-wrap gap-1 pl-5">
                               {group.map((r) => (
@@ -1464,7 +1472,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
  onChange={(e) => setChosen((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.sku); else n.delete(r.sku); return n })}
  className="sr-only"
                                   />
-                                  {r.size || "One size"}
+                                  {r.size || tl("inventory", "One size")}
                                 </label>
                               ))}
                             </div>
@@ -1478,23 +1486,23 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
             </>
           ) : (
             <>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">SKU</span><Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="G2000-BLK-L" className="h-9 tabular-nums" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gildan Ultra Cotton Tee" className="h-9" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Variant</span><Input value={variant} onChange={(e) => setVariant(e.target.value)} placeholder="Black · L" className="h-9" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Supplier</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&S Activewear / Otto Cap" className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">SKU</span><Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={tl("inventory", "G2000-BLK-L")} className="h-9 tabular-nums" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("inventory", "Name")}</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tl("inventory", "Gildan Ultra Cotton Tee")} className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("inventory", "Variant")}</span><Input value={variant} onChange={(e) => setVariant(e.target.value)} placeholder={tl("inventory", "Black · L")} className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("inventory", "Supplier")}</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder={tl("inventory", "S&S Activewear / Otto Cap")} className="h-9" /></label>
             </>
           )}
 
           <div className="grid grid-cols-3 gap-2">
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">In stock</span><Input value={stock} onChange={(e) => setStock(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" inputMode="numeric" className="h-9" /></label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Reorder at</span><Input value={reorder} onChange={(e) => setReorder(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="h-9" /></label>
+            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("inventory", "In stock")}</span><Input value={stock} onChange={(e) => setStock(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" inputMode="numeric" className="h-9" /></label>
+            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("inventory", "Reorder at")}</span><Input value={reorder} onChange={(e) => setReorder(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="h-9" /></label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Category</span>
-              <Input value={mode === "catalog" ? (picked?.type ?? "") : category} onChange={(e) => setCategory(e.target.value)} disabled={mode === "catalog"} placeholder="Apparel" className="h-9" />
+              <span className="text-xs text-muted-foreground">{tl("inventory", "Category")}</span>
+              <Input value={mode === "catalog" ? (picked?.type ?? "") : category} onChange={(e) => setCategory(e.target.value)} disabled={mode === "catalog"} placeholder={tl("inventory", "Apparel")} className="h-9" />
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Visibility</span>
+            <span className="text-xs text-muted-foreground">{tl("inventory", "Visibility")}</span>
             <select
  value={visibility}
  onChange={(e) => setVisibility(e.target.value as SkuVisibility)}
@@ -1503,21 +1511,21 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
               {VIS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
             <span className="text-2xs text-muted-foreground">
-              {visibility === "factory" ? "Internal only — nothing outside the factory sees this SKU."
- : visibility === "seller" ? "Published in the partner stock feed."
- : "Cleared for unauthenticated surfaces too. Nothing reads that yet — this records the decision."}
+              {visibility === "factory" ? tl("inventory", "Internal only — nothing outside the factory sees this SKU.")
+ : visibility === "seller" ? tl("inventory", "Published in the partner stock feed.")
+ : tl("inventory", "Cleared for unauthenticated surfaces too. Nothing reads that yet — this records the decision.")}
             </span>
           </label>
           {mode === "manual" && sku.trim() && <div className="flex justify-center rounded-lg border border-border bg-muted/30 py-2"><Barcode value={sku.trim()} height={40} /></div>}
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("inventory", "Cancel")}</Button>
             {mode === "catalog" ? (
               <Button onClick={saveCatalog} disabled={!picked || chosen.size === 0}>
                 Add {chosen.size || ""} item{chosen.size === 1 ? "" : "s"}
               </Button>
             ) : (
-              <Button onClick={saveManual}>Add item</Button>
+              <Button onClick={saveManual}>{tl("inventory", "Add item")}</Button>
             )}
           </div>
         </div>

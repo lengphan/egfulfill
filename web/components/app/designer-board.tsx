@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { PenNib, X, CircleNotch, Warning, Storefront, Needle, CurrencyDollar, CheckCircle, CheckSquare, Square, LinkSimple, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -28,6 +29,7 @@ import { TabBar } from "@/components/app/tab-bar"
  * the card render (it swaps in asynchronously if it arrives).
  */
 function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: string | null; orderId?: string | null; sku?: string | null; cached?: boolean; children: ReactNode }) {
+  const tl = useLabelT()
  const [png, setPng] = useState<string | null>(null)
  const [busy, setBusy] = useState(false)
   /**
@@ -113,7 +115,7 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
           }}
  className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
         >
-          {busy ? "Rendering…" : why ? "Couldn't render" : "Show stitches"}
+          {busy ? tl("designer", "Rendering…") : why ? tl("designer", "Couldn't render") : tl("designer", "Show stitches")}
         </span>
       )}
       {/* The reason, under the button that failed. Truncated to one line on the card — the
@@ -227,6 +229,7 @@ const amt = (v: unknown) => Number(v) || 0
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function DesignerBoard() {
+  const tl = useLabelT()
  const confirm = useConfirm()
  const [cards, setCards] = useState<DesignCard[] | null>(null)
   /** Why the list is empty, when it is empty because the read failed rather than because
@@ -344,7 +347,7 @@ export function DesignerBoard() {
   // and selects its title input (see newLaneId below) so the name is typed in place. Delete
   // still confirms via removeLane — adding is cheap and reversible, deleting re-homes cards.
  const addLane = useCallback(async () => {
- const r = await createDesignLane({ label: "New column" })
+ const r = await createDesignLane({ label: tl("designer", "New column") })
  if (r?.error) { setDelErr(r.error); return }
  if (r?.id) setNewLaneId(String(r.id))
  loadLanes()
@@ -475,13 +478,13 @@ export function DesignerBoard() {
     // a designer/operator/warehouse shouldn't reach it. The server enforces this too (reverts
     // the lane + refuses the credit); this just explains it instead of a silent snap-back.
  if (to === "approved" && role !== "admin") {
- await confirm({ title: "Only an admin can approve", body: "Moving a card to Approved releases the designer's payout, so it's limited to admins. Ask an admin to approve it.", confirmLabel: "OK" })
+ await confirm({ title: tl("designer", "Only an admin can approve"), body: "Moving a card to Approved releases the designer's payout, so it's limited to admins. Ask an admin to approve it.", confirmLabel: "OK" })
  return
     }
     // Confirm pulling a card back OUT of Approved — it reopens signed-off work. (The payout was
     // already made and is idempotent, so it won't be paid twice.)
  if (fromApproved && to !== "approved") {
- const ok = await confirm({ title: "Move out of Approved?", body: "This reopens a card that was already signed off. The designer's payout has already been made and won't be paid again.", confirmLabel: "Move it", cancelLabel: "Keep approved" })
+ const ok = await confirm({ title: tl("designer", "Move out of Approved?"), body: "This reopens a card that was already signed off. The designer's payout has already been made and won't be paid again.", confirmLabel: "Move it", cancelLabel: "Keep approved" })
  if (!ok) return
     }
     // Ownership tag. Moving a card into a working lane tags it to whoever moved it (ANY
@@ -581,8 +584,8 @@ export function DesignerBoard() {
  on the right stays. On mobile the hero is the title. */}
         <PenNib size={18} weight="regular" className="shrink-0 text-primary md:hidden" />
         <div className="min-w-0 md:hidden">
-          <PageTitle>Designer</PageTitle>
-          <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
+          <PageTitle>{tl("designer", "Designer")}</PageTitle>
+          <p className="truncate text-sm text-muted-foreground">{view === "board" ? tl("designer", "Drag cards between lanes.") : tl("designer", "Scan every card in one list.")} Claim work, send for review, get credited on approval.</p>
         </div>
         {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only
  works in Board view, which left List view with no way to bring artwork in.
@@ -591,12 +594,12 @@ export function DesignerBoard() {
         <Input
  value={query}
  onChange={(e) => setQuery(e.target.value)}
- placeholder="Search designs…"
+ placeholder={tl("designer", "Search designs…")}
  className="ml-auto h-9 w-36 sm:w-56"
- aria-label="Search designs"
+ aria-label={tl("designer", "Search designs")}
         />
         <label className="eg-tap inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-          <Plus size={14} weight="bold" /> Add design
+          <Plus size={14} weight="bold" /> {tl("designer", "Add design")}
           <input
  type="file"
  accept="image/*"
@@ -611,7 +614,7 @@ export function DesignerBoard() {
         </label>
         <TabBar
           ariaLabel="Board views"
-          items={[{ id: "board", label: "Board" }, { id: "list", label: "List" }, ...(canSeeHistory ? [{ id: "history" as const, label: "History" }] : [])]}
+          items={[{ id: "board", label: tl("designer", "Board") }, { id: "list", label: tl("designer", "List") }, ...(canSeeHistory ? [{ id: "history" as const, label: tl("designer", "History") }] : [])]}
           value={view}
           onChange={setView}
           spacing="none"
@@ -620,10 +623,10 @@ export function DesignerBoard() {
       </div>
 
       <StatGrid>
-        <StatCard label="Open cards" value={String(stats.total)} sub="on the board" />
-        <StatCard label="In progress" value={String(stats.active)} sub="being worked" />
-        <StatCard label="Approved" value={String(stats.approved)} sub="in the approved lane" />
-        <StatCard label="Credited" value={money(stats.credited)} sub="paid to designers" tone={stats.credited ? "pos" : undefined} />
+        <StatCard label={tl("designer", "Open cards")} value={String(stats.total)} sub={tl("designer", "on the board")} />
+        <StatCard label={tl("designer", "In progress")} value={String(stats.active)} sub={tl("designer", "being worked")} />
+        <StatCard label={tl("designer", "Approved")} value={String(stats.approved)} sub={tl("designer", "in the approved lane")} />
+        <StatCard label={tl("designer", "Credited")} value={money(stats.credited)} sub={tl("designer", "paid to designers")} tone={stats.credited ? "pos" : undefined} />
       </StatGrid>
 
       {/* Outsourced work is off the board, but not hidden: it's named so nobody wonders
@@ -647,7 +650,7 @@ export function DesignerBoard() {
         <div className={"flex items-center gap-2 rounded-lg border px-3 py-2 text-xs " +
           (err ? "border-hold/30 bg-hold/10 text-hold" : "border-border text-muted-foreground")}>
           {busy && <CircleNotch size={13} className="animate-spin" />}
-          {err ?? "Adding artwork to the board…"}
+          {err ?? tl("designer", "Adding artwork to the board…")}
         </div>
       )}
 
@@ -658,7 +661,7 @@ export function DesignerBoard() {
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           <Warning size={15} weight="fill" className="shrink-0" />
           <span className="min-w-0 flex-1">Couldn&apos;t load the board — {loadErr} Cards already sent are safe; this is a read failing, not work being lost.</span>
-          <Button size="sm" variant="outline" onClick={load}>Try again</Button>
+          <Button size="sm" variant="outline" onClick={load}>{tl("designer", "Try again")}</Button>
         </div>
       )}
       {cards === null ? (
@@ -732,7 +735,7 @@ export function DesignerBoard() {
  itself stays put instead of growing down as a lane fills. */}
                 <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
                   {list.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-muted-foreground/60">Drop cards or artwork here</div>
+                    <div className="py-6 text-center text-xs text-muted-foreground/60">{tl("designer", "Drop cards or artwork here")}</div>
                   ) : (
  list.map((c) => (
                       <div
@@ -760,7 +763,7 @@ export function DesignerBoard() {
                         <button
  type="button"
  onClick={() => setOpenId(c.id)}
- title="Open card details"
+ title={tl("designer", "Open card details")}
  aria-label={`Open ${c.title || "card"} details`}
  className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
                         >
@@ -801,7 +804,7 @@ export function DesignerBoard() {
                             Warehouse/admin only, matching the server. */}
                         {canDeleteCard() && <button
  aria-label={`Cancel ${c.title || "card"}`}
- title="Cancel this card"
+ title={tl("designer", "Cancel this card")}
  onClick={async (e) => {
  e.stopPropagation()
  const ok = await confirm({
@@ -856,7 +859,7 @@ export function DesignerBoard() {
                                 lookup. So the label is put on at display time and the stored
                                 value is left exactly as it is. */}
                             {designLabel(c.design_id) && (
-                              <span className="rounded bg-muted px-1.5 py-0.5 font-medium tabular-nums" title="This artwork's number — the same on the order">
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-medium tabular-nums" title={tl("designer", "This artwork's number — the same on the order")}>
                                 {designLabel(c.design_id)}
                               </span>
                             )}
@@ -867,7 +870,7 @@ export function DesignerBoard() {
  order number and matches nothing. The shared formatter
  takes the routing prefix off a marketplace id and shortens
  one of ours to the segment that distinguishes it. */}
-                              {c.order_id ? shortOrderRef(String(c.order_id)) : "No order"}
+                              {c.order_id ? shortOrderRef(String(c.order_id)) : tl("designer", "No order")}
                             </span>
                             {(c.product || c.type) && (
                               <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
@@ -920,10 +923,10 @@ export function DesignerBoard() {
             <button
  onClick={() => void addLane()}
  className="flex h-[calc(100vh-14rem)] min-h-[22rem] w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
- title="Add a column"
+ title={tl("designer", "Add a column")}
             >
               <Plus size={18} weight="bold" />
-              <span className="[writing-mode:vertical-rl] text-xs font-medium">Add Column</span>
+              <span className="[writing-mode:vertical-rl] text-xs font-medium">{tl("designer", "Add Column")}</span>
             </button>
           )}
         </div>
@@ -982,6 +985,7 @@ const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "la
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
 function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (id: string | number) => void; lanes: DesignLane[] }) {
+  const tl = useLabelT()
  const LIST_COLS = makeListCols(lanes)
  const order: string[] = lanes.map((l) => l.id)
  const rows = [...cards].sort((a, b) => order.indexOf(laneOf(a, lanes)) - order.indexOf(laneOf(b, lanes)))
@@ -1034,19 +1038,19 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
  setVisible(next); save(next, labels)
   }
 
- if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — use <span className="font-medium text-foreground">Add design</span> above, or send one from the Operator board.</div>
+ if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">{tl("designer", "No design cards yet — use")} <span className="font-medium text-foreground">{tl("designer", "Add design")}</span> {tl("designer", "above, or send one from the Operator board.")}</div>
 
  return (
     <div className="space-y-2">
       {canEdit && (
         <div className="flex justify-end">
           <div className="relative">
-            <Button variant="outline" size="sm" onClick={() => setMenuOpen((o) => !o)}>Columns</Button>
+            <Button variant="outline" size="sm" onClick={() => setMenuOpen((o) => !o)}>{tl("designer", "Columns")}</Button>
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 z-50 mt-1 w-72 rounded-xl border border-border bg-card p-2 shadow-xl">
-                  <div className="px-1 pb-1 eg-label text-muted-foreground">Columns — drag to reorder, toggle &amp; rename</div>
+                  <div className="px-1 pb-1 eg-label text-muted-foreground">{tl("designer", "Columns — drag to reorder, toggle & rename")}</div>
                   {/* Shown columns, in display order — drag the handle to reorder. */}
                   {shown.map((col, idx) => (
                     <div
@@ -1069,13 +1073,13 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
                   {LIST_COLS.filter((c) => !visible.includes(c.id)).map((col) => (
                     <div key={col.id} className="flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent">
                       <span className="size-3.5 shrink-0" />
-                      <button onClick={() => toggle(col.id)} title="Show" className="flex size-5 shrink-0 items-center justify-center">
+                      <button onClick={() => toggle(col.id)} title={tl("designer", "Show")} className="flex size-5 shrink-0 items-center justify-center">
                         <Square size={16} className="text-muted-foreground" />
                       </button>
                       <Input value={labelOf(col)} onChange={(e) => rename(col.id, e.target.value)} className="h-7 flex-1 text-xs" />
                     </div>
                   ))}
-                  <button onClick={reset} className="mt-1 w-full rounded-md px-2 py-1 text-left text-xs font-medium text-primary hover:bg-accent">Reset to default</button>
+                  <button onClick={reset} className="mt-1 w-full rounded-md px-2 py-1 text-left text-xs font-medium text-primary hover:bg-accent">{tl("designer", "Reset to default")}</button>
                 </div>
               </>
             )}
@@ -1107,6 +1111,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
 
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
 function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPushed, canPush, lanes }: { card: DesignCard; me: string; designFee: number; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPushed: () => void; canPush: boolean }) {
+  const tl = useLabelT()
   // Default the payout to the platform Design fee when the card hasn't set one.
  const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
  const [busy, setBusy] = useState(false)
@@ -1193,9 +1198,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
   // their board), not a local lane move, so their board and ours stay in step.
  const requestFix = async () => {
  const message = (await prompt({
- title: "What needs changing?",
+ title: tl("designer", "What needs changing?"),
  body: `This note is sent to ${vendorLabel(card.vendor)}.`,
- placeholder: "e.g. move the logo up, match Pantone 185…",
+ placeholder: tl("designer", "e.g. move the logo up, match Pantone 185…"),
  multiline: true,
  confirmLabel: `Send to ${vendorLabel(card.vendor)}`,
     }))?.trim()
@@ -1241,14 +1246,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
  if (e.key === "Enter") { e.preventDefault(); saveTitle() }
  else if (e.key === "Escape") { setTitleDraft(card.title || ""); setEditTitle(false) }
                   }}
- placeholder="Card title"
+ placeholder={tl("designer", "Card title")}
  className="w-full rounded-md border border-input bg-transparent px-2 py-1 text-base font-semibold outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               ) : (
                 <button
  type="button"
  onClick={() => { setTitleDraft(card.title || ""); setEditTitle(true) }}
- title="Click to rename"
+ title={tl("designer", "Click to rename")}
  className="group -ml-1 inline-flex max-w-full items-start gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-accent"
                 >
                   <span className="line-clamp-2">{cardLabel(card)}</span>
@@ -1275,12 +1280,12 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             <CardArt key={String(card.thumb ?? card.id)} card={card} imgClass="size-full object-contain" iconSize={40} />
             {card.thumb && (
               <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-background/80 py-1 text-2xs font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                <MagnifyingGlassPlus size={11} weight="bold" /> Full size
+                <MagnifyingGlassPlus size={11} weight="bold" /> {tl("designer", "Full size")}
               </span>
             )}
           </button>
           <div className="flex min-w-0 flex-1 flex-col">
-            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">{isEmbCard(card) ? "Check notes" : "Description / notes"}</label>
+            <label htmlFor={`card-desc-${card.id}`} className="mb-1 text-sm font-medium">{isEmbCard(card) ? tl("designer", "Check notes") : tl("designer", "Description / notes")}</label>
             <textarea
  id={`card-desc-${card.id}`}
  value={desc}
@@ -1297,13 +1302,13 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         {/* Compact meta line — method / priority / product, order state, customer, claimer.
             Status moved up to the header, so it isn't repeated here. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-pending"><Needle size={10} weight="bold" /> Embroidery</span>}
+          {isEmbCard(card) && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-pending"><Needle size={10} weight="bold" /> {tl("designer", "Embroidery")}</span>}
           {card.priority && card.priority !== "normal" && <span className="whitespace-nowrap text-xs font-medium text-hold">{String(card.priority)}</span>}
-          <span>{card.product || card.type || "No product / type set"}</span>
+          <span>{card.product || card.type || tl("designer", "No product / type set")}</span>
           <span aria-hidden>·</span>
           {card.order_id
-            ? <span>Order <span className="tabular-nums text-foreground" title={String(card.order_id)}>{shortOrderRef(String(card.order_id))}</span></span>
- : <span>Not attached to an order yet</span>}
+            ? <span>{tl("designer", "Order")} <span className="tabular-nums text-foreground" title={String(card.order_id)}>{shortOrderRef(String(card.order_id))}</span></span>
+ : <span>{tl("designer", "Not attached to an order yet")}</span>}
           {card.customer && <><span aria-hidden>·</span><span>{String(card.customer)}</span></>}
           {card.claimed_by && <><span aria-hidden>·</span><span>Claimed by {String(card.claimed_by)}</span></>}
         </div>
@@ -1313,14 +1318,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
         <div className="flex flex-wrap gap-2">
           {!card.order_id && (
             <Button size="sm" variant="outline" onClick={onAssign}>
-              Assign to an order
+              {tl("designer", "Assign to an order")}
             </Button>
           )}
           {/* EMB-check cards are already digitised — Pink Design DIGITISES raw art, so it's
  not an option here. They only get a factory check before stitching. */}
           {canPush && !card.vendor && !isEmbCard(card) && (
             <Button size="sm" variant={showPush ? "secondary" : "outline"} onClick={() => setShowPush((v) => !v)}>
-              Send to Pink Design
+              {tl("designer", "Send to Pink Design")}
             </Button>
           )}
         </div>
@@ -1342,14 +1347,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           </div>
           {refErr && <p className="text-xs text-destructive">{refErr}</p>}
           {refFiles.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push.</p>
+            <p className="text-xs text-muted-foreground">{tl("designer", "Mockups, spec sheets, marked-up screenshots — anything that tells the designer what you want. Kept on the card and sent with a Pink Design push.")}</p>
           ) : (
             <div className="space-y-1">
               {refFiles.map((f, i) => (
                 <div key={f.url + i} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs">
                   <Paperclip size={12} weight="bold" className="shrink-0 text-muted-foreground" />
                   <a href={f.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate hover:underline">{f.name || f.url}</a>
-                  <button onClick={() => removeRefFile(i)} className="shrink-0 text-muted-foreground hover:text-alert" title="Remove"><Trash size={13} /></button>
+                  <button onClick={() => removeRefFile(i)} className="shrink-0 text-muted-foreground hover:text-alert" title={tl("designer", "Remove")}><Trash size={13} /></button>
                 </div>
               ))}
             </div>
@@ -1389,26 +1394,26 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
             <div className="flex flex-wrap gap-2">
               {card.vendor_task_id && (
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-                  <div className="eg-label text-muted-foreground">Task ID</div>
+                  <div className="eg-label text-muted-foreground">{tl("designer", "Task ID")}</div>
                   <div className="select-all tabular-nums text-sm font-medium text-foreground">{String(card.vendor_task_id)}</div>
                 </div>
               )}
               {card.vendor_ref && (
                 <div className="rounded-lg border border-border bg-muted/40 px-3 py-1.5">
-                  <div className="eg-label text-muted-foreground">Ref ID</div>
+                  <div className="eg-label text-muted-foreground">{tl("designer", "Ref ID")}</div>
                   <div className="select-all tabular-nums text-sm font-medium text-foreground">{String(card.vendor_ref)}</div>
                 </div>
               )}
             </div>
             {card.vendor_ref && !card.vendor_task_id && (
               <div className="text-2xs text-muted-foreground">
-                Pink returns only the Ref ID on push — on their test-webhook form, put this in <span className="font-semibold">both</span> the Ref ID and Task ID fields.
+                {tl("designer", "Pink returns only the Ref ID on push — on their test-webhook form, put this in")} <span className="font-semibold">both</span> {tl("designer", "the Ref ID and Task ID fields.")}
               </div>
             )}
           </div>
         ) : (
           <div className="text-2xs text-hold">
-            No Ref/Task ID was recorded for this card, so status sync is off for it. Re-push to capture it.
+            {tl("designer", "No Ref/Task ID was recorded for this card, so status sync is off for it. Re-push to capture it.")}
           </div>
         ))}
 
@@ -1421,7 +1426,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {card.pushed_images.map((src, i) => (
                 <a key={i} href={src} target="_blank" rel="noopener noreferrer"
  className="block size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
- title="Open full size">
+ title={tl("designer", "Open full size")}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt="" loading="lazy" className="size-full object-cover" />
                 </a>
@@ -1466,14 +1471,14 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           }
  return canFee ? (
             <label className="flex items-center gap-2">
-              <span className="text-sm font-medium">Payout</span>
+              <span className="text-sm font-medium">{tl("designer", "Payout")}</span>
               <div className="relative w-32">
                 <CurrencyDollar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input value={pay} onChange={(e) => setPay(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="h-9 pl-7" inputMode="decimal" onBlur={() => patch(card.id, { payment: Number(pay) || 0 })} />
               </div>
             </label>
           ) : (
- amt(card.payment) > 0 ? <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div> : null
+ amt(card.payment) > 0 ? <div className="text-sm text-muted-foreground">{tl("designer", "Payout")} <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div> : null
           )
         })()}
 
@@ -1482,7 +1487,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
  order item with no extra step. */}
         {card.order_id && (
           <div className="space-y-1.5">
-            <span className="text-sm font-medium">Files</span>
+            <span className="text-sm font-medium">{tl("designer", "Files")}</span>
             {/* The card already knows its LINE (design_cards.line_id) — pass it, or a file a
  designer uploads here lands on every sibling of the same SKU. */}
             {/* `item` is what lets the panel NAME the artwork already placed on this line —
@@ -1517,8 +1522,8 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               )}
               {col === "review" && (
                 <>
-                  <Button size="sm" onClick={() => move("approved")}>Accept</Button>
-                  <Button size="sm" variant="outline" className="text-alert hover:text-alert" disabled={busy} onClick={requestFix}>Request changes</Button>
+                  <Button size="sm" onClick={() => move("approved")}>{tl("designer", "Accept")}</Button>
+                  <Button size="sm" variant="outline" className="text-alert hover:text-alert" disabled={busy} onClick={requestFix}>{tl("designer", "Request changes")}</Button>
                 </>
               )}
               {col === "fix" && (
@@ -1535,15 +1540,15 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {/* Sending out lives on the ORDER's item row, not here: the decision is made
  while looking at the line and its artwork, and a designer opening a card to
  claim it is not the person deciding to outsource it. */}
-              {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}>Claim</Button>}
-              {col === "inprogress" && <Button size="sm" onClick={() => move("review")}>Send for review</Button>}
+              {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}>{tl("designer", "Claim")}</Button>}
+              {col === "inprogress" && <Button size="sm" onClick={() => move("review")}>{tl("designer", "Send for review")}</Button>}
               {col === "review" && (
                 <>
-                  <Button size="sm" onClick={() => move("approved")}>Approve</Button>
-                  <Button size="sm" variant="outline" className="text-alert hover:text-alert" onClick={() => move("fix")}>Fix</Button>
+                  <Button size="sm" onClick={() => move("approved")}>{tl("designer", "Approve")}</Button>
+                  <Button size="sm" variant="outline" className="text-alert hover:text-alert" onClick={() => move("fix")}>{tl("designer", "Fix")}</Button>
                 </>
               )}
-              {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}>Back to work</Button>}
+              {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}>{tl("designer", "Back to work")}</Button>}
               {col === "approved" && (
  card.credited
                   ? <span className="inline-flex items-center gap-1 text-sm font-medium text-success"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
@@ -1551,7 +1556,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               )}
             </>
           )}
-          <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-alert">Remove card</button>
+          <button onClick={removeThis} className="ml-auto text-xs font-medium text-muted-foreground hover:text-alert">{tl("designer", "Remove card")}</button>
         </div>
 
         {/* Full-size artwork lightbox — fixed to the viewport (escapes the dialog's scroll
@@ -1560,7 +1565,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           <div
  role="button"
  tabIndex={0}
- aria-label="Close full-size view"
+ aria-label={tl("designer", "Close full-size view")}
  onClick={() => setZoom(false)}
  onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(false) }}
  className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6"
@@ -1600,6 +1605,7 @@ function boardSubject(r: AuditRow) {
 }
 
 function BoardHistory() {
+  const tl = useLabelT()
  const [rows, setRows] = useState<AuditRow[] | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [onlyDeletes, setOnlyDeletes] = useState(false)
@@ -1626,7 +1632,7 @@ function BoardHistory() {
  exactly that, without hunting through moves and credits. */}
         <button onClick={() => setOnlyDeletes((v) => !v)}
  className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-alert/30 bg-alert/12 text-alert" : "border-border text-muted-foreground hover:bg-accent")}>
-          {onlyDeletes ? "Showing deletions only" : "Deletions only"}
+          {onlyDeletes ? tl("designer", "Showing deletions only") : tl("designer", "Deletions only")}
         </button>
       </div>
 

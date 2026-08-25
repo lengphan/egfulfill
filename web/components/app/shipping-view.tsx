@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { Truck } from "@phosphor-icons/react"
 import { DispatchBoard } from "@/components/app/dispatch-board"
@@ -20,6 +21,7 @@ type Tab = "dispatch" | "shipments" | "rates"
  * (old-route redirects deep-link here); switching updates the URL in place.
  */
 export function ShippingView() {
+  const tl = useLabelT()
   const [tab, setTab] = useState<Tab>("dispatch")
 
   useEffect(() => {
@@ -45,15 +47,15 @@ export function ShippingView() {
       <div className="flex items-center gap-3 md:hidden">
         <Truck size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
-          <PageTitle>Shipping</PageTitle>
-          <p className="truncate text-sm text-muted-foreground">Today&apos;s dispatch queue, the shipment archive, and what a parcel costs.</p>
+          <PageTitle>{tl("shipping", "Shipping")}</PageTitle>
+          <p className="truncate text-sm text-muted-foreground">{tl("shipping", "Today’s dispatch queue, the shipment archive, and what a parcel costs.")}</p>
         </div>
       </div>
       {/* Rates is a THIRD tab rather than a dialog: pricing a parcel is work you do
           repeatedly while quoting, and the sweeps below fill a page rather than a popup. */}
       <TabBar
         ariaLabel="Shipping views"
-        items={[{ id: "dispatch", label: "Dispatch" }, { id: "shipments", label: "Shipments" }, { id: "rates", label: "Rates" }]}
+        items={[{ id: "dispatch", label: tl("shipping", "Dispatch") }, { id: "shipments", label: tl("shipping", "Shipments") }, { id: "rates", label: tl("shipping", "Rates") }]}
         value={tab}
         onChange={pick}
       />

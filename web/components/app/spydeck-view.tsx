@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
@@ -703,6 +704,7 @@ function KeywordCloud({ words, onPick }: { words: { text: string; weight: number
 }
 
 export function SpyDeckView() {
+  const tl = useLabelT()
   // Plan gate: SpyDeck is a paid add-on (bundled-free on Pro/Enterprise). Assume
   // entitled until we can read localStorage after mount, then re-check on plan change.
   // Entitlement is resolved SERVER-side (useEntitlements) because a team member inherits
@@ -861,7 +863,7 @@ export function SpyDeckView() {
  source: l.l,
  returnTo: "/spydeck",
  returnLabel: "Back to SpyDeck",
- title: "Edit listing",
+ title: tl("spydeck", "Edit listing"),
       })
  setEditing(null)
  if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
@@ -928,7 +930,7 @@ export function SpyDeckView() {
  source: l,
  returnTo: "/spydeck",
  returnLabel: "Back to SpyDeck",
- title: "Create product",
+ title: tl("spydeck", "Create product"),
       })
  setMakeListing(null)
  if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
@@ -1308,10 +1310,10 @@ export function SpyDeckView() {
 
             No caveat rides here — StatCard drops `sub` deliberately, app-wide. The sample the
  other three cards are computed over is named once, on the keyword card below. */}
-        <StatCard label="Results" value={stats.ready ? stats.count.toLocaleString("en-US") : "—"} />
-        <StatCard label="Median price" value={stats.ready ? money(stats.median) : "—"} sub="typical listing" />
-        <StatCard label="Shops" value={stats.ready ? String(stats.shops) : "—"} sub="unique sellers" />
-        <StatCard label="Most viewed" value={stats.ready && stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
+        <StatCard label={tl("spydeck", "Results")} value={stats.ready ? stats.count.toLocaleString("en-US") : "—"} />
+        <StatCard label={tl("spydeck", "Median price")} value={stats.ready ? money(stats.median) : "—"} sub={tl("spydeck", "typical listing")} />
+        <StatCard label={tl("spydeck", "Shops")} value={stats.ready ? String(stats.shops) : "—"} sub={tl("spydeck", "unique sellers")} />
+        <StatCard label={tl("spydeck", "Most viewed")} value={stats.ready && stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
       </StatGrid>
 
       {view === "search" && (
@@ -1331,7 +1333,7 @@ export function SpyDeckView() {
       )}
 
       <SectionCard
- title="Product research"
+ title={tl("spydeck", "Product research")}
  actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(([
@@ -1348,7 +1350,7 @@ export function SpyDeckView() {
                   (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
-                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? "Trending" : v === "account" ? "My shop" : v === "stores" ? "Stores" : "Search"}
+                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? tl("spydeck", "Trending") : v === "account" ? tl("spydeck", "My shop") : v === "stores" ? tl("spydeck", "Stores") : tl("spydeck", "Search")}
               </button>
             ))}
           </div>
@@ -1363,60 +1365,60 @@ export function SpyDeckView() {
  value={query}
  onChange={(e) => setQuery(e.target.value)}
  onKeyDown={(e) => e.key === "Enter" && run()}
- placeholder="e.g. vintage sunset tee"
+ placeholder={tl("spydeck", "e.g. vintage sunset tee")}
  className="pl-9"
                 />
               </div>
               {canFilter && (
                 <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
-                  Filters
+                  {tl("spydeck", "Filters")}
                 </Button>
               )}
               <Button onClick={() => { setView("search"); run() }} disabled={loading || (!query.trim() && !hasFilter)}>
-                {loading ? "Searching…" : "Search"}
+                {loading ? tl("spydeck", "Searching…") : tl("spydeck", "Search")}
               </Button>
             </div>
 
             {canFilter && showFilters && (
               <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-6">
-                <FilterField label="Category">
+                <FilterField label={tl("spydeck", "Category")}>
                   <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
-                    <option value="">All</option>
+                    <option value="">{tl("spydeck", "All")}</option>
                     {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </FilterField>
-                <FilterField label="Sort by">
+                <FilterField label={tl("spydeck", "Sort by")}>
                   <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select eg-control pr-8">
-                    <option value="relevance">Relevance</option>
+                    <option value="relevance">{tl("spydeck", "Relevance")}</option>
                     {/* Ranked from what has been fetched, not from Etsy — see CLIENT_SORTS. */}
-                    <option value="best">Est. best sellers</option>
-                    <option value="revenue">Est. revenue</option>
-                    <option value="newest">Newest</option>
-                    <option value="price_asc">Price: low → high</option>
-                    <option value="price_desc">Price: high → low</option>
+                    <option value="best">{tl("spydeck", "Est. best sellers")}</option>
+                    <option value="revenue">{tl("spydeck", "Est. revenue")}</option>
+                    <option value="newest">{tl("spydeck", "Newest")}</option>
+                    <option value="price_asc">{tl("spydeck", "Price: low → high")}</option>
+                    <option value="price_desc">{tl("spydeck", "Price: high → low")}</option>
                   </select>
                 </FilterField>
-                <FilterField label="Min price ($)">
+                <FilterField label={tl("spydeck", "Min price ($)")}>
                   <Input value={minPrice} onChange={(e) => setMinPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" className="h-9" inputMode="decimal" />
                 </FilterField>
-                <FilterField label="Max price ($)">
-                  <Input value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Any" className="h-9" inputMode="decimal" />
+                <FilterField label={tl("spydeck", "Max price ($)")}>
+                  <Input value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={tl("spydeck", "Any")} className="h-9" inputMode="decimal" />
                 </FilterField>
-                <FilterField label="Min sold/day">
+                <FilterField label={tl("spydeck", "Min sold/day")}>
                   <Input value={minSold} onChange={(e) => setMinSold(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
-                <FilterField label="Min favorites">
+                <FilterField label={tl("spydeck", "Min favorites")}>
                   <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
                 <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-6">
-                  <Button size="sm" onClick={() => run()} disabled={!query.trim() && !hasFilter}>Apply filters</Button>
+                  <Button size="sm" onClick={() => run()} disabled={!query.trim() && !hasFilter}>{tl("spydeck", "Apply filters")}</Button>
                   <button
  onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav("") }}
  className="text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
-                    Reset
+                    {tl("spydeck", "Reset")}
                   </button>
-                  <span className="ml-auto text-xs text-muted-foreground">Category, price &amp; sort search Etsy; sold/day &amp; favorites filter results live.</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{tl("spydeck", "Category, price & sort search Etsy; sold/day & favorites filter results live.")}</span>
                 </div>
               </div>
             )}
@@ -1445,7 +1447,7 @@ export function SpyDeckView() {
             // "The feed failed" and "nothing is trending" are different answers, and the
             // second one is the product's whole value proposition. Say which.
             <div className="py-16 text-center text-sm text-muted-foreground">
-              Couldn&apos;t load today&apos;s trending feed — this is a fetch problem, not an empty market.
+              {tl("spydeck", "Couldn’t load today’s trending feed — this is a fetch problem, not an empty market.")}
               <div className="mt-1 text-xs">{trendErr}</div>
             </div>
           ) : trending === null ? (
@@ -1453,7 +1455,7 @@ export function SpyDeckView() {
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[320px] animate-pulse rounded-2xl bg-muted" />)}
             </div>
           ) : trending.products.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">Today&apos;s trending feed isn&apos;t available yet — try a search, or check back shortly.</div>
+            <div className="py-16 text-center text-sm text-muted-foreground">{tl("spydeck", "Today’s trending feed isn’t available yet — try a search, or check back shortly.")}</div>
           ) : (
             <>
               {/* Refresh controls: "More ideas" reshuffles the day's cached pool for free;
@@ -1463,14 +1465,14 @@ export function SpyDeckView() {
                 <button
  type="button" onClick={moreIdeas} disabled={refreshing || freshScanning}
  className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
- title="Reshuffle the feed for a fresh set of ideas — free and instant"
+ title={tl("spydeck", "Reshuffle the feed for a fresh set of ideas — free and instant")}
                 >
                   {refreshing ? <CircleNotch size={14} className="animate-spin" /> : null} More ideas
                 </button>
                 <button
  type="button" onClick={freshScan} disabled={refreshing || freshScanning}
  className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
- title="Pull a brand-new batch of niches from Etsy (rate-limited)"
+ title={tl("spydeck", "Pull a brand-new batch of niches from Etsy (rate-limited)")}
                 >
                   {freshScanning ? <CircleNotch size={14} className="animate-spin" /> : null} Fresh scan
                 </button>
@@ -1490,8 +1492,8 @@ export function SpyDeckView() {
               <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <Storefront size={24} weight="duotone" />
               </span>
-              <div className="font-medium">Nothing uploaded yet</div>
-              <div className="max-w-xs text-sm text-muted-foreground">Hit &ldquo;Create product&rdquo; on any card to publish it as an Etsy draft — it&apos;ll show here.</div>
+              <div className="font-medium">{tl("spydeck", "Nothing uploaded yet")}</div>
+              <div className="max-w-xs text-sm text-muted-foreground">{tl("spydeck", "Hit “Create product” on any card to publish it as an Etsy draft — it’ll show here.")}</div>
             </div>
           ) : (
             <>
@@ -1509,8 +1511,8 @@ export function SpyDeckView() {
               <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <Heart size={24} weight="duotone" />
               </span>
-              <div className="font-medium">No saved listings yet</div>
-              <div className="max-w-xs text-sm text-muted-foreground">Tap the heart on any research card to save it here for later.</div>
+              <div className="font-medium">{tl("spydeck", "No saved listings yet")}</div>
+              <div className="max-w-xs text-sm text-muted-foreground">{tl("spydeck", "Tap the heart on any research card to save it here for later.")}</div>
             </div>
           ) : (
             <>
@@ -1527,8 +1529,8 @@ export function SpyDeckView() {
             <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <Binoculars size={26} weight="duotone" />
             </span>
-            <div className="font-medium">Research the competition</div>
-            <div className="max-w-xs text-sm text-muted-foreground">Search any keyword to spy live Etsy listings — price, views and favorites, with the standouts flagged <span className="font-medium text-rose-600">Trending</span>. Heart the winners to save them.</div>
+            <div className="font-medium">{tl("spydeck", "Research the competition")}</div>
+            <div className="max-w-xs text-sm text-muted-foreground">{tl("spydeck", "Search any keyword to spy live Etsy listings — price, views and favorites, with the standouts flagged")} <span className="font-medium text-rose-600">{tl("spydeck", "Trending")}</span>{tl("spydeck", ". Heart the winners to save them.")}</div>
           </div>
         ) : loading ? (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1537,7 +1539,7 @@ export function SpyDeckView() {
             ))}
           </div>
         ) : results.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">No listings found. Try another keyword.</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">{tl("spydeck", "No listings found. Try another keyword.")}</div>
         ) : (
           <>
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1561,7 +1563,7 @@ export function SpyDeckView() {
           {loadingMore && (
             <p className="px-5 pb-2 text-xs text-muted-foreground" role="status" aria-live="polite">
               <CircleNotch size={12} className="mr-1 inline animate-spin" />
-              Fetching more results…
+              {tl("spydeck", "Fetching more results…")}
             </p>
           )}
           <Pagination page={resultsPaged.page} pageCount={resultsPaged.pageCount} perPage={resultsPaged.perPage} total={resultsPaged.total} start={resultsPaged.start} onPage={resultsPaged.setPage} onPerPage={resultsPaged.setPerPage} perPageOptions={[24, 48, 96]} />
@@ -1598,6 +1600,7 @@ export function SpyDeckView() {
 
 // Shown when the seller isn't entitled to SpyDeck — an upsell to the Plan tab.
 function SpyDeckLocked() {
+  const tl = useLabelT()
  const cfg = getSpydeckConfig()
  const perks = [
     "Trending Etsy listings in your niche",
@@ -1614,7 +1617,7 @@ function SpyDeckLocked() {
             <LockSimple size={11} weight="fill" />
           </span>
         </span>
-        <h2 className="mt-4 text-xl font-semibold tracking-tight">SpyDeck is a research add-on</h2>
+        <h2 className="mt-4 text-xl font-semibold tracking-tight">{tl("spydeck", "SpyDeck is a research add-on")}</h2>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
           Unlock product research to find winning listings before you print. Included free on Pro &amp; Enterprise,
  or add it to any plan for ${cfg.price}/mo.
@@ -1628,7 +1631,7 @@ function SpyDeckLocked() {
           ))}
         </ul>
         <Link href="/settings?tab=plan" className={cn(buttonVariants(), "mt-6 w-full sm:w-auto")}>
-          See plans
+          {tl("spydeck", "See plans")}
         </Link>
       </div>
     </div>

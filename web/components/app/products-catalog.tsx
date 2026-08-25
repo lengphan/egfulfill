@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -108,6 +109,7 @@ const DEMO: CatalogProduct[] = [
 ]
 
 export function ProductsCatalog() {
+  const tl = useLabelT()
  const router = useRouter()
  const reduce = useReducedMotion()
  const [products, setProducts] = useState<CatalogProduct[] | null>(null)
@@ -236,14 +238,14 @@ export function ProductsCatalog() {
  return (
     <div className="space-y-5">
       <StatGrid>
-        <StatCard label="Products" value={String(stats.total)} sub="in your catalog" />
-        <StatCard label="Categories" value={String(stats.cats)} sub="product types" />
-        <StatCard label="Internal" value={String(stats.internal)} sub="sellers or staff only" />
+        <StatCard label={tl("products", "Products")} value={String(stats.total)} sub={tl("products", "in your catalog")} />
+        <StatCard label={tl("products", "Categories")} value={String(stats.cats)} sub={tl("products", "product types")} />
+        <StatCard label={tl("products", "Internal")} value={String(stats.internal)} sub={tl("products", "sellers or staff only")} />
         {/* Counts what the site actually SHOWS, not how many are Active. The two differ only
  when a product has no price, and when they do this tile says so rather than
  quietly reporting the larger, friendlier number. */}
         <StatCard
- label="On the public site"
+ label={tl("products", "On the public site")}
  value={String(stats.live)}
  sub={stats.stranded > 0
             ? `${stats.stranded} Active but held back`
@@ -263,8 +265,8 @@ export function ProductsCatalog() {
         <div className="flex items-start gap-2.5 rounded-xl border border-hold/30/60 bg-hold/10 px-4 py-3 text-sm text-hold">
           <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
           <div>
-            <strong>{stats.stranded} Active product{stats.stranded === 1 ? " is" : "s are"} not showing on the site.</strong>{" "}
-            {stats.stranded === 1 ? "It has" : "They have"} no price, and the public catalogue
+            <strong>{stats.stranded} Active product{stats.stranded === 1 ? " is" : tl("products", "s are")} not showing on the site.</strong>{" "}
+            {stats.stranded === 1 ? tl("products", "It has") : tl("products", "They have")} no price, and the public catalogue
  skips anything without one. Set a base price on the product and it appears.
           </div>
         </div>
@@ -298,7 +300,7 @@ export function ProductsCatalog() {
             <Input
  value={query}
  onChange={(e) => setQuery(e.target.value)}
- placeholder="Search products…"
+ placeholder={tl("products", "Search products…")}
  className="w-52 pl-9"
             />
           </div>
@@ -312,7 +314,7 @@ export function ProductsCatalog() {
           )}
           {isStaff && (
             <Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true) }}>
-              <Plus size={14} weight="bold" /> Add product
+              <Plus size={14} weight="bold" /> {tl("products", "Add product")}
             </Button>
           )}
         </div>
@@ -321,7 +323,7 @@ export function ProductsCatalog() {
       {isDemo && (
         <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Sparkle size={14} weight="fill" />
-          Showing sample products — sign in to load your live catalog.
+          {tl("products", "Showing sample products — sign in to load your live catalog.")}
         </div>
       )}
 
@@ -331,8 +333,8 @@ export function ProductsCatalog() {
           <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
             <Package size={26} weight="duotone" />
           </span>
-          <div className="font-medium">No products match that.</div>
-          <div className="text-sm text-muted-foreground">Try a different search or category.</div>
+          <div className="font-medium">{tl("products", "No products match that.")}</div>
+          <div className="text-sm text-muted-foreground">{tl("products", "Try a different search or category.")}</div>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -363,15 +365,15 @@ export function ProductsCatalog() {
                   <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
  onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
- title="Design this product"
+ title={tl("products", "Design this product")}
  className="flex size-7 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground shadow hover:bg-primary/90"
                     >
                       <PenNib size={13} weight="bold" />
                     </button>
                     {isStaff && (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditing(p); setEditorOpen(true) }} title="Edit" className="flex size-7 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-accent"><PencilSimple size={13} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); deleteProduct(p.id) }} title="Delete" className="flex size-7 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-alert"><Trash size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditing(p); setEditorOpen(true) }} title={tl("products", "Edit")} className="flex size-7 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-accent"><PencilSimple size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); deleteProduct(p.id) }} title={tl("products", "Delete")} className="flex size-7 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-alert"><Trash size={13} /></button>
                       </>
                     )}
                   </div>
@@ -443,7 +445,7 @@ export function ProductsCatalog() {
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="truncate font-semibold">{p.name ?? "Untitled"}</div>
+                      <div className="truncate font-semibold">{p.name ?? tl("products", "Untitled")}</div>
                       {/* Ours, else theirs. A product should always have ours — but the ones
  that don't are exactly the ones you need to find, and a row reading
                           "—" tells you nothing about which blank it is. sellerSafe strips
@@ -476,14 +478,14 @@ export function ProductsCatalog() {
                       {colors.length > 8 && (
                         <span className="shrink-0 text-2xs text-muted-foreground">+{colors.length - 8}</span>
                       )}
-                      {colors.length === 0 && <span className="text-2xs text-muted-foreground">No colours set</span>}
+                      {colors.length === 0 && <span className="text-2xs text-muted-foreground">{tl("products", "No colours set")}</span>}
                     </div>
                     {/* TEXT, NOT A PILL. Every card carried a beige type chip and three
  beige size chips — four boxes per tile, forty-eight in a grid of
  twelve, and not one of them was a control. The words say the same
  thing; the boxes were the "lots of shaded beige". */}
                     <span className="shrink-0 text-2xs font-medium text-muted-foreground">
-                      {p.type || "Uncategorised"}
+                      {p.type || tl("products", "Uncategorised")}
                     </span>
                   </div>
 
@@ -494,7 +496,7 @@ export function ProductsCatalog() {
  per-size price tiers (sizesOf unions both). */}
                   <div className="mt-3 flex min-h-6 items-center gap-2 overflow-hidden">
                     {sizes.length === 0 ? (
-                      <span className="text-2xs text-muted-foreground">No sizes set</span>
+                      <span className="text-2xs text-muted-foreground">{tl("products", "No sizes set")}</span>
                     ) : (
                       <>
                         {sizes.slice(0, 7).map((s) => (

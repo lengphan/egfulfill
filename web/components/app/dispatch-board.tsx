@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
@@ -216,6 +217,7 @@ const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
 ]
 
 export function DispatchBoard() {
+  const tl = useLabelT()
  const role = getUser()?.role || ""
   // Operators work this board too — they are the ones who notice a label shouldn't go
   // out. What they cannot do is claim a parcel LEFT: "Mark scanned" asserts physical
@@ -862,8 +864,8 @@ export function DispatchBoard() {
  return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="To scan" value={String(queue.length)} sub="labelled, not scanned yet" tone="pos" />
-        <StatCard label="With byeastside" value={String(withPartner.length)} sub="in their queue, not picked yet" tone={withPartner.length ? "neg" : "mut"} />
+        <StatCard label={tl("dispatch", "To scan")} value={String(queue.length)} sub={tl("dispatch", "labelled, not scanned yet")} tone="pos" />
+        <StatCard label={tl("dispatch", "With byeastside")} value={String(withPartner.length)} sub={tl("dispatch", "in their queue, not picked yet")} tone={withPartner.length ? "neg" : "mut"} />
       </StatGrid>
 
       {/* Stuck with the partner: still linked (dispatch_pdf_id) but off the board and unscanned,
@@ -876,7 +878,7 @@ export function DispatchBoard() {
             {stuck.length} order{stuck.length === 1 ? "" : "s"} still linked to byeastside but off the board
           </div>
           <p className="mt-1 text-xs text-hold">
-            Their recall failed, so the Scan tag stays amber. <b>Only after you&apos;ve confirmed the label is removed on byeastside</b>, force-clear our link — it may still be in their queue otherwise.
+            {tl("dispatch", "Their recall failed, so the Scan tag stays amber.")} <b>{tl("dispatch", "Only after you’ve confirmed the label is removed on byeastside")}</b>{tl("dispatch", ", force-clear our link — it may still be in their queue otherwise.")}
           </p>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {stuck.map((o) => (
@@ -885,7 +887,7 @@ export function DispatchBoard() {
  className="eg-tap inline-flex items-center gap-1 rounded-lg border border-hold/40 bg-white px-2 py-1 text-xs font-medium text-hold transition-colors hover:bg-hold/15 disabled:opacity-50"
  title={`Force-clear ${numOf(o)}'s byeastside link`}
               >
-                <span className="tabular-nums">{numOf(o)}</span> · Force-clear
+                <span className="tabular-nums">{numOf(o)}</span> {tl("dispatch", "· Force-clear")}
               </button>
             ))}
             {stuck.length > 1 && (
@@ -907,22 +909,22 @@ export function DispatchBoard() {
         <p className="px-1 text-xs text-muted-foreground">
           {/* The explicit spaces are load-bearing: the compiler drops the one after a
  closing tag mid-line, which shipped as "Externalare labels from outside". */}
-          Rows tagged <b>External</b>{" "}
+          Rows tagged <b>{tl("dispatch", "External")}</b>{" "}
  are labels from outside — they&apos;re not attached to an
           EGFUL order and nothing is charged for them. Tick one and press{" "}
-          <b>Send to byeastside</b> to put it in their pre-scan queue.
+          <b>{tl("dispatch", "Send to byeastside")}</b> to put it in their pre-scan queue.
         </p>
       )}
 
       <SectionCard
- title="Dispatch"
+ title={tl("dispatch", "Dispatch")}
  actions={view === "history" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
                 USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
             <DropdownMenu>
               <DropdownMenuTrigger className="eg-control">
-                Print <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+                {tl("dispatch", "Print")} <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               {/**
                 * WORDS, NOT ICONS — the rule the purchase board already follows.
@@ -937,13 +939,13 @@ export function DispatchBoard() {
                 */}
               <DropdownMenuContent align="start" className="w-44 p-1">
                 <DropdownMenuItem disabled={!chosen.length} onClick={printPackingSlips}>
-                  Packing slips
+                  {tl("dispatch", "Packing slips")}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!chosen.length} onClick={printManifest}>
-                  Manifest
+                  {tl("dispatch", "Manifest")}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!chosenWithLabel.length} onClick={openLabels}>
-                  Labels
+                  {tl("dispatch", "Labels")}
                 </DropdownMenuItem>
                 {/* REPRINT sits beside the SCAN form: both produce paper, neither spends
  money. Deliberately a separate item from anything that BUYS a label —
@@ -953,11 +955,11 @@ export function DispatchBoard() {
  disabled={!chosen.some((o) => o.tracking_label_url) || reprinting || busy}
  onClick={reprintLabels}
                 >
-                  Reprint labels
+                  {tl("dispatch", "Reprint labels")}
                 </DropdownMenuItem>
                 {canScanOut && (
                   <DropdownMenuItem disabled={!chosen.length || busy} onClick={() => setManifestOpen(true)} title={manifestTooltip(chosen)}>
-                    SCAN form
+                    {tl("dispatch", "SCAN form")}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -976,11 +978,11 @@ export function DispatchBoard() {
  their life disabled, which were taking prime space to do nothing. */}
             <DropdownMenu>
               <DropdownMenuTrigger className="eg-control">
-                More <CaretDown size={12} weight="bold" className="text-muted-foreground" />
+                {tl("dispatch", "More")} <CaretDown size={12} weight="bold" className="text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-1">
                 <DropdownMenuItem disabled={!chosenWithLabel.length || busy} onClick={labelAndSlip}>
-                  Label &amp; Slip
+                  {tl("dispatch", "Label & Slip")}
                 </DropdownMenuItem>
                 {/* Discards any selected file that was dropped but never sent. Only staged
  files — an ORDER has nothing to discard, it is listed because it has an
@@ -988,12 +990,12 @@ export function DispatchBoard() {
                 <DropdownMenuItem
  disabled={!stagedChosen.length || busy}
  onClick={() => { for (const s of stagedChosen) discardStaged(stagedKeyOf(s)) }}
- title="Discard the dropped files that haven't been sent anywhere"
+ title={tl("dispatch", "Discard the dropped files that haven't been sent anywhere")}
                 >
-                  Discard dropped files
+                  {tl("dispatch", "Discard dropped files")}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={(!chosen.length && !uploadsChosen.length) || busy} onClick={pullBack}>
-                  Cancel with byeastside
+                  {tl("dispatch", "Cancel with byeastside")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1009,19 +1011,19 @@ export function DispatchBoard() {
  title={stagedChosen.length
                   ? `Upload ${chosenWithLabel.length ? "these labels and " : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
  : "Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label"}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : "Send to byeastside"}
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Send to byeastside")}
               </Button>
             )}
             {canScanOut && (
               <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={markScanned}
- title="Record that we scanned these ourselves — starts the buyer's tracking. Doesn't change what production is doing.">
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : "Scanned here"}
+ title={tl("dispatch", "Record that we scanned these ourselves — starts the buyer's tracking. Doesn't change what production is doing.")}>
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Scanned here")}
               </Button>
             )}
             {canScanOut && (
               <Button size="sm" disabled={!chosen.length || busy || !canFinish} onClick={finishAll}
  title={canFinish ? "Mark the selected orders Shipped & Fulfilled" : "Your role can't ship orders out"}>
-                {busy ? <CircleNotch size={14} className="animate-spin" /> : "Finish All"}
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Finish All")}
               </Button>
             )}
           </div>
@@ -1038,13 +1040,13 @@ export function DispatchBoard() {
             ariaLabel="Dispatch view"
             className="shrink-0 border-b-0"
             items={[
-              { id: "queue" as const, label: "To scan" },
-              { id: "history" as const, label: "History", count: history.length || undefined },
+              { id: "queue" as const, label: tl("dispatch", "To scan") },
+              { id: "history" as const, label: tl("dispatch", "History"), count: history.length || undefined },
             ]}
             value={view}
             onChange={setView}
           />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search order, customer or tracking…" className="h-9 max-w-xs" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("dispatch", "Search order, customer or tracking…")} className="h-9 max-w-xs" />
           {view === "history" && (
             <div className="flex flex-wrap items-center gap-1">
               {HIST_FILTERS.map((f) => (
@@ -1087,7 +1089,7 @@ export function DispatchBoard() {
  what was on screen, and the count in each button was a count of half the list. */}
           {view === "queue" && (
             <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}>
-              {allSelected ? "Clear selection" : `Select all ${selectableAll}`}
+              {allSelected ? tl("dispatch", "Clear selection") : `Select all ${selectableAll}`}
             </Button>
           )}
         </div>
@@ -1109,19 +1111,19 @@ export function DispatchBoard() {
  history.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
               <ListChecks size={26} weight="duotone" className="opacity-50" />
-              <div className="text-sm font-medium text-foreground">{q || histFilter !== "all" ? "Nothing matches" : "No label activity yet"}</div>
-              <div className="text-xs">Every label and what became of it — scanned, shipped, pulled off the board, or dropped in from outside — shows here.</div>
+              <div className="text-sm font-medium text-foreground">{q || histFilter !== "all" ? tl("dispatch", "Nothing matches") : tl("dispatch", "No label activity yet")}</div>
+              <div className="text-xs">{tl("dispatch", "Every label and what became of it — scanned, shipped, pulled off the board, or dropped in from outside — shows here.")}</div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <div className={HIST_GRID + " border-b border-border py-2 eg-label text-muted-foreground"}>
                 <span />
-                <span>Status</span>
-                <span>Order / file</span>
-                <span>Customer</span>
-                <span>Channel</span>
-                <span>Method</span>
-                <span>When</span>
+                <span>{tl("dispatch", "Status")}</span>
+                <span>{tl("dispatch", "Order / file")}</span>
+                <span>{tl("dispatch", "Customer")}</span>
+                <span>{tl("dispatch", "Channel")}</span>
+                <span>{tl("dispatch", "Method")}</span>
+                <span>{tl("dispatch", "When")}</span>
                 <span />
               </div>
               <div className="divide-y divide-border">
@@ -1155,10 +1157,10 @@ export function DispatchBoard() {
                         <span className="truncate text-sm text-muted-foreground">
                           {u.total_pages ? `${u.total_pages} page${u.total_pages === 1 ? "" : "s"}` : "—"}
                         </span>
-                        <span className="truncate text-xs text-muted-foreground">External label</span>
+                        <span className="truncate text-xs text-muted-foreground">{tl("dispatch", "External label")}</span>
                         <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                           <UploadSimple size={12} className="shrink-0 opacity-70" />
-                          <span className="truncate">Drop zone</span>
+                          <span className="truncate">{tl("dispatch", "Drop zone")}</span>
                         </span>
                         <span className="truncate text-xs text-muted-foreground" title={u.created_by ? `Sent by ${u.created_by}` : undefined}>{when}</span>
                         {u.public_url ? (
@@ -1185,8 +1187,8 @@ export function DispatchBoard() {
                           }) : (
                             <div className="text-xs text-muted-foreground">
                               {u.total_labels === 0
-                                ? "byeastside read the file and found no tracking label on it — re-send a clearer copy."
- : "No tracking numbers read off this file yet."}
+                                ? tl("dispatch", "byeastside read the file and found no tracking label on it — re-send a clearer copy.")
+ : tl("dispatch", "No tracking numbers read off this file yet.")}
                             </div>
                           )}
                           <div className="pt-1 text-2xs text-muted-foreground">
@@ -1246,9 +1248,9 @@ export function DispatchBoard() {
  return (
                         <div className="border-t border-border bg-muted/20 py-2 pl-11 pr-5">
                           {events === null || events === undefined ? (
-                            <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> Loading dispatch history…</div>
+                            <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> {tl("dispatch", "Loading dispatch history…")}</div>
                           ) : !evs || evs.length === 0 ? (
-                            <div className="py-2 text-sm text-muted-foreground">No dispatch actions recorded for this label yet.</div>
+                            <div className="py-2 text-sm text-muted-foreground">{tl("dispatch", "No dispatch actions recorded for this label yet.")}</div>
                           ) : (
                             <ActivityFeed rows={evs} variant="bare" note />
                           )}
@@ -1264,8 +1266,8 @@ export function DispatchBoard() {
         ) : queue.length === 0 && !staged.length && !uploads.length ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
             <Truck size={26} weight="duotone" className="opacity-50" />
-            <div className="text-sm font-medium text-foreground">Nothing waiting to go out</div>
-            <div className="text-xs">An order appears here the moment it has a label nobody has scanned — or drop a label PDF anywhere on this page.</div>
+            <div className="text-sm font-medium text-foreground">{tl("dispatch", "Nothing waiting to go out")}</div>
+            <div className="text-xs">{tl("dispatch", "An order appears here the moment it has a label nobody has scanned — or drop a label PDF anywhere on this page.")}</div>
           </div>
         ) : (
           /* ONE COLUMN PER FACT — the same nine the external-label list uses, so the two
@@ -1275,13 +1277,13 @@ export function DispatchBoard() {
           <div className="overflow-x-auto">
             <div className={DISPATCH_GRID + " " + DISPATCH_HEAD}>
               <span />
-              <span>Order</span>
-              <span>Customer</span>
-              <span>Channel</span>
-              <span>Units</span>
-              <span>Ship to</span>
-              <span>Status</span>
-              <span>Tracking</span>
+              <span>{tl("dispatch", "Order")}</span>
+              <span>{tl("dispatch", "Customer")}</span>
+              <span>{tl("dispatch", "Channel")}</span>
+              <span>{tl("dispatch", "Units")}</span>
+              <span>{tl("dispatch", "Ship to")}</span>
+              <span>{tl("dispatch", "Status")}</span>
+              <span>{tl("dispatch", "Tracking")}</span>
               <span />
             </div>
             <div className="divide-y divide-border">
@@ -1342,7 +1344,7 @@ export function DispatchBoard() {
  but not scanned back yet), so it's visible whether a parcel is out for
  external scan or still waiting here. */}
                   <span className="min-w-0">
-                    {sentOut ? <DispStatus k="removed" label="Sent to partner" /> : <DispStatus k={d.key} label={d.label} />}
+                    {sentOut ? <DispStatus k="removed" label={tl("dispatch", "Sent to partner")} /> : <DispStatus k={d.key} label={d.label} />}
                   </span>
                   {o.tracking ? (
                     <span className="truncate text-xs tabular-nums text-muted-foreground" title={o.tracking}>{o.tracking}</span>
@@ -1353,7 +1355,7 @@ export function DispatchBoard() {
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLabelFor(o) }}
  className="eg-tap inline-flex w-fit items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
                     >
-                      Create label
+                      {tl("dispatch", "Create label")}
                     </button>
                   )}
                   <span className="flex justify-end gap-1">

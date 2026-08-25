@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { EnvelopeSimple, CircleNotch, Warning, Plus, PaperPlaneTilt, Trash, PencilSimple, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -92,6 +93,7 @@ const EMAIL_PRESETS: { id: string; label: string; hint: string }[] = [
  * non-admin write anyway). The logo reuses the hero-image upload — any public image URL.
  */
 function EmailBrandingCard() {
+  const tl = useLabelT()
  const [open, setOpen] = useState(false)
  const [b, setB] = useState<EmailBranding | null>(null)
  const [busy, setBusy] = useState(false)
@@ -157,13 +159,13 @@ function EmailBrandingCard() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Email branding</DialogTitle>
-            <DialogDescription>Logo, colour and footer — applied to every broadcast email.</DialogDescription>
+            <DialogTitle>{tl("broadcasts", "Email branding")}</DialogTitle>
+            <DialogDescription>{tl("broadcasts", "Logo, colour and footer — applied to every broadcast email.")}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Theme</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Theme")}</label>
             <select value={b.preset} onChange={(e) => patch({ preset: e.target.value })}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
               {EMAIL_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
@@ -171,46 +173,46 @@ function EmailBrandingCard() {
             <span className="mt-1 block text-xs text-muted-foreground">{preset.hint}</span>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Accent colour</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Accent colour")}</label>
             <div className="flex items-center gap-2">
               <input type="color" value={b.accent} onChange={(e) => patch({ accent: e.target.value })}
- className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-1" aria-label="Accent colour" />
-              <Input value={b.accent} onChange={(e) => patch({ accent: e.target.value })} className="h-9 tabular-nums" placeholder="#604cfa" />
+ className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-1" aria-label={tl("broadcasts", "Accent colour")} />
+              <Input value={b.accent} onChange={(e) => patch({ accent: e.target.value })} className="h-9 tabular-nums" placeholder={tl("broadcasts", "#604cfa")} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Logo</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Logo")}</label>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0])} />
             {b.logoUrl ? (
               <div className="flex flex-wrap items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={b.logoUrl} alt="Email logo" className="h-8 max-w-[10rem] rounded border border-border bg-white object-contain px-1" />
+                <img src={b.logoUrl} alt={tl("broadcasts", "Email logo")} className="h-8 max-w-[10rem] rounded border border-border bg-white object-contain px-1" />
                 <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? <CircleNotch size={13} className="animate-spin" /> : null}Replace</Button>
-                <Button variant="ghost" size="sm" onClick={() => patch({ logoUrl: "" })} disabled={uploading}>Remove</Button>
+                <Button variant="ghost" size="sm" onClick={() => patch({ logoUrl: "" })} disabled={uploading}>{tl("broadcasts", "Remove")}</Button>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? <CircleNotch size={13} className="animate-spin" /> : null}Upload logo</Button>
-                <span className="text-xs text-muted-foreground">Optional — falls back to the wordmark.</span>
+                <span className="text-xs text-muted-foreground">{tl("broadcasts", "Optional — falls back to the wordmark.")}</span>
               </div>
             )}
           </div>
           {!b.logoUrl && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Wordmark</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Wordmark")}</label>
               <Input value={b.heading} onChange={(e) => patch({ heading: e.target.value })} placeholder="egful" />
             </div>
           )}
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Footer note (optional)</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Footer note (optional)")}</label>
             <textarea className={TEXTAREA_CLS + " min-h-16"} value={b.footerNote} onChange={(e) => patch({ footerNote: e.target.value })}
- placeholder="A tagline or seasonal note. Shown above the required unsubscribe line." />
+ placeholder={tl("broadcasts", "A tagline or seasonal note. Shown above the required unsubscribe line.")} />
           </div>
         </div>
 
         {/* Chrome-only preview — the body copy is per-broadcast. Light-only, like the mail. */}
         <div>
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Preview</span>
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Preview")}</span>
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
             {b.preset === "branded" && <div className="h-1" style={{ background: b.accent }} />}
             <div className="px-5 py-4" style={b.preset === "bold" ? { background: b.accent } : undefined}>
@@ -225,18 +227,18 @@ function EmailBrandingCard() {
               )}
             </div>
             <div className="px-5 pb-4 text-sm text-zinc-700">
-              <p className="mb-2">Hi Alex,</p>
-              <p className="text-zinc-400">Your broadcast copy appears here…</p>
+              <p className="mb-2">{tl("broadcasts", "Hi Alex,")}</p>
+              <p className="text-zinc-400">{tl("broadcasts", "Your broadcast copy appears here…")}</p>
             </div>
             <div className="border-t border-zinc-200 px-5 py-3 text-2xs leading-relaxed text-zinc-400">
               {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
-              <p>You&apos;re receiving this because you have an EGFUL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
+              <p>{tl("broadcasts", "You’re receiving this because you have an EGFUL seller account.")} <span className="underline">{tl("broadcasts", "Unsubscribe from updates like this")}</span>.</p>
             </div>
           </div>
         </div>
       </div>
           <DialogFooter className="mt-2 flex-wrap items-center gap-3">
-            {saved && <span className="mr-auto text-xs text-success">Saved — applies to the next send.</span>}
+            {saved && <span className="mr-auto text-xs text-success">{tl("broadcasts", "Saved — applies to the next send.")}</span>}
             {err && <span className="mr-auto text-xs text-destructive">{err}</span>}
             <Button size="sm" onClick={save} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save branding</Button>
           </DialogFooter>
@@ -251,6 +253,7 @@ function EmailBrandingCard() {
 // but populated with the real copy so you compose against the finished layout — not a bare
 // textarea. `branding` may be null while it loads; a sane default keeps the preview stable.
 function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | null; body: string }) {
+  const tl = useLabelT()
  const b = branding ?? { preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egful", footerNote: "" }
  const paras = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
  return (
@@ -268,14 +271,14 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
         )}
       </div>
       <div className="px-5 pb-4 text-sm text-zinc-700">
-        <p className="mb-2">Hi Alex,</p>
+        <p className="mb-2">{tl("broadcasts", "Hi Alex,")}</p>
         {paras.length
           ? paras.map((p, i) => <p key={i} className="mb-2 whitespace-pre-line">{p}</p>)
- : <p className="text-zinc-400">Your message appears here…</p>}
+ : <p className="text-zinc-400">{tl("broadcasts", "Your message appears here…")}</p>}
       </div>
       <div className="border-t border-zinc-200 px-5 py-3 text-2xs leading-relaxed text-zinc-400">
         {b.footerNote && <p className="mb-1.5 text-zinc-500">{b.footerNote}</p>}
-        <p>You&apos;re receiving this because you have an EGFUL seller account. <span className="underline">Unsubscribe from updates like this</span>.</p>
+        <p>{tl("broadcasts", "You’re receiving this because you have an EGFUL seller account.")} <span className="underline">{tl("broadcasts", "Unsubscribe from updates like this")}</span>.</p>
       </div>
     </div>
   )
@@ -289,6 +292,7 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
  * least reversible thing in the product.
  */
 export function BroadcastsView() {
+  const tl = useLabelT()
  const [rows, setRows] = useState<Broadcast[]>([])
  const [mailOk, setMailOk] = useState(true)
  const [branding, setBranding] = useState<EmailBranding | null>(null) // saved branding, for the editor preview
@@ -537,7 +541,7 @@ export function BroadcastsView() {
 
  if (loading) {
  return (
-      <SectionCard title="Broadcasts">
+      <SectionCard title={tl("broadcasts", "Broadcasts")}>
         <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
       </SectionCard>
     )
@@ -546,12 +550,12 @@ export function BroadcastsView() {
  return (
     <div className="space-y-4">
       <SectionCard
- title="Broadcasts"
+ title={tl("broadcasts", "Broadcasts")}
  actions={
           <div className="flex items-center gap-2">
             {/* Branding is a one-time setup behind this button (admin-only), not a panel. */}
             {isAdmin && <EmailBrandingCard />}
-            <Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />New broadcast</Button>
+            <Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />{tl("broadcasts", "New broadcast")}</Button>
           </div>
         }
  bodyClassName="p-5"
@@ -559,7 +563,7 @@ export function BroadcastsView() {
         {!mailOk && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-            No mail transport is configured, so nothing can be sent. Set <code>BREVO_API_KEY</code> on the server.
+            {tl("broadcasts", "No mail transport is configured, so nothing can be sent. Set")} <code>BREVO_API_KEY</code> {tl("broadcasts", "on the server.")}
           </div>
         )}
         {err && <div className="mb-3 rounded-lg border border-alert/30 bg-alert/12 p-2.5 text-xs text-alert">{err}</div>}
@@ -567,20 +571,20 @@ export function BroadcastsView() {
         {rows.length === 0 ? (
           <div className="py-14 text-center">
             <EnvelopeSimple size={26} className="mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No broadcasts yet.</p>
-            <p className="mt-1 text-xs text-muted-foreground">Nothing has been sent — this isn&apos;t a load failure.</p>
+            <p className="text-sm text-muted-foreground">{tl("broadcasts", "No broadcasts yet.")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{tl("broadcasts", "Nothing has been sent — this isn’t a load failure.")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                  <th className="py-2 pr-3">Subject</th>
-                  <th className="py-2 pr-3">Audience</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3 text-right">Sent</th>
-                  <th className="py-2 pr-3">Sent by</th>
-                  <th className="py-2 pr-3">When</th>
+                  <th className="py-2 pr-3">{tl("broadcasts", "Subject")}</th>
+                  <th className="py-2 pr-3">{tl("broadcasts", "Audience")}</th>
+                  <th className="py-2 pr-3">{tl("broadcasts", "Status")}</th>
+                  <th className="py-2 pr-3 text-right">{tl("broadcasts", "Sent")}</th>
+                  <th className="py-2 pr-3">{tl("broadcasts", "Sent by")}</th>
+                  <th className="py-2 pr-3">{tl("broadcasts", "When")}</th>
                   <th className="py-2" />
                 </tr>
               </thead>
@@ -625,7 +629,7 @@ export function BroadcastsView() {
                         ) : !mailsOf(b) ? (
                           /* Announcement-only. "0 / 0" here read as a send to nobody, when
  in fact every one of these people was told. */
-                          <span title="Posted in-app; no email was sent">{(b.posted_count ?? 0).toLocaleString("en-US")} posted</span>
+                          <span title={tl("broadcasts", "Posted in-app; no email was sent")}>{(b.posted_count ?? 0).toLocaleString("en-US")} posted</span>
                         ) : (
                           <>
                             <span>{b.sent_count.toLocaleString("en-US")}</span>
@@ -646,11 +650,11 @@ export function BroadcastsView() {
                       <td className="py-2.5">
                         {b.status === "draft" && (
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => openEditor(b)} aria-label="Edit"><PencilSimple size={14} /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => remove(b)} aria-label="Delete"><Trash size={14} /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => openEditor(b)} aria-label={tl("broadcasts", "Edit")}><PencilSimple size={14} /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => remove(b)} aria-label={tl("broadcasts", "Delete")}><Trash size={14} /></Button>
                             {canSend && (
                               <Button size="sm" disabled={!mailOk && mailsOf(b)} onClick={() => startSend(b)}>
-                                Send
+                                {tl("broadcasts", "Send")}
                               </Button>
                             )}
                           </div>
@@ -665,7 +669,7 @@ export function BroadcastsView() {
         )}
         {!canSend && rows.some((b) => b.status === "draft") && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Drafts are open to the team; sending is admin and operator only. There is no unsend.
+            {tl("broadcasts", "Drafts are open to the team; sending is admin and operator only. There is no unsend.")}
           </p>
         )}
       </SectionCard>
@@ -674,19 +678,19 @@ export function BroadcastsView() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit draft" : "New broadcast"}</DialogTitle>
+            <DialogTitle>{editing ? tl("broadcasts", "Edit draft") : tl("broadcasts", "New broadcast")}</DialogTitle>
             <DialogDescription>
-              Written as plain text. An unsubscribe footer is added automatically — it is required, so it is not optional here.
+              {tl("broadcasts", "Written as plain text. An unsubscribe footer is added automatically — it is required, so it is not optional here.")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Subject</label>
-              <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What's new this month" />
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Subject")}</label>
+              <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={tl("broadcasts", "What's new this month")} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Body</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Body")}</label>
               <textarea className={TEXTAREA_CLS} value={body} onChange={(e) => setBody(e.target.value)}
  placeholder={"Blank lines start a new paragraph.\n\nSellers are greeted by name automatically."} />
             </div>
@@ -695,47 +699,46 @@ export function BroadcastsView() {
  switch. Mail reaches someone who isn't in the app; the bell reaches
  someone who is, and reaches sellers with no deliverable address at all.
                   Most announcements want both, which is why both start ticked. */}
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Send to</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Send to")}</label>
               <div className="mb-3 space-y-1.5 rounded-lg border border-border p-3">
                 <label className="flex items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-0.5 accent-primary" checked={channels.includes("email")}
  onChange={(e) => setChannels((p) => e.target.checked ? [...new Set([...p, "email" as BroadcastChannel])] : p.filter((c) => c !== "email"))} />
-                  <span>Email<span className="block text-xs text-muted-foreground">Full message with your branding and the unsubscribe footer.</span></span>
+                  <span>{tl("broadcasts", "Email")}<span className="block text-xs text-muted-foreground">{tl("broadcasts", "Full message with your branding and the unsubscribe footer.")}</span></span>
                 </label>
                 <label className="flex items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-0.5 accent-primary" checked={channels.includes("inapp")}
  onChange={(e) => setChannels((p) => e.target.checked ? [...new Set([...p, "inapp" as BroadcastChannel])] : p.filter((c) => c !== "inapp"))} />
-                  <span>In-app announcement<span className="block text-xs text-muted-foreground">Subject and body only, to the seller&apos;s notifications. Goes to everyone in the audience — including anyone who opted out of marketing email, since that isn&apos;t an opt-out from the app.</span></span>
+                  <span>{tl("broadcasts", "In-app announcement")}<span className="block text-xs text-muted-foreground">{tl("broadcasts", "Subject and body only, to the seller’s notifications. Goes to everyone in the audience — including anyone who opted out of marketing email, since that isn’t an opt-out from the app.")}</span></span>
                 </label>
                 {channels.length === 0 && (
-                  <p className="pt-1 text-xs text-hold">Pick at least one — otherwise this goes nowhere.</p>
+                  <p className="pt-1 text-xs text-hold">{tl("broadcasts", "Pick at least one — otherwise this goes nowhere.")}</p>
                 )}
               </div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Audience</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Audience")}</label>
               <div className="space-y-1.5 rounded-lg border border-border p-3">
                 <label className="flex items-center gap-2 text-sm">
                   <input type="radio" name="aud" className="accent-primary" checked={aud.hasOrders === undefined}
  onChange={() => setAud((p) => ({ ...p, hasOrders: undefined }))} />
-                  All sellers
+                  {tl("broadcasts", "All sellers")}
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="radio" name="aud" className="accent-primary" checked={aud.hasOrders === true}
  onChange={() => setAud((p) => ({ ...p, hasOrders: true }))} />
-                  Only sellers who have ordered
+                  {tl("broadcasts", "Only sellers who have ordered")}
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="radio" name="aud" className="accent-primary" checked={aud.hasOrders === false}
  onChange={() => setAud((p) => ({ ...p, hasOrders: false }))} />
-                  Only sellers who never have
+                  {tl("broadcasts", "Only sellers who never have")}
                 </label>
                 <label className="mt-1 flex items-center gap-2 border-t border-border pt-2 text-sm">
                   <input type="checkbox" className="accent-primary" checked={!!aud.includeInactive}
  onChange={(e) => setAud((p) => ({ ...p, includeInactive: e.target.checked }))} />
-                  Include deactivated accounts
+                  {tl("broadcasts", "Include deactivated accounts")}
                 </label>
                 <p className="pt-1 text-xs text-muted-foreground">
-                  Anyone who has unsubscribed is excluded automatically, and the list is resolved again when
- you send, so an unsubscribe between now and then is still honoured.
+                  {tl("broadcasts", "Anyone who has unsubscribed is excluded automatically, and the list is resolved again when you send, so an unsubscribe between now and then is still honoured.")}
                 </p>
               </div>
             </div>
@@ -743,10 +746,10 @@ export function BroadcastsView() {
           </div>
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Preview</span>
-              <span className="text-2xs text-muted-foreground">Your saved branding</span>
+              <span className="text-xs font-medium text-muted-foreground">{tl("broadcasts", "Preview")}</span>
+              <span className="text-2xs text-muted-foreground">{tl("broadcasts", "Your saved branding")}</span>
             </div>
-            <div className="mb-2 truncate text-xs text-muted-foreground">Subject: <span className="font-medium text-foreground">{subject || "…"}</span></div>
+            <div className="mb-2 truncate text-xs text-muted-foreground">{tl("broadcasts", "Subject:")} <span className="font-medium text-foreground">{subject || "…"}</span></div>
             <div className="max-h-[38vh] overflow-y-auto">
               <BrandedEmailPreview branding={branding} body={body} />
             </div>
@@ -781,14 +784,14 @@ export function BroadcastsView() {
                     </div>
                   ) : (
                     <p className="px-2.5 py-3 text-xs text-muted-foreground">
-                      {cCounting ? "Resolving…" : "Nobody matches this audience yet."}
+                      {cCounting ? tl("broadcasts", "Resolving…") : tl("broadcasts", "Nobody matches this audience yet.")}
                     </p>
                   )}
                   <div className="flex items-center gap-1.5 border-t border-border p-2">
                     <Input value={cAddr} onChange={(e) => setCAddr(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); cAdd() } }}
- placeholder="Add an address…" className="h-7 text-xs" />
-                    <Button size="sm" variant="outline" disabled={!cAddr.trim()} onClick={cAdd}>Add</Button>
+ placeholder={tl("broadcasts", "Add an address…")} className="h-7 text-xs" />
+                    <Button size="sm" variant="outline" disabled={!cAddr.trim()} onClick={cAdd}>{tl("broadcasts", "Add")}</Button>
                   </div>
                 </div>
                 {/* Addresses that cannot be delivered to, while fixing them is still cheap. */}
@@ -799,14 +802,14 @@ export function BroadcastsView() {
                   </p>
                 )}
                 <p className="mt-1.5 text-2xs text-muted-foreground">
-                  Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.
+                  {tl("broadcasts", "Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.")}
                 </p>
               </div>
             )}
           </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{tl("broadcasts", "Cancel")}</Button>
             {/* Saving without sending stays available, but only for the people who have no
  other option — a team member who can draft and cannot send. Offering it to a
  sender is what created the two-step nobody wanted. */}
@@ -822,7 +825,7 @@ export function BroadcastsView() {
  disabled={saving || cCounting || !subject.trim() || !body.trim() || channels.length === 0
                                 || (channels.includes("email") && !channels.includes("inapp") && !cCount?.count)}>
                 {saving ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
-                {channels.includes("email") && cCount ? `Send to ${cCount.count.toLocaleString("en-US")}` : "Send now"}
+                {channels.includes("email") && cCount ? `Send to ${cCount.count.toLocaleString("en-US")}` : tl("broadcasts", "Send now")}
               </Button>
             )}
           </DialogFooter>
@@ -901,8 +904,7 @@ export function BroadcastsView() {
                   /* An empty list and an unrecorded one are different facts, and a screen that
  showed nothing for both would read as "it went to nobody". */
                   <p className="rounded-lg border border-dashed border-border px-2.5 py-3 text-xs text-muted-foreground">
-                    No per-address record for this one — it was sent before addresses were kept.
-                    The counts above are what was logged at the time.
+                    {tl("broadcasts", "No per-address record for this one — it was sent before addresses were kept. The counts above are what was logged at the time.")}
                   </p>
                 )}
               </div>
@@ -914,7 +916,7 @@ export function BroadcastsView() {
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewing(null)}>Close</Button>
+            <Button variant="outline" onClick={() => setViewing(null)}>{tl("broadcasts", "Close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -922,8 +924,8 @@ export function BroadcastsView() {
       <Dialog open={!!confirming} onOpenChange={(v) => !v && setConfirming(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Send this broadcast?</DialogTitle>
-            <DialogDescription>There is no unsend. Read the number below before you confirm.</DialogDescription>
+            <DialogTitle>{tl("broadcasts", "Send this broadcast?")}</DialogTitle>
+            <DialogDescription>{tl("broadcasts", "There is no unsend. Read the number below before you confirm.")}</DialogDescription>
           </DialogHeader>
           {counting ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
@@ -944,7 +946,7 @@ export function BroadcastsView() {
                 )}
                 {sendsInApp && (
                   <p className={sendsEmail ? "mt-1 text-sm" : "text-sm"}>
-                    {sendsEmail ? "It also posts" : "This will post"} an announcement to{" "}
+                    {sendsEmail ? tl("broadcasts", "It also posts") : tl("broadcasts", "This will post")} an announcement to{" "}
                     <strong>{inWords(count.inAppCount ?? count.count)}</strong>{" "}
  seller{(count.inAppCount ?? count.count) === 1 ? "" : "s"}{" "}
                     <span className="text-muted-foreground">({(count.inAppCount ?? count.count).toLocaleString("en-US")})</span> in the app.
@@ -954,8 +956,8 @@ export function BroadcastsView() {
               </div>
               <p className={sendsEmail ? "text-xs text-muted-foreground" : "hidden"}>
                 {count.optedOut > 0
-                  ? `${count.optedOut.toLocaleString("en-US")} seller${count.optedOut === 1 ? " has" : "s have"} unsubscribed and ${count.optedOut === 1 ? "is" : "are"} excluded.`
- : "No seller has unsubscribed yet."}
+                  ? `${count.optedOut.toLocaleString("en-US")} seller${count.optedOut === 1 ? " has" : tl("broadcasts", "s have")} unsubscribed and ${count.optedOut === 1 ? "is" : "are"} excluded.`
+ : tl("broadcasts", "No seller has unsubscribed yet.")}
               </p>
 
               {/* ADDRESSES THAT CANNOT BE DELIVERED TO. Shown here because this is the last
@@ -998,29 +1000,29 @@ export function BroadcastsView() {
  value={addr}
  onChange={(e) => setAddr(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addRecipient() } }}
- placeholder="Add an address…"
+ placeholder={tl("broadcasts", "Add an address…")}
  className="h-7 text-xs"
                     />
-                    <Button size="sm" variant="outline" disabled={!addr.trim() || counting} onClick={() => void addRecipient()}>Add</Button>
+                    <Button size="sm" variant="outline" disabled={!addr.trim() || counting} onClick={() => void addRecipient()}>{tl("broadcasts", "Add")}</Button>
                   </div>
                   {/* Said plainly, because it is the part people assume doesn't work. */}
                   <p className="border-t border-border px-2.5 py-1.5 text-2xs text-muted-foreground">
-                    Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.
+                    {tl("broadcasts", "Added addresses get a real unsubscribe link — opting out suppresses that address for good, account or not.")}
                   </p>
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Subject: <strong className="text-foreground">{confirming?.subject}</strong>
+                {tl("broadcasts", "Subject:")} <strong className="text-foreground">{confirming?.subject}</strong>
               </p>
             </div>
           ) : (
-            <p className="py-4 text-sm text-muted-foreground">Could not resolve the audience.</p>
+            <p className="py-4 text-sm text-muted-foreground">{tl("broadcasts", "Could not resolve the audience.")}</p>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirming(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setConfirming(null)}>{tl("broadcasts", "Cancel")}</Button>
             <Button onClick={doSend} disabled={sending || counting || !count || count.count === 0}>
               {sending ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} />}
-              {count ? `Send to ${count.count.toLocaleString("en-US")}` : "Send"}
+              {count ? `Send to ${count.count.toLocaleString("en-US")}` : tl("broadcasts", "Send")}
             </Button>
           </DialogFooter>
         </DialogContent>

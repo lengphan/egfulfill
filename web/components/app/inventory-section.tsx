@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { Package } from "@phosphor-icons/react"
 import { InventoryView } from "@/components/app/inventory-view"
@@ -20,6 +21,7 @@ type Tab = "own" | "consigned" | "scan"
  * redirect and the PWA start_url both deep-link to the Scan tab).
  */
 export function InventorySection() {
+  const tl = useLabelT()
   const [tab, setTab] = useState<Tab>("own")
 
   useEffect(() => {
@@ -47,13 +49,13 @@ export function InventorySection() {
       <div className="flex items-center gap-3 md:hidden">
         <Package size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
-          <PageTitle>Inventory</PageTitle>
-          <p className="truncate text-sm text-muted-foreground">Stock levels on hand and the scan station.</p>
+          <PageTitle>{tl("inventory", "Inventory")}</PageTitle>
+          <p className="truncate text-sm text-muted-foreground">{tl("inventory", "Stock levels on hand and the scan station.")}</p>
         </div>
       </div>
       <TabBar
         ariaLabel="Inventory views"
-        items={[{ id: "own", label: "Our stock" }, { id: "consigned", label: "Incoming stock" }, { id: "scan", label: "Scan" }]}
+        items={[{ id: "own", label: tl("inventory", "Our stock") }, { id: "consigned", label: tl("inventory", "Incoming stock") }, { id: "scan", label: tl("inventory", "Scan") }]}
         value={tab}
         onChange={pick}
       />
