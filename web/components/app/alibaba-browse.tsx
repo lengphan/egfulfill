@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { MagnifyingGlass, CircleNotch, Plus, Check } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
    * switch to it — otherwise you add three things and find an empty table. */
  onSaved?: () => void
 } = {}) {
+  const tl = useLabelT()
  const [connected, setConnected] = useState<boolean | null>(null)
  const [q, setQ] = useState(initialQuery ?? "")
   // Alibaba pages server-side (param0.index), so this is a real page cursor, not a slice of
@@ -145,7 +147,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
     <SectionCard>
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
         <div className="flex-1">
-          <h2 className="text-sm font-semibold">Find suppliers</h2>
+          <h2 className="text-sm font-semibold">{tl("alibabaBrowse", "Find suppliers")}</h2>
         </div>
       </div>
 
@@ -156,7 +158,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
             <Input
  value={q} onChange={(e) => setQ(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") run(q, 1) }}
- placeholder="e.g. blank cotton tote bag" className="h-9 pl-8"
+ placeholder={tl("alibabaBrowse", "e.g. blank cotton tote bag")} className="h-9 pl-8"
             />
           </div>
           <Button size="sm" onClick={() => run(q, 1)} disabled={busy || !q.trim()}>
@@ -180,7 +182,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
  carries no counts — it is a seeded category, and the reader can tell. */}
           {!q.trim() && (
             <p className="mb-3 text-xs text-muted-foreground">
-              Starting points while you decide what to look for — search above for anything specific.
+              {tl("alibabaBrowse", "Starting points while you decide what to look for — search above for anything specific.")}
             </p>
           )}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -202,11 +204,11 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.image} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
                       ) : (
-                        <div className="flex size-full items-center justify-center text-xs text-muted-foreground">no photo</div>
+                        <div className="flex size-full items-center justify-center text-xs text-muted-foreground">{tl("alibabaBrowse", "no photo")}</div>
                       )
  return p.url ? (
                         <a href={p.url} target="_blank" rel="noopener noreferrer"
- title="Open this product on Alibaba"
+ title={tl("alibabaBrowse", "Open this product on Alibaba")}
  className="block size-full cursor-pointer">
                           {art}
                         </a>
@@ -232,7 +234,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
                             "Prospect" — the old first-stage label — so renaming the stage
  without renaming this would leave the button naming something
  that no longer appears anywhere in Sourcing. */}
-                        {isSaved ? "Saved" : "Add"}
+                        {isSaved ? tl("alibabaBrowse", "Saved") : tl("alibabaBrowse", "Add")}
                       </button>
                       {p.url && (
                         /* ONE button, and it says what it does. There were two — a speech
@@ -251,9 +253,9 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
                            The speech bubble was actively misleading: it suggested an in-app
  chat, and this only opens a product page. */
                         <a href={p.url} target="_blank" rel="noopener noreferrer"
- title="Opens the product on Alibaba, where Contact Supplier is"
+ title={tl("alibabaBrowse", "Opens the product on Alibaba, where Contact Supplier is")}
  className={cn(CARD_ACTION_SECONDARY, "flex-1")}>
-                          Contact
+                          {tl("alibabaBrowse", "Contact")}
                         </a>
                       )}
                     </div>
@@ -267,8 +269,8 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
           <div className="flex items-center justify-between pt-1">
             <span className="text-2xs text-muted-foreground">Page {page} · {rows.length} results</span>
             <div className="flex gap-1.5">
-              <Button size="sm" variant="outline" disabled={busy || page <= 1} onClick={() => run(q, page - 1)}>Previous</Button>
-              <Button size="sm" variant="outline" disabled={busy || rows.length < 24} onClick={() => run(q, page + 1)}>Next</Button>
+              <Button size="sm" variant="outline" disabled={busy || page <= 1} onClick={() => run(q, page - 1)}>{tl("alibabaBrowse", "Previous")}</Button>
+              <Button size="sm" variant="outline" disabled={busy || rows.length < 24} onClick={() => run(q, page + 1)}>{tl("alibabaBrowse", "Next")}</Button>
             </div>
           </div>
           </>

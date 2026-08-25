@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,7 @@ const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
  * other corrections rather than sitting open on the card.
  */
 export function AddTracking({ orderId, onSaved }: { orderId: string; onSaved: () => void }) {
+  const tl = useLabelT()
   const [open, setOpen] = useState(false)
   const [carrier, setCarrier] = useState("USPS")
   const [num, setNum] = useState("")
@@ -55,7 +57,7 @@ export function AddTracking({ orderId, onSaved }: { orderId: string; onSaved: ()
         onClick={() => setOpen(true)}
         className="mt-1 text-xs font-medium text-primary underline-offset-2 hover:underline"
       >
-        Add tracking
+        {tl("addTracking", "Add tracking")}
       </button>
     )
   }
@@ -66,7 +68,7 @@ export function AddTracking({ orderId, onSaved }: { orderId: string; onSaved: ()
         <select
           value={carrier}
           onChange={(e) => setCarrier(e.target.value)}
-          aria-label="Carrier"
+          aria-label={tl("addTracking", "Carrier")}
           className="eg-select eg-control pr-8"
         >
           {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -75,15 +77,15 @@ export function AddTracking({ orderId, onSaved }: { orderId: string; onSaved: ()
           value={num}
           onChange={(e) => { setNum(e.target.value); setErr(null) }}
           onKeyDown={(e) => { if (e.key === "Enter") void save() }}
-          placeholder="Tracking number"
-          aria-label="Tracking number"
+          placeholder={tl("addTracking", "Tracking number")}
+          aria-label={tl("addTracking", "Tracking number")}
           className="h-8 min-w-[12rem] flex-1 tabular-nums text-xs"
           autoFocus
         />
         <Button onClick={() => void save()} disabled={busy || !num.trim()}>
-          {busy ? <CircleNotch size={13} className="animate-spin" /> : "Save"}
+          {busy ? <CircleNotch size={13} className="animate-spin" /> : tl("addTracking", "Save")}
         </Button>
-        <Button variant="ghost" onClick={() => { setOpen(false); setErr(null) }} disabled={busy}>Cancel</Button>
+        <Button variant="ghost" onClick={() => { setOpen(false); setErr(null) }} disabled={busy}>{tl("addTracking", "Cancel")}</Button>
       </div>
       {err && <p className="text-xs text-destructive">{err}</p>}
       {/* SAID BEFORE IT HAPPENS, not discovered afterwards. Recording tracking is what this
@@ -91,7 +93,7 @@ export function AddTracking({ orderId, onSaved }: { orderId: string; onSaved: ()
           connected it pushes the fulfilment. Somebody typing a number to keep a note wants
           to know that first. */}
       <p className="text-2xs text-muted-foreground">
-        Recording tracking marks the parcel as on its way, and tells the store it was sold on.
+        {tl("addTracking", "Recording tracking marks the parcel as on its way, and tells the store it was sold on.")}
       </p>
     </div>
   )

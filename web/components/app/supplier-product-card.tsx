@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { SupplierFlag } from "@/components/app/supplier-flag"
 import { clickableProps } from "@/lib/a11y"
@@ -78,6 +79,7 @@ export function SupplierProductCard({
    *  the card can show the outcome. */
   onSync?: () => Promise<void> | void
 }) {
+  const tl = useLabelT()
   const [img, setImg] = useState<string | null>(data.image ?? null)
   const [activeColor, setActiveColor] = useState<string | null>(null)
   const [colorImages, setColorImages] = useState<Record<string, string> | null>(null)
@@ -190,7 +192,7 @@ export function SupplierProductCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain p-[7%]" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">{tl("supplierProductCard", "No image")}</div>
         )}
         {onFavorite && (
           <button onClick={toggleFav} title={fav ? "Unfavorite" : "Favorite"}
@@ -206,7 +208,7 @@ export function SupplierProductCard({
         {onSync && (
           <button onClick={runSync} disabled={syncing}
             title={synced ? "Synced" : "Re-sync this style from the supplier"}
-            aria-label="Re-sync this product"
+            aria-label={tl("supplierProductCard", "Re-sync this product")}
             className={"absolute bottom-2 left-2 flex size-7 items-center justify-center rounded-full border transition-colors " +
               (synced ? "border-transparent text-shipped"
                 : "border-border bg-background/80 text-muted-foreground hover:text-primary disabled:opacity-60")}>
@@ -257,7 +259,7 @@ export function SupplierProductCard({
                   title={showAllColors ? "Show fewer colours" : `Show all ${colors.length} colours`}
                   className="shrink-0 rounded px-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
-                  {showAllColors ? "Show less" : `+${colors.length - 7}`}
+                  {showAllColors ? tl("supplierProductCard", "Show less") : `+${colors.length - 7}`}
                 </button>
               )}
             </>
@@ -278,8 +280,8 @@ export function SupplierProductCard({
             // gave us (OSFM); a bare count is names-missing; "—" is genuinely unknown, which
             // for S&S means the sizes just haven't loaded — never dressed up as one-size.
             data.oneSize ? (
-              <span className="rounded border border-border px-1 py-0.5 text-2xs font-medium text-muted-foreground" title="One size fits most — this product isn't broken out by size">
-                One size
+              <span className="rounded border border-border px-1 py-0.5 text-2xs font-medium text-muted-foreground" title={tl("supplierProductCard", "One size fits most — this product isn't broken out by size")}>
+                {tl("supplierProductCard", "One size")}
               </span>
             ) : (
               <span className="text-2xs text-muted-foreground/60">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "—"}</span>
@@ -307,9 +309,9 @@ export function SupplierProductCard({
             Add to Products is the only child and takes the whole row on its own. */}
         <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
           {onQuickOrder && (
-            <button onClick={onQuickOrder} title="Order this — quantities and prices per size"
+            <button onClick={onQuickOrder} title={tl("supplierProductCard", "Order this — quantities and prices per size")}
               className={cn(CARD_ACTION_SECONDARY, "w-full")}>
-              Order
+              {tl("supplierProductCard", "Order")}
             </button>
           )}
           <button onClick={onAdd} disabled={added || adding}
@@ -323,7 +325,7 @@ export function SupplierProductCard({
                 : CARD_ACTION_PRIMARY + " w-full",
               !onQuickOrder && "col-span-2",
             )}>
-            {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to Products</>}
+            {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> {tl("supplierProductCard", "Added")}</> : <><Plus size={13} weight="bold" /> {tl("supplierProductCard", "Add to Products")}</>}
           </button>
         </div>
       </div>

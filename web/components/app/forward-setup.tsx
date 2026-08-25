@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { EnvelopeSimple, Copy, Check, CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -78,6 +79,7 @@ const PROVIDERS: Provider[] = [
 ]
 
 export function ForwardSetup() {
+  const tl = useLabelT()
  const [address, setAddress] = useState<string | null>(null)
  const [configured, setConfigured] = useState(true)
  const [loading, setLoading] = useState(true)
@@ -114,22 +116,22 @@ export function ForwardSetup() {
 
  return (
     <SectionCard
- title="Get buyer addresses automatically"
+ title={tl("forwardSetup", "Get buyer addresses automatically")}
     >
       <div className="space-y-4 p-5">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CircleNotch size={15} className="animate-spin" /> Loading…
+            <CircleNotch size={15} className="animate-spin" /> {tl("forwardSetup", "Loading…")}
           </div>
         ) : !configured ? (
           <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
             <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-            Email forwarding isn&apos;t set up on this server yet. Ask an admin to set MAIL_INGEST_DOMAIN.
+            {tl("forwardSetup", "Email forwarding isn’t set up on this server yet. Ask an admin to set MAIL_INGEST_DOMAIN.")}
           </div>
         ) : (
           <>
             <div>
-              <div className="mb-1.5 text-sm font-medium">1. Your forwarding address</div>
+              <div className="mb-1.5 text-sm font-medium">{tl("forwardSetup", "1. Your forwarding address")}</div>
               <div className="flex flex-wrap items-center gap-2">
                 <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-muted/50 px-3 py-2 tabular-nums text-sm">
                   {address}
@@ -138,16 +140,16 @@ export function ForwardSetup() {
  onClick={copy}
  className="eg-tap inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:bg-accent"
                 >
-                  {copied ? <><Check size={14} weight="bold" className="text-success" /> Copied</> : <><Copy size={14} weight="bold" /> Copy</>}
+                  {copied ? <><Check size={14} weight="bold" className="text-success" /> {tl("forwardSetup", "Copied")}</> : <><Copy size={14} weight="bold" /> {tl("forwardSetup", "Copy")}</>}
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Unique to your account — it&apos;s how we know which orders the addresses belong to.
+                {tl("forwardSetup", "Unique to your account — it’s how we know which orders the addresses belong to.")}
               </p>
             </div>
 
             <div>
-              <div className="mb-1.5 text-sm font-medium">2. Forward Etsy&apos;s sale emails to it</div>
+              <div className="mb-1.5 text-sm font-medium">{tl("forwardSetup", "2. Forward Etsy’s sale emails to it")}</div>
               <TabBar
                 size="sm"
                 ariaLabel="Email provider"
@@ -177,10 +179,7 @@ export function ForwardSetup() {
             <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
               <EnvelopeSimple size={15} className="mt-0.5 shrink-0" />
               <span>
-                One rule, once — then every sale email fills its order&apos;s address automatically, with nothing
- to export or upload. Use a <strong className="font-medium text-foreground">filter</strong>, not
- blanket forwarding: a filter sends us only Etsy&apos;s emails, and we never see anything else in
- your inbox.
+                {tl("forwardSetup", "One rule, once — then every sale email fills its order’s address automatically, with nothing to export or upload. Use a")} <strong className="font-medium text-foreground">filter</strong>{tl("forwardSetup", ", not blanket forwarding: a filter sends us only Etsy’s emails, and we never see anything else in your inbox.")}
               </span>
             </div>
           </>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { CircleNotch, Truck } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -16,6 +17,7 @@ const CARRIERS = ["usps", "ups"]
  * on the ZIP, so a placeholder street is enough to price them.
  */
 export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const tl = useLabelT()
  const [fromZip, setFromZip] = useState("")
  const [toZip, setToZip] = useState("")
  const [pkg, setPkg] = useState({ lb: 0, oz: 8, length: 10, width: 8, height: 2 })
@@ -46,27 +48,27 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Rate checker</DialogTitle></DialogHeader>
-        <p className="text-xs text-muted-foreground">Compare USPS &amp; UPS rates for a parcel — no order created, nothing bought.</p>
+        <DialogHeader><DialogTitle>{tl("rateChecker", "Rate checker")}</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">{tl("rateChecker", "Compare USPS & UPS rates for a parcel — no order created, nothing bought.")}</p>
         <div className="space-y-3 py-1">
           <div className="flex gap-2">
-            <label className="flex flex-1 flex-col gap-1"><span className="text-2xs text-muted-foreground">From ZIP</span><Input value={fromZip} onChange={(e) => setFromZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="75201" className="h-9" /></label>
-            <label className="flex flex-1 flex-col gap-1"><span className="text-2xs text-muted-foreground">To ZIP</span><Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="18405" className="h-9" /></label>
+            <label className="flex flex-1 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("rateChecker", "From ZIP")}</span><Input value={fromZip} onChange={(e) => setFromZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="75201" className="h-9" /></label>
+            <label className="flex flex-1 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("rateChecker", "To ZIP")}</span><Input value={toZip} onChange={(e) => setToZip(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" placeholder="18405" className="h-9" /></label>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) })} className="h-9" /></label>
+            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("rateChecker", "Weight lb")}</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) })} className="h-9" /></label>
             <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) })} className="h-9" /></label>
-            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" /></label>
-            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" /></label>
-            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" /></label>
+            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("rateChecker", "L in")}</span><Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" /></label>
+            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("rateChecker", "W in")}</span><Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" /></label>
+            <label className="flex w-14 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("rateChecker", "H in")}</span><Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" /></label>
           </div>
-          <Button className="w-full" onClick={check} disabled={loading}>{loading ? <><CircleNotch size={14} className="animate-spin" /> Checking…</> : <><Truck size={14} weight="bold" /> Check rates</>}</Button>
+          <Button className="w-full" onClick={check} disabled={loading}>{loading ? <><CircleNotch size={14} className="animate-spin" /> {tl("rateChecker", "Checking…")}</> : <><Truck size={14} weight="bold" /> {tl("rateChecker", "Check rates")}</>}</Button>
           {err && <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">{err}</div>}
           {/* USPS is on by default in Shippo; UPS only shows once a UPS carrier account is
  connected there. If nothing UPS came back, say why rather than leave a gap. */}
           {rates && rates.length > 0 && !rates.some((r) => (r.carrier || "").toLowerCase().includes("ups") && !(r.carrier || "").toLowerCase().includes("usps")) && (
             <div className="rounded-lg border border-border px-3 py-2 text-2xs text-muted-foreground">
-              No UPS rates came back. Connect a UPS account in your Shippo dashboard (Settings → Carriers → UPS) and they’ll appear here automatically.
+              {tl("rateChecker", "No UPS rates came back. Connect a UPS account in your Shippo dashboard (Settings → Carriers → UPS) and they’ll appear here automatically.")}
             </div>
           )}
           {rates && rates.length > 0 && (
@@ -75,7 +77,7 @@ export function RateCheckerDialog({ open, onOpenChange }: { open: boolean; onOpe
                 <div key={r.token} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm">
                   <div className="min-w-0 flex-1">
                     <div className="font-medium">{r.carrier}{r.service ? ` · ${r.service}` : ""}</div>
-                    <div className="text-2xs text-muted-foreground">{r.days != null ? `${r.days} day${r.days === 1 ? "" : "s"}` : "delivery est. n/a"}</div>
+                    <div className="text-2xs text-muted-foreground">{r.days != null ? `${r.days} day${r.days === 1 ? "" : "s"}` : tl("rateChecker", "delivery est. n/a")}</div>
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums">{usd(r.amount)}</div>
                 </div>

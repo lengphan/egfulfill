@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
 import { resolveProduct, colorsOf, methodsOf, sizesOf, productLabel } from "@/lib/variant-resolve"
@@ -35,6 +36,7 @@ export function VariantPicker({
    */
   dense?: boolean
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   // Same read as every other role check in components/app — anyone who isn't a seller.
@@ -165,16 +167,16 @@ export function VariantPicker({
             Required flag says the same thing "Pick a blank…" did, in the same space the
             other three use. */}
         <VariantField
-          label="Blank" value={blankLabel} required
+          label={tl("variantPicker", "Blank")} value={blankLabel} required
           options={blankOptions}
           disabled={busy === "blank"} onChange={pickBlank}
         />
         <VariantField
-          label="Colour" value={item.color || ""} options={colorList} swatches
+          label={tl("variantPicker", "Colour")} value={item.color || ""} options={colorList} swatches
           disabled={busy === "color"} onChange={(v) => save({ color: v }, "color")}
         />
         <VariantField
-          label="Size" value={item.size || ""} options={sizeList}
+          label={tl("variantPicker", "Size")} value={item.size || ""} options={sizeList}
           disabled={busy === "size"} onChange={(v) => save({ size: v }, "size")}
         />
         {/* Says WHY it is empty rather than just being dead. ONE WORD, not the sentence
@@ -182,7 +184,7 @@ export function VariantPicker({
             "Method · None on this blank" truncated to "Method · …" — which says less than
             nothing, since the reason was the part that got cut. "Method · none" fits. */}
         <VariantField
-          label="Method" value={item.print_type || ""} options={methodList}
+          label={tl("variantPicker", "Method")} value={item.print_type || ""} options={methodList}
           emptyLabel="none"
           disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
         />
@@ -211,7 +213,7 @@ export function VariantPicker({
         */}
       {product && methodOpts.length === 0 && isStaff && (
         <p className="mt-1.5 text-2xs text-muted-foreground">
-          No print method on this blank — set them on the product.
+          {tl("variantPicker", "No print method on this blank — set them on the product.")}
         </p>
       )}
       {err && (

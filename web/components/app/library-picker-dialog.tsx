@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { PenNib, CircleNotch, MagnifyingGlass, Stack } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -44,6 +45,7 @@ export function LibraryPickerDialog({
    *  they were trying to avoid. */
   initialSource?: Source
 }) {
+  const tl = useLabelT()
   const [source, setSource] = useState<Source>("designs")
   const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
   const [templates, setTemplates] = useState<ProductTemplate[] | null>(null)
@@ -116,7 +118,7 @@ export function LibraryPickerDialog({
           the designer so the pair reads as one tool: pick a design, land back on the
           garment, same footprint. */}
       <DialogContent className="sm:max-w-[min(94vw,720px)]">
-        <DialogHeader><DialogTitle>Your artwork and templates</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tl("libraryPicker", "Your artwork and templates")}</DialogTitle></DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
           {/* The count was loose text after the label — "Designs 12" reads as a name with a
@@ -128,15 +130,15 @@ export function LibraryPickerDialog({
             spacing="none"
             className="border-b-0"
             items={[
-              { id: "designs" as const, label: "Artwork", count: designs?.length },
-              { id: "templates" as const, label: "Templates", count: templates?.length },
+              { id: "designs" as const, label: tl("libraryPicker", "Artwork"), count: designs?.length },
+              { id: "templates" as const, label: tl("libraryPicker", "Templates"), count: templates?.length },
             ]}
             value={source}
             onChange={setSource}
           />
           <div className="relative min-w-[10rem] flex-1">
             <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name…" className="h-9 pl-8" aria-label="Search your library" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("libraryPicker", "Search by name…")} className="h-9 pl-8" aria-label={tl("libraryPicker", "Search your library")} />
           </div>
         </div>
 
@@ -149,8 +151,8 @@ export function LibraryPickerDialog({
               {term
                 ? `Nothing here matches “${q.trim()}”.`
                 : source === "designs"
-                  ? "No saved artwork yet — drop a file on Design Lab › Artwork."
-                  : "No templates yet — save one from the Design Lab and it shows up here."}
+                  ? tl("libraryPicker", "No saved artwork yet — drop a file on Design Lab › Artwork.")
+                  : tl("libraryPicker", "No templates yet — save one from the Design Lab and it shows up here.")}
             </div>
           ) : (
             /* Three tracks at the top end rather than four, and two below — about 280px a
@@ -183,7 +185,7 @@ export function LibraryPickerDialog({
                     />
                     {loadingId === d.id && <div className="absolute inset-0 flex items-center justify-center bg-background/60"><CircleNotch size={20} className="animate-spin text-primary" /></div>}
                   </div>
-                  <div className="truncate p-2 text-xs font-medium">{d.name || "Untitled"}</div>
+                  <div className="truncate p-2 text-xs font-medium">{d.name || tl("libraryPicker", "Untitled")}</div>
                 </button>
               )) : shownTemplates.map((t) => (
                 <button
@@ -202,7 +204,7 @@ export function LibraryPickerDialog({
                     />
                   </div>
                   <div className="flex items-center gap-1.5 p-2">
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{t.name || "Untitled template"}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{t.name || tl("libraryPicker", "Untitled template")}</span>
                     {t.seq != null && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 tabular-nums text-2xs text-muted-foreground">TPL-{t.seq}</span>}
                   </div>
                 </button>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -32,6 +33,7 @@ export function BrandSplitDialog({
    *  every other write on this page uses. */
   onApply: (next: CatalogProduct[]) => Promise<void>
 }) {
+  const tl = useLabelT()
   const plan = useMemo(() => planBrandSplit(products), [products])
   const [skip, setSkip] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -58,17 +60,17 @@ export function BrandSplitDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!busy) { onOpenChange(v); if (!v) { setSkip(new Set()); setErr(null) } } }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Split the brand off the name</DialogTitle>
+          <DialogTitle>{tl("brandSplit", "Split the brand off the name")}</DialogTitle>
           <DialogDescription>
-            The make becomes its own field. Old names keep resolving, so orders already placed are unaffected.
+            {tl("brandSplit", "The make becomes its own field. Old names keep resolving, so orders already placed are unaffected.")}
           </DialogDescription>
         </DialogHeader>
 
         {plan.length === 0 ? (
           <EmptyState
             icon={Tag}
-            title="No name here starts with a make we recognise"
-            note="A product that already has a brand is left alone. Anything else can be split by hand in the product itself."
+            title={tl("brandSplit", "No name here starts with a make we recognise")}
+            note={tl("brandSplit", "A product that already has a brand is left alone. Anything else can be split by hand in the product itself.")}
           />
         ) : (
           <div className="max-h-[52vh] overflow-y-auto rounded-lg border border-border">
@@ -110,9 +112,9 @@ export function BrandSplitDialog({
         {err && <p className="text-sm text-destructive">{err}</p>}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>{tl("brandSplit", "Cancel")}</Button>
           <Button onClick={apply} disabled={busy || chosen.length === 0}>
-            {busy ? "Saving…" : `Split ${chosen.length} product${chosen.length === 1 ? "" : "s"}`}
+            {busy ? tl("brandSplit", "Saving…") : `Split ${chosen.length} product${chosen.length === 1 ? "" : "s"}`}
           </Button>
         </DialogFooter>
       </DialogContent>

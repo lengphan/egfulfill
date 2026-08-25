@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { DotsThree } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
@@ -36,6 +37,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   canFulfill?: boolean
   onError?: (msg: string) => void
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState(false)
   const confirm = useConfirm()
   const items = order.items ?? []
@@ -71,7 +73,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   // Pending is left OUT for a factory order rather than greyed: a disabled row means "you
   // may not", and this is "this order can't be there at all". Every other stage still lists
   // with its reason.
-  const prod = withReason([{ id: "", label: "Draft", tone: "new" as const },
+  const prod = withReason([{ id: "", label: tl("orderStageMenu", "Draft"), tone: "new" as const },
     ...FACTORY_STAGES.filter((s) => !(fac && s.id === "in_review"))])
   const exc = withReason(EXCEPTION_STAGES)
   /** On hold is a STOP, not a stage — it has to be leavable from the same menu that set it.
@@ -82,7 +84,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
 
   const onStage = async (s: { id: string; label: string; deny: string | null; walk: boolean }) => {
     if (s.walk) {
-      if (await confirm({ title: "Record every stage?", body: `This records every stage up to “${s.label}”.`, confirmLabel: "Record", destructive: false })) setOrderStatus(s.id)
+      if (await confirm({ title: tl("orderStageMenu", "Record every stage?"), body: `This records every stage up to “${s.label}”.`, confirmLabel: "Record", destructive: false })) setOrderStatus(s.id)
       return
     }
     if (!s.deny) setOrderStatus(s.id)
@@ -91,7 +93,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Order actions"
+        aria-label={tl("orderStageMenu", "Order actions")}
         disabled={busy}
         className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-card px-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
       >
@@ -128,7 +130,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {/* NEW LABEL ONLY IF THE PAGE ISN'T ALREADY OFFERING IT — see onNewLabel. */}
-        {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}>New label</DropdownMenuItem>}
+        {canShip && <DropdownMenuItem onClick={() => onNewLabel?.()}>{tl("orderStageMenu", "New label")}</DropdownMenuItem>}
         <DropdownMenuGroup>
           {prod.map((s) => (
             <DropdownMenuItem
@@ -138,7 +140,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
               onClick={() => onStage(s)}
             >
               {s.label}
-              {s.walk && <span className="ml-auto text-2xs text-muted-foreground">catch up</span>}
+              {s.walk && <span className="ml-auto text-2xs text-muted-foreground">{tl("orderStageMenu", "catch up")}</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
@@ -159,9 +161,9 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
               onClick={() => setOrderStatus(resumeTo)}
               title={`Puts this back to ${FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"} — where it was when it was held`}
             >
-              Clear hold
+              {tl("orderStageMenu", "Clear hold")}
               <span className="ml-auto text-2xs text-muted-foreground">
-                {FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"}
+                {FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? tl("orderStageMenu", "Working")}
               </span>
             </DropdownMenuItem>
           </>

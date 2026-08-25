@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 /**
  * ONE SHEET, FULL SCREEN.
  *
@@ -39,6 +40,7 @@ import {
 const AUTOSAVE_MS = 1200
 
 export default function SheetPage() {
+  const tl = useLabelT()
 
   /**
    * WHERE BACK GOES, decided by where you came from.
@@ -123,13 +125,13 @@ export default function SheetPage() {
     return (
       <div className="p-6">
         <div className="rounded-xl border border-border p-8 text-center">
-          <div className="text-sm font-medium">That sheet isn&apos;t here</div>
-          <Button className="mt-4" variant="outline" onClick={goBack}>{fromImport ? "Back to import" : "All sheets"}</Button>
+          <div className="text-sm font-medium">{tl("sheet_[id]", "That sheet isn’t here")}</div>
+          <Button className="mt-4" variant="outline" onClick={goBack}>{fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "All sheets")}</Button>
         </div>
       </div>
     )
   }
-  if (!sheet) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+  if (!sheet) return <div className="p-6 text-sm text-muted-foreground">{tl("sheet_[id]", "Loading…")}</div>
 
   const done = sheet.status === "completed"
 
@@ -137,32 +139,32 @@ export default function SheetPage() {
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-6">
         {done ? (
-          <h1 className="text-base font-semibold tracking-tight">{sheet.name || "Untitled"}</h1>
+          <h1 className="text-base font-semibold tracking-tight">{sheet.name || tl("sheet_[id]", "Untitled")}</h1>
         ) : (
           /* The title IS the field — click it and type, the way a spreadsheet renames. A
              separate "rename" control would be a second thing to find. */
           <input
             value={name}
             onChange={(e) => rename(e.target.value)}
-            placeholder="Untitled"
-            aria-label="Sheet name"
+            placeholder={tl("sheet_[id]", "Untitled")}
+            aria-label={tl("sheet_[id]", "Sheet name")}
             className="min-w-40 max-w-80 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold tracking-tight outline-none hover:border-border focus:border-border"
           />
         )}
 
         {done ? (
-          <span className="rounded-full bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">Sent</span>
+          <span className="rounded-full bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Sent")}</span>
         ) : (
           /* State, not decoration: without it autosave is invisible and the only way to
              believe it is to close the tab and find out. */
           <span className="text-xs text-muted-foreground">
-            {saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "failed" ? "Not saved" : ""}
+            {saved === "saving" ? tl("sheet_[id]", "Saving…") : saved === "saved" ? tl("sheet_[id]", "Saved") : saved === "failed" ? tl("sheet_[id]", "Not saved") : ""}
           </span>
         )}
 
         <div className="ms-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={goBack}>{fromImport ? "Back to import" : "Back"}</Button>
-          {done && <Button size="sm" onClick={copy} disabled={busy}>Duplicate to edit</Button>}
+          <Button variant="outline" size="sm" onClick={goBack}>{fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "Back")}</Button>
+          {done && <Button size="sm" onClick={copy} disabled={busy}>{tl("sheet_[id]", "Duplicate to edit")}</Button>}
         </div>
       </div>
 
@@ -202,6 +204,7 @@ export default function SheetPage() {
  * react-hooks/static-components, and a component redefined each render remounts its subtree.
  */
 function ReadOnlyRows({ rows, orderIds }: { rows: string[][]; orderIds: string[] }) {
+  const tl = useLabelT()
   const filled = rows.filter((r) => r.some((c) => String(c ?? "").trim()))
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">

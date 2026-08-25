@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, ArrowSquareOut, Needle } from "@phosphor-icons/react"
 import { downloadDesignFile, filesForLine, getEmbPreview, type DesignFileRow, type OrderItem } from "@/lib/api"
@@ -34,6 +35,7 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
   files: DesignFileRow[] | undefined
   size?: number
 }) {
+  const tl = useLabelT()
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [png, setPng] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -133,7 +135,7 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
             className="pointer-events-none size-full border-0"
           />
           <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-foreground/70 px-1.5 py-0.5 text-2xs font-medium text-background">
-            Worksheet
+            {tl("trueViewTile", "Worksheet")}
             <ArrowSquareOut size={10} weight="bold" className="opacity-0 transition-opacity group-hover:opacity-100" />
           </span>
         </a>
@@ -146,7 +148,7 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
       <div className={frame} style={style}>
         {/* eslint-disable-next-line @next/next/no-img-element -- a base64 PNG from the
             renderer; next/image would want a loader and a domain for bytes we already hold. */}
-        <img src={`data:image/png;base64,${png}`} alt="Stitch preview" className="size-full object-contain" />
+        <img src={`data:image/png;base64,${png}`} alt={tl("trueViewTile", "Stitch preview")} className="size-full object-contain" />
       </div>
     )
   }
@@ -172,11 +174,11 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
           className="flex flex-col items-center gap-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <Needle size={16} />
-          Stitch view
+          {tl("trueViewTile", "Stitch view")}
           {/* Said out loud, because the first one is slow and metered and every one after it
               is free — which is the difference between "why is this hanging" and "of course
               it is, it is rendering". */}
-          <span className="font-normal opacity-70">renders once</span>
+          <span className="font-normal opacity-70">{tl("trueViewTile", "renders once")}</span>
         </button>
       )}
     </div>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch, ShieldWarning } from "@phosphor-icons/react"
 import { Switch } from "@/components/ui/switch"
@@ -21,6 +22,7 @@ import { VIS_ROLE_LABEL, type VisRole } from "@/lib/nav-visibility"
  * what exists.
  */
 export function RoleGrantsPanel() {
+  const tl = useLabelT()
   const [registry, setRegistry] = useState<RoleGrantDef[]>([])
   const [grants, setGrants] = useState<RoleGrants | null>(null)
   const [saving, setSaving] = useState(false)
@@ -61,16 +63,16 @@ export function RoleGrantsPanel() {
 
   return (
     <div className="mt-4 rounded-2xl border border-border bg-card p-5">
-      <h2 className="text-sm font-semibold">Extra permissions</h2>
+      <h2 className="text-sm font-semibold">{tl("roleGrants", "Extra permissions")}</h2>
       <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
         <ShieldWarning size={14} weight="fill" className="mt-0.5 shrink-0" />
-        <span>These <strong>widen</strong> what a role may do, unlike the list above. Every change is recorded in the audit log with who made it.</span>
+        <span>{tl("roleGrants", "These")} <strong>widen</strong> {tl("roleGrants", "what a role may do, unlike the list above. Every change is recorded in the audit log with who made it.")}</span>
       </p>
 
       {!grants ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{tl("roleGrants", "Loading…")}</div>
       ) : !registry.length ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">No extra permissions are available.</div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{tl("roleGrants", "No extra permissions are available.")}</div>
       ) : (
         <div className="mt-4 divide-y divide-border/60">
           {registry.map((g) => (

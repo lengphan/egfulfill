@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Archive } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,7 @@ const when = (s: string) =>
  * which is the only thing that makes it evidence rather than a guess.
  */
 export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void }) {
+  const tl = useLabelT()
  const [rows, setRows] = useState<CatalogExport[] | null>(null)
  const [err, setErr] = useState<string | null>(null)
 
@@ -34,7 +36,7 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
 
       {rows === null ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-          <CircleNotch size={16} className="animate-spin" /> Loading…
+          <CircleNotch size={16} className="animate-spin" /> {tl("catalogExportHistory", "Loading…")}
         </div>
       ) : rows.length === 0 ? (
         // Says what to do, not just that there's nothing — this list only fills when
@@ -42,17 +44,17 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
         <EmptyState
           icon={Archive}
           size="sm"
-          title="No catalogues saved yet"
-          note="Open Create lookbook and press Save this version before you send one — it records styles and prices as they were."
+          title={tl("catalogExportHistory", "No catalogues saved yet")}
+          note={tl("catalogExportHistory", "Open Create lookbook and press Save this version before you send one — it records styles and prices as they were.")}
         />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                <th className="px-2 py-2">Catalogue</th>
-                <th className="px-2 py-2">Saved</th>
-                <th className="px-2 py-2">Styles</th>
+                <th className="px-2 py-2">{tl("catalogExportHistory", "Catalogue")}</th>
+                <th className="px-2 py-2">{tl("catalogExportHistory", "Saved")}</th>
+                <th className="px-2 py-2">{tl("catalogExportHistory", "Styles")}</th>
                 <th className="px-2 py-2 text-right" />
               </tr>
             </thead>
@@ -66,7 +68,7 @@ export function CatalogExportHistory({ onOpen }: { onOpen: (id: string) => void 
                   <td className="px-2 py-2 text-xs tabular-nums text-muted-foreground">{e.styleCount}</td>
                   <td className="px-2 py-2 text-right">
                     <Button size="sm" variant="outline" onClick={() => onOpen(e.id)}>
-                      Reopen
+                      {tl("catalogExportHistory", "Reopen")}
                     </Button>
                   </td>
                 </tr>

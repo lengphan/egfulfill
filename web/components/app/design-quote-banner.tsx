@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { CircleNotch, Warning, CheckCircle, Sparkle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
  item: OrderItem
  onAnswered?: () => void
 }) {
+  const tl = useLabelT()
  const [busy, setBusy] = useState<"accept" | "decline" | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [done, setDone] = useState<string | null>(null)
@@ -76,12 +78,10 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
           <p className="mt-0.5 text-xs text-hold">
             We&apos;ve looked at your artwork and it needs more work than a standard digitise.
             It&apos;s <strong>{money(item.design_quote_make)}</strong> to make the machine file
-            {Number(item.design_quote_download) > 0 && <>, and <strong>{money(item.design_quote_download)}</strong> if you later want to download it</>}.
+            {Number(item.design_quote_download) > 0 && <>{tl("designQuoteBanner", ", and")} <strong>{money(item.design_quote_download)}</strong> {tl("designQuoteBanner", "if you later want to download it")}</>}.
           </p>
           <p className="mt-1 text-2xs text-hold">
-            Nothing has been charged. Declining turns down <strong>the design work only</strong> —
- your order stays exactly as it is. If you&apos;d rather cancel it, that&apos;s yours
- to do, and we won&apos;t do it for you.
+            {tl("designQuoteBanner", "Nothing has been charged. Declining turns down")} <strong>{tl("designQuoteBanner", "the design work only")}</strong> {tl("designQuoteBanner", "— your order stays exactly as it is. If you’d rather cancel it, that’s yours to do, and we won’t do it for you.")}
           </p>
 
           <div className="mt-2 flex flex-wrap gap-2">
@@ -89,7 +89,7 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
               {busy === "accept" ? <CircleNotch size={14} className="animate-spin" /> : `Accept ${money(item.design_quote_make)}`}
             </Button>
             <Button size="sm" variant="outline" onClick={() => answer("decline")} disabled={!!busy}>
-              {busy === "decline" ? <CircleNotch size={14} className="animate-spin" /> : "No thanks"}
+              {busy === "decline" ? <CircleNotch size={14} className="animate-spin" /> : tl("designQuoteBanner", "No thanks")}
             </Button>
           </div>
 

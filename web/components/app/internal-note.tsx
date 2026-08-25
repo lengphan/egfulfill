@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { setInternalNote } from "@/lib/api"
 
@@ -19,6 +20,7 @@ import { setInternalNote } from "@/lib/api"
  * actually worked — had no factory note at all.
  */
 export function InternalNote({ orderId, value }: { orderId: string; value: string }) {
+  const tl = useLabelT()
   const [text, setText] = useState(value)
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const save = async () => {
@@ -30,9 +32,9 @@ export function InternalNote({ orderId, value }: { orderId: string; value: strin
   return (
     <div>
       <div className="mb-0.5 flex items-center gap-2">
-        <span className="eg-label text-muted-foreground">Factory note</span>
+        <span className="eg-label text-muted-foreground">{tl("internalNote", "Factory note")}</span>
         <span className="text-2xs text-muted-foreground">
-          {state === "saving" ? "saving…" : state === "saved" ? "saved" : state === "error" ? "couldn't save" : "staff only"}
+          {state === "saving" ? tl("internalNote", "saving…") : state === "saved" ? "saved" : state === "error" ? tl("internalNote", "couldn't save") : tl("internalNote", "staff only")}
         </span>
       </div>
       <textarea
@@ -40,7 +42,7 @@ export function InternalNote({ orderId, value }: { orderId: string; value: strin
         onChange={(e) => { setText(e.target.value); if (state !== "idle") setState("idle") }}
         onBlur={save}
         rows={2}
-        placeholder="e.g. re-hooping, waiting on navy thread…"
+        placeholder={tl("internalNote", "e.g. re-hooping, waiting on navy thread…")}
         className="w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-relaxed"
       />
     </div>

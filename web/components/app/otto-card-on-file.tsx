@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CreditCard, Warning, CheckCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,7 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
    * the errand, so leaving the dialog open afterwards makes you dismiss it yourself. */
  onSaved?: () => void
 }) {
+  const tl = useLabelT()
  const [saved, setSaved] = useState<CardDetails | null>(null)
  const [editing, setEditing] = useState(false)
  const [name, setName] = useState("")
@@ -82,7 +84,7 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
  return (
     <div className="space-y-2">
       <h4 className={"flex items-center gap-1.5 font-medium " + (compact ? "text-sm" : "text-sm")}>
-        <CreditCard size={14} weight="fill" /> Card on file
+        <CreditCard size={14} weight="fill" /> {tl("ottoCardOnFile", "Card on file")}
       </h4>
 
       {saved && !editing ? (
@@ -94,15 +96,14 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
               {expired ? `expired ${saved.exp_date}` : saved.exp_date}
             </span>
             <span className="ml-auto flex gap-3 text-xs">
-              <button onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">Replace</button>
-              <button onClick={remove} className="text-muted-foreground hover:text-destructive">Remove</button>
+              <button onClick={() => setEditing(true)} className="font-medium text-primary hover:underline">{tl("ottoCardOnFile", "Replace")}</button>
+              <button onClick={remove} className="text-muted-foreground hover:text-destructive">{tl("ottoCardOnFile", "Remove")}</button>
             </span>
           </div>
           {expired ? (
             <p className="flex items-start gap-1.5 text-xs text-destructive">
               <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
-              This card has expired, so it won&apos;t be sent — Otto orders will ask for a card again
- until it&apos;s replaced.
+              {tl("ottoCardOnFile", "This card has expired, so it won’t be sent — Otto orders will ask for a card again until it’s replaced.")}
             </p>
           ) : null}
         </div>
@@ -111,12 +112,12 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
           {/* AUTOFILL IS THE OTHER HALF OF THIS. The cc-* hints let Safari, Chrome and
               1Password fill all four in one click, so even entering it here is one action. */}
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Name on card</span>
+            <span className="text-sm font-medium">{tl("ottoCardOnFile", "Name on card")}</span>
             <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9"
  autoComplete="cc-name" name="ccname" />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Card number</span>
+            <span className="text-sm font-medium">{tl("ottoCardOnFile", "Card number")}</span>
             <Input
  value={number}
               // Grouped as you type — a 16-digit run is unreadable, and unreadable is where a
@@ -127,7 +128,7 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Expiry</span>
+              <span className="text-sm font-medium">{tl("ottoCardOnFile", "Expiry")}</span>
               <Input value={exp} onChange={(e) => setExp(formatExpiry(e.target.value))}
  placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp"
  className="h-9 tabular-nums" />
@@ -148,11 +149,11 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
 
           <div className="flex items-center gap-3">
             <Button size="sm" onClick={commit} disabled={touched && errs.length > 0}>
-              Save card
+              {tl("ottoCardOnFile", "Save card")}
             </Button>
             {saved && (
               <button onClick={() => { setEditing(false); setTouched(false); setName(""); setNumber(""); setCvv(""); setExp("") }}
- className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+ className="text-xs text-muted-foreground hover:text-foreground">{tl("ottoCardOnFile", "Cancel")}</button>
             )}
           </div>
         </div>
@@ -160,7 +161,7 @@ export function OttoCardOnFile({ compact = false, onSaved }: {
 
       {justSaved && (
         <p className="flex items-center gap-1.5 text-xs text-shipped">
-          <CheckCircle size={13} weight="fill" /> Saved — Otto orders will stop asking.
+          <CheckCircle size={13} weight="fill" /> {tl("ottoCardOnFile", "Saved — Otto orders will stop asking.")}
         </p>
       )}
 

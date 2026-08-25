@@ -239,10 +239,10 @@ export function VariantStrip({
  return (
       <div className={cn("space-y-1", className)}>
         <div className="grid grid-cols-2 gap-x-2 gap-y-2.5 sm:grid-cols-[1.7fr_1.25fr_0.7fr_0.85fr]">
-          <VariantField label="Blank" value={blank || ""} options={[]} disabled onChange={() => {}} />
-          <VariantField label="Colour" value={color || ""} options={[]} swatches disabled onChange={() => {}} />
-          <VariantField label="Size" value={size || ""} options={[]} disabled onChange={() => {}} />
-          <VariantField label="Method" value={method || ""} options={[]} disabled onChange={() => {}} />
+          <VariantField label={tl("variantField", "Blank")} value={blank || ""} options={[]} disabled onChange={() => {}} />
+          <VariantField label={tl("variantField", "Colour")} value={color || ""} options={[]} swatches disabled onChange={() => {}} />
+          <VariantField label={tl("variantField", "Size")} value={size || ""} options={[]} disabled onChange={() => {}} />
+          <VariantField label={tl("variantField", "Method")} value={method || ""} options={[]} disabled onChange={() => {}} />
         </div>
       </div>
     )

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, MagnifyingGlass, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,7 @@ const PAGE = 40
  * in the browser would move the entire catalogue over the wire to save one round trip.
  */
 export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) {
+  const tl = useLabelT()
  const [rows, setRows] = useState<SupplierStyle[] | null>(null)
  const [total, setTotal] = useState(0)
  const [q, setQ] = useState("")
@@ -100,7 +102,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search style, brand or number…" className="h-9 w-72 pl-8" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("supplierStylesPicker", "Search style, brand or number…")} className="h-9 w-72 pl-8" />
         </div>
         <span className="text-xs text-muted-foreground">
           {total.toLocaleString()} styles synced
@@ -123,9 +125,9 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
  step, because a style with a catalogue price and no place in the catalogue is
  a state nobody wants. "Remove" stays, since taking something out is a real
  decision with no price attached to it. */}
-          <span className="text-xs text-muted-foreground">Cost +</span>
+          <span className="text-xs text-muted-foreground">{tl("supplierStylesPicker", "Cost +")}</span>
           <Input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^\d.]/g, ""))}
- className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label="Markup percent" />
+ className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label={tl("supplierStylesPicker", "Markup percent")} />
           {/* Applies to the ticked styles ON THIS PAGE — which are, by definition, the
  ones in the catalogue. No second selection to keep in sync with the first. */}
           <Button size="sm" variant="outline" onClick={markup} disabled={busy}>
@@ -143,11 +145,11 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
 
       {rows === null ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-          <CircleNotch size={16} className="animate-spin" /> Loading the supplier catalogue…
+          <CircleNotch size={16} className="animate-spin" /> {tl("supplierStylesPicker", "Loading the supplier catalogue…")}
         </div>
       ) : rows.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          {q ? `No style matches “${q}”.` : "No supplier styles are synced yet — run Sync all styles on the Suppliers page."}
+          {q ? `No style matches “${q}”.` : tl("supplierStylesPicker", "No supplier styles are synced yet — run Sync all styles on the Suppliers page.")}
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -155,11 +157,11 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
             <thead>
               <tr className="border-b border-border text-left eg-label text-muted-foreground">
                 <th className="w-8 px-2 py-2" />
-                <th className="px-2 py-2">Style</th>
-                <th className="px-2 py-2">Catalogue price</th>
+                <th className="px-2 py-2">{tl("supplierStylesPicker", "Style")}</th>
+                <th className="px-2 py-2">{tl("supplierStylesPicker", "Catalogue price")}</th>
                 {/* Our cost, staff-only. It sits here because the markup is judged against
  it — a percentage means nothing without the number it applies to. */}
-                <th className="px-2 py-2">Costs us</th>
+                <th className="px-2 py-2">{tl("supplierStylesPicker", "Costs us")}</th>
               </tr>
             </thead>
             <tbody>
@@ -208,7 +210,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
  onChange={(e) => setDraft((d) => ({ ...d, [st.ref]: e.target.value.replace(/[^\d.]/g, "") }))}
  onBlur={() => savePrice(st.ref)}
  onKeyDown={(e) => { if (e.key === "Enter") savePrice(st.ref) }}
- placeholder="set price"
+ placeholder={tl("supplierStylesPicker", "set price")}
  inputMode="decimal"
  aria-label={`Catalogue price for ${st.name || st.ref}`}
  className="h-8 w-24 text-right text-xs tabular-nums"

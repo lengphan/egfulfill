@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { Package, ArrowsLeftRight, PencilSimple, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -91,6 +92,7 @@ function blankOf(item: OrderItem, catalog?: CatalogProduct[]): { url: string; mi
 }
 
 export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, className }: ItemAvatarProps) {
+  const tl = useLabelT()
   const [preview, setPreview] = useState(false)
   const [showListing, setShowListing] = useState(false)
   const [over, setOver] = useState(false)
@@ -281,7 +283,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
                 : { left: 0, width: Math.round(size * SECONDARY), height: Math.round(size * SECONDARY) }
             }
           >
-            <Thumb src={listing} alt="Buyer's listing photo" className="size-full bg-transparent" icon={<Package size={14} />} />
+            <Thumb src={listing} alt={tl("itemAvatar", "Buyer's listing photo")} className="size-full bg-transparent" icon={<Package size={14} />} />
           </button>
         )}
 
@@ -308,7 +310,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
       <Dialog open={preview} onOpenChange={setPreview}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="pr-6 text-sm leading-snug">{item.name || item.sku || "Item"}</DialogTitle>
+            <DialogTitle className="pr-6 text-sm leading-snug">{item.name || item.sku || tl("itemAvatar", "Item")}</DialogTitle>
             {/* Shared by every board that renders a line, so the buyer's choice follows the
                 item wherever it is opened rather than only on the queue. */}
             <OrderedVariant item={item} className="pr-6" />
@@ -330,15 +332,15 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
                 className="eg-tap inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium transition-colors hover:bg-accent"
               >
                 <ArrowsLeftRight size={12} weight="bold" />
-                {showListing ? "Show what we'll print" : "Show the listing photo"}
+                {showListing ? tl("itemAvatar", "Show what we'll print") : tl("itemAvatar", "Show the listing photo")}
               </button>
             )}
             <p className="text-xs text-muted-foreground">
               {showListing
-                ? "The buyer's listing photo — for reference only."
+                ? tl("itemAvatar", "The buyer's listing photo — for reference only.")
                 : art
-                  ? "The blank with its artwork placed — this is what gets made."
-                  : "No artwork on this line yet."}
+                  ? tl("itemAvatar", "The blank with its artwork placed — this is what gets made.")
+                  : tl("itemAvatar", "No artwork on this line yet.")}
             </p>
           </div>
         </DialogContent>

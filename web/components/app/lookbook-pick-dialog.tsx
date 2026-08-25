@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ export function LookbookPickDialog({
   onSave: (next: string[] | null) => void
   busy?: boolean
 }) {
+  const tl = useLabelT()
   const [sel, setSel] = useState<Set<string>>(new Set())
 
   // Seeded on OPEN, not on every render of `picked` — the dialog is a draft of the choice and
@@ -69,7 +71,7 @@ export function LookbookPickDialog({
         <div className="max-h-[55vh] overflow-y-auto">
           {options.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
-              This style lists none to choose from.
+              {tl("lookbookPick", "This style lists none to choose from.")}
             </p>
           ) : hasImages ? (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
@@ -109,16 +111,16 @@ export function LookbookPickDialog({
           {/* The count is the only thing here that isn't a control, and it is the answer to
               "what did I just do" — so it is a reading, not a caption under a button. */}
           <span className="text-xs tabular-nums text-muted-foreground">
-            {sel.size === options.length ? "All" : `${sel.size} of ${options.length}`}
+            {sel.size === options.length ? tl("lookbookPick", "All") : `${sel.size} of ${options.length}`}
           </span>
           <Button
             variant="ghost" size="sm" className="ml-auto" disabled={busy}
             onClick={() => { onSave(null); onOpenChange(false) }}
-            title="Print the whole range, including any added later"
+            title={tl("lookbookPick", "Print the whole range, including any added later")}
           >
-            Show all
+            {tl("lookbookPick", "Show all")}
           </Button>
-          <Button size="sm" onClick={commit} disabled={busy}>Done</Button>
+          <Button size="sm" onClick={commit} disabled={busy}>{tl("lookbookPick", "Done")}</Button>
         </div>
       </DialogContent>
     </Dialog>

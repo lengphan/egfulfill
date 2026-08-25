@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { UploadSimple, Storefront, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -34,6 +35,7 @@ export function downscale(dataUrl: string, max = 320): Promise<string> {
 
 // Create a reusable design: choose a blank mockup, place artwork, save to the library.
 export function DesignStudioDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved?: () => void }) {
+  const tl = useLabelT()
   const [mockup, setMockup] = useState("")
   const [designUrl, setDesignUrl] = useState("")
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
@@ -60,7 +62,7 @@ export function DesignStudioDialog({ open, onOpenChange, onSaved }: { open: bool
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v) }}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Add artwork</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{tl("designStudio", "Add artwork")}</DialogTitle></DialogHeader>
 
         <div className="mx-auto w-full max-w-sm">
           <DesignStage className="w-full" mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} />
@@ -69,23 +71,23 @@ export function DesignStudioDialog({ open, onOpenChange, onSaved }: { open: bool
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
-              <Storefront size={14} weight="bold" /> {mockup ? "Change blank" : "Pick a blank"}
+              <Storefront size={14} weight="bold" /> {mockup ? tl("designStudio", "Change blank") : tl("designStudio", "Pick a blank")}
             </Button>
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">
-              <UploadSimple size={15} weight="bold" /> {designUrl ? "Replace artwork" : "Upload artwork"}
+              <UploadSimple size={15} weight="bold" /> {designUrl ? tl("designStudio", "Replace artwork") : tl("designStudio", "Upload artwork")}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => readImageFile(e.target.files?.[0], (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)} />
             </label>
           </div>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Design name</span>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Retro Sunset" />
+            <span className="text-sm font-medium">{tl("designStudio", "Design name")}</span>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tl("designStudio", "e.g. Retro Sunset")} />
           </label>
 
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save to library"}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("designStudio", "Cancel")}</Button>
+            <Button onClick={save} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : tl("designStudio", "Save to library")}</Button>
           </div>
         </div>
 

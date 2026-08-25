@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowUUpLeft, CircleNotch, CheckCircle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -28,6 +29,7 @@ const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(3
  * bug, where a struck-through balance reads as information.
  */
 export function OrderRefundPanel({ orderId }: { orderId: string }) {
+  const tl = useLabelT()
  const [state, setState] = useState<OrderCharges | null>(null)
   // Distinguishes "couldn't read this" from "there's nothing here". Without it a dead
   // endpoint renders exactly like an order that was never charged, and the panel simply
@@ -68,7 +70,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
   // missing button instead of a missing deploy.
  if (loadErr) {
  return (
-      <SectionCard title="Refund">
+      <SectionCard title={tl("orderRefund", "Refund")}>
         <div className="flex items-start gap-2 px-5 py-4 text-sm text-muted-foreground">
           <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-hold" />
           <span>Couldn&apos;t load this order&apos;s charges, so refunds can&apos;t be shown. {loadErr}</span>
@@ -180,7 +182,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
 
  return (
     <SectionCard
- title="Refund"
+ title={tl("orderRefund", "Refund")}
  actions={<span className="text-xs text-muted-foreground">{usd(state.refundable)} refundable</span>}
     >
       <div className="divide-y divide-border">
@@ -209,7 +211,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               </div>
               {spent ? (
                 <span className="inline-flex items-center gap-1 text-xs text-success">
-                  <CheckCircle size={12} weight="fill" /> fully refunded
+                  <CheckCircle size={12} weight="fill" /> {tl("orderRefund", "fully refunded")}
                 </span>
               ) : (
                 <Input
@@ -239,7 +241,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  have cost more, and hiding the whole footer once the refundable balance hits zero
  took the only control that could record that away with it. */}
         {nothingLeft && (
-          <p className="text-sm text-muted-foreground">Everything charged on this order has been refunded.</p>
+          <p className="text-sm text-muted-foreground">{tl("orderRefund", "Everything charged on this order has been refunded.")}</p>
         )}
         {(
           <>
@@ -266,11 +268,11 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               */}
             <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">Charge an adjustment</div>
+                <div className="text-sm font-medium">{tl("orderRefund", "Charge an adjustment")}</div>
                 <div className="text-xs text-muted-foreground">
                   {selected.length
-                    ? "Kept back out of this refund — both are recorded separately"
- : "Taken from the seller’s wallet against this order"}
+                    ? tl("orderRefund", "Kept back out of this refund — both are recorded separately")
+ : tl("orderRefund", "Taken from the seller’s wallet against this order")}
                 </div>
               </div>
               <Input
@@ -279,7 +281,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  placeholder="0.00"
  inputMode="decimal"
  disabled={busy}
- aria-label="Adjustment to charge"
+ aria-label={tl("orderRefund", "Adjustment to charge")}
  className="h-8 w-24 text-right tabular-nums"
               />
             </label>
@@ -314,8 +316,8 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
                 {!selected.length
                   ? `Charge ${usd(feeAmt)}`
  : feeAmt > 0
-                    ? `${isEverything ? "Full refund" : `Refund ${usd(planned)}`}, keep ${usd(feeAmt)}`
- : isEverything ? "Full refund" : `Refund ${usd(planned)}`}
+                    ? `${isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}, keep ${usd(feeAmt)}`
+ : isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}
               </Button>
             </div>
             {/* THE NET, stated, because two movements in one press is the one case where the
@@ -327,8 +329,8 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
             )}
             <p className="text-xs text-muted-foreground">
               {selected.length
-                ? "Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it."
- : "An adjustment is charged against this order and shows here as a refundable part, so it can be taken back the same way."}
+                ? tl("orderRefund", "Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it.")
+ : tl("orderRefund", "An adjustment is charged against this order and shows here as a refundable part, so it can be taken back the same way.")}
             </p>
           </>
         )}
@@ -336,7 +338,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
 
       {state.refunds.length > 0 && (
         <div className="border-t border-border px-5 py-3">
-          <div className="mb-1.5 text-xs font-medium text-muted-foreground">Already refunded</div>
+          <div className="mb-1.5 text-xs font-medium text-muted-foreground">{tl("orderRefund", "Already refunded")}</div>
           <div className="space-y-1">
             {state.refunds.map((r, i) => (
               <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">

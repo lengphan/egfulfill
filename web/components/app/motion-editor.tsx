@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 /**
  * Settings › Site content › Motion — tune how the marketing pages arrive, and WATCH it.
  *
@@ -90,6 +91,7 @@ export function MotionEditor({ value, onChange }: {
  value: MotionSettings
  onChange: (next: MotionSettings) => void
 }) {
+  const tl = useLabelT()
  const [name, setName] = useState<PresetName>("rise")
  const reduce = useReducedMotion()
  const preset = value[name] ?? DEFAULT_MOTION[name]
@@ -147,9 +149,7 @@ export function MotionEditor({ value, onChange }: {
         <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
           <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
           <span>
-            Your system is set to reduce motion, so the preview below fades instead of moving —
- and so does the live site, for anyone with that setting. The travel and easing you
- set here are real, they are just not what you personally will see.
+            {tl("motionEditor", "Your system is set to reduce motion, so the preview below fades instead of moving — and so does the live site, for anyone with that setting. The travel and easing you set here are real, they are just not what you personally will see.")}
           </span>
         </div>
       )}
@@ -167,7 +167,7 @@ export function MotionEditor({ value, onChange }: {
           ))}
 
           <label className="block">
-            <span className="text-xs font-medium">Curve</span>
+            <span className="text-xs font-medium">{tl("motionEditor", "Curve")}</span>
             <select
  className="mt-1.5 h-9 w-full rounded-lg border border-border bg-card px-2 text-sm"
  value={CURVES.some((c) => curveKey(c.value) === curveKey(preset.ease)) ? curveKey(preset.ease) : "custom"}
@@ -190,14 +190,14 @@ export function MotionEditor({ value, onChange }: {
 
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setReplay((n) => n + 1)}>
-              Replay
+              {tl("motionEditor", "Replay")}
             </Button>
             <Button
  size="sm" variant="ghost" disabled={isDefault}
  onClick={() => onChange({ ...value, [name]: { ...DEFAULT_MOTION[name] } })}
  className="text-muted-foreground"
             >
-              {isDefault ? "Is the default" : "Reset to default"}
+              {isDefault ? tl("motionEditor", "Is the default") : tl("motionEditor", "Reset to default")}
             </Button>
           </div>
         </div>

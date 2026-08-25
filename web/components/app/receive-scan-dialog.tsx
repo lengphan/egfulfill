@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState } from "react"
 import { CircleNotch, Barcode, Warning, CheckCircle, Package, Camera } from "@phosphor-icons/react"
 import {
@@ -30,6 +31,7 @@ const num = (v: unknown) => Number(v) || 0
 export function ReceiveScanDialog({
  open, onOpenChange, onReceived,
 }: { open: boolean; onOpenChange: (v: boolean) => void; onReceived?: () => void }) {
+  const tl = useLabelT()
  const [code, setCode] = useState("")
  const [box, setBox] = useState<SsBox | null>(null)
  const [busy, setBusy] = useState(false)
@@ -105,9 +107,9 @@ export function ReceiveScanDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Receive a box</DialogTitle>
+          <DialogTitle>{tl("receiveScan", "Receive a box")}</DialogTitle>
           <DialogDescription>
-            Scan the barcode on an S&amp;S carton to see exactly what&apos;s inside it.
+            {tl("receiveScan", "Scan the barcode on an S&S carton to see exactly what’s inside it.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,17 +122,17 @@ export function ReceiveScanDialog({
  onChange={(e) => setCode(e.target.value)}
               // A scanner types the code then sends Enter, so this is the whole interaction.
  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup() } }}
- placeholder="Scan or type — e.g. 42592959.0011"
+ placeholder={tl("receiveScan", "Scan or type — e.g. 42592959.0011")}
  className="h-10 tabular-nums"
  disabled={busy || saving}
             />
             {/* Phone camera, for a bench without a handheld scanner. */}
             <Button size="sm" variant="outline" onClick={() => setCam((v) => !v)} disabled={busy || saving}
- title="Scan with the camera">
+ title={tl("receiveScan", "Scan with the camera")}>
               <Camera size={14} weight="bold" />
             </Button>
             <Button size="sm" onClick={() => lookup()} disabled={busy || saving || !code.trim()}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : "Look up"}
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("receiveScan", "Look up")}
             </Button>
           </div>
 
@@ -160,8 +162,8 @@ export function ReceiveScanDialog({
                 <span className="inline-flex items-center gap-1 font-medium">
                   <Package size={13} weight="fill" /> Box {box.boxNumber}{box.boxCount ? ` of ${box.boxCount}` : ""}
                 </span>
-                <span className="text-muted-foreground">Order <span className="tabular-nums text-foreground">{box.orderNumber}</span></span>
-                <span className="text-muted-foreground">Invoice <span className="tabular-nums text-foreground">{box.invoiceNumber}</span></span>
+                <span className="text-muted-foreground">{tl("receiveScan", "Order")} <span className="tabular-nums text-foreground">{box.orderNumber}</span></span>
+                <span className="text-muted-foreground">{tl("receiveScan", "Invoice")} <span className="tabular-nums text-foreground">{box.invoiceNumber}</span></span>
                 {box.poNumber && <span className="text-muted-foreground">PO <span className="tabular-nums text-foreground">{box.poNumber}</span></span>}
                 {box.warehouse && <span className="text-muted-foreground">from {box.warehouse}</span>}
                 {box.tracking && <span className="text-muted-foreground">{box.carrier} <span className="tabular-nums text-foreground">{box.tracking}</span></span>}
@@ -173,7 +175,7 @@ export function ReceiveScanDialog({
                 <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
                   <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
                   <span>
-                    {short.length} line{short.length === 1 ? " was" : "s were"} shipped short — only what actually arrived
+                    {short.length} line{short.length === 1 ? " was" : tl("receiveScan", "s were")} shipped short — only what actually arrived
  will be added to stock.
                   </span>
                 </div>
@@ -205,9 +207,9 @@ export function ReceiveScanDialog({
 
         <DialogFooter>
           <span className="mr-auto text-xs text-muted-foreground">
-            {box ? `${units} units in this box` : "Scan a carton label to begin"}
+            {box ? `${units} units in this box` : tl("receiveScan", "Scan a carton label to begin")}
           </span>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={saving}>Close</Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={saving}>{tl("receiveScan", "Close")}</Button>
           <Button size="sm" onClick={receive} disabled={!box || saving || !units}>
             {saving ? <CircleNotch size={13} className="animate-spin" /> : null}
             Add to stock

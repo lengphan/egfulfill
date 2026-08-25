@@ -148,7 +148,7 @@ function Tag({ id, label, state, title, orderId, status, files }: {
 
         <div className="max-h-56 overflow-y-auto p-1">
           {rows === null ? (
-            <div className="px-2 py-3 text-xs text-muted-foreground">Loading…</div>
+            <div className="px-2 py-3 text-xs text-muted-foreground">{tl("readinessDots", "Loading…")}</div>
           ) : forTag(id, rows).length === 0 ? (
             /* The tag's STATE is the truth — it reads what the order actually is. History
  is supporting evidence and can legitimately be missing (an action taken
@@ -227,6 +227,7 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
  files?: DesignFileRow[]
  className?: string
 }) {
+  const tl = useLabelT()
   // (A `compact` flag used to select a dot-instead-of-pill variant that Tag never actually
   // implemented — it took a prop it ignored. The one rendering is now the compact one.)
   //
@@ -254,7 +255,7 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
     ...buyerUploads.map((it) => ({
  key: `buyer-${it.line_id ?? it.sku}`,
  name: `Buyer upload — ${it.name || it.sku}`,
- note: "Sent by the buyer, not a production file",
+ note: tl("readinessDots", "Sent by the buyer, not a production file"),
  href: it.design_src as string,
     })),
     // Machine files go through the API so the paywall still applies.
@@ -271,11 +272,11 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
  return (
     <span className={"inline-flex items-center gap-2 " + (className ?? "")}>
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
-      <Tag id="label" orderId={order.id} label="Label" state={ready.label.state}
+      <Tag id="label" orderId={order.id} label={tl("readinessDots", "Label")} state={ready.label.state}
  title={ready.label.status} status={ready.label.status} files={labelFile} />
-      <Tag id="scan" orderId={order.id} label="Scan" state={ready.scan.state}
+      <Tag id="scan" orderId={order.id} label={tl("readinessDots", "Scan")} state={ready.scan.state}
  title={ready.scan.status} status={ready.scan.status} files={labelFile} />
-      <Tag id="design" orderId={order.id} label="Design" state={ready.design.state}
+      <Tag id="design" orderId={order.id} label={tl("readinessDots", "Design")} state={ready.design.state}
  title={ready.design.status} status={ready.design.status} files={designFiles} />
     </span>
   )

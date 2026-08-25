@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { Suspense, useCallback, useEffect, useState } from "react"
 import { Plus, PenNib, X, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -56,6 +57,7 @@ const fmtDate = (s?: string) => {
 }
 
 function DesignLab() {
+  const tl = useLabelT()
  const tab = useDesignLabTab()
  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
  const [signedOut, setSignedOut] = useState(false)
@@ -152,13 +154,13 @@ function DesignLab() {
         */}
       {tab === "library" ? (
         <SectionCard
- title="Your artwork"
+ title={tl("design", "Your artwork")}
  actions={
             // Named for what it DOES, now that dropping is how artwork gets added. It was
             // "Add artwork", which is the zone's job — two controls claiming one verb, and
             // the one that opened a mockup dialog was the louder of the two.
             <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)} disabled={signedOut}>
-              <Plus size={14} weight="bold" /> Place on a mockup
+              <Plus size={14} weight="bold" /> {tl("design", "Place on a mockup")}
             </Button>
           }
         >
@@ -181,10 +183,10 @@ function DesignLab() {
                 slim={list.length > 0}
                 label={signedOut ? "Sign in to build your artwork library"
  : list.length > 0 ? "Add more artwork" : "Drop your artwork here"}
-                hint="PNG, JPG or SVG"
+                hint={tl("design", "PNG, JPG or SVG")}
                 action={!signedOut && list.length === 0 && (
                   <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)}>
-                    <Plus size={14} weight="bold" /> Place it on a mockup
+                    <Plus size={14} weight="bold" /> {tl("design", "Place it on a mockup")}
                   </Button>
                 )}
               />
@@ -208,14 +210,14 @@ function DesignLab() {
                     <button
                       type="button"
                       onClick={() => zoom.open(d.thumb ? proxiedImageSrc(d.thumb) : "", d.name || `IMG-${d.id}`)}
-                      title="View full size"
+                      title={tl("design", "View full size")}
                       className="absolute inset-0 cursor-zoom-in"
                       aria-label={`View ${d.name || "artwork"} full size`}
                     />
                     <button
  onClick={() => remove(d.id)}
  className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity hover:bg-alert group-hover:opacity-100"
- aria-label="Delete artwork"
+ aria-label={tl("design", "Delete artwork")}
                     >
                       <X size={13} weight="bold" />
                     </button>
@@ -245,10 +247,10 @@ function DesignLab() {
                     ) : (
                       <button
  onClick={() => setEditId(d.id)}
- title="Click to rename"
+ title={tl("design", "Click to rename")}
  className="eg-tap block max-w-full truncate text-left text-sm font-semibold transition-colors hover:text-primary"
                       >
-                        {d.name || "Untitled"}
+                        {d.name || tl("design", "Untitled")}
                       </button>
                     )}
                     <div className="mt-auto flex items-center gap-1.5 pt-1.5">
@@ -257,11 +259,11 @@ function DesignLab() {
  sheet, so it's shown at a readable size, not a tiny caption. */}
                       <button
  onClick={() => { navigator.clipboard?.writeText(`IMG-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
- title="Copy this artwork's reference"
+ title={tl("design", "Copy this artwork's reference")}
  className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
                         {copied === String(d.id)
-                          ? <span className="inline-flex items-center gap-1">Copied<Check size={12} weight="bold" /></span>
+                          ? <span className="inline-flex items-center gap-1">{tl("design", "Copied")}<Check size={12} weight="bold" /></span>
                           : `IMG-${d.id}`}
                       </button>
                     </div>

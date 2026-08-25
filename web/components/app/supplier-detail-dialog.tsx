@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch, Plus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -88,6 +89,7 @@ export function SupplierDetailDialog({
    * nothing has to be re-picked on the way out. */
  onAddToCart?: (sel: { colour: string | null; size: string | null; qty: number }) => void
 }) {
+  const tl = useLabelT()
  const [d, setD] = useState<Detail | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [colour, setColour] = useState<string | null>(null)
@@ -246,7 +248,7 @@ export function SupplierDetailDialog({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={shown} alt="" className="absolute inset-0 size-full object-contain" />
               ) : (
-                <div className="flex size-full items-center justify-center text-xs text-muted-foreground/60">No image</div>
+                <div className="flex size-full items-center justify-center text-xs text-muted-foreground/60">{tl("supplierDetail", "No image")}</div>
               )}
             </div>
             {/* The other angles of THIS colourway. A cap head-on says nothing about the back,
@@ -259,7 +261,7 @@ export function SupplierDetailDialog({
  key={u}
  type="button"
  onClick={() => setFrame(u)}
- aria-label="Show this angle"
+ aria-label={tl("supplierDetail", "Show this angle")}
  aria-pressed={u === shown}
  className={"relative size-14 shrink-0 overflow-hidden rounded-md border bg-white transition-colors "
                       + (u === shown ? "border-primary ring-1 ring-primary/40" : "border-border hover:border-foreground/25")}
@@ -279,7 +281,7 @@ export function SupplierDetailDialog({
  the description and the variant choice, and nothing else. */}
             {!d && !err && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <CircleNotch size={13} className="animate-spin" /> Loading the rest…
+                <CircleNotch size={13} className="animate-spin" /> {tl("supplierDetail", "Loading the rest…")}
               </div>
             )}
 
@@ -412,11 +414,11 @@ export function SupplierDetailDialog({
                   * you look while choosing rather than after.
                   */}
                 {d.stockByColor && colour && (
-                  <Section label="Stock">
+                  <Section label={tl("supplierDetail", "Stock")}>
                     {(() => {
  const bySize = d.stockByVariant?.[colour] ?? {}
  const entries = Object.entries(bySize)
- if (!entries.length) return <span className="text-muted-foreground">No figures for this colourway.</span>
+ if (!entries.length) return <span className="text-muted-foreground">{tl("supplierDetail", "No figures for this colourway.")}</span>
                       // A size chosen as well: one number, no labels. Nothing else is in
                       // question, and the colour and size are both lit up above.
  if (size) {
@@ -467,23 +469,23 @@ export function SupplierDetailDialog({
                   <input
  type="number" min={1} value={qty}
  onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
- aria-label="Quantity"
+ aria-label={tl("supplierDetail", "Quantity")}
  className="h-9 w-16 rounded-lg border border-border bg-card px-2.5 text-sm tabular-nums"
                   />
                   <Button size="sm" className="h-9" onClick={() => onAddToCart({ colour, size, qty })}>
-                    Add to cart
+                    {tl("supplierDetail", "Add to cart")}
                   </Button>
                 </div>
               )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
               {onOrder && (
                 <Button size="sm" variant="outline" className="h-9" onClick={onOrder}>
-                  Order
+                  {tl("supplierDetail", "Order")}
                 </Button>
               )}
               {onAddToCatalog && (
                 <Button size="sm" variant="outline" className="h-9" onClick={onAddToCatalog} disabled={added}>
-                  <Plus size={14} weight="bold" /> {added ? "In Products" : "Add to Products"}
+                  <Plus size={14} weight="bold" /> {added ? tl("supplierDetail", "In Products") : tl("supplierDetail", "Add to Products")}
                 </Button>
               )}
               </div>

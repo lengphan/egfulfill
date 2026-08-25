@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, CircleNotch } from "@phosphor-icons/react"
@@ -48,6 +49,7 @@ const TYPE_LABEL: Record<string, string> = {
  * "all sellers" is the same mechanism as a price alert to admins.
  */
 export function NotificationsView() {
+  const tl = useLabelT()
   const router = useRouter()
   const [items, setItems] = useState<Notification[] | null>(null)
   const [total, setTotal] = useState(0)
@@ -89,7 +91,7 @@ export function NotificationsView() {
 
   return (
     <SectionCard
-      title="Notifications"
+      title={tl("notifications", "Notifications")}
       actions={
         <div className="flex items-center gap-2">
           {/* A FILTER, so it looks like a field — .eg-control, same edge and radius as an
@@ -101,11 +103,11 @@ export function NotificationsView() {
           <select
             value={unreadOnly ? "unread" : "all"}
             onChange={(e) => { setUnreadOnly(e.target.value === "unread"); setPage(1) }}
-            aria-label="Which notifications to show"
+            aria-label={tl("notifications", "Which notifications to show")}
             className="eg-control h-8 text-xs"
           >
-            <option value="all">All</option>
-            <option value="unread">Unread only</option>
+            <option value="all">{tl("notifications", "All")}</option>
+            <option value="unread">{tl("notifications", "Unread only")}</option>
           </select>
           {unread > 0 && (
             <Button size="sm" variant="outline" onClick={readAll} disabled={busy}>
@@ -151,7 +153,7 @@ export function NotificationsView() {
                 {n.body && <span className="mt-0.5 block whitespace-pre-wrap text-sm text-muted-foreground">{n.body}</span>}
                 <span className="mt-1 block text-xs text-muted-foreground">
                   {when(n.created_at)}
-                  {n.href ? " · opens the related page" : ""}
+                  {n.href ? tl("notifications", " · opens the related page") : ""}
                 </span>
               </span>
             </button>

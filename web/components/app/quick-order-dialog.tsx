@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
 import { CircleNotch, Warning } from "@phosphor-icons/react"
@@ -48,6 +49,7 @@ export type QuickOrderProduct = {
 export function QuickOrderDialog({
  product, onClose, onAdded,
 }: { product: QuickOrderProduct | null; onClose: () => void; onAdded?: () => void }) {
+  const tl = useLabelT()
  const [qty, setQty] = useState<Record<string, string>>({})
  const [price, setPrice] = useState<Record<string, string>>({})
  const [busy, setBusy] = useState(false)
@@ -126,23 +128,23 @@ export function QuickOrderDialog({
     <Dialog open={!!product} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Quick order</DialogTitle>
+          <DialogTitle>{tl("quickOrder", "Quick order")}</DialogTitle>
           <DialogDescription>{product.name}</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[62vh] space-y-1 overflow-y-auto py-2">
           <div className="flex items-center gap-2 pb-1 text-2xs font-medium text-muted-foreground">
             <span className="w-16 shrink-0" aria-hidden />
-            <span className="flex-1">Colour / size</span>
-            <span className="w-16 text-center">Qty</span>
-            <span className="w-24 text-right">Unit price</span>
+            <span className="flex-1">{tl("quickOrder", "Colour / size")}</span>
+            <span className="w-16 text-center">{tl("quickOrder", "Qty")}</span>
+            <span className="w-24 text-right">{tl("quickOrder", "Unit price")}</span>
           </div>
           {product.sizes.length === 0 ? (
             <div className="space-y-2 py-8 text-center text-sm">
               <p className="text-muted-foreground">
                 {product.loadError
-                  ? "Couldn't load this product's sizes."
- : "This product lists no sizes, so there's nothing to order against."}
+                  ? tl("quickOrder", "Couldn't load this product's sizes.")
+ : tl("quickOrder", "This product lists no sizes, so there's nothing to order against.")}
               </p>
               {product.loadError && (
                 <p className="mx-auto max-w-sm text-xs text-destructive">{product.loadError}</p>
@@ -160,7 +162,7 @@ export function QuickOrderDialog({
                 <div className="text-sm font-medium">{s.size}</div>
                 {s.sku
                   ? <div className="truncate tabular-nums text-2xs text-muted-foreground">{s.sku}</div>
- : <div className="truncate text-2xs text-hold">no supplier sku — can&apos;t be ordered</div>}
+ : <div className="truncate text-2xs text-hold">{tl("quickOrder", "no supplier sku — can’t be ordered")}</div>}
               </div>
               <Input
  value={qty[s.size] ?? ""}
@@ -186,9 +188,9 @@ export function QuickOrderDialog({
 
         <DialogFooter>
           <span className="mr-auto text-xs text-muted-foreground">
-            {units ? `${units} units · ${usd(total)}` : "Nothing selected yet"}
+            {units ? `${units} units · ${usd(total)}` : tl("quickOrder", "Nothing selected yet")}
           </span>
-          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>{tl("quickOrder", "Cancel")}</Button>
           <Button size="sm" onClick={submit} disabled={busy || !picked.length}>
             {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
             Add to order list

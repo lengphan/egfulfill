@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Check, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -25,6 +26,7 @@ const COST_LOW = 0.0336   // flash-lite 1K
 const COST_HIGH = 0.134   // pro 2K, the default
 
 export function AiPricingPanel() {
+  const tl = useLabelT()
   const [p, setP] = useState<AiPricing | null>(null)
   const [imagePrice, setImagePrice] = useState("")
   const [freePerMonth, setFreePerMonth] = useState("")
@@ -73,38 +75,38 @@ export function AiPricingPanel() {
   const margin = price > 0 ? price / COST_HIGH : 0
 
   return (
-    <SectionCard title="AI image generation" bodyClassName="p-5">
+    <SectionCard title={tl("aiPricing", "AI image generation")} bodyClassName="p-5">
       <div className="space-y-6">
         {!p ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CircleNotch size={16} className="animate-spin" /> Loading…
+            <CircleNotch size={16} className="animate-spin" /> {tl("aiPricing", "Loading…")}
           </div>
         ) : (
           <>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium">Let sellers generate images</p>
+                <p className="text-sm font-medium">{tl("aiPricing", "Let sellers generate images")}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Off by default. While this is off, generation stays a factory tool and no seller can spend anything.
+                  {tl("aiPricing", "Off by default. While this is off, generation stays a factory tool and no seller can spend anything.")}
                 </p>
               </div>
-              <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Let sellers generate images" />
+              <Switch checked={enabled} onCheckedChange={setEnabled} aria-label={tl("aiPricing", "Let sellers generate images")} />
             </div>
 
             <div className="grid gap-5 sm:grid-cols-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">Price per image</span>
+                <span className="text-sm font-medium">{tl("aiPricing", "Price per image")}</span>
                 <Input
                   type="number" min={0} step="0.05" value={imagePrice}
                   onChange={(e) => setImagePrice(e.target.value)}
                 />
                 <span className="text-xs text-muted-foreground">
-                  Charged to the seller&apos;s wallet on generate, refunded if it fails.
+                  {tl("aiPricing", "Charged to the seller’s wallet on generate, refunded if it fails.")}
                 </span>
               </label>
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">Free images per month</span>
+                <span className="text-sm font-medium">{tl("aiPricing", "Free images per month")}</span>
                 <Input
                   type="number" min={0} step="1" value={freePerMonth}
                   onChange={(e) => setFreePerMonth(e.target.value)}
@@ -115,13 +117,13 @@ export function AiPricingPanel() {
               </label>
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">Daily limit per seller</span>
+                <span className="text-sm font-medium">{tl("aiPricing", "Daily limit per seller")}</span>
                 <Input
                   type="number" min={0} step="1" value={dailyCap}
                   onChange={(e) => setDailyCap(e.target.value)}
                 />
                 <span className="text-xs text-muted-foreground">
-                  Bounds the worst case. Resets at midnight.
+                  {tl("aiPricing", "Bounds the worst case. Resets at midnight.")}
                 </span>
               </label>
             </div>
@@ -143,7 +145,7 @@ export function AiPricingPanel() {
               </Button>
               {saved && (
                 <span className="inline-flex items-center gap-1 text-sm text-success">
-                  <Check size={14} weight="bold" /> Saved
+                  <Check size={14} weight="bold" /> {tl("aiPricing", "Saved")}
                 </span>
               )}
               {err && (
@@ -156,8 +158,7 @@ export function AiPricingPanel() {
             <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
               <Warning size={14} className="mt-0.5 shrink-0" />
               <span>
-                Video generation stays admin-only and is not sold to sellers. A clip costs $0.20–$4.80 — up to fifteen
-                images — and is rarely what turns into a listing.
+                {tl("aiPricing", "Video generation stays admin-only and is not sold to sellers. A clip costs $0.20–$4.80 — up to fifteen images — and is rarely what turns into a listing.")}
               </span>
             </div>
           </>

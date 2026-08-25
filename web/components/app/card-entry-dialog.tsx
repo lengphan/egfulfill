@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CreditCard, Warning } from "@phosphor-icons/react"
 import {
@@ -35,6 +36,7 @@ export function CardEntryDialog({
   onSubmit: (card: CardDetails) => void
   amount?: number
 }) {
+  const tl = useLabelT()
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
   const [cvv, setCvv] = useState("")
@@ -94,16 +96,16 @@ export function CardEntryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><CreditCard size={18} weight="fill" /> Card details</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><CreditCard size={18} weight="fill" /> {tl("cardEntry", "Card details")}</DialogTitle>
           <DialogDescription>
             {/* WHY IT OPENED. It no longer appears on every order, so "Otto require a card"
                 alone doesn't explain this particular window — the answer is that this
                 browser has no usable card on file. */}
             {onFile
               ? (cardExpired(onFile.exp_date)
-                  ? "The card saved in this browser has expired, so Otto won't take it. Update the expiry — the rest is filled in."
-                  : "The card saved in this browser is filled in below. Change it if you're paying with a different one, or just place the order again.")
-              : "No card is saved in this browser, so this order needs one."}{" "}
+                  ? tl("cardEntry", "The card saved in this browser has expired, so Otto won't take it. Update the expiry — the rest is filled in.")
+                  : tl("cardEntry", "The card saved in this browser is filled in below. Change it if you're paying with a different one, or just place the order again."))
+              : tl("cardEntry", "No card is saved in this browser, so this order needs one.")}{" "}
             Otto require it on every order and have no saved-card API.
             {/* The figure we hold is the PRODUCT subtotal, and Otto bill freight on top of
                 it: a $3.60 order of caps came back charged at $21.35. Presenting the
@@ -130,11 +132,11 @@ export function CardEntryDialog({
               still nothing. */}
           <div className="space-y-3 py-2">
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Name on card</span>
+            <span className="text-sm font-medium">{tl("cardEntry", "Name on card")}</span>
             <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9" autoComplete="cc-name" name="ccname" />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Card number</span>
+            <span className="text-sm font-medium">{tl("cardEntry", "Card number")}</span>
             <Input
               value={number}
               // Grouped as you type — a 16-digit run is unreadable, and unreadable is
@@ -146,7 +148,7 @@ export function CardEntryDialog({
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Expiry</span>
+              <span className="text-sm font-medium">{tl("cardEntry", "Expiry")}</span>
               <Input value={exp} onChange={(e) => setExp(formatExpiry(e.target.value))}
                      placeholder="03/28" inputMode="numeric" autoComplete="cc-exp" name="cc-exp" className="h-9 tabular-nums" />
             </label>
@@ -167,15 +169,15 @@ export function CardEntryDialog({
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
                    className="size-3.5 accent-[var(--primary)]" />
-            Save card for future payments
+            {tl("cardEntry", "Save card for future payments")}
           </label>
 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{tl("cardEntry", "Cancel")}</Button>
           <Button size="sm" onClick={submit} disabled={touched && errs.length > 0}>
-            Pay &amp; place order
+            {tl("cardEntry", "Pay & place order")}
           </Button>
         </DialogFooter>
       </DialogContent>

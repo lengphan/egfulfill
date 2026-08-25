@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { CaretDown, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
  onChanged: () => void
  onError?: (msg: string) => void
 }) {
+  const tl = useLabelT()
  const confirm = useConfirm()
  const [busy, setBusy] = useState(false)
  const labelUrl = order.tracking_label_url || ""
@@ -42,7 +44,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
    */
  const createAnother = async () => {
  const ok = await confirm({
- title: "This order already has a label",
+ title: tl("labelActionButton", "This order already has a label"),
  body: `A label was already bought for this order${order.tracking ? ` (${order.tracking})` : ""}. Creating another buys a SECOND label and charges again — the first stays valid unless you refund it.`,
  confirmLabel: "Buy another label",
  cancelLabel: "Cancel",
@@ -52,7 +54,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
 
  const refund = async () => {
  const ok = await confirm({
- title: "Refund this label?",
+ title: tl("labelActionButton", "Refund this label?"),
  body: "Voids the label with the carrier and credits the cost back to the ledger. This only works on an UNUSED label and within the carrier's refund window. It's recorded in the order's history.",
  confirmLabel: "Refund label",
  cancelLabel: "Keep it",
@@ -71,7 +73,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
  if (!hasLabel) {
  return (
       <Button variant="outline" size="sm" onClick={onOpenLabel}>
-        Create label
+        {tl("labelActionButton", "Create label")}
       </Button>
     )
   }
@@ -80,14 +82,14 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
     <div className="inline-flex h-9 items-center rounded-lg border border-border bg-card">
       <button
  onClick={() => window.open(labelUrl, "_blank", "noopener,noreferrer")}
- title="Open the stored label PDF"
+ title={tl("labelActionButton", "Open the stored label PDF")}
  className="inline-flex h-full items-center gap-1.5 rounded-l-lg px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        Download label
+        {tl("labelActionButton", "Download label")}
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger
- aria-label="More label actions"
+ aria-label={tl("labelActionButton", "More label actions")}
  disabled={busy}
  className="inline-flex h-full items-center justify-center rounded-r-lg border-l border-border px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
         >
@@ -99,7 +101,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
           {order.tracking && (
             <>
               <div className="px-2 py-1.5">
-                <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Tracking</div>
+                <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{tl("labelActionButton", "Tracking")}</div>
                 <div className="truncate tabular-nums text-xs">{order.tracking}</div>
               </div>
               <DropdownMenuSeparator />
@@ -110,9 +112,9 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
  slip, Cancel order, Approve), so a truck and a plus here were the only marks in
  the row and read as decoration on the one action that spends money. The CARET
  stays: it is not a picture of the action, it is what says there is a menu. */}
-          <DropdownMenuItem onClick={createAnother}>Create another label</DropdownMenuItem>
+          <DropdownMenuItem onClick={createAnother}>{tl("labelActionButton", "Create another label")}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={refund}><span className="text-alert">Refund label</span></DropdownMenuItem>
+          <DropdownMenuItem onClick={refund}><span className="text-alert">{tl("labelActionButton", "Refund label")}</span></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

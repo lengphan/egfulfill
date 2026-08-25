@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { SectionCard } from "@/components/app/section-card"
 import { getPlanUsage, type PlanUsage } from "@/lib/api"
@@ -28,9 +29,10 @@ const monthShort = (period: string) => {
 }
 
 function Shell({ children, note }: { children: React.ReactNode; note?: string }) {
+  const tl = useLabelT()
   return (
     <SectionCard
-      title="Volume discount"
+      title={tl("volumeBoard", "Volume discount")}
     >
       {/* pt-5, not pt-0: the first element is a pill, and it was landing directly on
           the header rule with nothing between them. */}
@@ -48,6 +50,7 @@ function Shell({ children, note }: { children: React.ReactNode; note?: string })
  * how the mis-aligned tier labels survived until they were spotted by eye.
  */
 export function VolumeRail({ data }: { data: PlanUsage }) {
+  const tl = useLabelT()
   const running = data.running
   const earned = data.earned
   const tiers = data.tiers
@@ -61,7 +64,7 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
     <>
       {!data.applied && (
         <div className="mb-4 inline-flex rounded-full bg-muted px-2.5 py-1 eg-label text-muted-foreground">
-          Preview
+          {tl("volumeBoard", "Preview")}
         </div>
       )}
 
@@ -127,7 +130,7 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
       {/* THE SENTENCE — the one thing this card exists to say. */}
       <p className="mt-5 text-sm leading-relaxed">
         You&apos;ve shipped <span className="font-semibold tabular-nums">{units.toLocaleString()}</span>{" "}
-        {units === 1 ? "unit" : "units"} in {running ? monthShort(running.period) : "this month"}.{" "}
+        {units === 1 ? "unit" : "units"} in {running ? monthShort(running.period) : tl("volumeBoard", "this month")}.{" "}
         {running?.next && running.unitsToNext != null ? (
           <>
             <span className="font-semibold tabular-nums">{running.unitsToNext.toLocaleString()}</span> more
@@ -145,8 +148,8 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
         <p className="mt-1.5 text-xs text-muted-foreground">
           {monthShort(earned.period)}: {earned.units.toLocaleString()} units
           {earned.pct > 0
-            ? <> — {earned.pct}% {data.applied ? "off" : "would apply"} this month.</>
-            : <> — no tier reached.</>}
+            ? <> — {earned.pct}% {data.applied ? "off" : tl("volumeBoard", "would apply")} this month.</>
+            : <> {tl("volumeBoard", "— no tier reached.")}</>}
         </p>
       )}
     </>
@@ -155,6 +158,7 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
 
 /** The seller's own card: fetches their standing and wraps the rail in the section chrome. */
 export function VolumeBoard() {
+  const tl = useLabelT()
   const [data, setData] = useState<PlanUsage | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -165,9 +169,9 @@ export function VolumeBoard() {
 
   // Unreadable and empty are different facts and must never look alike — a seller shown
   // "0 units" when the request failed would believe it.
-  if (err) return <Shell><p className="text-sm text-muted-foreground">We couldn&apos;t load your volume — that&apos;s a problem on our side, not a zero.</p></Shell>
-  if (!data) return <Shell><p className="text-sm text-muted-foreground">Loading…</p></Shell>
-  if (!data.tiers.length) return <Shell><p className="text-sm text-muted-foreground">There&apos;s no volume programme running right now.</p></Shell>
+  if (err) return <Shell><p className="text-sm text-muted-foreground">{tl("volumeBoard", "We couldn’t load your volume — that’s a problem on our side, not a zero.")}</p></Shell>
+  if (!data) return <Shell><p className="text-sm text-muted-foreground">{tl("volumeBoard", "Loading…")}</p></Shell>
+  if (!data.tiers.length) return <Shell><p className="text-sm text-muted-foreground">{tl("volumeBoard", "There’s no volume programme running right now.")}</p></Shell>
 
   return (
     <Shell note={

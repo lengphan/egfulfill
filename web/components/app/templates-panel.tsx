@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -19,6 +20,7 @@ import { EmptyState } from "@/components/app/empty-state"
  * them. This is the first surface that actually shows them.
  */
 export function TemplatesPanel() {
+  const tl = useLabelT()
   const router = useRouter()
   const [items, setItems] = useState<ProductTemplate[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -58,25 +60,25 @@ export function TemplatesPanel() {
 
   return (
     <SectionCard
-      title="Product templates"
+      title={tl("templates", "Product templates")}
       actions={
         <Button size="sm" onClick={() => router.push("/design/maker")}>
-          <Plus size={14} weight="bold" /> Make a template
+          <Plus size={14} weight="bold" /> {tl("templates", "Make a template")}
         </Button>
       }
     >
       {items === null ? (
         <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
-          <CircleNotch size={15} className="animate-spin" /> Loading…
+          <CircleNotch size={15} className="animate-spin" /> {tl("templates", "Loading…")}
         </div>
       ) : list.length === 0 ? (
         <EmptyState
           icon={Stack}
-          title="No templates yet"
-          note="Build a blank + artwork setup in the design maker and save it — it’ll appear here, ready to reopen."
+          title={tl("templates", "No templates yet")}
+          note={tl("templates", "Build a blank + artwork setup in the design maker and save it — it’ll appear here, ready to reopen.")}
           action={
             <Button size="sm" onClick={() => router.push("/design/maker")}>
-              <Plus size={14} weight="bold" /> Make a template
+              <Plus size={14} weight="bold" /> {tl("templates", "Make a template")}
             </Button>
           }
         />
@@ -134,7 +136,7 @@ export function TemplatesPanel() {
               </div>
               <div className="flex flex-col gap-1 p-2">
                 <div className="flex items-center gap-1">
-                  <div className="min-w-0 flex-1 truncate text-sm font-medium">{t.name || "Untitled"}</div>
+                  <div className="min-w-0 flex-1 truncate text-sm font-medium">{t.name || tl("templates", "Untitled")}</div>
                   <Button
                     size="icon-sm"
                     variant="ghost"
@@ -147,7 +149,7 @@ export function TemplatesPanel() {
                 <div className="flex items-center gap-1.5">
                   {/* Which blank this was built on — the other half of "blank + artwork",
                       and previously nowhere on the card. */}
-                  <span className="min-w-0 truncate text-xs text-muted-foreground">{blankName || "No blank saved"}</span>
+                  <span className="min-w-0 truncate text-xs text-muted-foreground">{blankName || tl("templates", "No blank saved")}</span>
                   {/* The template's ID, copyable — and not decoration: this is exactly what
                       goes in the import sheet's Template ID column, which fills the blank,
                       artwork, placement and method for a line in one field. Same treatment
@@ -157,10 +159,10 @@ export function TemplatesPanel() {
                       read rather than tucked away — same reason the design badge is. */}
                   <button
                     onClick={() => { navigator.clipboard?.writeText(ref).catch(() => {}); setCopied(t.id); setTimeout(() => setCopied(null), 1400) }}
-                    title="Copy this template's reference"
+                    title={tl("templates", "Copy this template's reference")}
                     className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    {copied === t.id ? "Copied" : ref}
+                    {copied === t.id ? tl("templates", "Copied") : ref}
                   </button>
                 </div>
               </div>

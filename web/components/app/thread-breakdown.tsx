@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -25,6 +26,7 @@ export function ThreadBreakdown({
   /** The trigger — usually the existing cone chip. */
  children: React.ReactNode
 }) {
+  const tl = useLabelT()
  const [open, setOpen] = useState(false)
  const [regions, setRegions] = useState<ThreadRegion[] | null>(null)
 
@@ -52,28 +54,28 @@ export function ThreadBreakdown({
  return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
- title="See which cone covers which part of the design"
+ title={tl("threadBreakdown", "See which cone covers which part of the design")}
  className="eg-tap cursor-pointer rounded transition-opacity hover:opacity-80"
       >
         {children}
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         <div className="border-b border-border px-3 py-2">
-          <div className="text-sm font-semibold">Thread map</div>
-          <div className="text-xs text-muted-foreground">Every cone this design needs — name, code, and the part it covers</div>
+          <div className="text-sm font-semibold">{tl("threadBreakdown", "Thread map")}</div>
+          <div className="text-xs text-muted-foreground">{tl("threadBreakdown", "Every cone this design needs — name, code, and the part it covers")}</div>
         </div>
 
         {shown === null ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-            <CircleNotch size={15} className="animate-spin" /> Reading the artwork…
+            <CircleNotch size={15} className="animate-spin" /> {tl("threadBreakdown", "Reading the artwork…")}
           </div>
         ) : shown.length === 0 ? (
           // Distinguish the two real causes rather than showing a blank panel — a
           // cross-origin design that can't be read looks identical to no design.
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
             {artwork
-              ? "Couldn't read this artwork — it may be hosted somewhere we can't sample."
- : "No design on this line yet."}
+              ? tl("threadBreakdown", "Couldn't read this artwork — it may be hosted somewhere we can't sample.")
+ : tl("threadBreakdown", "No design on this line yet.")}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -103,7 +105,7 @@ export function ThreadBreakdown({
  digitiser needs to see how far the match had to travel. */}
                   {r.poor && (
                     <div className="mt-0.5 rounded bg-hold/10 px-1.5 py-0.5 text-2xs font-medium text-hold">
-                      No close match in stock
+                      {tl("threadBreakdown", "No close match in stock")}
                     </div>
                   )}
                   <div className="mt-0.5 flex items-center gap-1.5 text-2xs text-muted-foreground">
@@ -115,7 +117,7 @@ export function ThreadBreakdown({
                 </div>
 
                 {/* Locator: where this colour sits within the whole design. */}
-                <div className="relative size-9 shrink-0 rounded border border-border bg-muted" title="Position in the design">
+                <div className="relative size-9 shrink-0 rounded border border-border bg-muted" title={tl("threadBreakdown", "Position in the design")}>
                   <span
  className="absolute rounded-[2px] bg-primary/70"
  style={{ left: `${r.box.x}%`, top: `${r.box.y}%`, width: `${r.box.w}%`, height: `${r.box.h}%` }}

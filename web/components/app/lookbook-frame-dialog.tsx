@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ export function LookbookFrameDialog({
   busy?: boolean
   maxImageMB?: number
 }) {
+  const tl = useLabelT()
   const [zoom, setZoom] = useState(100)
   const [focusY, setFocusY] = useState(50)
   const [image, setImage] = useState<string | undefined>(undefined)
@@ -99,7 +101,7 @@ export function LookbookFrameDialog({
 
           <div className="space-y-1">
             <label className="flex items-center gap-1.5">
-              <span className="w-10 shrink-0 eg-label text-muted-foreground">Zoom</span>
+              <span className="w-10 shrink-0 eg-label text-muted-foreground">{tl("lookbookFrame", "Zoom")}</span>
               <input
                 type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={5} value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
@@ -107,7 +109,7 @@ export function LookbookFrameDialog({
               />
             </label>
             <label className="flex items-center gap-1.5">
-              <span className="w-10 shrink-0 eg-label text-muted-foreground">Up/dn</span>
+              <span className="w-10 shrink-0 eg-label text-muted-foreground">{tl("lookbookFrame", "Up/dn")}</span>
               <input
                 type="range" min={FOCUS_MIN} max={FOCUS_MAX} step={1} value={focusY}
                 onChange={(e) => setFocusY(Number(e.target.value))}
@@ -124,7 +126,7 @@ export function LookbookFrameDialog({
               onChange={(e) => { void takeFile(e.target.files?.[0] ?? null); e.target.value = "" }}
             />
             <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()} disabled={busy}>
-              {image ? "Replace again" : "Replace photo"}
+              {image ? tl("lookbookFrame", "Replace again") : tl("lookbookFrame", "Replace photo")}
             </Button>
             {touched && (
               <button
@@ -132,7 +134,7 @@ export function LookbookFrameDialog({
                 onClick={() => { setZoom(100); setFocusY(50); setImage(undefined) }}
                 className="text-2xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
               >
-                Reset
+                {tl("lookbookFrame", "Reset")}
               </button>
             )}
             <Button
@@ -144,7 +146,7 @@ export function LookbookFrameDialog({
                 onOpenChange(false)
               }}
             >
-              Done
+              {tl("lookbookFrame", "Done")}
             </Button>
           </div>
         </div>

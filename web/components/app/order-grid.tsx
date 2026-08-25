@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 /**
  * THE SHEET, IN OUR APP.
  *
@@ -122,6 +123,7 @@ export type OrderGridProps = {
 }
 
 export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsChange }: OrderGridProps) {
+  const tl = useLabelT()
   /**
    * ONE FETCH, ON MOUNT. Deliberately not keyed to anything the fetch itself writes — see
    * CLAUDE.md §2.8, where an effect that re-ran on state its own result produced took a
@@ -560,7 +562,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                     <button
                       type="button"
                       onClick={() => removeRow(r)}
-                      title="Remove this row"
+                      title={tl("orderGrid", "Remove this row")}
                       aria-label={`Remove row ${r + 1}`}
                       className="px-1.5 py-1 text-muted-foreground transition-colors hover:text-destructive"
                     >
@@ -627,18 +629,18 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
       <div className="flex flex-wrap items-center gap-2">
         {onBack && (
           <Button variant="outline" onClick={onBack} disabled={busy}>
-            Back
+            {tl("orderGrid", "Back")}
           </Button>
         )}
         <Button onClick={complete} disabled={!validCount || busy}>
-          {busy ? "Working…" : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
+          {busy ? tl("orderGrid", "Working…") : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
         </Button>
-        <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>Add rows</Button>
+        <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
         {/* THE ONLY SENTENCE ON THIS SCREEN, and it is here because the state is not
             otherwise readable: a draft and a submitted order look the same from a grid that
             has just emptied. §4 allows a warning to carry its reason. */}
         <span className="text-xs text-muted-foreground">
-          Complete creates drafts — nothing is charged until you submit them from Orders.
+          {tl("orderGrid", "Complete creates drafts — nothing is charged until you submit them from Orders.")}
         </span>
       </div>
     </div>

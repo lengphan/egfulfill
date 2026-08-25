@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState } from "react"
 import { CircleNotch, DownloadSimple, Needle, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -32,6 +33,7 @@ import {
  * the machine reads.
  */
 export function MachineFilesPanel() {
+  const tl = useLabelT()
   const confirm = useConfirm()
   const [items, setItems] = useState<MachineFile[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -138,7 +140,7 @@ export function MachineFilesPanel() {
   const list = items ?? []
 
   return (
-    <SectionCard title="Machine files" bodyClassName="space-y-4 p-5">
+    <SectionCard title={tl("machineFiles", "Machine files")} bodyClassName="space-y-4 p-5">
       {/*
         * ONE REGION WHEN THERE IS NOTHING, NOT TWO.
         *
@@ -167,14 +169,14 @@ export function MachineFilesPanel() {
         busy={uploading}
         slim={list.length > 0}
         label={list.length > 0 ? "Add another stitch file" : "Drop your stitch files here"}
-        hint=".EMB, .PES, .DST — 50 MB each"
+        hint={tl("machineFiles", ".EMB, .PES, .DST — 50 MB each")}
       />
 
       {err && <p className="text-sm text-alert">{err}</p>}
 
       {items === null ? (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <CircleNotch size={15} className="animate-spin" /> Loading…
+          <CircleNotch size={15} className="animate-spin" /> {tl("machineFiles", "Loading…")}
         </div>
       ) : list.length === 0 ? null : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -196,13 +198,13 @@ export function MachineFilesPanel() {
                       if (e.key === "Escape") { e.preventDefault(); setEditId(null) }
                     }}
                     className="h-7 text-sm"
-                    aria-label="File name"
+                    aria-label={tl("machineFiles", "File name")}
                   />
                 ) : (
                   <button
                     type="button"
                     onClick={() => { setEditId(f.id); setEditName(f.name) }}
-                    title="Click to rename"
+                    title={tl("machineFiles", "Click to rename")}
                     className="eg-tap block max-w-full truncate text-left text-sm font-medium transition-colors hover:text-primary"
                   >
                     {f.name}
@@ -236,10 +238,10 @@ export function MachineFilesPanel() {
                   <button
                     type="button"
                     onClick={() => { navigator.clipboard?.writeText(f.ref).catch(() => {}); setCopied(f.id); setTimeout(() => setCopied(null), 1400) }}
-                    title="Copy this file's reference"
+                    title={tl("machineFiles", "Copy this file's reference")}
                     className="eg-tap ml-auto shrink-0 rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
-                    {copied === f.id ? "Copied" : f.ref}
+                    {copied === f.id ? tl("machineFiles", "Copied") : f.ref}
                   </button>
                 </div>
               </div>

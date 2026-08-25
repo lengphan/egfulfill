@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { Check, CircleNotch, LockSimple } from "@phosphor-icons/react"
 import {
@@ -15,6 +16,7 @@ import { putNavVisibility } from "@/lib/api"
  * untouched. So the worst a wrong click does is hide something.
  */
 export function PermissionsMatrix() {
+  const tl = useLabelT()
   const surfaces = useMemo(() => visSurfaces(), [])
   const groups = useMemo(() => {
     const g: Record<string, typeof surfaces> = {}
@@ -58,14 +60,14 @@ export function PermissionsMatrix() {
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
-      <h2 className="text-sm font-semibold">Permissions</h2>
+      <h2 className="text-sm font-semibold">{tl("permissionsMatrix", "Permissions")}</h2>
       <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
         <LockSimple size={14} weight="fill" className="mt-0.5 shrink-0" />
-        <span>A check means <strong>visible</strong>. Un-checking <strong>hides</strong> that page or tab for the role. This only ever hides — it can never expose a staff/internal page to a role that isn&apos;t already allowed it, and backend access controls are unchanged.</span>
+        <span>{tl("permissionsMatrix", "A check means")} <strong>visible</strong>{tl("permissionsMatrix", ". Un-checking")} <strong>hides</strong> {tl("permissionsMatrix", "that page or tab for the role. This only ever hides — it can never expose a staff/internal page to a role that isn’t already allowed it, and backend access controls are unchanged.")}</span>
       </p>
 
       {!hidden ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{tl("permissionsMatrix", "Loading…")}</div>
       ) : (
         <div className="mt-4 space-y-6">
           {Object.entries(groups).map(([group, list]) => (
@@ -75,7 +77,7 @@ export function PermissionsMatrix() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                      <th className="py-2 pr-4">Surface</th>
+                      <th className="py-2 pr-4">{tl("permissionsMatrix", "Surface")}</th>
                       {VIS_ROLES.map((r) => <th key={r} className="px-3 py-2 text-center font-medium">{VIS_ROLE_LABEL[r]}</th>)}
                     </tr>
                   </thead>
@@ -96,7 +98,7 @@ export function PermissionsMatrix() {
                                 <Check size={14} weight="bold" />
                               </button>
                             ) : (
-                              <span className="text-muted-foreground/30" title="Role can't access this — nothing to hide">—</span>
+                              <span className="text-muted-foreground/30" title={tl("permissionsMatrix", "Role can't access this — nothing to hide")}>—</span>
                             )}
                           </td>
                         ))}

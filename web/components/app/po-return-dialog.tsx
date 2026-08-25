@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch, Warning } from "@phosphor-icons/react"
 import {
@@ -27,6 +28,7 @@ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
 export function PoReturnDialog({
  po, onClose, onDone,
 }: { po: PurchaseOrder | null; onClose: () => void; onDone: () => void }) {
+  const tl = useLabelT()
  const [qty, setQty] = useState<Record<string, string>>({})
  const [credit, setCredit] = useState<Record<string, string>>({})
  const [rma, setRma] = useState("")
@@ -102,7 +104,7 @@ export function PoReturnDialog({
         <DialogHeader>
           <DialogTitle>Return to {po.supplier || "supplier"}</DialogTitle>
           <DialogDescription>
-            Records what goes back and what&apos;s owed. Confirm the credit separately, when it actually lands.
+            {tl("poReturn", "Records what goes back and what’s owed. Confirm the credit separately, when it actually lands.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -135,7 +137,7 @@ export function PoReturnDialog({
         <div className="space-y-2 border-t border-border pt-3">
           {isSs && (
             <label className="block space-y-1">
-              <span className="text-sm font-medium">Reason</span>
+              <span className="text-sm font-medium">{tl("poReturn", "Reason")}</span>
               <select value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                 {Object.entries(SS_RETURN_REASONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -146,23 +148,23 @@ export function PoReturnDialog({
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)}
  disabled={busy} className="size-4 accent-primary" />
-              Send a replacement instead of a credit
+              {tl("poReturn", "Send a replacement instead of a credit")}
             </label>
           )}
           <div className="grid grid-cols-2 gap-2">
             <Input value={rma} onChange={(e) => setRma(e.target.value)} disabled={busy}
- placeholder="RMA / reference" className="h-9" />
+ placeholder={tl("poReturn", "RMA / reference")} className="h-9" />
             <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={busy}
- placeholder="Reason" className="h-9" />
+ placeholder={tl("poReturn", "Reason")} className="h-9" />
           </div>
           {/* Said plainly: this is our record, not a message to the supplier. */}
           <p className="text-xs text-muted-foreground">
             Stock comes off the shelf now.{" "}
             {canApi
-              ? <>This <strong>is</strong> raised with S&amp;S — they return an RA number and a shipping label.</>
+              ? <>{tl("poReturn", "This")} <strong>is</strong> {tl("poReturn", "raised with S&S — they return an RA number and a shipping label.")}</>
  : isSs
-                ? <>This PO has no invoice number yet, so S&amp;S can&apos;t be told: they key returns to the invoice, not the order. Fetch the order status first, or raise it by hand and record their reference above.</>
- : <>This does <strong>not</strong> notify {po.supplier || "the supplier"} — raise it with them the usual way and record their reference above.</>}
+                ? <>{tl("poReturn", "This PO has no invoice number yet, so S&S can’t be told: they key returns to the invoice, not the order. Fetch the order status first, or raise it by hand and record their reference above.")}</>
+ : <>This does <strong>not</strong> notify {po.supplier || tl("poReturn", "the supplier")} — raise it with them the usual way and record their reference above.</>}
           </p>
           {raised && (
             <div className="space-y-1 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-sm text-shipped">
@@ -171,7 +173,7 @@ export function PoReturnDialog({
                   <span>RA <strong>{r.ra ?? "—"}</strong></span>
                   {r.label && (
                     <a href={r.label} target="_blank" rel="noreferrer" className="font-medium underline">
-                      Return shipping label
+                      {tl("poReturn", "Return shipping label")}
                     </a>
                   )}
                 </div>
@@ -186,7 +188,7 @@ export function PoReturnDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>{tl("poReturn", "Cancel")}</Button>
           <Button size="sm" onClick={submit} disabled={busy || !picked.length}>
             {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
             Return {picked.length || ""} line{picked.length === 1 ? "" : "s"}{expected > 0 ? ` · ${usd(expected)} expected` : ""}
