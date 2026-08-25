@@ -79,11 +79,16 @@ function bucketize(orders: OrderRow[], n: number, daysPer: number, now: number, 
   return cur.map((rev, i) => ({ label: label(i), revenue: Math.round(rev), prev: Math.round(prev[i]) }))
 }
 
-export function revenueSeries(orders: OrderRow[], now: number): Record<string, RevPoint[]> {
+/**
+ * The revenue chart's buckets. `tag` is a parameter for the same reason fmtDate's is: these
+ * are axis LABELS — weekday and month names — and they were the last English on a Vietnamese
+ * reports page. Non-React callers keep the old behaviour via the default.
+ */
+export function revenueSeries(orders: OrderRow[], now: number, tag: string = "en-US"): Record<string, RevPoint[]> {
   return {
-    "7d": bucketize(orders, 7, 1, now, (i) => new Date(now - (6 - i) * DAY).toLocaleDateString("en-US", { weekday: "short" })),
+    "7d": bucketize(orders, 7, 1, now, (i) => new Date(now - (6 - i) * DAY).toLocaleDateString(tag, { weekday: "short" })),
     "4w": bucketize(orders, 4, 7, now, (i) => `W${i + 1}`),
-    "3m": bucketize(orders, 3, 30, now, (i) => new Date(now - (2 - i) * 30 * DAY).toLocaleDateString("en-US", { month: "short" })),
+    "3m": bucketize(orders, 3, 30, now, (i) => new Date(now - (2 - i) * 30 * DAY).toLocaleDateString(tag, { month: "short" })),
   }
 }
 

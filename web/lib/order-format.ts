@@ -171,10 +171,18 @@ export const itemsLabel = (o: OrderRow) => {
   return extra > 0 ? `${first} +${extra}` : first
 }
 
-export const fmtDate = (s?: string | null) => {
+/**
+ * "MMM d" for a date column.
+ *
+ * The locale is a PARAMETER, not a constant, because this is the app's most-used date and it
+ * was rendering "Aug 25" on a page with no other English on it. It is not a hook — this
+ * module is imported by non-React code too — so React callers go through useOrderDate() in
+ * lib/i18n, which supplies the tag. The default keeps every non-React caller as it was.
+ */
+export const fmtDate = (s?: string | null, tag: string = "en-US", opts?: Intl.DateTimeFormatOptions) => {
   if (!s) return "—"
   const d = new Date(s)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(tag, opts ?? { month: "short", day: "numeric" })
 }
 
 /**

@@ -6,6 +6,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { DEFAULT_LOCALE, isLocale, messages, type Locale } from "@/lib/i18n/catalog"
+import { fmtDate as fmtDateRaw } from "@/lib/order-format"
 
 const COOKIE = "eg_lang"
 
@@ -129,4 +130,29 @@ export function useTimeFormat() {
     if (isNaN(d.getTime())) return "—"
     return d.toLocaleTimeString(tag, opts)
   }, [tag])
+}
+
+
+/**
+ * The app's "MMM d" order date, in the reader's locale.
+ *
+ * lib/order-format.fmtDate is shared with non-React code, so it cannot be a hook and takes
+ * the locale tag as an argument instead. This supplies it, and keeps the call signature the
+ * 44 existing call sites already use — fmtDate(value) — so switching a file over is an
+ * import change, not an edit to every row.
+ */
+export function useOrderDate() {
+  const { locale } = useLocale()
+  const tag = locale === "vi" ? "vi-VN" : "en-US"
+  return useCallback(
+    (s?: string | null, opts?: Intl.DateTimeFormatOptions) => fmtDateRaw(s, tag, opts),
+    [tag],
+  )
+}
+
+
+/** The BCP-47 tag for the active locale, for the shared formatters that take one. */
+export function useLocaleTag() {
+  const { locale } = useLocale()
+  return locale === "vi" ? "vi-VN" : "en-US"
 }

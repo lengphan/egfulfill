@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { ArrowRight, ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -128,6 +128,7 @@ export function ShipmentDetailDialog({
    * window was opened from is no longer what it was. */
  onChanged?: () => void
 }) {
+  const fmtDate = useDateFormat()
   const tl = useLabelT()
  const s = shipment
  const id = s?.id
@@ -481,7 +482,7 @@ export function ShipmentDetailDialog({
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
                           {/* The import date earns its place: two orders for one buyer are
  told apart by when they arrived and by nothing else here. */}
-                          <span>Imported {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : "—"}</span>
+                          <span>Imported {c.createdAt ? fmtDate(c.createdAt, { dateStyle: "medium" }) : "—"}</span>
                           {c.matchedZip && <span className="text-shipped">{tl("shipmentDetail", "· address matches")}</span>}
                           {c.matchedName && <span className="text-packed">{tl("shipmentDetail", "· name matches")}</span>}
                           {!c.matchedZip && !c.matchedName && <span className="text-hold">{tl("shipmentDetail", "· weak match")}</span>}

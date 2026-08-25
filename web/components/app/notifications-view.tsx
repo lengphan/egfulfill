@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, CircleNotch } from "@phosphor-icons/react"
@@ -14,7 +14,9 @@ import { EmptyState } from "@/components/app/empty-state"
 const PER_PAGE = 25
 
 /** Relative for anything recent, absolute once it stops being "ago". */
-function when(iso: string) {
+function useWhen() {
+  const fmtDate = useDateFormat()
+  return (iso: string) => {
   const t = new Date(iso).getTime()
   if (!isFinite(t)) return ""
   const mins = Math.round((Date.now() - t) / 60000)
@@ -22,7 +24,8 @@ function when(iso: string) {
   if (mins < 60) return `${mins}m ago`
   if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`
   if (mins < 60 * 24 * 7) return `${Math.round(mins / (60 * 24))}d ago`
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return fmtDate(iso, { month: "short", day: "numeric", year: "numeric" })
+  }
 }
 
 /** Type → a human label. Unknown types fall back to the raw string rather than being
@@ -49,6 +52,7 @@ const TYPE_LABEL: Record<string, string> = {
  * "all sellers" is the same mechanism as a price alert to admins.
  */
 export function NotificationsView() {
+  const when = useWhen()
   const tl = useLabelT()
   const router = useRouter()
   const [items, setItems] = useState<Notification[] | null>(null)

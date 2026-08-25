@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useTimeFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Barcode as BarcodeIcon, X, ArrowUp, ArrowDown, ArrowCounterClockwise, CircleNotch, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -15,13 +15,18 @@ import { EmptyState } from "@/components/app/empty-state"
 type Entry = { key: string; sku: string; qty: number; dir: "in" | "out"; ok: boolean; label: string; sub: string; scanId?: string }
 
 const nowKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-const timeNow = () => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+function useTimeNow() {
+  const fmtTime = useTimeFormat()
+  return useCallback(() => fmtTime(new Date(), { hour: "numeric", minute: "2-digit" }), [fmtTime])
+}
 
 // Scan station — one screen for a scanner gun (desktop) and a phone camera (PWA).
 // A gun is just a keyboard: it types the SKU then Enter. So the input stays focused
 // and refocuses on blur, and an exact SKU match auto-commits — no clicking, ever.
 // `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
 export function ScanStation({ embedded = false }: { embedded?: boolean }) {
+  const fmtTime = useTimeFormat()
+  const timeNow = useTimeNow()
   const tl = useLabelT()
   // Operator gets a READ-ONLY station: they need to look up what's on hand, but moving
   // stock is a claim about physical custody that belongs to the warehouse. Enforced here
@@ -81,7 +86,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
  label: r.item_name || r.sku,
             // created_at is optional on the type, so a missing one says so rather than
             // rendering "Invalid Date" beside a scan that really happened.
- sub: `${r.created_at ? new Date(r.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "earlier"}${r.by_name ? ` · ${r.by_name}` : ""}`,
+ sub: `${r.created_at ? fmtTime(r.created_at, { hour: "numeric", minute: "2-digit" }) : "earlier"}${r.by_name ? ` · ${r.by_name}` : ""}`,
  scanId: r.id,
           }))
  return [...prev.filter((e) => !e.key.startsWith("srv-")), ...fromServer].slice(0, 60)

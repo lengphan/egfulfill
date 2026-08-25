@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { Suspense, useCallback, useEffect, useState } from "react"
 import { Plus, PenNib, X, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -50,13 +50,17 @@ function LibraryThumb({ thumb, name }: { thumb?: string | null; name?: string | 
   )
 }
 
-const fmtDate = (s?: string) => {
+function useFmtDate() {
+  const fmtDate = useDateFormat()
+  return useCallback((s?: string) => {
  if (!s) return ""
  const d = new Date(s)
- return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+ return isNaN(d.getTime()) ? "" : fmtDate(d, { month: "short", day: "numeric" })
+}, [fmtDate])
 }
 
 function DesignLab() {
+  const fmtDate = useFmtDate()
   const tl = useLabelT()
  const tab = useDesignLabTab()
  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)

@@ -31,11 +31,6 @@ const RANGES = [
 ] as const
 type RangeId = (typeof RANGES)[number]["id"]
 
-const fmtDate = (s?: string | null) => {
- if (!s) return "—"
- const d = new Date(s)
- return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
 
 // Short blurbs for the shortcut tiles. Nav items don't carry descriptions; anything not
 // listed just shows its label, which is self-explanatory for a launcher.
@@ -130,7 +125,9 @@ function Gauge({ pct, caption }: { pct: number | null; caption: string }) {
 // snapshot, a recent-orders list, and quick links into the surfaces that role actually uses.
 export function StaffDashboard() {
  const t = useT()
-  const fmtDate = useDateFormat()
+  const fmtOn = useDateFormat()
+  // Short "MMM d" for a row of dates. Was a module-scope helper pinned to en-US.
+  const fmtDate = (v?: string | null) => (v ? fmtOn(v, { month: "short", day: "numeric" }) : "—")
   // KPI labels, captions, window names and shortcut blurbs are all defined as English
   // strings in data structures, so they translate through useLabelT (keyed by the value)
   // rather than being restructured into keys.
@@ -182,7 +179,7 @@ export function StaffDashboard() {
   // local clock — the reader's own morning, not the server's.
  const now = new Date()
  const greeting = t(now.getHours() < 12 ? "dash.goodMorning" : now.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
- const todayLabel = fmtDate(now, { weekday: "long", month: "short", day: "numeric" })
+ const todayLabel = fmtOn(now, { weekday: "long", month: "short", day: "numeric" })
 
   /**
    * The floor's shape, counted by the server. This was eight filter() passes over every

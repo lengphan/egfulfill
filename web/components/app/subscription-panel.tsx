@@ -1,7 +1,7 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
-import { useEffect, useState } from "react"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Check, MagnifyingGlass, Sparkle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -27,10 +27,13 @@ import {
 } from "@/lib/plans"
 
 const usd = (n: number) => (n === 0 ? "Free" : `$${n}`)
-const fmtDate = (s?: string | null) => {
+function useFmtDate() {
+  const fmtDate = useDateFormat()
+  return useCallback((s?: string | null) => {
  if (!s) return "—"
  const d = new Date(s)
- return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+ return isNaN(d.getTime()) ? "—" : fmtDate(d, { month: "short", day: "numeric", year: "numeric" })
+}, [fmtDate])
 }
 
 // Plans are SERVER state (users.plan). This panel used to WRITE localStorage, which
@@ -38,6 +41,7 @@ const fmtDate = (s?: string | null) => {
 // charges for real through /api/billing/subscribe — the price is decided server-side, so
 // the client can't name its own amount.
 export function SubscriptionPanel() {
+  const fmtDate = useFmtDate()
   const tl = useLabelT()
   // Session-backed; read after mount to avoid hydration mismatch.
  const [plan, setPlanState] = useState<PlanId>("starter")

@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowsClockwise, Trash, Plus, CheckCircle, Storefront, Warning, Prohibit } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
@@ -28,10 +28,13 @@ import { startTikTokConnect } from "@/lib/tiktok-oauth"
 import { getUser } from "@/lib/auth"
 import { EmptyState } from "@/components/app/empty-state"
 
-const fmtDate = (s: string | null) => {
+function useFmtDate() {
+  const fmtDate = useDateFormat()
+  return useCallback((s: string | null) => {
  if (!s) return "never"
  const d = new Date(s)
- return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+ return isNaN(d.getTime()) ? "—" : fmtDate(d, { month: "short", day: "numeric", year: "numeric" })
+}, [fmtDate])
 }
 
 // Channels shown even when unconnected. (Etsy + Shopify also import orders; TikTok is
@@ -127,6 +130,7 @@ const liveChannels = CHANNELS.filter((c) => c.live)
 const soonChannels = CHANNELS.filter((c) => !c.live)
 
 export function StoresManager() {
+  const fmtDate = useFmtDate()
   const tl = useLabelT()
  const reduce = useReducedMotion()
  const [conns, setConns] = useState<EtsyConnection[] | null>(null)

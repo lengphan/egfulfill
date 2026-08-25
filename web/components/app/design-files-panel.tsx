@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { getDesignFiles, deleteOrderDesign, scopeDesignFile, uploadDesignFile, s
 import { designSrc } from "@/lib/order-image"
 import { lineFactsOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
+import { onLive } from "@/lib/live"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { VariantField } from "@/components/app/variant-field"
 import { isEmbroidery } from "@/lib/variant-resolve"
@@ -345,6 +346,29 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  return () => clearTimeout(id)
   }, [load])
 
+  /**
+   * A FILE FILED ELSEWHERE ON THIS ORDER STILL BELONGS ON THIS LIST.
+   *
+   * The list was fetched once, on mount, and nothing ever asked again — so a machine file
+   * attached in the designer dialog (which is a dialog ON this page) landed in the database,
+   * appeared in the dialog's own Files list, and was simply absent here. The artwork dropped
+   * in the same session DID show up, because that comes from `order_designs`, which the page
+   * reloads when the designer saves; the two stores refresh on different signals and only
+   * one of them was wired. An embroidered line then read as "artwork, no stitch file" —
+   * the one fact the floor checks before hooping.
+   *
+   * The server already announces it: POST /api/design_files broadcasts `design-file` with
+   * the order id, which is what orders-hub listens to for the readiness tag. Same ping,
+   * same reload, filtered to THIS order so a busy factory's other orders cost nothing.
+   */
+ useEffect(() => onLive("design-file", (e) => {
+    // No order id = the synthetic wake `pollAll` sends when the stream is down, which means
+    // "you have missed events, re-read" and must not be filtered out as somebody else's.
+ const oid = String((e as { orderId?: string }).orderId || "")
+ if (!oid || oid === String(orderId)) load()
+  }), [orderId, load])
+
+
  const upload = async (list: FileList | File[]) => {
  const arr = Array.from(list)
  if (!arr.length) return
@@ -536,6 +560,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   /** Artwork went onto a line — the page reloads its designs so the canvas shows it. */
  onAttached?: () => void
 }) {
+  const fmtDate = useDateFormat()
   const tl = useLabelT()
  const [files, setFiles] = useState<DesignFileRow[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
@@ -554,6 +579,29 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
   }, [orderId])
  useEffect(() => { const id = setTimeout(() => { setRole(getUser()?.role || ""); load() }, 0); return () => clearTimeout(id) }, [load])
+
+  /**
+   * A FILE FILED ELSEWHERE ON THIS ORDER STILL BELONGS ON THIS LIST.
+   *
+   * The list was fetched once, on mount, and nothing ever asked again — so a machine file
+   * attached in the designer dialog (which is a dialog ON this page) landed in the database,
+   * appeared in the dialog's own Files list, and was simply absent here. The artwork dropped
+   * in the same session DID show up, because that comes from `order_designs`, which the page
+   * reloads when the designer saves; the two stores refresh on different signals and only
+   * one of them was wired. An embroidered line then read as "artwork, no stitch file" —
+   * the one fact the floor checks before hooping.
+   *
+   * The server already announces it: POST /api/design_files broadcasts `design-file` with
+   * the order id, which is what orders-hub listens to for the readiness tag. Same ping,
+   * same reload, filtered to THIS order so a busy factory's other orders cost nothing.
+   */
+ useEffect(() => onLive("design-file", (e) => {
+    // No order id = the synthetic wake `pollAll` sends when the stream is down, which means
+    // "you have missed events, re-read" and must not be filtered out as somebody else's.
+ const oid = String((e as { orderId?: string }).orderId || "")
+ if (!oid || oid === String(orderId)) load()
+  }), [orderId, load])
+
 
  const remove = async (f: DesignFileRow) => {
  if (!(await confirm({ title: `Remove ${f.name}?`, body: "This can't be undone.", confirmLabel: "Remove" }))) return
@@ -1084,7 +1132,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  and false for every operator, warehouse hand and admin looking at the same
  card — they are told who it was instead. */}
               {f.source === "seller"
-                ? `${isSeller ? tl("designFiles", "You sent this") : tl("designFiles", "Sent by the seller")}${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
+                ? `${isSeller ? tl("designFiles", "You sent this") : tl("designFiles", "Sent by the seller")}${f.created_at ? ` · ${fmtDate(f.created_at, { dateStyle: "medium" })}` : ""}`
  : f.kind === "image" ? tl("designFiles", "Design image")
  : f.paid ? tl("designFiles", "Purchased") : f.price ? `$${f.price} — pays from your wallet` : tl("designFiles", "Free")}
             </div>

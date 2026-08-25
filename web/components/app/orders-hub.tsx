@@ -70,7 +70,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
 import { OrderedVariant } from "@/components/app/ordered-variant"
-import { numOf, platformOf, customerOf, variantOf, addrLine, fmtDate, trackUrl, decodeEntities, shipAddressOf } from "@/lib/order-format"
+import { numOf, platformOf, customerOf, variantOf, addrLine, trackUrl, decodeEntities, shipAddressOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { clickableProps } from "@/lib/a11y"
 import { OrderFilterBar, OrderSearchInput, emptyOrdersMessage } from "@/components/app/order-filter-bar"
@@ -81,7 +81,7 @@ import { LabelSheet } from "@/components/app/label-sheet"
 import { AddItemDialog } from "@/components/app/inventory-view"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip, CHIP_TONE } from "@/components/app/readiness-dots"
-import { useT, useLabelT } from "@/lib/i18n"
+import { useT, useLabelT, useOrderDate } from "@/lib/i18n"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { consumeImportOpen } from "@/lib/sheet-return"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -407,6 +407,7 @@ function ageOf(iso: string | null | undefined): string {
  */
 
 export function OrdersHub() {
+  const fmtDate = useOrderDate()
  const router = useRouter()
  const t = useT()
  const tl = useLabelT()
@@ -2043,7 +2044,7 @@ export function OrdersHub() {
                       // hides that difference makes the weaker claim look like the strong
                       // one.
  o.ship_by
-                        ? `Ship by ${new Date(o.ship_by).toLocaleDateString("en-US", { dateStyle: "medium" })} (Etsy's promise to the buyer)`
+                        ? `Ship by ${fmtDate(o.ship_by, { dateStyle: "medium" })} (Etsy's promise to the buyer)`
  : `No marketplace ship-by — counted late after ${overdueDays} days`,
                     ].join(" · ")}
                   >

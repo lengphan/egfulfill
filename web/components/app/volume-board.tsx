@@ -1,7 +1,7 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
-import { useEffect, useState } from "react"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
+import { useEffect, useState, useCallback } from "react"
 import { SectionCard } from "@/components/app/section-card"
 import { getPlanUsage, type PlanUsage } from "@/lib/api"
 
@@ -22,10 +22,13 @@ import { getPlanUsage, type PlanUsage } from "@/lib/api"
  * reader is already looking for what the card is, plus a chip for scanning. Same promise,
  * stated where it is actually read.
  */
-const monthShort = (period: string) => {
+function useMonthShort() {
+  const fmtDate = useDateFormat()
+  return useCallback((period: string) => {
   const [y, m] = period.split("-").map(Number)
   if (!y || !m) return period
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" })
+  return fmtDate(new Date(Date.UTC(y, m - 1, 1)), { month: "long", timeZone: "UTC" })
+}, [fmtDate])
 }
 
 function Shell({ children, note }: { children: React.ReactNode; note?: string }) {
@@ -50,6 +53,7 @@ function Shell({ children, note }: { children: React.ReactNode; note?: string })
  * how the mis-aligned tier labels survived until they were spotted by eye.
  */
 export function VolumeRail({ data }: { data: PlanUsage }) {
+  const monthShort = useMonthShort()
   const tl = useLabelT()
   const running = data.running
   const earned = data.earned

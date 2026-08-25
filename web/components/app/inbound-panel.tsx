@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, CaretRight, Check, Warning, Truck } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -38,6 +38,7 @@ const num = (v: unknown) => Number(v) || 0
  * same rows, receiving a carton that way can erase a morning's counts.
  */
 export function InboundPanel() {
+  const fmtDate = useDateFormat()
   const tl = useLabelT()
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -113,7 +114,7 @@ export function InboundPanel() {
   const when = (s?: string) => {
     if (!s) return ""
     const d = new Date(s)
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    return isNaN(d.getTime()) ? "" : fmtDate(d, { month: "short", day: "numeric" })
   }
 
   return (

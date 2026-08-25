@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Receipt, CircleNotch, DownloadSimple, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -58,6 +58,7 @@ function thisMonth() {
  * Amounts are signed from OUR side: negative means we paid out or owe.
  */
 export function BillingView() {
+  const fmtDate = useDateFormat()
   const tl = useLabelT()
   const [entryOpen, setEntryOpen] = useState(false)
   const [partners, setPartners] = useState<PartnerTotal[] | null>(null)
@@ -217,7 +218,7 @@ export function BillingView() {
                 {rows.map((r) => (
                   <tr key={String(r.id)}>
                     <td className="whitespace-nowrap px-5 py-2 text-muted-foreground">
-                      {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" })}
+                      {fmtDate(r.created_at, { month: "short", day: "2-digit" })}
                     </td>
                     <td className="px-3 py-2">{r.partner ? label(r.partner) : "—"}</td>
                     <td className="px-3 py-2 tabular-nums text-xs text-muted-foreground">{r.type}</td>

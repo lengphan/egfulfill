@@ -1,7 +1,7 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
-import { useEffect, useState } from "react"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
+import { useEffect, useState, useCallback } from "react"
 import { Package, Barcode, MapPin, Warning, CircleNotch, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -15,10 +15,13 @@ import {
  type ConsignmentShipment, type WarehouseBin, type ConsignmentStock,
 } from "@/lib/api"
 
-const fmtDate = (s?: string | null) => {
+function useFmtDate() {
+  const fmtDate = useDateFormat()
+  return useCallback((s?: string | null) => {
  if (!s) return "—"
  const d = new Date(s)
- return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+ return isNaN(d.getTime()) ? "—" : fmtDate(d, { month: "short", day: "numeric", year: "numeric" })
+}, [fmtDate])
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -38,6 +41,7 @@ const STATUS_TONE: Record<string, string> = {
  * seller, and the bins it lives in.
  */
 export function ConsignmentPanel() {
+  const fmtDate = useFmtDate()
   const tl = useLabelT()
  const [shipments, setShipments] = useState<ConsignmentShipment[] | null>(null)
  const [stock, setStock] = useState<ConsignmentStock[]>([])

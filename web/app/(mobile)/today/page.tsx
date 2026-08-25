@@ -1,5 +1,7 @@
 "use client"
 
+import { useDateFormat } from "@/lib/i18n"
+
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { CaretRight, CircleNotch, Warning, Lightning, Barcode, ArrowClockwise } from "@phosphor-icons/react"
@@ -42,6 +44,7 @@ const TONE: Record<Job["tone"], { dot: string; count: string }> = {
 }
 
 export default function TodayPage() {
+  const fmtDate = useDateFormat()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [busy, setBusy] = useState(false)
@@ -57,7 +60,7 @@ export default function TodayPage() {
  const mounted = useMounted()
  const name = mounted ? (getUser()?.name?.split(" ")[0] || "there") : ""
  const today = mounted
-    ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+    ? fmtDate(new Date(), { weekday: "long", month: "long", day: "numeric" })
  : ""
 
  const load = useCallback(async () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useLocaleTag } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Sparkle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -33,6 +33,7 @@ const DEMO: OrderRow[] = [
 
 export function ReportsView() {
   const tl = useLabelT()
+  const localeTag = useLocaleTag()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [isDemo, setIsDemo] = useState(false)
   // A failed read must not render as "Fulfillment rate 0%" and "No revenue yet" — those
@@ -73,7 +74,7 @@ export function ReportsView() {
     }
   }, [list, now])
 
- const series = useMemo(() => revenueSeries(list, now), [list, now])
+ const series = useMemo(() => revenueSeries(list, now, localeTag), [list, now, localeTag])
  const channels = useMemo(() => channelBreakdown(list), [list])
  const top = useMemo(() => topProducts(list), [list])
 

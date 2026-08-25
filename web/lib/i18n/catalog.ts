@@ -938,6 +938,7 @@ const vi: Dict = {
   // Money FIGURES stay USD, formatted en-US (see the note at the top of this file).
   // Only the words around them move.
   "wallet.Wallet": "Ví",
+  "wallet.Couldn’t read your balance, so it isn’t shown — this is a connection problem, not a zero balance. Your money is unaffected.": "Không đọc được số dư của bạn nên số dư không được hiển thị — đây là sự cố kết nối, không phải số dư bằng không. Tiền của bạn không bị ảnh hưởng.",
   "wallet.Add Funds": "Nạp tiền",
   "wallet.Withdraw": "Rút tiền",
   "wallet.Transaction history": "Lịch sử giao dịch",
@@ -3944,6 +3945,11 @@ const vi: Dict = {
   "inbound.Unassigned supplier": "Nhà cung cấp chưa gán",
   "inbound.Purchase orders you place — including Alibaba orders imported from Purchasing — wait here until the goods arrive.": "Các đơn đặt hàng bạn tạo — kể cả đơn Alibaba nhập từ mục Mua hàng — chờ ở đây cho đến khi hàng về.",
   "itemDesignActions.Design": "Thiết kế",
+  "itemDesignActions.Send to Board": "Gửi lên Bảng",
+  "itemDesignActions.Send to Pink Design": "Gửi sang Pink Design",
+  "itemDesignActions.Design board": "Bảng thiết kế",
+  "itemDesignActions.On our design board": "Đang trên bảng thiết kế của chúng tôi",
+  "newOrder.Add item": "Thêm sản phẩm",
   "itemDesignActions.Design actions": "Thao tác thiết kế",
   "itemDesignActions.Send to design partner": "Gửi cho đối tác thiết kế",
   "lineDownloads.Artwork": "Thiết kế",

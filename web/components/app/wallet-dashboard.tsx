@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { labelRail } from "@/lib/payment-method"
 import { Plus, DownloadSimple } from "@phosphor-icons/react"
@@ -303,7 +303,7 @@ const shortRef = (ref: string) => {
  return collapsed.slice(0, 16) + "…" + collapsed.slice(-14)
 }
 
-function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary): View {
+function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | null, o?: Intl.DateTimeFormatOptions) => string, summary?: WalletSummary): View {
  let run = balance
  let charges = 0
  let deposited = 0
@@ -322,7 +322,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
  return {
  id: String(l.id),
  at: new Date(l.created_at).getTime(),
- date: new Date(l.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
+ date: fmtDate(l.created_at, { month: "short", day: "2-digit" }),
  desc: l.note || meta.label,
  ref: shortRef(l.ref || ""),
  refFull: l.ref || "",
@@ -342,6 +342,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
 //  It is deliberately gone: a zeroed wallet and an unreadable one must not look alike.)
 
 export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: boolean } = {}) {
+  const fmtDate = useDateFormat()
   const tl = useLabelT()
  const [view, setView] = useState<View | null>(null)
   // Distinguishes "couldn't read the wallet" from "this wallet is empty". Without it the
@@ -380,7 +381,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  if (!rejected.length) return base
  const extra: Row[] = rejected.map((r) => ({
  id: `rejected-${r.id}`,
- date: new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
+ date: fmtDate(r.created_at, { month: "short", day: "2-digit" }),
  desc: `Top-up declined${r.method ? ` · ${r.method}` : ""}`,
  ref: r.ref || "",
  method: r.method || "—",
@@ -414,7 +415,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
     // — NOT their own personal id, which is empty. Loading the wrong account is why the P&L
     // cards read $0 while the partner breakdown (no account filter) showed real costs.
  getWallet(isFactoryWallet ? "factory" : undefined)
-      .then((w) => { setView(mapLedger(w.balance, w.ledger, w.summary)); setLoadErr(null) })
+      .then((w) => { setView(mapLedger(w.balance, w.ledger, fmtDate, w.summary)); setLoadErr(null) })
       // Keep any balance already on screen (a failed REFRESH shouldn't blank a good
       // reading) but never invent one where we have none — that was the $0.00 lie.
       .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
@@ -490,8 +491,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         <div className="flex items-start gap-2 px-5 py-4 text-sm text-muted-foreground">
           <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-hold" />
           <span>
-            Couldn&apos;t read your balance, so it isn&apos;t shown — this is a connection
- problem, not a zero balance. Your money is unaffected. {loadErr}
+            {tl("wallet", "Couldn’t read your balance, so it isn’t shown — this is a connection problem, not a zero balance. Your money is unaffected.")} {loadErr}
           </span>
         </div>
       </SectionCard>
@@ -671,7 +671,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                         {rejected ? tl("wallet", "Rejected") : selfServe ? tl("wallet", "Awaiting payment") : tl("wallet", "Awaiting confirmation")}
                       </Badge>
                       <span className="text-muted-foreground">
-                        {p.method || tl("wallet", "Top-up")}{p.ref ? ` · ${p.ref}` : ""} · {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {p.method || tl("wallet", "Top-up")}{p.ref ? ` · ${p.ref}` : ""} · {fmtDate(p.created_at, { month: "short", day: "numeric" })}
                       </span>
                     </div>
                     <span className={"font-semibold tabular-nums " + (rejected ? "text-muted-foreground line-through" : "text-foreground")}>

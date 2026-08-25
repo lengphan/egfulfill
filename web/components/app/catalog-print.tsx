@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { X, CircleNotch } from "@phosphor-icons/react"
@@ -218,6 +218,7 @@ const hexOr = (v: unknown, fallback: string) =>
  */
 export function CatalogPrint({ onClose, exportId }: { onClose: () => void; exportId?: string }) {
   const tl = useLabelT()
+  const fmtDate = useDateFormat()
   /**
    * PORTALLED TO <body>, WHICH IS THE ONLY REASON THIS PRINTS.
    *
@@ -540,7 +541,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
               <span className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
  style={{ background: HOUSE.lime, color: HOUSE.ink }}>
-                {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                {fmtDate(new Date(), { month: "long", year: "numeric" })}
               </span>
             </div>
 
@@ -1215,7 +1216,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
               <footer className="mt-6 flex items-center justify-between border-t border-neutral-200 pt-3 text-[9px] text-neutral-400">
                 <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">{brand.title}</span>
-                <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                <span>{fmtDate(new Date(), { month: "long", year: "numeric" })}</span>
               </footer>
             </section>
           )})}
@@ -1325,7 +1326,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  a term the table no longer uses. */}
                   <footer className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-3 text-[9px] text-neutral-400">
                     <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">{brand.title}</span>
-                    <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                    <span>{fmtDate(new Date(), { month: "long", year: "numeric" })}</span>
                   </footer>
                 </div>
               </section>
@@ -1388,7 +1389,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               )}
               <p className="mt-4 text-[10px]" style={{ color: "rgba(250,248,243,0.6)" }}>
                 Prices in this catalogue are per unit and were current on{" "}
-                {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.
+                {fmtDate(new Date(), { month: "long", day: "numeric", year: "numeric" })}.
               </p>
             </div>
           </section>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
@@ -125,6 +125,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 // deliberately NOT rendered here. They're someone else's sales; under our title they'd
 // read as ours. The source is reachable as a labelled link and nothing more.
 const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: UploadedListing; onRemove?: (l: UploadedListing) => void; onEdit?: (l: UploadedListing, images: string[]) => void }) {
+  const fmtDate = useDateFormat()
   // "What did I actually upload?" is a question the 300px tile can't answer — the cover is
   // cropped square and scaled down, so a misplaced design or the wrong file looks fine.
  const [zoom, setZoom] = useState(false)
@@ -312,7 +313,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
             {l.by_name && l.uploaded_at && <span className="opacity-50">·</span>}
             {l.uploaded_at && (
               <span className="shrink-0" title={new Date(l.uploaded_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}>
-                {new Date(l.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {fmtDate(l.uploaded_at, { month: "short", day: "numeric" })}
               </span>
             )}
           </div>

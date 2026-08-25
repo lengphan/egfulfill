@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
-import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
+import { useT, useLabelT, useDateFormat, useLocaleTag } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { getToken, getUser } from "@/lib/auth"
@@ -41,11 +41,6 @@ const itemsLabel = (o: OrderRow, fallback: string) => {
  const first = items[0]?.name || items[0]?.sku || fallback
  return items.length > 1 ? `${first} +${items.length - 1}` : first
 }
-const fmtDate = (s?: string | null) => {
- if (!s) return "—"
- const d = new Date(s)
- return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
 
 const DEMO: OrderRow[] = [
   { id: "etsy-4142", seq: 4142, source: "etsy", customer: { name: "A. Nguyen" }, factory_status: "printing", total: 63.75, created_at: new Date(Date.now() - 1 * DAY).toISOString(), items: [{ name: "Hoodie · black", qty: 1 }] },
@@ -58,7 +53,10 @@ const DEMO: OrderRow[] = [
 export function DashboardView() {
  const router = useRouter()
  const t = useT()
-  const fmtDate = useDateFormat()
+  const fmtOn = useDateFormat()
+  const localeTag = useLocaleTag()
+  // Short "MMM d" for a row of dates. Was a module-scope helper pinned to en-US.
+  const fmtDate = (v?: string | null) => (v ? fmtOn(v, { month: "short", day: "numeric" }) : "—")
  const cl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [balance, setBalance] = useState<number | null>(null)
@@ -116,10 +114,10 @@ export function DashboardView() {
   // Time-of-day greeting — client component, so this is the seller's own local clock.
  const greetDate = new Date()
  const greeting = t(greetDate.getHours() < 12 ? "dash.goodMorning" : greetDate.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
- const todayLabel = fmtDate(greetDate, { weekday: "long", month: "short", day: "numeric" })
+ const todayLabel = fmtOn(greetDate, { weekday: "long", month: "short", day: "numeric" })
  const name = getUser()?.name || t("dash.there")
 
- const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])
+ const series = useMemo(() => revenueSeries(orders ?? [], now, localeTag), [orders, now, localeTag])
 
  const recent = useMemo(
     () => [...(orders ?? [])].sort((a, b) => (tsOf(b) || 0) - (tsOf(a) || 0)).slice(0, 6),

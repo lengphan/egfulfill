@@ -82,12 +82,15 @@ import {
 } from "@/lib/api"
 import { TabLabel } from "@/components/app/tab-label"
 import { getShippoBilling, SHIPPO_BILLING_URL, type ShippoBilling } from "@/lib/api"
-import { useLabelT, useT } from "@/lib/i18n"
+import { useLabelT, useT, useDateFormat } from "@/lib/i18n"
 
-const fmtDate = (s?: string | null) => {
+function useFmtDate() {
+  const fmtDate = useDateFormat()
+  return useCallback((s?: string | null) => {
  if (!s) return "—"
  const d = new Date(s)
- return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+ return isNaN(d.getTime()) ? "—" : fmtDate(d, { month: "short", day: "numeric", year: "numeric" })
+}, [fmtDate])
 }
 // Compact "how long ago" for the last-active column — a date alone makes you do the
 // subtraction; "3d ago" reads at a glance which accounts have gone quiet.
@@ -346,6 +349,7 @@ function ProfilePanel() {
 
 // ─────────────────────────── API keys ───────────────────────────
 function ApiKeysPanel() {
+  const fmtDate = useFmtDate()
   const tl = useLabelT()
  const [keys, setKeys] = useState<ApiKey[] | null>(null)
  const [label, setLabel] = useState("")
@@ -2123,6 +2127,7 @@ function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolea
 }
 
 function UsersPanel() {
+  const fmtDate = useFmtDate()
   const tl = useLabelT()
  const [users, setUsers] = useState<AdminUser[]>([])
  const [loaded, setLoaded] = useState(false)
