@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { FileArrowDown, CircleNotch, Warning, CurrencyDollar, Image as ImageIcon, FileZip, Sparkle, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -156,12 +157,13 @@ function placedRows(bySide: Record<string, Record<string, OrderDesign>> | undefi
  * of borrowing a number, at a smaller size so three characters still fit the circle.
  */
 function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
+  const tl = useLabelT()
  return (
     <span
  className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-2xs" : "text-xs")}
  title={title ?? (no == null ? "Applies to every item on this order" : `Item ${no}`)}
     >
-      {no ?? "All"}
+      {no ?? tl("designFiles", "All")}
     </span>
   )
 }
@@ -173,6 +175,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
  onRemove?: (r: PlacedRow) => void
  busy?: string | null
 }) {
+  const tl = useLabelT()
   /** Click the artwork to see it full size. Held HERE rather than at the two call sites, so
    *  both lists get it and neither can grow its own. The shared lightbox, never a new one. */
  const [zoom, setZoom] = useState<string | null>(null)
@@ -201,7 +204,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
           <button
  type="button"
  onClick={() => setZoom(r.src)}
- title="See it full size"
+ title={tl("designFiles", "See it full size")}
  className="size-9 shrink-0 overflow-hidden rounded-md border border-border bg-white"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -213,7 +216,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{r.name}</div>
           </div>
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-foreground/70" title="Which face this artwork is on">
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium capitalize text-foreground/70" title={tl("designFiles", "Which face this artwork is on")}>
             {r.side}
           </span>
           {/* DOWNLOAD, matching the machine-file row — WORD ALONE, and for the same reason
@@ -244,7 +247,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
  a.href = r.src; a.download = r.name || "artwork"; a.click()
             }}
           >
-            Download
+            {tl("designFiles", "Download")}
           </Button>
           {onRemove && (
             <Button
@@ -254,7 +257,7 @@ function PlacedArtworkList({ rows, onRemove, busy }: {
  onClick={() => onRemove(r)}
  title={`Take the ${r.side} artwork off this item`}
             >
-              Remove
+              {tl("designFiles", "Remove")}
             </Button>
           )}
         </div>
@@ -298,6 +301,7 @@ function scopeLabel(f: DesignFileRow): string {
 export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orderId: string; sku?: string; lineId?: string | null; compact?: boolean
   /** The line this panel is mounted for, so a placed artwork row can name it. */
  item?: OrderItem }) {
+  const tl = useLabelT()
  const [files, setFiles] = useState<DesignFileRow[] | null>(null)
   /**
    * The artwork ON the line, which lives in a DIFFERENT table to the files below — see
@@ -417,7 +421,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
         multiple
         onFiles={upload}
         busy={busy ? `Uploading ${busy}…` : null}
-        label="Drop files here, or click to browse"
+        label={tl("designFiles", "Drop files here, or click to browse")}
         hint={compact ? undefined : ".pes goes to the seller · .emb + images stay on the factory boards"}
       />
 
@@ -447,7 +451,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
          * instead of an omission. §4: an empty state must not be readable as a broken one.
          */
         placedLines.length ? null : (
-          <div className="py-2 text-center text-2xs text-muted-foreground">No files yet.</div>
+          <div className="py-2 text-center text-2xs text-muted-foreground">{tl("designFiles", "No files yet.")}</div>
         )
       ) : (
         <div className="divide-y divide-border rounded-xl border border-border">
@@ -459,7 +463,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-xs font-medium">{f.name}</span>
-                    {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+                    {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title={tl("designFiles", "Most recent machine file for this item — the current fixed version")}>LATEST</span>}
                   </div>
                   <div className="truncate text-2xs text-muted-foreground">{scopeLabel(f)}{k.hint}</div>
                 </div>
@@ -468,7 +472,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
  may set it (the server rejects anyone else regardless). */}
                 {f.kind === "pes" && (
  canPrice ? (
-                    <label className="flex shrink-0 items-center gap-1" title="What the seller pays to download this">
+                    <label className="flex shrink-0 items-center gap-1" title={tl("designFiles", "What the seller pays to download this")}>
                       <CurrencyDollar size={11} className="text-muted-foreground" />
                       <Input
  defaultValue={String(f.price ?? 0)}
@@ -479,18 +483,18 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
                       />
                     </label>
                   ) : (
-                    <span className="shrink-0 text-2xs font-medium tabular-nums">{f.price ? `$${f.price}` : "Free"}</span>
+                    <span className="shrink-0 text-2xs font-medium tabular-nums">{f.price ? `$${f.price}` : tl("designFiles", "Free")}</span>
                   )
                 )}
 
-                <Button size="sm" variant="ghost" className="shrink-0" disabled={busy === f.designId} onClick={() => get(f)} title="Download">
+                <Button size="sm" variant="ghost" className="shrink-0" disabled={busy === f.designId} onClick={() => get(f)} title={tl("designFiles", "Download")}>
                   {busy === f.designId ? <CircleNotch size={12} className="animate-spin" /> : <FileArrowDown size={13} weight="bold" />}
                 </Button>
                 {/* Corner X, matching the seller card — see the note there. */}
                 <button
  onClick={() => remove(f)}
  disabled={busy === f.designId}
- title="Remove this file"
+ title={tl("designFiles", "Remove this file")}
  aria-label={`Remove ${f.name}`}
  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
                 >
@@ -532,6 +536,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
   /** Artwork went onto a line — the page reloads its designs so the canvas shows it. */
  onAttached?: () => void
 }) {
+  const tl = useLabelT()
  const [files, setFiles] = useState<DesignFileRow[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
  const [err, setErr] = useState<string | null>(null)
@@ -746,7 +751,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       onFiles={stage}
       busy={busy ? `Sending ${busy}…` : null}
       label={slim ? "Add another machine file or design image" : "Have a machine file or a design image? Drop it here"}
-      hint="Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)"
+      hint={tl("designFiles", "Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)")}
     />
   )
 
@@ -846,7 +851,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
         <span className="text-xs font-semibold text-muted-foreground">
           {staged.length} file{staged.length === 1 ? "" : "s"} ready — check where each one goes
         </span>
-        <button onClick={() => setStaged([])} className="text-2xs text-muted-foreground underline-offset-2 hover:underline">Clear</button>
+        <button onClick={() => setStaged([])} className="text-2xs text-muted-foreground underline-offset-2 hover:underline">{tl("designFiles", "Clear")}</button>
       </div>
       <div>
         {staged.map((s) => (
@@ -878,7 +883,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  auto-attach with extra steps. */}
               <div className="truncate text-xs text-muted-foreground">
                 {targetFacts(s)}
-                {items.length > 0 && s.target !== ALL ? " · matched by name" : ""}
+                {items.length > 0 && s.target !== ALL ? tl("designFiles", " · matched by name") : ""}
               </div>
             </div>
             {/* text-xs, matching the file name beside it — the field was two steps smaller
@@ -886,7 +891,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
                 "no line at all" is not a state a file can hold. */}
             {items.length > 0 && (targetsFor(s.image).length > 0 ? (
               <VariantField
- label="Goes on" compact clearable={false} className="w-32 text-xs"
+ label={tl("designFiles", "Goes on")} compact clearable={false} className="w-32 text-xs"
  value={labelFor(s.image, s.target)} options={optionsFor(s.image)}
  onChange={(v) => setStaged((prev) => prev.map((x) => (x.name === s.name ? { ...x, target: keyAt(s.image, v) } : x)))}
               />
@@ -894,12 +899,12 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
               // Not a disabled dropdown — there is no choice to grey out. It says why, and
               // Attach below leaves this row alone.
               <span className="shrink-0 rounded-lg bg-hold/10 px-2 py-1 text-2xs font-medium text-hold">
-                No embroidery item on this order
+                {tl("designFiles", "No embroidery item on this order")}
               </span>
             ))}
             <button
  onClick={() => setStaged((prev) => prev.filter((x) => x.name !== s.name))}
- title="Take this one out" aria-label={`Take ${s.name} out`}
+ title={tl("designFiles", "Take this one out")} aria-label={`Take ${s.name} out`}
  className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive hover:text-destructive-foreground"
             >
               <X size={11} weight="bold" />
@@ -1026,7 +1031,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
               dropzone's own label written a second time, six millimetres above the dropzone.
               A control that needs the sentence above it repeated inside it is one control
               too many sentences. */}
-          No files on this order yet. Machine files appear here once we&apos;ve cut them.
+          {tl("designFiles", "No files on this order yet. Machine files appear here once we’ve cut them.")}
         </p>
         {dropZone()}
         {queue}
@@ -1071,7 +1076,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm font-medium">{f.name}</span>
-              {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title="Most recent machine file for this item — the current fixed version">LATEST</span>}
+              {f.isLatest && <span className="shrink-0 rounded bg-shipped/12 px-1 py-0.5 text-2xs font-bold text-shipped" title={tl("designFiles", "Most recent machine file for this item — the current fixed version")}>LATEST</span>}
             </div>
             <div className="text-xs text-muted-foreground">
               {f.sku ? `Item ${f.sku} · ` : ""}
@@ -1079,9 +1084,9 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  and false for every operator, warehouse hand and admin looking at the same
  card — they are told who it was instead. */}
               {f.source === "seller"
-                ? `${isSeller ? "You sent this" : "Sent by the seller"}${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
- : f.kind === "image" ? "Design image"
- : f.paid ? "Purchased" : f.price ? `$${f.price} — pays from your wallet` : "Free"}
+                ? `${isSeller ? tl("designFiles", "You sent this") : tl("designFiles", "Sent by the seller")}${f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}`
+ : f.kind === "image" ? tl("designFiles", "Design image")
+ : f.paid ? tl("designFiles", "Purchased") : f.price ? `$${f.price} — pays from your wallet` : tl("designFiles", "Free")}
             </div>
           </div>
 
@@ -1106,7 +1111,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  text-sm and stays there: a name is content, these are controls. */}
           {items.length > 0 && (
             <VariantField
- label="Goes on" compact clearable={false} className="w-32 shrink-0 text-xs"
+ label={tl("designFiles", "Goes on")} compact clearable={false} className="w-32 shrink-0 text-xs"
  value={labelFor(f.kind === "image", f.lineId || ALL)}
  options={optionsFor(f.kind === "image")}
  onChange={(v) => void rescope(f, keyAt(f.kind === "image", v))}
@@ -1122,7 +1127,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
             * deliverable could only be priced from a board that neither of them lives on.
             */}
           {f.kind === "pes" && f.canPrice && (
-            <label className="flex shrink-0 items-center gap-1" title="What the seller pays to download this">
+            <label className="flex shrink-0 items-center gap-1" title={tl("designFiles", "What the seller pays to download this")}>
               <CurrencyDollar size={11} className="text-muted-foreground" />
               <Input
  defaultValue={String(f.price ?? 0)}
@@ -1155,7 +1160,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  and its action, so they should look like a pair. The spinner stays: that
  one carries information the word cannot. */}
               {busy === f.designId ? <CircleNotch size={13} className="animate-spin" />
- : (f.paid || !f.price) ? "Download"
+ : (f.paid || !f.price) ? tl("designFiles", "Download")
  : <>Buy ${f.price} &amp; download</>}
             </Button>
           )}
@@ -1176,9 +1181,9 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
  className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
  onClick={() => remove(f)}
  disabled={busy === f.designId}
- title="Remove this file from the order"
+ title={tl("designFiles", "Remove this file from the order")}
             >
-              Remove
+              {tl("designFiles", "Remove")}
             </Button>
           )}
         </div>

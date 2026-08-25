@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check, MagicWand, Question, CircleNotch, CaretDown, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -44,6 +45,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
  onChange: (z: PrintArea) => void
  onReset: () => void
 }) {
+  const tl = useLabelT()
  const box = useRef<HTMLDivElement | null>(null)
   // One handler for both gestures: move keeps the size and shifts the origin, resize pins
   // the origin and grows. Pointer capture, so a drag that leaves the box still tracks.
@@ -117,7 +119,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={src} alt="" className="pointer-events-none size-full object-contain" />
         ) : (
-          <span className="grid size-full place-items-center text-xs text-muted-foreground">No photo for this side</span>
+          <span className="grid size-full place-items-center text-xs text-muted-foreground">{tl("product", "No photo for this side")}</span>
         )}
         <div
  onPointerDown={(e) => start(e, "move")}
@@ -132,8 +134,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
       </div>
       <div className="space-y-2">
         <p className="max-w-xs text-xs text-muted-foreground">
-          Drag the box to move it, the corner to resize. Everything outside it is trimmed in
- production. Values are percentages of the photo.
+          {tl("product", "Drag the box to move it, the corner to resize. Everything outside it is trimmed in production. Values are percentages of the photo.")}
         </p>
         <div className="flex flex-wrap gap-2">{num("x", "X")}{num("y", "Y")}{num("w", "W")}{num("h", "H")}</div>
         {/**
@@ -146,7 +147,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
           * a factory job, which is why it is here and read-only there.
           */}
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-          <span className="text-xs font-medium">Real size</span>
+          <span className="text-xs font-medium">{tl("product", "Real size")}</span>
           {inches("wIn", "W")}
           <span className="text-xs text-muted-foreground">×</span>
           {inches("hIn", "H")}
@@ -156,7 +157,7 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
           Left empty this side is treated as {BASE_PRINT_IN.w}&quot; × {BASE_PRINT_IN.h}&quot;, which is what the
  fallback outlines were drawn for — right for a shirt front, wrong for a cap.
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={onReset}>Reset to the type default</Button>
+        <Button type="button" variant="outline" size="sm" onClick={onReset}>{tl("product", "Reset to the type default")}</Button>
       </div>
     </div>
   )
@@ -293,6 +294,7 @@ export function ProductEditorDialog({
    * means NOT ASKED — never zero — so the trim control simply does not appear. */
  stockByColor?: Record<string, number> | null
 }) {
+  const tl = useLabelT()
  const [name, setName] = useState("")
   /**
    * THE GARMENT'S BRAND — Gildan, Bella+Canvas, Otto — as its OWN field.
@@ -1031,7 +1033,7 @@ export function ProductEditorDialog({
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
-            {title ?? (product ? "Edit product" : "New product")}
+            {title ?? (product ? tl("product", "Edit product") : tl("product", "New product"))}
             {importSupplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {importSupplier}</span>}
           </DialogTitle>
         </DialogHeader>
@@ -1083,7 +1085,7 @@ export function ProductEditorDialog({
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                  <ImageIcon size={22} weight="duotone" /><span className="text-xs">Main image</span>
+                  <ImageIcon size={22} weight="duotone" /><span className="text-xs">{tl("product", "Main image")}</span>
                 </div>
               )}
             </div>
@@ -1102,15 +1104,15 @@ export function ProductEditorDialog({
             {img && (
               <div className="space-y-1">
                 <label className="flex items-center gap-1.5">
-                  <span className="w-8 shrink-0 eg-label text-muted-foreground">Zoom</span>
+                  <span className="w-8 shrink-0 eg-label text-muted-foreground">{tl("product", "Zoom")}</span>
                   <input
  type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={5} value={imgZoom || 100}
  onChange={(e) => setImgZoom(Number(e.target.value))}
- className="h-1 flex-1 accent-primary" aria-label="Main image zoom"
+ className="h-1 flex-1 accent-primary" aria-label={tl("product", "Main image zoom")}
                   />
                 </label>
                 <label className="flex items-center gap-1.5">
-                  <span className="w-8 shrink-0 eg-label text-muted-foreground">Up/dn</span>
+                  <span className="w-8 shrink-0 eg-label text-muted-foreground">{tl("product", "Up/dn")}</span>
                   {/* The ENDS are the same numbers they always were (0–100, 50 centre) — what
  grew is how far each one moves the picture. It used to pan through the
  cover overflow, which on a 4:3 photo in a square box is zero: the slider
@@ -1118,7 +1120,7 @@ export function ProductEditorDialog({
                   <input
  type="range" min={FOCUS_MIN} max={FOCUS_MAX} step={1} value={imgFocusY ?? 50}
  onChange={(e) => setImgFocusY(Number(e.target.value))}
- className="h-1 flex-1 accent-primary" aria-label="Main image vertical position"
+ className="h-1 flex-1 accent-primary" aria-label={tl("product", "Main image vertical position")}
                   />
                 </label>
                 {((imgZoom || 100) !== 100 || (imgFocusY ?? 50) !== 50) && (
@@ -1127,20 +1129,20 @@ export function ProductEditorDialog({
  onClick={() => { setImgZoom(100); setImgFocusY(50) }}
  className="w-full text-2xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                   >
-                    Reset framing
+                    {tl("product", "Reset framing")}
                   </button>
                 )}
               </div>
             )}
             </div>
             <div className="flex-1 space-y-2">
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">{tl("product", "Name")}</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={tl("product", "Heavyweight Hoodie")} className="h-9" /></label>
               {/* UNDER the name, because that is where it was taken FROM: the import lifts a
  leading brand out of the supplier's title so the name is the garment and this
  is the make. Both are free text — renaming either changes what the blank
  READS and nothing about where the line goes (productLabel is a label, never a
  key; stock is held against the sku and the cart groups by supplier). */}
-              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Brand</span>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">{tl("product", "Brand")}</span>
                 {/* ON BLUR, NOT ON EVERY KEYSTROKE. Filling this on a product whose name still
  leads with the make takes the make off the name — the whole point of the
  field — but doing it per character would eat "G", then "Gi", and mangle the
@@ -1150,7 +1152,7 @@ export function ProductEditorDialog({
  value={brand}
  onChange={(e) => setBrand(e.target.value)}
  onBlur={(e) => setName((n) => stripBrandPrefix(n, e.target.value))}
- placeholder="Gildan, Bella+Canvas…" className="h-9"
+ placeholder={tl("product", "Gildan, Bella+Canvas…")} className="h-9"
                 />
               </label>
               {/* TWO SKUS, and the labels say which is which — the whole point is that one
@@ -1158,7 +1160,7 @@ export function ProductEditorDialog({
  theirs is optional and only exists for a blank we buy in. */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-sm text-muted-foreground">Our SKU</span>
+                  <span className="text-sm text-muted-foreground">{tl("product", "Our SKU")}</span>
                   {/* The placeholder is the number this product would ACTUALLY get, not a
  hardcoded example — "EG-1005" over an empty field reads as filled. */}
                   <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? "EG-1005"} className="h-9 tabular-nums" />
@@ -1190,13 +1192,13 @@ export function ProductEditorDialog({
                       )}
                     </span>
                   ) : (
-                    <span className="text-2xs text-muted-foreground">Stock is held against this, and the seller sees it on their listing.</span>
+                    <span className="text-2xs text-muted-foreground">{tl("product", "Stock is held against this, and the seller sees it on their listing.")}</span>
                   )}
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-sm text-muted-foreground">Supplier SKU</span>
+                  <span className="text-sm text-muted-foreground">{tl("product", "Supplier SKU")}</span>
                   <Input value={supplierSku} onChange={(e) => setSupplierSku(e.target.value)} placeholder="optional" className="h-9 tabular-nums" />
-                  <span className="text-2xs text-muted-foreground">Never shown to sellers or published anywhere.</span>
+                  <span className="text-2xs text-muted-foreground">{tl("product", "Never shown to sellers or published anywhere.")}</span>
                 </label>
               </div>
               {/* WHO WE BUY IT FROM, AND WHERE — the two facts that decide whether a shortage
@@ -1210,14 +1212,14 @@ export function ProductEditorDialog({
  nowhere. */}
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-sm text-muted-foreground">Supplier</span>
-                  <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&amp;S Activewear, a local shop, Alibaba…" className="h-9" />
-                  <span className="text-2xs text-muted-foreground">Groups this product&apos;s shortages in the purchase cart.</span>
+                  <span className="text-sm text-muted-foreground">{tl("product", "Supplier")}</span>
+                  <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder={tl("product", "S&S Activewear, a local shop, Alibaba…")} className="h-9" />
+                  <span className="text-2xs text-muted-foreground">{tl("product", "Groups this product’s shortages in the purchase cart.")}</span>
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-sm text-muted-foreground">Where to buy</span>
-                  <Input value={supplierUrl} onChange={(e) => setSupplierUrl(e.target.value)} placeholder="https://… (optional)" className="h-9" inputMode="url" />
-                  <span className="text-2xs text-muted-foreground">Opens straight from the cart, so &ldquo;order by hand&rdquo; is one click.</span>
+                  <span className="text-sm text-muted-foreground">{tl("product", "Where to buy")}</span>
+                  <Input value={supplierUrl} onChange={(e) => setSupplierUrl(e.target.value)} placeholder={tl("product", "https://… (optional)")} className="h-9" inputMode="url" />
+                  <span className="text-2xs text-muted-foreground">{tl("product", "Opens straight from the cart, so “order by hand” is one click.")}</span>
                 </label>
               </div>
               {/* Type + Status share the top row; Status used to sit alone far down the
@@ -1225,7 +1227,7 @@ export function ProductEditorDialog({
  the chips flow across the whole width instead of wrapping inside a cramped
  half-column and leaving a blank gap beside Type. */}
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
+                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">{tl("product", "Type")}</span>
                   {/* THE FIELD BECOMES THE FIELD FOR THE NEW ONE. A select and a text input
                       are both ways of setting the same value, so they take the same slot
                       rather than the input appearing underneath as a second thing to read.
@@ -1239,7 +1241,7 @@ export function ProductEditorDialog({
                       className="eg-select eg-control pr-8"
                     >
                       {typeNames.map((t) => <option key={t}>{t}</option>)}
-                      {canAddType && <option value={NEW_TYPE}>+ New category…</option>}
+                      {canAddType && <option value={NEW_TYPE}>{tl("product", "+ New category…")}</option>}
                     </select>
                   ) : (
                     <div className="flex items-center gap-1.5">
@@ -1251,15 +1253,15 @@ export function ProductEditorDialog({
                           if (e.key === "Enter") { e.preventDefault(); void addType() }
                           if (e.key === "Escape") { e.preventDefault(); setNewType(null); setTypeErr(null) }
                         }}
-                        placeholder="Category name"
+                        placeholder={tl("product", "Category name")}
                         className="h-9"
                         disabled={typeBusy}
                       />
                       <Button size="sm" onClick={() => void addType()} disabled={typeBusy || !newType.trim()}>
-                        {typeBusy ? <CircleNotch size={14} className="animate-spin" /> : "Add"}
+                        {typeBusy ? <CircleNotch size={14} className="animate-spin" /> : tl("product", "Add")}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => { setNewType(null); setTypeErr(null) }} disabled={typeBusy}>
-                        Cancel
+                        {tl("product", "Cancel")}
                       </Button>
                     </div>
                   )}
@@ -1272,13 +1274,13 @@ export function ProductEditorDialog({
  not decoration: "Active" alone gave no hint that it published to the open
  web, which is exactly how five Active products and a one-product website
  coexisted for months. */}
-                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Status</span>
+                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">{tl("product", "Status")}</span>
                   <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select eg-control pr-8">
-                    <option>Active</option>
-                    <option>Sellers only</option>
-                    <option>Staff only</option>
-                    <option>Draft</option>
-                    <option>Archived</option>
+                    <option>{tl("product", "Active")}</option>
+                    <option>{tl("product", "Sellers only")}</option>
+                    <option>{tl("product", "Staff only")}</option>
+                    <option>{tl("product", "Draft")}</option>
+                    <option>{tl("product", "Archived")}</option>
                   </select>
                 </label>
               </div>
@@ -1289,10 +1291,10 @@ export function ProductEditorDialog({
  it; there is simply no control here that changes it. */}
               <p className="-mt-1 text-xs text-muted-foreground">
                 {status === "Active"
-                  ? "On the public marketing site, and orderable by sellers."
+                  ? tl("product", "On the public marketing site, and orderable by sellers.")
  : status === "Sellers only"
-                    ? "Orderable by sellers in the app. Not on the public site."
- : "Staff only — sellers never see this product."}
+                    ? tl("product", "Orderable by sellers in the app. Not on the public site.")
+ : tl("product", "Staff only — sellers never see this product.")}
               </p>
               {/* METHODS ARE MULTIPLE. A blank commonly takes several techniques — the
  single select forced one, which is why a product that can be embroidered
@@ -1302,7 +1304,7 @@ export function ProductEditorDialog({
                   Only this control was single-valued. Stored in the same joined format,
  so nothing downstream changes. Full width so all chips sit on one line. */}
               <div className="flex flex-col gap-1">
-                <span className="text-sm text-muted-foreground">Methods</span>
+                <span className="text-sm text-muted-foreground">{tl("product", "Methods")}</span>
                 <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border bg-card px-2 py-2">
                   {PRODUCT_METHODS.map((pm) => {
  const m = pm.label
@@ -1342,7 +1344,7 @@ export function ProductEditorDialog({
  hold), and this is a form telling you what a field will do. */}
                 {pickedKeys.length === 0 && (
                   <p className="text-xs text-primary">
-                    No method picked — an order for this blank won&apos;t be able to choose one.
+                    {tl("product", "No method picked — an order for this blank won’t be able to choose one.")}
                   </p>
                 )}
               </div>
@@ -1368,9 +1370,9 @@ export function ProductEditorDialog({
  back. */}
             <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium">Sizes &amp; pricing</span>
+                  <span className="text-xs font-medium">{tl("product", "Sizes & pricing")}</span>
                   {Object.keys(tiers).length > 0 && (
-                    <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear pricing</button>
+                    <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">{tl("product", "Clear pricing")}</button>
                   )}
                 </div>
                 {/* Bulk-fill every size at once. Base is an UPCHARGE over the product cost,
@@ -1378,7 +1380,7 @@ export function ProductEditorDialog({
  percentage. Shipping is a flat fee. A blank field is left as-is. */}
                 {sizes.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-2.5 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">Base = product cost +</span>
+                    <span className="text-xs font-medium text-muted-foreground">{tl("product", "Base = product cost +")}</span>
                     <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
                       {([[false, "$"], [true, "%"]] as const).map(([v, lbl]) => (
                         <button key={lbl} type="button" onClick={() => setBulkPct(v)}
@@ -1388,21 +1390,21 @@ export function ProductEditorDialog({
                       ))}
                     </div>
                     <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-32 text-xs" inputMode="decimal" aria-label="Base upcharge over product cost" />
+ placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-32 text-xs" inputMode="decimal" aria-label={tl("product", "Base upcharge over product cost")} />
                     {/* BLANK, in the same bulk row. "Apply to all" that skipped it would
  mean something different depending on which box you typed in — the
  same argument that put stock in here. */}
-                    <span className="text-xs text-muted-foreground">· blank</span>
+                    <span className="text-xs text-muted-foreground">{tl("product", "· blank")}</span>
                     <Input value={bulkBlank} onChange={(e) => setBulkBlank(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder="$ each" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk blank price" />
-                    <span className="text-xs text-muted-foreground">· shipping</span>
+ placeholder={tl("product", "$ each")} className="h-8 w-20 text-xs" inputMode="decimal" aria-label={tl("product", "Bulk blank price")} />
+                    <span className="text-xs text-muted-foreground">{tl("product", "· shipping")}</span>
                     <Input value={bulkShip} onChange={(e) => setBulkShip(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder="$ flat" className="h-8 w-20 text-xs" inputMode="decimal" aria-label="Bulk shipping fee" />
-                    <span className="text-xs text-muted-foreground">· stock</span>
+ placeholder={tl("product", "$ flat")} className="h-8 w-20 text-xs" inputMode="decimal" aria-label={tl("product", "Bulk shipping fee")} />
+                    <span className="text-xs text-muted-foreground">{tl("product", "· stock")}</span>
                     <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
- placeholder="units" className="h-8 w-20 text-xs" inputMode="numeric" aria-label="Bulk stock" disabled={!ourSku}
+ placeholder="units" className="h-8 w-20 text-xs" inputMode="numeric" aria-label={tl("product", "Bulk stock")} disabled={!ourSku}
  title={ourSku ? undefined : "Give the product a SKU — stock is held against it"} />
-                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim() && !bulkBlank.trim()}>Apply to all</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim() && !bulkBlank.trim()}>{tl("product", "Apply to all")}</Button>
                   </div>
                 )}
                 {/* STOCK IS A COLUMN HERE. It was a size × colour grid of its own below —
@@ -1410,15 +1412,15 @@ export function ProductEditorDialog({
  question ("how many 3XL?") this row is already asking. Held per SIZE now,
  so the sku is EG-1001-L rather than EG-1001-L-BLK. */}
                 <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_1fr_4.5rem_5rem_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span title="What this size costs undecorated — charged when a line carries no print method">Blank ($)</span><span>Shipping ($)</span>
+                  <span /><span>{tl("product", "Product cost ($)")}</span><span>{tl("product", "Base cost ($)")}</span><span title={tl("product", "What this size costs undecorated — charged when a line carries no print method")}>{tl("product", "Blank ($)")}</span><span>{tl("product", "Shipping ($)")}</span>
                   {/* WEIGHT IS PER SIZE, which is the whole reason it is a column here. A 3XL
  crewneck runs several ounces over an S, and postage is priced in bands
                       (4 / 8 / 12 / 15.999oz, then 1lb), so one size can sit a band above
  another. One product-level figure has to be the heaviest — over-declaring
  every small one — or an average, which under-declares the big ones and is
  corrected by the carrier later at about $1.65 a parcel. */}
-                  <span title="What one of this size weighs, in ounces. Postage is quoted against it; the carrier re-weighs the parcel and bills the difference.">Weight (oz)</span>
-                  <span>Stock</span><span className="text-right">Margin</span><span />
+                  <span title={tl("product", "What one of this size weighs, in ounces. Postage is quoted against it; the carrier re-weighs the parcel and bills the difference.")}>{tl("product", "Weight (oz)")}</span>
+                  <span>{tl("product", "Stock")}</span><span className="text-right">{tl("product", "Margin")}</span><span />
                 </div>
                 <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => {
@@ -1464,7 +1466,7 @@ export function ProductEditorDialog({
  blank cell leaves the printed base cost in charge exactly as
  before. */
  placeholder="—"
- title="What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost."
+ title={tl("product", "What a seller pays for this size with nothing printed on it. Leave empty to charge the base cost.")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Blank price for size ${s}`}
                       />
                       <Input
@@ -1482,7 +1484,7 @@ export function ProductEditorDialog({
  so the number in force is visible without saving — the same rule
                            Base cost and Shipping follow in this row. */
  placeholder={weightOz.trim() !== "" ? String(Number(weightOz)) : "—"}
- title="What one of this size weighs, in ounces — what postage is quoted against"
+ title={tl("product", "What one of this size weighs, in ounces — what postage is quoted against")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Weight in ounces for size ${s}`}
                       />
                       {/* STOCK FOR THIS SIZE — a total, opened per colourway.
@@ -1596,7 +1598,7 @@ export function ProductEditorDialog({
  return (
                               <label key={c ?? "any"} className="flex items-center gap-1.5 text-xs">
                                 <span className="max-w-[9rem] truncate" title={c ? prettyColorName(c) : "Held for this size without a colourway"}>
-                                  {c ? prettyColorName(c) : "Any colour"}
+                                  {c ? prettyColorName(c) : tl("product", "Any colour")}
                                 </span>
                                 <Input
  value={stock[k] ?? ""}
@@ -1623,7 +1625,7 @@ export function ProductEditorDialog({
  would make unaddable. */}
                 {sizeSuggestions.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> Add:</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {tl("product", "Add:")}</span>
                     {sizeSuggestions.map((s) => (
                       <button
  key={s}
@@ -1637,7 +1639,7 @@ export function ProductEditorDialog({
                   </div>
                 )}
                 {sizes.length === 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">No sizes yet — add one above to price it.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{tl("product", "No sizes yet — add one above to price it.")}</p>
                 )}
               </div>
           </div>
@@ -1652,12 +1654,12 @@ export function ProductEditorDialog({
  dimensional weight (L×W×H÷166); keep the box under the ceiling so you're always
  billed on weight and never reweighed up. */}
           <div className="rounded-xl border border-border p-4">
-            <span className="text-sm font-medium">Weight &amp; dimensions</span>
+            <span className="text-sm font-medium">{tl("product", "Weight & dimensions")}</span>
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Weight (oz)</span><Input value={weightOz} onChange={(e) => setWeightOz(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 12" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Length (in)</span><Input value={boxL} onChange={(e) => setBoxL(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="L" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Width (in)</span><Input value={boxW} onChange={(e) => setBoxW(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="W" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Height (in)</span><Input value={boxH} onChange={(e) => setBoxH(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="H" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("product", "Weight (oz)")}</span><Input value={weightOz} onChange={(e) => setWeightOz(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 12" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("product", "Length (in)")}</span><Input value={boxL} onChange={(e) => setBoxL(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="L" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("product", "Width (in)")}</span><Input value={boxW} onChange={(e) => setBoxW(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="W" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("product", "Height (in)")}</span><Input value={boxH} onChange={(e) => setBoxH(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="H" className="h-9" inputMode="decimal" /></label>
             </div>
             {pkg ? (
               <div className={"mt-3 flex items-start gap-2 rounded-lg border p-2.5 text-xs " +
@@ -1665,7 +1667,7 @@ export function ProductEditorDialog({
                 <Question size={14} weight="bold" className="mt-0.5 shrink-0" />
                 {pkg.billedOnSize ? (
                   <span>
-                    <span className="font-medium text-primary">Billed on size, not weight.</span> This box&apos;s dimensional weight is {pkg.dimLb!.toFixed(2)} lb vs {pkg.actualLb.toFixed(2)} lb actual — the carrier upcharges the difference. Keep the box under <span className="font-medium tabular-nums">{Math.round(pkg.maxVolumeIn3)} in³</span> (about {pkg.suggestedCube.toFixed(1)}″ each side) to be billed on the {pkg.actualLb.toFixed(2)} lb actual weight instead.
+                    <span className="font-medium text-primary">{tl("product", "Billed on size, not weight.")}</span> This box&apos;s dimensional weight is {pkg.dimLb!.toFixed(2)} lb vs {pkg.actualLb.toFixed(2)} lb actual — the carrier upcharges the difference. Keep the box under <span className="font-medium tabular-nums">{Math.round(pkg.maxVolumeIn3)} in³</span> (about {pkg.suggestedCube.toFixed(1)}″ each side) to be billed on the {pkg.actualLb.toFixed(2)} lb actual weight instead.
                   </span>
                 ) : (
                   <span>
@@ -1674,7 +1676,7 @@ export function ProductEditorDialog({
                 )}
               </div>
             ) : (
-              <p className="mt-2 text-xs text-muted-foreground">Enter the weight to see the smallest box that avoids a dimensional-weight upcharge (USPS/Shippo, ÷166).</p>
+              <p className="mt-2 text-xs text-muted-foreground">{tl("product", "Enter the weight to see the smallest box that avoids a dimensional-weight upcharge (USPS/Shippo, ÷166).")}</p>
             )}
           </div>
 
@@ -1702,7 +1704,7 @@ export function ProductEditorDialog({
             }}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">Photo</span>
+              <span className="text-sm font-medium">{tl("product", "Photo")}</span>
               <div className="flex items-center gap-2">
                 {/**
                   * DROP THE COLOURWAYS THE SUPPLIER CANNOT FILL — before they become a product.
@@ -1746,10 +1748,10 @@ export function ProductEditorDialog({
                 {colors.length > 0 && gallery.length > 0 && (
                   <button type="button" onClick={autoMatch} disabled={matching} className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60">
                     {matching ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <MagicWand size={12} weight="fill" />}
-                    {matching ? "Matching…" : "Auto-match colours"}
+                    {matching ? tl("product", "Matching…") : tl("product", "Auto-match colours")}
                   </button>
                 )}
-                <span className="text-xs text-muted-foreground">{gallery.length ? `${gallery.length} photos · drag to reorder` : "Drag in, paste, or add"}</span>
+                <span className="text-xs text-muted-foreground">{gallery.length ? `${gallery.length} photos · drag to reorder` : tl("product", "Drag in, paste, or add")}</span>
               </div>
             </div>
 
@@ -1789,9 +1791,9 @@ export function ProductEditorDialog({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u} alt="" className="size-full object-cover" draggable={false} />
                     </button>
-                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-2xs font-semibold text-primary-foreground shadow">Main</span>}
-                    {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-success" aria-label="Confident match" />}
-                    {assigned && matchConf[assigned] === "low" && <Question size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-hold" aria-label="Guessed — verify" />}
+                    {u === img && <span className="pointer-events-none absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-2xs font-semibold text-primary-foreground shadow">{tl("product", "Main")}</span>}
+                    {assigned && matchConf[assigned] === "high" && <Check size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-success" aria-label={tl("product", "Confident match")} />}
+                    {assigned && matchConf[assigned] === "low" && <Question size={13} weight="bold" className="pointer-events-none absolute right-1 top-1 rounded-full bg-white/90 p-0.5 text-hold" aria-label={tl("product", "Guessed — verify")} />}
                     {/* Colour tag overlaid on the photo. */}
                     {colors.length > 0 && (
                       <select
@@ -1825,9 +1827,9 @@ export function ProductEditorDialog({
  : assigned ? "border-primary/30 bg-primary/20 text-primary"
  : "border-border bg-card/90 text-muted-foreground")}
  title={isRep ? `${assigned} — this colour's photo` : assigned ? `${assigned} — extra angle` : "Tag this photo's colour"}
- aria-label="Tag this photo's colour"
+ aria-label={tl("product", "Tag this photo's colour")}
                       >
-                        <option value="">— colour —</option>
+                        <option value="">{tl("product", "— colour —")}</option>
                         {colors.map((c) => <option key={c} value={c}>{prettyColorName(c)}</option>)}
                       </select>
                     )}
@@ -1863,7 +1865,7 @@ export function ProductEditorDialog({
               <label className="grid size-28 cursor-pointer place-items-center gap-1 rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
                 <span className="flex flex-col items-center gap-1">
                   <Plus size={20} />
-                  <span className="text-xs font-medium">Add</span>
+                  <span className="text-xs font-medium">{tl("product", "Add")}</span>
                 </span>
                 <input
  type="file" accept="image/*" multiple className="hidden"
@@ -1873,7 +1875,7 @@ export function ProductEditorDialog({
             </div>
 
             <p className="mt-3 text-xs text-muted-foreground">
-              The first image is the main one — click any tile to promote it, drag to reorder, and tag each with its colour.
+              {tl("product", "The first image is the main one — click any tile to promote it, drag to reorder, and tag each with its colour.")}
             </p>
           </div>
 
@@ -1886,7 +1888,7 @@ export function ProductEditorDialog({
           {typeSides.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Print sides</span>
+                <span className="text-sm font-medium">{tl("product", "Print sides")}</span>
                 <span className="text-xs text-muted-foreground">from {type} · override only if this blank differs</span>
               </div>
               {/* SAY WHICH WAY THE FALLBACK RUNS. Three ways to fill a side and one to empty
@@ -1954,7 +1956,7 @@ export function ProductEditorDialog({
                         {/* Says "this one is ours", so the absence of a tag means it's
  following the type — the common case stays silent. */}
                         {override ? (
-                          <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-primary/90 py-0.5 text-center text-xs font-medium text-primary-foreground">Custom</span>
+                          <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-primary/90 py-0.5 text-center text-xs font-medium text-primary-foreground">{tl("product", "Custom")}</span>
                         ) : shown ? (
                           /* Says WHERE the picture came from. Without it an inherited
  outline looks identical to one set on this product, which is
@@ -1970,7 +1972,7 @@ export function ProductEditorDialog({
  two controls sharing one corner is a mis-click waiting to happen. */}
                       <div className="absolute -left-1.5 -top-1.5 z-10 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/side:opacity-100">
                         <label
- title="Upload a photo for this side"
+ title={tl("product", "Upload a photo for this side")}
  className="grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background"
                         >
                           <UploadSimple size={12} weight="bold" />
@@ -1983,7 +1985,7 @@ export function ProductEditorDialog({
                         {/* A real select, visually hidden over its own icon — keeps keyboard
  and screen-reader behaviour while the icon is what you click. */}
                         <label
- title="Use one of this product's photos for this side"
+ title={tl("product", "Use one of this product's photos for this side")}
  className="relative grid size-6 cursor-pointer place-items-center rounded-full bg-foreground/75 text-background"
                         >
                           <ImageIcon size={12} weight="bold" />
@@ -1997,7 +1999,7 @@ export function ProductEditorDialog({
                             })}
  className="absolute inset-0 cursor-pointer opacity-0"
                           >
-                            <option value="">{inherited ? "Use settings" : "None set"}</option>
+                            <option value="">{inherited ? tl("product", "Use settings") : tl("product", "None set")}</option>
                             {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
                           </select>
                         </label>
@@ -2008,7 +2010,7 @@ export function ProductEditorDialog({
                         <button
  type="button"
  aria-label={`Clear the ${sd} mockup`}
- title="Remove this override — go back to the type's mockup"
+ title={tl("product", "Remove this override — go back to the type's mockup")}
  onClick={(e) => {
  e.preventDefault(); e.stopPropagation()
  setSideMockups((m) => { const n = { ...m }; delete n[sd]; return n })
@@ -2043,15 +2045,15 @@ export function ProductEditorDialog({
           {/* Colors — chips + suggested */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Colors</span>
+              <span className="text-sm font-medium">{tl("product", "Colors")}</span>
               {/* Same rule in bulk: the colours go and so do their photos. Untagged
  pictures are nobody's, so they stay. */}
               {colors.length > 0 && (
                 <button
  onClick={() => dropColors(colors)}
- title="Remove every colour and the photos tagged to them"
+ title={tl("product", "Remove every colour and the photos tagged to them")}
  className="text-xs font-medium text-primary hover:underline"
-                >Clear</button>
+                >{tl("product", "Clear")}</button>
               )}
             </div>
             {/* Photo↔colour tagging now lives on the tiles in the Photo section above; this
@@ -2073,12 +2075,12 @@ export function ProductEditorDialog({
               </div>
             )}
             <div className="flex gap-1.5">
-              <Input value={colorInput} onChange={(e) => setColorInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor(colorInput) } }} placeholder="Add a color…" className="h-8 text-xs" />
+              <Input value={colorInput} onChange={(e) => setColorInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor(colorInput) } }} placeholder={tl("product", "Add a color…")} className="h-8 text-xs" />
               <Button size="sm" variant="outline" className="h-8 shrink-0 px-2" onClick={() => addColor(colorInput)}><Plus size={13} weight="bold" /></Button>
             </div>
             {colorSuggestions.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? tl("product", "From supplier") : tl("product", "Suggested")}:</span>
                 {colorSuggestions.map((c) => (
                   <button key={c} title={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {prettyColorName(c)}</button>
                 ))}
@@ -2092,7 +2094,7 @@ export function ProductEditorDialog({
 
           {/* Description */}
           <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Description</span>
+            <span className="text-sm font-medium">{tl("product", "Description")}</span>
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={supplier ? "Auto-filled from the supplier — edit as needed." : "Product description…"} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
           </label>
 
@@ -2102,10 +2104,10 @@ export function ProductEditorDialog({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("product", "Cancel")}</Button>
           <Button onClick={save} disabled={saving}>
             {saving ? <CircleNotch size={14} className="animate-spin" /> : null}
-            {saving ? "Saving…" : (ctaLabel ?? (product ? "Save changes" : "Add product"))}
+            {saving ? tl("product", "Saving…") : (ctaLabel ?? (product ? tl("product", "Save changes") : tl("product", "Add product")))}
           </Button>
         </div>
       </DialogContent>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
 import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, MagnifyingGlassPlus, type Icon } from "@phosphor-icons/react"
@@ -208,6 +209,7 @@ export type RailArt = {
 function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onDelete, onZoom }: {
  url: string; src?: string; name?: string; badge?: string; title?: string; measure?: boolean; onPlace: () => void; onDelete?: () => void; onZoom?: () => void
 }) {
+  const tl = useLabelT()
   /**
    * THE SIZE, MEASURED FROM THE PICTURE ITSELF.
    *
@@ -240,7 +242,7 @@ function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onD
       >
         <Thumb className="aspect-square w-full" icon={<LinkSimpleBreak size={18} weight="duotone" />} note="" />
         <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium text-hold">
-          Can’t load
+          {tl("designMaker", "Can’t load")}
         </span>
       </a>
     )
@@ -276,7 +278,7 @@ function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onD
           hover, the same split ItemAvatar already makes between verifying and authoring. */}
       {onZoom && (
         <button
- type="button" onClick={onZoom} title="View full size"
+ type="button" onClick={onZoom} title={tl("designMaker", "View full size")}
  className="absolute left-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 group-hover/thumb:flex"
         >
           <MagnifyingGlassPlus size={11} weight="bold" />
@@ -284,7 +286,7 @@ function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onD
       )}
       {onDelete && (
         <button
- type="button" onClick={onDelete} title="Remove from your library"
+ type="button" onClick={onDelete} title={tl("designMaker", "Remove from your library")}
  className="absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-alert group-hover/thumb:flex"
         >
           <Trash size={11} weight="bold" />
@@ -324,6 +326,7 @@ const TOOLS: { key: ToolKey; label: string; Icon: Icon }[] = [
 const RAIL_LIMIT = 6
 
 export function DesignMaker() {
+  const tl = useLabelT()
  const search = useSearchParams()
  const productParam = search.get("product")
  const templateParam = search.get("template")
@@ -874,7 +877,7 @@ export function DesignMaker() {
  prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl: art, designPos: artPos },
  returnTo: "/design/maker",
  returnLabel: "Back to Design",
- title: "Publish product",
+ title: tl("designMaker", "Publish product"),
               })
  if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }
  router.push(`/publish?d=${id}`)
@@ -936,16 +939,16 @@ export function DesignMaker() {
         <Button
  variant="ghost" size="sm" className="-ml-1 shrink-0"
  onClick={() => router.push("/design?tab=library")}
- title="Leave the editor"
+ title={tl("designMaker", "Leave the editor")}
         >
-          <ArrowLeft size={15} weight="bold" /> Back
+          <ArrowLeft size={15} weight="bold" /> {tl("designMaker", "Back")}
         </Button>
         {/* The name, as a title rather than a form field: transparent until you touch it.
             It was an Input at the bottom of a panel, which made naming a design feel like
  filling something in rather than titling your work. */}
         <Input
  value={name} onChange={(e) => setName(e.target.value)}
- placeholder="Untitled design" aria-label="Design name"
+ placeholder={tl("designMaker", "Untitled design")} aria-label={tl("designMaker", "Design name")}
  className="h-8 w-40 min-w-0 border-transparent bg-transparent px-2 text-sm font-medium shadow-none hover:border-border focus:border-border lg:w-56"
         />
         {msg && <span className={"truncate text-xs " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
@@ -979,23 +982,23 @@ export function DesignMaker() {
               }
             />
             <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={saveToLibrary} title="A flattened picture you can place on anything. Does not reopen.">
-                <ImageSquare size={14} weight="bold" /> Save to Artwork
+              <DropdownMenuItem onClick={saveToLibrary} title={tl("designMaker", "A flattened picture you can place on anything. Does not reopen.")}>
+                <ImageSquare size={14} weight="bold" /> {tl("designMaker", "Save to Artwork")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={saveAsTemplate} title="The layers, the blank and the print area, every side. Reopens in the editor.">
-                <Stack size={14} weight="bold" /> Save as Template
+              <DropdownMenuItem onClick={saveAsTemplate} title={tl("designMaker", "The layers, the blank and the print area, every side. Reopens in the editor.")}>
+                <Stack size={14} weight="bold" /> {tl("designMaker", "Save as Template")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" onClick={publishProduct} disabled={!designUrl && texts.length === 0}>
-            Publish
+            {tl("designMaker", "Publish")}
           </Button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1 gap-3">
         {/* Left: the rail, then the panel for whatever it has selected. */}
-        <nav aria-label="Tools" className="hidden w-16 shrink-0 flex-col gap-1 rounded-2xl border border-border bg-card p-1.5 lg:flex">
+        <nav aria-label={tl("designMaker", "Tools")} className="hidden w-16 shrink-0 flex-col gap-1 rounded-2xl border border-border bg-card p-1.5 lg:flex">
           {TOOLS.map(({ key, label, Icon }) => (
             <button
  key={key}
@@ -1017,8 +1020,8 @@ export function DesignMaker() {
         <aside className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card p-3 lg:flex">
           {tool === "blank" && (
             <div className="space-y-2">
-              <div className="text-sm font-semibold">Blank</div>
-              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? "Change blank" : "Pick a blank"}</Button>
+              <div className="text-sm font-semibold">{tl("designMaker", "Blank")}</div>
+              <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? tl("designMaker", "Change blank") : tl("designMaker", "Pick a blank")}</Button>
               {product && (
                 <div className="space-y-0.5 text-xs text-muted-foreground">
                   <div className="font-medium text-foreground">{product.name}</div>
@@ -1033,9 +1036,9 @@ export function DesignMaker() {
           {tool === "images" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Artwork</div>
+              <div className="text-sm font-semibold">{tl("designMaker", "Artwork")}</div>
               <label className="flex cursor-pointer items-center gap-1 text-2xs font-medium text-primary hover:underline">
-                <UploadSimple size={12} weight="bold" /> Upload
+                <UploadSimple size={12} weight="bold" /> {tl("designMaker", "Upload")}
                 <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadImages(e.target.files); e.target.value = "" }} />
               </label>
             </div>
@@ -1061,9 +1064,9 @@ export function DesignMaker() {
               // badges do not fit in it — and the number is already under the grid, on the
               // "Browse all N" that acts on it. Saying it twice cost the labels their line.
  items={[
-                { id: "yours" as const, label: "Yours" },
-                { id: "orders" as const, label: "From orders" },
-                { id: "templates" as const, label: "Templates" },
+                { id: "yours" as const, label: tl("designMaker", "Yours") },
+                { id: "orders" as const, label: tl("designMaker", "From orders") },
+                { id: "templates" as const, label: tl("designMaker", "Templates") },
               ]}
             />
             {imagesLoading ? (
@@ -1073,10 +1076,10 @@ export function DesignMaker() {
  read — §4. One per source, saying what puts something here. */
               <p className="px-1 text-2xs text-muted-foreground">
                 {source === "yours"
-                  ? "Upload an image and it stays here to reuse."
+                  ? tl("designMaker", "Upload an image and it stays here to reuse.")
                   : source === "orders"
-                    ? "Artwork buyers send with an order lands here on its own."
-                    : "Save a design as a template to reopen it on any blank."}
+                    ? tl("designMaker", "Artwork buyers send with an order lands here on its own.")
+                    : tl("designMaker", "Save a design as a template to reopen it on any blank.")}
               </p>
             ) : (
               <>
@@ -1107,14 +1110,12 @@ export function DesignMaker() {
 
           {tool === "text" && (
             <div className="space-y-2">
-              <div className="text-sm font-semibold">Text</div>
+              <div className="text-sm font-semibold">{tl("designMaker", "Text")}</div>
               <Button variant="outline" size="sm" className="w-full justify-start" onClick={addText}>
-                <TextT size={14} weight="bold" /> Add text
+                <TextT size={14} weight="bold" /> {tl("designMaker", "Add text")}
               </Button>
               <p className="text-2xs text-muted-foreground">
-                Added text lands in the middle of the print area. Select it on the canvas to
- change the words, size and colour — the controls are on the right, with the
- rest of the layer.
+                {tl("designMaker", "Added text lands in the middle of the print area. Select it on the canvas to change the words, size and colour — the controls are on the right, with the rest of the layer.")}
               </p>
             </div>
           )}
@@ -1181,7 +1182,7 @@ export function DesignMaker() {
               />
               {dragOver && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-primary/10 text-sm font-medium text-primary">
-                  Drop artwork to place it
+                  {tl("designMaker", "Drop artwork to place it")}
                 </div>
               )}
             </div>
@@ -1193,7 +1194,7 @@ export function DesignMaker() {
               <button
  type="button"
  onClick={() => setZoom(1)}
- title="Back to 100%"
+ title={tl("designMaker", "Back to 100%")}
  className="absolute right-6 top-6 z-10 rounded-full border border-border bg-card/90 px-2.5 py-1 text-xs font-medium tabular-nums backdrop-blur hover:text-primary"
               >
                 {Math.round(zoom * 100)}% · reset
@@ -1234,16 +1235,16 @@ export function DesignMaker() {
             * thing Printify puts in front of you and we did not.
             */}
           <div className="space-y-2">
-            <div className="text-sm font-semibold">Print area</div>
+            <div className="text-sm font-semibold">{tl("designMaker", "Print area")}</div>
             <div className="flex items-baseline gap-1.5 text-sm tabular-nums">
               <span className="font-medium">{areaIn.w}&quot; × {areaIn.h}&quot;</span>
               <span className="text-2xs text-muted-foreground">
-                {product ? "set on this product" : "standard size"}
+                {product ? tl("designMaker", "set on this product") : tl("designMaker", "standard size")}
               </span>
             </div>
             <div className="flex items-baseline justify-between text-2xs text-muted-foreground">
               <span className="tabular-nums">{Math.round(areaIn.w * 300)} × {Math.round(areaIn.h * 300)} px</span>
-              <span>at 300 DPI</span>
+              <span>{tl("designMaker", "at 300 DPI")}</span>
             </div>
             {/* Only once there is something to judge. A meter that is wrong while idle is
  one nobody reads when it matters. */}
@@ -1253,8 +1254,8 @@ export function DesignMaker() {
                 <span>
                   {quality.label}
                   {worstDpi != null && <span className="tabular-nums"> · {Math.round(worstDpi)} DPI</span>}
-                  {quality.tone === "bad" && <> — scale it down, or send a larger file.</>}
-                  {quality.tone === "warn" && <> — fine for DTG and DTF; embroidery wants 300.</>}
+                  {quality.tone === "bad" && <> {tl("designMaker", "— scale it down, or send a larger file.")}</>}
+                  {quality.tone === "warn" && <> {tl("designMaker", "— fine for DTG and DTF; embroidery wants 300.")}</>}
                 </span>
               </div>
             )}
@@ -1262,21 +1263,21 @@ export function DesignMaker() {
 
           {selText ? (
             <div className="space-y-3 border-t border-border pt-3">
-              <div className="text-sm font-semibold">Text</div>
-              <Input value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} placeholder="Your text" />
+              <div className="text-sm font-semibold">{tl("designMaker", "Text")}</div>
+              <Input value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} placeholder={tl("designMaker", "Your text")} />
               <label className="flex items-center justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">Size</span>
+                <span className="text-muted-foreground">{tl("designMaker", "Size")}</span>
                 <input type="range" min={3} max={24} value={selText.size} onChange={(e) => updateText(selText.id, { size: Number(e.target.value) })} className="flex-1" />
               </label>
               <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">Color
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">{tl("designMaker", "Color")}
                   <input type="color" value={selText.color} onChange={(e) => updateText(selText.id, { color: e.target.value })} className="size-7 rounded border border-border" />
                 </label>
                 <label className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <input type="checkbox" checked={!!selText.bold} onChange={(e) => updateText(selText.id, { bold: e.target.checked })} /> Bold
+                  <input type="checkbox" checked={!!selText.bold} onChange={(e) => updateText(selText.id, { bold: e.target.checked })} /> {tl("designMaker", "Bold")}
                 </label>
               </div>
-              <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-alert hover:text-alert">Delete text</Button>
+              <Button variant="outline" size="sm" onClick={() => removeText(selText.id)} className="text-alert hover:text-alert">{tl("designMaker", "Delete text")}</Button>
             </div>
           ) : images.length > 0 || texts.length > 0 ? (
             <div className="space-y-3 border-t border-border pt-3">
@@ -1291,7 +1292,7 @@ export function DesignMaker() {
                 * runs bottom-up matches the array and nothing else anybody has ever used.
                 */}
               <div className="flex items-baseline justify-between gap-2">
-                <div className="text-sm font-semibold">Layers</div>
+                <div className="text-sm font-semibold">{tl("designMaker", "Layers")}</div>
                 <span className="text-2xs tabular-nums text-muted-foreground">{images.length + texts.length} / {MAX_LAYERS}</span>
               </div>
               <div className="space-y-1">
@@ -1305,7 +1306,7 @@ export function DesignMaker() {
  className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={im.src} alt="" className="eg-checker size-7 shrink-0 rounded border border-border object-contain" />
-                      <span className="truncate">{im.name || "Image"}</span>
+                      <span className="truncate">{im.name || tl("designMaker", "Image")}</span>
                       <span
  className={"ml-auto size-1.5 shrink-0 rounded-full bg-current " + QUALITY_TONE[v.tone]}
  title={d == null ? "Measuring this layer" : `${Math.round(d)} DPI as placed — ${v.label.replace("Print quality: ", "")}`}
@@ -1316,7 +1317,7 @@ export function DesignMaker() {
                 {texts.map((t) => (
                   <button key={t.id} onClick={() => setSelected(t.id)}
  className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === t.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
-                    <TextT size={14} className="shrink-0" /> <span className="truncate">{t.text || "Text"}</span>
+                    <TextT size={14} className="shrink-0" /> <span className="truncate">{t.text || tl("designMaker", "Text")}</span>
                   </button>
                 ))}
               </div>
@@ -1327,7 +1328,7 @@ export function DesignMaker() {
               {bg.msg && <p className="text-2xs text-muted-foreground">{bg.msg}</p>}
             </div>
           ) : (
-            <div className="border-t border-border pt-3 text-sm text-muted-foreground">Pick a blank, then place artwork or add text from the tools on the left. Select a layer and its controls appear here.</div>
+            <div className="border-t border-border pt-3 text-sm text-muted-foreground">{tl("designMaker", "Pick a blank, then place artwork or add text from the tools on the left. Select a layer and its controls appear here.")}</div>
           )}
 
           {/* What publishing will and won't carry. Kept next to the work rather than on the

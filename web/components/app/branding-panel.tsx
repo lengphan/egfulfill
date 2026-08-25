@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Check, Warning, UploadSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -31,6 +32,7 @@ import { FACES, SKINS, rememberSkin, type FaceKey, type SkinKey } from "@/lib/sk
  * declaration the app runs on, so this panel cannot show one colour and apply another.
  */
 export function BrandingPanel() {
+  const tl = useLabelT()
   const [b, setB] = useState<Branding | null>(null)
   const [appName, setAppName] = useState("")
   const [busy, setBusy] = useState<null | "save" | "favicon" | "logo">(null)
@@ -164,14 +166,14 @@ export function BrandingPanel() {
   const faviconSrc = b?.faviconUrl ? `${b.faviconUrl}${b.faviconUrl.includes("?") ? "&" : "?"}v=${bust}` : ""
 
   return (
-    <SectionCard title="Branding" bodyClassName="p-5">
+    <SectionCard title={tl("branding", "Branding")} bodyClassName="p-5">
       <div className="space-y-6">
         <div className="grid gap-5 sm:grid-cols-2">
           {/* FAVICON */}
           <div>
-            <p className="text-sm font-medium">Favicon</p>
+            <p className="text-sm font-medium">{tl("branding", "Favicon")}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              The browser tab, the phone home screen and the installed app. Upload one <strong>512&times;512 PNG</strong>, square, mark centred — everything else is scaled from it.
+              {tl("branding", "The browser tab, the phone home screen and the installed app. Upload one")} <strong>{tl("branding", "512&times;512 PNG")}</strong>{tl("branding", ", square, mark centred — everything else is scaled from it.")}
             </p>
             <div className="mt-3 flex items-center gap-3">
               <span className="flex size-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40">
@@ -184,23 +186,22 @@ export function BrandingPanel() {
                      className="hidden" onChange={(e) => upload("favicon", e.target.files?.[0])} />
               <Button size="sm" variant="outline" disabled={busy === "favicon"} onClick={() => faviconRef.current?.click()}>
                 {busy === "favicon" ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} />}
-                {busy === "favicon" ? "Uploading…" : "Replace"}
+                {busy === "favicon" ? tl("branding", "Uploading…") : tl("branding", "Replace")}
               </Button>
             </div>
             {/* SAID WHERE IT HAPPENED. One "Saved" chip at the bottom of a panel with three
                 controls cannot tell you WHICH of them saved, and it is 40cm from the mark
                 you just replaced. */}
             <p className="mt-1.5 text-2xs text-muted-foreground">
-              Saves the moment you upload — no Save needed. The tab may take a minute to
-              catch up, and a hard reload is instant.
+              {tl("branding", "Saves the moment you upload — no Save needed. The tab may take a minute to catch up, and a hard reload is instant.")}
             </p>
           </div>
 
           {/* LOGO */}
           <div>
-            <p className="text-sm font-medium">Logo</p>
+            <p className="text-sm font-medium">{tl("branding", "Logo")}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Used on emails and printed sheets. A wide PNG or SVG with transparent ground.
+              {tl("branding", "Used on emails and printed sheets. A wide PNG or SVG with transparent ground.")}
             </p>
             <div className="mt-3 flex items-center gap-3">
               <span className="flex h-14 w-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40 px-2">
@@ -213,20 +214,20 @@ export function BrandingPanel() {
                      className="hidden" onChange={(e) => upload("logo", e.target.files?.[0])} />
               <Button size="sm" variant="outline" disabled={busy === "logo"} onClick={() => logoRef.current?.click()}>
                 {busy === "logo" ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} />}
-                {busy === "logo" ? "Uploading…" : "Replace"}
+                {busy === "logo" ? tl("branding", "Uploading…") : tl("branding", "Replace")}
               </Button>
             </div>
           </div>
         </div>
 
         <label className="flex max-w-sm flex-col gap-1.5">
-          <span className="text-sm font-medium">App name</span>
+          <span className="text-sm font-medium">{tl("branding", "App name")}</span>
           <Input value={appName} onChange={(e) => { setAppName(e.target.value); setSaved(false) }} placeholder="EGFUL" maxLength={60} />
-          <span className="text-xs text-muted-foreground">Shown on the phone home screen, which fits about 12 characters.</span>
+          <span className="text-xs text-muted-foreground">{tl("branding", "Shown on the phone home screen, which fits about 12 characters.")}</span>
         </label>
 
         <div>
-          <p className="text-sm font-medium">Palette</p>
+          <p className="text-sm font-medium">{tl("branding", "Palette")}</p>
           {/**
             * THE SITE'S COLOURS, CHANGEABLE WITHOUT A DEPLOY — which is the whole reason this
             * exists. Every previous palette change was a code edit and a release, and on a
@@ -270,7 +271,7 @@ export function BrandingPanel() {
         </div>
 
         <div>
-          <p className="text-sm font-medium">Marketing typeface</p>
+          <p className="text-sm font-medium">{tl("branding", "Marketing typeface")}</p>
           {/**
             * THE DISPLAY FACE, on exactly the terms the palette runs on: a stored KEY, an
             * allow-list on the server, and the faces themselves loaded by next/font so each
@@ -298,7 +299,7 @@ export function BrandingPanel() {
                 <span data-face={f.key} className="grid size-8 shrink-0 place-items-center rounded-md border border-border">
                   {/* Aa, because the thing a person is choosing is the letterforms — a swatch
                       of colour tells you nothing about a typeface. */}
-                  <span className="font-display text-base font-semibold leading-none">Aa</span>
+                  <span className="font-display text-base font-semibold leading-none">{tl("branding", "Aa")}</span>
                 </span>
                 <span>
                   <span className="block text-sm font-medium">{f.label}</span>
@@ -311,7 +312,7 @@ export function BrandingPanel() {
         </div>
 
         <div>
-          <p className="text-sm font-medium">Accent</p>
+          <p className="text-sm font-medium">{tl("branding", "Accent")}</p>
           {/* The one colour in the app, and it carries one meaning: something is new and it
               is for you. Unread badge, unread dot, unread row — nothing else, because an
               accent spent on two things is just a second UI colour. */}
@@ -353,15 +354,15 @@ export function BrandingPanel() {
             disabled={busy === "save" || appName === (b?.appName ?? "")}
             title={appName === (b?.appName ?? "") ? "The app name hasn't changed. Marks save the moment you upload them." : undefined}
           >
-            {busy === "save" ? "Saving…" : "Save app name"}
+            {busy === "save" ? tl("branding", "Saving…") : tl("branding", "Save app name")}
           </Button>
-          {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+          {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> {tl("branding", "Saved")}</span>}
         </div>
 
         <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
           <Warning size={14} className="mt-0.5 shrink-0" />
           <span>
-            The palette and the accent are chosen from presets that have been measured, never typed as a colour. What a preset cannot reach is set in code: <strong>--primary</strong> inks around 247 pieces of text as well as filling buttons, and the status colours (shipped, hold, alert) carry meaning on the floor — so a free picker could make a quarter of the app unreadable without anyone noticing. Ask for another preset and it can be added properly, with the contrast measured.
+            {tl("branding", "The palette and the accent are chosen from presets that have been measured, never typed as a colour. What a preset cannot reach is set in code:")} <strong>--primary</strong> {tl("branding", "inks around 247 pieces of text as well as filling buttons, and the status colours (shipped, hold, alert) carry meaning on the floor — so a free picker could make a quarter of the app unreadable without anyone noticing. Ask for another preset and it can be added properly, with the contrast measured.")}
           </span>
         </div>
       </div>

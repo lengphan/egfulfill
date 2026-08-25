@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState } from "react"
 import { UploadSimple, X, CircleNotch, CheckSquare, Square, Plus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -30,6 +31,7 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
   listing: EtsyListing | null
   onPublished?: (listing: EtsyListing, url?: string) => void
 }) {
+  const tl = useLabelT()
   const [title, setTitle] = useState("")
   const [desc, setDesc] = useState("")
   const [price, setPrice] = useState("")
@@ -114,14 +116,14 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b border-border px-6 py-4">
-          <DialogTitle>Make product</DialogTitle>
+          <DialogTitle>{tl("makeProduct", "Make product")}</DialogTitle>
         </DialogHeader>
 
         {result?.ok ? (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <div className="font-semibold text-success">{result.text}</div>
-            {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">Open the draft on Etsy →</a>}
-            <Button onClick={() => onOpenChange(false)}>Done</Button>
+            {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">{tl("makeProduct", "Open the draft on Etsy →")}</a>}
+            <Button onClick={() => onOpenChange(false)}>{tl("makeProduct", "Done")}</Button>
           </div>
         ) : (
           <>
@@ -133,7 +135,7 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Images ({imgs.length})</span>
                     <label className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-primary hover:underline">
-                      <UploadSimple size={13} weight="bold" /> Add
+                      <UploadSimple size={13} weight="bold" /> {tl("makeProduct", "Add")}
                       <input type="file" accept="image/*" className="hidden" onChange={(e) => readImageFile(e.target.files?.[0], (u) => setImgs((p) => [...p, u]), () => {})} />
                     </label>
                   </div>
@@ -148,8 +150,8 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                   </div>
                 </div>
 
-                <label className="flex flex-col gap-1"><span className="text-sm font-medium">Title</span><Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-                <label className="flex flex-col gap-1"><span className="text-sm font-medium">Description</span>
+                <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("makeProduct", "Title")}</span><Input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+                <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("makeProduct", "Description")}</span>
                   <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={5} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
                 </label>
 
@@ -185,15 +187,15 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
 
               {/* RIGHT: pricing + variants */}
               <div className="space-y-4">
-                <label className="flex flex-col gap-1"><span className="text-sm font-medium">Base price ($)</span>
+                <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("makeProduct", "Base price ($)")}</span>
                   <Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="w-40" />
                 </label>
 
                 {/* Colors — chips, no comma typing */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Colors</span>
-                    {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
+                    <span className="text-sm font-medium">{tl("makeProduct", "Colors")}</span>
+                    {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">{tl("makeProduct", "Clear")}</button>}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {colors.map((c) => (
@@ -204,7 +206,7 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                     ))}
                   </div>
                   <div className="flex gap-1.5">
-                    <Input value={colorInput} onChange={(e) => setColorInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor() } }} placeholder="Add a color…" className="h-8 text-xs" />
+                    <Input value={colorInput} onChange={(e) => setColorInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor() } }} placeholder={tl("makeProduct", "Add a color…")} className="h-8 text-xs" />
                     <Button size="sm" variant="outline" className="h-8 shrink-0 px-2" onClick={addColor}><Plus size={13} weight="bold" /></Button>
                   </div>
                 </div>
@@ -212,10 +214,10 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                 {/* Sizes + per-size variant pricing */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Sizes &amp; variant pricing</span>
+                    <span className="text-sm font-medium">{tl("makeProduct", "Sizes & variant pricing")}</span>
                     <div className="flex items-center gap-3 text-xs font-medium text-primary">
-                      <button onClick={applyBaseToAll} className="hover:underline">Reset to base</button>
-                      <button onClick={() => setSizes(sizes.length === COMMON_SIZES.length ? [] : [...COMMON_SIZES])} className="hover:underline">{sizes.length === COMMON_SIZES.length ? "Clear" : "All"}</button>
+                      <button onClick={applyBaseToAll} className="hover:underline">{tl("makeProduct", "Reset to base")}</button>
+                      <button onClick={() => setSizes(sizes.length === COMMON_SIZES.length ? [] : [...COMMON_SIZES])} className="hover:underline">{sizes.length === COMMON_SIZES.length ? tl("makeProduct", "Clear") : tl("makeProduct", "All")}</button>
                     </div>
                   </div>
                   <div className="overflow-hidden rounded-lg border border-border">
@@ -241,7 +243,7 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                       )
                     })}
                   </div>
-                  <p className="text-2xs text-muted-foreground">Each size is its own Etsy variant — set a different price per size, or reset them all to the base price.</p>
+                  <p className="text-2xs text-muted-foreground">{tl("makeProduct", "Each size is its own Etsy variant — set a different price per size, or reset them all to the base price.")}</p>
                 </div>
               </div>
             </div>
@@ -250,8 +252,8 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
             <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
               {busy && progress && <span className="mr-auto text-xs text-muted-foreground">{progress}</span>}
               {result && !result.ok && <span className="mr-auto text-sm text-destructive">{result.text}</span>}
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={publish} disabled={busy}>{busy ? <CircleNotch size={15} className="animate-spin" /> : "Publish draft"}</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("makeProduct", "Cancel")}</Button>
+              <Button onClick={publish} disabled={busy}>{busy ? <CircleNotch size={15} className="animate-spin" /> : tl("makeProduct", "Publish draft")}</Button>
             </div>
           </>
         )}

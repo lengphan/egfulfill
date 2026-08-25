@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
@@ -109,6 +110,7 @@ function VariantChips({
  onChange: (next: string[]) => void
  render?: (v: string) => string
 }) {
+  const tl = useLabelT()
  const allOn = picked.length === options.length && options.length > 0
  return (
     <div className="space-y-1">
@@ -121,7 +123,7 @@ function VariantChips({
  onClick={() => onChange(allOn ? [] : options)}
  className="text-2xs font-medium text-primary transition-colors hover:underline"
         >
-          {allOn ? "None" : "All"}
+          {allOn ? tl("publish", "None") : tl("publish", "All")}
         </button>
       </div>
       <div className="flex flex-wrap gap-1">
@@ -261,6 +263,7 @@ function TiktokFields({ dest, fields, onChange }: {
  fields: TtFields
  onChange: (patch: Partial<TtFields>) => void
 }) {
+  const tl = useLabelT()
   // Leaf categories that match what the seller typed. Capped so a 5,000-node tree can't
   // render at once; the search box is how you reach the rest.
  const matches = useMemo(() => {
@@ -281,7 +284,7 @@ function TiktokFields({ dest, fields, onChange }: {
  shows it, so "Category · Family Clothing Sets" above a box reading "Family
             Clothing Sets" was the same words twice, with a floating search pill wedged
  between them — three controls' worth of chrome for one choice. */}
-        <div className="text-xs font-medium">Category</div>
+        <div className="text-xs font-medium">{tl("publish", "Category")}</div>
         {/* ONE CONTROL, TWO ROWS. The filter sits directly on top of the list it filters,
  sharing an outline — a detached pill above a detached box reads as two unrelated
  fields, which is exactly how it looked. */}
@@ -310,11 +313,11 @@ function TiktokFields({ dest, fields, onChange }: {
  rememberCategory(dest.connection_id, c)
           }}
  disabled={!fields.categories.length}
- aria-label="TikTok leaf category"
+ aria-label={tl("publish", "TikTok leaf category")}
  className="eg-select block h-8 w-full border-0 bg-transparent px-2 text-xs outline-none"
         >
           <option value="">
-            {fields.categories.length ? "Choose a category…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
+            {fields.categories.length ? tl("publish", "Choose a category…") : fields.loadErr ? tl("publish", "Couldn't load categories") : tl("publish", "Loading categories…")}
           </option>
           {/* The current pick is listed even when the filter excludes it, or typing would
  silently clear a category that is still selected. */}
@@ -325,7 +328,7 @@ function TiktokFields({ dest, fields, onChange }: {
         </select>
         </div>
         {fields.query.trim() && matches.length === 0 && (
-          <p className="text-xs text-muted-foreground">No leaf category matches that.</p>
+          <p className="text-xs text-muted-foreground">{tl("publish", "No leaf category matches that.")}</p>
         )}
         {fields.query.trim() && matches.length > 0 && (
           <p className="text-2xs text-muted-foreground">Showing {matches.length} match{matches.length === 1 ? "" : "es"}.</p>
@@ -334,16 +337,16 @@ function TiktokFields({ dest, fields, onChange }: {
 
       {/* Warehouse — per-SKU inventory is booked against it, and it belongs to THIS shop. */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Warehouse</span>
+        <span className="text-xs font-medium">{tl("publish", "Warehouse")}</span>
         <select value={fields.warehouse} onChange={(e) => onChange({ warehouse: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-          {!fields.warehouses.length && <option value="">No warehouse found</option>}
+          {!fields.warehouses.length && <option value="">{tl("publish", "No warehouse found")}</option>}
           {fields.warehouses.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
         </select>
       </label>
 
       {/* Package weight — required for physical products. */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Package weight</span>
+        <span className="text-xs font-medium">{tl("publish", "Package weight")}</span>
         <div className="flex gap-1.5">
           <Input value={fields.weight} onChange={(e) => onChange({ weight: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="0.5" inputMode="decimal" className="h-8 flex-1 text-xs" />
           <select value={fields.unit} onChange={(e) => onChange({ unit: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs">
@@ -360,14 +363,14 @@ function TiktokFields({ dest, fields, onChange }: {
  failed. Prefilled for a poly mailer and editable, because a required number that
  starts blank is just a later failure. */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Package size</span>
+        <span className="text-xs font-medium">{tl("publish", "Package size")}</span>
         <div className="flex items-center gap-1.5">
-          <Input value={fields.length} onChange={(e) => onChange({ length: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="L" inputMode="decimal" aria-label="Package length" className="h-8 min-w-0 flex-1 text-xs" />
+          <Input value={fields.length} onChange={(e) => onChange({ length: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="L" inputMode="decimal" aria-label={tl("publish", "Package length")} className="h-8 min-w-0 flex-1 text-xs" />
           <span className="text-2xs text-muted-foreground">×</span>
-          <Input value={fields.width} onChange={(e) => onChange({ width: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="W" inputMode="decimal" aria-label="Package width" className="h-8 min-w-0 flex-1 text-xs" />
+          <Input value={fields.width} onChange={(e) => onChange({ width: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="W" inputMode="decimal" aria-label={tl("publish", "Package width")} className="h-8 min-w-0 flex-1 text-xs" />
           <span className="text-2xs text-muted-foreground">×</span>
-          <Input value={fields.height} onChange={(e) => onChange({ height: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="H" inputMode="decimal" aria-label="Package height" className="h-8 min-w-0 flex-1 text-xs" />
-          <select value={fields.dimUnit} onChange={(e) => onChange({ dimUnit: e.target.value })} aria-label="Dimension unit" className="eg-select h-8 shrink-0 rounded-md border border-border bg-card px-2 text-xs">
+          <Input value={fields.height} onChange={(e) => onChange({ height: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="H" inputMode="decimal" aria-label={tl("publish", "Package height")} className="h-8 min-w-0 flex-1 text-xs" />
+          <select value={fields.dimUnit} onChange={(e) => onChange({ dimUnit: e.target.value })} aria-label={tl("publish", "Dimension unit")} className="eg-select h-8 shrink-0 rounded-md border border-border bg-card px-2 text-xs">
             <option value="INCH">in</option>
             <option value="CENTIMETER">cm</option>
           </select>
@@ -400,6 +403,7 @@ const OUTCOME_MARK = {
 }
 
 function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; outcome?: Outcome; sameForAll?: boolean }) {
+  const tl = useLabelT()
  if (!outcome) return null
  const mark = outcome.state === "ok" ? OUTCOME_MARK.ok
  : outcome.state === "dry" ? OUTCOME_MARK.dry
@@ -459,7 +463,7 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
  or the rows either side of it shift. */}
       <span className="justify-self-end">
         {outcome.url
-          ? <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">View →</a>
+          ? <a href={outcome.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">{tl("publish", "View →")}</a>
  : <span className="text-muted-foreground/50">—</span>}
       </span>
 
@@ -490,6 +494,7 @@ export type { PublishPrefill }
  * dialogs couldn't show any of them — and nothing to actually produce against.
  */
 export function PublishProductPage({ draftId }: { draftId: string | null }) {
+  const tl = useLabelT()
  const router = useRouter()
   /**
    * The draft, read once from sessionStorage — in an EFFECT, so the three states stay
@@ -1436,15 +1441,13 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  tab, so this is what a shared or bookmarked /publish URL lands on. */}
       {draft === null && (
         <div className="mx-auto max-w-lg space-y-3 rounded-2xl border border-border bg-card p-6 text-center">
-          <p className="font-medium">There&apos;s nothing to publish here.</p>
+          <p className="font-medium">{tl("publish", "There’s nothing to publish here.")}</p>
           <p className="text-sm text-muted-foreground">
-            A publish page is opened from a product — and the draft it carried is gone, which
- happens when the tab was closed or this link came from somewhere else. Start again
- from the board you were on.
+            {tl("publish", "A publish page is opened from a product — and the draft it carried is gone, which happens when the tab was closed or this link came from somewhere else. Start again from the board you were on.")}
           </p>
           <div className="flex justify-center gap-2">
-            <Button variant="outline" onClick={() => router.push("/spydeck")}>SpyDeck</Button>
-            <Button variant="outline" onClick={() => router.push("/design/maker")}>Design</Button>
+            <Button variant="outline" onClick={() => router.push("/spydeck")}>{tl("publish", "SpyDeck")}</Button>
+            <Button variant="outline" onClick={() => router.push("/design/maker")}>{tl("publish", "Design")}</Button>
           </div>
         </div>
       )}
@@ -1459,7 +1462,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
             <div className="text-sm font-semibold text-success">
               {pickedDests.every((d) => outcomes[d.connection_id]?.state === "ok")
                 ? PUBLISH_OK
- : "Finished — with one shop that sent nothing"}
+ : tl("publish", "Finished — with one shop that sent nothing")}
             </div>
             {/* Said ONCE when every shop said the same thing, which is the usual run. Three
  rows each reading "Draft listing created" is one fact printed three times, and
@@ -1507,7 +1510,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  repeating "Photos" inside a card called Photos is the kind of doubling a
  dialog's title bar used to hide. */}
               <SectionCard
- title={<>Photos <span className="font-normal text-muted-foreground">({images.length}/{MAX_IMAGES})</span></>}
+ title={<>{tl("publish", "Photos")} <span className="font-normal text-muted-foreground">({images.length}/{MAX_IMAGES})</span></>}
  description={referencePhotos.length > 0
                   ? `${referencePhotos.length} reference ${referencePhotos.length === 1 ? "photo" : "photos"} shown, none published${prefill?.referenceNote ? ` — ${prefill.referenceNote}` : ""}`
  : undefined}
@@ -1525,7 +1528,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  disabled={refPicked.length === 0}
  title={refPicked.length === 0 ? "Pick at least one reference photo below" : "Generate our own photos from the picked references"}
                   >
-                    Generate Images
+                    {tl("publish", "Generate Images")}
                   </Button>
                 ) : undefined}
  bodyClassName="space-y-3 p-4"
@@ -1556,8 +1559,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   {images.length < MAX_IMAGES && (
                     <button
  onClick={() => fileRef.current?.click()}
- aria-label="Add a photo"
- title="Add a photo"
+ aria-label={tl("publish", "Add a photo")}
+ title={tl("publish", "Add a photo")}
  className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                     >
                       <Plus size={22} weight="bold" />
@@ -1567,7 +1570,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
-                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-2xs font-semibold uppercase text-primary-foreground">Primary</span>}
+                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-2xs font-semibold uppercase text-primary-foreground">{tl("publish", "Primary")}</span>}
                       <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
                         {/* ZOOM ON THE PUBLISHABLE PHOTOS TOO. Only the competitor's shots
  opened full size, which had it exactly backwards: the photos that
@@ -1575,8 +1578,8 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  inspect before sending them. */}
                         <button onClick={() => setZoom({ which: "own", index: i })} aria-label={`View photo ${i + 1} larger`}
  className="cursor-zoom-in rounded bg-white/90 p-1 text-black"><MagnifyingGlassPlus size={11} weight="bold" /></button>
-                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">Primary</button>}
-                        <button onClick={() => removeImage(i)} aria-label="Remove photo" className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
+                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">{tl("publish", "Primary")}</button>}
+                        <button onClick={() => removeImage(i)} aria-label={tl("publish", "Remove photo")} className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
                       </div>
                     </div>
                   ))}
@@ -1699,12 +1702,12 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  did the grouping, and without them the form read as one long drift of inputs
  with no structure and no column boundary. */}
             <div className="space-y-4">
-              <SectionCard title="Listing" bodyClassName="space-y-4 p-4">
-              <label className="flex flex-col gap-1"><span className="text-sm font-medium">Title</span>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Retro Sunset Comfort Colors Tee" />
+              <SectionCard title={tl("publish", "Listing")} bodyClassName="space-y-4 p-4">
+              <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("publish", "Title")}</span>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tl("publish", "Retro Sunset Comfort Colors Tee")} />
               </label>
-              <label className="flex flex-col gap-1"><span className="text-sm font-medium">Description</span>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder="Describe the product…" className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
+              <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("publish", "Description")}</span>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={tl("publish", "Describe the product…")} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
               </label>
 
               {/* THE ASSIST, ON A BUTTON. Nothing here runs until it is pressed — no call on
@@ -1712,24 +1715,24 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  it again simply rewrites again, which is how it is actually used. */}
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" onClick={runRewrite} disabled={aiBusy || (!title.trim() && !desc.trim())}
- title="Rewrite the title and description in place">
+ title={tl("publish", "Rewrite the title and description in place")}>
                   {aiBusy ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} weight="fill" />}
-                  {aiBusy ? "Rewriting…" : aiPrev ? "Rewrite again" : "Rewrite with AI"}
+                  {aiBusy ? tl("publish", "Rewriting…") : aiPrev ? tl("publish", "Rewrite again") : tl("publish", "Rewrite with AI")}
                 </Button>
                 {aiPrev && !aiBusy && (
                   <Button size="sm" variant="ghost" onClick={() => { setTitle(aiPrev.title); setDesc(aiPrev.description); setAiPrev(null) }}
- title="Put back the title and description as they were before the last rewrite">
-                    Undo
+ title={tl("publish", "Put back the title and description as they were before the last rewrite")}>
+                    {tl("publish", "Undo")}
                   </Button>
                 )}
                 <span className="text-2xs text-muted-foreground">
-                  {aiPrev ? "Applied — press again for another take, or undo." : "Rewrites the title and description in place."}
+                  {aiPrev ? tl("publish", "Applied — press again for another take, or undo.") : tl("publish", "Rewrites the title and description in place.")}
                 </span>
               </div>
               {aiErr && <p className="text-xs text-destructive">{aiErr}</p>}
 
               <div className="space-y-1.5">
-                <div className="text-sm font-medium">Tags <span className="text-muted-foreground">({tags.length}/{MAX_TAGS})</span></div>
+                <div className="text-sm font-medium">{tl("publish", "Tags")} <span className="text-muted-foreground">({tags.length}/{MAX_TAGS})</span></div>
                 <Input
  value={tagDraft}
  onChange={(e) => setTagDraft(e.target.value)}
@@ -1759,9 +1762,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  asked the reader to scan sideways for the sequence, and squeezed the
  per-size price table into a third of the page when it is the widest thing
  on it. */}
-              <SectionCard title="Product & pricing" bodyClassName="space-y-4 p-4">
+              <SectionCard title={tl("publish", "Product & pricing")} bodyClassName="space-y-4 p-4">
               <div className="space-y-1.5">
-                <div className="text-sm font-medium">Base product</div>
+                <div className="text-sm font-medium">{tl("publish", "Base product")}</div>
                 <ProductCombobox
  value={blankText}
  onText={setBlankText}
@@ -1776,25 +1779,25 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  if (catalogRef.current.length) pick(catalogRef.current)
  else getCatalogProducts().then((rows) => { catalogRef.current = rows ?? []; pick(catalogRef.current) }).catch(() => {})
                   }}
- placeholder="Pick the blank to print on"
+ placeholder={tl("publish", "Pick the blank to print on")}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Sets what we produce, and the cost behind your margin.
+                  {tl("publish", "Sets what we produce, and the cost behind your margin.")}
                 </p>
               </div>
 
 
               {blank && (pickedColors.length === 0 || (sizeOpts.length > 0 && pickedSizes.length === 0)) && (
                 <p className="text-xs text-hold">
-                  With none selected this publishes as a flat listing with no variants.
+                  {tl("publish", "With none selected this publishes as a flat listing with no variants.")}
                 </p>
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1"><span className="text-sm font-medium">Retail price ($)</span>
+                <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("publish", "Retail price ($)")}</span>
                   <Input value={retail} onChange={(e) => setRetail(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="24.00" inputMode="decimal" />
                 </label>
-                <label className="flex flex-col gap-1"><span className="text-sm font-medium">Quantity</span>
+                <label className="flex flex-col gap-1"><span className="text-sm font-medium">{tl("publish", "Quantity")}</span>
                   <Input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" />
                 </label>
               </div>
@@ -1809,9 +1812,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   // product, and the order it eventually produces can't be priced. Worth
                   // more than a neutral hint — this is the SpyDeck default path.
                   <p className="text-xs text-hold">
-                    Pick a base product. Without one this publishes with no cost, no margin
- and no variant SKUs we recognise — the order it creates won&apos;t price
- or reach the factory.
+                    {tl("publish", "Pick a base product. Without one this publishes with no cost, no margin and no variant SKUs we recognise — the order it creates won’t price or reach the factory.")}
                   </p>
                 ) : sizeRows.length > 0 ? (
                   <div className="space-y-2">
@@ -1821,18 +1822,18 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           <tr className="text-muted-foreground">
                             {/* px-2 matters: with no horizontal padding these ran together
  as "SizeProductionShipping". */}
-                            <th className="px-2 pb-1 text-left">Size</th>
-                            <th className="px-2 pb-1 text-right">Production</th>
-                            <th className="px-2 pb-1 text-right">Shipping</th>
-                            <th className="px-2 pb-1 text-right">Your cost</th>
-                            <th className="px-2 pb-1 text-right">Retail</th>
-                            <th className="px-2 pb-1 text-right">Profit</th>
+                            <th className="px-2 pb-1 text-left">{tl("publish", "Size")}</th>
+                            <th className="px-2 pb-1 text-right">{tl("publish", "Production")}</th>
+                            <th className="px-2 pb-1 text-right">{tl("publish", "Shipping")}</th>
+                            <th className="px-2 pb-1 text-right">{tl("publish", "Your cost")}</th>
+                            <th className="px-2 pb-1 text-right">{tl("publish", "Retail")}</th>
+                            <th className="px-2 pb-1 text-right">{tl("publish", "Profit")}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {sizeRows.map((r) => (
                             <tr key={r.size} className="border-t border-border">
-                              <td className="px-2 py-1 text-left font-medium">{r.size || "One size"}</td>
+                              <td className="px-2 py-1 text-left font-medium">{r.size || tl("publish", "One size")}</td>
                               <td className="px-2 py-1 text-right">{r.unitCost == null ? "—" : usd(r.unitCost)}</td>
                               <td className="px-2 py-1 text-right">{r.shipping == null ? "—" : usd(r.shipping)}</td>
                               <td className="px-2 py-1 text-right font-medium">{r.total == null ? "—" : usd(r.total)}</td>
@@ -1857,34 +1858,34 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     {/* A dash in the table means "we don't know", which reads identically to
                         "it's free" unless we say which. */}
                     {sizeRows.some((r) => r.total == null) && (
-                      <p className="text-xs text-hold">Some sizes have no price set on the blank — add pricing in Products.</p>
+                      <p className="text-xs text-hold">{tl("publish", "Some sizes have no price set on the blank — add pricing in Products.")}</p>
                     )}
                     {retailN <= 0 && !Object.values(sizeRetail).some((v) => Number(v) > 0) && (
-                      <p className="text-xs text-muted-foreground">Enter a retail price to see profit per size.</p>
+                      <p className="text-xs text-muted-foreground">{tl("publish", "Enter a retail price to see profit per size.")}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Retail is per size — leave a row blank to use the price above. Profit updates as you type.
+                      {tl("publish", "Retail is per size — leave a row blank to use the price above. Profit updates as you type.")}
                     </p>
-                    {anyLoss && <p className="text-xs text-destructive">Sizes shown in red sell at a loss at this retail price.</p>}
+                    {anyLoss && <p className="text-xs text-destructive">{tl("publish", "Sizes shown in red sell at a loss at this retail price.")}</p>}
                   </div>
                 ) : quote?.unitCost == null ? (
                   <p className="text-xs text-hold">
-                    That blank has no price set, so we can&apos;t work out a margin. Add pricing to it in Products.
+                    {tl("publish", "That blank has no price set, so we can’t work out a margin. Add pricing to it in Products.")}
                   </p>
                 ) : (
                   <dl className="space-y-2">
-                    <div className="flex justify-between"><dt className="text-muted-foreground">Production</dt><dd className="tabular-nums">{usd(quote.unitCost)}</dd></div>
-                    <div className="flex justify-between"><dt className="text-muted-foreground">Shipping</dt><dd className="tabular-nums">{usd(quote.shipping ?? 0)}</dd></div>
-                    <div className="flex justify-between border-t border-border pt-2"><dt className="text-muted-foreground">Your cost</dt><dd className="font-medium tabular-nums">{usd(cost ?? 0)}</dd></div>
-                    <div className="flex justify-between"><dt className="text-muted-foreground">Retail</dt><dd className="tabular-nums">{retailN > 0 ? usd(retailN) : "—"}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">{tl("publish", "Production")}</dt><dd className="tabular-nums">{usd(quote.unitCost)}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">{tl("publish", "Shipping")}</dt><dd className="tabular-nums">{usd(quote.shipping ?? 0)}</dd></div>
+                    <div className="flex justify-between border-t border-border pt-2"><dt className="text-muted-foreground">{tl("publish", "Your cost")}</dt><dd className="font-medium tabular-nums">{usd(cost ?? 0)}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">{tl("publish", "Retail")}</dt><dd className="tabular-nums">{retailN > 0 ? usd(retailN) : "—"}</dd></div>
                     <div className={"flex justify-between border-t border-border pt-2 font-semibold " + (margin != null && margin < 0 ? "text-destructive" : "")}>
-                      <dt>Profit / unit</dt>
+                      <dt>{tl("publish", "Profit / unit")}</dt>
                       <dd className="tabular-nums">
                         {margin == null ? "—" : `${usd(margin)}${marginPct != null ? ` · ${marginPct.toFixed(0)}%` : ""}`}
                       </dd>
                     </div>
                     {margin != null && margin < 0 && (
-                      <p className="text-xs text-destructive">This sells at a loss — raise the retail price.</p>
+                      <p className="text-xs text-destructive">{tl("publish", "This sells at a loss — raise the retail price.")}</p>
                     )}
                   </dl>
                 )}
@@ -1897,7 +1898,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
             {/* top-20, not top-4: the app header is sticky and 64px tall, so a rail pinned
  at 16px slides UNDER it and loses its first line — measured, not guessed. */}
             <aside className="xl:sticky xl:top-20">
-              <SectionCard title="Publish to" bodyClassName="space-y-4 p-4">
+              <SectionCard title={tl("publish", "Publish to")} bodyClassName="space-y-4 p-4">
               {/* WHERE THIS GOES — the seller's connected shops.
                   One shop: a sentence, no checkbox. There is no choice to make, and a
  single tick-box you must tick before publishing is ceremony.
@@ -1907,22 +1908,21 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               <div className="space-y-1.5">
                 {dests === null ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CircleNotch size={12} className="animate-spin" /> Finding your shops…
+                    <CircleNotch size={12} className="animate-spin" /> {tl("publish", "Finding your shops…")}
                   </div>
                 ) : destErr ? (
                   <p className="text-xs text-destructive">{destErr}</p>
                 ) : dests.length === 0 ? (
                   // Not an empty picker — an empty picker looks like a broken feature.
                   <div className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-                    No shop is connected to your account yet, so there&apos;s nowhere to publish this.
-                    Connect one under <a href="/stores" className="font-medium text-primary hover:underline">Stores</a>.
+                    {tl("publish", "No shop is connected to your account yet, so there’s nowhere to publish this. Connect one under")} <a href="/stores" className="font-medium text-primary hover:underline">{tl("publish", "Stores")}</a>.
                   </div>
                 ) : dests.length === 1 ? (
                   <div className="flex flex-wrap items-center gap-x-2 text-sm">
                     <span className="font-medium">{dests[0].shop_name}</span>
                     <span className="text-xs text-muted-foreground">· {dests[0].platform_label}</span>
                     {dests[0].dry_run && (
-                      <span className="whitespace-nowrap text-2xs font-medium text-hold">dry run — nothing is sent</span>
+                      <span className="whitespace-nowrap text-2xs font-medium text-hold">{tl("publish", "dry run — nothing is sent")}</span>
                     )}
                   </div>
                 ) : (
@@ -1948,7 +1948,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           <span className="font-medium">{d.shop_name}</span>
                           <span className="text-xs text-muted-foreground">{d.platform_label}</span>
                           {d.dry_run && (
-                            <span className="whitespace-nowrap text-2xs font-medium text-hold">dry run</span>
+                            <span className="whitespace-nowrap text-2xs font-medium text-hold">{tl("publish", "dry run")}</span>
                           )}
                           {isDone(d.connection_id) && (
                             <span className="ml-auto text-2xs font-medium text-success">published</span>
@@ -1969,11 +1969,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  three admins this can reach. */}
               {dests !== null && dests.length > 0 && (
                 <div className="space-y-1">
-                  <span className="eg-label text-muted-foreground">When it&apos;s created</span>
+                  <span className="eg-label text-muted-foreground">{tl("publish", "When it’s created")}</span>
                   <div className="grid gap-1 sm:grid-cols-2">
                     {[
-                      { live: false, label: "Save as draft" },
-                      { live: true, label: "Publish live" },
+                      { live: false, label: tl("publish", "Save as draft") },
+                      { live: true, label: tl("publish", "Publish live") },
                     ].map((o) => (
                       <label
  key={o.label}
@@ -2011,7 +2011,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  after the listing exists. */}
                   {goLive && pickedDests.some((d) => d.platform === "etsy") && (
                     <p className="text-2xs text-muted-foreground">
-                      Etsy activates after the photos upload — if it refuses, the listing stays a draft and we&apos;ll say why.
+                      {tl("publish", "Etsy activates after the photos upload — if it refuses, the listing stays a draft and we’ll say why.")}
                     </p>
                   )}
                 </div>
@@ -2034,9 +2034,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  choosing one to represent the rest was the thing hiding the others. */}
               {blank && (
                 <label className="flex flex-col gap-1">
-                  <span className="eg-label text-muted-foreground">Method</span>
+                  <span className="eg-label text-muted-foreground">{tl("publish", "Method")}</span>
                   <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select eg-control pr-8">
-                    {methodOpts.length === 0 && <option value="">Any</option>}
+                    {methodOpts.length === 0 && <option value="">{tl("publish", "Any")}</option>}
                     {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </label>
@@ -2048,7 +2048,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  hiding colours behind a "+N" made them unreachable. */}
               {blank && colorOpts.length > 0 && (
                 <VariantChips
- label="Colours"
+ label={tl("publish", "Colours")}
  options={colorOpts}
  picked={pickedColors}
  onChange={setPickedColors}
@@ -2058,7 +2058,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
 
               {blank && sizeOpts.length > 0 && (
                 <VariantChips
- label="Sizes"
+ label={tl("publish", "Sizes")}
  options={sizeOpts}
  picked={pickedSizes}
  onChange={setPickedSizes}
@@ -2083,7 +2083,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
                   <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
                   <span>
-                    <strong>{tmHits.length === 1 ? "A brand name is" : `${tmHits.length} brand names are`}</strong>{" "}
+                    <strong>{tmHits.length === 1 ? tl("publish", "A brand name is") : `${tmHits.length} brand names are`}</strong>{" "}
  in this listing&apos;s text: {tmHits.slice(0, 8).join(", ")}
                     {tmHits.length > 8 && ` +${tmHits.length - 8} more`}. Marketplaces remove listings that
  use a brand they don&apos;t license, and repeats put the shop itself at risk. Edit the
@@ -2097,7 +2097,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  seller acknowledges it. Publishing someone else's images to your shop can
  get a listing pulled and, repeated, put the shop at risk. */}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={leave}>Cancel</Button>
+                <Button variant="outline" onClick={leave}>{tl("publish", "Cancel")}</Button>
                 {/* The label says what will actually happen. "Publish draft" over four ticked
  shops understates it, and after a partial failure the button's job has
  changed to retrying only what failed — which the label has to admit, or
@@ -2113,7 +2113,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  failure, Reupload once anything has gone out. */}
                 <Button onClick={publish} disabled={busy || !dests?.length}>
                   {busy && <CircleNotch size={15} className="animate-spin" />}
-                  {anyFailed ? "Retry" : anyPublished ? "Reupload" : "Publish"}
+                  {anyFailed ? tl("publish", "Retry") : anyPublished ? tl("publish", "Reupload") : tl("publish", "Publish")}
                 </Button>
               </div>
               {/* THE STANDING PARAGRAPH IS GONE.
@@ -2129,7 +2129,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  press and changes what the press means. */}
               {pickedDests.some((d) => d.dry_run) && (
                 <p className="text-xs text-muted-foreground">
-                  One shop is in dry-run mode: it will be validated and nothing will be sent.
+                  {tl("publish", "One shop is in dry-run mode: it will be validated and nothing will be sent.")}
                 </p>
               )}
               </SectionCard>
@@ -2151,7 +2151,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         <DialogContent className="w-auto max-w-[calc(100vw-2rem)] gap-3 p-3 sm:max-w-[min(92vw,900px)]">
           <DialogTitle className="pr-10 text-xs font-medium text-muted-foreground">
             {zoom?.which === "own"
-              ? `Photo ${(zoom.index ?? 0) + 1} of ${images.length}${zoom.index === 0 ? " — the cover photo" : ""}`
+              ? `Photo ${(zoom.index ?? 0) + 1} of ${images.length}${zoom.index === 0 ? tl("publish", " — the cover photo") : ""}`
  : `Reference photo ${(zoom?.index ?? 0) + 1} of ${referencePhotos.length} — the competitor’s own shot, not published with your listing`}
           </DialogTitle>
           <div className="relative flex max-h-[72dvh] justify-center overflow-hidden rounded-lg bg-muted/40">
@@ -2168,10 +2168,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
           {zoomList.length > 1 && (
             <div className="flex items-center justify-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setZoom((z) => (z ? { ...z, index: (z.index - 1 + zoomList.length) % zoomList.length } : z))}>
-                <CaretLeft size={13} weight="bold" /> Prev
+                <CaretLeft size={13} weight="bold" /> {tl("publish", "Prev")}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setZoom((z) => (z ? { ...z, index: (z.index + 1) % zoomList.length } : z))}>
-                Next <CaretRight size={13} weight="bold" />
+                {tl("publish", "Next")} <CaretRight size={13} weight="bold" />
               </Button>
             </div>
           )}
