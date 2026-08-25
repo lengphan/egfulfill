@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { markCameFromImport } from "@/lib/sheet-return"
 import { useRouter } from "next/navigation"
@@ -199,6 +200,7 @@ export function ImportOrdersDialog({
    */
   initialRows?: string[][]
 }) {
+  const tl = useLabelT()
   const router = useRouter()
   const [records, setRecords] = useState<ImportRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -591,7 +593,7 @@ export function ImportOrdersDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Import orders</DialogTitle>
+          <DialogTitle>{tl("import", "Import orders")}</DialogTitle>
         </DialogHeader>
 
         {done ? (
@@ -600,7 +602,7 @@ export function ImportOrdersDialog({
               <CheckCircle size={30} weight="fill" />
             </span>
             <div className="font-semibold">Imported {done.imported} {done.imported === 1 ? "order" : "orders"}</div>
-            <div className="text-sm text-muted-foreground">They’re in your orders queue now.</div>
+            <div className="text-sm text-muted-foreground">{tl("import", "They’re in your orders queue now.")}</div>
             {/* WHAT THE STITCH-FILE COLUMN DID, said here rather than left to be discovered.
                 An embroidered line that arrives without its file is the one failure on this
                 screen that looks exactly like success until the floor picks the job up. */}
@@ -618,17 +620,17 @@ export function ImportOrdersDialog({
                     reference, wrong print method, no such line). Collapsing them to a count
                     would throw away the only part anyone can act on. */}
                 {done.mfFailed.map((m, i) => <div key={i} className="text-xs text-muted-foreground">{m}</div>)}
-                <div className="text-xs text-muted-foreground">The orders imported. Attach these from the line’s designer.</div>
+                <div className="text-xs text-muted-foreground">{tl("import", "The orders imported. Attach these from the line’s designer.")}</div>
               </div>
             )}
-            <Button className="w-full" onClick={() => onOpenChange(false)}>Done</Button>
+            <Button className="w-full" onClick={() => onOpenChange(false)}>{tl("import", "Done")}</Button>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm text-muted-foreground">Upload a CSV/XLSX, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.</p>
+              <p className="text-sm text-muted-foreground">{tl("import", "Upload a CSV/XLSX, paste rows, or pull a Google Sheet. Common Shopify/Etsy column names are recognized automatically.")}</p>
               <Button variant="outline" size="sm" className="shrink-0" onClick={() => void downloadXlsxTemplate()}>
-                <DownloadSimple size={14} weight="bold" /> Template (.xlsx)
+                <DownloadSimple size={14} weight="bold" /> {tl("import", "Template (.xlsx)")}
               </Button>
             </div>
 
@@ -639,7 +641,7 @@ export function ImportOrdersDialog({
                 the first block, and the rest can be ignored. */}
             <details className="rounded-xl border border-border bg-muted/20" open>
               <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
-                Columns — <span className="text-muted-foreground">grouped the way you fill them</span>
+                {tl("import", "Columns —")} <span className="text-muted-foreground">{tl("import", "grouped the way you fill them")}</span>
               </summary>
               <div className="space-y-2.5 px-3 pb-3">
                 {/* Bands are SUBJECTS now, and obligation rides on each chip. Grouping by
@@ -683,10 +685,10 @@ export function ImportOrdersDialog({
                   </div>
                 ))}
                 <p className="text-2xs text-muted-foreground">
-                  <span className="font-medium text-primary">Blue *</span> = required on every row.
-                  <span className="ml-1 font-medium text-primary">Dashed</span> = fill it, or we assign one.
+                  <span className="font-medium text-primary">{tl("import", "Blue *")}</span> = required on every row.
+                  <span className="ml-1 font-medium text-primary">{tl("import", "Dashed")}</span> = fill it, or we assign one.
                   Everything else is optional and can be completed after import.{" "}
-                  <b>Order Number</b> is what groups lines — give every line of one order the same
+                  <b>{tl("import", "Order Number")}</b> is what groups lines — give every line of one order the same
                   number, or each line imports as a separate order. Hover any column for what it does.
                 </p>
               </div>
@@ -698,9 +700,9 @@ export function ImportOrdersDialog({
                   this app. The Google tab is gone from here — its server routes are
                   untouched, so nothing already in someone's Drive stops working. */}
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="grid">Sheet</TabsTrigger>
-                <TabsTrigger value="file">File</TabsTrigger>
-                <TabsTrigger value="paste">Paste</TabsTrigger>
+                <TabsTrigger value="grid">{tl("import", "Sheet")}</TabsTrigger>
+                <TabsTrigger value="file">{tl("import", "File")}</TabsTrigger>
+                <TabsTrigger value="paste">{tl("import", "Paste")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="grid" className="mt-3">
@@ -713,7 +715,7 @@ export function ImportOrdersDialog({
                       different promise from the one a seller who came from Orders expects —
                       and it strands the dialog open behind a tab they can no longer see. */}
                   <Button onClick={() => { markCameFromImport(); onOpenChange(false); router.push("/sheet") }}>
-                    Open Sheet
+                    {tl("import", "Open Sheet")}
                   </Button>
                 </div>
               </TabsContent>
@@ -725,8 +727,8 @@ export function ImportOrdersDialog({
                   className={"flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center transition-colors " + (dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
                 >
                   <UploadSimple size={24} className="text-muted-foreground" />
-                  <span className="text-sm font-medium">Drop a .csv, .xlsx or .xls — or <span className="text-primary">browse</span></span>
-                  <span className="text-xs text-muted-foreground">All three work here · uses the egful template format</span>
+                  <span className="text-sm font-medium">{tl("import", "Drop a .csv, .xlsx or .xls — or")} <span className="text-primary">browse</span></span>
+                  <span className="text-xs text-muted-foreground">{tl("import", "All three work here · uses the egful template format")}</span>
                   <input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
                 </label>
               </TabsContent>
@@ -739,7 +741,7 @@ export function ImportOrdersDialog({
                   placeholder={"Paste rows copied from a spreadsheet (tab or comma separated), including the header row."}
                   className="w-full rounded-md border border-input bg-transparent px-3 py-2 tabular-nums text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
-                <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>Preview rows</Button>
+                <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>{tl("import", "Preview rows")}</Button>
               </TabsContent>
 
             </Tabs>
@@ -779,7 +781,7 @@ export function ImportOrdersDialog({
                   <div className="flex items-start gap-2 border-b border-border bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                     <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
                     <span>
-                      {summary.ungrouped} {summary.ungrouped === 1 ? "row has" : "rows have"} no Order Number — each imports as
+                      {summary.ungrouped} {summary.ungrouped === 1 ? tl("import", "row has") : tl("import", "rows have")} no Order Number — each imports as
                       its OWN order under a platform number (FF-…). If any of them are lines of the
                       same order, give them a shared Order Number first.
                     </span>
@@ -799,12 +801,12 @@ export function ImportOrdersDialog({
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
                       {templatesFailed
-                        ? "Your saved templates couldn't be loaded, so the Template ID column won't apply anything — the blank and artwork will be empty on those lines."
+                        ? tl("import", "Your saved templates couldn't be loaded, so the Template ID column won't apply anything — the blank and artwork will be empty on those lines.")
                         : <>
                             {templateOutcome.applied} of {templateOutcome.typed} {templateOutcome.typed === 1 ? "line" : "lines"} will take
                             their blank and artwork from a saved template.
-                            {templateOutcome.unmatched.length > 0 && <> No template matches <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span> — check the number on the template card.</>}
-                            {templateOutcome.ambiguous.length > 0 && <> More than one template is called <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span>, so those lines were left alone — use the TPL- number instead.</>}
+                            {templateOutcome.unmatched.length > 0 && <> {tl("import", "No template matches")} <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span> {tl("import", "— check the number on the template card.")}</>}
+                            {templateOutcome.ambiguous.length > 0 && <> {tl("import", "More than one template is called")} <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span>{tl("import", ", so those lines were left alone — use the TPL- number instead.")}</>}
                           </>}
                     </span>
                   </div>
@@ -823,14 +825,14 @@ export function ImportOrdersDialog({
                       : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
                     <span>
                       {machineOutcome.failed
-                        ? "Your machine files couldn't be looked up, so the Machine File ID column won't attach anything — those lines will arrive without a stitch file."
+                        ? tl("import", "Your machine files couldn't be looked up, so the Machine File ID column won't attach anything — those lines will arrive without a stitch file.")
                         : <>
                             {machineOutcome.ok} of {machineOutcome.typed} {machineOutcome.typed === 1 ? "line" : "lines"} will get
                             their stitch file, attached to that line only.
-                            {machineOutcome.unknown.length > 0 && <> Nothing in your library matches <span className="tabular-nums">{machineOutcome.unknown.join(", ")}</span> — check the reference on the file&rsquo;s card in Design Lab.</>}
+                            {machineOutcome.unknown.length > 0 && <> {tl("import", "Nothing in your library matches")} <span className="tabular-nums">{machineOutcome.unknown.join(", ")}</span> {tl("import", "— check the reference on the file’s card in Design Lab.")}</>}
                             {/* Named separately from "unknown" because the fix is different:
                                 the reference is right and the ROW is wrong. */}
-                            {machineOutcome.wrongMethod.length > 0 && <> <span className="tabular-nums">{machineOutcome.wrongMethod.join(", ")}</span> {machineOutcome.wrongMethod.length === 1 ? "is on a line" : "are on lines"} that {machineOutcome.wrongMethod.length === 1 ? "isn&rsquo;t" : "aren&rsquo;t"} embroidered — a stitch file has no machine to run there, so it won&rsquo;t be attached.</>}
+                            {machineOutcome.wrongMethod.length > 0 && <> <span className="tabular-nums">{machineOutcome.wrongMethod.join(", ")}</span> {machineOutcome.wrongMethod.length === 1 ? tl("import", "is on a line") : tl("import", "are on lines")} that {machineOutcome.wrongMethod.length === 1 ? tl("import", "isn’t") : tl("import", "aren’t")} embroidered — a stitch file has no machine to run there, so it won&rsquo;t be attached.</>}
                           </>}
                     </span>
                   </div>
@@ -840,10 +842,10 @@ export function ImportOrdersDialog({
                     <thead className="sticky top-0 z-10 bg-card border-b border-border text-left eg-label text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2">#</th>
-                        <th className="px-3 py-2">Order</th>
-                        <th className="px-3 py-2">Ship to</th>
-                        <th className="px-3 py-2">Item</th>
-                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">{tl("import", "Order")}</th>
+                        <th className="px-3 py-2">{tl("import", "Ship to")}</th>
+                        <th className="px-3 py-2">{tl("import", "Item")}</th>
+                        <th className="px-3 py-2">{tl("import", "Status")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -873,9 +875,9 @@ export function ImportOrdersDialog({
             )}
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("import", "Cancel")}</Button>
               <Button onClick={confirm} disabled={saving || !summary.valid}>
-                {saving ? "Importing…" : summary.valid ? `Import ${summary.orders} ${summary.orders === 1 ? "order" : "orders"}` : "Import"}
+                {saving ? tl("import", "Importing…") : summary.valid ? `Import ${summary.orders} ${summary.orders === 1 ? "order" : "orders"}` : tl("import", "Import")}
               </Button>
             </div>
           </div>

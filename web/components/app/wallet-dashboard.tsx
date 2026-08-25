@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { labelRail } from "@/lib/payment-method"
 import { Plus, DownloadSimple } from "@phosphor-icons/react"
@@ -29,6 +30,7 @@ const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date
 
 // Admin review of pending seller top-ups (moved here from the old Console).
 function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
+  const tl = useLabelT()
   // Warehouse shares the factory wallet and sees the same ledger. APPROVING a top-up
   // stays admin-only though: that's confirming money arrived by bank transfer, which is
   // a higher-trust act than reading the balance.
@@ -79,18 +81,18 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
  confirming is looking at what actually arrived. Optional: blank means the
  full amount landed, which is the common case. */}
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                Fee $
+                {tl("wallet", "Fee $")}
                 <input
  type="number" min="0" step="0.01" inputMode="decimal"
  value={fees[t.id] ?? ""}
  onChange={(e) => setFees((f) => ({ ...f, [t.id]: e.target.value }))}
  placeholder="0.00"
- title="What the transfer itself cost. The seller is still credited the full amount — this is recorded as a separate charge they can see."
+ title={tl("wallet", "What the transfer itself cost. The seller is still credited the full amount — this is recorded as a separate charge they can see.")}
  className="h-8 w-20 rounded-lg border border-border bg-card px-2 text-right text-sm tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </label>
-              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-alert hover:text-alert">Reject</Button>
-              <Button size="sm" onClick={() => review(t, "confirm")} disabled={busy === t.id}>{busy === t.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Confirm &amp; credit</>}</Button>
+              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-alert hover:text-alert">{tl("wallet", "Reject")}</Button>
+              <Button size="sm" onClick={() => review(t, "confirm")} disabled={busy === t.id}>{busy === t.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> {tl("wallet", "Confirm & credit")}</>}</Button>
             </div>
           </div>
         ))}
@@ -103,6 +105,7 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
 // They pay the seller off-platform using the details shown, then Mark paid to debit the
 // wallet. Gated to admin/warehouse because it moves money OUT (the server enforces it too).
 function AdminPayouts({ onPaid }: { onPaid: () => void }) {
+  const tl = useLabelT()
    const canPay = getUser()?.role === "admin"
  const [rows, setRows] = useState<PayoutRequest[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
@@ -135,12 +138,12 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
                   {(m.account_id || m.account_number) && <div className="text-muted-foreground">{m.account_id || m.account_number}{m.bank_name ? ` · ${m.bank_name}` : ""}</div>}
                   {m.note && <div className="text-muted-foreground">{m.note}</div>}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {m.qr && <img src={m.qr} alt="Seller bank QR" className="mt-1.5 size-24 rounded border border-border object-contain" />}
+                  {m.qr && <img src={m.qr} alt={tl("wallet", "Seller bank QR")} className="mt-1.5 size-24 rounded border border-border object-contain" />}
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-alert hover:text-alert">Reject</Button>
-                <Button size="sm" onClick={() => act(p, "pay")} disabled={busy === p.id}>{busy === p.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark paid</>}</Button>
+                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-alert hover:text-alert">{tl("wallet", "Reject")}</Button>
+                <Button size="sm" onClick={() => act(p, "pay")} disabled={busy === p.id}>{busy === p.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> {tl("wallet", "Mark paid")}</>}</Button>
               </div>
             </div>
           )
@@ -339,6 +342,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], summary?: WalletSummary
 //  It is deliberately gone: a zeroed wallet and an unreadable one must not look alike.)
 
 export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: boolean } = {}) {
+  const tl = useLabelT()
  const [view, setView] = useState<View | null>(null)
   // Distinguishes "couldn't read the wallet" from "this wallet is empty". Without it the
   // catch below fell back to ZERO, which renders "Available balance $0.00" under a green
@@ -380,7 +384,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  desc: `Top-up declined${r.method ? ` · ${r.method}` : ""}`,
  ref: r.ref || "",
  method: r.method || "—",
- label: "Declined",
+ label: tl("wallet", "Declined"),
  tone: "bg-alert/12 text-alert",
  rejected: true,
  amount: Number(r.amount_usd) || 0,
@@ -482,7 +486,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // be told wrongly. Skeletons keep animating only while a read is genuinely in flight.
  if (!view && loadErr) {
  return (
-      <SectionCard title="Wallet">
+      <SectionCard title={tl("wallet", "Wallet")}>
         <div className="flex items-start gap-2 px-5 py-4 text-sm text-muted-foreground">
           <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-hold" />
           <span>
@@ -529,24 +533,24 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  const profit = s ? s.revenue + aiRevenue - s.productCost - fees - aiCost - s.refundsOut : 0
  const kpis = isFactoryWallet && s
     ? [
-        { label: "Revenue", value: usd(s.revenue), sub: "order charges received", tone: "pos" as const },
-        { label: "Product cost", value: usd(s.productCost), sub: "blanks booked (COGS)", tone: "mut" as const },
-        { label: "Fees & partner", value: usd(fees), sub: "postage · design · dispatch · samples", tone: "mut" as const },
+        { label: tl("wallet", "Revenue"), value: usd(s.revenue), sub: tl("wallet", "order charges received"), tone: "pos" as const },
+        { label: tl("wallet", "Product cost"), value: usd(s.productCost), sub: tl("wallet", "blanks booked (COGS)"), tone: "mut" as const },
+        { label: tl("wallet", "Fees & partner"), value: usd(fees), sub: tl("wallet", "postage · design · dispatch · samples"), tone: "mut" as const },
         /* ITS OWN CARD, at the owner's request — and it earns one: this is the only cost here
  incurred by a BUTTON rather than by an order, so it is the only one that can run up
  with nothing shipped. The sub names what came back from sellers when any did, so a
  card reading $40 is not mistaken for $40 lost. */
-        { label: "AI generation", value: usd(aiCost), sub: aiRevenue > 0 ? `renders & prompts · ${usd(aiRevenue)} billed on` : "renders & prompts", tone: "mut" as const },
+        { label: tl("wallet", "AI generation"), value: usd(aiCost), sub: aiRevenue > 0 ? `renders & prompts · ${usd(aiRevenue)} billed on` : "renders & prompts", tone: "mut" as const },
         // SIGNED when negative. usd() renders Math.abs(), so a factory running at a loss
         // read "Profit $103.75" — identical to earning it — with only the tone to say
         // otherwise. A minus sign is not decoration on this number.
-        { label: "Profit", value: profit < 0 ? usd(profit, true) : usd(profit), sub: `${pct(profit, s.revenue)} margin`, tone: (profit >= 0 ? "pos" : "neg") as "pos" | "neg" },
+        { label: tl("wallet", "Profit"), value: profit < 0 ? usd(profit, true) : usd(profit), sub: `${pct(profit, s.revenue)} margin`, tone: (profit >= 0 ? "pos" : "neg") as "pos" | "neg" },
       ]
  : [
-        { label: "Available balance", value: usd(view.balance), sub: "Ready for fulfillment", tone: "pos" as const },
-        { label: "Total paid", value: usd(s?.paid ?? view.charges), sub: "fulfillment charges", tone: "mut" as const },
-        { label: "Deposited", value: usd(s?.deposits ?? view.deposited), sub: "top-ups", tone: "mut" as const },
-        { label: "Refunds", value: usd(s?.refundsIn ?? 0), sub: "returned to you", tone: "mut" as const },
+        { label: tl("wallet", "Available balance"), value: usd(view.balance), sub: tl("wallet", "Ready for fulfillment"), tone: "pos" as const },
+        { label: tl("wallet", "Total paid"), value: usd(s?.paid ?? view.charges), sub: tl("wallet", "fulfillment charges"), tone: "mut" as const },
+        { label: tl("wallet", "Deposited"), value: usd(s?.deposits ?? view.deposited), sub: "top-ups", tone: "mut" as const },
+        { label: tl("wallet", "Refunds"), value: usd(s?.refundsIn ?? 0), sub: tl("wallet", "returned to you"), tone: "mut" as const },
       ]
 
  return (
@@ -559,11 +563,11 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             "Manage Linked Accounts" is gone: those details now live in that dialog. */}
         {!isFactoryWallet && (
           <Button variant="outline" onClick={() => setPayoutOpen(true)}>
-            Withdraw
+            {tl("wallet", "Withdraw")}
           </Button>
         )}
         <Button onClick={() => setTopUpOpen(true)}>
-          <Plus size={16} weight="bold" /> Add Funds
+          <Plus size={16} weight="bold" /> {tl("wallet", "Add Funds")}
         </Button>
       </div>
 
@@ -583,7 +587,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       {/* Transaction detail — click any row for the full record (ref, type, note, balances). */}
       <Dialog open={!!detail} onOpenChange={(o) => { if (!o) setDetail(null) }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Transaction detail</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("wallet", "Transaction detail")}</DialogTitle></DialogHeader>
           {detail && (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -594,12 +598,12 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
               </div>
               <dl className="divide-y divide-border rounded-lg border border-border text-sm">
                 {[
- ["Description", detail.desc],
- ["Date", detail.date],
- ["Reference", detail.ref || "—"],
- ["Method", detail.method],
- ["Balance before", Number.isFinite(detail.balance) ? usd(detail.balance - detail.amount) : "—"],
- ["Balance after", Number.isFinite(detail.balance) ? usd(detail.balance) : "—"],
+ [tl("wallet", "Description"), detail.desc],
+ [tl("wallet", "Date"), detail.date],
+ [tl("wallet", "Reference"), detail.ref || "—"],
+ [tl("wallet", "Method"), detail.method],
+ [tl("wallet", "Balance before"), Number.isFinite(detail.balance) ? usd(detail.balance - detail.amount) : "—"],
+ [tl("wallet", "Balance after"), Number.isFinite(detail.balance) ? usd(detail.balance) : "—"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-start justify-between gap-4 px-3 py-2">
                     <dt className="shrink-0 text-muted-foreground">{k}</dt>
@@ -608,7 +612,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                 ))}
               </dl>
               {detail.ref && /^(FF-|etsy-|shopify-|tiktok-)/i.test(detail.ref) && (
-                <a href={`/orders/${encodeURIComponent(detail.ref)}`} className="inline-flex text-sm font-medium text-primary hover:underline">Open order →</a>
+                <a href={`/orders/${encodeURIComponent(detail.ref)}`} className="inline-flex text-sm font-medium text-primary hover:underline">{tl("wallet", "Open order →")}</a>
               )}
             </div>
           )}
@@ -643,9 +647,9 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  const txCard = (
       <Card className="gap-0 overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="text-base font-bold">Transaction history</div>
+          <div className="text-base font-bold">{tl("wallet", "Transaction history")}</div>
           <Button variant="outline" size="sm">
-            <DownloadSimple size={14} /> Export CSV
+            <DownloadSimple size={14} /> {tl("wallet", "Export CSV")}
           </Button>
         </div>
         {pending.length > 0 && (
@@ -653,7 +657,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             {/* Not "Awaiting confirmation": a VietQR request confirms ITSELF when the money
  arrives, so nobody is waiting to approve it — the seller is waiting to pay
  it. Only a manual transfer waits on a human. */}
-            <div className="mb-2 eg-label text-muted-foreground">Not in your balance yet</div>
+            <div className="mb-2 eg-label text-muted-foreground">{tl("wallet", "Not in your balance yet")}</div>
             <div className="space-y-1.5">
               {pending.map((p) => {
  const rejected = p.status === "rejected"
@@ -664,10 +668,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                   <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className={rejected ? "bg-alert/12 text-alert" : "bg-hold/15 text-hold"}>
-                        {rejected ? "Rejected" : selfServe ? "Awaiting payment" : "Awaiting confirmation"}
+                        {rejected ? tl("wallet", "Rejected") : selfServe ? tl("wallet", "Awaiting payment") : tl("wallet", "Awaiting confirmation")}
                       </Badge>
                       <span className="text-muted-foreground">
-                        {p.method || "Top-up"}{p.ref ? ` · ${p.ref}` : ""} · {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {p.method || tl("wallet", "Top-up")}{p.ref ? ` · ${p.ref}` : ""} · {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
                     </div>
                     <span className={"font-semibold tabular-nums " + (rejected ? "text-muted-foreground line-through" : "text-foreground")}>
@@ -677,13 +681,13 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                 )
               })}
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">Pending top-ups credit your balance once confirmed (BIDV auto-confirms on payment; manual transfers are reviewed by our team).</div>
+            <div className="mt-2 text-xs text-muted-foreground">{tl("wallet", "Pending top-ups credit your balance once confirmed (BIDV auto-confirms on payment; manual transfers are reviewed by our team).")}</div>
           </div>
         )}
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
+              <TableHead>{tl("wallet", "Date")}</TableHead>
               {/* Reference and Method used to be columns of their own. Between a mono
  reference like "expedite-cancel-etsy-4128916808" and a Method that is "—"
  on almost every row, they pushed the two BALANCE columns off the right
@@ -691,18 +695,18 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  from one number to the next, was the thing you had to scroll to find.
                   They sit under the description now, and the row still opens a detail
  dialog carrying both in full. */}
-              <TableHead>Description</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Balance before</TableHead>
-              <TableHead className="text-right">Balance after</TableHead>
+              <TableHead>{tl("wallet", "Description")}</TableHead>
+              <TableHead>{tl("wallet", "Type")}</TableHead>
+              <TableHead className="text-right">{tl("wallet", "Amount")}</TableHead>
+              <TableHead className="text-right">{tl("wallet", "Balance before")}</TableHead>
+              <TableHead className="text-right">{tl("wallet", "Balance after")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {histRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  No transactions yet
+                  {tl("wallet", "No transactions yet")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -736,7 +740,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                           {t.label}
                         </Badge>
                         {t.isTest && (
-                          <Badge variant="secondary" className="bg-muted text-muted-foreground">Test</Badge>
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground">{tl("wallet", "Test")}</Badge>
                         )}
                       </span>
                       {/* ONE CONTROL, NOT TWO.
@@ -760,18 +764,18 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  if (v === "__test__") { void toggleTest(t); return }
  void attribute(t, v)
                           }}
- title="Which real account this moved through, or mark it a test"
+ title={tl("wallet", "Which real account this moved through, or mark it a test")}
  className={"w-[9.5rem] rounded border border-border bg-transparent px-1 py-0.5 text-2xs "
                             + (t.cashAccount ? "text-muted-foreground" : "text-hold")}
                         >
-                          <option value="">{markingId === t.id ? "…" : "— unassigned"}</option>
+                          <option value="">{markingId === t.id ? "…" : tl("wallet", "— unassigned")}</option>
                           {accounts.length > 0 && (
-                            <optgroup label="Account">
+                            <optgroup label={tl("wallet", "Account")}>
                               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                             </optgroup>
                           )}
-                          <optgroup label="Bookkeeping">
-                            <option value="__test__">{t.isTest ? "Count as real money" : "Mark as test"}</option>
+                          <optgroup label={tl("wallet", "Bookkeeping")}>
+                            <option value="__test__">{t.isTest ? tl("wallet", "Count as real money") : tl("wallet", "Mark as test")}</option>
                           </optgroup>
                         </select>
                       ) : <span />}
@@ -809,8 +813,8 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  return partnerHistory && isFactoryWallet ? (
         <Tabs defaultValue="transactions" className="space-y-3">
           <TabsList>
-            <TabsTrigger value="transactions">Transaction history</TabsTrigger>
-            <TabsTrigger value="partners">Partner history</TabsTrigger>
+            <TabsTrigger value="transactions">{tl("wallet", "Transaction history")}</TabsTrigger>
+            <TabsTrigger value="partners">{tl("wallet", "Partner history")}</TabsTrigger>
           </TabsList>
           <TabsContent value="transactions">{txCard}</TabsContent>
           <TabsContent value="partners"><BillingView /></TabsContent>

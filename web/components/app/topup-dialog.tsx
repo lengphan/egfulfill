@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
 import { CheckCircle, Warning, CircleNotch, Copy, Check, X, Sparkle, CaretDown } from "@phosphor-icons/react"
@@ -18,6 +19,7 @@ const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLo
 const usd0 = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
 
 function Success({ title, sub, onDone }: { title: string; sub: string; onDone: () => void }) {
+  const tl = useLabelT()
  return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
       <span className="flex size-14 items-center justify-center rounded-full bg-shipped/12 text-success">
@@ -25,7 +27,7 @@ function Success({ title, sub, onDone }: { title: string; sub: string; onDone: (
       </span>
       <div className="font-semibold">{title}</div>
       <div className="text-sm text-muted-foreground">{sub}</div>
-      <Button className="w-full" onClick={onDone}>Done</Button>
+      <Button className="w-full" onClick={onDone}>{tl("topup", "Done")}</Button>
     </div>
   )
 }
@@ -66,6 +68,7 @@ function useSeedAmount(cfg: TopupConfig | null, amount: string, setAmount: (v: s
 // admin-set minimum, then an amber warning. Everything is driven by `minUsd` — nothing here
 // is hardcoded, so it tracks whatever the admin sets.
 function MinHint({ amount, minUsd }: { amount: string; minUsd: number }) {
+  const tl = useLabelT()
  const n = Number(amount)
  if (n > 0 && n < minUsd)
  return (
@@ -77,6 +80,7 @@ function MinHint({ amount, minUsd }: { amount: string; minUsd: number }) {
 }
 
 function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
+  const tl = useLabelT()
  const [amount, setAmount] = useState("")   // USD
  const [showBulk, setShowBulk] = useState(false)
  const [phase, setPhase] = useState<"amount" | "qr" | "paid" | "error">("amount")
@@ -161,14 +165,14 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
     }
   }
 
- if (phase === "paid") return <Success title="Payment received" sub="Your wallet balance has been updated." onDone={onClose} />
+ if (phase === "paid") return <Success title={tl("topup", "Payment received")} sub={tl("topup", "Your wallet balance has been updated.")} onDone={onClose} />
  if (phase === "error")
  return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <span className="flex size-14 items-center justify-center rounded-full bg-hold/15 text-hold"><Warning size={28} weight="fill" /></span>
-        <div className="font-semibold">Couldn&apos;t start the payment</div>
+        <div className="font-semibold">{tl("topup", "Couldn’t start the payment")}</div>
         <div className="text-sm text-muted-foreground">{error}</div>
-        <Button variant="outline" className="w-full" onClick={() => setPhase("amount")}>Try again</Button>
+        <Button variant="outline" className="w-full" onClick={() => setPhase("amount")}>{tl("topup", "Try again")}</Button>
       </div>
     )
  if (phase === "qr")
@@ -176,7 +180,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
       <div className="flex flex-col items-center gap-4 py-2">
         {qrImg ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={qrImg} alt="BIDV payment code" className="size-56 rounded-xl border border-border" />
+          <img src={qrImg} alt={tl("topup", "BIDV payment code")} className="size-56 rounded-xl border border-border" />
         ) : (
           <div className="flex size-56 items-center justify-center rounded-xl border border-border"><CircleNotch size={28} className="animate-spin text-muted-foreground" /></div>
         )}
@@ -192,18 +196,18 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
             {/* Who the money is going to, so the payer can check it against their banking
  app BEFORE sending. A QR alone asks people to trust an opaque image. */}
             <dl className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-              <Detail label="Receiver" value={payment.name} missing="Receiver name not returned" />
+              <Detail label={tl("topup", "Receiver")} value={payment.name} missing="Receiver name not returned" />
               <Detail
- label="Bank"
+ label={tl("topup", "Bank")}
  value={payment.bankCode ? (VN_BANK_NAMES[payment.bankCode.toUpperCase()] ?? payment.bankCode) : ""}
  missing="Bank not returned"
               />
-              <Detail label="Account" value={payment.vaAccount || payment.account} mono missing="Account not returned" />
+              <Detail label={tl("topup", "Account")} value={payment.vaAccount || payment.account} mono missing="Account not returned" />
               {/* The FULL description, not just our ref. VietQR wraps our EG-code in a
  virtual-account prefix, so the bank shows something longer — which is
  why this never matched what you saw on the VietQR side. Our ref is
  inside it, and that substring is what the poll reconciles on. */}
-              <Detail label="Description" value={payment.content || payment.note} mono missing="Description not returned" />
+              <Detail label={tl("topup", "Description")} value={payment.content || payment.note} mono missing="Description not returned" />
               {payment.content && payment.note && payment.content !== payment.note && (
                 <p className="mt-2 text-2xs text-muted-foreground">
                   Send the description exactly as shown. Our reference <span className="tabular-nums">{payment.note}</span>{" "}sits inside it — that&apos;s what matches the payment to your wallet.
@@ -212,7 +216,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
             </dl>
           </div>
         )}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CircleNotch size={15} className="animate-spin" /> Waiting for payment…</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CircleNotch size={15} className="animate-spin" /> {tl("topup", "Waiting for payment…")}</div>
       </div>
     )
  return (
@@ -230,8 +234,8 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  showBulk ? (
           <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary"><Sparkle size={13} weight="fill" /> Top up more, pay a better rate</span>
-              <button onClick={() => setShowBulk(false)} className="text-2xs text-muted-foreground hover:text-foreground">Hide</button>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary"><Sparkle size={13} weight="fill" /> {tl("topup", "Top up more, pay a better rate")}</span>
+              <button onClick={() => setShowBulk(false)} className="text-2xs text-muted-foreground hover:text-foreground">{tl("topup", "Hide")}</button>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {displayTiers.map((t) => {
@@ -244,7 +248,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  onClick={() => setAmount(String(t.usd))}
  className={"relative flex flex-col gap-2 overflow-hidden rounded-xl border p-4 text-left transition-colors " + (active ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}
                   >
-                    {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 eg-label text-primary-foreground">Best rate</span>}
+                    {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 eg-label text-primary-foreground">{tl("topup", "Best rate")}</span>}
                     <span className="text-lg font-semibold tabular-nums">{usd0(t.usd)}</span>
                     <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
                     {saveVnd > 0 && <span className="w-fit rounded-full bg-shipped/12 px-2 py-0.5 text-xs font-semibold text-shipped">save {vnd(saveVnd)}</span>}
@@ -255,13 +259,13 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           </div>
         ) : (
           <button onClick={() => setShowBulk(true)} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5">
-            Top up more for a better rate <CaretDown size={13} weight="bold" />
+            {tl("topup", "Top up more for a better rate")} <CaretDown size={13} weight="bold" />
           </button>
         )
       )}
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Amount (USD)</span>
+        <span className="text-sm font-medium">{tl("topup", "Amount (USD)")}</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
         <MinHint amount={amount} minUsd={minUsd} />
       </label>
@@ -271,17 +275,17 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
           <>
             <span className="text-muted-foreground">
               $1 = <span className="font-medium tabular-nums text-foreground">{vnd(applicableRate)}</span>
-              {discounted && <span className="ml-1 rounded bg-primary/15 px-1 py-0.5 text-2xs font-semibold text-primary">bulk rate</span>}
+              {discounted && <span className="ml-1 rounded bg-primary/15 px-1 py-0.5 text-2xs font-semibold text-primary">{tl("topup", "bulk rate")}</span>}
             </span>
-            <span className="tabular-nums"><span className="text-muted-foreground">You&apos;ll pay </span><span className="font-semibold">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span></span>
+            <span className="tabular-nums"><span className="text-muted-foreground">{tl("topup", "You’ll pay")} </span><span className="font-semibold">{usdAmt > 0 ? vnd(vndAmt) : "—"}</span></span>
           </>
         ) : (
-          <span className="text-muted-foreground">Loading exchange rate…</span>
+          <span className="text-muted-foreground">{tl("topup", "Loading exchange rate…")}</span>
         )}
       </div>
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <Button className="w-full" onClick={start} disabled={!rate || usdAmt < minUsd}>Generate QR Code</Button>
-      <p className="text-center text-xs text-muted-foreground">Pay the VND amount with any VN banking app. Your USD balance updates automatically once paid.</p>
+      <Button className="w-full" onClick={start} disabled={!rate || usdAmt < minUsd}>{tl("topup", "Generate QR Code")}</Button>
+      <p className="text-center text-xs text-muted-foreground">{tl("topup", "Pay the VND amount with any VN banking app. Your USD balance updates automatically once paid.")}</p>
     </div>
   )
 }
@@ -305,6 +309,7 @@ function Detail({ label, value, mono, missing }: { label: string; value?: string
 
 // ───────────────────────────── Card (Stripe) ─────────────────────────────
 function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
+  const tl = useLabelT()
  const [amount, setAmount] = useState("")
  const [phase, setPhase] = useState<"amount" | "pay" | "paid">("amount")
  const [error, setError] = useState<string | null>(null)
@@ -315,17 +320,17 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
  setError(null); setPhase("pay")
   }
 
- if (phase === "paid") return <Success title="Payment received" sub="Your card top-up has been credited." onDone={onClose} />
+ if (phase === "paid") return <Success title={tl("topup", "Payment received")} sub={tl("topup", "Your card top-up has been credited.")} onDone={onClose} />
  if (phase === "pay")
  return (
       <div className="space-y-3">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Topping up</span>
+          <span className="text-muted-foreground">{tl("topup", "Topping up")}</span>
           <span className="font-semibold tabular-nums">{usd(Number(amount) || 0)}</span>
         </div>
         <StripeCardForm amount={Number(amount) || 0} onPaid={() => { setPhase("paid"); onFunded() }} onError={(m) => setError(m || null)} />
         {error && <div className="text-sm text-destructive">{error}</div>}
-        <button onClick={() => setPhase("amount")} className="text-xs text-muted-foreground hover:text-foreground">← Change amount</button>
+        <button onClick={() => setPhase("amount")} className="text-xs text-muted-foreground hover:text-foreground">{tl("topup", "← Change amount")}</button>
       </div>
     )
  return (
@@ -336,13 +341,13 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
         ))}
       </div>
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Amount (USD)</span>
+        <span className="text-sm font-medium">{tl("topup", "Amount (USD)")}</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
         <MinHint amount={amount} minUsd={minUsd} />
       </label>
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>Continue to card</Button>
-      <p className="text-center text-xs text-muted-foreground">Secured by Stripe. Balance updates on success.</p>
+      <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>{tl("topup", "Continue to card")}</Button>
+      <p className="text-center text-xs text-muted-foreground">{tl("topup", "Secured by Stripe. Balance updates on success.")}</p>
     </div>
   )
 }
@@ -354,6 +359,7 @@ const PROVIDERS = [
   { key: "PayPal", to: "admin@embroiderygoods.com", hint: "Send to this PayPal, attach your receipt, then submit — we credit your wallet once it lands." },
 ]
 function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
+  const tl = useLabelT()
  const [provider, setProvider] = useState(PROVIDERS[0])
  const [amount, setAmount] = useState("")
  const { minUsd, small: smallPresets, bulk: bulkPresets } = amountOptions(cfg)
@@ -392,7 +398,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
   }
 
  if (phase === "sent")
- return <Success title="Request submitted" sub={`We'll credit ${usd(Number(amount) || 0)} once your ${provider.key} transfer is confirmed.`} onDone={onClose} />
+ return <Success title={tl("topup", "Request submitted")} sub={`We'll credit ${usd(Number(amount) || 0)} once your ${provider.key} transfer is confirmed.`} onDone={onClose} />
 
  return (
     <div className="space-y-4">
@@ -412,7 +418,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
  variant="outline"
  onClick={async () => { try { await navigator.clipboard.writeText(provider.to!); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
             >
-              {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />} {copied ? "Copied" : "Copy"}
+              {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />} {copied ? tl("topup", "Copied") : tl("topup", "Copy")}
             </Button>
           </div>
         </div>
@@ -434,23 +440,23 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
       </div>
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Amount (USD)</span>
+        <span className="text-sm font-medium">{tl("topup", "Amount (USD)")}</span>
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
         <MinHint amount={amount} minUsd={minUsd} />
       </label>
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Reference / transaction note (optional)</span>
-        <Input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. your PayPal transaction ID" />
+        <span className="text-sm font-medium">{tl("topup", "Reference / transaction note (optional)")}</span>
+        <Input value={ref} onChange={(e) => setRef(e.target.value)} placeholder={tl("topup", "e.g. your PayPal transaction ID")} />
       </label>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Payment screenshot <span className="font-normal text-muted-foreground">(optional)</span></span>
+        <span className="text-sm font-medium">{tl("topup", "Payment screenshot")} <span className="font-normal text-muted-foreground">{tl("topup", "(optional)")}</span></span>
         {proof ? (
           <div className="flex items-center gap-3 rounded-xl border border-border p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={proof.dataUrl} alt="Payment receipt" className="size-14 shrink-0 rounded-lg border border-border object-cover" />
+            <img src={proof.dataUrl} alt={tl("topup", "Payment receipt")} className="size-14 shrink-0 rounded-lg border border-border object-cover" />
             <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{proof.name}</span>
-            <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-alert" onClick={() => setProof(null)} aria-label="Remove screenshot">
+            <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-alert" onClick={() => setProof(null)} aria-label={tl("topup", "Remove screenshot")}>
               <X size={15} weight="bold" />
             </Button>
           </div>
@@ -458,14 +464,14 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
           <Dropzone
             accept="image/*"
             onFiles={(files) => takeFile(files[0])}
-            label="Drop a screenshot, or click to browse"
-            hint="Helps us confirm your transfer faster"
+            label={tl("topup", "Drop a screenshot, or click to browse")}
+            hint={tl("topup", "Helps us confirm your transfer faster")}
           />
         )}
       </div>
 
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <Button className="w-full" onClick={submit} disabled={saving}>{saving ? "Submitting…" : "I've sent it — submit request"}</Button>
+      <Button className="w-full" onClick={submit} disabled={saving}>{saving ? tl("topup", "Submitting…") : tl("topup", "I've sent it — submit request")}</Button>
       <p className="text-center text-xs text-muted-foreground">{provider.hint}</p>
     </div>
   )
@@ -473,6 +479,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
 
 // ───────────────────────────── Dialog ─────────────────────────────
 export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; onOpenChange: (v: boolean) => void; onFunded: () => void }) {
+  const tl = useLabelT()
  const close = () => onOpenChange(false)
   // One config fetch for the whole dialog — the admin-set minimum, quick-amount presets, and
   // (for the QR tab) the exchange rate + volume tiers. Shared so every method enforces the
@@ -488,13 +495,13 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add funds</DialogTitle>
+          <DialogTitle>{tl("topup", "Add funds")}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="transfer">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="transfer">Transfer</TabsTrigger>
-            <TabsTrigger value="vietqr">QR Code</TabsTrigger>
-            <TabsTrigger value="card">Card</TabsTrigger>
+            <TabsTrigger value="transfer">{tl("topup", "Transfer")}</TabsTrigger>
+            <TabsTrigger value="vietqr">{tl("topup", "QR Code")}</TabsTrigger>
+            <TabsTrigger value="card">{tl("topup", "Card")}</TabsTrigger>
           </TabsList>
           <TabsContent value="transfer" className="mt-4">
             <TransferTopUp onFunded={onFunded} onClose={close} cfg={cfg} />

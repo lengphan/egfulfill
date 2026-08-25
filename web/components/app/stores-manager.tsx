@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowsClockwise, Trash, Plus, CheckCircle, Storefront, Warning, Prohibit } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
@@ -126,6 +127,7 @@ const liveChannels = CHANNELS.filter((c) => c.live)
 const soonChannels = CHANNELS.filter((c) => !c.live)
 
 export function StoresManager() {
+  const tl = useLabelT()
  const reduce = useReducedMotion()
  const [conns, setConns] = useState<EtsyConnection[] | null>(null)
  const [isDemo, setIsDemo] = useState(false)
@@ -266,10 +268,10 @@ export function StoresManager() {
     // "Today", not "New orders only": the server now reads 0 as midnight UTC rather than the
     // instant you connect, so a shop linked at 4pm still gets that morning's sales. The old
     // label described the old behaviour and would now be wrong.
-    { days: 0, label: "Today", sub: "Today's orders — nothing older" },
-    { days: 7, label: "Past 7 days", sub: "Roughly this week" },
-    { days: 30, label: "Past 30 days", sub: "About a month", rec: true },
-    { days: 90, label: "Past 90 days", sub: "The last quarter" },
+    { days: 0, label: tl("stores", "Today"), sub: tl("stores", "Today's orders — nothing older") },
+    { days: 7, label: tl("stores", "Past 7 days"), sub: tl("stores", "Roughly this week") },
+    { days: 30, label: tl("stores", "Past 30 days"), sub: tl("stores", "About a month"), rec: true },
+    { days: 90, label: tl("stores", "Past 90 days"), sub: tl("stores", "The last quarter") },
   ]
 
   /** How far back this channel has ALREADY imported — the floor the chooser ratchets against.
@@ -380,22 +382,22 @@ export function StoresManager() {
  return (
     <div className="space-y-5">
       <StatGrid>
-        <StatCard label="Connected shops" value={String(connected.length)} sub="syncing orders" />
+        <StatCard label={tl("stores", "Connected shops")} value={String(connected.length)} sub={tl("stores", "syncing orders")} />
         <StatCard
- label="Channels live"
+ label={tl("stores", "Channels live")}
  value={String(liveChannels.length)}
  sub={liveChannels.map((c) => c.name.replace(" Shop", "")).join(" · ")}
  tone="pos"
         />
         <StatCard
- label="Coming soon"
+ label={tl("stores", "Coming soon")}
  value={String(soonChannels.length)}
  sub={soonChannels.map((c) => c.name).join(" · ")}
         />
         <StatCard
- label="Last sync"
+ label={tl("stores", "Last sync")}
  value={connected.length ? fmtDate(connected[0].last_sync_at).split(",")[0] : "—"}
- sub="most recent shop"
+ sub={tl("stores", "most recent shop")}
         />
       </StatGrid>
 
@@ -416,18 +418,18 @@ export function StoresManager() {
       {isDemo && (
         <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
           <Warning size={14} weight="fill" />
-          Sign in to load and manage your connected shops.
+          {tl("stores", "Sign in to load and manage your connected shops.")}
         </div>
       )}
 
       {/* Connected shops */}
       <div className="rounded-2xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <div className="font-semibold">Connected shops</div>
+          <div className="font-semibold">{tl("stores", "Connected shops")}</div>
           {connected.length > 0 && (
             <Button size="sm" variant="outline" onClick={onSync} disabled={busy === "sync"}>
               <ArrowsClockwise size={14} weight="bold" className={busy === "sync" ? "animate-spin" : ""} />
-              {busy === "sync" ? "Syncing…" : "Sync now"}
+              {busy === "sync" ? tl("stores", "Syncing…") : tl("stores", "Sync now")}
             </Button>
           )}
         </div>
@@ -441,8 +443,8 @@ export function StoresManager() {
         ) : connected.length === 0 ? (
           <EmptyState
             icon={Storefront}
-            title="No shops connected yet"
-            note="Connect a marketplace below to start syncing orders into one queue."
+            title={tl("stores", "No shops connected yet")}
+            note={tl("stores", "Connect a marketplace below to start syncing orders into one queue.")}
           />
         ) : (
           <div className="divide-y divide-border">
@@ -471,7 +473,7 @@ export function StoresManager() {
                       ) : (
                         <>{scopeCount(c.scopes)} scopes</>
                       )}
-                      {" · last sync "}{fmtDate(c.last_sync_at)}
+                      {tl("stores", " · last sync ")}{fmtDate(c.last_sync_at)}
                     </div>
                     {isAdmin && openScopes.has(c.shop_id) && c.scopes && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
@@ -490,7 +492,7 @@ export function StoresManager() {
  disabled={busy === c.shop_id}
                 >
                   <Trash size={14} weight="bold" />
-                  {busy === c.shop_id ? "Removing…" : "Disconnect"}
+                  {busy === c.shop_id ? tl("stores", "Removing…") : tl("stores", "Disconnect")}
                 </Button>
               </div>
             ))}
@@ -500,7 +502,7 @@ export function StoresManager() {
 
       {/* Available channels */}
       <div>
-        <div className="mb-3 eg-label text-muted-foreground">Add a channel</div>
+        <div className="mb-3 eg-label text-muted-foreground">{tl("stores", "Add a channel")}</div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CHANNELS.map((ch, i) => (
             <motion.div
@@ -527,17 +529,17 @@ export function StoresManager() {
                       }
  setPending("shopify")
                     }}>
-                    <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Connecting…" : "Connect"}
+                    <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? tl("stores", "Connecting…") : tl("stores", "Connect")}
                   </Button>
                 </div>
               ) : ch.live ? (
                 <Button size="sm" className="mt-4" onClick={() => setPending(ch.key as "etsy" | "tiktok")} disabled={busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect")}>
                   <Plus size={14} weight="bold" />
-                  {busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect") ? "Connecting…" : "Connect"}
+                  {busy === (ch.key === "tiktok" ? "connect-tiktok" : "connect") ? tl("stores", "Connecting…") : tl("stores", "Connect")}
                 </Button>
               ) : (
                 <span className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-dashed border-border px-3 text-center text-xs font-medium text-muted-foreground">
-                  {ch.soon ?? "Coming soon"}
+                  {ch.soon ?? tl("stores", "Coming soon")}
                 </span>
               )}
             </motion.div>
@@ -561,13 +563,12 @@ export function StoresManager() {
           >
             <div className="text-base font-semibold">Import orders from {channelName(pending)}</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              How far back should we pull existing orders? This only affects the first import —
- new orders always sync automatically afterward.
+              {tl("stores", "How far back should we pull existing orders? This only affects the first import — new orders always sync automatically afterward.")}
             </p>
             {pending === "tiktok" && tiktokRegion && (
               <div className="mt-3 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                 Opens the <span className="font-medium text-foreground">{tiktokRegion === "us" ? "US" : "global"}</span> TikTok Shop
- login. If your shop is {tiktokRegion === "us" ? "not US" : "US"} and it can&apos;t find your account, the
+ login. If your shop is {tiktokRegion === "us" ? tl("stores", "not US") : "US"} and it can&apos;t find your account, the
  server&apos;s <code className="tabular-nums">TIKTOK_REGION</code> is set to the wrong region.
               </div>
             )}
@@ -608,17 +609,17 @@ export function StoresManager() {
                       {o.label}
                       {o.rec && !off && synced === null && (
                         <span className="rounded-md bg-primary/10 px-1.5 py-0.5 eg-label text-primary">
-                          Recommended
+                          {tl("stores", "Recommended")}
                         </span>
                       )}
                       {synced === o.days && (
                         <span className="rounded-md bg-muted px-1.5 py-0.5 eg-label text-muted-foreground">
-                          Current
+                          {tl("stores", "Current")}
                         </span>
                       )}
                     </span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {off ? "Shorter than what's already imported" : o.sub}
+                      {off ? tl("stores", "Shorter than what's already imported") : o.sub}
                     </span>
                   </span>
                   {off
@@ -633,7 +634,7 @@ export function StoresManager() {
  onClick={() => setPending(null)}
  className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              Cancel
+              {tl("stores", "Cancel")}
             </button>
           </div>
         </div>

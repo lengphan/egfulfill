@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent, Tag } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ const money = (n: number | string | null | undefined) =>
  * catalogue price, and the markup writes to the same column.
  */
 export function CatalogView() {
+  const tl = useLabelT()
  const [rows, setRows] = useState<CatalogProduct[] | null>(null)
  const [q, setQ] = useState("")
  const [busy, setBusy] = useState(false)
@@ -161,7 +163,7 @@ export function CatalogView() {
 
  return (
     <SectionCard
- title="Published catalogue"
+ title={tl("catalog", "Published catalogue")}
  actions={
         <div className="flex items-center gap-2">
           {/* TWO FORMATS, because they are two jobs. The PDF is what you show a buyer —
@@ -169,8 +171,8 @@ export function CatalogView() {
  their own system. A spreadsheet of image URLs is not a catalogue, and a
  lookbook is not importable. */}
           <Button size="sm" onClick={() => setPrintOpen(true)}
- title="A printable catalogue with images — save it as PDF">
-            Create lookbook
+ title={tl("catalog", "A printable catalogue with images — save it as PDF")}>
+            {tl("catalog", "Create lookbook")}
           </Button>
           <a href={catalogExportUrl()} download>
             <Button size="sm" variant="outline" disabled={!published}
@@ -191,20 +193,20 @@ export function CatalogView() {
  method; supplier styles are published by reference and read live from the
  sync. Both land in the same PDF and the same CSV — the tabs are about where
  a thing comes FROM, not about two separate catalogues. */}
-            <TabsTrigger value="mine">Our products</TabsTrigger>
-            <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
+            <TabsTrigger value="mine">{tl("catalog", "Our products")}</TabsTrigger>
+            <TabsTrigger value="supplier">{tl("catalog", "Supplier styles")}</TabsTrigger>
             {/* A partner's own workbook, filled from this same catalogue. It lives beside
  the lookbook and the CSV because they are three renderings of one picked
  set, not three features. */}
-            <TabsTrigger value="partners">Partner sheets</TabsTrigger>
-            <TabsTrigger value="history">Sent catalogues</TabsTrigger>
+            <TabsTrigger value="partners">{tl("catalog", "Partner sheets")}</TabsTrigger>
+            <TabsTrigger value="history">{tl("catalog", "Sent catalogues")}</TabsTrigger>
           </TabsList>
           {tab === "mine" && (
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{published} published</span>
               <div className="relative">
                 <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or SKU…" className="h-9 w-64 pl-8" />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("catalog", "Search name or SKU…")} className="h-9 w-64 pl-8" />
               </div>
             </div>
           )}
@@ -218,9 +220,9 @@ export function CatalogView() {
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
             {/* No publish/remove buttons: the tick already is that decision, and two ways
  to express one thing is how they drifted apart. This bar only prices. */}
-            <span className="text-xs text-muted-foreground">Base +</span>
+            <span className="text-xs text-muted-foreground">{tl("catalog", "Base +")}</span>
             <Input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^\d.]/g, ""))}
- className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label="Markup percent" />
+ className="h-8 w-16 text-center text-xs tabular-nums" inputMode="decimal" aria-label={tl("catalog", "Markup percent")} />
             <Button size="sm" variant="outline" onClick={markup} disabled={busy}>
               {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Percent size={14} weight="bold" /> Price these {(rows ?? []).filter((p) => p.inCatalog).length}</>}
             </Button>
@@ -236,7 +238,7 @@ export function CatalogView() {
 
         {rows === null ? (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-            <CircleNotch size={16} className="animate-spin" /> Loading products…
+            <CircleNotch size={16} className="animate-spin" /> {tl("catalog", "Loading products…")}
           </div>
         ) : shown.length === 0 ? (
           // THREE different nothings, and they must not read alike: the read failed, the
@@ -276,12 +278,12 @@ export function CatalogView() {
  onChange={(e) => void toggleAllShown(e.target.checked)}
                     />
                   </th>
-                  <th className="px-2 py-2">Product</th>
-                  <th className="px-2 py-2">Catalogue price</th>
+                  <th className="px-2 py-2">{tl("catalog", "Product")}</th>
+                  <th className="px-2 py-2">{tl("catalog", "Catalogue price")}</th>
                   {/* Labelled as what it is, and not editable here. The two prices sitting
  side by side is the point — it's how someone sees they are different
  things rather than discovering it later. */}
-                  <th className="px-2 py-2">Seller pays</th>
+                  <th className="px-2 py-2">{tl("catalog", "Seller pays")}</th>
                 </tr>
               </thead>
               <tbody>

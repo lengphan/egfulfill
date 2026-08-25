@@ -126,6 +126,7 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
    * one (a seller's own view), where the chip stays a plain statement. */
  onTrack?: (sku: string) => void
 }) {
+  const tl = useLabelT()
  if (!show) return null
   /**
    * THE KEY THE SHELF IS ACTUALLY UNDER — stockSkuOf, not a private re-derivation.
@@ -170,7 +171,7 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
  className="font-medium text-primary underline decoration-dotted underline-offset-2 hover:no-underline"
  title={`${blankSku} has no inventory row yet — click to add it`}
       >
-        Add to inventory
+        {tl("orders", "Add to inventory")}
       </button>
     ) : null
   }
@@ -213,7 +214,7 @@ function LineStock({ item, catalog, stock, pos, orderId, show, onTrack }: {
           ? `${have} of ${blankSku} on the shelf — this line needs ${need}`
  : `Only ${have} of ${blankSku} in stock, this line needs ${need}${poNum ? ` — on PO ${poNum}` : ""}`}
     >
-      <span className="font-medium text-foreground/70">Stock:</span>{" "}
+      <span className="font-medium text-foreground/70">{tl("orders", "Stock:")}</span>{" "}
       <span className={none
         ? "font-semibold text-alert"
  : enough
@@ -239,6 +240,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
  sending: boolean
  onSend: (o: OrderRow) => void
 }) {
+  const tl = useLabelT()
  const { state, why } = orderStock(items, catalog, stock)
   // Same solid-tinted pill as the Label/Scan/Design chips beside it (readiness-dots.tsx):
   // purple = ready/in-stock, amber = needs action/out, grey = unknown. The colour IS the
@@ -275,7 +277,7 @@ function StockChip({ order, items, catalog, stock, canPO, sending, onSend }: {
       // when it is the fourth of the same set.
  className={"eg-tap inline-flex shrink-0 items-center whitespace-nowrap rounded px-1 py-0.5 text-xs transition-colors " + tone + (clickable ? " cursor-pointer" : " cursor-default")}
     >
-      {sending ? "Sending…" : label}
+      {sending ? tl("orders", "Sending…") : label}
     </button>
   )
 }
@@ -1742,7 +1744,7 @@ export function OrdersHub() {
  they also shouldn't be unreachable. */}
             <DropdownMenu>
               <DropdownMenuTrigger
- aria-label="Choose which status pills to show"
+ aria-label={tl("orders", "Choose which status pills to show")}
  title={tl("ui", "Choose which status pills to show")}
  className="eg-tap flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
@@ -1843,7 +1845,7 @@ export function OrdersHub() {
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-2.5">
               <span className="text-sm text-muted-foreground">{selected.size} selected</span>
               <Button size="sm" variant="outline" onClick={doBulkSlips} disabled={pushing || !!buying}>
-                Packing slips
+                {tl("orders", "Packing slips")}
               </Button>
               {/* HIDDEN, not disabled, for a role that cannot start. The per-row and per-item
                   Start buttons have always checked canSetStage; this bulk one never did, so
@@ -1851,12 +1853,12 @@ export function OrdersHub() {
  refuse one at a time. Starting production is the warehouse's call. */}
               {canSetStage(role, "approved", "working") && (
                 <Button size="sm" variant="outline" onClick={doBulkStart} disabled={pushing || !!buying}>
-                  Start
+                  {tl("orders", "Start")}
                 </Button>
               )}
               <Button size="sm" onClick={doPush} disabled={pushing}>
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
-                {pushing ? "Sending…" : `Send ${selected.size} to dispatch board`}
+                {pushing ? tl("orders", "Sending…") : `Send ${selected.size} to dispatch board`}
               </Button>
               {/* SAME GATE AS BUYING ONE. The single-order ship button on these very rows is
  canFulfill (warehouse/admin) because a label spends real money on the
@@ -2159,7 +2161,7 @@ export function OrdersHub() {
                             </div>
                             <div className="truncate text-xs text-muted-foreground">
                               {[variantOf(items[0]), items.length > 1 ? `+${items.length - 1} more` : ""]
-                                .filter(Boolean).join(" · ") || "No variant chosen"}
+                                .filter(Boolean).join(" · ") || tl("orders", "No variant chosen")}
                             </div>
                           </div>
                         )}
@@ -2196,7 +2198,7 @@ export function OrdersHub() {
                     <span
  className="pointer-events-none absolute left-3 top-[-2.3px] text-primary"
  title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
- aria-label="Rush"
+ aria-label={tl("orders", "Rush")}
                     >
                       <BookmarkSimple size={18} weight="fill" />
                     </span>
@@ -2386,7 +2388,7 @@ export function OrdersHub() {
                       // factory order doesn't get Pending at all. Disabled means "you may
                       // not"; this is "this order can never be there", and showing the
                       // seller queue's stage on the floor's own order is what we're removing.
- const prod = withReason([{ id: "", label: "Draft", tone: "new" as const },
+ const prod = withReason([{ id: "", label: tl("orders", "Draft"), tone: "new" as const },
                         ...FACTORY_STAGES.filter((s) => !(fac && s.id === "in_review"))])
  const exc = withReason(EXCEPTION_STAGES)
                       /**
@@ -2815,7 +2817,7 @@ export function OrdersHub() {
                               <div>{[a.city, a.state].filter(Boolean).join(", ")}</div>
                               {a.country && <div>{a.country}</div>}
                               <div className="mt-1 text-2xs text-muted-foreground">
-                                Street and postcode are held by the factory — ask support if an order needs checking.
+                                {tl("orders", "Street and postcode are held by the factory — ask support if an order needs checking.")}
                               </div>
                             </div>
                           ) : street ? (
@@ -2955,7 +2957,7 @@ export function OrdersHub() {
                             {/* Title reserves height + right room on desktop for the controls,
  which are lifted to the top-right corner (position: absolute)
  so the variant strip below can run the FULL width of the row. */}
-                            <div className="truncate text-sm font-medium sm:min-h-8 sm:pr-[15rem]">{it.name || it.sku || "Item"}</div>
+                            <div className="truncate text-sm font-medium sm:min-h-8 sm:pr-[15rem]">{it.name || it.sku || tl("orders", "Item")}</div>
                             {/* What the BUYER chose, kept under the title through the whole
  picking step — the pickers below decide what we make, and this
  is the only thing on screen that says what they asked for. */}
@@ -3115,7 +3117,7 @@ export function OrdersHub() {
  size="sm" variant="outline" className="h-8 shrink-0"
  disabled={busy === key}
  onClick={() => advanceItem(o, it, "working")}
- title="Start making this line — the rest of the order is unaffected"
+ title={tl("orders", "Start making this line — the rest of the order is unaffected")}
                               >
                                 {tl("ui", "Start")}
                               </Button>
@@ -3187,7 +3189,7 @@ export function OrdersHub() {
  disabled={busy === key}
  className="eg-select h-8 shrink-0 rounded-lg border border-border bg-card px-1.5 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
  aria-label={`Flag ${it.name || it.sku}`}
- title="The warehouse has this item. You can still stop it if the artwork is wrong."
+ title={tl("orders", "The warehouse has this item. You can still stop it if the artwork is wrong.")}
                                 >
                                   <option value="">{tl("ui", "Flag…")}</option>
                                   {exc.map((s) => <option key={s.id} value={s.id}>{tl("stage", s.label)}</option>)}
@@ -3240,7 +3242,7 @@ export function OrdersHub() {
  lines nobody chose. */}
           <Dialog open={!!applyAll} onOpenChange={(v) => { if (!v) setApplyAll(null) }}>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Put this on the other lines too?</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{tl("orders", "Put this on the other lines too?")}</DialogTitle></DialogHeader>
               <div className="space-y-3 px-1 pb-1">
                 <p className="text-sm text-muted-foreground">
                   The artwork is on <strong className="text-foreground">{applyAll?.item.name || applyAll?.item.sku}</strong> only.
@@ -3260,12 +3262,11 @@ export function OrdersHub() {
                 {/* Said plainly: a colourway usually wants its OWN artwork, which is the
  reason this is a question rather than a default. */}
                 <p className="text-xs text-muted-foreground">
-                  Leave it if each line needs its own customisation — that&apos;s the usual case for a
- multi-colour order.
+                  {tl("orders", "Leave it if each line needs its own customisation — that’s the usual case for a multi-colour order.")}
                 </p>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" size="sm" onClick={() => setApplyAll(null)} disabled={applyAllBusy}>
-                    This line only
+                    {tl("orders", "This line only")}
                   </Button>
                   <Button
  size="sm"
@@ -3296,7 +3297,7 @@ export function OrdersHub() {
  : `Copied to ${done} of ${siblings.length} — the rest kept what they had.`)
                     }}
                   >
-                    {applyAllBusy ? <><CircleNotch size={13} className="animate-spin" /> Copying…</> : `Apply to all ${(applyAll?.siblings.length ?? 0) + 1} lines`}
+                    {applyAllBusy ? <><CircleNotch size={13} className="animate-spin" /> {tl("orders", "Copying…")}</> : `Apply to all ${(applyAll?.siblings.length ?? 0) + 1} lines`}
                   </Button>
                 </div>
               </div>
@@ -3310,13 +3311,13 @@ export function OrdersHub() {
           <Dialog open={!!reuse} onOpenChange={(v) => { if (!v) setReuse(null) }}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>{reuse?.exact.length ? "This design already exists" : "Similar designs found"}</DialogTitle>
+                <DialogTitle>{reuse?.exact.length ? tl("orders", "This design already exists") : tl("orders", "Similar designs found")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 px-1 pb-1">
                 <p className="text-sm text-muted-foreground">
                   {reuse?.exact.length
-                    ? "The same artwork has already been digitised. Reuse that file instead of sending this to a designer again — the seller sees a normal deliverable on their own order and nothing about where it came from."
- : "Nothing matches exactly, but these look similar. Check one before paying for the same work twice."}
+                    ? tl("orders", "The same artwork has already been digitised. Reuse that file instead of sending this to a designer again — the seller sees a normal deliverable on their own order and nothing about where it came from.")
+ : tl("orders", "Nothing matches exactly, but these look similar. Check one before paying for the same work twice.")}
                 </p>
 
                 {reuse?.exact.length ? (
@@ -3534,7 +3535,7 @@ export function OrdersHub() {
  return (
               <div className="space-y-3 text-sm">
                 <p className="text-muted-foreground">
-                  {numOf(catchUp.order)} is at <span className="font-medium text-foreground">{stageMeta(normalizeStage(from))?.label ?? "Draft"}</span>.
+                  {numOf(catchUp.order)} is at <span className="font-medium text-foreground">{stageMeta(normalizeStage(from))?.label ?? tl("orders", "Draft")}</span>.
                   {" "}This records <span className="font-medium text-foreground">{path.length} stages</span>, in order:
                 </p>
                 <ol className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
@@ -3548,8 +3549,7 @@ export function OrdersHub() {
                 {/* The honest warning. Every stage here is a claim about what physically
  happened to the goods, and this writes all of them at once. */}
                 <p className="text-xs text-hold">
-                  Each stage is a record that the work was done. Only catch up when it really was —
- the floor and the seller both read this as what happened.
+                  {tl("orders", "Each stage is a record that the work was done. Only catch up when it really was — the floor and the seller both read this as what happened.")}
                 </p>
               </div>
             )
