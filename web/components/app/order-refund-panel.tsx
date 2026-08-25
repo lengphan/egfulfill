@@ -248,7 +248,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
             <Input
  value={note}
  onChange={(e) => setNote(e.target.value)}
- placeholder={feeAmt > 0 ? "Why the adjustment — required, and the seller sees it" : "Reason (shown on the ledger entry)"}
+ placeholder={feeAmt > 0 ? tl("orderRefund", "Why the adjustment — required, and the seller sees it") : tl("orderRefund", "Reason (shown on the ledger entry)")}
  disabled={busy}
  className="h-9"
             />

@@ -123,7 +123,7 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
           href={pdfUrl}
           target="_blank"
           rel="noopener noreferrer"
-          title={`${sheet?.name || "Production worksheet"} — open full size`}
+          title={`${sheet?.name || tl("trueViewTile", "Production worksheet")} — open full size`}
           className="group relative block size-full"
         >
           {/* pointer-events-none so the frame never swallows the click: the tile is small on
@@ -131,7 +131,7 @@ export function TrueViewTile({ orderId, item, files, size = 144 }: {
               worksheet, and here is roughly what it shows", and opening it is the point. */}
           <iframe
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-            title={sheet?.name || "Production worksheet"}
+            title={sheet?.name || tl("trueViewTile", "Production worksheet")}
             className="pointer-events-none size-full border-0"
           />
           <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-foreground/70 px-1.5 py-0.5 text-2xs font-medium text-background">

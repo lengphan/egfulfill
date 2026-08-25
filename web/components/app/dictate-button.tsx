@@ -3,7 +3,7 @@
 import { useRef } from "react"
 import { Microphone } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { useLocale } from "@/lib/i18n"
+import { useLocale, useLabelT } from "@/lib/i18n"
 import { useDictation, recogniserLang } from "@/lib/speech"
 
 /**
@@ -28,6 +28,7 @@ export function DictateButton({
   className?: string
   label?: string
 }) {
+  const tl = useLabelT()
   const { locale } = useLocale()
   /**
    * IT TYPES INTO THE BOX, WORD BY WORD.
@@ -76,11 +77,11 @@ export function DictateButton({
       className={className ?? "size-9 shrink-0"}
       onClick={onToggle}
       disabled={disabled}
-      aria-label={listening ? "Stop dictating" : label}
+      aria-label={listening ? tl("dictateButton", "Stop dictating") : label}
       aria-pressed={listening}
       /* The reason lives on the control that caused it. A mic that stopped because
          permission was refused has to say so somewhere the eye already is. */
-      title={error ?? (listening ? "Listening — press to stop" : label)}
+      title={error ?? (listening ? tl("dictateButton", "Listening — press to stop") : label)}
     >
       <Microphone
         size={17}

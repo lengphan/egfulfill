@@ -1052,7 +1052,7 @@ export function ProductEditorDialog({
             <div className="shrink-0 space-y-1.5">
             <div
  className="relative flex size-44 items-center justify-center overflow-hidden rounded-xl border border-border bg-white"
- title={img ? "The main image, chosen in Images below" : "No image yet — add one in Images below"}
+ title={img ? tl("product", "The main image, chosen in Images below") : tl("product", "No image yet — add one in Images below")}
             >
               {img ? (
                 /**
@@ -1163,7 +1163,7 @@ export function ProductEditorDialog({
                   <span className="text-sm text-muted-foreground">{tl("product", "Our SKU")}</span>
                   {/* The placeholder is the number this product would ACTUALLY get, not a
  hardcoded example — "EG-1005" over an empty field reads as filled. */}
-                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? "EG-1005"} className="h-9 tabular-nums" />
+                  <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder={nextSku ?? tl("product", "EG-1005")} className="h-9 tabular-nums" />
                   {/*
                     * SAY IT HERE, WHERE IT CAN STILL BE FIXED.
                     *
@@ -1390,7 +1390,7 @@ export function ProductEditorDialog({
                       ))}
                     </div>
                     <Input value={bulkBase} onChange={(e) => setBulkBase(e.target.value.replace(/[^0-9.]/g, ""))}
- placeholder={bulkPct ? "upcharge %" : "upcharge $"} className="h-8 w-32 text-xs" inputMode="decimal" aria-label={tl("product", "Base upcharge over product cost")} />
+ placeholder={bulkPct ? tl("product", "upcharge %") : tl("product", "upcharge $")} className="h-8 w-32 text-xs" inputMode="decimal" aria-label={tl("product", "Base upcharge over product cost")} />
                     {/* BLANK, in the same bulk row. "Apply to all" that skipped it would
  mean something different depending on which box you typed in — the
  same argument that put stock in here. */}
@@ -1403,7 +1403,7 @@ export function ProductEditorDialog({
                     <span className="text-xs text-muted-foreground">{tl("product", "· stock")}</span>
                     <Input value={bulkStock} onChange={(e) => setBulkStock(e.target.value.replace(/[^0-9]/g, ""))}
  placeholder="units" className="h-8 w-20 text-xs" inputMode="numeric" aria-label={tl("product", "Bulk stock")} disabled={!ourSku}
- title={ourSku ? undefined : "Give the product a SKU — stock is held against it"} />
+ title={ourSku ? undefined : tl("product", "Give the product a SKU — stock is held against it")} />
                     <Button type="button" size="sm" variant="outline" className="h-8" onClick={applyBulk} disabled={!bulkBase.trim() && !bulkShip.trim() && !bulkStock.trim() && !bulkBlank.trim()}>{tl("product", "Apply to all")}</Button>
                   </div>
                 )}
@@ -1441,7 +1441,7 @@ export function ProductEditorDialog({
  this size has none of its own — the same pattern Base cost and
                            Shipping use. Only override here when a size actually costs more. */
  placeholder={productCost.trim() !== "" ? Number(productCost).toFixed(2) : "—"}
- title={productCost.trim() !== "" ? `Using the product-level supplier cost ${Number(productCost).toFixed(2)}` : "Enter the supplier cost for this size"}
+ title={productCost.trim() !== "" ? `Using the product-level supplier cost ${Number(productCost).toFixed(2)}` : tl("product", "Enter the supplier cost for this size")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Product cost for size ${s}`}
                       />
                       <Input
@@ -1455,7 +1455,7 @@ export function ProductEditorDialog({
  placeholder={derived || (basePrice.trim() !== "" ? Number(basePrice).toFixed(2) : "—")}
  title={derived
                           ? `Auto: product cost ${costN.toFixed(2)} + ${markup.toFixed(2)} markup = ${derived}`
- : basePrice.trim() !== "" ? "Using the product-level base cost above" : "Enter a product cost to price this size"}
+ : basePrice.trim() !== "" ? tl("product", "Using the product-level base cost above") : tl("product", "Enter a product cost to price this size")}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
                       />
                       <Input
@@ -1474,7 +1474,7 @@ export function ProductEditorDialog({
  onChange={(e) => patch("shipping", e.target.value)}
                         /* Same rule: the real default fee, not the word "default". */
  placeholder={shipping.trim() !== "" ? Number(shipping).toFixed(2) : (bandFee != null ? Number(bandFee).toFixed(2) : "—")}
- title={shipping.trim() !== "" ? "Using the product-level shipping fee above" : (bandFee != null ? "Platform default for this weight band" : undefined)}
+ title={shipping.trim() !== "" ? tl("product", "Using the product-level shipping fee above") : (bandFee != null ? tl("product", "Platform default for this weight band") : undefined)}
  className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
                       />
                       <Input
@@ -1506,7 +1506,7 @@ export function ProductEditorDialog({
  type="button"
  disabled={!ourSku}
  onClick={() => setStockOpen((p) => (p === s ? null : s))}
- title={ourSku ? `Stock per colourway for ${s}` : "Give the product a SKU — stock is held against it"}
+ title={ourSku ? `Stock per colourway for ${s}` : tl("product", "Give the product a SKU — stock is held against it")}
  className="flex h-8 w-full items-center justify-between gap-1 rounded-md border border-border px-2 text-xs transition-colors hover:border-primary disabled:opacity-50"
                         >
                           {/* BLANK WHEN NOTHING IS TRACKED, not a dash. Every other cell in
@@ -1535,7 +1535,7 @@ export function ProductEditorDialog({
                           }}
  disabled={!ourSku}
  placeholder={ourSku ? "" : "sku"}
- title={ourSku ? `Held against ${variantSku(ourSku, s, colors[0] ?? null)}` : "Give the product a SKU — stock is held against it"}
+ title={ourSku ? `Held against ${variantSku(ourSku, s, colors[0] ?? null)}` : tl("product", "Give the product a SKU — stock is held against it")}
  className="h-8 text-xs" inputMode="numeric" aria-label={`Stock for size ${s}`}
                         />
                       )}
@@ -1553,7 +1553,7 @@ export function ProductEditorDialog({
  return (
                           <span
  className={"text-right text-xs font-semibold tabular-nums " + (!isFinite(m) ? "text-muted-foreground" : m >= 0 ? "text-success" : "text-destructive")}
- title={isFinite(m) ? `Base ${baseN.toFixed(2)} − product cost ${costRow.toFixed(2)}` : "Enter a product cost and a base cost"}
+ title={isFinite(m) ? `Base ${baseN.toFixed(2)} − product cost ${costRow.toFixed(2)}` : tl("product", "Enter a product cost and a base cost")}
                           >
                             {isFinite(m) ? `$${m.toFixed(2)}` : "—"}
                           </span>
@@ -1597,7 +1597,7 @@ export function ProductEditorDialog({
  const k = variantSku(ourSku, s, c).toUpperCase()
  return (
                               <label key={c ?? "any"} className="flex items-center gap-1.5 text-xs">
-                                <span className="max-w-[9rem] truncate" title={c ? prettyColorName(c) : "Held for this size without a colourway"}>
+                                <span className="max-w-[9rem] truncate" title={c ? prettyColorName(c) : tl("product", "Held for this size without a colourway")}>
                                   {c ? prettyColorName(c) : tl("product", "Any colour")}
                                 </span>
                                 <Input
@@ -1605,7 +1605,7 @@ export function ProductEditorDialog({
  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setStock((p) => ({ ...p, [k]: v })) }}
  placeholder="" inputMode="numeric"
  className="h-7 w-14 shrink-0 text-center text-xs"
- aria-label={`Stock for ${c ? prettyColorName(c) : "any colour"} ${s}`}
+ aria-label={`Stock for ${c ? prettyColorName(c) : tl("product", "any colour")} ${s}`}
  title={variantSku(ourSku, s, c)}
                                 />
                               </label>
@@ -1787,7 +1787,7 @@ export function ProductEditorDialog({
                 >
                   <div className={"relative size-28 overflow-hidden rounded-lg border-2 transition-colors " + (u === img ? "border-primary" : "border-border") + (dragIdx === i ? " opacity-40" : "")}>
                     {/* Click the photo to make it the MAIN image (first = hero). */}
-                    <button type="button" onClick={() => setImg(u)} title={u === img ? "Main image" : "Make this the main image"} className="block size-full">
+                    <button type="button" onClick={() => setImg(u)} title={u === img ? tl("product", "Main image") : tl("product", "Make this the main image")} className="block size-full">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={u} alt="" className="size-full object-cover" draggable={false} />
                     </button>
@@ -1826,7 +1826,7 @@ export function ProductEditorDialog({
                           + (isRep ? "border-primary/40 bg-primary/90 text-primary-foreground"
  : assigned ? "border-primary/30 bg-primary/20 text-primary"
  : "border-border bg-card/90 text-muted-foreground")}
- title={isRep ? `${assigned} — this colour's photo` : assigned ? `${assigned} — extra angle` : "Tag this photo's colour"}
+ title={isRep ? `${assigned} — this colour's photo` : assigned ? `${assigned} — extra angle` : tl("product", "Tag this photo's colour")}
  aria-label={tl("product", "Tag this photo's colour")}
                       >
                         <option value="">{tl("product", "— colour —")}</option>
@@ -1836,10 +1836,10 @@ export function ProductEditorDialog({
                   </div>
                   <button
  type="button"
- aria-label={isRep ? `Remove ${prettyColorName(assigned!)} and its other angles` : "Remove image"}
+ aria-label={isRep ? `Remove ${prettyColorName(assigned!)} and its other angles` : tl("product", "Remove image")}
  title={isRep
                       ? `Remove this photo${colorPhotoCount(assigned!) > 1 ? ` and the other ${colorPhotoCount(assigned!) - 1} ${prettyColorName(assigned!)} angle${colorPhotoCount(assigned!) === 2 ? "" : "s"}` : ""}`
- : "Remove this photo"}
+ : tl("product", "Remove this photo")}
  onClick={() => {
                       /**
                        * Deleting a colour's MAIN shot deletes its side angles too.
@@ -2095,7 +2095,7 @@ export function ProductEditorDialog({
           {/* Description */}
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">{tl("product", "Description")}</span>
-            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={supplier ? "Auto-filled from the supplier — edit as needed." : "Product description…"} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={supplier ? tl("product", "Auto-filled from the supplier — edit as needed.") : tl("product", "Product description…")} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
           </label>
 
           {/* Status moved to the top row beside Type. */}

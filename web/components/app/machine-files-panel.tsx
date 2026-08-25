@@ -168,7 +168,7 @@ export function MachineFilesPanel() {
         onFiles={take}
         busy={uploading}
         slim={list.length > 0}
-        label={list.length > 0 ? "Add another stitch file" : "Drop your stitch files here"}
+        label={list.length > 0 ? tl("machineFiles", "Add another stitch file") : tl("machineFiles", "Drop your stitch files here")}
         hint={tl("machineFiles", ".EMB, .PES, .DST — 50 MB each")}
       />
 

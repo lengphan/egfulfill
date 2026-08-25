@@ -654,8 +654,8 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
           {visible.length === 0 ? (
             <EmptyState
               icon={Package}
-              title={anyFilter ? "No loaded blanks match these filters" : "No blanks match that search"}
-              note={anyFilter ? "Load more to widen the pool." : `Nothing loaded matches “${debounced}”.`}
+              title={anyFilter ? tl("allSuppliers", "No loaded blanks match these filters") : tl("allSuppliers", "No blanks match that search")}
+              note={anyFilter ? tl("allSuppliers", "Load more to widen the pool.") : `Nothing loaded matches “${debounced}”.`}
             />
           ) : (
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 lg:grid-cols-4">

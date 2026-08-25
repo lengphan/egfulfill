@@ -136,7 +136,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
             <DropdownMenuItem
               key={s.id || "new"}
               disabled={(!!s.deny && !s.walk) || normalizeStage(stage) === s.id}
-              title={s.walk ? `Records every stage up to ${s.label} — asks first` : s.deny ?? (normalizeStage(stage) === s.id ? "Already at this stage" : undefined)}
+              title={s.walk ? `Records every stage up to ${s.label} — asks first` : s.deny ?? (normalizeStage(stage) === s.id ? tl("orderStageMenu", "Already at this stage") : undefined)}
               onClick={() => onStage(s)}
             >
               {s.label}
@@ -159,7 +159,7 @@ export function OrderStageMenu({ order, role, onChanged, onNewLabel, canFulfill,
                 "catch up" does above, and in the title for anyone who wants it spelled out. */}
             <DropdownMenuItem
               onClick={() => setOrderStatus(resumeTo)}
-              title={`Puts this back to ${FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? "Working"} — where it was when it was held`}
+              title={`Puts this back to ${FACTORY_STAGES.find((x) => x.id === resumeTo)?.label ?? tl("orderStageMenu", "Working")} — where it was when it was held`}
             >
               {tl("orderStageMenu", "Clear hold")}
               <span className="ml-auto text-2xs text-muted-foreground">

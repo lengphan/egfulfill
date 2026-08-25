@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { MagnifyingGlass, Package } from "@phosphor-icons/react"
@@ -67,6 +68,7 @@ export function ProductPickerDialog({
   onOpenChange: (v: boolean) => void
   onPick: (p: PickedProduct) => void
 }) {
+  const tl = useLabelT()
   const [products, setProducts] = useState<CatalogProduct[] | null>(null)
   const [query, setQuery] = useState("")
 
@@ -97,12 +99,12 @@ export function ProductPickerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add from catalog</DialogTitle>
+          <DialogTitle>{tl("productPicker", "Add from catalog")}</DialogTitle>
         </DialogHeader>
 
         <div className="relative">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products…" className="pl-9" autoFocus />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tl("productPicker", "Search products…")} className="pl-9" autoFocus />
         </div>
 
         <div className="max-h-[55vh] overflow-y-auto">

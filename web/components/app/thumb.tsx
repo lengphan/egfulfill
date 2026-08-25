@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState, type ReactNode } from "react"
 import NextImage from "next/image"
 import { ImageBroken } from "@phosphor-icons/react"
@@ -45,6 +46,7 @@ export function Thumb({ src, alt = "", fit = "cover", className = "", icon, note
    *  grey tile can — a caption, a disabled action, a link to the original. */
   onBroken?: () => void
 } & Pick<React.ImgHTMLAttributes<HTMLImageElement>, "onLoad" | "loading" | "draggable">) {
+  const tl = useLabelT()
   /**
    * The FAILED URL, not a boolean. A boolean survives a src change, so swapping a broken
    * tile for a good one left the fallback showing — and the fix for that is normally a
@@ -57,7 +59,7 @@ export function Thumb({ src, alt = "", fit = "cover", className = "", icon, note
     return (
       <span
         className={"flex items-center justify-center bg-muted text-muted-foreground/40 " + className}
-        title={note ?? (src ? "This image couldn't be loaded" : "No image")}
+        title={note ?? (src ? tl("thumb", "This image couldn't be loaded") : tl("thumb", "No image"))}
         aria-label={alt || undefined}
         role={alt ? "img" : undefined}
       >
@@ -97,13 +99,14 @@ export function ThumbFill({ src, alt = "", fit = "cover", sizes, className = "",
   icon?: ReactNode
   note?: string
 }) {
+  const tl = useLabelT()
   const [badSrc, setBadSrc] = useState<string | null>(null)
 
   if (!src || badSrc === src) {
     return (
       <span
         className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground/40"
-        title={note ?? (src ? "This image couldn't be loaded" : "No image")}
+        title={note ?? (src ? tl("thumb", "This image couldn't be loaded") : tl("thumb", "No image"))}
         aria-label={alt || undefined}
         role={alt ? "img" : undefined}
       >

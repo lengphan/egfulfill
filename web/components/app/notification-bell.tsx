@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, Package, Headset, ChatCircle, Megaphone, Warning } from "@phosphor-icons/react"
@@ -56,6 +57,7 @@ function chime() {
 }
 
 export function NotificationBell() {
+  const tl = useLabelT()
   const router = useRouter()
   // The notifications PAGE marks things read too — listen so the badge follows.
   const [items, setItems] = useState<Notification[]>([])
@@ -122,7 +124,7 @@ export function NotificationBell() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={unread ? `Notifications (${unread} unread)` : "Notifications"}
+        aria-label={unread ? `Notifications (${unread} unread)` : tl("notificationBell", "Notifications")}
         className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none"
       >
         <Bell size={18} />
@@ -134,13 +136,13 @@ export function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-sm font-semibold">Notifications</span>
-          {unread > 0 && <button onClick={readAll} className="text-xs text-muted-foreground hover:text-foreground">Mark all read</button>}
+          <span className="text-sm font-semibold">{tl("notificationBell", "Notifications")}</span>
+          {unread > 0 && <button onClick={readAll} className="text-xs text-muted-foreground hover:text-foreground">{tl("notificationBell", "Mark all read")}</button>}
         </div>
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 py-10 text-center text-muted-foreground">
             <Bell size={20} weight="duotone" />
-            <span className="text-xs">Nothing yet — you&apos;re all caught up.</span>
+            <span className="text-xs">{tl("notificationBell", "Nothing yet — you’re all caught up.")}</span>
           </div>
         ) : (
           <div className="max-h-96 divide-y divide-border overflow-auto">
@@ -170,7 +172,7 @@ export function NotificationBell() {
           onClick={() => router.push("/notifications")}
           className="w-full border-t border-border px-3 py-2 text-center text-xs font-medium text-primary hover:bg-accent"
         >
-          See all notifications
+          {tl("notificationBell", "See all notifications")}
         </button>
       </DropdownMenuContent>
     </DropdownMenu>

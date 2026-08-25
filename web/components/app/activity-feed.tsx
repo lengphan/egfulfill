@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import type { ReactNode } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { actionMeta, actionDetail, actorName } from "@/components/app/activity-meta"
@@ -67,15 +68,16 @@ export function ActivityFeed({
   empty?: ReactNode
   className?: string
 }) {
+  const tl = useLabelT()
   if (rows === null) {
     return (
       <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-        <CircleNotch size={16} className="animate-spin" /> {loadingText ?? "Loading…"}
+        <CircleNotch size={16} className="animate-spin" /> {loadingText ?? tl("activityFeed", "Loading…")}
       </div>
     )
   }
   if (rows.length === 0) {
-    return <div className={"px-3 py-6 text-center text-sm text-muted-foreground " + (className ?? "")}>{empty ?? "Nothing recorded yet."}</div>
+    return <div className={"px-3 py-6 text-center text-sm text-muted-foreground " + (className ?? "")}>{empty ?? tl("activityFeed", "Nothing recorded yet.")}</div>
   }
 
   // A list still needs its rows separated when it is bare — bare means "no card of my own",

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Camera, X, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +23,7 @@ import { startCameraScan, releaseCamera, cameraSupported } from "@/lib/barcode-s
  * trust problem.
  */
 export function BarcodeCamera({ onScan, onClose }: { onScan: (value: string) => void; onClose: () => void }) {
+  const tl = useLabelT()
  const videoRef = useRef<HTMLVideoElement | null>(null)
  const streamRef = useRef<MediaStream | null>(null)
  const stopped = useRef(false)
@@ -90,7 +92,7 @@ export function BarcodeCamera({ onScan, onClose }: { onScan: (value: string) => 
         )}
         <button onClick={() => { stop(); onClose() }}
  className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
- aria-label="Close camera">
+ aria-label={tl("barcodeCamera", "Close camera")}>
           <X size={14} weight="bold" />
         </button>
       </div>
@@ -102,11 +104,11 @@ export function BarcodeCamera({ onScan, onClose }: { onScan: (value: string) => 
       ) : (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Camera size={13} weight="fill" />
-          Hold the carton label inside the box. It reads automatically.
+          {tl("barcodeCamera", "Hold the carton label inside the box. It reads automatically.")}
         </p>
       )}
 
-      {err && <Button size="sm" variant="outline" onClick={() => { stop(); onClose() }}>Type it instead</Button>}
+      {err && <Button size="sm" variant="outline" onClick={() => { stop(); onClose() }}>{tl("barcodeCamera", "Type it instead")}</Button>}
     </div>
   )
 }

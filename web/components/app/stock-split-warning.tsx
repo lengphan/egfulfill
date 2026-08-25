@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { Warning, Truck } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { warehouseEta, fmtEta } from "@/lib/warehouse-eta"
@@ -35,6 +36,7 @@ export function StockSplitWarning({
  onReduce: (qty: number, warehouse: string) => void
  onSaveForLater: () => void
 }) {
+  const tl = useLabelT()
  const stocked = stock.warehouses.filter((w) => w.qty > 0)
  const covers = stocked.filter((w) => w.qty >= qty)
  if (covers.length > 0) return null          // one warehouse can send it whole — nothing to say
@@ -66,8 +68,7 @@ export function StockSplitWarning({
         <div className="min-w-0 flex-1 space-y-1.5">
           {none ? (
             <p>
-              <strong>Out of stock everywhere.</strong> S&amp;S will ship nothing for this line and report it
- back as an error — the order still goes, just without this.
+              <strong>{tl("stockSplitWarning", "Out of stock everywhere.")}</strong> {tl("stockSplitWarning", "S&S will ship nothing for this line and report it back as an error — the order still goes, just without this.")}
             </p>
           ) : (
             <p>
@@ -87,10 +88,10 @@ export function StockSplitWarning({
                 {eta?.deliveryAt ? ` · ${fmtEta(eta.deliveryAt)}` : ""}
               </Button>
               <Button size="sm" variant="outline" className="h-7" onClick={onSaveForLater}>
-                Save for later
+                {tl("stockSplitWarning", "Save for later")}
               </Button>
               <span className="inline-flex items-center gap-1 text-2xs opacity-80">
-                <Truck size={11} /> or order anyway and accept the split
+                <Truck size={11} /> {tl("stockSplitWarning", "or order anyway and accept the split")}
               </span>
             </div>
           )}

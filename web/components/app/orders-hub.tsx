@@ -2036,7 +2036,7 @@ export function OrdersHub() {
                   <div
  className={"tabular-nums text-xs " + (isOverdue(o, overdueDays) ? "font-medium text-hold" : "text-muted-foreground")}
  title={[
- o.created_at ? `Ordered ${new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : "No order date recorded",
+ o.created_at ? `Ordered ${new Date(o.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}` : tl("orders", "No order date recorded"),
                       // Say WHICH clock this row is judged by. Two rows can both read
                       // "late" on different authority — one against Etsy's promise to the
                       // buyer, one against our own age threshold — and a tooltip that
@@ -2197,7 +2197,7 @@ export function OrdersHub() {
                   {isRush(o) && (
                     <span
  className="pointer-events-none absolute left-3 top-[-2.3px] text-primary"
- title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : "Rush"}
+ title={o.rushed_at ? `Rush — flagged ${fmtDate(o.rushed_at)}` : tl("orders", "Rush")}
  aria-label={tl("orders", "Rush")}
                     >
                       <BookmarkSimple size={18} weight="fill" />
@@ -2562,8 +2562,8 @@ export function OrdersHub() {
                           {primary === "start" && (
                             <Button size="sm" onClick={() => startOrder(o)} disabled={busyO}
  title={fac
-                                ? "Put this into production — moves it to Awaiting scan"
- : "Accept this seller's order into production — moves it to Awaiting scan"}>
+                                ? tl("orders", "Put this into production — moves it to Awaiting scan")
+ : tl("orders", "Accept this seller's order into production — moves it to Awaiting scan")}>
                               {tl("ui", "Start")}
                             </Button>
                           )}
@@ -2677,7 +2677,7 @@ export function OrdersHub() {
                                   <DropdownMenuItem
  disabled={!printable}
  onClick={() => printable && setBarcodeOrder(o)}
- title={printable ? undefined : "Pick a blank on at least one line first — the barcode is the stock code"}
+ title={printable ? undefined : tl("orders", "Pick a blank on at least one line first — the barcode is the stock code")}
                                   >
                                     {tl("ui", "Print blank labels")}
                                   </DropdownMenuItem>
@@ -2696,7 +2696,7 @@ export function OrdersHub() {
  disabled={(!!s.deny && !s.walk) || normalizeStage(stage) === s.id}
  title={s.walk
                                           ? `Records every stage up to ${s.label} — asks first`
- : s.deny ?? (normalizeStage(stage) === s.id ? "Already at this stage" : undefined)}
+ : s.deny ?? (normalizeStage(stage) === s.id ? tl("orders", "Already at this stage") : undefined)}
  onClick={() => {
  if (s.walk) { setCatchUp({ order: o, to: s.id, label: s.label }); return }
  if (!s.deny) setOrderStatus(o, s.id)
@@ -2753,7 +2753,7 @@ export function OrdersHub() {
  key={s.id}
  disabled={!onHoldNow && !!s.deny}
  title={onHoldNow
-                                            ? `Take this order off hold and return it to ${stageMeta(holdFrom)?.label || "Draft"}`
+                                            ? `Take this order off hold and return it to ${stageMeta(holdFrom)?.label || tl("orders", "Draft")}`
  : s.deny ?? undefined}
  onClick={() => {
  if (onHoldNow) { setOrderStatus(o, holdFrom); return }

@@ -68,15 +68,15 @@ export function FactoryColumnsMenu({ order, hidden, onOrder, onHidden, className
 
       <PopoverContent align="end" className="w-60 p-2">
         <div className="mb-1.5 flex items-center justify-between px-1">
-          <span className="text-sm font-semibold">Columns</span>
+          <span className="text-sm font-semibold">{tl("factoryColumnsMenu", "Columns")}</span>
           <button
             onClick={reset}
             className="eg-tap inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            Reset
+            {tl("factoryColumnsMenu", "Reset")}
           </button>
         </div>
-        <p className="mb-1.5 px-1 text-2xs leading-relaxed text-muted-foreground">Drag to reorder · click to show or hide.</p>
+        <p className="mb-1.5 px-1 text-2xs leading-relaxed text-muted-foreground">{tl("factoryColumnsMenu", "Drag to reorder · click to show or hide.")}</p>
         {order.map((id, i) => {
           const locked = isFactoryColLocked(id)
           const shown = !hidden.includes(id)
@@ -109,7 +109,7 @@ export function FactoryColumnsMenu({ order, hidden, onOrder, onHidden, className
                 </span>
                 <span className="truncate">{tl("col", FACTORY_COLS[id].label)}</span>
                 {/* Says WHY it can't be turned off, rather than just refusing the click. */}
-                {locked && <span className="ml-auto shrink-0 text-2xs text-muted-foreground">always on</span>}
+                {locked && <span className="ml-auto shrink-0 text-2xs text-muted-foreground">{tl("factoryColumnsMenu", "always on")}</span>}
               </button>
             </div>
           )

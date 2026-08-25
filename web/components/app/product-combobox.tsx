@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import Image from "next/image"
@@ -44,6 +45,7 @@ export function ProductCombobox({
   onBrowse?: () => void
   placeholder?: string
 }) {
+  const tl = useLabelT()
   const [products, setProducts] = useState<CatalogProduct[]>(cache ?? [])
   // Which of three states the list is in. Without this, "your catalogue is empty" and
   // "the catalogue failed to load" were both rendered as a list of five invented products.
@@ -199,8 +201,8 @@ export function ProductCombobox({
       <button
         type="button"
         tabIndex={-1}
-        aria-label={onBrowse ? "Browse all products" : "Show products"}
-        title={onBrowse ? "Browse all products" : "Show products"}
+        aria-label={onBrowse ? tl("productCombobox", "Browse all products") : tl("productCombobox", "Show products")}
+        title={onBrowse ? tl("productCombobox", "Browse all products") : tl("productCombobox", "Show products")}
         // With no browse handler the caret used to call an empty function and look broken.
         // Fall back to toggling the list so it always does something.
         onClick={() => { if (onBrowse) { setOpen(false); onBrowse() } else setOpen((v) => !v) }}
@@ -225,11 +227,11 @@ export function ProductCombobox({
               // Say WHICH of the three it is. A failed load and an empty catalogue lead to
               // different actions, and neither is "no match for what you typed".
               <div className="px-3 py-2.5 text-xs text-muted-foreground">
-                {load === "loading" ? "Loading your catalogue…"
-                  : load === "error" ? "Couldn't load your catalogue — check the connection and reopen. Nothing is missing from it; we just can't read it right now."
-                  : load === "empty" ? "No products in your catalogue yet. Add one in Products, then reopen this."
+                {load === "loading" ? tl("productCombobox", "Loading your catalogue…")
+                  : load === "error" ? tl("productCombobox", "Couldn't load your catalogue — check the connection and reopen. Nothing is missing from it; we just can't read it right now.")
+                  : load === "empty" ? tl("productCombobox", "No products in your catalogue yet. Add one in Products, then reopen this.")
                   : value.trim() ? `No catalog match — "${value.trim()}" stays a custom item.`
-                  : "No catalog products yet."}
+                  : tl("productCombobox", "No catalog products yet.")}
               </div>
             ) : (
               matches.map((p, i) => {

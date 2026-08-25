@@ -1,3 +1,6 @@
+"use client"
+
+import { useLabelT } from "@/lib/i18n"
 import type { OrderItem } from "@/lib/api"
 import { decodeEntities } from "@/lib/order-format"
 
@@ -41,6 +44,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
    */
   blankSku?: string | null
 }) {
+  const tl = useLabelT()
   // Entities arrive HTML-encoded from the marketplaces (&amp;, &#39;) — the same decode the
   // order title gets, or "Men&#39;s" is what a packer reads.
   const ordered = decodeEntities(String(item.variant ?? "").trim())
@@ -91,7 +95,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
    * times.
    */
   const parts: React.ReactNode[] = []
-  if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">Listing SKU:</span> <span className="tabular-nums">{sku}</span></span>)
+  if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">{tl("orderedVariant", "Listing SKU:")}</span> <span className="tabular-nums">{sku}</span></span>)
   // The blank stands in where there is no listing sku — a manual line — and sits beside it
   // where there is one, because they are different codes for different things.
   /**
@@ -109,7 +113,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
    */
   if (blankSku || blank) parts.push(
     <span key="b" title={blank || undefined}>
-      <span className="font-medium text-foreground/70">Blank SKU:</span>{" "}
+      <span className="font-medium text-foreground/70">{tl("orderedVariant", "Blank SKU:")}</span>{" "}
       <span className="tabular-nums">{blankSku || blank}</span>
     </span>
   )
@@ -118,7 +122,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
   // should not.
   parts.push(
     <span key="q">
-      <span className="font-medium text-foreground/70">Qty</span>{" "}
+      <span className="font-medium text-foreground/70">{tl("orderedVariant", "Qty")}</span>{" "}
       <span className={qty > 1 ? "font-semibold text-foreground" : ""}>{qty}</span>
     </span>
   )
@@ -131,7 +135,7 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
     <div className={"mt-0.5 space-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
       {ordered && (
         <div>
-          <span className="font-medium text-foreground/70">Ordered:</span> {ordered}
+          <span className="font-medium text-foreground/70">{tl("orderedVariant", "Ordered:")}</span> {ordered}
         </div>
       )}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

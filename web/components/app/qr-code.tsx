@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import QRCode from "qrcode"
 
@@ -27,6 +28,7 @@ export function QrCode({ value, className, margin = 1 }: {
    *  all, so 1 is the floor rather than the default. */
   margin?: number
 }) {
+  const tl = useLabelT()
   const [svg, setSvg] = useState<string | null>(null)
   // State, not a ref: whether generation failed is rendered, so it has to be able to
   // trigger a re-render. A ref read during render is stale by definition.
@@ -52,7 +54,7 @@ export function QrCode({ value, className, margin = 1 }: {
     // printed, stuck to a garment, and discovered at the scanner.
     return (
       <div className={"flex items-center justify-center text-[7px] text-muted-foreground " + (className ?? "")}>
-        {failed ? "QR failed" : ""}
+        {failed ? tl("qrCode", "QR failed") : ""}
       </div>
     )
   }

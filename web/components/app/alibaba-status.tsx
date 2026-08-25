@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CheckCircle, Plug } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import { getUser } from "@/lib/auth"
  * redirecting a sourcing connect to a page about shops.
  */
 export function AlibabaStatus() {
+  const tl = useLabelT()
   const [cfg, setCfg] = useState<AlibabaConfig | null>(null)
   const isAdmin = getUser()?.role === "admin"
 
@@ -63,7 +65,7 @@ export function AlibabaStatus() {
   if (cfg.connected) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title={cfg.account ?? undefined}>
-        <CheckCircle size={13} weight="fill" className="text-success" /> Connected
+        <CheckCircle size={13} weight="fill" className="text-success" /> {tl("alibabaStatus", "Connected")}
       </span>
     )
   }
@@ -73,7 +75,7 @@ export function AlibabaStatus() {
      which situation they are in — and neither may show a green tick. */
   return (
     <Button size="sm" variant="outline" disabled={!cfg.authorizeUrl} onClick={connect}>
-      <Plug size={14} weight="bold" /> {cfg.expired ? "Reconnect Alibaba" : "Connect Alibaba"}
+      <Plug size={14} weight="bold" /> {cfg.expired ? tl("alibabaStatus", "Reconnect Alibaba") : tl("alibabaStatus", "Connect Alibaba")}
     </Button>
   )
 }

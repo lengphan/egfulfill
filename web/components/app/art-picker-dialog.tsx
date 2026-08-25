@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
 import { ImageSquare, MagnifyingGlass, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -44,6 +45,7 @@ export function ArtPickerDialog({
   emptyText?: string
   searchPlaceholder?: string
 }) {
+  const tl = useLabelT()
   const [qy, setQy] = useState("")
   const zoom = useLightbox()
 
@@ -107,7 +109,7 @@ export function ArtPickerDialog({
                       role="button" tabIndex={0}
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); zoom.open(it.src ?? it.url, it.name) }}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); zoom.open(it.src ?? it.url, it.name) } }}
-                      title="View full size"
+                      title={tl("artPicker", "View full size")}
                       className="absolute left-1.5 top-1.5 hidden size-6 cursor-zoom-in items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/75 group-hover/well:flex"
                     >
                       <MagnifyingGlassPlus size={12} weight="bold" />
@@ -115,7 +117,7 @@ export function ArtPickerDialog({
                   </div>
                   <div className="border-t border-border p-2">
                     {it.badge && <div className="text-2xs font-semibold text-primary">{it.badge}</div>}
-                    <div className="truncate text-xs text-muted-foreground">{it.name || "Untitled"}</div>
+                    <div className="truncate text-xs text-muted-foreground">{it.name || tl("artPicker", "Untitled")}</div>
                   </div>
                 </button>
               ))}
@@ -128,7 +130,7 @@ export function ArtPickerDialog({
             {shown.length === items.length
               ? `${items.length} image${items.length === 1 ? "" : "s"}`
               : `${shown.length} of ${items.length}`}
-            {" · click one to place it on the design"}
+            {tl("artPicker", " · click one to place it on the design")}
           </p>
         )}
       </DialogContent>

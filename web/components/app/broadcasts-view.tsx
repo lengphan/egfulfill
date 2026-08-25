@@ -603,7 +603,7 @@ export function BroadcastsView() {
  type="button"
  onClick={() => (b.status === "draft" ? openEditor(b) : openViewer(b))}
  className="eg-tap block max-w-full truncate text-left font-medium transition-colors hover:text-primary"
- title={b.status === "draft" ? "Open this draft" : "Read what was sent"}
+ title={b.status === "draft" ? tl("broadcasts", "Open this draft") : tl("broadcasts", "Read what was sent")}
                         >
                           {b.subject}
                         </button>
@@ -692,7 +692,7 @@ export function BroadcastsView() {
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Body")}</label>
               <textarea className={TEXTAREA_CLS} value={body} onChange={(e) => setBody(e.target.value)}
- placeholder={"Blank lines start a new paragraph.\n\nSellers are greeted by name automatically."} />
+ placeholder={tl("broadcasts", "Blank lines start a new paragraph.\n\nSellers are greeted by name automatically.")} />
             </div>
             <div>
               {/* WHERE IT GOES. Two places, chosen independently — this is not a format

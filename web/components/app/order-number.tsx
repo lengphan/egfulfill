@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState } from "react"
 import { Check, X } from "@phosphor-icons/react/dist/ssr"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ export function OrderNumber({
   onSaved?: (seq: number) => void
   className?: string
 }) {
+  const tl = useLabelT()
   const label = numOf(order)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
@@ -97,7 +99,7 @@ export function OrderNumber({
         /* These numbers sit inside rows that navigate on click. Without this, pressing the
            number both opened the editor and left the page it was on. */
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); open() }}
-        title="Change this order's number"
+        title={tl("orderNumber", "Change this order's number")}
         className={`-mx-1 rounded px-1 text-left hover:bg-accent ${className}`}
       >
         {label}
@@ -121,13 +123,13 @@ export function OrderNumber({
             if (e.key === "Escape") { e.preventDefault(); setEditing(false); setErr(null) }
           }}
           className="h-8 w-24 tabular-nums"
-          aria-label="Order number"
+          aria-label={tl("orderNumber", "Order number")}
         />
-        <Button size="icon" variant="ghost" className="size-8" disabled={busy} onClick={() => void commit()} aria-label="Save number">
+        <Button size="icon" variant="ghost" className="size-8" disabled={busy} onClick={() => void commit()} aria-label={tl("orderNumber", "Save number")}>
           <Check size={15} />
         </Button>
         <Button size="icon" variant="ghost" className="size-8" disabled={busy}
-          onClick={() => { setEditing(false); setErr(null) }} aria-label="Cancel">
+          onClick={() => { setEditing(false); setErr(null) }} aria-label={tl("orderNumber", "Cancel")}>
           <X size={15} />
         </Button>
       </span>

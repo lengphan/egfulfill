@@ -179,7 +179,7 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
  type="checkbox"
  checked={st.picked}
  disabled={busy}
- aria-label={`${st.picked ? "Remove" : "Add"} ${st.name || st.ref} ${st.picked ? "from" : "to"} the catalogue`}
+ aria-label={`${st.picked ? tl("supplierStylesPicker", "Remove") : tl("supplierStylesPicker", "Add")} ${st.name || st.ref} ${st.picked ? "from" : "to"} the catalogue`}
  onChange={(e) => void toggle(st.ref, e.target.checked)}
                       />
                     </td>

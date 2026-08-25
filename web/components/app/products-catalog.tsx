@@ -249,7 +249,7 @@ export function ProductsCatalog() {
  value={String(stats.live)}
  sub={stats.stranded > 0
             ? `${stats.stranded} Active but held back`
- : stats.live === stats.total ? "all products" : `of ${stats.total} products`}
+ : stats.live === stats.total ? tl("products", "all products") : `of ${stats.total} products`}
  tone={stats.stranded > 0 ? "neg" : stats.live ? "pos" : undefined}
         />
       </StatGrid>
@@ -393,7 +393,7 @@ export function ProductsCatalog() {
                     <div className="absolute inset-0" style={framingStyle(p)}>
                       <Image
  src={img}
- alt={p.name ?? "Product"}
+ alt={p.name ?? tl("products", "Product")}
  fill
  unoptimized
  className="object-contain transition-transform duration-300 group-hover:scale-[1.04]"
@@ -428,7 +428,7 @@ export function ProductsCatalog() {
  const tone = st.live ? "text-shipped" : st.label === "No price" ? "text-hold" : "text-draft"
  return (
                       <span
- title={st.why ?? "On the public site."}
+ title={st.why ?? tl("products", "On the public site.")}
  className="pointer-events-none absolute right-2 top-2 z-[5] inline-flex items-center gap-1.5 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium ring-1 ring-border backdrop-blur-sm transition-opacity group-hover:opacity-0"
                       >
                         {/* A DOT, not a filled chip. Over a photo the fill is what turns a

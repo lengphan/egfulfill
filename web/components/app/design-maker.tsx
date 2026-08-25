@@ -237,7 +237,7 @@ function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onD
     return (
       <a
  href={url} target="_blank" rel="noreferrer"
- title={[title || [badge, name].filter(Boolean).join(" · "), "Not an image we can load — opens the original"].filter(Boolean).join(" · ")}
+ title={[title || [badge, name].filter(Boolean).join(" · "), tl("designMaker", "Not an image we can load — opens the original")].filter(Boolean).join(" · ")}
  className="block w-full overflow-hidden rounded-md border border-border transition-colors hover:border-primary/50"
       >
         <Thumb className="aspect-square w-full" icon={<LinkSimpleBreak size={18} weight="duotone" />} note="" />
@@ -250,7 +250,7 @@ function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onD
  return (
     <div className="group/thumb relative">
       <button
- type="button" onClick={onPlace} title={[title || [badge, name].filter(Boolean).join(" · "), dim ? `${dim.w} × ${dim.h} px` : null].filter(Boolean).join(" · ") || "Place on the design"}
+ type="button" onClick={onPlace} title={[title || [badge, name].filter(Boolean).join(" · "), dim ? `${dim.w} × ${dim.h} px` : null].filter(Boolean).join(" · ") || tl("designMaker", "Place on the design")}
  className="block w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
       >
         {/* A picture that fails must not paint its ALT — and the alt here is the marketplace
@@ -1309,7 +1309,7 @@ export function DesignMaker() {
                       <span className="truncate">{im.name || tl("designMaker", "Image")}</span>
                       <span
  className={"ml-auto size-1.5 shrink-0 rounded-full bg-current " + QUALITY_TONE[v.tone]}
- title={d == null ? "Measuring this layer" : `${Math.round(d)} DPI as placed — ${v.label.replace("Print quality: ", "")}`}
+ title={d == null ? tl("designMaker", "Measuring this layer") : `${Math.round(d)} DPI as placed — ${v.label.replace("Print quality: ", "")}`}
                       />
                     </button>
                   )
@@ -1364,12 +1364,26 @@ export function DesignMaker() {
       <ArtPickerDialog
  open={browse !== null}
  onOpenChange={(v) => { if (!v) setBrowse(null) }}
- title={browse === "uploads" ? "Your uploads" : "Artwork from your orders"}
+ title={browse === "uploads" ? tl("designMaker", "Your uploads") : tl("designMaker", "Artwork from your orders")}
  items={browseItems}
  onPick={placeImage}
- emptyText={browse === "uploads" ? "You haven't uploaded anything yet." : "No buyer artwork has come in from your orders yet."}
+ emptyText={browse === "uploads" ? tl("designMaker", "You haven't uploaded anything yet.") : tl("designMaker", "No buyer artwork has come in from your orders yet.")}
  searchPlaceholder={browse === "uploads" ? "Search your uploads…" : "Search by order number or item…"}
       />
     </div>
   )
+}
+
+
+/**
+ * The Suspense fallback for the maker route.
+ *
+ * app/(app)/design/maker/page.tsx is a SERVER component, so it cannot call useLabelT — a
+ * hook inserted there fails the build on prerender, not at runtime. This is the same client
+ * island treatment the help pages use: the page stays a server component and one line of
+ * transient text still translates.
+ */
+export function DesignMakerFallback() {
+  const tl = useLabelT()
+  return <div className="py-24 text-center text-muted-foreground">{tl("designMaker", "Loading maker…")}</div>
 }

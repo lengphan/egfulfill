@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { ShoppingCart, CircleNotch } from "@phosphor-icons/react"
 import { getFactoryList, type SavedPOLine } from "@/lib/api"
@@ -29,6 +30,7 @@ import { EmptyState } from "@/components/app/empty-state"
  * square that means "no picture", never a broken one.
  */
 export function CartReadOnly({ refreshKey = 0 }: { refreshKey?: number }) {
+  const tl = useLabelT()
   const [lines, setLines] = useState<SavedPOLine[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -69,7 +71,7 @@ export function CartReadOnly({ refreshKey = 0 }: { refreshKey?: number }) {
     <div className="space-y-4">
       {err && <div className="text-sm text-destructive">{err}</div>}
       <SectionCard
-        title="In the cart"
+        title={tl("cartReadonly", "In the cart")}
         // SectionCard's body carries NO padding of its own — every caller brings it. Without
         // this the supplier headings sat flush against the card's own border.
         bodyClassName="px-5 py-4"
@@ -79,8 +81,8 @@ export function CartReadOnly({ refreshKey = 0 }: { refreshKey?: number }) {
           <EmptyState
             icon={ShoppingCart}
             size="sm"
-            title="Nothing waiting to be ordered"
-            note="Blanks land here when an order runs stock short."
+            title={tl("cartReadonly", "Nothing waiting to be ordered")}
+            note={tl("cartReadonly", "Blanks land here when an order runs stock short.")}
           />
         ) : (
           <div className="space-y-5">

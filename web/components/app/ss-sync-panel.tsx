@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import { getSsSyncStatus, startSsSyncAll, stopSsSyncAll, type SsSyncStatus } fro
  * stopping it costs nothing.
  */
 export function SsSyncPanel() {
+  const tl = useLabelT()
   const [st, setSt] = useState<SsSyncStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -116,7 +118,7 @@ export function SsSyncPanel() {
 
       {st.running ? (
         <Button size="sm" variant="outline" onClick={stop} disabled={busy}>
-          Stop
+          {tl("ssSync", "Stop")}
         </Button>
       ) : (
         <>
@@ -128,7 +130,7 @@ export function SsSyncPanel() {
               occasional full pass is worth an hour; a normal run should skip them. */}
           <button onClick={() => start(true)} disabled={busy}
             className="text-xs font-medium text-muted-foreground hover:text-foreground">
-            refresh existing
+            {tl("ssSync", "refresh existing")}
           </button>
         </>
       )}

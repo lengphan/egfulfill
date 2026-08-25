@@ -231,7 +231,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <SectionCard
- title={readOnly ? "Stock levels — view only" : isIn ? "Scanning IN — adds to stock" : "Scanning OUT — removes from stock"}
+ title={readOnly ? tl("scan", "Stock levels — view only") : isIn ? tl("scan", "Scanning IN — adds to stock") : tl("scan", "Scanning OUT — removes from stock")}
  actions={hasCam ? (
           <Button size="sm" variant="outline" onClick={() => setCamOpen(true)}>{tl("scan", "Camera")}</Button>
         ) : undefined}

@@ -137,6 +137,7 @@ function RefTile({ src, i, picked, current, onShow, onToggle }: {
   src: string; i: number; picked: boolean; current: boolean
   onShow: () => void; onToggle: () => void
 }) {
+  const tl = useLabelT()
   return (
     /* One size. `big` existed to tween a tile between the grid layout and the strip layout,
        and there is only one layout now — see the note on the panel grid. */
@@ -162,7 +163,7 @@ function RefTile({ src, i, picked, current, onShow, onToggle }: {
         onClick={onToggle}
         aria-pressed={picked}
         aria-label={picked ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
-        title={picked ? "Using this one — click to drop it" : "Not used — click to add it"}
+        title={picked ? tl("photoStudio", "Using this one — click to drop it") : tl("photoStudio", "Not used — click to add it")}
         /* Same two states as the grid on the publish page: one ring, filled or not. */
         className={"absolute -right-1 -top-1 grid place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
           "size-4 " +
@@ -784,7 +785,7 @@ export function ListingPhotoStudio({
                     <Button size="sm" onClick={() => use(hero)}>{tl("photoStudio", "Use this photo")}</Button>
                     {/* Free, so it says so — every other button in this panel spends money. */}
                     <Button size="sm" variant="outline" onClick={() => cutOut(hero)} disabled={cutting === hero.url || hero.cutOut}
-                      title={hero.cutOut ? "Background already removed" : "Lift the backdrop off and keep it as a PNG — done in your browser, no charge"}>
+                      title={hero.cutOut ? tl("photoStudio", "Background already removed") : tl("photoStudio", "Lift the backdrop off and keep it as a PNG — done in your browser, no charge")}>
                       {cutting === hero.url ? <CircleNotch size={13} className="animate-spin" /> : <Eraser size={13} weight="bold" />}
                       {hero.cutOut ? tl("photoStudio", "Background removed") : cutting === hero.url ? tl("photoStudio", "Removing…") : tl("photoStudio", "Remove background")}
                     </Button>
@@ -798,8 +799,8 @@ export function ListingPhotoStudio({
                       className={usedAsRef.includes(hero.url) ? "" : "text-muted-foreground"}
                       onClick={() => toggleRenderRef(hero.url)}
                       title={usedAsRef.includes(hero.url)
-                        ? "The next render and Write from photos will both see this one"
-                        : "Use this render as a reference for the next one"}
+                        ? tl("photoStudio", "The next render and Write from photos will both see this one")
+                        : tl("photoStudio", "Use this render as a reference for the next one")}
                     >
                       <Check size={13} weight="bold" />
                       {usedAsRef.includes(hero.url) ? tl("photoStudio", "Used as reference") : tl("photoStudio", "Use as reference")}
@@ -938,8 +939,8 @@ export function ListingPhotoStudio({
                          reference — so the label and the tooltip ask for one only when there
                          is genuinely nothing on either side to read. */
                       title={(picked.length || usedAsRef.length)
-                        ? "Read the ticked photos and write the brief"
-                        : "Tick a reference photo above, or use one of our renders"}
+                        ? tl("photoStudio", "Read the ticked photos and write the brief")
+                        : tl("photoStudio", "Tick a reference photo above, or use one of our renders")}
                     >
                       {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
                       {reading ? tl("photoStudio", "Reading…")
@@ -1102,7 +1103,7 @@ export function ListingPhotoStudio({
                             <button
                               type="button"
                               onClick={() => openFromHistory(h)}
-                              title={h.prompt || "Open this render"}
+                              title={h.prompt || tl("photoStudio", "Open this render")}
                               aria-label={tl("photoStudio", "Open this render")}
                               className="size-20 overflow-hidden rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/60"
                             >

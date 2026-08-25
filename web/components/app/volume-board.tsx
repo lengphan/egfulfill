@@ -176,8 +176,8 @@ export function VolumeBoard() {
   return (
     <Shell note={
       data.applied
-        ? "Ship more in a month, pay less the next."
-        : "Ship more in a month, pay less the next. We're tracking this now — it isn't discounting orders yet."
+        ? tl("volumeBoard", "Ship more in a month, pay less the next.")
+        : tl("volumeBoard", "Ship more in a month, pay less the next. We're tracking this now — it isn't discounting orders yet.")
     }>
       <VolumeRail data={data} />
     </Shell>

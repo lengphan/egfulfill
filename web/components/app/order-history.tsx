@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CaretDown } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import { getUser } from "@/lib/auth"
  * seller rather than leaking who on the floor touched their order.
  */
 export function OrderHistory({ orderId, items = [] }: { orderId: string; items?: OrderItem[] }) {
+  const tl = useLabelT()
   // "FFL-mssfifwo0l05v" means nothing to a reader. The order knows which line that is, so
   // the log borrows the SAME number the item rows and the drop zone use.
   const resolveLine = (key: string) => {
@@ -75,14 +77,14 @@ export function OrderHistory({ orderId, items = [] }: { orderId: string; items?:
 
   return (
     <SectionCard
-      title="Order history"
+      title={tl("orderHistory", "Order history")}
       actions={
         /* A control, not a caption: it SAYS which way it will go, and the caret turns so
            the state is readable without reading the word. Ghost because opening a record
            is a minor action next to anything else on this page (§4: the variants are a
            hierarchy). */
         <Button variant="ghost" size="sm" onClick={toggle} aria-expanded={open}>
-          {open ? "Hide" : "Show"}
+          {open ? tl("orderHistory", "Hide") : tl("orderHistory", "Show")}
           <CaretDown size={13} weight="bold" className={"transition-transform " + (open ? "rotate-180" : "")} />
         </Button>
       }

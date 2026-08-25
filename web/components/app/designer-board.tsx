@@ -843,7 +843,7 @@ export function DesignerBoard() {
                               // title no longer makes the whole card shorter than its neighbours —
                               // everything below stays docked at the same place. line-clamp-2 caps
                               // it at two lines; the full title is on hover and in the rename input.
- title={c.title || "Design"}
+ title={c.title || tl("designer", "Design")}
  className="line-clamp-2 min-h-[2.25rem] rounded text-left text-sm font-medium leading-tight transition-colors hover:bg-accent"
                             >
                               {cardLabel(c)}
@@ -863,7 +863,7 @@ export function DesignerBoard() {
                                 {designLabel(c.design_id)}
                               </span>
                             )}
-                            <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums" title={c.order_id ? `Order ${c.order_id}` : "Not attached to an order"}>
+                            <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums" title={c.order_id ? `Order ${c.order_id}` : tl("designer", "Not attached to an order")}>
                               {/* shortOrderRef, not slice(0,14). Truncating at a character
  count cut `etsy-4149084185` to `etsy-414908418` — a number
  with its last digit removed, which still LOOKS like an
@@ -902,7 +902,7 @@ export function DesignerBoard() {
  return (
                                 <span
  className="shrink-0 font-medium tabular-nums text-foreground"
- title={c.vendor ? "Outsourced — partner cost" : c.credited ? "Credited to the designer" : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : "Designer payout on approval")}
+ title={c.vendor ? tl("designer", "Outsourced — partner cost") : c.credited ? tl("designer", "Credited to the designer") : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : tl("designer", "Designer payout on approval"))}
                                 >
                                   {money(payout)}{suffix}
                                 </span>
@@ -1063,7 +1063,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
  className={"flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-accent " + (dragIdx === idx ? "opacity-50" : "")}
                     >
                       <DotsSixVertical size={14} weight="bold" className="shrink-0 cursor-grab text-muted-foreground" />
-                      <button onClick={() => !col.locked && toggle(col.id)} disabled={col.locked} title={col.locked ? "Always shown" : "Hide"} className="flex size-5 shrink-0 items-center justify-center disabled:opacity-40">
+                      <button onClick={() => !col.locked && toggle(col.id)} disabled={col.locked} title={col.locked ? tl("designer", "Always shown") : tl("designer", "Hide")} className="flex size-5 shrink-0 items-center justify-center disabled:opacity-40">
                         <CheckSquare size={16} weight="fill" className="text-primary" />
                       </button>
                       <Input value={labelOf(col)} onChange={(e) => rename(col.id, e.target.value)} className="h-7 flex-1 text-xs" />
@@ -1274,7 +1274,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
  type="button"
  onClick={() => { if (card.thumb) setZoom(true) }}
  disabled={!card.thumb}
- title={card.thumb ? "Click to view full size" : undefined}
+ title={card.thumb ? tl("designer", "Click to view full size") : undefined}
  className="group relative size-52 shrink-0 overflow-hidden rounded-xl border border-border bg-muted disabled:cursor-default"
           >
             <CardArt key={String(card.thumb ?? card.id)} card={card} imgClass="size-full object-contain" iconSize={40} />
@@ -1292,8 +1292,8 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
  onChange={(e) => setDesc(e.target.value)}
  onBlur={saveDesc}
  placeholder={isEmbCard(card)
-                ? "Notes for the factory check — thread colours, placement, anything to verify before stitching. Saved to the card."
- : "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."}
+                ? tl("designer", "Notes for the factory check — thread colours, placement, anything to verify before stitching. Saved to the card.")
+ : tl("designer", "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card.")}
  className="min-h-[9rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
             />
           </div>
@@ -1571,7 +1571,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
  className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={String(card.thumb)} alt={card.title || "Design"} className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
+            <img src={String(card.thumb)} alt={card.title || tl("designer", "Design")} className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
           </div>
         )}
       </DialogContent>

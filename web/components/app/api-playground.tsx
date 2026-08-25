@@ -212,7 +212,7 @@ export function ApiPlayground() {
  value={revealed || !apiKey ? apiKey : maskKey(apiKey)}
  onChange={(e) => rememberKey(e.target.value)}
  readOnly={!!apiKey && !revealed}
- placeholder={env === "live" ? "Paste your egk_live_… key from Settings → API keys" : "Paste your egk_test_… key from Settings → API keys"}
+ placeholder={env === "live" ? tl("apiPlayground", "Paste your egk_live_… key from Settings → API keys") : tl("apiPlayground", "Paste your egk_test_… key from Settings → API keys")}
  className="pl-9 pr-20 font-mono text-xs"
               />
               {apiKey && (
@@ -220,8 +220,8 @@ export function ApiPlayground() {
                   <button
  type="button"
  onClick={() => setRevealed((v) => !v)}
- aria-label={revealed ? "Hide key" : "Reveal key"}
- title={revealed ? "Hide" : "Reveal"}
+ aria-label={revealed ? tl("apiPlayground", "Hide key") : tl("apiPlayground", "Reveal key")}
+ title={revealed ? tl("apiPlayground", "Hide") : tl("apiPlayground", "Reveal")}
  className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     {revealed ? <EyeSlash size={14} weight="bold" /> : <Eye size={14} weight="bold" />}

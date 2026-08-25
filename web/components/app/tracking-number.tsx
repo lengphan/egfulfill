@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { Copy, Check, ArrowSquareOut } from "@phosphor-icons/react"
 import { trackUrl } from "@/lib/order-format"
@@ -20,6 +21,7 @@ import { trackUrl } from "@/lib/order-format"
  * cursor is one you misclick.
  */
 export function TrackingNumber({ carrier, tracking }: { carrier?: string | null; tracking?: string | null }) {
+  const tl = useLabelT()
  const [copied, setCopied] = useState(false)
  if (!tracking) return null
  const url = trackUrl(carrier, tracking)
@@ -42,7 +44,7 @@ export function TrackingNumber({ carrier, tracking }: { carrier?: string | null;
       <button
  type="button"
  onClick={copy}
- title={copied ? "Copied" : "Copy this tracking number"}
+ title={copied ? tl("trackingNumber", "Copied") : tl("trackingNumber", "Copy this tracking number")}
  className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 tabular-nums text-xs tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <span className="select-all">{tracking}</span>
@@ -55,7 +57,7 @@ export function TrackingNumber({ carrier, tracking }: { carrier?: string | null;
  href={url}
  target="_blank"
  rel="noopener noreferrer"
- title={`Track this on ${carrier || "the carrier"}'s site`}
+ title={`Track this on ${carrier || tl("trackingNumber", "the carrier")}'s site`}
  className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <ArrowSquareOut size={12} weight="bold" />

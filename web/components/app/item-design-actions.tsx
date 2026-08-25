@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock } from "@phosphor-icons/react"
 import {
@@ -54,6 +55,7 @@ export function ItemDesignActions({
  state?: CardState
  onChanged?: () => void
 }) {
+  const tl = useLabelT()
  const [pushOpen, setPushOpen] = useState(false)
  const sent = !!state?.vendor
  const lane = state?.col ? LANE[state.col] : undefined
@@ -112,19 +114,19 @@ export function ItemDesignActions({
         <DropdownMenu>
           <DropdownMenuTrigger
  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
- aria-label="Design actions"
+ aria-label={tl("itemDesignActions", "Design actions")}
           >
             <DotsThree size={16} weight="bold" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Design</DropdownMenuLabel>
+              <DropdownMenuLabel>{tl("itemDesignActions", "Design")}</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={!!blocker}>
                 <PaperPlaneTilt size={14} />
                 {/* The blocker IS the label. A greyed "Send to design partner" says it
  cannot be pressed and not one word about why, which on a row that looks
  identical to the one above it is the most annoying kind of disabled. */}
-                {blocker ?? "Send to design partner"}
+                {blocker ?? tl("itemDesignActions", "Send to design partner")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>

@@ -264,7 +264,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
                       <div className="mt-1 flex items-center gap-2 text-xs">
                         {chatUrl(s.sellerEid) && (
                           <a href={chatUrl(s.sellerEid)!} target="_blank" rel="noopener noreferrer"
- title={`Open the Alibaba chat with ${s.sellerName || "this supplier"} — you'll need to be signed in there`}
+ title={`Open the Alibaba chat with ${s.sellerName || tl("samples", "this supplier")} — you'll need to be signed in there`}
  className="inline-flex items-center gap-1 text-primary hover:underline">
                             <ChatCircleDots size={12} weight="bold" /> {tl("samples", "Chat")}
                           </a>

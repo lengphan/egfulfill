@@ -174,8 +174,8 @@ export function PartnerSheets() {
             template where every column reads "leave blank" and looks like a bad detector. */}
         <Button size="sm" onClick={() => fileRef.current?.click()} disabled={busy || rows === null}
           title={rows === null
-            ? "Reading the catalogue first — the column guesses come from its fields"
-            : "Upload the workbook the partner sent you — we read its columns, not its contents"}>
+            ? tl("partnerSheets", "Reading the catalogue first — the column guesses come from its fields")
+            : tl("partnerSheets", "Upload the workbook the partner sent you — we read its columns, not its contents")}>
           {busy ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />}
           {" "}Upload a partner template
         </Button>

@@ -180,7 +180,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
  than sitting there dead. */}
                         {loaded?.sellerEid && (
                           <a href={chatUrl(loaded.sellerEid) ?? "#"} target="_blank" rel="noopener noreferrer"
- title={`Message ${loaded.sellerName ?? "this supplier"} on Alibaba`}>
+ title={`Message ${loaded.sellerName ?? tl("alibaba", "this supplier")} on Alibaba`}>
                             <Button size="sm" variant="outline">{tl("alibaba", "Chat")}</Button>
                           </a>
                         )}

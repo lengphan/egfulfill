@@ -122,10 +122,10 @@ export function NotificationsView() {
       ) : items.length === 0 ? (
         <EmptyState
           icon={Bell}
-          title={unreadOnly ? "Nothing unread" : "No notifications yet"}
+          title={unreadOnly ? tl("notifications", "Nothing unread") : tl("notifications", "No notifications yet")}
           note={unreadOnly
-            ? "Everything here has been read."
-            : "Order updates, team invites and announcements for this account appear here."}
+            ? tl("notifications", "Everything here has been read.")
+            : tl("notifications", "Order updates, team invites and announcements for this account appear here.")}
         />
       ) : (
         <div className="divide-y divide-border">

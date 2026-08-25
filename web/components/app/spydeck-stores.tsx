@@ -91,7 +91,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
           </div>
           <button
  type="button" onClick={() => onToggle(s)} aria-pressed={saved}
- aria-label={saved ? "Unsave store" : "Save store"}
+ aria-label={saved ? tl("spydeckStores", "Unsave store") : tl("spydeckStores", "Save store")}
  className={"flex size-8 shrink-0 items-center justify-center rounded-full transition-colors " + (saved ? "bg-rose-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent")}
           >
             <Heart size={15} weight={saved ? "fill" : "regular"} />
@@ -353,8 +353,8 @@ export function StoresTab(h: Handlers) {
            is what an empty region looks like when nobody decided it was one. */
         <EmptyState
           icon={Storefront}
-          title={tab === "saved" ? "No saved stores yet" : "No stores match that name"}
-          note={tab === "saved" ? "Hit the heart on any store to keep it here." : undefined}
+          title={tab === "saved" ? tl("spydeckStores", "No saved stores yet") : tl("spydeckStores", "No stores match that name")}
+          note={tab === "saved" ? tl("spydeckStores", "Hit the heart on any store to keep it here.") : undefined}
         />
       ) : (
         <div className="space-y-3 p-5">

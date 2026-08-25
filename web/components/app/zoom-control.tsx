@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { TextAa, Check } from "@phosphor-icons/react"
 
@@ -18,6 +19,7 @@ import { ZOOM_LEVELS, DEFAULT_ZOOM, loadZoom, applyZoom, zoomLabel } from "@/lib
  * is how you notice you left the page at 150% yesterday.
  */
 export function ZoomControl() {
+  const tl = useLabelT()
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM)
 
   // Read AFTER mount. localStorage doesn't exist during SSR, and reading it in render would
@@ -56,7 +58,7 @@ export function ZoomControl() {
         {/* Label INSIDE the Group — Base UI throws on a GroupLabel outside one, which blanks
             the page rather than misrendering a heading. */}
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2 py-1 text-2xs text-muted-foreground">Content zoom</DropdownMenuLabel>
+          <DropdownMenuLabel className="px-2 py-1 text-2xs text-muted-foreground">{tl("zoomControl", "Content zoom")}</DropdownMenuLabel>
           {ZOOM_LEVELS.map((z) => (
             <DropdownMenuItem key={z} onClick={() => pick(z)} className="flex items-center gap-2 text-sm">
               <Check size={12} weight="bold" className={z === zoom ? "text-primary" : "opacity-0"} />

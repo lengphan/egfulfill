@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { X } from "@phosphor-icons/react"
@@ -27,6 +28,7 @@ export function ImageLightbox({ src, label, onClose }: {
   label?: string | null
   onClose: () => void
 }) {
+  const tl = useLabelT()
   const [host, setHost] = useState<HTMLElement | null>(null)
   // The body only exists after mount, and never on the server.
   useEffect(() => { const t = setTimeout(() => setHost(document.body), 0); return () => clearTimeout(t) }, [])
@@ -42,7 +44,7 @@ export function ImageLightbox({ src, label, onClose }: {
 
   return createPortal(
     <div
-      role="dialog" aria-modal="true" aria-label={label || "Image"}
+      role="dialog" aria-modal="true" aria-label={label || tl("imageLightbox", "Image")}
       onClick={onClose}
       // z-[80]: above the lookbook's print overlay (z-50) and the app's dialogs (z-50), both
       // of which can be what you opened this from.
@@ -58,7 +60,7 @@ export function ImageLightbox({ src, label, onClose }: {
       />
       {label && <span className="max-w-full truncate text-sm text-white/80">{label}</span>}
       <button
-        type="button" onClick={onClose} aria-label="Close"
+        type="button" onClick={onClose} aria-label={tl("imageLightbox", "Close")}
         className="absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
       >
         <X size={16} weight="bold" />

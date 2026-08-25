@@ -363,11 +363,11 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           * the figure that names the job was the one thing on the page you could not press.
           */}
         <button type="button" onClick={() => setNeeds(needs === "low" ? null : "low")} className="text-left">
-          <StatCard label={tl("inventory", "Low stock")} value={String(stats.low)} sub={needs === "low" ? "showing these" : "at/below reorder"}
+          <StatCard label={tl("inventory", "Low stock")} value={String(stats.low)} sub={needs === "low" ? tl("inventory", "showing these") : tl("inventory", "at/below reorder")}
  tone={stats.low ? "neg" : undefined} />
         </button>
         <button type="button" onClick={() => setNeeds(needs === "out" ? null : "out")} className="text-left">
-          <StatCard label={tl("inventory", "Out of stock")} value={String(stats.out)} sub={needs === "out" ? "showing these" : "need reorder"}
+          <StatCard label={tl("inventory", "Out of stock")} value={String(stats.out)} sub={needs === "out" ? tl("inventory", "showing these") : tl("inventory", "need reorder")}
  tone={stats.out ? "neg" : undefined} />
         </button>
         <StatCard label={tl("inventory", "Reserved")} value={String(stats.reserved)} sub={tl("inventory", "on open orders")} />
@@ -473,8 +473,8 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Package}
-            title={(items.length ?? 0) === 0 ? "No inventory yet" : "No items match"}
-            note={(items.length ?? 0) === 0 ? "Add an item to start tracking stock." : "Nothing matches that search or filter."}
+            title={(items.length ?? 0) === 0 ? tl("inventory", "No inventory yet") : tl("inventory", "No items match")}
+            note={(items.length ?? 0) === 0 ? tl("inventory", "Add an item to start tracking stock.") : tl("inventory", "Nothing matches that search or filter.")}
           />
         ) : (
           <>
@@ -537,6 +537,7 @@ type Group = { key: string; name: string; product: CatalogProduct | null; image:
  * else. A blank square with an initial says "no picture"; a placeholder garment would say
  *  "this is the garment", which is a lie the picker acts on. */
 function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: number }) {
+  const tl = useLabelT()
  return src ? (
     <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-muted/40" style={{ width: size, height: size }}>
       <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
@@ -549,7 +550,7 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
     <span
  className="grid shrink-0 place-items-center rounded-md border border-border bg-muted/40 text-muted-foreground/50"
  style={{ width: size, height: size }}
- title={name ? `No picture for ${name}` : "No picture"}
+ title={name ? `No picture for ${name}` : tl("inventory", "No picture")}
  aria-hidden
     >
       <Package size={Math.round(size / 2.6)} weight="light" />
@@ -1021,7 +1022,7 @@ function StockMatrix({ group, edit, lowAt, sel, setSel, onOrder }: {
                 <td className={`${LABEL_W} ${GUTTER} relative truncate whitespace-nowrap py-1 pe-2 font-medium`}>
                   <input
  type="checkbox"
- aria-label={`Select ${c ? prettyColorName(c) : "this variant"}`}
+ aria-label={`Select ${c ? prettyColorName(c) : tl("inventory", "this variant")}`}
  checked={rowSkus(c).length > 0 && rowSkus(c).every((k) => sel.has(k))}
  onChange={(e) => {
  const next = new Set(sel)
@@ -1445,7 +1446,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
  type="checkbox"
  checked={allOn}
  disabled={free.length === 0}
- aria-label={`All sizes of ${color ? prettyColorName(color) : "this product"}`}
+ aria-label={`All sizes of ${color ? prettyColorName(color) : tl("inventory", "this product")}`}
  onChange={(e) => setChosen((prev) => {
  const n = new Set(prev)
  for (const r of free) { if (e.target.checked) n.add(r.sku); else n.delete(r.sku) }

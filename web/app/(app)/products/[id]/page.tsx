@@ -169,7 +169,7 @@ export default function ProductDetailPage() {
  moment you opened the product — the same photo, cropped two ways, one click
  apart. Only the hero: the thumbnail strip is an index of what is available
  and wants the whole picture in each tile. */
-              <Image src={gallery[active] ?? gallery[0]} alt={product.name ?? "Product"} fill unoptimized className="object-contain" style={framingStyle(product)} />
+              <Image src={gallery[active] ?? gallery[0]} alt={product.name ?? tl("productPage", "Product")} fill unoptimized className="object-contain" style={framingStyle(product)} />
             ) : (
               <div className="flex size-full items-center justify-center bg-gradient-to-br from-working to-pending text-working">
                 <span className="font-title text-6xl font-semibold">
@@ -314,7 +314,7 @@ export default function ProductDetailPage() {
  return (
                         <span key={s} className="flex items-center gap-1.5 rounded border border-border px-2 py-1 text-xs font-medium">
                           {s}
-                          <span className={"tabular-nums " + (own ? "text-foreground" : "text-muted-foreground")} title={own ? `This size is priced on its own` : "No tier of its own — charged the base price"}>
+                          <span className={"tabular-nums " + (own ? "text-foreground" : "text-muted-foreground")} title={own ? `This size is priced on its own` : tl("productPage", "No tier of its own — charged the base price")}>
                             {usd(priceOfSize(s))}
                           </span>
                         </span>

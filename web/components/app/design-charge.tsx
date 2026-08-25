@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, PencilSimple, Check, X } from "@phosphor-icons/react"
 import { getDesignFees, setDesignTier, type DesignFees, type DesignTier, type OrderDesignFee } from "@/lib/api"
@@ -39,6 +40,7 @@ export function DesignFeeAmount({ orderId, fee, onChanged }: {
   fee: OrderDesignFee
   onChanged?: () => void
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -108,12 +110,12 @@ export function DesignFeeAmount({ orderId, fee, onChanged }: {
             aria-label={`${fee.label} amount`}
             className="h-7 w-20 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
           />
-          <button type="button" aria-label="Save this amount" title="Save — this is what gets charged"
+          <button type="button" aria-label={tl("designCharge", "Save this amount")} title={tl("designCharge", "Save — this is what gets charged")}
             disabled={busy} onClick={commit}
             className="rounded p-1 text-primary hover:bg-accent disabled:opacity-50">
             {busy ? <CircleNotch size={13} className="animate-spin" /> : <Check size={13} weight="bold" />}
           </button>
-          <button type="button" aria-label="Cancel" onClick={() => setEditing(false)}
+          <button type="button" aria-label={tl("designCharge", "Cancel")} onClick={() => setEditing(false)}
             className="rounded p-1 text-muted-foreground hover:bg-accent">
             <X size={13} weight="bold" />
           </button>
@@ -131,7 +133,7 @@ export function DesignFeeAmount({ orderId, fee, onChanged }: {
       {/* To Be Determined is a real answer, not a missing one: a complex fee is quoted, and
           no figure exists until somebody names one — which typing here does. */}
       {fee.amount == null
-        ? <span className="italic text-muted-foreground">To Be Determined</span>
+        ? <span className="italic text-muted-foreground">{tl("designCharge", "To Be Determined")}</span>
         : usd(fee.amount)}
       {/* Said only when true. An unusual figure beside a familiar label otherwise reads as a
           pricing bug rather than as a decision somebody made. */}
@@ -139,7 +141,7 @@ export function DesignFeeAmount({ orderId, fee, onChanged }: {
       <button
         type="button"
         disabled={locked}
-        title={locked ? "Already charged — this is settled" : "Change what this costs"}
+        title={locked ? tl("designCharge", "Already charged — this is settled") : tl("designCharge", "Change what this costs")}
         aria-label={`Edit ${fee.label}`}
         onClick={() => { setEditing(true); setDraft(fee.amount == null ? "" : String(fee.amount)) }}
         className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"

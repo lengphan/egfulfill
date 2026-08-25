@@ -311,7 +311,7 @@ export function RateCalculatorView() {
       <div className="space-y-4">
         <SectionCard
  title={tl("rates", "Rates")}
- description={rates ? `${rates.length} live quotes — nothing is bought` : "Every service both carriers will run for this parcel"}
+ description={rates ? `${rates.length} live quotes — nothing is bought` : tl("rates", "Every service both carriers will run for this parcel")}
  bodyClassName="p-0"
         >
           {!rates ? (

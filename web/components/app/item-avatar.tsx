@@ -212,7 +212,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
-        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
       </span>
     )
   }
@@ -230,7 +230,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         <button
           type="button"
           onClick={showBoth && listingFront ? () => setListingFront(false) : open}
-          title={showBoth && listingFront ? "Bring the design forward" : (onEdit ? "Edit the design" : "View larger")}
+          title={showBoth && listingFront ? tl("itemAvatar", "Bring the design forward") : (onEdit ? tl("itemAvatar", "Edit the design") : tl("itemAvatar", "View larger"))}
           // ALWAYS ABSOLUTE, so picking a blank moves numbers rather than swapping layout
           // modes. Going from `size-full` in flow to absolutely positioned is a discrete
           // change nothing can tween, which is why the row jumped the moment the listing
@@ -239,7 +239,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             + (showBoth && !listingFront ? " z-20 border-2 border-background shadow-md" : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} blankMissing={blankMissing} color={item.color} />
+          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -268,7 +268,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
               if (listingFront) { setShowListing(true); setPreview(true) }
               else setListingFront(true)
             }}
-            title={listingFront ? "View the buyer's listing photo" : "Bring the listing photo forward"}
+            title={listingFront ? tl("itemAvatar", "View the buyer's listing photo") : tl("itemAvatar", "Bring the listing photo forward")}
             className={
               "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md transition-all hover:brightness-105 " +
               (listingFront ? "z-20" : "z-0")
@@ -294,7 +294,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowListing((v) => !v) }}
-            title={showListing ? "Show what we'll print" : "Show the buyer's listing photo"}
+            title={showListing ? tl("itemAvatar", "Show what we'll print") : tl("itemAvatar", "Show the buyer's listing photo")}
             aria-pressed={showListing}
             className={
               "eg-tap absolute -right-1 -bottom-1 grid size-4 place-items-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-opacity " +
@@ -323,7 +323,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
                   the same "one click away" the row strips already rely on. With artwork the
                   stand-in stays, because a design floating on the buyer's photo is the
                   misleading composite this whole component avoids. */}
-              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} blankMissing={blankMissing} color={item.color} fit="contain" />
+              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} fit="contain" />
             </div>
             {canSwap && (
               <button

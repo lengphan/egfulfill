@@ -167,7 +167,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                   </div>
                 </>
               ) : (
-                <Input placeholder={type === "pingpong" ? "PingPong email or ID" : "LianLian email or ID"} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
+                <Input placeholder={type === "pingpong" ? tl("payout", "PingPong email or ID") : tl("payout", "LianLian email or ID")} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
               )}
 
               <Input placeholder={tl("payout", "Note (optional)")} value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />

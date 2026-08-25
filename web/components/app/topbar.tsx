@@ -40,6 +40,7 @@ import { useT, useLabelT } from "@/lib/i18n"
  * are uploaded. Amber once the limit is reached.
  */
 function CapacityBadge({ staff }: { staff: boolean }) {
+  const tl = useLabelT()
  const [s, setS] = useState<{ mode: boolean; limit: number; usedToday: number; over?: boolean } | null>(null)
  useEffect(() => {
  let alive = true
@@ -59,10 +60,10 @@ function CapacityBadge({ staff }: { staff: boolean }) {
  const cap = s.limit > 0 ? `${s.usedToday}/${s.limit}` : String(s.usedToday)
  return (
     <span
- title={staff ? "Orders taken in today across the floor" : "Orders you've uploaded today vs your daily limit"}
+ title={staff ? tl("topbar", "Orders taken in today across the floor") : tl("topbar", "Orders you've uploaded today vs your daily limit")}
  className={"hidden items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold tabular-nums sm:inline-flex " + (over ? "bg-hold/15 text-hold" : "bg-muted text-muted-foreground")}
     >
-      {staff ? "Factory" : "Orders"} {cap}
+      {staff ? tl("topbar", "Factory") : tl("topbar", "Orders")} {cap}
     </span>
   )
 }
@@ -90,6 +91,7 @@ function IconButton({
 }
 
 export function TopBar({ balance: initialBalance }: { balance?: number }) {
+  const tl = useLabelT()
  const pathname = usePathname()
  const router = useRouter()
  const t = useT()
@@ -211,7 +213,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
         </IconButton>
 
         {showCart && (
-          <IconButton label="Purchasing cart" onClick={() => router.push("/purchasing?tab=purchase")}>
+          <IconButton label={tl("topbar", "Purchasing cart")} onClick={() => router.push("/purchasing?tab=purchase")}>
             <ShoppingCart size={18} />
             {cartCount > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold leading-none text-primary-foreground">

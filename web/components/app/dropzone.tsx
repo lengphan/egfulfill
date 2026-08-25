@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useRef, useState } from "react"
 import { CheckCircle, CircleNotch, DownloadSimple, UploadSimple, WarningCircle, X, type Icon } from "@phosphor-icons/react"
 import { RegionMark, REGION_LINE, REGION_NOTE } from "@/components/app/region"
@@ -130,6 +131,7 @@ export function fileRoleLabel(kind?: string | null): string {
  * than inventing a ninth one.
  */
 export function FileRow({ file, className }: { file: DroppedFile; className?: string }) {
+  const tl = useLabelT()
   const size = formatBytes(file.size)
   const state = file.status ?? "done"
   const facts = [size, file.note].filter(Boolean).join(" · ")
@@ -156,7 +158,7 @@ export function FileRow({ file, className }: { file: DroppedFile; className?: st
             control above it. */}
         {(file.error || facts || state === "uploading") && (
           <span className={cn("block truncate text-2xs", file.error ? "text-alert" : "text-muted-foreground")}>
-            {file.error ?? (state === "uploading" ? "Uploading…" : facts)}
+            {file.error ?? (state === "uploading" ? tl("dropzone", "Uploading…") : facts)}
           </span>
         )}
       </span>

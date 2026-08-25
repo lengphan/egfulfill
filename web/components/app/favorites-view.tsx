@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Heart } from "@phosphor-icons/react"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
@@ -31,6 +32,7 @@ type FavItem = { supplier: "ss" | "otto"; id: string; title: string; brand?: str
  *  changed on the All-suppliers tab. The reload replaces the list in place, so it is
  *  invisible: the old cards stay on screen until the new ones land. */
 export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
+  const tl = useLabelT()
   const [items, setItems] = useState<FavItem[] | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -103,14 +105,14 @@ export function FavoritesView({ refreshKey = 0 }: { refreshKey?: number }) {
     else toggleOttoFavorite({ style: f.id }, false).catch(() => {})
   }
 
-  if (items === null) return <Loading label="Loading favorites…" />
+  if (items === null) return <Loading label={tl("favorites", "Loading favorites…")} />
   const visible = items.filter((f) => !removed.has(keyOf(f)))
   if (visible.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
         <Heart size={18} weight="regular"  className="shrink-0 text-muted-foreground" />
-        <div className="font-medium">No favorites yet</div>
-        <div className="max-w-xs text-sm text-muted-foreground">Tap the heart on any S&amp;S or Otto blank to save it here.</div>
+        <div className="font-medium">{tl("favorites", "No favorites yet")}</div>
+        <div className="max-w-xs text-sm text-muted-foreground">{tl("favorites", "Tap the heart on any S&S or Otto blank to save it here.")}</div>
       </div>
     )
   }

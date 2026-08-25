@@ -129,7 +129,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
         <span className="flex items-center gap-1.5 font-mono">
           {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">{tl("integrations", "not set")}</span>}
           {s.editable && (
-            <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label={tl("integrations", "Edit credential")}>
+            <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? tl("integrations", "Replace") : tl("integrations", "Set")} aria-label={tl("integrations", "Edit credential")}>
               <PencilSimple size={12} />
             </button>
           )}

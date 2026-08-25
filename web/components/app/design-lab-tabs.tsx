@@ -96,7 +96,7 @@ export function DesignLabTabs({ className }: { className?: string }) {
               key={key}
               aria-current={on ? "page" : undefined}
               aria-disabled={disabled || undefined}
-              title={disabled ? "Sign in to use the design maker" : undefined}
+              title={disabled ? tl("designLab", "Sign in to use the design maker") : undefined}
               className={cn(classes, disabled && "opacity-50")}
             >
               {body}

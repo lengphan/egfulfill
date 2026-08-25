@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Warning } from "@phosphor-icons/react"
@@ -23,6 +24,7 @@ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
  * is how a loss stays visible instead of blocking the floor.
  */
 export function LowBalanceBanner() {
+  const tl = useLabelT()
  const [w, setW] = useState<{ balance: number; low?: boolean; lowBelow?: number | null } | null>(null)
 
  const load = useCallback(() => {
@@ -50,12 +52,12 @@ export function LowBalanceBanner() {
       <Warning size={16} weight="fill" className="shrink-0" />
       <span className="min-w-0 flex-1">
         {negative ? (
-          <>Your balance is <strong>{usd(w.balance)}</strong>. Orders can&apos;t be submitted to production until it&apos;s positive.</>
+          <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until it’s positive.")}</>
         ) : (
-          <>Your balance is <strong>{usd(w.balance)}</strong>. Submitting an order charges it — top up before it runs out.</>
+          <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Submitting an order charges it — top up before it runs out.")}</>
         )}
       </span>
-      <Link href="/wallet" className="shrink-0 font-medium underline">Top up</Link>
+      <Link href="/wallet" className="shrink-0 font-medium underline">{tl("lowBalanceBanner", "Top up")}</Link>
     </div>
   )
 }

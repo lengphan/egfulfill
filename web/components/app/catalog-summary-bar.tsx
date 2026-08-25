@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Storefront, Warning, CircleNotch, Globe } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,7 @@ type Summary = {
  * a published style with no price prints a blank where a number should be.
  */
 export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
+  const tl = useLabelT()
  const [s, setS] = useState<Summary | null>(null)
  const [busy, setBusy] = useState(false)
  const confirm = useConfirm()
@@ -37,7 +39,7 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
     // Naming the number, because "clear the catalogue" reads as tidying and this undoes
     // an afternoon of curation.
  const ok = await confirm({
- title: "Empty the catalogue?",
+ title: tl("catalogSummaryBar", "Empty the catalogue?"),
  body: `This removes all ${s.total} published item${s.total === 1 ? "" : "s"}. Saved catalogues you have already sent are untouched — but you would have to pick these again.`,
  confirmLabel: "Empty it",
     })
@@ -52,10 +54,10 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
     <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-2.5 text-sm">
       <Storefront size={15} weight="duotone" className="text-muted-foreground" />
       {s.total === 0 ? (
-        <span className="text-muted-foreground">Nothing in the catalogue yet.</span>
+        <span className="text-muted-foreground">{tl("catalogSummaryBar", "Nothing in the catalogue yet.")}</span>
       ) : (
         <span>
-          <strong>{s.total}</strong> in the catalogue
+          <strong>{s.total}</strong> {tl("catalogSummaryBar", "in the catalogue")}
           <span className="text-muted-foreground">
             {" "}— {s.products} product{s.products === 1 ? "" : "s"}, {s.styles} supplier style{s.styles === 1 ? "" : "s"}
           </span>
@@ -80,7 +82,7 @@ export function CatalogSummaryBar({ refresh }: { refresh?: number }) {
       )}
       {s.total > 0 && (
         <Button size="sm" variant="ghost" className="ml-auto text-muted-foreground" onClick={clear} disabled={busy}>
-          {busy ? <CircleNotch size={13} className="animate-spin" /> : "Empty catalogue"}
+          {busy ? <CircleNotch size={13} className="animate-spin" /> : tl("catalogSummaryBar", "Empty catalogue")}
         </Button>
       )}
     </div>

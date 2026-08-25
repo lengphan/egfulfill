@@ -1009,8 +1009,8 @@ export function DispatchBoard() {
             {(dispatchOn || staged.length > 0) && (
               <Button size="sm" variant="outline" disabled={(!chosenWithLabel.length && !stagedChosen.length) || busy} onClick={sendToPartner}
  title={stagedChosen.length
-                  ? `Upload ${chosenWithLabel.length ? "these labels and " : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
- : "Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label"}>
+                  ? `Upload ${chosenWithLabel.length ? tl("dispatch", "these labels and ") : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
+ : tl("dispatch", "Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label")}>
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Send to byeastside")}
               </Button>
             )}
@@ -1022,7 +1022,7 @@ export function DispatchBoard() {
             )}
             {canScanOut && (
               <Button size="sm" disabled={!chosen.length || busy || !canFinish} onClick={finishAll}
- title={canFinish ? "Mark the selected orders Shipped & Fulfilled" : "Your role can't ship orders out"}>
+ title={canFinish ? tl("dispatch", "Mark the selected orders Shipped & Fulfilled") : tl("dispatch", "Your role can't ship orders out")}>
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("dispatch", "Finish All")}
               </Button>
             )}
@@ -1225,7 +1225,7 @@ export function DispatchBoard() {
                           </span>
                         )
                       })()}
-                      <span className="truncate text-xs text-muted-foreground" title={o.label_scanned_at ? "Scanned" : "Labelled"}>
+                      <span className="truncate text-xs text-muted-foreground" title={o.label_scanned_at ? tl("dispatch", "Scanned") : tl("dispatch", "Labelled")}>
                         {when}
                       </span>
                       {o.tracking_label_url ? (

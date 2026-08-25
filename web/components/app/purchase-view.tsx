@@ -67,7 +67,7 @@ function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src:
  if (!src) return <span className="size-11 shrink-0 rounded border border-dashed border-border" aria-hidden />
  return (
     <button type="button" onClick={() => onZoom?.(src, label ?? "")}
- title={tl("purchase", "Click to enlarge")} aria-label={`Enlarge ${label || "product image"}`}
+ title={tl("purchase", "Click to enlarge")} aria-label={`Enlarge ${label || tl("purchase", "product image")}`}
  className="shrink-0 rounded border border-border bg-white transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" loading="lazy" className="size-11 rounded object-contain" />
@@ -1491,10 +1491,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                             <button onClick={() => cancelPO(po)} disabled={busy === po.num}
  className="text-xs font-medium text-muted-foreground hover:text-alert"
  title={past
-                                ? "Past S&S's usual 10-minute window — we'll still ask them, and tell you what they say"
+                                ? tl("purchase", "Past S&S's usual 10-minute window — we'll still ask them, and tell you what they say")
  : sentSs
                                   ? `Cancels with S&S too — about ${Math.max(0, 10 - (mins ?? 0))} min left of their window`
- : "Cancel our record of this order"}>
+ : tl("purchase", "Cancel our record of this order")}>
                               {tl("purchase", "Cancel")}
                             </button>
                           )
@@ -1636,8 +1636,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           <span
  className="w-20 text-right tabular-nums text-muted-foreground"
  title={num(l.price)
-                              ? `${usd(num(l.price))} each${l.priceSource === "catalog" ? " — our catalogue price when this was placed, not a supplier confirmation" : ""}`
- : "No price was recorded on this line"}
+                              ? `${usd(num(l.price))} each${l.priceSource === "catalog" ? tl("purchase", " — our catalogue price when this was placed, not a supplier confirmation") : ""}`
+ : tl("purchase", "No price was recorded on this line")}
                           >
                             {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
                           </span>
@@ -1828,7 +1828,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  disabled={!autoGroups.length || busy === "place-all"}
  title={autoGroups.length
                   ? undefined
- : (handGroups.length ? "Every supplier in this cart is ordered by hand." : "Nothing to place.")}
+ : (handGroups.length ? tl("purchase", "Every supplier in this cart is ordered by hand.") : tl("purchase", "Nothing to place."))}
               >
                 {busy === "place-all" && <CircleNotch size={14} className="animate-spin" />}
                 {autoGroups.length > 1 ? `Place ${autoGroups.length} orders` : tl("purchase", "Place order")}
@@ -1927,7 +1927,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  const taken = split[key] ?? ""
  return (
                                   <label key={w.abbr}
- title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
+ title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : tl("purchase", " — not enough for this line on its own")}`}
  className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
                                     {/* Shared Input primitive — pill shape + violet focus ring
  come from the theme, so they can't drift. Capped at the
@@ -1963,7 +1963,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         ) : g.api === "otto" ? (
                           <label
  title={ottoStock[l.sku] == null
-                              ? "Otto didn't return a stock figure we could read"
+                              ? tl("purchase", "Otto didn't return a stock figure we could read")
  : `${ottoStock[l.sku]} available from Otto`}
  className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1">
                             <Input

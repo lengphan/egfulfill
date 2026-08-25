@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { DownloadSimple, CircleNotch } from "@phosphor-icons/react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -28,6 +29,7 @@ export function LineDownloads({ design, files, item }: {
   files?: DesignFileRow[]
   item: { line_id?: string | null; sku?: string | null; name?: string | null }
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState<string | null>(null)
   const art = designSrc(design?.data)
   const mine = filesForLine(files, { line_id: item.line_id, sku: item.sku })
@@ -68,7 +70,7 @@ export function LineDownloads({ design, files, item }: {
   return (
     <Popover>
       <PopoverTrigger
-        title={`${count} file${count === 1 ? "" : "s"} on this line — artwork${machine.length ? " and stitch file" : ""}`}
+        title={`${count} file${count === 1 ? "" : "s"} on this line — artwork${machine.length ? tl("lineDownloads", " and stitch file") : ""}`}
         className="eg-tap absolute -bottom-1.5 -left-1.5 z-10 inline-flex items-center gap-0.5 rounded-full border border-border bg-card px-1.5 py-1 text-xs font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary hover:text-primary"
       >
         <DownloadSimple size={12} weight="bold" />
@@ -84,7 +86,7 @@ export function LineDownloads({ design, files, item }: {
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
           >
             <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">Artwork</span>
+            <span className="min-w-0 flex-1 truncate">{tl("lineDownloads", "Artwork")}</span>
             <span className="shrink-0 text-2xs text-muted-foreground">PNG</span>
           </a>
         )}
@@ -99,7 +101,7 @@ export function LineDownloads({ design, files, item }: {
             {busy === f.designId
               ? <CircleNotch size={14} className="shrink-0 animate-spin" />
               : <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />}
-            <span className="min-w-0 flex-1 truncate" title={f.name || undefined}>{f.name || "Machine file"}</span>
+            <span className="min-w-0 flex-1 truncate" title={f.name || undefined}>{f.name || tl("lineDownloads", "Machine file")}</span>
             {/* The KIND, not the id. The slug this used to print is unreadable and
                 unactionable; "EMB" is the fact somebody is looking for. */}
             <span className="shrink-0 text-2xs text-muted-foreground">{fileRoleLabel(f.kind)}</span>

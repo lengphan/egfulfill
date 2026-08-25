@@ -631,10 +631,10 @@ export function SourcingView() {
 
                 <div className={`grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4 ${missing.length ? "opacity-40" : ""}`}>
                   <Stat label={tl("sourcing", "Landed cost / unit")} value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
- sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : "no freight"} />
+ sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : tl("sourcing", "no freight")} />
                   <Stat label={tl("sourcing", "Fees")} value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
                   <Stat label={tl("sourcing", "Profit / unit")} value={missing.length ? "—" : money(result.profit)}
- sub={missing.length ? "not enough entered" : pct(result.marginPct) + " margin"}
+ sub={missing.length ? tl("sourcing", "not enough entered") : pct(result.marginPct) + " margin"}
  tone={missing.length ? undefined : result.profit >= 0 ? "good" : "bad"} />
                   <Stat label={`Profit at MOQ ${(active.moq ?? 1).toLocaleString()}`}
  value={missing.length ? "—" : money(result.profitAtMoq)}

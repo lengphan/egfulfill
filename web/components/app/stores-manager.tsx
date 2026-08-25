@@ -595,7 +595,7 @@ export function StoresManager() {
  type="button"
  disabled={off}
  aria-disabled={off}
- title={off ? "Already imported a longer period — the window can only widen" : undefined}
+ title={off ? tl("stores", "Already imported a longer period — the window can only widen") : undefined}
  onClick={() => !off && chooseScope(o.days)}
  className={
                     "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors " +

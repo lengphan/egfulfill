@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { loadStripe, type Stripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js"
@@ -9,6 +10,7 @@ import { getStripeConfig, createStripeIntent, verifyStripeIntent } from "@/lib/a
 
 // Inner form — inside <Elements>, so it can use useStripe/useElements.
 function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () => void; onError: (m: string) => void }) {
+  const tl = useLabelT()
  const stripe = useStripe()
  const elements = useElements()
  const [busy, setBusy] = useState(false)
@@ -45,13 +47,14 @@ function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () =
     <div className="space-y-4">
       <PaymentElement />
       <Button className="w-full" onClick={pay} disabled={busy || !stripe}>
-        {busy ? "Processing…" : "Pay now"}
+        {busy ? tl("stripeCardForm", "Processing…") : tl("stripeCardForm", "Pay now")}
       </Button>
     </div>
   )
 }
 
 export function StripeCardForm({ amount, onPaid, onError }: { amount: number; onPaid: () => void; onError: (m: string) => void }) {
+  const tl = useLabelT()
  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
  const [clientSecret, setClientSecret] = useState("")
  const [intentId, setIntentId] = useState("")
@@ -85,7 +88,7 @@ export function StripeCardForm({ amount, onPaid, onError }: { amount: number; on
  if (loading) {
  return (
       <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-        <CircleNotch size={16} className="animate-spin" /> Preparing secure card form…
+        <CircleNotch size={16} className="animate-spin" /> {tl("stripeCardForm", "Preparing secure card form…")}
       </div>
     )
   }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { CaretLeft, CaretRight } from "@phosphor-icons/react"
 
@@ -37,6 +38,7 @@ export function Pagination({
    *  PRODUCTS while its stat card counts SKUs, and "of 3" beside "SKUs 5" reads as a bug. */
   noun?: string
 }) {
+  const tl = useLabelT()
   if (total === 0) return null
   const from = start + 1
   const to = Math.min(start + perPage, total)
@@ -45,17 +47,17 @@ export function Pagination({
       <span className="text-muted-foreground">Showing {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}{noun ? ` ${noun}` : ""}</span>
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="hidden sm:inline">Per page</span>
+          <span className="hidden sm:inline">{tl("pagination", "Per page")}</span>
           <select value={perPage} onChange={(e) => onPerPage(Number(e.target.value))} className="eg-select h-8 rounded-2xl border border-border bg-card px-1.5 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
             {perPageOptions.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
         <div className="flex items-center gap-1">
-          <button onClick={() => onPage(page - 1)} disabled={page <= 1} className="flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:enabled:bg-accent disabled:opacity-40" aria-label="Previous page">
+          <button onClick={() => onPage(page - 1)} disabled={page <= 1} className="flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:enabled:bg-accent disabled:opacity-40" aria-label={tl("pagination", "Previous page")}>
             <CaretLeft size={14} weight="bold" />
           </button>
           <span className="min-w-20 text-center text-muted-foreground tabular-nums">Page {page} / {pageCount}</span>
-          <button onClick={() => onPage(page + 1)} disabled={page >= pageCount} className="flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:enabled:bg-accent disabled:opacity-40" aria-label="Next page">
+          <button onClick={() => onPage(page + 1)} disabled={page >= pageCount} className="flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:enabled:bg-accent disabled:opacity-40" aria-label={tl("pagination", "Next page")}>
             <CaretRight size={14} weight="bold" />
           </button>
         </div>

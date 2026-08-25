@@ -135,9 +135,9 @@ export function BillingView() {
         )}
         {partners !== null && partners.length === 0 && (
           <StatCard
-            label={partnersErr ? "Couldn't load partners" : "No partner costs yet"}
+            label={partnersErr ? tl("billing", "Couldn't load partners") : tl("billing", "No partner costs yet")}
             value="—"
-            sub={partnersErr ?? "Set the rates in Settings → Platform → Partner rates"}
+            sub={partnersErr ?? tl("billing", "Set the rates in Settings → Platform → Partner rates")}
             tone={partnersErr ? "neg" : undefined}
           />
         )}

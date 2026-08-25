@@ -161,7 +161,7 @@ function ItemNumberBadge({ no, title }: { no: number | null; title?: string }) {
  return (
     <span
  className={"flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-bold tabular-nums text-primary-foreground " + (no == null ? "text-2xs" : "text-xs")}
- title={title ?? (no == null ? "Applies to every item on this order" : `Item ${no}`)}
+ title={title ?? (no == null ? tl("designFiles", "Applies to every item on this order") : `Item ${no}`)}
     >
       {no ?? tl("designFiles", "All")}
     </span>
@@ -422,7 +422,7 @@ export function DesignFilesPanel({ orderId, sku, lineId, compact, item }: { orde
         onFiles={upload}
         busy={busy ? `Uploading ${busy}…` : null}
         label={tl("designFiles", "Drop files here, or click to browse")}
-        hint={compact ? undefined : ".pes goes to the seller · .emb + images stay on the factory boards"}
+        hint={compact ? undefined : tl("designFiles", ".pes goes to the seller · .emb + images stay on the factory boards")}
       />
 
       {err && <div className="flex items-center gap-1.5 text-xs text-destructive"><Warning size={12} weight="fill" /> {err}</div>}
@@ -750,7 +750,7 @@ export function SellerDesignFiles({ orderId, items = [], designs, onAttached }: 
       accept={MACHINE_ACCEPT + ",image/*"}
       onFiles={stage}
       busy={busy ? `Sending ${busy}…` : null}
-      label={slim ? "Add another machine file or design image" : "Have a machine file or a design image? Drop it here"}
+      label={slim ? tl("designFiles", "Add another machine file or design image") : tl("designFiles", "Have a machine file or a design image? Drop it here")}
       hint={tl("designFiles", "Machine file (.pes · .dst · .emb …) — we check it instead of digitising · or a design image (PNG / JPG)")}
     />
   )

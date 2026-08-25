@@ -108,7 +108,7 @@ export function TemplatesPanel() {
                 {t.composite ? (
                   <Image
                     src={t.composite}
-                    alt={t.name ?? "Template"}
+                    alt={t.name ?? tl("templates", "Template")}
                     fill
                     unoptimized
                     className={blankImg ? "object-contain p-[18%]" : "object-cover"}

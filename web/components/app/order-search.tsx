@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Package } from "@phosphor-icons/react"
@@ -20,6 +21,7 @@ function orderNum(o: OrderRow): string {
 // line SKU, then jumps to its detail page. Orders are fetched once on open (the same
 // list every orders view already loads) and filtered client-side, so typing is instant.
 export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const tl = useLabelT()
   const router = useRouter()
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [qy, setQy] = useState("")
@@ -85,7 +87,7 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
             value={qy}
             onChange={(e) => setQy(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Search orders — number, customer, or SKU"
+            placeholder={tl("orderSearch", "Search orders — number, customer, or SKU")}
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 text-2xs text-muted-foreground sm:block">esc</kbd>
@@ -93,7 +95,7 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
         {qy.trim() && (
           <div className="max-h-[50vh] overflow-y-auto p-1.5">
             {orders === null ? (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">Loading…</div>
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">{tl("orderSearch", "Loading…")}</div>
             ) : results.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">No orders match “{qy.trim()}”.</div>
             ) : (

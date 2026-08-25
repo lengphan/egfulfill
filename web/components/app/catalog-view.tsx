@@ -176,7 +176,7 @@ export function CatalogView() {
           </Button>
           <a href={catalogExportUrl()} download>
             <Button size="sm" variant="outline" disabled={!published}
- title={published ? "Spreadsheet — one row per variant, for importing" : "Publish something first — the file would be empty"}>
+ title={published ? tl("catalog", "Spreadsheet — one row per variant, for importing") : tl("catalog", "Publish something first — the file would be empty")}>
               <DownloadSimple size={14} weight="bold" /> CSV
             </Button>
           </a>
@@ -251,11 +251,11 @@ export function CatalogView() {
              EXIST, say which. The icon changes too — a warning, not a tag. */
           <EmptyState
             icon={err ? Warning : Tag}
-            title={err ? "Couldn't load the catalogue" : q ? "Nothing matches that search" : "No products yet"}
+            title={err ? tl("catalog", "Couldn't load the catalogue") : q ? tl("catalog", "Nothing matches that search") : tl("catalog", "No products yet")}
             note={err
-              ? "So this isn't empty — it's unknown. Try again in a moment."
+              ? tl("catalog", "So this isn't empty — it's unknown. Try again in a moment.")
               : q ? `Nothing in the catalogue matches “${q}”.`
-              : "Products you publish appear here."}
+              : tl("catalog", "Products you publish appear here.")}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -273,8 +273,8 @@ export function CatalogView() {
  ref={(el) => { if (el) el.indeterminate = someShown && !allShown }}
  checked={allShown}
  disabled={busy || shown.length === 0}
- aria-label={allShown ? "Remove all shown products from the catalogue" : "Add all shown products to the catalogue"}
- title={allShown ? "Remove all shown from the catalogue" : "Add all shown to the catalogue"}
+ aria-label={allShown ? tl("catalog", "Remove all shown products from the catalogue") : tl("catalog", "Add all shown products to the catalogue")}
+ title={allShown ? tl("catalog", "Remove all shown from the catalogue") : tl("catalog", "Add all shown to the catalogue")}
  onChange={(e) => void toggleAllShown(e.target.checked)}
                     />
                   </th>
@@ -306,7 +306,7 @@ export function CatalogView() {
  type="checkbox"
  checked={!!p.inCatalog}
  disabled={busy || pending.has(id)}
- aria-label={`${p.inCatalog ? "Remove" : "Add"} ${p.name || id} ${p.inCatalog ? "from" : "to"} the catalogue`}
+ aria-label={`${p.inCatalog ? tl("catalog", "Remove") : tl("catalog", "Add")} ${p.name || id} ${p.inCatalog ? "from" : "to"} the catalogue`}
  onChange={(e) => void toggleOne(id, e.target.checked)}
                         />
                       </td>

@@ -436,7 +436,7 @@ function ApiKeysPanel() {
         <Input
  value={label}
  onChange={(e) => setLabel(e.target.value)}
- placeholder={mode === "live" ? "Key label (e.g. Production)" : "Key label (e.g. Local testing)"}
+ placeholder={mode === "live" ? tl("settings", "Key label (e.g. Production)") : tl("settings", "Key label (e.g. Local testing)")}
  className="sm:max-w-xs"
  onKeyDown={(e) => e.key === "Enter" && onCreate()}
         />
@@ -1774,7 +1774,7 @@ function PlatformPanel() {
  key={sd}
  onClick={() => toggleSide(sd)}
  disabled={on && sd === "front"}
- title={sd === "front" ? "Every product has a front" : undefined}
+ title={sd === "front" ? tl("settings", "Every product has a front") : undefined}
  className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors " +
                           (on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
                       >
@@ -2502,7 +2502,7 @@ function UsersPanel() {
                     <span
  className={"hidden text-right text-sm tabular-nums sm:block " +
                         ((u.balance ?? 0) <= 0 ? "font-medium text-primary" : "text-muted-foreground")}
- title={(u.balance ?? 0) <= 0 ? "No funds — this account can't submit orders" : "Wallet balance"}
+ title={(u.balance ?? 0) <= 0 ? tl("settings", "No funds — this account can't submit orders") : tl("settings", "Wallet balance")}
                     >
                       {usd2(u.balance ?? 0)}
                     </span>
@@ -2848,17 +2848,17 @@ function PiiRetentionPanel() {
         <BackupStat
  label={tl("settings", "Past the window")}
  value={String(due)}
- sub={due ? "a purge would redact these" : "none past the window"}
+ sub={due ? tl("settings", "a purge would redact these") : tl("settings", "none past the window")}
         />
         <BackupStat
  label={tl("settings", "Oldest still held")}
  value={oldestDays == null ? "—" : `${oldestDays}d`}
- sub={oldestDays == null ? "no shipped orders holding data" : "since it shipped"}
+ sub={oldestDays == null ? tl("settings", "no shipped orders holding data") : tl("settings", "since it shipped")}
         />
         <BackupStat
  label={tl("settings", "Automatic purge")}
  value={state?.enabled ? "On" : "Off"}
- sub={state?.enabled ? `${state?.days ?? 30} days after shipping` : "nothing runs by itself"}
+ sub={state?.enabled ? `${state?.days ?? 30} days after shipping` : tl("settings", "nothing runs by itself")}
         />
       </div>
 

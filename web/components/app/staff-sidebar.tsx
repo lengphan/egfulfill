@@ -12,6 +12,7 @@ import { getUser, clearSession } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 
 export function StaffSidebar() {
+  const tl = useLabelT()
   const pathname = usePathname()
   const router = useRouter()
   const nl = useLabelT()
@@ -41,8 +42,8 @@ export function StaffSidebar() {
 
   const mobileSections: MobileNavSection[] = [
     { items: items.map((i) => ({ label: i.label, href: i.href, icon: i.icon })) },
-    ...(tools.length ? [{ heading: "Tools", items: tools.map((i) => ({ label: i.label, href: i.href, icon: i.icon })) }] : []),
-    { heading: "Account", items: [{ label: "Chat", href: "/chat", icon: ChatCircleDots }, { label: "Settings", href: "/settings", icon: Gear }] },
+    ...(tools.length ? [{ heading: tl("staffSidebar", "Tools"), items: tools.map((i) => ({ label: i.label, href: i.href, icon: i.icon })) }] : []),
+    { heading: tl("staffSidebar", "Account"), items: [{ label: tl("staffSidebar", "Chat"), href: "/chat", icon: ChatCircleDots }, { label: tl("staffSidebar", "Settings"), href: "/settings", icon: Gear }] },
   ]
 
   return (
@@ -97,7 +98,7 @@ export function StaffSidebar() {
 
         {/* Common to every staff member — profile + factory chat. */}
         <div className="px-3 pb-2 pt-5 eg-label text-sidebar-foreground/70">{nl("nav", "Account")}</div>
-        {[{ label: "Chat", href: "/chat", icon: ChatCircleDots }, { label: "Settings", href: "/settings", icon: Gear }].map((item) => {
+        {[{ label: tl("staffSidebar", "Chat"), href: "/chat", icon: ChatCircleDots }, { label: tl("staffSidebar", "Settings"), href: "/settings", icon: Gear }].map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/")
           const Icon = item.icon
           return (

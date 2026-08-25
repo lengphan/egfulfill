@@ -296,7 +296,7 @@ function TiktokFields({ dest, fields, onChange }: {
  while the field still said "Loading categories…" left the two halves of the
  screen contradicting each other, and the spinner-ish wording is the one people
  believe — so it read as slow rather than broken. */
- placeholder={fields.categories.length ? "Type to filter…" : fields.loadErr ? "Couldn't load categories" : "Loading categories…"}
+ placeholder={fields.categories.length ? tl("publish", "Type to filter…") : fields.loadErr ? tl("publish", "Couldn't load categories") : tl("publish", "Loading categories…")}
  disabled={!fields.categories.length && !!fields.loadErr}
  className="block h-8 w-full border-b border-border bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground"
           />
@@ -1526,7 +1526,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   <Button
  size="sm" variant="outline" onClick={openStudio}
  disabled={refPicked.length === 0}
- title={refPicked.length === 0 ? "Pick at least one reference photo below" : "Generate our own photos from the picked references"}
+ title={refPicked.length === 0 ? tl("publish", "Pick at least one reference photo below") : tl("publish", "Generate our own photos from the picked references")}
                   >
                     {tl("publish", "Generate Images")}
                   </Button>
@@ -1612,7 +1612,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  onClick={() => toggleRefPick(i)}
  aria-pressed={refPicked.includes(i)}
  aria-label={refPicked.includes(i) ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
- title={refPicked.includes(i) ? "Using this one — click to drop it" : "Not used — click to add it"}
+ title={refPicked.includes(i) ? tl("publish", "Using this one — click to drop it") : tl("publish", "Not used — click to add it")}
  className="group relative aspect-square overflow-hidden rounded-lg bg-muted/40 outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/60"
                     >
                       {/* GREYED, ALWAYS — even for staff.
@@ -1742,7 +1742,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   }}
  onBlur={() => addTag(tagDraft)}
  disabled={tags.length >= MAX_TAGS}
- placeholder={tags.length >= MAX_TAGS ? "13 tags is Etsy's maximum" : "Type a tag, press Enter"}
+ placeholder={tags.length >= MAX_TAGS ? tl("publish", "13 tags is Etsy's maximum") : tl("publish", "Type a tag, press Enter")}
                 />
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -1843,7 +1843,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  onChange={(e) => setSizeRetail((p) => ({ ...p, [r.size]: e.target.value.replace(/[^0-9.]/g, "") }))}
  placeholder={retailN > 0 ? retailN.toFixed(2) : "—"}
  inputMode="decimal"
- aria-label={`Retail price for size ${r.size || "one size"}`}
+ aria-label={`Retail price for size ${r.size || tl("publish", "one size")}`}
  className="h-7 w-20 rounded border border-input bg-transparent px-1.5 text-right text-xs tabular-nums transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                                 />
                               </td>

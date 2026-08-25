@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { createContext, useCallback, useContext, useRef, useState } from "react"
 import { Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -55,6 +56,7 @@ const ConfirmContext = createContext<((o: ConfirmOptions) => Promise<boolean>) |
 const PromptContext = createContext<((o: PromptOptions) => Promise<string | null>) | null>(null)
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const tl = useLabelT()
  const [state, setState] = useState<DialogState | null>(null)
  const [value, setValue] = useState("")
  const resolver = useRef<((v: boolean | string | null) => void) | null>(null)
@@ -120,7 +122,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             ))}
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => settle(isPrompt ? null : false)}>
-                {state?.opts.cancelLabel ?? (isPrompt ? "Cancel" : "Keep it")}
+                {state?.opts.cancelLabel ?? (isPrompt ? tl("confirm", "Cancel") : tl("confirm", "Keep it"))}
               </Button>
               <Button
  size="sm"
@@ -129,7 +131,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
  onClick={() => settle(isPrompt ? value.trim() : true)}
  autoFocus={!isPrompt}
               >
-                {state?.opts.confirmLabel ?? (isPrompt ? "Send" : "Confirm")}
+                {state?.opts.confirmLabel ?? (isPrompt ? tl("confirm", "Send") : tl("confirm", "Confirm"))}
               </Button>
             </DialogFooter>
           </DialogContent>

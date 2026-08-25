@@ -1,3 +1,6 @@
+"use client"
+
+import { useLabelT } from "@/lib/i18n"
 import { Thumb } from "@/components/app/thumb"
 
 /**
@@ -27,6 +30,7 @@ export function ProductThumb({ src, alt = "", className = "" }: {
   /** Size override only — `size-16` for a denser table. Everything else is the house tile. */
   className?: string
 }) {
+  const tl = useLabelT()
   return (
     <div className={"size-24 shrink-0 overflow-hidden rounded-lg border border-border bg-white p-1 " + className}>
       {/* "no image" rather than an icon: a product with no photograph is a thing someone
@@ -35,7 +39,7 @@ export function ProductThumb({ src, alt = "", className = "" }: {
           instead of a torn-picture glyph and a paragraph of `alt`. */}
       <Thumb
         src={src} alt={alt} fit="contain" className="size-full bg-transparent text-center"
-        icon={<span className="text-2xs text-muted-foreground">no image</span>}
+        icon={<span className="text-2xs text-muted-foreground">{tl("productThumb", "no image")}</span>}
       />
     </div>
   )

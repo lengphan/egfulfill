@@ -92,7 +92,7 @@ export function PermissionsMatrix() {
                                 type="button"
                                 onClick={() => toggle(r, s.key)}
                                 aria-pressed={isVisible(r, s.key)}
-                                title={isVisible(r, s.key) ? "Visible — click to hide" : "Hidden — click to show"}
+                                title={isVisible(r, s.key) ? tl("permissionsMatrix", "Visible — click to hide") : tl("permissionsMatrix", "Hidden — click to show")}
                                 className={"inline-flex size-6 items-center justify-center rounded-md border transition-colors " + (isVisible(r, s.key) ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted text-transparent hover:text-muted-foreground")}
                               >
                                 <Check size={14} weight="bold" />

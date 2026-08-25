@@ -738,7 +738,7 @@ export function ImportOrdersDialog({
                   value={paste}
                   onChange={(e) => setPaste(e.target.value)}
                   rows={6}
-                  placeholder={"Paste rows copied from a spreadsheet (tab or comma separated), including the header row."}
+                  placeholder={tl("import", "Paste rows copied from a spreadsheet (tab or comma separated), including the header row.")}
                   className="w-full rounded-md border border-input bg-transparent px-3 py-2 tabular-nums text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <Button variant="outline" size="sm" onClick={ingestPaste} disabled={!paste.trim()}>{tl("import", "Preview rows")}</Button>

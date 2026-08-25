@@ -583,7 +583,7 @@ export function POAddItems({
           <Input
  value={term}
  onChange={(e) => setTerm(e.target.value)}
- placeholder={tab === "inventory" ? "Search your stocked blanks…" : "Search the supplier catalog…"}
+ placeholder={tab === "inventory" ? tl("poItems", "Search your stocked blanks…") : tl("poItems", "Search the supplier catalog…")}
  className="pl-9"
           />
         </div>

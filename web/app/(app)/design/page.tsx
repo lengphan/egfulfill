@@ -181,8 +181,8 @@ function DesignLab() {
                 busy={uploading ? `Saving ${uploading}…` : null}
                 disabled={signedOut}
                 slim={list.length > 0}
-                label={signedOut ? "Sign in to build your artwork library"
- : list.length > 0 ? "Add more artwork" : "Drop your artwork here"}
+                label={signedOut ? tl("design", "Sign in to build your artwork library")
+ : list.length > 0 ? tl("design", "Add more artwork") : tl("design", "Drop your artwork here")}
                 hint={tl("design", "PNG, JPG or SVG")}
                 action={!signedOut && list.length === 0 && (
                   <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)}>

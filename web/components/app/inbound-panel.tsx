@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, CaretRight, Check, Warning, Truck } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -37,6 +38,7 @@ const num = (v: unknown) => Number(v) || 0
  * same rows, receiving a carton that way can erase a morning's counts.
  */
 export function InboundPanel() {
+  const tl = useLabelT()
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [open, setOpen] = useState<Set<string>>(new Set())
   /** Received-quantity overrides, keyed `${po}|${sku}`. Absent = take the ordered qty. */
@@ -115,7 +117,7 @@ export function InboundPanel() {
   }
 
   return (
-    <SectionCard title="On its way">
+    <SectionCard title={tl("inbound", "On its way")}>
       {msg && (
         <div className={"flex items-center gap-2 border-b border-border px-5 py-2.5 text-sm " + (msg.ok ? "text-success" : "text-destructive")}>
           {msg.ok ? <Check size={14} weight="bold" /> : <Warning size={14} weight="fill" />} {msg.text}
@@ -127,8 +129,8 @@ export function InboundPanel() {
         <EmptyState
           icon={Truck}
           size="sm"
-          title="Nothing on order"
-          note="Purchase orders you place — including Alibaba orders imported from Purchasing — wait here until the goods arrive."
+          title={tl("inbound", "Nothing on order")}
+          note={tl("inbound", "Purchase orders you place — including Alibaba orders imported from Purchasing — wait here until the goods arrive.")}
         />
       ) : (
         <div className="divide-y divide-border">
@@ -147,7 +149,7 @@ export function InboundPanel() {
                   >
                     <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">{po.supplier || "Unassigned supplier"}</span>
+                      <span className="block truncate text-sm font-medium">{po.supplier || tl("inbound", "Unassigned supplier")}</span>
                       <span className="block truncate text-xs text-muted-foreground">
                         <span className="tabular-nums">{po.num}</span>
                         {" · "}{lines.length} sku{lines.length === 1 ? "" : "s"}{" · "}{units} unit{units === 1 ? "" : "s"}

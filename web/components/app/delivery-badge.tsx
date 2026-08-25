@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { ArrowClockwise, CircleNotch } from "@phosphor-icons/react"
 import { refreshTracking, type OrderRow } from "@/lib/api"
@@ -21,6 +22,7 @@ export function DeliveryBadge({ order, onRefreshed, className }: {
   onRefreshed?: () => void
   className?: string
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState(false)
   // Only meaningful once it's left us — before that, the pipeline stage is the answer.
   if (!order.tracking) return null
@@ -43,15 +45,15 @@ export function DeliveryBadge({ order, onRefreshed, className }: {
         </span>
       ) : (
         <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
-          Not asked yet
+          {tl("deliveryBadge", "Not asked yet")}
         </span>
       )}
       <button
         onClick={(e) => { e.stopPropagation(); check() }}
         disabled={busy}
-        title="Ask the carrier where this is now"
+        title={tl("deliveryBadge", "Ask the carrier where this is now")}
         className="eg-tap text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-        aria-label="Refresh carrier status"
+        aria-label={tl("deliveryBadge", "Refresh carrier status")}
       >
         {busy ? <CircleNotch size={12} className="animate-spin" /> : <ArrowClockwise size={12} weight="bold" />}
       </button>

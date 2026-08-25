@@ -455,7 +455,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  setTo({ name: name || "", street: addr.street || "", street2: addr.street2 || "", city: addr.city || "", state: addr.state || "", zip: addr.zip || "" })
                   }}
  rows={4}
- placeholder={"Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405"}
+ placeholder={tl("label", "Sara Fetterhoff\n230 Trails End Rd\nBeach Lake, PA 18405")}
  className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <div className="pointer-events-none absolute bottom-2 right-2.5">

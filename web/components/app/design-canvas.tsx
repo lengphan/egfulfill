@@ -482,14 +482,14 @@ export function DesignStage({
  onPointerDown={(e) => e.stopPropagation()}
       >
         {onCopy && (
-          <button type="button" onClick={onCopy} title={copyLabel ?? "Copy to the other sides"} aria-label={copyLabel ?? "Copy to the other sides"} className={stripBtn}>
+          <button type="button" onClick={onCopy} title={copyLabel ?? tl("canvas", "Copy to the other sides")} aria-label={copyLabel ?? tl("canvas", "Copy to the other sides")} className={stripBtn}>
             <Copy size={stripIcon} weight="bold" />
           </button>
         )}
         <button
  onPointerDown={locked ? undefined : startDrag(target, "rotate")}
  disabled={locked}
- title={locked ? "Locked" : "Drag to rotate"} aria-label={tl("canvas", "Rotate")}
+ title={locked ? tl("canvas", "Locked") : tl("canvas", "Drag to rotate")} aria-label={tl("canvas", "Rotate")}
  className={stripBtn + " touch-none " + (locked ? "" : "cursor-grab")}
         >
           <ArrowClockwise size={stripIcon} weight="bold" />
@@ -497,8 +497,8 @@ export function DesignStage({
         <button
  type="button"
  onClick={() => setLocked((v) => !v)}
- title={locked ? "Unlock — let it be moved again" : "Lock in place"}
- aria-label={locked ? "Unlock" : "Lock in place"}
+ title={locked ? tl("canvas", "Unlock — let it be moved again") : tl("canvas", "Lock in place")}
+ aria-label={locked ? tl("canvas", "Unlock") : tl("canvas", "Lock in place")}
  aria-pressed={locked}
  className={stripBtn + (locked ? " bg-primary/10 text-primary" : "")}
         >
@@ -736,7 +736,7 @@ export function DesignStage({
           } : undefined}
  style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%,-50%) rotate(${t.r}deg)`, color: t.color, fontSize: `${t.size}cqw`, fontWeight: t.bold ? 800 : 600, whiteSpace: "nowrap", lineHeight: 1.1 }}
  className={"absolute touch-none outline-none " + (isEditing ? "cursor-text" : lockedIds[t.id] ? "cursor-default" : canEdit ? "cursor-move" : "cursor-move")}
- title={canEdit && !isEditing ? "Double-click to edit" : undefined}
+ title={canEdit && !isEditing ? tl("canvas", "Double-click to edit") : undefined}
         >
           {t.text || tl("canvas", "Text")}
           {sel === t.id && !isEditing && handles(t.id)}
@@ -2353,7 +2353,7 @@ export function DesignCanvasDialog({
                   icon={UploadSimple}
                   accept={"image/*," + MACHINE_EXT_LIST}
                   label={tl("canvas", "Drop your files, or click to browse")}
-                  hint={isEmb ? "PNG or JPG, and a stitch file — .EMB .PES .DST .EXP .JEF — together" : "PNG or JPG"}
+                  hint={isEmb ? tl("canvas", "PNG or JPG, and a stitch file — .EMB .PES .DST .EXP .JEF — together") : tl("canvas", "PNG or JPG")}
                   multiple
                   onFiles={(f) => void takeFiles(f)}
                   onPick={() => uploadRef.current?.click()}
@@ -2399,9 +2399,9 @@ export function DesignCanvasDialog({
  onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
  disabled={mockBusy}
  title={ownMockups[sideKey]
-                ? "Put our product photo back"
- : "Use your own product photo as the backdrop — the design file is still needed"}
- aria-label={ownMockups[sideKey] ? "Use our product photo" : "Use my own product photo"}
+                ? tl("canvas", "Put our product photo back")
+ : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
+ aria-label={ownMockups[sideKey] ? tl("canvas", "Use our product photo") : tl("canvas", "Use my own product photo")}
  className={railBtn + (ownMockups[sideKey] ? " bg-primary/10 text-primary" : "")}
             >
               {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
@@ -2426,7 +2426,7 @@ export function DesignCanvasDialog({
  type="button"
  onClick={async () => { if (await save(false)) onSendToDesigner() }}
  disabled={!designUrl || saving}
- title={designUrl ? "Save this line and put it on the designers' board" : "Needs artwork first — there is nothing to digitise"}
+ title={designUrl ? tl("canvas", "Save this line and put it on the designers' board") : tl("canvas", "Needs artwork first — there is nothing to digitise")}
  aria-label={tl("canvas", "Send this line to a designer")}
  className={railBtn}
               >
@@ -3045,7 +3045,7 @@ export function DesignCanvasDialog({
  size="sm"
  variant={boardCard ? "outline" : "default"}
  disabled={sending || !designUrl || !!boardCard}
- title={boardCard ? "Already on the design board" : designUrl ? undefined : "Add an image first — a designer needs something to work from"}
+ title={boardCard ? tl("canvas", "Already on the design board") : designUrl ? undefined : tl("canvas", "Add an image first — a designer needs something to work from")}
  onClick={openSendPanel}
                   >
                     {boardCard ? tl("canvas", "Sent") : sending ? tl("canvas", "Sending…") : tl("canvas", "Send to Board")}
@@ -3237,7 +3237,7 @@ export function DesignCanvasDialog({
                   id="send-card-title"
                   value={cardTitle}
                   onChange={(e) => setCardTitle(e.target.value)}
-                  placeholder={item.name || item.sku || "Design"}
+                  placeholder={item.name || item.sku || tl("canvas", "Design")}
                 />
               </div>
               <div className="flex gap-3">

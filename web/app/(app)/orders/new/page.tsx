@@ -244,7 +244,7 @@ export default function NewOrderPage() {
  value={block}
  onChange={(e) => setBlock(e.target.value)}
  rows={5}
- placeholder={"e.g.\nJane Doe\n123 Main St\nSpringfield, IL 62704"}
+ placeholder={tl("newOrder", "e.g.\nJane Doe\n123 Main St\nSpringfield, IL 62704")}
  className="w-full rounded-md border border-input bg-transparent px-3 pb-8 pt-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
               />
               <div className="pointer-events-none absolute bottom-2 right-2.5">

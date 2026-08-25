@@ -170,7 +170,7 @@ export function CampaignsView() {
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{int(c.conversions)}</td>
                       <td className={"px-4 py-2.5 text-right font-semibold tabular-nums " + ((c.roas ?? 0) >= 1 ? "text-success" : c.roas != null ? "text-alert" : "text-muted-foreground")}>{c.roas != null ? `${c.roas}x` : "—"}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <Button size="sm" variant="ghost" disabled={busy === c.id} onClick={() => toggle(c.channel, c.id, c.status)} title={c.status === "active" ? "Pause" : "Resume"}>
+                        <Button size="sm" variant="ghost" disabled={busy === c.id} onClick={() => toggle(c.channel, c.id, c.status)} title={c.status === "active" ? tl("campaigns", "Pause") : tl("campaigns", "Resume")}>
                           {busy === c.id ? <CircleNotch size={13} className="animate-spin" /> : c.status === "active" ? <Pause size={13} weight="fill" /> : <Play size={13} weight="fill" />}
                         </Button>
                       </td>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -43,6 +44,7 @@ export function ApproveOrderButton({
   onError?: (m: string) => void
   size?: "sm" | "default"
 }) {
+  const tl = useLabelT()
   const [busy, setBusy] = useState(false)
   const role = getUser()?.role ?? ""
   if (!isApprovable(order)) return null
@@ -108,10 +110,10 @@ export function ApproveOrderButton({
       title={blocked
         ? `${incomplete} item${incomplete === 1 ? "" : "s"} still need a blank, colour, size & method — set them before starting.`
         : isFactoryOrder(order)
-          ? target === "approved" ? "Confirm the blank on every line" : "Put this into production"
+          ? target === "approved" ? tl("approveOrderButton", "Confirm the blank on every line") : tl("approveOrderButton", "Put this into production")
           : target === "approved"
-            ? "Confirm the blank on every line — the warehouse starts production from there"
-            : "Accept this order into production"}
+            ? tl("approveOrderButton", "Confirm the blank on every line — the warehouse starts production from there")
+            : tl("approveOrderButton", "Accept this order into production")}
     >
       {/* ONE WORD, both kinds of order. "Approve" and "Start" were the same write with two
           names, and the row in the hub had a third ("Next stage") for the same act on a

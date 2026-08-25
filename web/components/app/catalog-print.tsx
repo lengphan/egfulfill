@@ -114,7 +114,7 @@ function Editable({
  return (
       <button
  type="button" onClick={() => setOpen(true)}
- title={title ?? "Click to edit — this changes the catalogue, not the product"}
+ title={title ?? tl("catalogPrint", "Click to edit — this changes the catalogue, not the product")}
  className={"text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:decoration-neutral-500 " + (className ?? "")}
       >
         {value ? children : <span className="text-neutral-400">{placeholder ?? tl("catalogPrint", "Add")}</span>}

@@ -352,7 +352,7 @@ export function BrandingPanel() {
           <Button
             size="sm" onClick={save}
             disabled={busy === "save" || appName === (b?.appName ?? "")}
-            title={appName === (b?.appName ?? "") ? "The app name hasn't changed. Marks save the moment you upload them." : undefined}
+            title={appName === (b?.appName ?? "") ? tl("branding", "The app name hasn't changed. Marks save the moment you upload them.") : undefined}
           >
             {busy === "save" ? tl("branding", "Saving…") : tl("branding", "Save app name")}
           </Button>

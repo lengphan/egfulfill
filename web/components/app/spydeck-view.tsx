@@ -1318,7 +1318,7 @@ export function SpyDeckView() {
 
       {view === "search" && (
         <SectionCard
- title={cloud.live ? "Keywords in these results" : "Trending keywords & niches"}
+ title={cloud.live ? tl("spydeck", "Keywords in these results") : tl("spydeck", "Trending keywords & niches")}
           /* WHICH RESULTS, exactly. The Results card now says how many listings Etsy matched
              — often thousands — while the keywords, the median, the shop count and the top
  view count are all computed over the few hundred we actually fetch. Said once,

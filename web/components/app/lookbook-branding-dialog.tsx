@@ -175,7 +175,7 @@ export function LookbookBrandingDialog({
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               rows={2}
-              placeholder={"orders@egful.store\negful.store"}
+              placeholder={tl("lookbook", "orders@egful.store\negful.store")}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             />
             <span className="block text-2xs text-muted-foreground">{tl("lookbook", "Left blank, the block is omitted rather than printed empty.")}</span>

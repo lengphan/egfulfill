@@ -195,7 +195,7 @@ export function SupplierProductCard({
           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">{tl("supplierProductCard", "No image")}</div>
         )}
         {onFavorite && (
-          <button onClick={toggleFav} title={fav ? "Unfavorite" : "Favorite"}
+          <button onClick={toggleFav} title={fav ? tl("supplierProductCard", "Unfavorite") : tl("supplierProductCard", "Favorite")}
             className={"absolute right-2 top-2 flex size-7 items-center justify-center rounded-full border transition-colors " + (fav ? "border-rose-200 bg-rose-50 text-rose-500" : "border-border bg-background/80 text-muted-foreground hover:text-rose-500")}>
             <Heart size={14} weight={fav ? "fill" : "regular"} />
           </button>
@@ -207,7 +207,7 @@ export function SupplierProductCard({
             whose data didn't load, not the whole catalogue. */}
         {onSync && (
           <button onClick={runSync} disabled={syncing}
-            title={synced ? "Synced" : "Re-sync this style from the supplier"}
+            title={synced ? tl("supplierProductCard", "Synced") : tl("supplierProductCard", "Re-sync this style from the supplier")}
             aria-label={tl("supplierProductCard", "Re-sync this product")}
             className={"absolute bottom-2 left-2 flex size-7 items-center justify-center rounded-full border transition-colors " +
               (synced ? "border-transparent text-shipped"
@@ -256,7 +256,7 @@ export function SupplierProductCard({
               {colors.length > 7 && (
                 <button
                   onClick={() => setShowAllColors((v) => !v)}
-                  title={showAllColors ? "Show fewer colours" : `Show all ${colors.length} colours`}
+                  title={showAllColors ? tl("supplierProductCard", "Show fewer colours") : `Show all ${colors.length} colours`}
                   className="shrink-0 rounded px-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
                   {showAllColors ? tl("supplierProductCard", "Show less") : `+${colors.length - 7}`}
@@ -294,7 +294,7 @@ export function SupplierProductCard({
               {sizeNames.length > 6 && (
                 <button
                   onClick={() => setShowAllSizes((v) => !v)}
-                  title={showAllSizes ? "Show fewer sizes" : `Show all ${sizeNames.length} sizes`}
+                  title={showAllSizes ? tl("supplierProductCard", "Show fewer sizes") : `Show all ${sizeNames.length} sizes`}
                   className="shrink-0 rounded px-0.5 text-2xs font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
                   {showAllSizes ? "less" : `+${sizeNames.length - 6}`}

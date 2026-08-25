@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { Columns, DotsSixVertical, Eye, EyeSlash } from "@phosphor-icons/react"
 
@@ -20,6 +21,7 @@ export function ColumnsMenu({
   onOrder: (ids: OrderColId[]) => void
   onHidden: (ids: OrderColId[]) => void
 }) {
+  const tl = useLabelT()
   const [dragId, setDragId] = useState<OrderColId | null>(null)
 
   const toggle = (id: OrderColId) => {
@@ -31,13 +33,13 @@ export function ColumnsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="eg-control">
-        <Columns size={14} weight="bold" /> Columns
+        <Columns size={14} weight="bold" /> {tl("columnsMenu", "Columns")}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 p-1.5">
         <div className="flex items-center justify-between px-1.5 pb-1.5 pt-0.5">
-          <span className="text-xs font-semibold text-muted-foreground">Columns</span>
+          <span className="text-xs font-semibold text-muted-foreground">{tl("columnsMenu", "Columns")}</span>
           <button onClick={reset} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            Reset
+            {tl("columnsMenu", "Reset")}
           </button>
         </div>
         {order.map((id, i) => {
@@ -72,7 +74,7 @@ export function ColumnsMenu({
             </div>
           )
         })}
-        <p className="px-1.5 pb-0.5 pt-1.5 text-2xs text-muted-foreground">Drag to reorder. Saved on this device.</p>
+        <p className="px-1.5 pb-0.5 pt-1.5 text-2xs text-muted-foreground">{tl("columnsMenu", "Drag to reorder. Saved on this device.")}</p>
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -1392,7 +1392,7 @@ export default function ChatPage() {
  value={input}
  onChange={(next) => { setInput(next); if (!readOnly) detectMention(next, next.length) }}
  disabled={signedOut || !activeId || readOnly}
- label="Dictate a message"
+ label={tl("chat", "Dictate a message")}
               />
               <div className="relative shrink-0">
                 <Button variant="ghost" size="icon" className="size-9" onClick={() => setEmojiOpen((o) => !o)}
