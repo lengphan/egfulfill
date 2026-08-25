@@ -12,7 +12,6 @@ import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
 import { GenerateButton, AnimateImageButton, EditImageButton, type GenSettings } from "@/components/app/generate-menu"
 import { promptWarning } from "@/lib/image-gen"
-import { UserAvatar } from "@/components/app/user-avatar"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -39,8 +38,6 @@ type Convo = {
   /** Incoming messages since our last reply — the unread badge. Zero once answered, which
    * is how every other messenger behaves: the badge is a to-do, not a size. */
  count?: number
-  /** The person's own avatar, when the row is a person. */
- avatar?: { name?: string | null; avatar_emoji?: string | null; avatar_color?: string | null } | null
 }
 const STAFF_CHANNEL = "staff-general"
 const ANNOUNCE_CHANNEL = "announce"
@@ -166,8 +163,20 @@ export default function ChatPage() {
  const t = setTimeout(() => { getAiQuote().then(setAiQuote).catch(() => setAiQuote(null)) }, 0)
  return () => clearTimeout(t)
   }, [])
- const genChannel = aiQuote && !aiQuote.staff && aiQuote.enabled ? aiQuote.genChannel ?? null : null
- const canGenerate = isImageStaff || (!!aiQuote && !aiQuote.staff && aiQuote.enabled)
+ /*
+  * GENERATION IS STAFF-ONLY, AND SO THE GENERATIONS CHANNEL IS GONE.
+  *
+  * A seller's rail carried three rows, and the middle one was a room they had never
+  * written in and could not write in — it existed only to catch AI images. It read as
+  * clutter next to the one conversation that matters, and "No messages yet" under it is
+  * the least useful line in the rail.
+  *
+  * The two are ONE change, not two: the row is where a seller's images arrived, so
+  * hiding it while `enabled` was still true would have put every render into a channel
+  * they can no longer open. Dropping the capability is what makes dropping the row safe.
+  * Staff keep theirs — it lands in their own My Assistant thread, not here.
+  */
+ const canGenerate = isImageStaff
   /*
    * WHERE THE CONTROL LIVES HAS TO MATCH WHERE THE IMAGE LANDS.
    *
@@ -175,7 +184,7 @@ export default function ChatPage() {
    * Generations channel — so gating the button on the support thread left sellers looking at
    * the very channel their images arrive in, with no way to make one.
    */
- const genHere = genChannel ? activeId === genChannel : activeId === supportId
+ const genHere = activeId === supportId
  const priceNote = !aiQuote || aiQuote.staff ? null
  : aiQuote.freeLeft > 0
       ? `${aiQuote.freeLeft} free image${aiQuote.freeLeft === 1 ? "" : "s"} left this month, then $${aiQuote.imagePrice.toFixed(2)} each.`
@@ -235,7 +244,7 @@ export default function ChatPage() {
      * support conversation staff are reading. Listed only when the server says this account
      * has one (it names the id: a team member cannot derive their owner's account id).
      */
- if (genChannel) list.push(pin({ id: genChannel, kind: "gen", title: "Generations", sub: "" }))
+
     // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
  if (!isDesigner) list.push(pin({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: "" }))
     /**
@@ -256,14 +265,13 @@ export default function ChatPage() {
  list.push({
  id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
  sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated, count: t.unanswered ?? 0,
- avatar: { name: t.seller_name, avatar_emoji: t.avatar_emoji, avatar_color: t.avatar_color },
       })
     }
     // Channels opened from the directory that have no messages yet, so they don't
     // vanish from the rail the moment you click one.
  for (const c of opened) if (!list.some((x) => x.id === c.id)) list.push(c)
  return list
-  }, [isStaffUser, isDesigner, supportId, inbox, opened, genChannel, chanMeta])
+  }, [isStaffUser, isDesigner, supportId, inbox, opened, chanMeta])
 
   // Filtered rail. Searching only narrows what's already there; sellers who have
   // never written in come from the directory below, not from this list.
@@ -503,9 +511,8 @@ export default function ChatPage() {
  const pinnedIds = useMemo(() => [
     ...(isStaffUser ? [STAFF_CHANNEL] : []),
     ...(supportId ? [supportId] : []),
-    ...(genChannel ? [genChannel] : []),
     ...(isDesigner ? [] : [ANNOUNCE_CHANNEL]),
-  ], [isStaffUser, isDesigner, supportId, genChannel])
+  ], [isStaffUser, isDesigner, supportId])
 
  const refreshChanMeta = useCallback(() => {
  if (!pinnedIds.length || !getToken()) return
@@ -810,27 +817,12 @@ export default function ChatPage() {
  onClick={() => setActiveId(c.id)}
  className={"flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent " + (c.id === activeId ? "bg-accent" : "")}
               >
-                {/* THE PERSON, not a parcel. Every row drew the same glyph, so an inbox of
- eight conversations looked like eight copies of one thing and the only way
- to find the one you were mid-sentence with was to read names. The pinned
- channels (Announcements, EG Channel, My Assistant) keep their icons — those are
- places, not people. A website visitor has no account, so UserAvatar falls
- back to their initial rather than inventing a face. */}
-                {c.avatar ? (
-                  <UserAvatar
- user={{
- name: c.avatar.name ?? undefined,
- avatar_emoji: c.avatar.avatar_emoji ?? null,
- avatar_color: c.avatar.avatar_color ?? null,
-                    }}
- size={36}
- className="shrink-0"
-                  />
-                ) : (
-                  <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (c.kind === "support" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                    {convoIcon(c.kind)}
-                  </span>
-                )}
+                {/* NO GLYPH. The row is a name, its newest message and a count — three facts
+                    that read left-to-right off one margin. A 36px disc in front of every one
+                    of them pushed all three in by 48px and said nothing the name doesn't:
+                    the channel icons were three variations on "this is a room", and a face
+                    is not how anyone finds a conversation they were mid-sentence with. The
+                    unread badge is the row's only mark now, which is what makes it carry. */}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-sm font-semibold">{c.title}</span>
@@ -1369,7 +1361,7 @@ export default function ChatPage() {
  staffer's "My Assistant" is a general assistant thread where most messages are
  not image prompts, and arming it would put a price on the send button
  for ordinary chat. */
- autoArm={!!genChannel && activeId === genChannel}
+ autoArm={false}
                 />
               )}
               <input ref={attachRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => onAttach(e.target.files?.[0])} />
