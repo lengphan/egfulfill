@@ -87,3 +87,46 @@ export function useLabelT() {
     return messages[locale]?.[key] ?? messages.en[key] ?? value
   }, [locale])
 }
+
+/**
+ * DATES FOLLOW THE LOCALE. Money does NOT.
+ *
+ * 28 call sites passed "en-US" to toLocaleDateString, so a Vietnamese seller read
+ * "Tuesday, Aug 26" under a heading that said "Chào buổi sáng" — English on a page with no
+ * other English left on it. A date is not a currency: the figure is the same number in both
+ * languages, only the month name and the order of the parts change.
+ *
+ * Money stays en-US on purpose and must NOT route through here (see the note at the top of
+ * catalog.ts): sellers list on international marketplaces and price in dollars, so "$1,250.50"
+ * is the same string in every language. Reformatting it as "1.250,50" would change what the
+ * number appears to say.
+ *
+ *   const fmtDate = useDateFormat()
+ *   fmtDate(order.created_at, { month: "short", day: "numeric" })
+ *
+ * Returns an em dash for anything unparseable, which is what the call sites already did by
+ * hand — a blank cell reads as a column that failed to load rather than a date we don't have.
+ */
+export function useDateFormat() {
+  const { locale } = useLocale()
+  // Intl wants a BCP-47 tag, and our locale codes are only the language half.
+  const tag = locale === "vi" ? "vi-VN" : "en-US"
+  return useCallback((value: string | number | Date | null | undefined, opts?: Intl.DateTimeFormatOptions) => {
+    if (value == null || value === "") return "—"
+    const d = value instanceof Date ? value : new Date(value)
+    if (isNaN(d.getTime())) return "—"
+    return d.toLocaleDateString(tag, opts)
+  }, [tag])
+}
+
+/** The same, for a wall-clock time. Same locale rule, same em-dash fallback. */
+export function useTimeFormat() {
+  const { locale } = useLocale()
+  const tag = locale === "vi" ? "vi-VN" : "en-US"
+  return useCallback((value: string | number | Date | null | undefined, opts?: Intl.DateTimeFormatOptions) => {
+    if (value == null || value === "") return "—"
+    const d = value instanceof Date ? value : new Date(value)
+    if (isNaN(d.getTime())) return "—"
+    return d.toLocaleTimeString(tag, opts)
+  }, [tag])
+}

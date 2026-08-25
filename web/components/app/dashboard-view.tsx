@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
-import { useT, useLabelT } from "@/lib/i18n"
+import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { getToken, getUser } from "@/lib/auth"
@@ -58,6 +58,7 @@ const DEMO: OrderRow[] = [
 export function DashboardView() {
  const router = useRouter()
  const t = useT()
+  const fmtDate = useDateFormat()
  const cl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [balance, setBalance] = useState<number | null>(null)
@@ -115,7 +116,7 @@ export function DashboardView() {
   // Time-of-day greeting — client component, so this is the seller's own local clock.
  const greetDate = new Date()
  const greeting = t(greetDate.getHours() < 12 ? "dash.goodMorning" : greetDate.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
- const todayLabel = greetDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+ const todayLabel = fmtDate(greetDate, { weekday: "long", month: "short", day: "numeric" })
  const name = getUser()?.name || t("dash.there")
 
  const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])

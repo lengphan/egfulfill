@@ -9,7 +9,7 @@ import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { getOverview, getFactoryPnl, type Overview, type FactoryPnl } from "@/lib/api"
-import { useT, useLabelT } from "@/lib/i18n"
+import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
 import { staffNav, staffTools } from "@/lib/staff-nav"
@@ -129,6 +129,7 @@ function Gauge({ pct, caption }: { pct: number | null; caption: string }) {
 // snapshot, a recent-orders list, and quick links into the surfaces that role actually uses.
 export function StaffDashboard() {
  const t = useT()
+  const fmtDate = useDateFormat()
   // KPI labels, captions, window names and shortcut blurbs are all defined as English
   // strings in data structures, so they translate through useLabelT (keyed by the value)
   // rather than being restructured into keys.
@@ -180,7 +181,7 @@ export function StaffDashboard() {
   // local clock — the reader's own morning, not the server's.
  const now = new Date()
  const greeting = t(now.getHours() < 12 ? "dash.goodMorning" : now.getHours() < 18 ? "dash.goodAfternoon" : "dash.goodEvening")
- const todayLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+ const todayLabel = fmtDate(now, { weekday: "long", month: "short", day: "numeric" })
 
   /**
    * The floor's shape, counted by the server. This was eight filter() passes over every
