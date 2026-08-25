@@ -48,9 +48,9 @@ export const SKINS: { key: SkinKey; label: string; what: string }[] = [
 export type FaceKey = "inter" | "outfit" | "grotesk"
 
 export const FACES: { key: FaceKey; label: string; what: string }[] = [
-  { key: "outfit", label: "Outfit", what: "Wide, geometric. The default." },
+  { key: "inter", label: "Inter", what: "The body sans, set heavier. One face everywhere. The default." },
   { key: "grotesk", label: "Space Grotesk", what: "Narrower, more technical." },
-  { key: "inter", label: "Inter", what: "The body sans, set heavier. One face everywhere." },
+  { key: "outfit", label: "Outfit", what: "Wide, geometric." },
 ]
 
 const STORE_KEY = "eg_skin"

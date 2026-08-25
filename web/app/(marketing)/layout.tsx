@@ -49,7 +49,13 @@ export default async function MarketingLayout({ children }: { children: React.Re
     <div
       data-skin={theme.skin}
       data-face={theme.face}
-      className="flex min-h-svh flex-col"
+      /* `overflow-x: clip`, NOT `hidden`. The hero cut-out is scaled by a stored per-image
+         value the admin sets in the editor, so it can and does reach past the viewport —
+         measured at 1454px against a 1440px page, which gave the whole site a sideways
+         scrollbar and clipped the right-hand end of every full-width row. `clip` contains it
+         without creating a scroll container, so the sticky header still sticks; `hidden`
+         would break it. The image keeps the scale its author chose. */
+      className="flex min-h-svh flex-col overflow-x-clip"
       style={{ background: "var(--mk-surface)" }}
     >
       <SiteHeader />

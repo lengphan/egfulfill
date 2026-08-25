@@ -80,7 +80,7 @@ const DEFAULT_SKIN = 'studio';
  * is exactly why it can be a free-ish choice where a colour cannot.
  */
 const FACES = ['inter', 'outfit', 'grotesk'];
-const DEFAULT_FACE = 'outfit';
+const DEFAULT_FACE = 'inter';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_FAVICON = path.join(HERE, '..', 'assets', 'default-favicon.png');
 

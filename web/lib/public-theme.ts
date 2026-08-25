@@ -32,7 +32,7 @@ const FACES = ["inter", "outfit", "grotesk"] as const
 export type PublicTheme = { skin: (typeof SKINS)[number]; face: (typeof FACES)[number] }
 
 /** What the site renders with no stored choice, and what a bad answer falls back to. */
-export const DEFAULT_PUBLIC_THEME: PublicTheme = { skin: "studio", face: "outfit" }
+export const DEFAULT_PUBLIC_THEME: PublicTheme = { skin: "studio", face: "inter" }
 
 export async function getPublicTheme(): Promise<PublicTheme> {
   const origin = (process.env.API_ORIGIN || "https://egful.store").replace(/\/+$/, "")

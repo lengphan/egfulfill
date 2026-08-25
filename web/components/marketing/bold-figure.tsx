@@ -634,17 +634,25 @@ export function ObjectSlot({ src, alt = "", scale = 1, rotate = 0, className = "
  */
 export function StatOrbs({ items, className = "", path }: { items: Stat[]; className?: string; path?: string }) {
   const reduce = useReducedMotion()
-  const grounds = [LILAC, ACID, ACCENT, FIELD]
+  const grounds = [ACID, FIELD, ACCENT, FIELD]
   const sizes = ["clamp(9rem, 15vw, 13rem)", "clamp(7.5rem, 12vw, 10.5rem)", "clamp(6.5rem, 10vw, 9rem)", "clamp(6rem, 9vw, 8rem)"]
   return (
-    <div className={`flex flex-wrap items-center gap-x-10 gap-y-12 ${className}`}>
+    /* A WRAPPING FLEX ROW ORPHANS THE LAST ORB. Four stats at 1366px fit three across and
+       drop the fourth onto a row of its own with ~1000px of empty page beside it — measured,
+       and it is the single biggest reason this section reads as unfinished rather than airy.
+       Four discs plus their captions need ~1728px and can never share one row at a laptop
+       width, so the layout has to be a grid that resolves instead of a row that wraps. Two
+       columns, and an odd last one spans both. */
+    <div className={`grid gap-x-10 gap-y-12 sm:grid-cols-2 ${className}`}>
       {items.map((s, i) => {
         const ground = grounds[i % grounds.length]
         const onInk = ground === ACCENT
         return (
           <motion.div
             key={`${s.value}-${i}`}
-            className="flex items-center gap-5"
+            className={`flex items-center gap-5 ${
+              items.length % 2 === 1 && i === items.length - 1 ? "sm:col-span-2" : ""
+            }`}
             initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.88 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "0px 0px -12% 0px" }}
@@ -703,14 +711,26 @@ export function Bento({ items, className = "", path }: {
     <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${className}`}>
       {items.map((it, i) => {
         const ground = TILES[i % TILES.length]
-        const plain = ground === "var(--mk-surface)"
+        /* THE LAST TILE CLOSES THE ROW. Four items on a 3-column grid where the first is
+           `wide` fills five of six cells, and the sixth read as unfinished rather than
+           spacious — it was the loudest thing on the section. The final tile takes whatever
+           the row has left, so the grid always resolves. Computed from the same `wide`
+           flags the tiles above it use, never hard-coded to a count. */
+        const spans = items.map((x) => (x.wide ? 2 : 1))
+        const used = spans.slice(0, -1).reduce((a, b) => a + b, 0)
+        const remainder = used % 3
+        const lastFills = i === items.length - 1 && remainder !== 0 ? 3 - remainder : 0
         return (
           <motion.div
             key={`${it.title}-${i}`}
-            className={`flex flex-col rounded-[26px] p-7 ${it.wide ? "sm:col-span-2" : ""}`}
-            /* A white tile in a run of coloured ones would vanish into the page, so it — and
-               only it — keeps a hairline. Every other ground separates itself. */
-            style={{ background: ground, border: plain ? `1px solid ${HAIRLINE}` : "none" }}
+            className={`flex flex-col rounded-[26px] p-7 ${it.wide ? "sm:col-span-2" : ""} ${
+              lastFills === 2 ? "lg:col-span-2" : ""
+            }`}
+            /* NO BORDER ON ANY TILE. Every ground here is a different surface from the page,
+               which separates more strongly than a 1px rule and adds no line to a product
+               §4 has already counted 490 outlined boxes in. The white tile that needed a
+               hairline is gone with the second accent. */
+            style={{ background: ground, border: "none" }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "0px 0px -10% 0px" }}
@@ -725,7 +745,7 @@ export function Bento({ items, className = "", path }: {
                  one only when it carries meaning. */
               <span
                 className="mt-3 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
-                style={{ background: plain ? FIELD : "rgba(255,255,255,0.55)", color: INK }}
+                style={{ background: "rgba(255,255,255,0.55)", color: INK }}
               >
                 <Words path={path ? `${path}.${i}.meta` : undefined}>{it.meta}</Words>
               </span>

@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, FIELD, HAIRLINE, EASE, MaskedWords, Pill } from "@/components/marketing/bold-kit"
-import { LabelRule, CalloutList, Chip, ArrowBadge, ObjectSlot, StatOrbs, Bento } from "@/components/marketing/bold-figure"
+import { LabelRule, CalloutList, Chip, ObjectSlot, StatOrbs, Bento } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
 
 /**
@@ -67,11 +67,18 @@ export function BoldHome({ content }: { content: SiteContent }) {
             what we do at the right — and directly beneath it the word says the brand at 184px
             while this chip says what we do. Three lines, two facts. The rule is the one that
             loses: a hairline with the same words on it is the weakest of the three. */}
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <Chip tone="lime" path="hero.ruleRight">{hero.ruleRight}</Chip>
-          {/* No second line under the mark, for the same reason — it was repeating the chip
-              two inches to its right. */}
-          <ArrowBadge label={hero.ctaSecondary} href="/how-it-works" labelPath="hero.ctaSecondary" />
+        {/* THE MARK THAT USED TO SIT AT THE RIGHT IS GONE TOO, for the reason its own second
+            line went: it repeated something already on screen. It carried `hero.ctaSecondary`
+            — the identical words to the "See how it works" button 500px below it — so the
+            hero asked twice, in two different shapes, for one thing.
+
+            It was also the collision. The object below is absolutely positioned and pulled up
+            past this row's baseline, so the garment landed squarely on the badge and left a
+            fragment of the label sticking out from behind a sleeve. Measured: the badge at
+            x=1267 under an image spanning x=818–1454. Removing the duplicate removes the
+            overlap; nothing has to be nudged. */}
+        <div className="flex flex-wrap items-center gap-6">
+          <Chip path="hero.ruleRight">{hero.ruleRight}</Chip>
         </div>
 
         {/*
@@ -225,7 +232,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
-        <Chip tone="lilac">What it does</Chip>
+        <Chip>What it does</Chip>
         <h2 className="mt-5 max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           <EditableText path="features.heading">{features.heading}</EditableText>
         </h2>

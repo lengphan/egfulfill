@@ -182,7 +182,11 @@ export const FIELD = "var(--mk-field)"
  * a grid of mixed tiles read as designed is that the same few grounds recur in a rhythm —
  * and the thing that makes it read as noise is nine tiles each choosing for themselves.
  */
-export const TILES = [FIELD, LIME, "var(--mk-surface)", LILAC, FIELD, "var(--mk-surface)"] as const
+/* ONE BRIGHT THING. Six grounds used to cycle grey / lime / white / lilac, which put FOUR
+   tile treatments in one grid — a filled neutral, a filled accent, an outlined white and a
+   second filled accent — so no tile's appearance meant anything. Neutral is the ground and
+   lime is the exception, at one tile in four. §4: one accent. */
+export const TILES = [FIELD, LIME, FIELD, FIELD, FIELD, LIME] as const
 
 /**
  * THE AUTH GROUND — login, signup, forgot, reset.
