@@ -82,7 +82,7 @@ import {
 } from "@/lib/api"
 import { TabLabel } from "@/components/app/tab-label"
 import { getShippoBilling, SHIPPO_BILLING_URL, type ShippoBilling } from "@/lib/api"
-import { useLabelT } from "@/lib/i18n"
+import { useLabelT, useT } from "@/lib/i18n"
 
 const fmtDate = (s?: string | null) => {
  if (!s) return "—"
@@ -110,6 +110,8 @@ const fmtAgo = (s?: string | null) => {
 
 // ─────────────────────────── Profile ───────────────────────────
 function ProfilePanel() {
+  const tl = useLabelT()
+  const t = useT()
  const [user, setUser] = useState<ReturnType<typeof getUser>>(null)
  const [name, setName] = useState("")
  const [uname, setUname] = useState("")
@@ -204,28 +206,28 @@ function ProfilePanel() {
   }
 
  return (
-    <SectionCard title="Profile">
+    <SectionCard title={tl("settings", "Profile")}>
       {!user && (
         <div className="flex items-center gap-2 border-b border-border bg-hold/10 px-5 py-2.5 text-xs font-medium text-hold">
-          <Warning size={14} weight="fill" /> Sign in to see your account details.
+          <Warning size={14} weight="fill" /> {tl("settings", "Sign in to see your account details.")}
         </div>
       )}
       <div className="flex items-center gap-4 border-b border-border px-5 py-5">
         {/* Live preview — this is exactly what the topbar will show. */}
         <UserAvatar user={{ name: name || user?.name, avatar_emoji: emoji, avatar_color: color }} size={56} className="rounded-2xl" />
         <div>
-          <div className="text-lg font-semibold">{user?.name || "Your account"}</div>
-          <div className="text-sm text-muted-foreground">{user?.email || "Not signed in"}</div>
+          <div className="text-lg font-semibold">{user?.name || tl("settings", "Your account")}</div>
+          <div className="text-sm text-muted-foreground">{user?.email || tl("settings", "Not signed in")}</div>
         </div>
       </div>
       <div className="space-y-4 p-5">
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Display name</span>
+          <span className="text-sm font-medium">{tl("settings", "Display name")}</span>
           <Input
  value={name}
  onChange={(e) => { setName(e.target.value); setSaved(false) }}
  onKeyDown={(e) => { if (e.key === "Enter") save() }}
- placeholder="Your name"
+ placeholder={tl("settings", "Your name")}
  disabled={!user}
  className="max-w-sm"
           />
@@ -234,7 +236,7 @@ function ProfilePanel() {
         {/* Username — the SECOND way to sign in (email still works). No '@' allowed,
  which is what stops a username ever colliding with someone's email. */}
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Username <span className="font-normal text-muted-foreground">— optional, for signing in</span></span>
+          <span className="text-sm font-medium">{tl("settings", "Username")} <span className="font-normal text-muted-foreground">{tl("settings", "— optional, for signing in")}</span></span>
           <Input
  value={uname}
  onChange={(e) => { setUname(e.target.value); setSaved(false) }}
@@ -243,19 +245,19 @@ function ProfilePanel() {
  disabled={!user}
  className="max-w-sm"
           />
-          <span className="text-xs text-muted-foreground">12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.</span>
+          <span className="text-xs text-muted-foreground">{tl("settings", "12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.")}</span>
         </label>
 
         {/* Avatar — an emoji + a colour. Deliberately not an image upload: no file
  storage, no extra request per page, nothing to slow the app down. */}
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Avatar</span>
+          <span className="text-sm font-medium">{tl("settings", "Avatar")}</span>
           <div className="flex flex-wrap items-center gap-1.5">
             <button
  type="button"
  onClick={() => { setEmoji(""); setSaved(false) }}
  disabled={!user}
- title="Use your initial"
+ title={tl("settings", "Use your initial")}
  className={"flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition-colors " + (emoji === "" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent")}
             >
               {(name || user?.name || "?").charAt(0).toUpperCase()}
@@ -294,8 +296,8 @@ function ProfilePanel() {
               {sound ? <SpeakerHigh size={15} weight="fill" /> : null}
             </span>
             <span>
-              <span className="block text-sm font-medium">Notification sound</span>
-              <span className="block text-xs text-muted-foreground">Play a chime when something needs you</span>
+              <span className="block text-sm font-medium">{tl("settings", "Notification sound")}</span>
+              <span className="block text-xs text-muted-foreground">{tl("settings", "Play a chime when something needs you")}</span>
             </span>
           </span>
           <Switch checked={sound} onCheckedChange={(v) => { setSound(v); setSaved(false) }} disabled={!user} />
@@ -307,36 +309,35 @@ function ProfilePanel() {
           // it says what the old value was and where it is going rather than appearing to
           // lose it.
           <label className="flex max-w-sm flex-col gap-1.5 rounded-xl border border-hold/20 bg-hold/10 p-3">
-            <span className="text-sm font-medium">Email <span className="font-normal text-muted-foreground">— we don&apos;t have one for you</span></span>
+            <span className="text-sm font-medium">{tl("settings", "Email")} <span className="font-normal text-muted-foreground">{tl("settings", "— we don’t have one for you")}</span></span>
             <Input
  type="email"
  value={email}
  onChange={(e) => { setEmail(e.target.value); setSaved(false) }}
  onKeyDown={(e) => { if (e.key === "Enter") save() }}
- placeholder="you@example.com"
+ placeholder={tl("settings", "you@example.com")}
  className="bg-card"
             />
             <span className="text-xs text-muted-foreground">
-              &ldquo;{storedEmail}&rdquo; was saved here when you signed up. It stays as your username, so you
- can keep signing in with it — but a password reset needs a real address.
+              {t("settings.storedEmailNote", { email: storedEmail })}
             </span>
           </label>
         ) : (
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-muted-foreground">Email</span>
+            <span className="text-sm font-medium text-muted-foreground">{tl("settings", "Email")}</span>
             <div className="text-sm">{user?.email || "—"}</div>
           </div>
         )}
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-muted-foreground">Role</span>
-          <div className="text-sm capitalize">{user?.role || "seller"}</div>
+          <span className="text-sm font-medium text-muted-foreground">{tl("settings", "Role")}</span>
+          <div className="text-sm capitalize">{tl("role", user?.role || "seller")}</div>
         </div>
         {err && <div className="text-sm text-destructive">{err}</div>}
         <div className="flex items-center gap-3">
           <Button onClick={save} disabled={!dirty || saving}>
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? tl("settings", "Saving…") : tl("settings", "Save changes")}
           </Button>
-          {saved && <span className="inline-flex items-center gap-1 text-sm text-success">Saved</span>}
+          {saved && <span className="inline-flex items-center gap-1 text-sm text-success">{tl("settings", "Saved")}</span>}
         </div>
       </div>
     </SectionCard>
@@ -345,6 +346,7 @@ function ProfilePanel() {
 
 // ─────────────────────────── API keys ───────────────────────────
 function ApiKeysPanel() {
+  const tl = useLabelT()
  const [keys, setKeys] = useState<ApiKey[] | null>(null)
  const [label, setLabel] = useState("")
  const [creating, setCreating] = useState(false)
@@ -406,7 +408,7 @@ function ApiKeysPanel() {
 
  return (
     <SectionCard
- title="API keys"
+ title={tl("settings", "API keys")}
  actions={
         // Same test/live switch as the API Playground — the two must agree, or you
         // generate a key in one place that the other can't use.
@@ -426,7 +428,7 @@ function ApiKeysPanel() {
       {mode === "live" && (
         <div className="flex items-start gap-2 border-b border-border bg-alert/12 px-5 py-2.5 text-xs text-alert">
           <Warning size={14} weight="fill" className="mt-px shrink-0" />
-          <span><b>Live mode</b> — a live key (egk_live_…) makes calls create <b>real</b> orders. Use a test key while building.</span>
+          <span><b>{tl("settings", "Live mode")}</b> {tl("settings", "— a live key (egk_live_…) makes calls create")} <b>real</b> {tl("settings", "orders. Use a test key while building.")}</span>
         </div>
       )}
       {/* create row */}
@@ -439,7 +441,7 @@ function ApiKeysPanel() {
  onKeyDown={(e) => e.key === "Enter" && onCreate()}
         />
         <Button size="sm" onClick={onCreate} disabled={creating}>
-          <Plus size={14} weight="bold" /> {creating ? "Generating…" : `Generate ${mode} key`}
+          <Plus size={14} weight="bold" /> {creating ? tl("settings", "Generating…") : `Generate ${mode} key`}
         </Button>
         {err && <span className="text-xs font-medium text-alert">{err}</span>}
       </div>
@@ -448,7 +450,7 @@ function ApiKeysPanel() {
       {fresh && (
         <div className="border-b border-border bg-shipped/12 px-5 py-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-shipped">
-            <Check size={15} weight="bold" /> Copy your new key now — it won&apos;t be shown again.
+            <Check size={15} weight="bold" /> {tl("settings", "Copy your new key now — it won’t be shown again.")}
           </div>
           <div className="mt-2 flex items-center gap-2">
             <code className="flex-1 truncate rounded-lg border border-shipped/30 bg-white px-3 py-2 tabular-nums text-sm">
@@ -456,7 +458,7 @@ function ApiKeysPanel() {
             </code>
             <Button size="sm" variant="outline" onClick={copy}>
               {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? tl("settings", "Copied") : tl("settings", "Copy")}
             </Button>
           </div>
         </div>
@@ -485,9 +487,9 @@ function ApiKeysPanel() {
       ) : shown.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-12 text-center">
           <Key size={18} weight="regular" className="shrink-0 text-muted-foreground" />
-          <div className="font-medium">{view === "active" ? "No active keys" : "No revoked keys"}</div>
+          <div className="font-medium">{view === "active" ? tl("settings", "No active keys") : tl("settings", "No revoked keys")}</div>
           <div className="max-w-xs text-sm text-muted-foreground">
-            {view === "active" ? "Generate a test key to call the sandbox endpoints." : "Keys you revoke will show up here."}
+            {view === "active" ? tl("settings", "Generate a test key to call the sandbox endpoints.") : tl("settings", "Keys you revoke will show up here.")}
           </div>
         </div>
       ) : (
@@ -496,7 +498,7 @@ function ApiKeysPanel() {
             <div key={String(k.id)} className={"flex items-center justify-between gap-4 px-5 py-3.5 " + (k.revoked_at ? "opacity-50" : "")}>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="truncate font-medium">{k.label || "Test key"}</span>
+                  <span className="truncate font-medium">{k.label || tl("settings", "Test key")}</span>
                   <Badge variant="secondary" className="text-2xs uppercase">{k.mode}</Badge>
                   {k.revoked_at && <span className="text-2xs font-medium text-alert">revoked</span>}
                 </div>
@@ -513,7 +515,7 @@ function ApiKeysPanel() {
  className="text-muted-foreground hover:text-alert"
  onClick={() => onRevoke(k.id)}
                 >
-                  Revoke
+                  {tl("settings", "Revoke")}
                 </Button>
               )}
             </div>
@@ -557,6 +559,7 @@ const SHAREABLE = [
 const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 function TeamPanel() {
+  const tl = useLabelT()
  const [members, setMembers] = useState<TeamMember[] | null>(null)
  const [email, setEmail] = useState("")
  const [role, setRole] = useState("editor")
@@ -671,7 +674,7 @@ function TeamPanel() {
   }
 
  return (
-    <SectionCard title="Team">
+    <SectionCard title={tl("settings", "Team")}>
       {/* MY side of things. An invite has to be accepted before any sharing limits take
  effect — until then the membership is 'invited' and the member sees everything,
  which looked exactly like "the toggles don't work". */}
@@ -694,15 +697,15 @@ function TeamPanel() {
               <span className="text-muted-foreground"> invited you as {inv.role}</span>
             </div>
             <div className="truncate text-xs text-muted-foreground">
-              Accepting limits your menu to the pages they shared.
+              {tl("settings", "Accepting limits your menu to the pages they shared.")}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => onDropMembership(inv.id, "decline")} disabled={acceptBusy === inv.id}>
-              Decline
+              {tl("settings", "Decline")}
             </Button>
             <Button size="sm" onClick={() => onAccept(inv)} disabled={acceptBusy === inv.id}>
-              {acceptBusy === inv.id ? "Accepting…" : "Accept invite"}
+              {acceptBusy === inv.id ? tl("settings", "Accepting…") : tl("settings", "Accept invite")}
             </Button>
           </div>
         </div>
@@ -712,7 +715,7 @@ function TeamPanel() {
         <Input
  value={email}
  onChange={(e) => setEmail(e.target.value)}
- placeholder="teammate@email.com"
+ placeholder={tl("settings", "teammate@email.com")}
  type="email"
  className="sm:max-w-xs"
  onKeyDown={(e) => e.key === "Enter" && onInvite()}
@@ -722,12 +725,12 @@ function TeamPanel() {
  onChange={(e) => setRole(e.target.value)}
  className="eg-select eg-control pr-8"
         >
-          <option value="editor">Editor</option>
-          <option value="viewer">Viewer</option>
-          <option value="admin">Admin</option>
+          <option value="editor">{tl("settings", "Editor")}</option>
+          <option value="viewer">{tl("settings", "Viewer")}</option>
+          <option value="admin">{tl("settings", "Admin")}</option>
         </select>
         <Button size="sm" onClick={onInvite} disabled={busy}>
-          <Plus size={14} weight="bold" /> {busy ? "Inviting…" : "Invite"}
+          <Plus size={14} weight="bold" /> {busy ? tl("settings", "Inviting…") : tl("settings", "Invite")}
         </Button>
         {err && <span className="text-xs font-medium text-alert">{err}</span>}
       </div>
@@ -739,7 +742,7 @@ function TeamPanel() {
           ))}
         </div>
       ) : members.length === 0 ? (
-        <div className="p-8 text-center text-sm text-muted-foreground">No team members yet.</div>
+        <div className="p-8 text-center text-sm text-muted-foreground">{tl("settings", "No team members yet.")}</div>
       ) : (
         <div className="divide-y divide-border">
           {members.map((m) => (
@@ -787,7 +790,7 @@ function TeamPanel() {
  className="shrink-0 text-muted-foreground hover:text-alert"
  onClick={() => setRemoving(m)}
                 >
-                  Remove
+                  {tl("settings", "Remove")}
                 </Button>
               </div>
             </div>
@@ -814,7 +817,7 @@ function TeamPanel() {
  onClick={() => onDropMembership(String(access.membershipId), "leave the team")}
  disabled={acceptBusy === String(access.membershipId)}
             >
-              Leave team
+              {tl("settings", "Leave team")}
             </Button>
           )}
         </div>
@@ -828,17 +831,17 @@ function TeamPanel() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Remove {removing?.email} from your team?</DialogTitle>
-            <DialogDescription>They lose access to your account immediately.</DialogDescription>
+            <DialogDescription>{tl("settings", "They lose access to your account immediately.")}</DialogDescription>
           </DialogHeader>
           <ul className="space-y-1.5 text-sm text-muted-foreground">
-            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />Your orders, wallet, stores and design files are hidden from them right away.</li>
-            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />Work they did stays on your account — nothing of yours is deleted.</li>
-            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-shipped/60" />Their account is <span className="font-medium text-foreground">not</span> deleted. They keep the same login and go back to their own empty seller board.</li>
-            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />To bring them back later, invite the same email again.</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />{tl("settings", "Your orders, wallet, stores and design files are hidden from them right away.")}</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />{tl("settings", "Work they did stays on your account — nothing of yours is deleted.")}</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-shipped/60" />{tl("settings", "Their account is")} <span className="font-medium text-foreground">not</span> {tl("settings", "deleted. They keep the same login and go back to their own empty seller board.")}</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />{tl("settings", "To bring them back later, invite the same email again.")}</li>
           </ul>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoving(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => removing && onRemove(removing.id)}>Remove from team</Button>
+            <Button variant="outline" onClick={() => setRemoving(null)}>{tl("settings", "Cancel")}</Button>
+            <Button variant="destructive" onClick={() => removing && onRemove(removing.id)}>{tl("settings", "Remove from team")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -859,12 +862,12 @@ function TeamPanel() {
  * from a saved one until an invoice is short.
  */
 function ReadOnlyFor({ on, children }: { on: boolean; children: React.ReactNode }) {
+  const tl = useLabelT()
  if (!on) return <>{children}</>
  return (
     <>
       <p className="mb-3 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
-        Read-only for operators — these are the numbers your jobs are quoted on. Admin or
- warehouse changes them.
+        {tl("settings", "Read-only for operators — these are the numbers your jobs are quoted on. Admin or warehouse changes them.")}
       </p>
       <fieldset disabled className="min-w-0 opacity-70">{children}</fieldset>
     </>
@@ -893,15 +896,16 @@ function MoneyField({ label, value, onChange }: { label: string; value: string; 
  * the default legible too: leave it at 0 and base cost simply equals product cost.
  */
 function MarkupFormula({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const tl = useLabelT()
  const x = Number(value) || 0
  const example = 12.5
  return (
     <div className="flex flex-col gap-1.5 sm:col-span-2">
-      <span className="text-sm font-medium">Base cost formula</span>
+      <span className="text-sm font-medium">{tl("settings", "Base cost formula")}</span>
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-        <span className="text-sm font-medium">Base cost</span>
+        <span className="text-sm font-medium">{tl("settings", "Base cost")}</span>
         <span className="text-muted-foreground">=</span>
-        <span className="rounded-md bg-background px-2 py-1 text-sm font-medium">Product cost</span>
+        <span className="rounded-md bg-background px-2 py-1 text-sm font-medium">{tl("settings", "Product cost")}</span>
         <span className="text-muted-foreground">+</span>
         <div className="relative w-28">
           <CurrencyDollar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -909,14 +913,14 @@ function MarkupFormula({ value, onChange }: { value: string; onChange: (v: strin
  value={value}
  onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
  placeholder="0.00" inputMode="decimal" className="h-9 pl-7"
- aria-label="Base cost markup"
+ aria-label={tl("settings", "Base cost markup")}
           />
         </div>
       </div>
       <span className="text-xs text-muted-foreground">
         {x > 0
           ? `A blank costing $${example.toFixed(2)} from your supplier sells at $${(example + x).toFixed(2)} before the print-method surcharge.`
- : "Leave it at 0 and base cost simply copies the product cost — set a number here to add a default margin to every synced product."}
+ : tl("settings", "Leave it at 0 and base cost simply copies the product cost — set a number here to add a default margin to every synced product.")}
         {" "}A base cost typed on a product always wins, and print-method surcharges are added on top.
       </span>
     </div>
@@ -1042,6 +1046,7 @@ function Fold(props: FoldProps): React.ReactNode {
  * into state by an effect, so there's no frame where the panel and the query disagree.
  */
 function FoldGroup({ children }: { children: React.ReactNode }) {
+  const tl = useLabelT()
  const q = useContext(SettingsSearch)
  const [picked, setPicked] = useState("")
 
@@ -1065,7 +1070,7 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
         <PanelPicker
  value={active?.props.title ?? ""}
  onChange={setPicked}
- label="Choose a settings section"
+ label={tl("settings", "Choose a settings section")}
  options={visible.map((f) => ({
  value: f.props.title,
  label: f.props.title,
@@ -1097,6 +1102,7 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
 }
 
 function PlatformPanel() {
+  const tl = useLabelT()
  const [loaded, setLoaded] = useState<FactorySettings | null>(null)
  const [designFee, setDesignFee] = useState("")
  const [designStd, setDesignStd] = useState("")
@@ -1315,10 +1321,10 @@ function PlatformPanel() {
     } finally { setSaving(false) }
   }
 
- if (loaded === null) return <SectionCard title="Platform"><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
+ if (loaded === null) return <SectionCard title={tl("settings", "Platform")}><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
 
  return (
-    <SectionCard title="Platform">
+    <SectionCard title={tl("settings", "Platform")}>
       <SettingsSearch.Provider value={settingsQ.trim().toLowerCase()}>
       {/* Sticky, because the point is to type a word and watch the page below it shrink —
  scrolling away from the box you're filtering with defeats that. */}
@@ -1328,14 +1334,14 @@ function PlatformPanel() {
           <Input
  value={settingsQ}
  onChange={(e) => setSettingsQ(e.target.value)}
- placeholder="Search settings — try “tiktok”, “shipping”, “payout”…"
+ placeholder={tl("settings", "Search settings — try “tiktok”, “shipping”, “payout”…")}
  className="h-9 pl-8"
- aria-label="Search settings"
+ aria-label={tl("settings", "Search settings")}
           />
           {!!settingsQ && (
             <button
  onClick={() => setSettingsQ("")}
- aria-label="Clear search"
+ aria-label={tl("settings", "Clear search")}
  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
             >
               <X size={12} weight="bold" />
@@ -1345,26 +1351,25 @@ function PlatformPanel() {
       </div>
       <FoldGroup>
       {!isOperator && (
-      <Fold title="Warehouse ship-from address" status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
+      <Fold title={tl("settings", "Warehouse ship-from address")} status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          Where parcels are tendered from. Set once for the whole team. If returns come back
- somewhere else, set that separately below.
+          {tl("settings", "Where parcels are tendered from. Set once for the whole team. If returns come back somewhere else, set that separately below.")}
         </p>
         {!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip) && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-            No ship-from address yet — buying a label will fail until street, city, state and ZIP are filled in.
+            {tl("settings", "No ship-from address yet — buying a label will fail until street, city, state and ZIP are filled in.")}
           </div>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Name / company" value={shipFrom.name ?? ""} onChange={(v) => setFromField("name", v)} />
-          <TextField label="Phone" value={shipFrom.phone ?? ""} onChange={(v) => setFromField("phone", v)} />
-          <TextField label="Street" value={shipFrom.street ?? ""} onChange={(v) => setFromField("street", v)} />
-          <TextField label="Suite / unit" value={shipFrom.street2 ?? ""} onChange={(v) => setFromField("street2", v)} />
-          <TextField label="City" value={shipFrom.city ?? ""} onChange={(v) => setFromField("city", v)} />
+          <TextField label={tl("settings", "Name / company")} value={shipFrom.name ?? ""} onChange={(v) => setFromField("name", v)} />
+          <TextField label={tl("settings", "Phone")} value={shipFrom.phone ?? ""} onChange={(v) => setFromField("phone", v)} />
+          <TextField label={tl("settings", "Street")} value={shipFrom.street ?? ""} onChange={(v) => setFromField("street", v)} />
+          <TextField label={tl("settings", "Suite / unit")} value={shipFrom.street2 ?? ""} onChange={(v) => setFromField("street2", v)} />
+          <TextField label={tl("settings", "City")} value={shipFrom.city ?? ""} onChange={(v) => setFromField("city", v)} />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="State" value={shipFrom.state ?? ""} onChange={(v) => setFromField("state", v)} />
+            <TextField label={tl("settings", "State")} value={shipFrom.state ?? ""} onChange={(v) => setFromField("state", v)} />
             <TextField label="ZIP" value={shipFrom.zip ?? ""} onChange={(v) => setFromField("zip", v)} />
           </div>
         </div>
@@ -1380,13 +1385,13 @@ function PlatformPanel() {
  onChange={(e) => setShipFrom((p) => ({ ...p, blind: e.target.checked }))}
           />
           <span className="text-xs">
-            <span className="font-medium">Ship under each seller&rsquo;s shop name</span>
+            <span className="font-medium">{tl("settings", "Ship under each seller’s shop name")}</span>
             <span className="block text-muted-foreground">
               The sender name becomes the seller&rsquo;s own shop, at the address above — so a buyer
  sees the shop they bought from, and two parcels from two shops don&rsquo;t advertise a
  shared factory. Only the name changes; carriers route on the address, so returns
  still come here. Turn this off and every label reverts to
-              &ldquo;{shipFrom.name || "the name above"}&rdquo;.
+              &ldquo;{shipFrom.name || tl("settings", "the name above")}&rdquo;.
             </span>
           </span>
         </label>
@@ -1399,20 +1404,18 @@ function PlatformPanel() {
           (Shippo) / return_address (EasyPost). Left blank, the carrier falls back to the
  sender, which is what happened before this field existed. */}
       {!isOperator && (
-      <Fold title="Return address" status={returnAddr.street ? "set" : "using ship-from"}>
+      <Fold title={tl("settings", "Return address")} status={returnAddr.street ? "set" : "using ship-from"}>
         <p className="mb-3 text-xs text-muted-foreground">
-          Only needed if returns come back to a <b>different address</b> than the one you ship
- from. Leave it blank and returns follow the ship-from address above. The name here is
- yours — it is never replaced by the seller&rsquo;s shop name.
+          {tl("settings", "Only needed if returns come back to a")} <b>{tl("settings", "different address")}</b> {tl("settings", "than the one you ship from. Leave it blank and returns follow the ship-from address above. The name here is yours — it is never replaced by the seller’s shop name.")}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Name / company" value={returnAddr.name ?? ""} onChange={(v) => setReturnField("name", v)} />
-          <TextField label="Phone" value={returnAddr.phone ?? ""} onChange={(v) => setReturnField("phone", v)} />
-          <TextField label="Street" value={returnAddr.street ?? ""} onChange={(v) => setReturnField("street", v)} />
-          <TextField label="Suite / unit" value={returnAddr.street2 ?? ""} onChange={(v) => setReturnField("street2", v)} />
-          <TextField label="City" value={returnAddr.city ?? ""} onChange={(v) => setReturnField("city", v)} />
+          <TextField label={tl("settings", "Name / company")} value={returnAddr.name ?? ""} onChange={(v) => setReturnField("name", v)} />
+          <TextField label={tl("settings", "Phone")} value={returnAddr.phone ?? ""} onChange={(v) => setReturnField("phone", v)} />
+          <TextField label={tl("settings", "Street")} value={returnAddr.street ?? ""} onChange={(v) => setReturnField("street", v)} />
+          <TextField label={tl("settings", "Suite / unit")} value={returnAddr.street2 ?? ""} onChange={(v) => setReturnField("street2", v)} />
+          <TextField label={tl("settings", "City")} value={returnAddr.city ?? ""} onChange={(v) => setReturnField("city", v)} />
           <div className="grid grid-cols-2 gap-3">
-            <TextField label="State" value={returnAddr.state ?? ""} onChange={(v) => setReturnField("state", v)} />
+            <TextField label={tl("settings", "State")} value={returnAddr.state ?? ""} onChange={(v) => setReturnField("state", v)} />
             <TextField label="ZIP" value={returnAddr.zip ?? ""} onChange={(v) => setReturnField("zip", v)} />
           </div>
         </div>
@@ -1422,14 +1425,13 @@ function PlatformPanel() {
           && !(returnAddr.street && returnAddr.city && returnAddr.state && returnAddr.zip) && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
             <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-            Incomplete return address — street, city, state and ZIP are all needed. Until then
- returns fall back to the ship-from address.
+            {tl("settings", "Incomplete return address — street, city, state and ZIP are all needed. Until then returns fall back to the ship-from address.")}
           </div>
         )}
       </Fold>
       )}
       {!isOperator && (
-      <Fold title="Fees">
+      <Fold title={tl("settings", "Fees")}>
         {/* MONEY OUT first, then money in, and the direction is written into every hint.
             These sat together unlabelled when the payout was called "design fee", which is
  how a rate paid TO a designer read as a charge made to a seller. */}
@@ -1437,10 +1439,10 @@ function PlatformPanel() {
  came from. Said once here rather than three times in three hints, because the
  thing that confuses is not each fee — it is not knowing they are alternatives. */}
         <FeeGroup
- title="Design work — what a seller pays"
+ title={tl("settings", "Design work — what a seller pays")}
         >
-          <MoneyField label="Standard" value={designStd} onChange={setDesignStd} />
-          <MoneyField label="Complex" value={designCx} onChange={setDesignCx} />
+          <MoneyField label={tl("settings", "Standard")} value={designStd} onChange={setDesignStd} />
+          <MoneyField label={tl("settings", "Complex")} value={designCx} onChange={setDesignCx} />
           {/* "Their own file" (the check fee) was here. RETIRED 2026-08-24 — a seller who
               brings their own machine file is not billed for us opening it, so there is no
               longer a price to set. The stored key survives so an order already charged one
@@ -1450,37 +1452,37 @@ function PlatformPanel() {
         </FeeGroup>
 
         <FeeGroup
- title="The file itself — what a seller pays"
+ title={tl("settings", "The file itself — what a seller pays")}
         >
-          <MoneyField label="Standard" value={embPrice} onChange={setEmbPrice} />
-          <MoneyField label="Complex" value={embCx} onChange={setEmbCx} />
+          <MoneyField label={tl("settings", "Standard")} value={embPrice} onChange={setEmbPrice} />
+          <MoneyField label={tl("settings", "Complex")} value={embCx} onChange={setEmbCx} />
         </FeeGroup>
 
         <FeeGroup
- title="What we pay out"
+ title={tl("settings", "What we pay out")}
         >
-          <MoneyField label="Designer payout" value={designFee} onChange={setDesignFee} />
+          <MoneyField label={tl("settings", "Designer payout")} value={designFee} onChange={setDesignFee} />
         </FeeGroup>
         <FeeGroup
- title="Seller payouts"
+ title={tl("settings", "Seller payouts")}
         >
-          <MoneyField label="Minimum payout" value={payoutMin} onChange={setPayoutMin} />
-          <MoneyField label="Maximum payout" value={payoutMax} onChange={setPayoutMax} />
+          <MoneyField label={tl("settings", "Minimum payout")} value={payoutMin} onChange={setPayoutMin} />
+          <MoneyField label={tl("settings", "Maximum payout")} value={payoutMax} onChange={setPayoutMax} />
         </FeeGroup>
         {isAdminUser && (
           <FeeGroup
- title="VietQR top-up rate"
+ title={tl("settings", "VietQR top-up rate")}
           >
             <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Base rate — VND per $1</span>
+              <span className="text-sm font-medium">{tl("settings", "Base rate — VND per $1")}</span>
               <Input value={vqrRate} onChange={(e) => setVqrRate(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="25400" className="h-9" />
-              <span className="text-2xs text-muted-foreground">e.g. 25400 means $50 → 1,270,000₫</span>
+              <span className="text-2xs text-muted-foreground">{tl("settings", "e.g. 25400 means $50 → 1,270,000₫")}</span>
             </label>
             {/* Volume discounts — each row: at/above $usd, the seller pays this better $1 = rate₫. */}
             <div className="sm:col-span-2 space-y-2">
-              <span className="text-sm font-medium">Volume discounts</span>
-              <p className="text-2xs text-muted-foreground">A better rate the more a seller adds. Lower ₫/$1 = a bigger discount. Shown in Add Funds under &ldquo;Top up more for a better rate&rdquo;.</p>
-              {vqrTiers.length === 0 && <p className="text-2xs italic text-muted-foreground">No tiers yet — everyone gets the base rate.</p>}
+              <span className="text-sm font-medium">{tl("settings", "Volume discounts")}</span>
+              <p className="text-2xs text-muted-foreground">{tl("settings", "A better rate the more a seller adds. Lower ₫/$1 = a bigger discount. Shown in Add Funds under “Top up more for a better rate”.")}</p>
+              {vqrTiers.length === 0 && <p className="text-2xs italic text-muted-foreground">{tl("settings", "No tiers yet — everyone gets the base rate.")}</p>}
               {vqrTiers.map((t, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="relative w-24">
@@ -1490,32 +1492,32 @@ function PlatformPanel() {
                   <span className="shrink-0 text-xs text-muted-foreground">→ $1 =</span>
                   <Input value={t.rate} onChange={(e) => setTier(i, "rate", e.target.value)} inputMode="numeric" placeholder="26000" className="h-9 flex-1" />
                   <span className="shrink-0 text-xs text-muted-foreground">₫</span>
-                  <button type="button" onClick={() => removeTier(i)} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-alert" aria-label="Remove tier"><X size={15} weight="bold" /></button>
+                  <button type="button" onClick={() => removeTier(i)} className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-alert" aria-label={tl("settings", "Remove tier")}><X size={15} weight="bold" /></button>
                 </div>
               ))}
-              <button type="button" onClick={addTier} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Plus size={13} weight="bold" /> Add tier</button>
+              <button type="button" onClick={addTier} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><Plus size={13} weight="bold" /> {tl("settings", "Add tier")}</button>
             </div>
           </FeeGroup>
         )}
         {isAdminUser && (
           <FeeGroup
- title="Top-up amounts"
+ title={tl("settings", "Top-up amounts")}
           >
-            <MoneyField label="Minimum top-up" value={vqrMin} onChange={setVqrMin} />
+            <MoneyField label={tl("settings", "Minimum top-up")} value={vqrMin} onChange={setVqrMin} />
             <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Quick amounts</span>
+              <span className="text-sm font-medium">{tl("settings", "Quick amounts")}</span>
               <Input value={vqrSmall} onChange={(e) => setVqrSmall(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="50, 100, 200, 500, 1000" className="h-9" />
-              <span className="text-2xs text-muted-foreground">Comma-separated. Amounts below the minimum are hidden automatically.</span>
+              <span className="text-2xs text-muted-foreground">{tl("settings", "Comma-separated. Amounts below the minimum are hidden automatically.")}</span>
             </label>
             <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-sm font-medium">Bulk amounts</span>
+              <span className="text-sm font-medium">{tl("settings", "Bulk amounts")}</span>
               <Input value={vqrBulk} onChange={(e) => setVqrBulk(e.target.value.replace(/[^0-9,\s]/g, ""))} inputMode="numeric" placeholder="2000, 5000, 10000, 20000" className="h-9" />
-              <span className="text-2xs text-muted-foreground">The larger &ldquo;top up more&rdquo; suggestions. Comma-separated.</span>
+              <span className="text-2xs text-muted-foreground">{tl("settings", "The larger “top up more” suggestions. Comma-separated.")}</span>
             </label>
           </FeeGroup>
         )}
         <FeeGroup
- title="Product & shipping"
+ title={tl("settings", "Product & shipping")}
         >
           <div className="sm:col-span-2"><MarkupFormula value={baseMarkup} onChange={setBaseMarkup} /></div>
           {/* Both shipping fields moved to "Shipping by product type" below. They were
@@ -1528,7 +1530,7 @@ function PlatformPanel() {
  directions. Only TikTok-SHIPPED orders — a seller-shipped TikTok order buys a
  real label through the rates above and must never pay both. */}
           <MoneyField
- label="TikTok label fee"
+ label={tl("settings", "TikTok label fee")}
  value={tiktokLabelFee} onChange={setTiktokLabelFee}
           />
         </FeeGroup>
@@ -1539,25 +1541,22 @@ function PlatformPanel() {
  category and every product in it inherits a blank for the Design Maker, instead
  of an upload per product. A product's own mockup still wins. */}
       {!isOperator && (
-      <Fold title="Partner rates" status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
+      <Fold title={tl("settings", "Partner rates")} status={Number(expediteCost) > 0 || Number(designPartnerCost) > 0 ? "set" : "unset — nothing booked"}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          Neither partner can be billed through an API — byeastside and Pink Design both
- settle by invoice — so what they cost us is a fixed figure set here and booked
- against every job as it happens. <strong>A rate of 0 records nothing</strong>, so
- their statement on the Billing page will be empty until these are set.
+          {tl("settings", "Neither partner can be billed through an API — byeastside and Pink Design both settle by invoice — so what they cost us is a fixed figure set here and booked against every job as it happens.")} <strong>{tl("settings", "A rate of 0 records nothing")}</strong>{tl("settings", ", so their statement on the Billing page will be empty until these are set.")}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <MoneyField
- label="Dispatch — what byeastside charges us"
+ label={tl("settings", "Dispatch — what byeastside charges us")}
  value={expediteCost} onChange={setExpediteCost}
           />
           <MoneyField
- label="Dispatch — what we charge the seller"
+ label={tl("settings", "Dispatch — what we charge the seller")}
  value={expediteFee} onChange={setExpediteFee}
           />
           <MoneyField
- label="Design — what Pink Design charges us"
+ label={tl("settings", "Design — what Pink Design charges us")}
  value={designPartnerCost} onChange={setDesignPartnerCost}
           />
         </div>
@@ -1565,14 +1564,13 @@ function PlatformPanel() {
         {/* Default product type sent to Pink on every push — set once so the card's send form
  doesn't ask for it. Options come live from Pink; empty = pick per card. */}
         <div className="mt-4">
-          <label className="mb-1 block text-sm font-medium">Default product type for Pink Design</label>
+          <label className="mb-1 block text-sm font-medium">{tl("settings", "Default product type for Pink Design")}</label>
           <p className="mb-1.5 text-xs text-muted-foreground">
-            Applied to every design sent to Pink, so the card&apos;s send form won&apos;t ask for it.
-            Choose <strong>No default</strong> to pick per card instead.
+            {tl("settings", "Applied to every design sent to Pink, so the card’s send form won’t ask for it. Choose")} <strong>{tl("settings", "No default")}</strong> {tl("settings", "to pick per card instead.")}
           </p>
           <select value={pinkProductType} onChange={(e) => setPinkProductType(e.target.value)}
  className="h-9 w-full max-w-sm min-w-0 rounded-md border border-input bg-transparent px-2 text-sm">
-            <option value="">— No default (pick per card) —</option>
+            <option value="">{tl("settings", "— No default (pick per card) —")}</option>
             {pinkTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             {/* Keep a saved value selectable even if Pink's list didn't load or dropped it. */}
             {pinkProductType && !pinkTypeOptions.some((o) => o.value === pinkProductType) && (
@@ -1580,55 +1578,53 @@ function PlatformPanel() {
             )}
           </select>
           {!pinkTypeOptions.length && (
-            <p className="mt-1 text-xs text-muted-foreground">Connect Pink Design to load its product types.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{tl("settings", "Connect Pink Design to load its product types.")}</p>
           )}
         </div>
       </Fold>
       )}
 
       {!isOperator && (
-      <Fold title="Peak-season capacity" status={capacityMode ? "on" : "off"}>
+      <Fold title={tl("settings", "Peak-season capacity")} status={capacityMode ? "on" : "off"}>
         {/* Master switch — off = no header counters, no notice, limits ignored. */}
         <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <input type="checkbox" checked={capacityMode} onChange={(e) => setCapacityMode(e.target.checked)} className="size-4 accent-primary" />
           <span className="text-sm font-medium">Peak-season mode {capacityMode ? "on" : "off"}</span>
-          <span className="text-xs text-muted-foreground">— turns on the order counters in the header (sellers see their own, staff see the factory total) and the delay notice.</span>
+          <span className="text-xs text-muted-foreground">{tl("settings", "— turns on the order counters in the header (sellers see their own, staff see the factory total) and the delay notice.")}</span>
         </label>
         <p className="mb-3 text-xs text-muted-foreground">
-          When a seller crosses their daily order limit they see the notice below at submit — a
- heads-up, never a block. Set a limit on an individual seller from the Accounts list;
- this is the <strong>default</strong> for any seller without their own.
+          {tl("settings", "When a seller crosses their daily order limit they see the notice below at submit — a heads-up, never a block. Set a limit on an individual seller from the Accounts list; this is the")} <strong>default</strong> {tl("settings", "for any seller without their own.")}
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Default daily order limit</span>
+            <span className="text-sm font-medium">{tl("settings", "Default daily order limit")}</span>
             <Input
  value={orderLimitDefault}
  onChange={(e) => setOrderLimitDefault(e.target.value.replace(/[^0-9]/g, ""))}
  inputMode="numeric" placeholder="0" className="h-9"
             />
-            <span className="block text-2xs text-muted-foreground">0 = no default cap. A seller&apos;s own limit always wins.</span>
+            <span className="block text-2xs text-muted-foreground">{tl("settings", "0 = no default cap. A seller’s own limit always wins.")}</span>
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium">Factory daily limit (staff only)</span>
+            <span className="text-sm font-medium">{tl("settings", "Factory daily limit (staff only)")}</span>
             <Input
  value={factoryDailyLimit}
  onChange={(e) => setFactoryDailyLimit(e.target.value.replace(/[^0-9]/g, ""))}
  inputMode="numeric" placeholder="0" className="h-9"
             />
-            <span className="block text-2xs text-muted-foreground">Total orders/day the whole floor can take — shown in the staff header. 0 = shown as a plain count.</span>
+            <span className="block text-2xs text-muted-foreground">{tl("settings", "Total orders/day the whole floor can take — shown in the staff header. 0 = shown as a plain count.")}</span>
           </label>
         </div>
         <label className="mt-3 block space-y-1">
-          <span className="text-sm font-medium">Delay notice (shown only once a seller is over the limit)</span>
+          <span className="text-sm font-medium">{tl("settings", "Delay notice (shown only once a seller is over the limit)")}</span>
           <textarea
  value={capacityNotice}
  onChange={(e) => setCapacityNotice(e.target.value)}
  rows={2}
- placeholder="Due to high order volume, orders submitted now may ship later than usual."
+ placeholder={tl("settings", "Due to high order volume, orders submitted now may ship later than usual.")}
  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
           />
-          <span className="block text-2xs text-muted-foreground">Leave blank to use the default wording.</span>
+          <span className="block text-2xs text-muted-foreground">{tl("settings", "Leave blank to use the default wording.")}</span>
         </label>
       </Fold>
       )}
@@ -1639,25 +1635,22 @@ function PlatformPanel() {
  which meant setting a hex here, navigating back, and looking. They are not platform
  policy like a postage band. (components/app/lookbook-branding-dialog.tsx) */}
 
-      <Fold title="Embroidery threads" status={`${threads.length} cones`}>
+      <Fold title={tl("settings", "Embroidery threads")} status={`${threads.length} cones`}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          Thread matching picks the nearest cone <em>you stock</em>. The built-in starter
- list is 16 colours, which is why a light blue can come back as Grey — add your
- real chart here and matches get proportionally better. Leave it empty to keep
- the starter list.
+          {tl("settings", "Thread matching picks the nearest cone")} <em>{tl("settings", "you stock")}</em>{tl("settings", ". The built-in starter list is 16 colours, which is why a light blue can come back as Grey — add your real chart here and matches get proportionally better. Leave it empty to keep the starter list.")}
         </p>
 
         <div className="mb-3 overflow-hidden rounded-lg border border-border">
           <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border px-3 py-1.5 eg-label text-muted-foreground">
             <span className="w-6" />
-            <span>Code</span>
-            <span>Name</span>
+            <span>{tl("settings", "Code")}</span>
+            <span>{tl("settings", "Name")}</span>
             <span className="w-8" />
           </div>
           {threads.length === 0 ? (
             <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-              No cones added — matching uses the 16-colour starter list.
+              {tl("settings", "No cones added — matching uses the 16-colour starter list.")}
             </div>
           ) : (
             <div className="max-h-72 divide-y divide-border overflow-y-auto">
@@ -1683,7 +1676,7 @@ function PlatformPanel() {
  value={t.name}
  onChange={(e) => setThreads((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
  className="h-7 text-xs"
- placeholder="White"
+ placeholder={tl("settings", "White")}
                   />
                   <button
  type="button"
@@ -1705,18 +1698,18 @@ function PlatformPanel() {
  value={newThread.hex}
  onChange={(e) => { const hex = e.target.value.toUpperCase(); setNewThread((p) => ({ ...p, hex, name: p.name.trim() ? p.name : nearestColorName(hex) })) }}
  className="size-9 cursor-pointer rounded border border-border bg-transparent p-0"
- aria-label="New thread colour"
+ aria-label={tl("settings", "New thread colour")}
           />
           <Input
  value={newThread.code}
  onChange={(e) => setNewThread((p) => ({ ...p, code: e.target.value }))}
- placeholder="Code"
+ placeholder={tl("settings", "Code")}
  className="h-9 w-28 tabular-nums"
           />
           <Input
  value={newThread.name}
  onChange={(e) => setNewThread((p) => ({ ...p, name: e.target.value }))}
- placeholder="Colour name"
+ placeholder={tl("settings", "Colour name")}
  className="h-9 w-44"
           />
           <Button
@@ -1735,20 +1728,17 @@ function PlatformPanel() {
  setNewThread({ code: "", name: "", hex: "#000000" })
             }}
           >
-            <Plus size={13} weight="bold" /> Add thread
+            <Plus size={13} weight="bold" /> {tl("settings", "Add thread")}
           </Button>
           <span className="text-xs text-muted-foreground">{threads.length} cone{threads.length === 1 ? "" : "s"} — remember to Save</span>
         </div>
       </Fold>
 
-      <Fold title="Positions / Design Surfaces" status={`${types.length} types`}>
+      <Fold title={tl("settings", "Positions / Design Surfaces")} status={`${types.length} types`}>
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          Sides and outlines are set once per category and inherited by every product in it —
- define four faces on Headwear and fifty hats get them without fifty uploads. The
- outlines are positioning aids for the Design Maker only; they never appear as a
- product&apos;s catalog image.
+          {tl("settings", "Sides and outlines are set once per category and inherited by every product in it — define four faces on Headwear and fifty hats get them without fifty uploads. The outlines are positioning aids for the Design Maker only; they never appear as a product’s catalog image.")}
         </p>
         <div className="space-y-2">
           {types.map((t, i) => {
@@ -1776,7 +1766,7 @@ function PlatformPanel() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1">
-                  <span className="mr-1 eg-label text-muted-foreground">Sides</span>
+                  <span className="mr-1 eg-label text-muted-foreground">{tl("settings", "Sides")}</span>
                   {ALL_SIDES.map((sd) => {
  const on = sides.includes(sd)
  return (
@@ -1883,10 +1873,10 @@ function PlatformPanel() {
             <Input
  value={newType} onChange={(e) => setNewType(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter" && newType.trim()) { setTypes((p) => [...p, { name: newType.trim(), sides: ["front"], mockups: {} }]); setNewType("") } }}
- placeholder="Add a type…" className="h-9 max-w-xs"
+ placeholder={tl("settings", "Add a type…")} className="h-9 max-w-xs"
             />
             <Button variant="outline" size="sm" disabled={!newType.trim()} onClick={() => { setTypes((p) => [...p, { name: newType.trim(), sides: ["front"], mockups: {} }]); setNewType("") }}>
-              <Plus size={14} weight="bold" /> Add
+              <Plus size={14} weight="bold" /> {tl("settings", "Add")}
             </Button>
           </div>
         </div>
@@ -1903,7 +1893,7 @@ function PlatformPanel() {
  which card is active and when it expires — the card itself is changed in Shippo's
  own dashboard, which is where card details belong. */}
       {!isOperator && (
-      <Fold title="Postage card">
+      <Fold title={tl("settings", "Postage card")}>
         <ShippoBillingPanel />
       </Fold>
       )}
@@ -1915,24 +1905,20 @@ function PlatformPanel() {
  the bands as though it took precedence. It took nothing: pricing.js reaches the
  bands first and one of them always matches, so that field was edited and saved and
  changed no invoice. It is gone, and what remains is the two figures that bill. */}
-      <Fold title="Shipping">
+      <Fold title={tl("settings", "Shipping")}>
         <ReadOnlyFor on={isOperator}>
 
         <p className="mb-3 text-xs text-muted-foreground">
-          The first item is charged at its garment&rsquo;s rate below; every other unit in the
- same parcel adds the extra-item fee. A product with its own shipping fee — set on
- the product card — overrides the rate for that product, and a per-size fee overrides
- both. When an order mixes garments, the DEAREST rate applies: a parcel with a hoodie
- in it costs hoodie postage whatever else is in the box.
+          {tl("settings", "The first item is charged at its garment’s rate below; every other unit in the same parcel adds the extra-item fee. A product with its own shipping fee — set on the product card — overrides the rate for that product, and a per-size fee overrides both. When an order mixes garments, the DEAREST rate applies: a parcel with a hoodie in it costs hoodie postage whatever else is in the box.")}
         </p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <MoneyField label="Caps & hats" value={bands.ship_cap ?? ""} onChange={(v) => setBand("ship_cap", v)} />
-          <MoneyField label="Sweatshirts, hoodies, jackets" value={bands.ship_heavy ?? ""} onChange={(v) => setBand("ship_heavy", v)} />
-          <MoneyField label="All other garments" value={bands.ship_garment ?? ""} onChange={(v) => setBand("ship_garment", v)} />
+          <MoneyField label={tl("settings", "Caps & hats")} value={bands.ship_cap ?? ""} onChange={(v) => setBand("ship_cap", v)} />
+          <MoneyField label={tl("settings", "Sweatshirts, hoodies, jackets")} value={bands.ship_heavy ?? ""} onChange={(v) => setBand("ship_heavy", v)} />
+          <MoneyField label={tl("settings", "All other garments")} value={bands.ship_garment ?? ""} onChange={(v) => setBand("ship_garment", v)} />
         </div>
         <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <MoneyField
- label="Each additional item"
+ label={tl("settings", "Each additional item")}
  value={shipExtra} onChange={setShipExtra}
           />
         </div>
@@ -1943,22 +1929,22 @@ function PlatformPanel() {
  than for the one kind of surcharge that was in it first — the per-side charge
  belongs here too, and "Print method surcharge" would have read as the wrong home
  for it. */}
-      <Fold title="Surcharge">
+      <Fold title={tl("settings", "Surcharge")}>
         <ReadOnlyFor on={isOperator}>
 
-        <p className="mb-3 text-xs text-muted-foreground">Added to the base cost per unit. A product can override this for its own methods.</p>
+        <p className="mb-3 text-xs text-muted-foreground">{tl("settings", "Added to the base cost per unit. A product can override this for its own methods.")}</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <MoneyField label="DTG printing" value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
-          <MoneyField label="DTF printing" value={bands.method_dtf ?? ""} onChange={(v) => setBand("method_dtf", v)} />
-          <MoneyField label="Embroidery" value={bands.method_emb ?? ""} onChange={(v) => setBand("method_emb", v)} />
-          <MoneyField label="Appliqué" value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
-          <MoneyField label="Laser" value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
+          <MoneyField label={tl("settings", "DTG printing")} value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
+          <MoneyField label={tl("settings", "DTF printing")} value={bands.method_dtf ?? ""} onChange={(v) => setBand("method_dtf", v)} />
+          <MoneyField label={tl("settings", "Embroidery")} value={bands.method_emb ?? ""} onChange={(v) => setBand("method_emb", v)} />
+          <MoneyField label={tl("settings", "Appliqué")} value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
+          <MoneyField label={tl("settings", "Laser")} value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
         </div>
         {/* Per EXTRA face, not per face. Its own row under a rule, because it multiplies by
  something different from everything above it — sides, not units of technique. */}
         <div className="mt-4 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <MoneyField
- label="Each additional side"
+ label={tl("settings", "Each additional side")}
  value={bands.method_side ?? ""} onChange={(v) => setBand("method_side", v)}
           />
         </div>
@@ -1968,8 +1954,8 @@ function PlatformPanel() {
       {/* Save stays OUTSIDE the search filter and always visible: a filtered page still
  edits the same form, and hiding Save behind a query is how an edit gets lost. */}
       <div className="flex items-center gap-3 border-t border-border px-5 py-3">
-        <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+        <Button size="sm" onClick={save} disabled={saving}>{saving ? tl("settings", "Saving…") : tl("settings", "Save")}</Button>
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> {tl("settings", "Saved")}</span>}
         {err && <span className="text-sm text-destructive">{err}</span>}
       </div>
       </SettingsSearch.Provider>
@@ -2084,6 +2070,7 @@ function UserStat({ label, value }: { label: string; value?: number }) {
 }
 
 function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolean; hasOrders: boolean }) {
+  const tl = useLabelT()
   // Every volume figure here counts orders whose seller_id IS this account. A warehouse or
   // designer account works on other people's orders and owns none, so four zeros would be a
   // true number answering a question nobody asked — say that instead.
@@ -2094,16 +2081,16 @@ function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolea
       {ownsOrders ? (
         <>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-            <UserStat label="Units shipped" value={u.items_shipped} />
-            <UserStat label="Units waiting" value={u.items_waiting} />
+            <UserStat label={tl("settings", "Units shipped")} value={u.items_shipped} />
+            <UserStat label={tl("settings", "Units waiting")} value={u.items_waiting} />
             {/* The number the volume ladder reads — last month earns, this month spends — so
  a rung can be checked here rather than taken on faith. */}
-            <UserStat label="Units last month" value={u.units_last_month} />
-            <UserStat label="Orders" value={u.orders_total} />
+            <UserStat label={tl("settings", "Units last month")} value={u.units_last_month} />
+            <UserStat label={tl("settings", "Orders")} value={u.orders_total} />
           </div>
           {!measured && (
             <p className="mt-3 text-xs text-muted-foreground">
-              Unit figures aren&apos;t coming back from the server — a dash here means unread, not zero.
+              {tl("settings", "Unit figures aren’t coming back from the server — a dash here means unread, not zero.")}
             </p>
           )}
         </>
@@ -2134,6 +2121,7 @@ function UserDetail({ u, isSeller, hasOrders }: { u: AdminUser; isSeller: boolea
 }
 
 function UsersPanel() {
+  const tl = useLabelT()
  const [users, setUsers] = useState<AdminUser[]>([])
  const [loaded, setLoaded] = useState(false)
  const [busy, setBusy] = useState<string | null>(null)
@@ -2333,22 +2321,22 @@ function UsersPanel() {
 
  return (
     <div className="space-y-4">
-      <SectionCard title="New staff / user">
+      <SectionCard title={tl("settings", "New staff / user")}>
         <div className="flex flex-wrap items-end gap-2 p-5">
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><PasswordInput value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
-          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Role</span>
-            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select eg-control pr-8 capitalize">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("settings", "Email")}</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder={tl("settings", "ops@egful.store")} className="h-9" /></label>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("settings", "Password")}</span><PasswordInput value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder={tl("settings", "8+ characters")} className="h-9" /></label>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("settings", "Role")}</span>
+            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select eg-control pr-8 capitalize">{ROLES.map((r) => <option key={r} value={r}>{tl("role", r)}</option>)}</select>
           </label>
-          <Button size="sm" onClick={addUser} disabled={busy === "new"}>{busy === "new" ? <CircleNotch size={14} className="animate-spin" /> : <><UserPlus size={14} weight="bold" /> Create</>}</Button>
+          <Button size="sm" onClick={addUser} disabled={busy === "new"}>{busy === "new" ? <CircleNotch size={14} className="animate-spin" /> : <><UserPlus size={14} weight="bold" /> {tl("settings", "Create")}</>}</Button>
           {nuErr && <span className="w-full text-sm text-destructive">{nuErr}</span>}
         </div>
       </SectionCard>
-      <SectionCard title="Users">
+      <SectionCard title={tl("settings", "Users")}>
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
           <div className="relative min-w-[220px] flex-1">
             <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={qStr} onChange={(e) => setQStr(e.target.value)} placeholder="Search name, email or store…" className="h-9 pl-8" />
+            <Input value={qStr} onChange={(e) => setQStr(e.target.value)} placeholder={tl("settings", "Search name, email or store…")} className="h-9 pl-8" />
           </div>
           {/* A FIELD, not seven capsules. This was a run of seven pills with a filled black
               one — a primary button's shape and fill, seven times over, wrapping to a second
@@ -2359,10 +2347,10 @@ function UsersPanel() {
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            aria-label="Filter by role"
+            aria-label={tl("settings", "Filter by role")}
             className="eg-control h-9 text-xs"
           >
-            {[["all", "All"], ["staff", "Staff"], ["seller", "Sellers"], ["operator", "Operator"], ["warehouse", "Warehouse"], ["designer", "Designer"], ["admin", "Admin"]].map(([id, label]) => (
+            {[["all", tl("settings", "All")], ["staff", tl("settings", "Staff")], ["seller", tl("settings", "Sellers")], ["operator", tl("settings", "Operator")], ["warehouse", tl("settings", "Warehouse")], ["designer", tl("settings", "Designer")], ["admin", tl("settings", "Admin")]].map(([id, label]) => (
               <option key={id} value={id}>{label} ({roleCount(id)})</option>
             ))}
           </select>
@@ -2374,11 +2362,11 @@ function UsersPanel() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as "recent" | "busy")}
-            aria-label="Sort users"
+            aria-label={tl("settings", "Sort users")}
             className="eg-control h-9 text-xs"
           >
-            <option value="recent">Newest first</option>
-            <option value="busy">Busiest first</option>
+            <option value="recent">{tl("settings", "Newest first")}</option>
+            <option value="busy">{tl("settings", "Busiest first")}</option>
           </select>
           {/* Head-room: how much of the factory cap the seller limits claim. The cap is the
  master knob (raise it in Platform to take more overall); editing a seller here
@@ -2399,7 +2387,7 @@ function UsersPanel() {
  onClick={() => setShowInactive((v) => !v)}
  className={"eg-tap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " + (showInactive ? "border-border bg-accent" : "border-border text-muted-foreground hover:bg-accent")}
             >
-              {showInactive ? "Hide" : "Show"} {inactiveCount} deactivated
+              {showInactive ? tl("settings", "Hide") : tl("settings", "Show")} {inactiveCount} deactivated
             </button>
           )}
         </div>
@@ -2416,21 +2404,21 @@ function UsersPanel() {
  rows, so each label sits exactly above its values. */}
             {paged.pageItems.length > 0 && (
               <div className={USER_ROW_GRID + " py-2 eg-label text-muted-foreground"}>
-                <span className="min-w-0">Account</span>
-                <span className="hidden lg:block">Joined</span>
-                <span className="hidden lg:block">Order limit (/day)</span>
-                <span className="hidden text-right sm:block">Balance</span>
+                <span className="min-w-0">{tl("settings", "Account")}</span>
+                <span className="hidden lg:block">{tl("settings", "Joined")}</span>
+                <span className="hidden lg:block">{tl("settings", "Order limit (/day)")}</span>
+                <span className="hidden text-right sm:block">{tl("settings", "Balance")}</span>
                 {/* Same 3-col sub-grid as the row's Access cell, so Role / Plan sit exactly
  over their selects. */}
                 <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
-                  <span>Role</span>
-                  <span>Plan</span>
+                  <span>{tl("settings", "Role")}</span>
+                  <span>{tl("settings", "Plan")}</span>
                   <span className="w-8" />
                 </div>
               </div>
             )}
             {paged.pageItems.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</div>
+              <div className="py-10 text-center text-muted-foreground">{users.length ? tl("settings", "No users match that search.") : tl("settings", "No users")}</div>
             ) : (
  paged.pageItems.map(({ u, child }) => {
  const isSeller = u.role === "seller"
@@ -2474,10 +2462,10 @@ function UsersPanel() {
                           </span>
                         )}
                         {isSeller && u.spydeck_addon && (
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">Spydeck</span>
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">{tl("settings", "Spydeck")}</span>
                         )}
                         {u.active === false && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Deactivated</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{tl("settings", "Deactivated")}</span>
                         )}
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
@@ -2534,7 +2522,7 @@ function UsersPanel() {
  value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id}
  className="eg-select h-8 rounded-md bg-transparent px-1 text-sm capitalize transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       >
-                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                        {ROLES.map((r) => <option key={r} value={r}>{tl("role", r)}</option>)}
                       </select>
                     )}
                     {/* Plan — sellers only; an empty cell keeps Role/Plan/menu aligned for staff. */}
@@ -2559,22 +2547,22 @@ function UsersPanel() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52">
                         <DropdownMenuItem onClick={() => { setPwFor(u); setPwValue(""); setPwErr(null); setPwDone(false) }}>
-                          Set a new password
+                          {tl("settings", "Set a new password")}
                         </DropdownMenuItem>
                         {u.role === "seller" && (
                           <DropdownMenuItem onClick={() => { setAdjFor(u); setAdjAmt(""); setAdjNote(""); setAdjErr(null) }}>
-                            Adjust balance…
+                            {tl("settings", "Adjust balance…")}
                           </DropdownMenuItem>
                         )}
                         {u.active === false ? (
-                          <DropdownMenuItem onClick={() => setActive(u, true)}>Reactivate account</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setActive(u, true)}>{tl("settings", "Reactivate account")}</DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem onClick={() => setActive(u, false)}>Deactivate (blocks sign-in)</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setActive(u, false)}>{tl("settings", "Deactivate (blocks sign-in)")}</DropdownMenuItem>
                         )}
                         {isAdminCaller && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setRemoving(u)} className="text-destructive">Delete permanently…</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setRemoving(u)} className="text-destructive">{tl("settings", "Delete permanently…")}</DropdownMenuItem>
                           </>
                         )}
                       </DropdownMenuContent>
@@ -2605,22 +2593,22 @@ function UsersPanel() {
  manager hands it over directly. */}
       <Dialog open={!!pwFor} onOpenChange={(v) => { if (!v) { setPwFor(null); setPwValue(""); setPwErr(null) } }}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Set a new password</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("settings", "Set a new password")}</DialogTitle></DialogHeader>
           <div className="space-y-3 px-1">
             <p className="text-sm text-muted-foreground">
-              For <span className="font-medium text-foreground">{pwFor?.email}</span>. They can sign in with it immediately — give it to them directly and have them change it.
+              {tl("settings", "For")} <span className="font-medium text-foreground">{pwFor?.email}</span>{tl("settings", ". They can sign in with it immediately — give it to them directly and have them change it.")}
             </p>
             <Input
  type="text" value={pwValue} onChange={(e) => { setPwValue(e.target.value); setPwErr(null) }}
- placeholder="8+ characters" className="h-9" autoFocus
+ placeholder={tl("settings", "8+ characters")} className="h-9" autoFocus
             />
             {pwErr && <p className="text-sm text-destructive">{pwErr}</p>}
-            {pwDone && <p className="flex items-center gap-1.5 text-sm text-success"><Check size={14} weight="bold" /> Password updated.</p>}
+            {pwDone && <p className="flex items-center gap-1.5 text-sm text-success"><Check size={14} weight="bold" /> {tl("settings", "Password updated.")}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setPwFor(null)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setPwFor(null)}>{tl("settings", "Cancel")}</Button>
             <Button size="sm" onClick={resetPassword} disabled={busy === pwFor?.id || pwDone}>
-              {busy === pwFor?.id ? <CircleNotch size={14} className="animate-spin" /> : "Set password"}
+              {busy === pwFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Set password")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2631,26 +2619,26 @@ function UsersPanel() {
  edited afterwards — only offset by another entry. */}
       <Dialog open={!!adjFor} onOpenChange={(v) => { if (!v) { setAdjFor(null); setAdjErr(null) } }}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Adjust balance</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("settings", "Adjust balance")}</DialogTitle></DialogHeader>
           <div className="space-y-3 px-1">
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{adjFor?.email}</span> · currently {usd2(adjFor?.balance ?? 0)}
             </p>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Amount</span>
+              <span className="text-xs text-muted-foreground">{tl("settings", "Amount")}</span>
               <Input value={adjAmt} onChange={(e) => { setAdjAmt(e.target.value.replace(/[^0-9.]/g, "")); setAdjErr(null) }} placeholder="0.00" inputMode="decimal" className="h-9" autoFocus />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Reason (recorded in the ledger)</span>
-              <Input value={adjNote} onChange={(e) => { setAdjNote(e.target.value); setAdjErr(null) }} placeholder="Bank transfer received · ref 4471" className="h-9" />
+              <span className="text-xs text-muted-foreground">{tl("settings", "Reason (recorded in the ledger)")}</span>
+              <Input value={adjNote} onChange={(e) => { setAdjNote(e.target.value); setAdjErr(null) }} placeholder={tl("settings", "Bank transfer received · ref 4471")} className="h-9" />
             </label>
             {adjErr && <p className="text-sm text-destructive">{adjErr}</p>}
           </div>
           <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setAdjFor(null)} disabled={busy === adjFor?.id}>Cancel</Button>
-            <Button variant="outline" size="sm" onClick={() => applyAdjust(-1)} disabled={busy === adjFor?.id}>Deduct</Button>
+            <Button variant="ghost" size="sm" onClick={() => setAdjFor(null)} disabled={busy === adjFor?.id}>{tl("settings", "Cancel")}</Button>
+            <Button variant="outline" size="sm" onClick={() => applyAdjust(-1)} disabled={busy === adjFor?.id}>{tl("settings", "Deduct")}</Button>
             <Button size="sm" onClick={() => applyAdjust(1)} disabled={busy === adjFor?.id}>
-              {busy === adjFor?.id ? <CircleNotch size={14} className="animate-spin" /> : "Top up"}
+              {busy === adjFor?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Top up")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2658,20 +2646,20 @@ function UsersPanel() {
 
       <Dialog open={!!removing} onOpenChange={(v) => { if (!v) setRemoving(null) }}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Delete this account?</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("settings", "Delete this account?")}</DialogTitle></DialogHeader>
           <div className="space-y-3 px-1">
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{removing?.email}</span> will be removed permanently. This cannot be undone.
+              <span className="font-medium text-foreground">{removing?.email}</span> {tl("settings", "will be removed permanently. This cannot be undone.")}
             </p>
             <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
               <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-              If they simply left, deactivate instead — that blocks sign-in but keeps their orders attached to a real account.
+              {tl("settings", "If they simply left, deactivate instead — that blocks sign-in but keeps their orders attached to a real account.")}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setRemoving(null)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setRemoving(null)}>{tl("settings", "Cancel")}</Button>
             <Button size="sm" variant="destructive" onClick={removeUser} disabled={busy === removing?.id}>
-              {busy === removing?.id ? <CircleNotch size={14} className="animate-spin" /> : "Delete permanently"}
+              {busy === removing?.id ? <CircleNotch size={14} className="animate-spin" /> : tl("settings", "Delete permanently")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2689,6 +2677,7 @@ const ACTIVITY_RANGES = [
 ]
 
 function ActivityPanel() {
+  const tl = useLabelT()
  const [audit, setAudit] = useState<AuditRow[] | null>(null)
  const [cats, setCats] = useState<string[]>([])   // selected category keys; empty = all
  const [query, setQuery] = useState("")
@@ -2713,7 +2702,7 @@ function ActivityPanel() {
  const filtered = cats.length > 0 || query.trim() !== "" || range !== "all"
 
  return (
-    <SectionCard title="Activity log" bodyClassName="p-5">
+    <SectionCard title={tl("settings", "Activity log")} bodyClassName="p-5">
       {/* Filter bar: category toggles + free-text + time range. */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -2738,14 +2727,14 @@ function ActivityPanel() {
           })}
           {cats.length > 0 && (
             <button type="button" onClick={() => setCats([])} className="ml-0.5 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">
-              Clear
+              {tl("settings", "Clear")}
             </button>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search actor, note, id…" className="h-8 w-60 pl-8" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tl("settings", "Search actor, note, id…")} className="h-8 w-60 pl-8" />
           </div>
           <select
  value={range}
@@ -2785,6 +2774,7 @@ function ActivityPanel() {
 // how old the oldest is — and only then offers the switch. "Purge now" states the number it
 // is about to redact in the confirm, because the number is the whole decision.
 function PiiRetentionPanel() {
+  const tl = useLabelT()
  const [state, setState] = useState<PiiRetention | null>(null)
   // Age of the oldest still-held order, in days. Computed WHEN THE DATA ARRIVES, not during
   // render: reading the clock while rendering is impure and re-renders would shift it
@@ -2840,37 +2830,33 @@ function PiiRetentionPanel() {
     } finally { setBusy(false) }
   }
 
- if (!loaded) return <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+ if (!loaded) return <div className="py-8 text-center text-sm text-muted-foreground">{tl("settings", "Loading…")}</div>
 
  const due = state?.due ?? 0
 
  return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold">Buyer data retention</h3>
+        <h3 className="text-sm font-semibold">{tl("settings", "Buyer data retention")}</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          <b className="text-foreground">Amazon</b> contractually requires buyer data to be deleted
- within 30 days of shipping — that is its Data Protection Policy, not a general privacy
- law, and Etsy, Shopify and TikTok do not impose it. Retaining records to settle a late
- dispute is normal and lawful. Turn this on when Amazon goes live; until then, access
- control does the work.
+          <b className="text-foreground">{tl("settings", "Amazon")}</b> {tl("settings", "contractually requires buyer data to be deleted within 30 days of shipping — that is its Data Protection Policy, not a general privacy law, and Etsy, Shopify and TikTok do not impose it. Retaining records to settle a late dispute is normal and lawful. Turn this on when Amazon goes live; until then, access control does the work.")}
         </p>
       </div>
 
       {/* The preview. This is the point of the screen: see the number before deciding. */}
       <div className="grid gap-2 sm:grid-cols-3">
         <BackupStat
- label="Past the window"
+ label={tl("settings", "Past the window")}
  value={String(due)}
  sub={due ? "a purge would redact these" : "none past the window"}
         />
         <BackupStat
- label="Oldest still held"
+ label={tl("settings", "Oldest still held")}
  value={oldestDays == null ? "—" : `${oldestDays}d`}
  sub={oldestDays == null ? "no shipped orders holding data" : "since it shipped"}
         />
         <BackupStat
- label="Automatic purge"
+ label={tl("settings", "Automatic purge")}
  value={state?.enabled ? "On" : "Off"}
  sub={state?.enabled ? `${state?.days ?? 30} days after shipping` : "nothing runs by itself"}
         />
@@ -2883,10 +2869,10 @@ function PiiRetentionPanel() {
  teaches you to ignore alerts. It states the position instead. */}
       {!state?.enabled && due > 0 && (
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-          <b className="text-foreground">Retained on purpose.</b>{" "}
-          {due} shipped {due === 1 ? "order holds" : "orders hold"} buyer name and address beyond
+          <b className="text-foreground">{tl("settings", "Retained on purpose.")}</b>{" "}
+          {due} shipped {due === 1 ? tl("settings", "order holds") : tl("settings", "orders hold")} buyer name and address beyond
           {" "}{state?.days ?? 30} days
-          {oldestDays != null && <> — the oldest for <b className="text-foreground">{oldestDays} days</b></>}.
+          {oldestDays != null && <> {tl("settings", "— the oldest for")} <b className="text-foreground">{oldestDays} days</b></>}.
           Sellers only ever see the buyer&rsquo;s name and city; the street, postcode, phone and email
  are staff-only. Nothing is deleted unless you turn the purge on or run it by hand.
         </div>
@@ -2895,7 +2881,7 @@ function PiiRetentionPanel() {
       <div className="space-y-3 rounded-lg border bg-card p-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <label className="eg-label text-muted-foreground">Delete after</label>
+            <label className="eg-label text-muted-foreground">{tl("settings", "Delete after")}</label>
             <div className="flex items-center gap-1.5">
               <Input
  value={days}
@@ -2903,25 +2889,23 @@ function PiiRetentionPanel() {
  className="h-8 w-20 text-sm"
  inputMode="numeric"
               />
-              <span className="text-xs text-muted-foreground">days after shipping</span>
+              <span className="text-xs text-muted-foreground">{tl("settings", "days after shipping")}</span>
             </div>
             {/* The cap is a compliance floor, not a preference — say why it won't go higher. */}
-            <p className="text-2xs text-muted-foreground">Max 30 — Amazon&rsquo;s policy ceiling.</p>
+            <p className="text-2xs text-muted-foreground">{tl("settings", "Max 30 — Amazon’s policy ceiling.")}</p>
           </div>
           <Button size="sm" disabled={busy} onClick={() => save(true)}>
-            {state?.enabled ? "Save" : "Turn on"}
+            {state?.enabled ? tl("settings", "Save") : tl("settings", "Turn on")}
           </Button>
           {state?.enabled && (
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => save(false)}>Turn off</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => save(false)}>{tl("settings", "Turn off")}</Button>
           )}
           <Button size="sm" variant="outline" disabled={busy || !due} onClick={purgeNow}>
             Purge {due} now
           </Button>
         </div>
         <p className="text-2xs text-muted-foreground">
-          What survives a purge: order id, totals, SKUs, tracking number and dates — revenue and
- growth reporting are unaffected. What goes: buyer name, street, city, postcode, email,
- phone and the label PDF. Orders still in production are never purged, whatever their age.
+          {tl("settings", "What survives a purge: order id, totals, SKUs, tracking number and dates — revenue and growth reporting are unaffected. What goes: buyer name, street, city, postcode, email, phone and the label PDF. Orders still in production are never purged, whatever their age.")}
         </p>
       </div>
 
@@ -2972,6 +2956,7 @@ function BackupStat({ label, value, sub }: { label: string; value: string; sub?:
 }
 
 function BackupsPanel() {
+  const tl = useLabelT()
  const [state, setState] = useState<BackupsState | null>(null)
  const [loaded, setLoaded] = useState(false)
  const [busy, setBusy] = useState(false)
@@ -3032,7 +3017,7 @@ function BackupsPanel() {
   }
 
  if (!loaded) return (
-    <SectionCard title="Backups">
+    <SectionCard title={tl("settings", "Backups")}>
       <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
     </SectionCard>
   )
@@ -3043,28 +3028,28 @@ function BackupsPanel() {
  const cfg = state?.config
 
  return (
-    <SectionCard title="Backups" bodyClassName="p-5">
+    <SectionCard title={tl("settings", "Backups")} bodyClassName="p-5">
       {/* Prerequisite warnings — name what's missing and how to fix it, rather than a dead button. */}
       {!state?.storageConfigured && (
         <div className="mb-4 flex items-start gap-2 rounded-md border border-hold/30/40 bg-hold/10 px-3 py-2.5 text-sm">
           <Warning size={18} className="mt-0.5 shrink-0 text-hold" />
-          <span>Object storage (R2) isn’t configured, so there’s nowhere to keep a backup. Set the <code>SPACES_*</code> keys first.</span>
+          <span>{tl("settings", "Object storage (R2) isn’t configured, so there’s nowhere to keep a backup. Set the")} <code>{tl("settings", "SPACES_*")}</code> {tl("settings", "keys first.")}</span>
         </div>
       )}
       {state?.storageConfigured && !state?.pgDumpAvailable && (
         <div className="mb-4 flex items-start gap-2 rounded-md border border-hold/30/40 bg-hold/10 px-3 py-2.5 text-sm">
           <Warning size={18} className="mt-0.5 shrink-0 text-hold" />
-          <span><code>pg_dump</code> isn’t in the running server image yet. Rebuild it on the server (<code>docker compose up -d --build</code>), then reload.</span>
+          <span><code>pg_dump</code> {tl("settings", "isn’t in the running server image yet. Rebuild it on the server (")}<code>{tl("settings", "docker compose up -d --build")}</code>{tl("settings", "), then reload.")}</span>
         </div>
       )}
 
       {/* Summary strip — totals and cadence at a glance. */}
       {sum && cfg && (
         <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <BackupStat label="Stored" value={fmtBytes(sum.totalBytes)} sub={`${sum.doneCount} backup${sum.doneCount === 1 ? "" : "s"}${sum.doneCount ? ` · avg ${fmtBytes(Math.round(sum.totalBytes / sum.doneCount))}` : ""}`} />
-          <BackupStat label="This week" value={String(sum.weekCount)} sub={`${sum.monthCount} in 30 days`} />
-          <BackupStat label="Last backup" value={fmtRel(sum.lastDone)} sub={sum.lastDone ? new Date(sum.lastDone).toLocaleDateString() : "—"} />
-          <BackupStat label="Next (auto)" value={fmtNext(sum.nextAuto)} sub={freqLabel(cfg.frequencyDays)} />
+          <BackupStat label={tl("settings", "Stored")} value={fmtBytes(sum.totalBytes)} sub={`${sum.doneCount} backup${sum.doneCount === 1 ? "" : "s"}${sum.doneCount ? ` · avg ${fmtBytes(Math.round(sum.totalBytes / sum.doneCount))}` : ""}`} />
+          <BackupStat label={tl("settings", "This week")} value={String(sum.weekCount)} sub={`${sum.monthCount} in 30 days`} />
+          <BackupStat label={tl("settings", "Last backup")} value={fmtRel(sum.lastDone)} sub={sum.lastDone ? new Date(sum.lastDone).toLocaleDateString() : "—"} />
+          <BackupStat label={tl("settings", "Next (auto)")} value={fmtNext(sum.nextAuto)} sub={freqLabel(cfg.frequencyDays)} />
         </div>
       )}
 
@@ -3074,23 +3059,23 @@ function BackupsPanel() {
         </p>
         <Button onClick={startBackup} disabled={!ready || busy || anyRunning}>
           {busy || anyRunning ? <CircleNotch size={16} className="animate-spin" /> : <Database size={16} />}
-          {anyRunning ? "Backing up…" : "Back up now"}
+          {anyRunning ? tl("settings", "Backing up…") : tl("settings", "Back up now")}
         </Button>
       </div>
 
       {/* Editable schedule — saved to the DB, no redeploy. */}
       <div className="mt-4 flex flex-wrap items-end gap-4 rounded-lg border bg-muted/20 p-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="bk-freq">Automatic frequency</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="bk-freq">{tl("settings", "Automatic frequency")}</label>
           <select id="bk-freq" value={freq} onChange={(e) => setFreq(e.target.value)}
  className="h-8 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-            <option value="1">Every day</option>
-            <option value="2">Every 2 days</option>
-            <option value="7">Every week</option>
+            <option value="1">{tl("settings", "Every day")}</option>
+            <option value="2">{tl("settings", "Every 2 days")}</option>
+            <option value="7">{tl("settings", "Every week")}</option>
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="bk-keep">Keep last</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="bk-keep">{tl("settings", "Keep last")}</label>
           <Input id="bk-keep" type="number" min={1} max={90} value={keep} onChange={(e) => setKeep(e.target.value)} className="h-8 w-24" />
         </div>
         <Button variant="outline" size="sm" onClick={saveConfig} disabled={savingCfg || !freq || !keep}>
@@ -3106,35 +3091,35 @@ function BackupsPanel() {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left eg-label text-muted-foreground">
-              <th className="px-4 py-3">When</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Size</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3" aria-label="Actions" />
+              <th className="px-4 py-3">{tl("settings", "When")}</th>
+              <th className="px-4 py-3">{tl("settings", "Type")}</th>
+              <th className="px-4 py-3">{tl("settings", "Size")}</th>
+              <th className="px-4 py-3">{tl("settings", "Status")}</th>
+              <th className="px-4 py-3" aria-label={tl("settings", "Actions")} />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No backups yet. Run one now, or wait for the next automatic backup.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{tl("settings", "No backups yet. Run one now, or wait for the next automatic backup.")}</td></tr>
             )}
             {rows.map((b) => (
               <tr key={b.id} className="border-b last:border-0">
                 <td className="px-4 py-3 tabular-nums">{new Date(b.created_at).toLocaleString()}</td>
-                <td className="px-4 py-3"><Badge variant={b.kind === "auto" ? "secondary" : "outline"}>{b.kind === "auto" ? "Automatic" : "Manual"}</Badge></td>
+                <td className="px-4 py-3"><Badge variant={b.kind === "auto" ? "secondary" : "outline"}>{b.kind === "auto" ? tl("settings", "Automatic") : tl("settings", "Manual")}</Badge></td>
                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{b.status === "done" ? fmtBytes(Number(b.size_bytes || 0)) : "—"}</td>
                 <td className="px-4 py-3">
-                  {b.status === "done" && <span className="inline-flex items-center gap-1 text-green-600"><Check size={14} /> Done</span>}
-                  {b.status === "running" && <span className="inline-flex items-center gap-1 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> Running</span>}
-                  {b.status === "failed" && <span className="inline-flex items-center gap-1 text-destructive" title={b.error || undefined}><Warning size={14} /> Failed</span>}
+                  {b.status === "done" && <span className="inline-flex items-center gap-1 text-green-600"><Check size={14} /> {tl("settings", "Done")}</span>}
+                  {b.status === "running" && <span className="inline-flex items-center gap-1 text-muted-foreground"><CircleNotch size={14} className="animate-spin" /> {tl("settings", "Running")}</span>}
+                  {b.status === "failed" && <span className="inline-flex items-center gap-1 text-destructive" title={b.error || undefined}><Warning size={14} /> {tl("settings", "Failed")}</span>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     {b.status === "done" && (
-                      <Button variant="ghost" size="sm" onClick={() => download(b)} title="Download">
+                      <Button variant="ghost" size="sm" onClick={() => download(b)} title={tl("settings", "Download")}>
                         <DownloadSimple size={16} />
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => setConfirmDel(b)} title="Delete">
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmDel(b)} title={tl("settings", "Delete")}>
                       <Trash size={16} />
                     </Button>
                   </div>
@@ -3150,14 +3135,14 @@ function BackupsPanel() {
       <Dialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete this backup?</DialogTitle>
+            <DialogTitle>{tl("settings", "Delete this backup?")}</DialogTitle>
             <DialogDescription>
-              The dump file is removed from R2 for good. This does not touch your live database — only this saved copy.
+              {tl("settings", "The dump file is removed from R2 for good. This does not touch your live database — only this saved copy.")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmDel(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => confirmDel && doDelete(confirmDel)}>Delete backup</Button>
+            <Button variant="ghost" onClick={() => setConfirmDel(null)}>{tl("settings", "Cancel")}</Button>
+            <Button variant="destructive" onClick={() => confirmDel && doDelete(confirmDel)}>{tl("settings", "Delete backup")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3184,6 +3169,7 @@ function BackupsPanel() {
  * here; a card that expires next month is one we can warn about.
  */
 function ShippoBillingPanel() {
+  const tl = useLabelT()
  const [b, setB] = useState<ShippoBilling | null>(null)
  const [err, setErr] = useState<string | null>(null)
  useEffect(() => {
@@ -3194,8 +3180,8 @@ function ShippoBillingPanel() {
   }, [])
 
  if (err) return <p className="text-xs text-muted-foreground">{err}</p>
- if (!b) return <p className="text-xs text-muted-foreground">Loading…</p>
- if (!b.configured) return <p className="text-xs text-muted-foreground">No Shippo token set — add one in Integrations.</p>
+ if (!b) return <p className="text-xs text-muted-foreground">{tl("settings", "Loading…")}</p>
+ if (!b.configured) return <p className="text-xs text-muted-foreground">{tl("settings", "No Shippo token set — add one in Integrations.")}</p>
  if (b.error) return <p className="text-xs text-muted-foreground">Shippo didn&apos;t answer: {b.error}</p>
 
  return (
@@ -3211,14 +3197,13 @@ function ShippoBillingPanel() {
         */}
       {b.blocked && (
         <div className="rounded-lg border border-alert/30 bg-alert/12 p-2 text-xs text-alert">
-          <p className="font-medium">Shippo is refusing labels on this account.</p>
+          <p className="font-medium">{tl("settings", "Shippo is refusing labels on this account.")}</p>
           <p className="mt-1">
-            It is <strong>unpaid invoices</strong>, not the card on file — changing the card doesn&apos;t settle an amount
- already outstanding. Pay the past-due invoices in Shippo and labels resume straight away.
+            {tl("settings", "It is")} <strong>{tl("settings", "unpaid invoices")}</strong>{tl("settings", ", not the card on file — changing the card doesn’t settle an amount already outstanding. Pay the past-due invoices in Shippo and labels resume straight away.")}
           </p>
           <a href={SHIPPO_BILLING_URL} target="_blank" rel="noopener noreferrer"
  className="mt-1.5 inline-flex items-center gap-1 font-medium underline underline-offset-2">
-            Open Shippo invoices <ArrowSquareOut size={11} weight="bold" />
+            {tl("settings", "Open Shippo invoices")} <ArrowSquareOut size={11} weight="bold" />
           </a>
         </div>
       )}
@@ -3234,27 +3219,27 @@ function ShippoBillingPanel() {
       )}
       {b.methods.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          {b.current ? "No other cards on file." : "No card on the Shippo account."}
+          {b.current ? tl("settings", "No other cards on file.") : tl("settings", "No card on the Shippo account.")}
         </p>
       ) : (
         <div className="rounded-lg border border-border">
           {b.methods.map((m, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 text-sm last:border-b-0">
-              <span className="font-medium">{m.brand || "Card"}</span>
+              <span className="font-medium">{m.brand || tl("settings", "Card")}</span>
               <span className="tabular-nums text-muted-foreground">•••• {m.last4 || "????"}</span>
               {/* The expiry stops being grey the moment it starts mattering. */}
               {m.expires && (
                 <span className={"text-xs " + (m.expired ? "font-medium text-destructive" : m.expiringSoon ? "font-medium text-hold" : "text-muted-foreground")}>
- exp {m.expires}{m.expired ? " · expired" : m.expiringSoon ? " · expiring" : ""}
+ exp {m.expires}{m.expired ? tl("settings", " · expired") : m.expiringSoon ? tl("settings", " · expiring") : ""}
                 </span>
               )}
               <span className="ml-auto flex flex-wrap gap-1.5">
                 {/* CHARGING, not just Default: the one Shippo actually bills is the fact you
  came here for, and it is not always the one flagged default. */}
-                {m.charging && <Badge variant="secondary" className="bg-primary text-primary-foreground">Charging</Badge>}
-                {m.default && !m.charging && <Badge variant="secondary" className="bg-primary/10 text-primary">Default</Badge>}
+                {m.charging && <Badge variant="secondary" className="bg-primary text-primary-foreground">{tl("settings", "Charging")}</Badge>}
+                {m.default && !m.charging && <Badge variant="secondary" className="bg-primary/10 text-primary">{tl("settings", "Default")}</Badge>}
                 <Badge variant="secondary" className={m.active ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground"}>
-                  {m.active ? "Active" : "Inactive"}
+                  {m.active ? tl("settings", "Active") : tl("settings", "Inactive")}
                 </Badge>
               </span>
             </div>
@@ -3276,18 +3261,17 @@ function ShippoBillingPanel() {
  href={SHIPPO_BILLING_URL} target="_blank" rel="noopener noreferrer"
  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-primary/50 hover:bg-accent/40"
       >
-        Change the card in Shippo <ArrowSquareOut size={12} weight="bold" />
+        {tl("settings", "Change the card in Shippo")} <ArrowSquareOut size={12} weight="bold" />
       </a>
       <p className="text-2xs text-muted-foreground">
-        Cards are added and switched in Shippo (Settings › Billing) — they publish no API for it, so it can&apos;t be done from here.
-        Postage is charged per label to that card; Shippo keeps no prepaid balance, so there is none to show.
-        Your postage SPEND is in Finance › Wallet, as label costs.
+        {tl("settings", "Cards are added and switched in Shippo (Settings › Billing) — they publish no API for it, so it can’t be done from here. Postage is charged per label to that card; Shippo keeps no prepaid balance, so there is none to show. Your postage SPEND is in Finance › Wallet, as label costs.")}
       </p>
     </div>
   )
 }
 
 export function SettingsView() {
+  const tl = useLabelT()
   // Integrations is a platform/admin concern (Stripe secret, supplier creds, AI key,
   // etc.) — ADMIN only. Operator/warehouse/designer + sellers never see it.
  const [isAdmin, setIsAdmin] = useState(false)
@@ -3395,47 +3379,47 @@ export function SettingsView() {
           "lg:[&>button]:data-active:bg-muted/60 lg:[&>button]:rounded-lg"
         }
       >
-        <TabsTrigger value="profile"><TabLabel>Profile</TabLabel></TabsTrigger>
+        <TabsTrigger value="profile"><TabLabel>{tl("settings", "Profile")}</TabLabel></TabsTrigger>
         {/* API keys are for building AGAINST the platform — a seller integrating their
  own systems, or an admin. An operator works the floor and has nothing to
  integrate, so the tab is noise on their settings. */}
         {/* Merged: your own live/test keys (top) + the platform's connected-service
  credentials (admin-only, below). One tab so keys live in one place. */}
-        {canUseKeys && <TabsTrigger value="keys"><TabLabel>API keys</TabLabel></TabsTrigger>}
-        {canPlatform && <TabsTrigger value="platform"><TabLabel>Platform</TabLabel></TabsTrigger>}
+        {canUseKeys && <TabsTrigger value="keys"><TabLabel>{tl("settings", "API keys")}</TabLabel></TabsTrigger>}
+        {canPlatform && <TabsTrigger value="platform"><TabLabel>{tl("settings", "Platform")}</TabLabel></TabsTrigger>}
         {/* Its own tab rather than a section of Platform. It is settings and belongs with the
  settings — but it is not the same KIND as a postage band: a band is a cost we pass
  on, these two decide what a seller pays US. Admin only, because operators reach
             Platform now for the cone list and this is not theirs. */}
-        {isAdmin && <TabsTrigger value="plans"><TabLabel>Plans</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="plans"><TabLabel>{tl("settings", "Plans")}</TabLabel></TabsTrigger>}
         {/* ADMIN ONLY. Warehouse keeps Platform, Suppliers and Usage — this one writes
  users.password_hash, which is account takeover in one call. */}
-        {isAdmin && <TabsTrigger value="users"><TabLabel>Users</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="users"><TabLabel>{tl("settings", "Users")}</TabLabel></TabsTrigger>}
         {/* Supplier ordering defaults — these decide how a purchase order PAYS and ships,
             so they follow the money boundary rather than canPlatform alone. Warehouse lost
             it on 2026-08-24; the floor receives stock, it does not decide the terms. */}
-        {canPlatform && canSeeMoney() && <TabsTrigger value="suppliers"><TabLabel>Suppliers</TabLabel></TabsTrigger>}
+        {canPlatform && canSeeMoney() && <TabsTrigger value="suppliers"><TabLabel>{tl("settings", "Suppliers")}</TabLabel></TabsTrigger>}
         {/* Integration usage carries an estimated $ per platform — a cost surface, so it
             takes the same boundary as Suppliers above rather than canPlatform's. */}
-        {canPlatform && canSeeMoney() && <TabsTrigger value="usage"><TabLabel>Usage</TabLabel></TabsTrigger>}
+        {canPlatform && canSeeMoney() && <TabsTrigger value="usage"><TabLabel>{tl("settings", "Usage")}</TabLabel></TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
-        {isAdmin && <TabsTrigger value="site"><TabLabel>Site content</TabLabel></TabsTrigger>}
-        {isAdmin && <TabsTrigger value="branding"><TabLabel>Branding</TabLabel></TabsTrigger>}
-        {isAdmin && <TabsTrigger value="activity"><TabLabel>Activity</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="site"><TabLabel>{tl("settings", "Site content")}</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="branding"><TabLabel>{tl("settings", "Branding")}</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="activity"><TabLabel>{tl("settings", "Activity")}</TabLabel></TabsTrigger>}
         {/* Backups — admin-only. Restoring a lost database is the least reversible thing on
  the platform, so who can trigger/delete a backup matches who can touch money. */}
-        {isAdmin && <TabsTrigger value="backups"><TabLabel>Backups</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="backups"><TabLabel>{tl("settings", "Backups")}</TabLabel></TabsTrigger>}
         {/* Privacy — buyer-PII retention. Admin-only for the same reason as Backups: the
  purge is irreversible, so it sits with the people who can touch money. */}
-        {isAdmin && <TabsTrigger value="privacy"><TabLabel>Privacy</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="privacy"><TabLabel>{tl("settings", "Privacy")}</TabLabel></TabsTrigger>}
         {/* Permissions — admin-only, HIDE-only nav visibility per role. */}
-        {isAdmin && <TabsTrigger value="permissions"><TabLabel>Permissions</TabLabel></TabsTrigger>}
+        {isAdmin && <TabsTrigger value="permissions"><TabLabel>{tl("settings", "Permissions")}</TabLabel></TabsTrigger>}
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
  in Users by admin/warehouse, so a "Team" tab on an operator's settings invites
  them to invite people into an account that isn't theirs. */}
-        {showTeam && <TabsTrigger value="team"><TabLabel>Team</TabLabel></TabsTrigger>}
+        {showTeam && <TabsTrigger value="team"><TabLabel>{tl("settings", "Team")}</TabLabel></TabsTrigger>}
         {/* Plan is a SELLER subscription — operator/warehouse/admin have no plan. */}
-        {isSeller && <TabsTrigger value="plan"><TabLabel>Plan</TabLabel></TabsTrigger>}
+        {isSeller && <TabsTrigger value="plan"><TabLabel>{tl("settings", "Plan")}</TabLabel></TabsTrigger>}
       </TabsList>
 
       {/* One column for every panel, so a tab change swaps the contents rather than the
@@ -3482,7 +3466,7 @@ export function SettingsView() {
       {canPlatform && (
         <TabsContent value="suppliers">
           <SectionCard
- title="Supplier ordering"
+ title={tl("settings", "Supplier ordering")}
           >
             <SupplierOrderingSettings />
           </SectionCard>
