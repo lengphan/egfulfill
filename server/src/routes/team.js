@@ -35,7 +35,7 @@ export function teamRoutes(app, requireAuth) {
       sent = await sendMail({
         to,
         subject: 'EGFUL · email test',
-        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFUL email is working. 🎉</div>'
+        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFUL email is working.</div>'
       });
     } catch (e) { error = e.message; }
     // sendMail never throws, so `error` was ALWAYS null here — the real reason lived

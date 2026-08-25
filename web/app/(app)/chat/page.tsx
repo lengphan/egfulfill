@@ -224,11 +224,20 @@ export default function ChatPage() {
 
  const convos = useMemo<Convo[]>(() => {
  const list: Convo[] = []
-    // The newest message stands in for the subtitle; an empty room says so, because a blank
-    // line beside a title reads as a row that failed to load rather than one nobody has used.
+    /*
+     * The newest message stands in for the subtitle; an empty room says so, because a blank
+     * line beside a title reads as a row that failed to load rather than one nobody has used.
+     *
+     * "Attachment" is the SERVER's word for a message that is a file and nothing else (see
+     * the channel-summary query) — the one string in this rail we do not author here. It is
+     * matched exactly and translated, so a Vietnamese seller does not get one English row
+     * among Vietnamese ones. It used to carry a 📎 as well.
+     */
+    const lastLine = (last?: string) =>
+      !last ? tl("chat", "No messages yet") : last === "Attachment" ? tl("chat", "Attachment") : last
  const pin = (c: Convo): Convo => {
  const m = chanMeta[c.id]
- return { ...c, sub: m?.last || tl("chat", "No messages yet"), count: m?.unread || 0 }
+ return { ...c, sub: lastLine(m?.last), count: m?.unread || 0 }
     }
     /*
      * A PINNED ROW READS LIKE EVERY OTHER ROW.
@@ -267,7 +276,7 @@ export default function ChatPage() {
  if (t.order_id === supportId) continue // don't list my own thread twice
  list.push({
  id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
- sub: t.last ? t.last.slice(0, 40) : tl("chat", "Support request"), escalated: !!t.escalated, count: t.unanswered ?? 0,
+ sub: t.last ? lastLine(t.last).slice(0, 40) : tl("chat", "Support request"), escalated: !!t.escalated, count: t.unanswered ?? 0,
       })
     }
     // Channels opened from the directory that have no messages yet, so they don't

@@ -603,7 +603,11 @@ export function IntegrationsPanel() {
               )}
               {tests[active.key]?.result && (
                 <div className={"break-words text-xs " + (tests[active.key]!.result!.ok ? "text-success" : "text-destructive")}>
-                  {tests[active.key]!.result!.ok ? "✓ " : "✗ "}{tests[active.key]!.result!.msg}
+                  {/* An ICON, not a glyph. ✓/✗ typed into a string render as the operating
+                      system's own characters — a different weight and baseline per platform,
+                      and nothing the icon set controls. */}
+                  {tests[active.key]!.result!.ok ? <Check size={13} weight="bold" className="mr-1 inline shrink-0" /> : <X size={13} weight="bold" className="mr-1 inline shrink-0" />}
+                  {tests[active.key]!.result!.msg}
                 </div>
               )}
               {(secrets[active.key] ?? []).length > 0 ? (
@@ -770,7 +774,8 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
       </div>
       {testResult && (
         <div className={"mt-2 text-sm " + (testResult.ok ? "text-success" : "text-destructive")}>
-          {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
+          {testResult.ok ? <Check size={14} weight="bold" className="mr-1 inline shrink-0" /> : <X size={14} weight="bold" className="mr-1 inline shrink-0" />}
+          {testResult.msg}
         </div>
       )}
       <p className="mt-2 text-xs text-muted-foreground">A saved key overrides the server env. Haiku 4.5 runs about a fifth of a cent per question. Admin only.</p>
@@ -924,7 +929,8 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
       </div>
       {testResult && (
         <div className={"mt-2 text-sm " + (testResult.ok ? "text-success" : "text-destructive")}>
-          {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
+          {testResult.ok ? <Check size={14} weight="bold" className="mr-1 inline shrink-0" /> : <X size={14} weight="bold" className="mr-1 inline shrink-0" />}
+          {testResult.msg}
         </div>
       )}
       <p className="mt-2 text-xs text-muted-foreground">

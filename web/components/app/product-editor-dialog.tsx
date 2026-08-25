@@ -1669,7 +1669,7 @@ export function ProductEditorDialog({
                   </span>
                 ) : (
                   <span>
-                    Billed on actual weight ({pkg.actualLb.toFixed(2)} lb) ✓{pkg.dimLb != null ? ` · dim weight ${pkg.dimLb.toFixed(2)} lb` : ""}. Stay under <span className="font-medium tabular-nums">{Math.round(pkg.maxVolumeIn3)} in³</span> (≈ {pkg.suggestedCube.toFixed(1)}″ cube) and it keeps winning — no reweigh upcharge.
+                    Billed on actual weight ({pkg.actualLb.toFixed(2)} lb)<Check size={12} weight="bold" className="mx-1 inline" />{pkg.dimLb != null ? `· dim weight ${pkg.dimLb.toFixed(2)} lb` : ""}. Stay under <span className="font-medium tabular-nums">{Math.round(pkg.maxVolumeIn3)} in³</span> (≈ {pkg.suggestedCube.toFixed(1)}″ cube) and it keeps winning — no reweigh upcharge.
                   </span>
                 )}
               </div>

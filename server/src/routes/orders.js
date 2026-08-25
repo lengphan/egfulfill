@@ -4005,7 +4005,7 @@ export function ordersRoutes(app, requireAuth) {
               max(m.created_at) as last_at,
               -- An attachment-only message has an empty body, and a rail row that goes
               -- blank when someone sends a photo reads as a broken channel.
-              (select coalesce(nullif(x.body, ''), case when x.attachment is not null then '📎 Attachment' else '' end)
+              (select coalesce(nullif(x.body, ''), case when x.attachment is not null then 'Attachment' else '' end)
                  from order_messages x
                 where x.order_id = m.order_id
                   and ($2::boolean or not coalesce((x.meta->>'internal')::boolean, false))

@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useState } from "react"
-import { Plus, PenNib, X } from "@phosphor-icons/react"
+import { Plus, PenNib, X, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TemplatesPanel } from "@/components/app/templates-panel"
 import { MachineFilesPanel } from "@/components/app/machine-files-panel"
@@ -260,7 +260,9 @@ function DesignLab() {
  title="Copy this artwork's reference"
  className="eg-tap ml-auto rounded-md bg-muted px-2 py-1 tabular-nums text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                       >
-                        {copied === String(d.id) ? "Copied ✓" : `IMG-${d.id}`}
+                        {copied === String(d.id)
+                          ? <span className="inline-flex items-center gap-1">Copied<Check size={12} weight="bold" /></span>
+                          : `IMG-${d.id}`}
                       </button>
                     </div>
                   </div>

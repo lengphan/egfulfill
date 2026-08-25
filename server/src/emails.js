@@ -45,7 +45,7 @@ function button(href, label) {
 export function welcomeEmail(name) {
   const hi = name ? `Welcome, ${esc(name)}` : 'Welcome to EGFUL';
   const inner =
-    `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">${hi} 👋</p>
+    `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">${hi}</p>
      <p style="margin:0 0 15px">Your seller account is ready. Here's how fulfilment goes hands-off from here:</p>
      <ol style="margin:0 0 20px;padding-left:20px;color:${BRAND.ink}">
        <li style="margin-bottom:7px"><strong>Connect a store</strong> — Etsy, Shopify or TikTok Shop. Orders sync into one queue automatically.</li>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle } from "@phosphor-icons/react"
+import { CircleNotch, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -1743,7 +1743,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 />
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {tags.map((t) => <button key={t} onClick={() => removeTag(t)} className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">{t} ✕</button>)}
+                    {tags.map((t) => <button key={t} onClick={() => removeTag(t)} className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">{t}<X size={10} weight="bold" /></button>)}
                   </div>
                 )}
                 {/* NO TRENDING-KEYWORD CHIPS. A dozen shop-wide SpyDeck keywords sat under

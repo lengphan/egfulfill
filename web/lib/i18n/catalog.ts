@@ -892,6 +892,7 @@ const vi: Dict = {
   "chat.animating this still": "đang tạo chuyển động cho ảnh này",
   "chat.Draft with AI": "Soạn bằng AI",
   "chat.No messages yet": "Chưa có tin nhắn",
+  "chat.Attachment": "Tệp đính kèm",
   "chat.EGFUL Support": "Hỗ trợ EGFUL",
   "chat.My Assistant": "Trợ lý của tôi",
   "chat.Support request": "Yêu cầu hỗ trợ",
