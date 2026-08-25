@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, Barcode, CheckCircle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
  onOpenChange: (v: boolean) => void
  onDone?: () => void
 }) {
+  const tl = useLabelT()
  const today = new Date().toISOString().slice(0, 10)
  const [shipDate, setShipDate] = useState(today)
  const [groups, setGroups] = useState<ManifestGroup[] | null>(null)
@@ -78,11 +80,10 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Barcode size={18} weight="duotone" /> Create a USPS SCAN form
+            <Barcode size={18} weight="duotone" /> {tl("manifest", "Create a USPS SCAN form")}
           </DialogTitle>
           <DialogDescription>
-            One barcode covering every label below. The carrier scans it once when they take
- the parcels, instead of scanning each one.
+            {tl("manifest", "One barcode covering every label below. The carrier scans it once when they take the parcels, instead of scanning each one.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -91,9 +92,8 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
             <div className="flex items-start gap-2 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-xs text-shipped">
               <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
               <span>
-                {made.length === 1 ? "Form created" : `${made.length} forms created`}. Print it and hand
- it over with the parcels — <strong>they don&apos;t count as accepted until USPS scans
- it</strong>, and the Scan tags stay amber until they do.
+                {made.length === 1 ? tl("manifest", "Form created") : `${made.length} forms created`}. Print it and hand
+ it over with the parcels — <strong>{tl("manifest", "they don’t count as accepted until USPS scans it")}</strong>, and the Scan tags stay amber until they do.
               </span>
             </div>
             {made.map((m) => (
@@ -105,12 +105,12 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                 {m.pdf ? (
                   <Button size="sm" variant="outline"
  onClick={() => window.open(m.pdf as string, "_blank", "noopener,noreferrer")}>
-                    Print
+                    {tl("manifest", "Print")}
                   </Button>
                 ) : (
                   // Honest about the async gap rather than showing a dead button: USPS has
                   // the form, the PDF just hasn't landed yet.
-                  <span className="text-xs text-muted-foreground">Still generating — reopen from history in a moment.</span>
+                  <span className="text-xs text-muted-foreground">{tl("manifest", "Still generating — reopen from history in a moment.")}</span>
                 )}
               </div>
             ))}
@@ -118,16 +118,16 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
         ) : (
           <div className="space-y-3">
             <div>
-              <label htmlFor="scan-form-date" className="mb-1 block text-xs font-medium">Handover date</label>
+              <label htmlFor="scan-form-date" className="mb-1 block text-xs font-medium">{tl("manifest", "Handover date")}</label>
               <Input id="scan-form-date" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} className="h-9 w-44" />
               <p className="mt-1 text-2xs text-muted-foreground">
-                The day the parcels actually go out. USPS can refuse a form dated for a day the pile didn&apos;t move.
+                {tl("manifest", "The day the parcels actually go out. USPS can refuse a form dated for a day the pile didn’t move.")}
               </p>
             </div>
 
             {busy && !groups ? (
               <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                <CircleNotch size={14} className="animate-spin" /> Checking which labels can go on it…
+                <CircleNotch size={14} className="animate-spin" /> {tl("manifest", "Checking which labels can go on it…")}
               </div>
             ) : (
               <>
@@ -147,7 +147,7 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
                   </div>
                 ) : (
                 <div className="text-sm">
-                  <strong>{eligible}</strong> {eligible === 1 ? "label goes" : "labels go"} on {groups && groups.length > 1 ? `${groups.length} forms` : "this form"}.
+                  <strong>{eligible}</strong> {eligible === 1 ? tl("manifest", "label goes") : tl("manifest", "labels go")} on {groups && groups.length > 1 ? `${groups.length} forms` : tl("manifest", "this form")}.
                 </div>
                 )}
                 {skipped.length > 0 && (
@@ -174,10 +174,10 @@ export function ManifestDialog({ orderIds, open, onOpenChange, onDone }: {
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{made ? "Done" : "Cancel"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{made ? tl("manifest", "Done") : tl("manifest", "Cancel")}</Button>
           {!made && (
             <Button onClick={create} disabled={busy || !eligible}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Barcode size={14} weight="bold" /> Create form</>}
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><Barcode size={14} weight="bold" /> {tl("manifest", "Create form")}</>}
             </Button>
           )}
         </DialogFooter>

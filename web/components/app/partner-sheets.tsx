@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CircleNotch, Warning, UploadSimple, DownloadSimple, FloppyDisk, Plus, X } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -45,6 +46,7 @@ const MODES: { value: BlockMode; label: string; hint: string }[] = [
  * unfilled is listed rather than quietly exported blank.
  */
 export function PartnerSheets() {
+  const tl = useLabelT()
   const [templates, setTemplates] = useState<PartnerTemplate[] | null>(null)
   const [id, setId] = useState<string | null>(null)
   const [layout, setLayout] = useState<TemplateLayout>({ sheets: [] })
@@ -183,12 +185,12 @@ export function PartnerSheets() {
               const t = (templates ?? []).find((x) => x.id === e.target.value)
               if (t) select(t)
             }}>
-            <option value="">Pick a partner…</option>
+            <option value="">{tl("partnerSheets", "Pick a partner…")}</option>
             {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )}
         <span className="ml-auto text-xs text-muted-foreground">
-          {rows === null ? "Reading the catalogue…" : `${rows.length} catalogue lines available`}
+          {rows === null ? tl("partnerSheets", "Reading the catalogue…") : `${rows.length} catalogue lines available`}
         </span>
       </div>
 
@@ -201,22 +203,22 @@ export function PartnerSheets() {
 
       {templates === null ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-          <CircleNotch size={16} className="animate-spin" /> Loading templates…
+          <CircleNotch size={16} className="animate-spin" /> {tl("partnerSheets", "Loading templates…")}
         </div>
       ) : !current ? (
         // Not the same sentence for "we couldn't read this" as for "you have none yet".
         <div className="py-12 text-center text-sm text-muted-foreground">
           {err
-            ? "Couldn't load templates, so this isn't empty — it's unknown."
+            ? tl("partnerSheets", "Couldn't load templates, so this isn't empty — it's unknown.")
             : templates.length
-              ? "Pick a partner above to edit how their sheet is filled."
-              : "No partner templates yet. Upload the workbook a partner sent you and map their columns to ours once — after that, exporting is one click."}
+              ? tl("partnerSheets", "Pick a partner above to edit how their sheet is filled.")
+              : tl("partnerSheets", "No partner templates yet. Upload the workbook a partner sent you and map their columns to ours once — after that, exporting is one click.")}
         </div>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={save} disabled={busy || !dirty}>
-              <FloppyDisk size={14} weight="bold" /> {dirty ? "Save mapping" : "Saved"}
+              <FloppyDisk size={14} weight="bold" /> {dirty ? tl("partnerSheets", "Save mapping") : tl("partnerSheets", "Saved")}
             </Button>
             <Button size="sm" onClick={exportSheet} disabled={busy || !rows}>
               <DownloadSimple size={14} weight="bold" /> Build {current.name} sheet
@@ -228,7 +230,7 @@ export function PartnerSheets() {
                 actually being aimed at. */}
             <Button size="sm" variant="ghost" onClick={() => remove(current)} disabled={busy}
               className="ml-auto text-muted-foreground hover:text-destructive">
-              Delete
+              {tl("partnerSheets", "Delete")}
             </Button>
           </div>
 
@@ -266,11 +268,11 @@ export function PartnerSheets() {
                           <tr className="border-b border-border text-left eg-label text-muted-foreground">
                             {/* nowrap: a partner header is a phrase ("PALLET SIZE (mm, width
                                 x height)") and the column it names has to stay legible as one. */}
-                            <th className="whitespace-nowrap px-3 py-2">Their column</th>
-                            <th className="px-3 py-2">Filled from</th>
+                            <th className="whitespace-nowrap px-3 py-2">{tl("partnerSheets", "Their column")}</th>
+                            <th className="px-3 py-2">{tl("partnerSheets", "Filled from")}</th>
                             {/* Takes the slack, so the control and the value it produces
                                 sit next to each other instead of at opposite margins. */}
-                            <th className="w-full px-3 py-2">First row</th>
+                            <th className="w-full px-3 py-2">{tl("partnerSheets", "First row")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -290,11 +292,11 @@ export function PartnerSheets() {
                                             : v === "const" ? { kind: "const", value: "" }
                                               : { kind: "field", field: v })
                                       }}>
-                                      <option value="">— leave blank —</option>
+                                      <option value="">{tl("partnerSheets", "— leave blank —")}</option>
                                       {fields.map((f) => <option key={f} value={f}>{FIELD_LABEL[f] ?? f}</option>)}
                                       {/* The answer for pallet size, carton weight, lead time:
                                           one value, every row, typed once. */}
-                                      <option value="const">Same value for every row…</option>
+                                      <option value="const">{tl("partnerSheets", "Same value for every row…")}</option>
                                     </select>
                                     {rule.kind === "const" && (
                                       <Input value={rule.value} placeholder="e.g. 350x448"
@@ -337,7 +339,7 @@ export function PartnerSheets() {
                                   </td>
                                 ))}
                                 <td className="px-1">
-                                  <Button size="sm" variant="ghost" aria-label="Remove line"
+                                  <Button size="sm" variant="ghost" aria-label={tl("partnerSheets", "Remove line")}
                                     onClick={() => patchBlock(block.id, { fixed: m.fixed.filter((_, x) => x !== r) })}>
                                     <X size={14} />
                                   </Button>
@@ -348,14 +350,14 @@ export function PartnerSheets() {
                         </table>
                         <Button size="sm" variant="outline" className="mt-2"
                           onClick={() => patchBlock(block.id, { fixed: [...m.fixed, new Array(block.columns.length).fill("")] })}>
-                          <Plus size={14} weight="bold" /> Add a line
+                          <Plus size={14} weight="bold" /> {tl("partnerSheets", "Add a line")}
                         </Button>
                       </div>
                     )}
 
                     {m.mode === "skip" && (
                       <p className="px-3 py-3 text-xs text-muted-foreground">
-                        Headers only — this block exports with no rows under it.
+                        {tl("partnerSheets", "Headers only — this block exports with no rows under it.")}
                       </p>
                     )}
                   </div>
@@ -365,10 +367,7 @@ export function PartnerSheets() {
           ))}
 
           <p className="text-xs text-muted-foreground">
-            The file carries their sheet names, section titles, headers and column order. It does
-            not carry their cell colours or merged headings — those don&apos;t survive being rebuilt,
-            and a sheet that looked right but had lost a merge would be worse than one that plainly
-            never had them.
+            {tl("partnerSheets", "The file carries their sheet names, section titles, headers and column order. It does not carry their cell colours or merged headings — those don’t survive being rebuilt, and a sheet that looked right but had lost a merge would be worse than one that plainly never had them.")}
           </p>
         </>
       )}

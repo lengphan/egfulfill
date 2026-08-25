@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
@@ -68,6 +69,7 @@ function techsOf(p: CatalogProduct): { key: string; label: string }[] {
 }
 
 export default function ProductDetailPage() {
+  const tl = useLabelT()
  const params = useParams<{ id: string }>()
  const router = useRouter()
  const id = decodeURIComponent(String(params?.id ?? ""))
@@ -116,9 +118,9 @@ export default function ProductDetailPage() {
         <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
           <Package size={26} weight="duotone" />
         </span>
-        <div className="font-medium">Product not found</div>
+        <div className="font-medium">{tl("productPage", "Product not found")}</div>
         <Button variant="outline" size="sm" onClick={() => router.push("/products")}>
-          Back to products
+          {tl("productPage", "Back to products")}
         </Button>
       </div>
     )
@@ -150,7 +152,7 @@ export default function ProductDetailPage() {
  onClick={() => router.push("/products")}
  className="-ml-1 inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
-        <CaretLeft size={14} weight="bold" /> Products
+        <CaretLeft size={14} weight="bold" /> {tl("productPage", "Products")}
       </button>
 
       {/* Fill the page container (eg-content, 1600px) like every other page — the old
@@ -211,7 +213,7 @@ export default function ProductDetailPage() {
                 <span className="rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">{product.type}</span>
               )}
             </div>
-            <h1 className="mt-2 font-title text-3xl font-semibold tracking-tight">{product.name ?? "Untitled"}</h1>
+            <h1 className="mt-2 font-title text-3xl font-semibold tracking-tight">{product.name ?? tl("productPage", "Untitled")}</h1>
             <div className="mt-1 tabular-nums text-sm text-muted-foreground">{product.sku ?? "—"}</div>
           </div>
 
@@ -237,10 +239,10 @@ export default function ProductDetailPage() {
  className="w-full sm:w-auto"
  onClick={() => router.push(`/design/maker?product=${encodeURIComponent(String(product.id ?? product.sku ?? ""))}`)}
           >
-            Start designing
+            {tl("productPage", "Start designing")}
           </Button>
 
-          <SectionCard title="Variants">
+          <SectionCard title={tl("productPage", "Variants")}>
             <div className="space-y-4 p-5">
               <div>
                 {/* THE NAME LIVES ON THE HEADING, NOT ON EVERY CHIP.
@@ -327,7 +329,7 @@ export default function ProductDetailPage() {
           </SectionCard>
 
           {descriptionLines(product.description).length > 0 && (
-            <SectionCard title="About this product">
+            <SectionCard title={tl("productPage", "About this product")}>
               <ul className="space-y-1.5 p-5 text-sm">
                 {descriptionLines(product.description).map((line, i) => (
                   <li key={i} className="flex items-start gap-2">
@@ -341,7 +343,7 @@ export default function ProductDetailPage() {
 
           {/* Print methods available — chips per technique, with the per-unit surcharge
  when the product carries one (methodPrices). */}
-          <SectionCard title="Printing methods">
+          <SectionCard title={tl("productPage", "Printing methods")}>
             <div className="flex flex-wrap gap-2 p-5">
               {techs.map((t) => {
  const fee = product.methodPrices?.[t.key.toUpperCase()] ?? product.methodPrices?.[t.label.split(" ")[0]]
@@ -357,13 +359,13 @@ export default function ProductDetailPage() {
 
           {/* File guidelines — the artwork requirements from the old HTML PDP, shown per
  method the product actually supports. */}
-          <SectionCard title="File guidelines">
+          <SectionCard title={tl("productPage", "File guidelines")}>
             <div className="space-y-4 p-5">
               {hasPrint && (
                 <div>
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Print · DTG / DTF</div>
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tl("productPage", "Print · DTG / DTF")}</div>
                   <ul className="space-y-1.5 text-sm">
-                    {["PNG or PDF, 150 DPI minimum (300 preferred)", "Transparent background", "Design true-to-size to the print area"].map((g) => (
+                    {[tl("productPage", "PNG or PDF, 150 DPI minimum (300 preferred)"), tl("productPage", "Transparent background"), tl("productPage", "Design true-to-size to the print area")].map((g) => (
                       <li key={g} className="flex items-start gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" /><span>{g}</span></li>
                     ))}
                   </ul>
@@ -371,9 +373,9 @@ export default function ProductDetailPage() {
               )}
               {hasEmb && (
                 <div>
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Embroidery</div>
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tl("productPage", "Embroidery")}</div>
                   <ul className="space-y-1.5 text-sm">
-                    {["Vector PDF, or PNG at 150 DPI+", "Solid shapes & colors only — no gradients", "Max 15K stitches (25K for large designs)"].map((g) => (
+                    {[tl("productPage", "Vector PDF, or PNG at 150 DPI+"), tl("productPage", "Solid shapes & colors only — no gradients"), tl("productPage", "Max 15K stitches (25K for large designs)")].map((g) => (
                       <li key={g} className="flex items-start gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" /><span>{g}</span></li>
                     ))}
                   </ul>

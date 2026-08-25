@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, MagnifyingGlass, Plus, Check } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -233,6 +234,7 @@ export function POAddItems({
  inventory: InventoryItem[]
  onAdd: (lines: POLine[]) => void
 }) {
+  const tl = useLabelT()
  const [tab, setTab] = useState<Tab>("inventory")
  const [term, setTerm] = useState("")
  const [q, setQ] = useState("")
@@ -554,17 +556,17 @@ export function POAddItems({
             <p className="mt-1 text-hold">
               {unmapped.product
                 ? <>We stock <span className="font-medium">{unmapped.product}</span>, but nothing records that its{unmapped.variant ? ` ${unmapped.variant}` : " variant"} is <span className="tabular-nums">{unmapped.supplierSku}</span> at this supplier. Open that product and add the supplier code to this variant, then add it here again.</>
- : <>Add it to Products first — with <span className="tabular-nums">{unmapped.supplierSku}</span> recorded as the supplier code for this variant — so what arrives can be booked onto the right shelf.</>}
+ : <>{tl("poItems", "Add it to Products first — with")} <span className="tabular-nums">{unmapped.supplierSku}</span> {tl("poItems", "recorded as the supplier code for this variant — so what arrives can be booked onto the right shelf.")}</>}
             </p>
             <button type="button" onClick={() => setUnmapped(null)}
  className="mt-1.5 font-medium text-hold underline underline-offset-2">
-              Dismiss
+              {tl("poItems", "Dismiss")}
             </button>
           </div>
         )}
 
         <div className="flex gap-1 rounded-lg bg-muted p-1">
-          {([["inventory", "Inventory"], ["ss", "S&S"], ["otto", "Otto Cap"], ["sanmar", "SanMar"]] as [Tab, string][]).map(([k, label]) => (
+          {([["inventory", tl("poItems", "Inventory")], ["ss", "S&S"], ["otto", tl("poItems", "Otto Cap")], ["sanmar", tl("poItems", "SanMar")]] as [Tab, string][]).map(([k, label]) => (
             <button
  key={k}
  type="button"
@@ -589,7 +591,7 @@ export function POAddItems({
         <div className="max-h-[60vh] min-h-[24rem] divide-y divide-border overflow-y-auto rounded-lg border border-border">
           {tab === "inventory" && (
  invRows.length === 0
-              ? <Empty>{q ? "Nothing matches that." : "No inventory yet."}</Empty>
+              ? <Empty>{q ? tl("poItems", "Nothing matches that.") : tl("poItems", "No inventory yet.")}</Empty>
  : invRows.map((i) => (
                 <PickRow key={i.sku}
  line={{ sku: i.sku, name: i.name ?? undefined, variant: i.variant ?? undefined, qty: 1 }}
@@ -620,7 +622,7 @@ export function POAddItems({
                   {ssStyles.map(renderLocalStyle)}
                   {extraStyleHits.length > 0 && ss.length > 0 && (
                     <div className="border-y border-border px-4 py-1.5 text-xs font-medium text-muted-foreground">
-                      More from S&amp;S — open one to load its colours and sizes
+                      {tl("poItems", "More from S&S — open one to load its colours and sizes")}
                     </div>
                   )}
                   {extraStyleHits.map((st) => (
@@ -642,7 +644,7 @@ export function POAddItems({
                       {openSsStyle === String(st.styleID) && (
                         <div className="border-t border-border bg-muted/30 pl-6">
                           {ssStyleSkus[String(st.styleID)] === undefined ? <Loading />
- : ssStyleSkus[String(st.styleID)].length === 0 ? <Empty>S&amp;S list no orderable skus for this style.</Empty>
+ : ssStyleSkus[String(st.styleID)].length === 0 ? <Empty>{tl("poItems", "S&S list no orderable skus for this style.")}</Empty>
  : <ColourGroups
  variants={ssStyleSkus[String(st.styleID)].map((p) => ({ sku: p.sku, color: p.color, size: p.size, price: num(p.price), image: p.image ?? null }))}
  name={ssTitle(ssStyleSkus[String(st.styleID)][0])}
@@ -653,12 +655,12 @@ export function POAddItems({
                   ))}
                 </>
               )
- : <Empty>{q ? "No S&S products match, and no style of that name either." : "Search a style name, number or colour — anything S&S sell is reachable."}</Empty>
+ : <Empty>{q ? tl("poItems", "No S&S products match, and no style of that name either.") : tl("poItems", "Search a style name, number or colour — anything S&S sell is reachable.")}</Empty>
           )}
 
           {tab === "sanmar" && (
  sanmar === null ? <Loading />
- : sanmar.length === 0 ? <Empty>{q ? "No SanMar styles match." : "Import the SanMar catalogue first, or search for a style."}</Empty>
+ : sanmar.length === 0 ? <Empty>{q ? tl("poItems", "No SanMar styles match.") : tl("poItems", "Import the SanMar catalogue first, or search for a style.")}</Empty>
  : sanmar.map((s2) => (
                   <div key={s2.style}>
                     <button type="button" onClick={() => expandSanmar(s2.style)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
@@ -678,7 +680,7 @@ export function POAddItems({
                     {openSanmar === s2.style && (
                       <div className="border-t border-border bg-muted/30 pl-6">
                         {sanmarSkus[s2.style] === undefined ? <Loading />
- : sanmarSkus[s2.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
+ : sanmarSkus[s2.style].length === 0 ? <Empty>{tl("poItems", "No skus listed for this style.")}</Empty>
  : <ColourGroups
  variants={sanmarSkus[s2.style].map((v) => ({ sku: v.sku, color: v.color, size: v.size, price: num(v.price ?? s2.price), image: v.image || s2.image || null }))}
  name={s2.name ?? undefined}
@@ -690,7 +692,7 @@ export function POAddItems({
           )}
           {tab === "otto" && (
  otto === null ? <Loading />
- : otto.length === 0 ? <Empty>{q ? "No Otto Cap styles match." : "Sync the Otto Cap catalog first, or search for a style."}</Empty>
+ : otto.length === 0 ? <Empty>{q ? tl("poItems", "No Otto Cap styles match.") : tl("poItems", "Sync the Otto Cap catalog first, or search for a style.")}</Empty>
  : otto.map((s) => (
                   <div key={s.style}>
                     {/* A style isn't orderable — expand it to its skus and pick one. */}
@@ -709,7 +711,7 @@ export function POAddItems({
                     {openStyle === s.style && (
                       <div className="border-t border-border bg-muted/30 pl-6">
                         {styleSkus[s.style] === undefined ? <Loading />
- : styleSkus[s.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
+ : styleSkus[s.style].length === 0 ? <Empty>{tl("poItems", "No skus listed for this style.")}</Empty>
  : <ColourGroups
  variants={styleSkus[s.style].map((v) => ({ sku: v.sku, color: v.color, size: v.size, price: num(v.price ?? s.price), image: driveImg(v.image || s.image) || null }))}
  name={s.name ?? undefined}
@@ -722,7 +724,7 @@ export function POAddItems({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>{tl("poItems", "Cancel")}</Button>
           <Button onClick={commit} disabled={!chosen.length}>
             Add {chosen.length || ""} item{chosen.length === 1 ? "" : "s"}
           </Button>

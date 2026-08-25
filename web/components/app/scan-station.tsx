@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Barcode as BarcodeIcon, X, ArrowUp, ArrowDown, ArrowCounterClockwise, CircleNotch, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -21,6 +22,7 @@ const timeNow = () => new Date().toLocaleTimeString("en-US", { hour: "numeric", 
 // and refocuses on blur, and an exact SKU match auto-commits — no clicking, ever.
 // `embedded` hides the mobile hero when this sits inside the Inventory tab shell.
 export function ScanStation({ embedded = false }: { embedded?: boolean }) {
+  const tl = useLabelT()
   // Operator gets a READ-ONLY station: they need to look up what's on hand, but moving
   // stock is a claim about physical custody that belongs to the warehouse. Enforced here
   // AND by leaving the commit path unreachable, not just by hiding the input.
@@ -205,15 +207,15 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
         <div className="flex items-center gap-3 md:hidden">
           <BarcodeIcon size={18} weight="regular" className="shrink-0 text-primary" />
           <div className="min-w-0">
-            <PageTitle>Scan</PageTitle>
-            <p className="truncate text-sm text-muted-foreground">Scan stock in and out. Works with a scanner gun or your phone camera.</p>
+            <PageTitle>{tl("scan", "Scan")}</PageTitle>
+            <p className="truncate text-sm text-muted-foreground">{tl("scan", "Scan stock in and out. Works with a scanner gun or your phone camera.")}</p>
           </div>
         </div>
       )}
 
       {/* Mode — big targets; stays put so you can rapid-fire a whole pallet */}
       <div className="grid grid-cols-2 gap-2">
-        {([["in", "Stock In", ArrowDown], ["out", "Stock Out", ArrowUp]] as const).map(([m, label, Icon]) => {
+        {([["in", tl("scan", "Stock In"), ArrowDown], ["out", tl("scan", "Stock Out"), ArrowUp]] as const).map(([m, label, Icon]) => {
  const on = mode === m
  const tone = m === "in" ? "border-shipped/30 bg-shipped text-white" : "border-alert/30 bg-alert text-white"
  return (
@@ -231,7 +233,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
       <SectionCard
  title={readOnly ? "Stock levels — view only" : isIn ? "Scanning IN — adds to stock" : "Scanning OUT — removes from stock"}
  actions={hasCam ? (
-          <Button size="sm" variant="outline" onClick={() => setCamOpen(true)}>Camera</Button>
+          <Button size="sm" variant="outline" onClick={() => setCamOpen(true)}>{tl("scan", "Camera")}</Button>
         ) : undefined}
       >
         <div className="space-y-3 p-5">
@@ -239,8 +241,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
  no explanation reads as broken. */}
           {readOnly && (
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-              You can look up stock here, but moving it is the warehouse&apos;s call — scanning in and out
- records physical custody.
+              {tl("scan", "You can look up stock here, but moving it is the warehouse’s call — scanning in and out records physical custody.")}
             </div>
           )}
           <Input
@@ -251,22 +252,22 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
  onChange={(e) => onChange(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") { if (autoRef.current) clearTimeout(autoRef.current); commit(value, mode) } }}
  onBlur={() => { if (!camOpen && !readOnly) setTimeout(() => inputRef.current?.focus(), 0) }}
- placeholder="Scan or type a SKU…  (try SKU x5 for qty)"
+ placeholder={tl("scan", "Scan or type a SKU…  (try SKU x5 for qty)")}
  spellCheck={false}
  autoComplete="off"
  className={"h-16 text-center tabular-nums text-lg transition-colors " + (flash === "ok" ? "border-shipped/30 bg-shipped/12" : flash === "err" ? "border-alert/30 bg-alert/12" : "")}
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{busy ? <span className="inline-flex items-center gap-1"><CircleNotch size={12} className="animate-spin" /> saving…</span> : "Ready — the input stays focused for the gun."}</span>
+            <span>{busy ? <span className="inline-flex items-center gap-1"><CircleNotch size={12} className="animate-spin" /> {tl("scan", "saving…")}</span> : tl("scan", "Ready — the input stays focused for the gun.")}</span>
             {log.length > 0 && <span>Session net <b className={netToday >= 0 ? "text-success" : "text-alert"}>{netToday >= 0 ? "+" : ""}{netToday}</b> · {log.length} scan{log.length === 1 ? "" : "s"}</span>}
           </div>
         </div>
       </SectionCard>
 
       {/* Session log — mis-scans happen constantly, so undo is one tap */}
-      <SectionCard title="This session">
+      <SectionCard title={tl("scan", "This session")}>
         {log.length === 0 ? (
-          <EmptyState icon={BarcodeIcon} size="sm" title="Scans show up here as you go" />
+          <EmptyState icon={BarcodeIcon} size="sm" title={tl("scan", "Scans show up here as you go")} />
         ) : (
           <div className="divide-y divide-border">
             {log.map((e) => (
@@ -279,7 +280,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
                   <div className="truncate tabular-nums text-xs text-muted-foreground">{e.sub}</div>
                 </div>
                 {e.ok && e.scanId && (
-                  <Button size="sm" variant="ghost" onClick={() => undo(e)} title="Undo this scan" className="shrink-0 text-muted-foreground hover:text-destructive">
+                  <Button size="sm" variant="ghost" onClick={() => undo(e)} title={tl("scan", "Undo this scan")} className="shrink-0 text-muted-foreground hover:text-destructive">
                     <ArrowCounterClockwise size={14} weight="bold" />
                   </Button>
                 )}
@@ -293,8 +294,8 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
       {camOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black">
           <div className="flex items-center justify-between px-4 py-3 text-white">
-            <span className="text-sm font-semibold">{isIn ? "Scanning IN" : "Scanning OUT"}</span>
-            <button onClick={() => setCamOpen(false)} aria-label="Close scanner" className="rounded-lg p-1.5 hover:bg-white/10"><X size={20} weight="bold" /></button>
+            <span className="text-sm font-semibold">{isIn ? tl("scan", "Scanning IN") : tl("scan", "Scanning OUT")}</span>
+            <button onClick={() => setCamOpen(false)} aria-label={tl("scan", "Close scanner")} className="rounded-lg p-1.5 hover:bg-white/10"><X size={20} weight="bold" /></button>
           </div>
           <div className="relative flex-1 overflow-hidden">
             <video ref={videoRef} playsInline muted className="absolute inset-0 size-full object-cover" />
@@ -313,7 +314,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
             {!camErr && !sawScan && (
               <div className="absolute inset-x-4 bottom-4 rounded-lg bg-black/70 px-3 py-2 text-xs text-white">
                 {engine === null
-                  ? "Starting the camera…"
+                  ? tl("scan", "Starting the camera…")
  : stale
                     ? `Reading (${engine === "native" ? "built-in" : "fallback"}) but nothing decoded yet. Fill the frame with the barcode, tap an inventory code to enlarge it first, and keep 15–25cm away.`
  : `Reading (${engine === "native" ? "built-in" : "fallback"} decoder) — point at a barcode.`}
@@ -329,7 +330,7 @@ export function ScanStation({ embedded = false }: { embedded?: boolean }) {
             )}
           </div>
           <div className="grid grid-cols-2 gap-2 p-3">
-            {([["in", "Stock In"], ["out", "Stock Out"]] as const).map(([m, label]) => (
+            {([["in", tl("scan", "Stock In")], ["out", tl("scan", "Stock Out")]] as const).map(([m, label]) => (
               <button key={m} onClick={() => setMode(m)} className={"rounded-xl py-3 text-sm font-semibold " + (mode === m ? (m === "in" ? "bg-shipped text-white" : "bg-alert text-white") : "bg-white/10 text-white/70")}>{label}</button>
             ))}
           </div>

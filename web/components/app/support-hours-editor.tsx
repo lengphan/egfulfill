@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Moon, CheckCircle } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -21,6 +22,7 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
  isAdmin: boolean
  onSaved?: (a: SupportAvailability) => void
 }) {
+  const tl = useLabelT()
  const [cfg, setCfg] = useState<SupportHoursConfig | null>(null)
  const [avail, setAvail] = useState<SupportAvailability | null>(null)
  const [busy, setBusy] = useState(false)
@@ -60,9 +62,9 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Support hours</DialogTitle>
+          <DialogTitle>{tl("supportHours", "Support hours")}</DialogTitle>
           <DialogDescription>
-            When the team is available. Outside these hours sellers see an out-of-office notice with the return time.
+            {tl("supportHours", "When the team is available. Outside these hours sellers see an out-of-office notice with the return time.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -75,31 +77,31 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
                 ? "border-shipped/30 bg-shipped/12 text-shipped"
  : "border-hold/30 bg-hold/10 text-hold")}>
                 {avail.open ? <CheckCircle size={15} weight="fill" /> : <Moon size={15} weight="fill" />}
-                <span>{avail.open ? "Open now" : `Closed right now${avail.resumesLabel ? ` — back ${avail.resumesLabel}` : ""}`}</span>
+                <span>{avail.open ? tl("supportHours", "Open now") : `Closed right now${avail.resumesLabel ? ` — back ${avail.resumesLabel}` : ""}`}</span>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">Opens (24h)</span>
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("supportHours", "Opens (24h)")}</span>
                 <Input type="number" min={0} max={24} value={cfg.startH} disabled={!isAdmin} onChange={(e) => patch({ startH: Number(e.target.value) })} className="h-9" />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">Closes (24h)</span>
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("supportHours", "Closes (24h)")}</span>
                 <Input type="number" min={0} max={24} value={cfg.endH} disabled={!isAdmin} onChange={(e) => patch({ endH: Number(e.target.value) })} className="h-9" />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">UTC offset</span>
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("supportHours", "UTC offset")}</span>
                 <Input type="number" value={cfg.tzOffset} disabled={!isAdmin} onChange={(e) => patch({ tzOffset: Number(e.target.value) })} className="h-9" />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">Timezone label</span>
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("supportHours", "Timezone label")}</span>
                 <Input value={cfg.tzLabel} disabled={!isAdmin} onChange={(e) => patch({ tzLabel: e.target.value })} className="h-9" />
               </label>
             </div>
 
             <div>
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">Working days</span>
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("supportHours", "Working days")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {DAYS.map(([label, d]) => (
                   <button key={d} type="button" disabled={!isAdmin} onClick={() => toggleDay(d)}
@@ -113,15 +115,15 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
             </div>
 
             <div className="rounded-lg border border-border p-3">
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">Holiday closure (optional)</span>
-              <p className="mb-2 text-xs text-muted-foreground">A date we&apos;re out until — overrides the weekly hours until then. Clear it to cancel.</p>
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("supportHours", "Holiday closure (optional)")}</span>
+              <p className="mb-2 text-xs text-muted-foreground">{tl("supportHours", "A date we’re out until — overrides the weekly hours until then. Clear it to cancel.")}</p>
               <div className="flex items-center gap-2">
                 <Input type="date" value={cfg.ooo.until ? String(cfg.ooo.until).slice(0, 10) : ""} disabled={!isAdmin}
  onChange={(e) => patchOoo({ until: e.target.value || null })} className="h-9" />
-                {cfg.ooo.until && isAdmin && <Button variant="ghost" size="sm" onClick={() => patchOoo({ until: null })}>Clear</Button>}
+                {cfg.ooo.until && isAdmin && <Button variant="ghost" size="sm" onClick={() => patchOoo({ until: null })}>{tl("supportHours", "Clear")}</Button>}
               </div>
               <Input value={cfg.ooo.message} disabled={!isAdmin} onChange={(e) => patchOoo({ message: e.target.value })}
- placeholder="Optional message, e.g. Closed for Tết" className="mt-2 h-9" />
+ placeholder={tl("supportHours", "Optional message, e.g. Closed for Tết")} className="mt-2 h-9" />
             </div>
 
             {err && <p className="text-sm text-destructive">{err}</p>}
@@ -129,8 +131,8 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
         )}
 
         <DialogFooter>
-          {saved && <span className="mr-auto self-center text-xs text-success">Saved — applies immediately.</span>}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          {saved && <span className="mr-auto self-center text-xs text-success">{tl("supportHours", "Saved — applies immediately.")}</span>}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("supportHours", "Close")}</Button>
           {isAdmin && <Button onClick={save} disabled={busy || !cfg}>{busy ? <CircleNotch size={14} className="animate-spin" /> : null}Save</Button>}
         </DialogFooter>
       </DialogContent>

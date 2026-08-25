@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch, Warning, Plus, Check } from "@phosphor-icons/react"
 import {
@@ -32,6 +33,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
  onClose: () => void
  onSaved?: (label: string) => void
 }) {
+  const tl = useLabelT()
  const [data, setData] = useState<Suggestion | null>(null)
  const [err, setErr] = useState<string | null>(null)
 
@@ -134,7 +136,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
     <Dialog open={!!listing} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Find suppliers</DialogTitle>
+          <DialogTitle>{tl("sourcingSuggest", "Find suppliers")}</DialogTitle>
           <DialogDescription className="line-clamp-2">{listing.title}</DialogDescription>
         </DialogHeader>
 
@@ -145,7 +147,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
             !data && !err, so ask that instead of tracking it. */}
         {!data && !err && (
           <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-            <CircleNotch size={16} className="animate-spin" /> Reading the product…
+            <CircleNotch size={16} className="animate-spin" /> {tl("sourcingSuggest", "Reading the product…")}
           </div>
         )}
 
@@ -161,22 +163,22 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
               <div className="flex gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm">
                 <Warning size={16} weight="fill" className="mt-0.5 shrink-0 text-hold" />
                 <div>
-                  <div className="font-medium">This is a blank you already stock</div>
+                  <div className="font-medium">{tl("sourcingSuggest", "This is a blank you already stock")}</div>
                   <p className="mt-0.5 text-muted-foreground">
-                    {data.note || "Buy it from SanMar, S&&S or Otto — domestic, no minimum, days not weeks."}
+                    {data.note || tl("sourcingSuggest", "Buy it from SanMar, S&&S or Otto — domestic, no minimum, days not weeks.")}
                   </p>
                 </div>
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="What it is" value={data.productType} />
-              <Field label="Likely material" value={data.material} />
+              <Field label={tl("sourcingSuggest", "What it is")} value={data.productType} />
+              <Field label={tl("sourcingSuggest", "Likely material")} value={data.material} />
             </div>
 
             {!!data.attributes?.length && (
               <div>
-                <div className="mb-1.5 text-xs text-muted-foreground">Specs a supplier will list</div>
+                <div className="mb-1.5 text-xs text-muted-foreground">{tl("sourcingSuggest", "Specs a supplier will list")}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {data.attributes.map((a) => (
                     <span key={a} className="rounded-full bg-muted px-2 py-0.5 text-xs">{a}</span>
@@ -191,7 +193,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
  which is no use to the person reading it. The reasoning belongs in the
  comment below, where it already is. */}
               <div className="mb-1.5 text-xs text-muted-foreground">
-                Suppliers who can make this
+                {tl("sourcingSuggest", "Suppliers who can make this")}
               </div>
               {/* THE PRODUCTS THEMSELVES, not more keywords.
                   This listed the AI's suggested queries and asked you to go and run one,
@@ -203,19 +205,19 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
  understands); they just don't need to be read to be useful. */}
               {hits === null && !hitErr && (
                 <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                  <CircleNotch size={14} className="animate-spin" /> Finding suppliers…
+                  <CircleNotch size={14} className="animate-spin" /> {tl("sourcingSuggest", "Finding suppliers…")}
                 </div>
               )}
               {hitErr && (
                 <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
                   {/^.*(token is invalid|expired)/i.test(hitErr)
-                    ? "Alibaba needs reconnecting — open Sourcing and click Reconnect, then try again."
+                    ? tl("sourcingSuggest", "Alibaba needs reconnecting — open Sourcing and click Reconnect, then try again.")
  : `Couldn't reach Alibaba just now — ${hitErr}`}
                 </p>
               )}
               {hits !== null && hits.length === 0 && !hitErr && (
                 <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-                  No supplier matches on any of the search angles we tried. Sourcing has the full search if you want to widen it.
+                  {tl("sourcingSuggest", "No supplier matches on any of the search angles we tried. Sourcing has the full search if you want to widen it.")}
                 </p>
               )}
               {hits !== null && hits.length > 0 && (
@@ -230,7 +232,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
                           {h.image
                             // eslint-disable-next-line @next/next/no-img-element
                             ? <img src={h.image} alt="" className="size-full object-cover" />
- : <span className="flex size-full items-center justify-center text-2xs text-muted-foreground">no image</span>}
+ : <span className="flex size-full items-center justify-center text-2xs text-muted-foreground">{tl("sourcingSuggest", "no image")}</span>}
                           {h.price && (
                             <span className="absolute bottom-1 left-1 rounded bg-foreground/80 px-1.5 py-0.5 text-2xs font-semibold text-background">
                               {h.price}
@@ -245,7 +247,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
  onClick={() => saveHit(h)}>
                             {savingId === id ? <CircleNotch size={12} className="animate-spin" />
  : isSaved ? <Check size={12} weight="bold" /> : <Plus size={12} weight="bold" />}
-                            {isSaved ? "Saved" : "Add"}
+                            {isSaved ? tl("sourcingSuggest", "Saved") : tl("sourcingSuggest", "Add")}
                           </Button>
                         </div>
                       </div>
@@ -267,7 +269,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
 
             {data.cached && (
               <p className="text-xs text-muted-foreground">
-                Read earlier and cached — looking at this product again costs nothing.
+                {tl("sourcingSuggest", "Read earlier and cached — looking at this product again costs nothing.")}
               </p>
             )}
           </div>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Sparkle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -31,6 +32,7 @@ const DEMO: OrderRow[] = [
 ]
 
 export function ReportsView() {
+  const tl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [isDemo, setIsDemo] = useState(false)
   // A failed read must not render as "Fulfillment rate 0%" and "No revenue yet" — those
@@ -78,15 +80,15 @@ export function ReportsView() {
  return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="Revenue (30d)" value={orders === null ? "—" : usd(stats.rev30)} sub="gross" tone="pos" />
-        <StatCard label="Orders (30d)" value={orders === null ? "—" : String(stats.orders30)} sub="placed" />
-        <StatCard label="Avg order value" value={orders === null ? "—" : usd(stats.aov)} sub="per order" />
-        <StatCard label="Fulfillment rate" value={orders === null ? "—" : `${stats.fulfillRate}%`} sub="shipped / total" />
+        <StatCard label={tl("reports", "Revenue (30d)")} value={orders === null ? "—" : usd(stats.rev30)} sub="gross" tone="pos" />
+        <StatCard label={tl("reports", "Orders (30d)")} value={orders === null ? "—" : String(stats.orders30)} sub="placed" />
+        <StatCard label={tl("reports", "Avg order value")} value={orders === null ? "—" : usd(stats.aov)} sub={tl("reports", "per order")} />
+        <StatCard label={tl("reports", "Fulfillment rate")} value={orders === null ? "—" : `${stats.fulfillRate}%`} sub={tl("reports", "shipped / total")} />
       </StatGrid>
 
       {isDemo && (
         <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
-          <Sparkle size={13} weight="fill" /> Showing sample analytics — sign in to load your live data.
+          <Sparkle size={13} weight="fill" /> {tl("reports", "Showing sample analytics — sign in to load your live data.")}
         </div>
       )}
 
@@ -99,15 +101,15 @@ export function ReportsView() {
 
       {/* Same rule as the dashboard: an all-zero chart asserts zero revenue. */}
       {orders === null && loadErr ? (
-        <SectionCard title="Revenue">
+        <SectionCard title={tl("reports", "Revenue")}>
           {/* NOT an empty chart. The orders failed to load, so the honest reading is
               "unknown", not "zero" — a blank chart claiming no revenue is a lie the data
               cannot support. */}
           <EmptyState
             icon={Warning}
             size="sm"
-            title="Couldn't load your orders"
-            note="So there is nothing to chart yet — this isn't zero revenue, it's unknown."
+            title={tl("reports", "Couldn't load your orders")}
+            note={tl("reports", "So there is nothing to chart yet — this isn't zero revenue, it's unknown.")}
           />
         </SectionCard>
       ) : (
@@ -115,13 +117,13 @@ export function ReportsView() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Revenue by channel" bodyClassName="space-y-4 p-5">
+        <SectionCard title={tl("reports", "Revenue by channel")} bodyClassName="space-y-4 p-5">
           {orders === null && loadErr ? (
             // "No revenue yet" is a statement about the business. Only make it when the
             // orders were actually read.
-            <div className="text-sm text-muted-foreground">Couldn&apos;t load this.</div>
+            <div className="text-sm text-muted-foreground">{tl("reports", "Couldn’t load this.")}</div>
           ) : channels.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No revenue yet.</div>
+            <div className="text-sm text-muted-foreground">{tl("reports", "No revenue yet.")}</div>
           ) : (
  channels.map((c, i) => (
               <div key={c.name}>
@@ -137,18 +139,18 @@ export function ReportsView() {
           )}
         </SectionCard>
 
-        <SectionCard title="Top products">
+        <SectionCard title={tl("reports", "Top products")}>
           {orders === null && loadErr ? (
-            <div className="p-5 text-sm text-muted-foreground">Couldn&apos;t load this.</div>
+            <div className="p-5 text-sm text-muted-foreground">{tl("reports", "Couldn’t load this.")}</div>
           ) : top.length === 0 ? (
-            <div className="p-5 text-sm text-muted-foreground">No product sales yet.</div>
+            <div className="p-5 text-sm text-muted-foreground">{tl("reports", "No product sales yet.")}</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Units</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead>{tl("reports", "Product")}</TableHead>
+                  <TableHead className="text-right">{tl("reports", "Units")}</TableHead>
+                  <TableHead className="text-right">{tl("reports", "Revenue")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

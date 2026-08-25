@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Bank, CreditCard, ArrowsClockwise, CircleNotch, Warning } from "@phosphor-icons/react"
 import { Card } from "@/components/ui/card"
@@ -36,6 +37,7 @@ const SUGGESTED = [
  * it. The gap is the point: it is money that moved without the platform seeing it.
  */
 export function CashAccountsPanel() {
+  const tl = useLabelT()
  const [view, setView] = useState<CashAccountsView | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
@@ -47,7 +49,7 @@ export function CashAccountsPanel() {
  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
 
  const add = async (seed?: { id: string; name: string; kind: string }) => {
- const name = seed?.name ?? await prompt({ title: "New account", body: "What is it called? e.g. US Bank ····4471", placeholder: "US Bank ····4471" })
+ const name = seed?.name ?? await prompt({ title: tl("cashAccounts", "New account"), body: "What is it called? e.g. US Bank ····4471", placeholder: tl("cashAccounts", "US Bank ····4471") })
  if (!name) return
     // The id is the key the server maps payment rails onto, so a suggested rail keeps its
     // slug; anything typed gets a slug derived from its name.
@@ -106,7 +108,7 @@ export function CashAccountsPanel() {
  placeholder: "0.00",
     })
  if (!amount) return
- const note = await prompt({ title: "What was it for?", placeholder: direction === "in" ? "Transfer from PingPong" : "Supplier payment" })
+ const note = await prompt({ title: tl("cashAccounts", "What was it for?"), placeholder: direction === "in" ? "Transfer from PingPong" : "Supplier payment" })
  if (note === null) return
  setBusy(id)
  try { await recordCashPayment(id, { amount: Number(amount), direction, note }); load() }
@@ -126,7 +128,7 @@ export function CashAccountsPanel() {
  if (!view) {
  return (
       <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-        <CircleNotch size={12} className="animate-spin" /> Accounts…
+        <CircleNotch size={12} className="animate-spin" /> {tl("cashAccounts", "Accounts…")}
       </p>
     )
   }
@@ -164,8 +166,8 @@ export function CashAccountsPanel() {
  second box around a group the cards' own borders had already grouped. */
     <div className="space-y-2 p-0.5">
       <div className="flex items-baseline justify-between gap-2 px-0.5">
-        <span className="eg-label text-muted-foreground">Accounts</span>
-        <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">+ Add</button>
+        <span className="eg-label text-muted-foreground">{tl("cashAccounts", "Accounts")}</span>
+        <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">{tl("cashAccounts", "+ Add")}</button>
       </div>
 
       {/* Across, not down — six to a row on a wide screen, so five accounts and an
@@ -186,11 +188,11 @@ export function CashAccountsPanel() {
             </span>
             <span className="flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/acct:opacity-100">
               <button onClick={() => pay(a.id, a.name, "in")} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Money in">+</button>
+ className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title={tl("cashAccounts", "Money in")}>+</button>
               <button onClick={() => pay(a.id, a.name, "out")} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Money out">−</button>
+ className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title={tl("cashAccounts", "Money out")}>−</button>
               <button onClick={() => reconcile(a.id, a.name, a.balance)} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title="Set the real balance">
+ className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title={tl("cashAccounts", "Set the real balance")}>
                 {busy === a.id ? <CircleNotch size={9} className="animate-spin" /> : <ArrowsClockwise size={9} />}
               </button>
               {/* WHICH CARD SHIPPO CHARGES. Named once here, and every label cost places
@@ -201,7 +203,7 @@ export function CashAccountsPanel() {
               {a.kind === "card" && !a.is_postage && (
                 <button onClick={() => setPostage(a)} disabled={busy === a.id}
  className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent"
- title="Charge postage to this card">$</button>
+ title={tl("cashAccounts", "Charge postage to this card")}>$</button>
               )}
             </span>
           </div>
@@ -210,7 +212,7 @@ export function CashAccountsPanel() {
 
       {view.unassigned.entries > 0 && (
         <Card className="group/un gap-0 border-dashed px-3 py-2">
-          <div className="eg-label text-muted-foreground">Unassigned</div>
+          <div className="eg-label text-muted-foreground">{tl("cashAccounts", "Unassigned")}</div>
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
             <span className="text-base font-bold tabular-nums">{usd(view.unassigned.amount)}</span>
             <span className="text-2xs text-muted-foreground">{view.unassigned.entries} entries</span>
@@ -222,7 +224,7 @@ export function CashAccountsPanel() {
           {view.accounts.some((a) => a.is_postage) && (
             <button onClick={runBackfill} disabled={busy === "backfill"}
  className="eg-tap mt-1 self-start rounded border border-border px-1.5 text-2xs leading-4 hover:bg-accent">
-              {busy === "backfill" ? "…" : "Place past postage"}
+              {busy === "backfill" ? "…" : tl("cashAccounts", "Place past postage")}
             </button>
           )}
         </Card>
@@ -235,7 +237,7 @@ export function CashAccountsPanel() {
           "Ping Pong" becomes `ping-pong` and then silently receives nothing. */}
       {missing.length > 0 && (
         <div className="flex flex-wrap items-center gap-1 pt-0.5 text-2xs text-muted-foreground">
-          <span>Add:</span>
+          <span>{tl("cashAccounts", "Add:")}</span>
           {missing.map((sg) => (
             <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}
  className="eg-tap rounded border border-dashed border-border px-1.5 py-0.5 font-medium transition-colors hover:border-primary hover:text-foreground">

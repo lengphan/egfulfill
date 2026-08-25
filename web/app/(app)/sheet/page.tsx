@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 /**
  * THE SHEETS A SELLER HAS.
  *
@@ -29,6 +30,7 @@ const defaultName = () =>
   `Sheet · ${new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
 
 export default function SheetsPage() {
+  const tl = useLabelT()
 
   /**
    * IMPORT LANDS HERE FIRST — "Open Sheet" pushes /sheet, not a sheet — and this page had no
@@ -89,11 +91,11 @@ export default function SheetsPage() {
             className="-ms-2"
             onClick={() => { clearCameFromImport(); requestImportOpen(); router.push(ordersHomeFor(getUser()?.role)) }}
           >
-            <ArrowLeft size={14} weight="bold" /> Back to import
+            <ArrowLeft size={14} weight="bold" /> {tl("sheet", "Back to import")}
           </Button>
         )}
-        <h1 className="text-xl font-semibold tracking-tight">Sheets</h1>
-        <Button className="ms-auto" onClick={start} disabled={busy}>New sheet</Button>
+        <h1 className="text-xl font-semibold tracking-tight">{tl("sheet", "Sheets")}</h1>
+        <Button className="ms-auto" onClick={start} disabled={busy}>{tl("sheet", "New sheet")}</Button>
       </div>
 
       {err && (
@@ -101,29 +103,28 @@ export default function SheetsPage() {
       )}
 
       {sheets === null ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{tl("sheet", "Loading…")}</div>
       ) : !sheets.length ? (
         /* An empty state may carry one sentence, because there is nothing else to read. */
         <div className="rounded-xl border border-border p-8 text-center">
-          <div className="text-sm font-medium">No sheets yet</div>
+          <div className="text-sm font-medium">{tl("sheet", "No sheets yet")}</div>
           <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-            A sheet is where you type orders in bulk. It saves as you go, so you can leave it
-            and come back.
+            {tl("sheet", "A sheet is where you type orders in bulk. It saves as you go, so you can leave it and come back.")}
           </p>
-          <Button className="mt-4" onClick={start} disabled={busy}>New sheet</Button>
+          <Button className="mt-4" onClick={start} disabled={busy}>{tl("sheet", "New sheet")}</Button>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Name</th>
-                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-left font-medium">{tl("sheet", "Name")}</th>
+                <th className="px-3 py-2 text-left font-medium">{tl("sheet", "Status")}</th>
                 {/* Right-aligned, so tabular figures are already on — globals.css does that
                     for every text-right cell; adding tabular-nums here would be the second
                     copy the alignment rule exists to prevent. */}
-                <th className="px-3 py-2 text-right font-medium">Rows</th>
-                <th className="px-3 py-2 text-left font-medium">Updated</th>
+                <th className="px-3 py-2 text-right font-medium">{tl("sheet", "Rows")}</th>
+                <th className="px-3 py-2 text-left font-medium">{tl("sheet", "Updated")}</th>
                 <th className="w-40 px-3 py-2" />
               </tr>
             </thead>
@@ -136,7 +137,7 @@ export default function SheetsPage() {
                       onClick={() => router.push(`/sheet/${s.id}`)}
                       className="text-left font-medium hover:underline"
                     >
-                      {s.name || "Untitled"}
+                      {s.name || tl("sheet", "Untitled")}
                     </button>
                   </td>
                   <td className="px-3 py-2">
@@ -149,7 +150,7 @@ export default function SheetsPage() {
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {s.status === "completed" ? "Sent" : "Draft"}
+                      {s.status === "completed" ? tl("sheet", "Sent") : tl("sheet", "Draft")}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right">{s.rowCount}</td>
@@ -159,11 +160,11 @@ export default function SheetsPage() {
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1.5">
                       <Button variant="outline" size="sm" onClick={() => copy(s.id)} disabled={busy}>
-                        Duplicate
+                        {tl("sheet", "Duplicate")}
                       </Button>
                       {s.status === "draft" && (
                         <Button variant="ghost" size="sm" onClick={() => remove(s.id)} disabled={busy}>
-                          Delete
+                          {tl("sheet", "Delete")}
                         </Button>
                       )}
                     </div>

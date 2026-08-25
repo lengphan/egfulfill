@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { PaperPlaneTilt, Warning } from "@phosphor-icons/react"
@@ -53,6 +54,7 @@ export function SubmitOrderButton({
    * and pushed to the floor. Callers with the catalog compute this; default 0 = no gate. */
  incomplete?: number
 }) {
+  const tl = useLabelT()
  const router = useRouter()
  const [busy, setBusy] = useState(false)
  const [err, setErr] = useState<string | null>(null)
@@ -126,20 +128,20 @@ export function SubmitOrderButton({
       <Dialog open={open} onOpenChange={(v) => { if (busy) return; setOpen(v); if (!v) { setErr(null); setShort(false) } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Submit to production?</DialogTitle>
+            <DialogTitle>{tl("submitOrder", "Submit to production?")}</DialogTitle>
             <DialogDescription>
-              This sends the order to the factory and charges your wallet. You can still cancel until the floor starts work.
+              {tl("submitOrder", "This sends the order to the factory and charges your wallet. You can still cancel until the floor starts work.")}
             </DialogDescription>
           </DialogHeader>
 
           {q ? (
             <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Production</dt>
+                <dt className="text-muted-foreground">{tl("submitOrder", "Production")}</dt>
                 <dd className="tabular-nums">{money(q.subtotal)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Shipping</dt>
+                <dt className="text-muted-foreground">{tl("submitOrder", "Shipping")}</dt>
                 <dd className="tabular-nums">{money(q.shipping)}</dd>
               </div>
               {/* This is the dialog someone confirms a CHARGE in, so the discount has to be
@@ -148,7 +150,7 @@ export function SubmitOrderButton({
               {q.volumeDiscount > 0 && (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">
-                    Volume discount<span className="opacity-70"> · {q.volumePct}%</span>
+                    {tl("submitOrder", "Volume discount")}<span className="opacity-70"> · {q.volumePct}%</span>
                   </dt>
                   <dd className="tabular-nums text-success">−{money(q.volumeDiscount)}</dd>
                 </div>
@@ -165,19 +167,19 @@ export function SubmitOrderButton({
                   <dt className="text-muted-foreground">{f.label}</dt>
                   <dd className="tabular-nums">
                     {f.amount == null
-                      ? <span className="italic text-muted-foreground">To Be Determined</span>
+                      ? <span className="italic text-muted-foreground">{tl("submitOrder", "To Be Determined")}</span>
                       : money(f.amount)}
                   </dd>
                 </div>
               ))}
               <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                <dt>Total</dt>
+                <dt>{tl("submitOrder", "Total")}</dt>
                 <dd className="tabular-nums">{money(chargeNow)}</dd>
               </div>
             </dl>
           ) : loadingQuote ? (
             <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-              Working out the price…
+              {tl("submitOrder", "Working out the price…")}
             </div>
           ) : null}
 
@@ -202,10 +204,10 @@ export function SubmitOrderButton({
           {err && <p className="text-sm text-destructive">{err}</p>}
 
           <DialogFooter>
-            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
-            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Not yet</Button>
+            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>{tl("submitOrder", "Top up wallet")}</Button>}
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>{tl("submitOrder", "Not yet")}</Button>
             <Button onClick={submit} disabled={busy || loadingQuote || blocked}>
-              {busy ? "Submitting…" : q ? `Charge ${money(chargeNow)}` : "Submit"}
+              {busy ? tl("submitOrder", "Submitting…") : q ? `Charge ${money(chargeNow)}` : tl("submitOrder", "Submit")}
             </Button>
           </DialogFooter>
         </DialogContent>

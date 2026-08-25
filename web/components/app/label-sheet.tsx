@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { Minus, Plus, X } from "@phosphor-icons/react"
@@ -45,6 +46,7 @@ export function LabelSheet({
   onClose: () => void
   title?: string
 }) {
+  const tl = useLabelT()
   // Global multiplier on top of each label's own `copies` — for "print the whole
   // sheet twice" without editing every row.
   const [multiplier, setMultiplier] = useState(1)
@@ -131,7 +133,7 @@ export function LabelSheet({
         <span className="font-medium">{sheet.length} {title}</span>
         <span className="text-xs text-muted-foreground">{labels.length} variant{labels.length === 1 ? "" : "s"}</span>
         <button
-          type="button" onClick={onClose} aria-label="Close"
+          type="button" onClick={onClose} aria-label={tl("labelSheet", "Close")}
           className="ml-auto grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <X size={16} weight="bold" />
@@ -145,11 +147,11 @@ export function LabelSheet({
       <div className="flex min-h-0 flex-1">
       <div className="no-print order-2 w-60 shrink-0 space-y-4 overflow-auto border-l border-border bg-card p-4">
         <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-          Copies of each
+          {tl("labelSheet", "Copies of each")}
           <span className="flex items-center gap-1">
-            <Button size="sm" variant="outline" className="size-7 p-0" onClick={() => setMultiplier((m) => Math.max(1, m - 1))} aria-label="Fewer copies"><Minus size={12} weight="bold" /></Button>
+            <Button size="sm" variant="outline" className="size-7 p-0" onClick={() => setMultiplier((m) => Math.max(1, m - 1))} aria-label={tl("labelSheet", "Fewer copies")}><Minus size={12} weight="bold" /></Button>
             <span className="w-6 text-center text-sm font-semibold text-foreground tabular-nums">{multiplier}</span>
-            <Button size="sm" variant="outline" className="size-7 p-0" onClick={() => setMultiplier((m) => Math.min(50, m + 1))} aria-label="More copies"><Plus size={12} weight="bold" /></Button>
+            <Button size="sm" variant="outline" className="size-7 p-0" onClick={() => setMultiplier((m) => Math.min(50, m + 1))} aria-label={tl("labelSheet", "More copies")}><Plus size={12} weight="bold" /></Button>
           </span>
         </label>
 
@@ -157,7 +159,7 @@ export function LabelSheet({
             directly above, and a list of one restates it. */}
         {labels.length > 1 && (
           <div className="space-y-1.5">
-            <div className="text-xs text-muted-foreground">Per variant</div>
+            <div className="text-xs text-muted-foreground">{tl("labelSheet", "Per variant")}</div>
             <div className="max-h-44 space-y-1 overflow-auto pr-1">
               {labels.map((l) => (
                 <label key={l.sku} className="flex items-center gap-2">
@@ -180,30 +182,30 @@ export function LabelSheet({
               code — so the wrong choice here produces a bin of labels nothing can scan,
               and that is not a discovery to make at the scanner. */}
           <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-            Print
+            {tl("labelSheet", "Print")}
             <select
               value={content}
               onChange={(e) => setContent(e.target.value as "both" | "code" | "sku")}
               className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
-              <option value="both">Code + SKU</option>
-              <option value="code">Code only</option>
-              <option value="sku">SKU only</option>
+              <option value="both">{tl("labelSheet", "Code + SKU")}</option>
+              <option value="code">{tl("labelSheet", "Code only")}</option>
+              <option value="sku">{tl("labelSheet", "SKU only")}</option>
             </select>
           </label>
           <label className={"flex flex-col gap-1.5 text-xs text-muted-foreground " + (content === "sku" ? "hidden" : "")}>
-            Code
+            {tl("labelSheet", "Code")}
             <select
               value={codeType}
               onChange={(e) => setCodeType(e.target.value as "barcode" | "qr")}
               className="eg-select h-9 w-full rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
-              <option value="barcode">Barcode — scanner guns</option>
-              <option value="qr">QR — phone cameras</option>
+              <option value="barcode">{tl("labelSheet", "Barcode — scanner guns")}</option>
+              <option value="qr">{tl("labelSheet", "QR — phone cameras")}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-            Label stock
+            {tl("labelSheet", "Label stock")}
             <select
               value={stock}
               onChange={(e) => setStock(e.target.value as StockId)}
@@ -212,13 +214,13 @@ export function LabelSheet({
               {STOCKS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </label>
-          <Button className="w-full" onClick={() => window.print()} disabled={!sheet.length}>Print</Button>
+          <Button className="w-full" onClick={() => window.print()} disabled={!sheet.length}>{tl("labelSheet", "Print")}</Button>
         </div>
       </div>
 
       <div className="eg-print-body order-1 min-h-0 flex-1 overflow-auto bg-muted/30">
       {sheet.length === 0 ? (
-        <div className="py-20 text-center text-sm text-muted-foreground">Nothing selected to print.</div>
+        <div className="py-20 text-center text-sm text-muted-foreground">{tl("labelSheet", "Nothing selected to print.")}</div>
       ) : (
         <>
           {/* @page must match the STOCK, or the printer scales/clips to whatever it

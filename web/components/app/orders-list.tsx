@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { mayEditVariants } from "@/shared/order-rules"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
@@ -129,6 +130,7 @@ function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderD
 }
 
 export function OrdersList() {
+  const tl = useLabelT()
  const router = useRouter()
   /**
    * WHO MAY CHANGE WHAT WE MAKE — the same rule the order hub applies, which this board did
@@ -322,21 +324,21 @@ export function OrdersList() {
           <span>
             <span className="font-medium">Viewing {actingFor}&apos;s orders.</span>{" "}
             <span className="text-muted-foreground">
-              You&apos;re working in their shop, so anything you create here belongs to them — your own orders stay separate and private.
+              {tl("ordersList", "You’re working in their shop, so anything you create here belongs to them — your own orders stay separate and private.")}
             </span>
           </span>
         </div>
       )}
       <SectionCard
- title="Orders"
+ title={tl("ordersList", "Orders")}
  actions={
           <div className="flex items-center gap-2">
             <ColumnsMenu order={colOrder} hidden={hidden} onOrder={setOrderCols} onHidden={setHiddenCols} />
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <UploadSimple size={14} weight="bold" /> Import
+              <UploadSimple size={14} weight="bold" /> {tl("ordersList", "Import")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => router.push("/orders/new")}>
-              <Plus size={14} weight="bold" /> New order
+              <Plus size={14} weight="bold" /> {tl("ordersList", "New order")}
             </Button>
           </div>
         }
@@ -362,7 +364,7 @@ export function OrdersList() {
             <Input
  value={query}
  onChange={(e) => setQuery(e.target.value)}
- placeholder="Search orders…"
+ placeholder={tl("ordersList", "Search orders…")}
  className="h-9 pl-8"
             />
           </div>
@@ -370,7 +372,7 @@ export function OrdersList() {
 
         {isDemo && (
           <div className="flex items-center gap-2 border-b border-border bg-hold/10 px-5 py-2 text-xs font-medium text-hold">
-            <Sparkle size={13} weight="fill" /> Showing sample orders — sign in to load your live queue.
+            <Sparkle size={13} weight="fill" /> {tl("ordersList", "Showing sample orders — sign in to load your live queue.")}
           </div>
         )}
 
@@ -388,21 +390,21 @@ export function OrdersList() {
           (orders?.length ?? 0) === 0 ? (
             <EmptyState
               icon={Package}
-              title="No orders yet"
-              note="Orders appear here once you create one, or connect a store to sync."
+              title={tl("ordersList", "No orders yet")}
+              note={tl("ordersList", "Orders appear here once you create one, or connect a store to sync.")}
               action={
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => router.push("/orders/new")}>
-                    <Plus size={14} weight="bold" /> New order
+                    <Plus size={14} weight="bold" /> {tl("ordersList", "New order")}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => router.push("/stores")}>
-                    Connect a store
+                    {tl("ordersList", "Connect a store")}
                   </Button>
                 </div>
               }
             />
           ) : (
-            <EmptyState icon={Package} title="No orders here" note="Nothing matches that filter or search." />
+            <EmptyState icon={Package} title={tl("ordersList", "No orders here")} note={tl("ordersList", "Nothing matches that filter or search.")} />
           )
         ) : (
           <div className="overflow-x-auto">
@@ -460,7 +462,7 @@ export function OrdersList() {
                             ))}
                             <div className="space-y-2">
                               {items.length === 0 ? (
-                                <div className="text-sm text-muted-foreground">No line items on this order.</div>
+                                <div className="text-sm text-muted-foreground">{tl("ordersList", "No line items on this order.")}</div>
                               ) : items.map((it, i) => {
  return (
                                   <div key={it.line_id ?? it.sku ?? i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-2.5">
@@ -489,7 +491,7 @@ export function OrdersList() {
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-baseline gap-2">
                                         <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                          {it.name || it.sku || "Item"}
+                                          {it.name || it.sku || tl("ordersList", "Item")}
                                           <span className="ml-1.5 font-normal text-muted-foreground">×{Number(it.qty) || 1}</span>
                                         </span>
                                         <span className="w-20 shrink-0 text-right text-sm font-medium tabular-nums">
@@ -527,7 +529,7 @@ export function OrdersList() {
                                   <Truck size={12} weight="fill" /> {o.carrier || "USPS"} {o.tracking} <ArrowSquareOut size={10} weight="bold" />
                                 </a>
                               ) : (
-                                <span className="inline-flex items-center gap-1"><Truck size={12} weight="fill" /> No tracking yet</span>
+                                <span className="inline-flex items-center gap-1"><Truck size={12} weight="fill" /> {tl("ordersList", "No tracking yet")}</span>
                               )}
                               {/* Actions live together in the expanded row. Submit was
  briefly stacked under the Status badge, which put a
@@ -535,9 +537,9 @@ export function OrdersList() {
                                   STATE, submit is an ACTION, and six of them read as six
  alarms rather than one thing to do. */}
                               <span className="ml-auto flex items-center gap-2">
-                                <SubmitOrderButton order={o} onDone={load} label="Submit to production" incomplete={orderNeedsSetup(o.items, catalog)} />
+                                <SubmitOrderButton order={o} onDone={load} label={tl("ordersList", "Submit to production")} incomplete={orderNeedsSetup(o.items, catalog)} />
                                 <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${encodeURIComponent(o.id)}`) }}>
-                                  Open order <CaretRight size={12} weight="bold" />
+                                  {tl("ordersList", "Open order")} <CaretRight size={12} weight="bold" />
                                 </Button>
                               </span>
                             </div>

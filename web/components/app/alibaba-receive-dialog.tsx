@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch, Warning, Package } from "@phosphor-icons/react"
 import {
@@ -44,6 +45,7 @@ export function AlibabaReceiveDialog({
  onClose: () => void
  onImported?: (poNum: string) => void
 }) {
+  const tl = useLabelT()
  const [lines, setLines] = useState<POLine[]>([])
  const [busy, setBusy] = useState(false)
  const [err, setErr] = useState<string | null>(null)
@@ -190,10 +192,10 @@ export function AlibabaReceiveDialog({
  so the sentence is separated rather than joined — otherwise "Ltd.. Receive". */}
             {order.sellerName ? ` against ${order.sellerName}` : ""}
             {order.sellerName && /[.!?]$/.test(order.sellerName) ? " " : ". "}
-            {receiveNow ? " The quantities go into inventory as sellable stock now" : " Receive it from the Orders tab when the goods arrive"} —{" "}
+            {receiveNow ? tl("alibabaReceive", " The quantities go into inventory as sellable stock now") : tl("alibabaReceive", " Receive it from the Orders tab when the goods arrive")} —{" "}
             {order.total != null
-              ? <>the <strong>{`$${Number(order.total).toFixed(2)}`}</strong> Alibaba billed, freight included, books to the ledger then.</>
- : <>its cost books to the ledger then.</>}
+              ? <>the <strong>{`$${Number(order.total).toFixed(2)}`}</strong> {tl("alibabaReceive", "Alibaba billed, freight included, books to the ledger then.")}</>
+ : <>{tl("alibabaReceive", "its cost books to the ledger then.")}</>}
           </DialogDescription>
         </DialogHeader>
 
@@ -210,16 +212,13 @@ export function AlibabaReceiveDialog({
             <label className="flex items-start gap-2 text-xs">
               <input type="checkbox" checked={receiveNow} onChange={(e) => setReceiveNow(e.target.checked)} className="mt-0.5" />
               <span>
-                <span className="font-medium">Receive into stock now</span> — adds these quantities to
- inventory as sellable stock. Untick if the goods haven&apos;t physically arrived.
+                <span className="font-medium">{tl("alibabaReceive", "Receive into stock now")}</span> {tl("alibabaReceive", "— adds these quantities to inventory as sellable stock. Untick if the goods haven’t physically arrived.")}
               </span>
             </label>
             <label className="flex items-start gap-2 text-xs">
               <input type="checkbox" checked={makeProducts} onChange={(e) => setMakeProducts(e.target.checked)} className="mt-0.5" />
               <span>
-                <span className="font-medium">Create products for new skus</span> — built from the
- supplier&apos;s photo, name and unit cost, and left <strong>switched off</strong> until you
- publish them in Products. Skus that already have a product are skipped.
+                <span className="font-medium">{tl("alibabaReceive", "Create products for new skus")}</span> {tl("alibabaReceive", "— built from the supplier’s photo, name and unit cost, and left")} <strong>{tl("alibabaReceive", "switched off")}</strong> {tl("alibabaReceive", "until you publish them in Products. Skus that already have a product are skipped.")}
               </span>
             </label>
           </div>
@@ -228,10 +227,10 @@ export function AlibabaReceiveDialog({
             <table className="w-full text-sm">
               <thead className="border-b border-border text-left eg-label text-muted-foreground">
                 <tr>
-                  <th className="py-1.5 pr-3">Item</th>
-                  <th className="py-1.5 pr-3">Our sku</th>
-                  <th className="py-1.5 pr-3 text-right">Qty</th>
-                  <th className="py-1.5 text-right">Unit</th>
+                  <th className="py-1.5 pr-3">{tl("alibabaReceive", "Item")}</th>
+                  <th className="py-1.5 pr-3">{tl("alibabaReceive", "Our sku")}</th>
+                  <th className="py-1.5 pr-3 text-right">{tl("alibabaReceive", "Qty")}</th>
+                  <th className="py-1.5 text-right">{tl("alibabaReceive", "Unit")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -248,7 +247,7 @@ export function AlibabaReceiveDialog({
  sometimes right — the same blank in one colour ordered twice — and
  sometimes a mistake, and only the person importing knows which. */}
                       {dupSkus.has(l.sku.trim()) && (
-                        <span className="text-2xs text-hold">shares a sku with another line — the quantities will merge</span>
+                        <span className="text-2xs text-hold">{tl("alibabaReceive", "shares a sku with another line — the quantities will merge")}</span>
                       )}
                     </td>
                     <td className="py-2 pr-3 text-right">
@@ -283,7 +282,7 @@ export function AlibabaReceiveDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={onClose}>{tl("alibabaReceive", "Cancel")}</Button>
           <Button size="sm" onClick={importIt} disabled={busy || !usable.length}>
             {busy ? <CircleNotch size={14} className="animate-spin" /> : null}
             Create {poNum}

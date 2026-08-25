@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CircleNotch, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -26,6 +27,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 const ROW = "grid grid-cols-[minmax(0,1fr)_5rem_7rem_6rem] items-center gap-x-3 px-5"
 
 export function PlanPackagesPanel() {
+  const tl = useLabelT()
   const [prices, setPrices] = useState<PlanPrices | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -85,7 +87,7 @@ export function PlanPackagesPanel() {
       let r = await savePlanPrices({ plans, spydeck_addon: addonPrice })
       if (r.needsConfirm) {
         const ok = await confirm({
-          title: "Save this price cut?",
+          title: tl("planPackages", "Save this price cut?"),
           body: `${(r.drops ?? []).join("\n")}\n\nExisting charges are unaffected — this applies from each seller's next renewal. A plan at $0 stops renewing altogether.`,
           confirmLabel: "Save prices",
           destructive: true,
@@ -103,7 +105,7 @@ export function PlanPackagesPanel() {
   }
 
   return (
-    <SectionCard title="Subscription packages" description="What each plan is billed per month.">
+    <SectionCard title={tl("planPackages", "Subscription packages")} description={tl("planPackages", "What each plan is billed per month.")}>
       {!prices ? (
         <div className="flex justify-center py-6 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
       ) : (
@@ -114,10 +116,10 @@ export function PlanPackagesPanel() {
               directly in it, full width, separated the way every other list in the app is. */}
           <div className="divide-y divide-border border-b border-border">
             <div className={ROW + " py-2 eg-label text-muted-foreground"}>
-              <span>Plan</span>
-              <span className="text-right">Sellers</span>
-              <span className="text-right">Per month</span>
-              <span className="text-right">Billing</span>
+              <span>{tl("planPackages", "Plan")}</span>
+              <span className="text-right">{tl("planPackages", "Sellers")}</span>
+              <span className="text-right">{tl("planPackages", "Per month")}</span>
+              <span className="text-right">{tl("planPackages", "Billing")}</span>
             </div>
             {Object.entries(prices.plans).map(([name, v]) => {
               const n = counts?.plans[name]
@@ -154,7 +156,7 @@ export function PlanPackagesPanel() {
               const bills = monthly(n, shown("addon", prices.spydeck_addon))
               return (
                 <div className={ROW + " py-2.5"}>
-                  <span className="text-sm font-medium">SpyDeck add-on</span>
+                  <span className="text-sm font-medium">{tl("planPackages", "SpyDeck add-on")}</span>
                   <span className="text-right text-sm tabular-nums text-muted-foreground">{n == null ? "—" : n}</span>
                   <div className="flex items-center justify-end gap-1">
                     <span className="text-sm text-muted-foreground">$</span>
@@ -162,7 +164,7 @@ export function PlanPackagesPanel() {
                       value={shown("addon", prices.spydeck_addon)}
                       onChange={(e) => setDraft((d) => ({ ...d, addon: e.target.value.replace(/[^\d.]/g, "") }))}
                       inputMode="decimal"
-                      aria-label="SpyDeck add-on price per month"
+                      aria-label={tl("planPackages", "SpyDeck add-on price per month")}
                       className="h-8 w-20 px-2 text-right tabular-nums"
                     />
                   </div>
@@ -178,7 +180,7 @@ export function PlanPackagesPanel() {
                 page is really about — every other row is a component of it. */}
             {counts && (
               <div className={ROW + " py-2.5"}>
-                <span className="text-sm font-semibold">Every renewal, monthly</span>
+                <span className="text-sm font-semibold">{tl("planPackages", "Every renewal, monthly")}</span>
                 <span className="text-right text-sm tabular-nums text-muted-foreground">
                   {Object.values(counts.plans).reduce((a, b) => a + b, 0)}
                 </span>
@@ -197,14 +199,12 @@ export function PlanPackagesPanel() {
             {/* The one thing worth knowing before typing. A plan at 0 never renews — that is
                 what makes Starter free, rather than a special case in the code. */}
             <p className="text-xs text-muted-foreground">
-              A new price applies from the next renewal — a month already charged stays at what it was
-              charged. A plan priced at $0 never renews. Seller counts exclude deactivated accounts,
-              which are never renewed.
+              {tl("planPackages", "A new price applies from the next renewal — a month already charged stays at what it was charged. A plan priced at $0 never renews. Seller counts exclude deactivated accounts, which are never renewed.")}
             </p>
 
             <div className="flex items-center gap-3">
-              <Button size="sm" onClick={() => void save()} disabled={busy}>{busy ? "Saving…" : "Save prices"}</Button>
-              {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+              <Button size="sm" onClick={() => void save()} disabled={busy}>{busy ? tl("planPackages", "Saving…") : tl("planPackages", "Save prices")}</Button>
+              {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> {tl("planPackages", "Saved")}</span>}
               {err && <span className="text-sm text-destructive">{err}</span>}
             </div>
           </div>

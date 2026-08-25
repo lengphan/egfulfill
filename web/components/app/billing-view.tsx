@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { Receipt, CircleNotch, DownloadSimple, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -57,6 +58,7 @@ function thisMonth() {
  * Amounts are signed from OUR side: negative means we paid out or owe.
  */
 export function BillingView() {
+  const tl = useLabelT()
   const [entryOpen, setEntryOpen] = useState(false)
   const [partners, setPartners] = useState<PartnerTotal[] | null>(null)
   const [rows, setRows] = useState<LedgerRowOut[] | null>(null)
@@ -99,8 +101,8 @@ export function BillingView() {
       <div className="flex items-center gap-3 md:hidden">
         <Receipt size={18} weight="regular"  className="shrink-0 text-primary" />
         <div className="min-w-0">
-          <PageTitle>Billing</PageTitle>
-          <p className="truncate text-sm text-muted-foreground">What each partner is owed, and the rows behind it.</p>
+          <PageTitle>{tl("billing", "Billing")}</PageTitle>
+          <p className="truncate text-sm text-muted-foreground">{tl("billing", "What each partner is owed, and the rows behind it.")}</p>
         </div>
       </div>
 
@@ -128,7 +130,7 @@ export function BillingView() {
           <StatCard
             label={`+${(partners?.length ?? 0) - 8} more partners`}
             value={usd((partners ?? []).slice(8).reduce((t, x) => t + x.total, 0))}
-            sub="Filter the ledger below to see any one of them"
+            sub={tl("billing", "Filter the ledger below to see any one of them")}
           />
         )}
         {partners !== null && partners.length === 0 && (
@@ -142,7 +144,7 @@ export function BillingView() {
       </StatGrid>
 
       <SectionCard
-        title="Ledger"
+        title={tl("billing", "Ledger")}
         actions={
           <div className="flex items-center gap-2">
             {/* Manual entry lives HERE, next to the ledger it writes into, rather than in
@@ -150,11 +152,11 @@ export function BillingView() {
                 once written, and the person adding one is already reading this list. The
                 page is warehouse/admin-only, which is the same gate the route enforces. */}
             <Button size="sm" variant="outline" onClick={() => setEntryOpen(true)}>
-              <Plus size={14} weight="bold" /> Add entry
+              <Plus size={14} weight="bold" /> {tl("billing", "Add entry")}
             </Button>
             <a href={ledgerExportUrl(filters)} download>
               <Button size="sm" variant="outline" disabled={!rows?.length}>
-                <DownloadSimple size={14} weight="bold" /> Export CSV
+                <DownloadSimple size={14} weight="bold" /> {tl("billing", "Export CSV")}
               </Button>
             </a>
           </div>
@@ -162,30 +164,30 @@ export function BillingView() {
       >
         <div className="flex flex-wrap items-end gap-2 border-b border-border px-5 py-3">
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Partner</span>
+            <span className="text-xs text-muted-foreground">{tl("billing", "Partner")}</span>
             <select
               value={partner}
               onChange={(e) => setPartner(e.target.value)}
               className="eg-select h-9 rounded-md border border-border bg-card px-2 text-sm"
             >
-              <option value="">All partners</option>
+              <option value="">{tl("billing", "All partners")}</option>
               {options.map((k) => (
                 <option key={k} value={k}>
-                  {label(k)}{seen.has(k) ? "" : " — nothing booked yet"}
+                  {label(k)}{seen.has(k) ? "" : tl("billing", " — nothing booked yet")}
                 </option>
               ))}
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">From</span>
+            <span className="text-xs text-muted-foreground">{tl("billing", "From")}</span>
             <Input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="h-9 w-40" />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">To</span>
+            <span className="text-xs text-muted-foreground">{tl("billing", "To")}</span>
             <Input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="h-9 w-40" />
           </label>
           <span className="ml-auto text-sm">
-            <span className="text-muted-foreground">Period total </span>
+            <span className="text-muted-foreground">{tl("billing", "Period total")} </span>
             <span className={"font-semibold tabular-nums " + (total < 0 ? "text-destructive" : "text-success")}>{usd(total)}</span>
           </span>
         </div>
@@ -195,7 +197,7 @@ export function BillingView() {
         ) : rows.length === 0 ? (
           <EmptyState
             icon={Receipt}
-            title="Nothing booked in this period"
+            title={tl("billing", "Nothing booked in this period")}
             note={partner ? `No costs recorded for ${label(partner)} in this window.` : undefined}
           />
         ) : (
@@ -203,12 +205,12 @@ export function BillingView() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                  <th className="px-5 py-2">Date</th>
-                  <th className="px-3 py-2">Partner</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Reference</th>
-                  <th className="px-3 py-2">Note</th>
-                  <th className="px-5 py-2 text-right">Amount</th>
+                  <th className="px-5 py-2">{tl("billing", "Date")}</th>
+                  <th className="px-3 py-2">{tl("billing", "Partner")}</th>
+                  <th className="px-3 py-2">{tl("billing", "Type")}</th>
+                  <th className="px-3 py-2">{tl("billing", "Reference")}</th>
+                  <th className="px-3 py-2">{tl("billing", "Note")}</th>
+                  <th className="px-5 py-2 text-right">{tl("billing", "Amount")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

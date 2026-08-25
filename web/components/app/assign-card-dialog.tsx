@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { MagnifyingGlass, CircleNotch, Warning, CheckCircle, LinkSimple } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
  onOpenChange: (v: boolean) => void
  onDone?: () => void
 }) {
+  const tl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [q, setQ] = useState("")
  const [picked, setPicked] = useState<OrderRow | null>(null)
@@ -81,10 +83,10 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <LinkSimple size={17} weight="duotone" /> Assign to an order
+            <LinkSimple size={17} weight="duotone" /> {tl("assignCard", "Assign to an order")}
           </DialogTitle>
           <DialogDescription>
-            {card?.title ? `“${card.title}” ` : "This card "}
+            {card?.title ? `“${card.title}” ` : tl("assignCard", "This card ")}
  joins the order&apos;s normal flow, and its artwork attaches to the line you pick.
           </DialogDescription>
         </DialogHeader>
@@ -93,25 +95,24 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
           <div className="flex items-start gap-2 rounded-lg border border-shipped/30 bg-shipped/12 px-3 py-2 text-sm text-shipped">
             <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" />
             <span>
-              Attached to <strong>{picked ? numOf(picked) : "the order"}</strong>. Its design tag
- will show the artwork — the card now moves with that order.
+              {tl("assignCard", "Attached to")} <strong>{picked ? numOf(picked) : tl("assignCard", "the order")}</strong>{tl("assignCard", ". Its design tag will show the artwork — the card now moves with that order.")}
             </span>
           </div>
         ) : (
           <div className="space-y-3">
             <div>
-              <label htmlFor="ac-q" className="mb-1 block text-xs font-medium">Find the order</label>
+              <label htmlFor="ac-q" className="mb-1 block text-xs font-medium">{tl("assignCard", "Find the order")}</label>
               <div className="relative">
                 <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input id="ac-q" value={q}
  onChange={(e) => { setQ(e.target.value); setPicked(null); setLine(null) }}
- placeholder="Order number, customer or store…" className="h-9 pl-8" />
+ placeholder={tl("assignCard", "Order number, customer or store…")} className="h-9 pl-8" />
               </div>
             </div>
 
             {orders === null ? (
               <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                <CircleNotch size={14} className="animate-spin" /> Loading orders…
+                <CircleNotch size={14} className="animate-spin" /> {tl("assignCard", "Loading orders…")}
               </div>
             ) : picked ? (
               <div className="space-y-2">
@@ -119,12 +120,12 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                   <span className="tabular-nums text-xs">{numOf(picked)}</span>
                   <span className="truncate text-muted-foreground">{picked.customer?.name ?? "—"}</span>
                   <Button size="sm" variant="ghost" className="ml-auto"
- onClick={() => { setPicked(null); setLine(null) }}>Change</Button>
+ onClick={() => { setPicked(null); setLine(null) }}>{tl("assignCard", "Change")}</Button>
                 </div>
                 <div>
-                  <span className="mb-1 block text-xs font-medium">Which line?</span>
+                  <span className="mb-1 block text-xs font-medium">{tl("assignCard", "Which line?")}</span>
                   {(picked.items ?? []).length === 0 ? (
-                    <p className="text-xs text-muted-foreground">This order has no lines to attach to.</p>
+                    <p className="text-xs text-muted-foreground">{tl("assignCard", "This order has no lines to attach to.")}</p>
                   ) : (
                     <div className="space-y-1">
                       {(picked.items ?? []).map((it, i) => {
@@ -136,7 +137,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
  className={"flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors " +
                               (on ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
                           >
-                            <span className="min-w-0 flex-1 truncate">{it.name ?? it.sku ?? "Line"}</span>
+                            <span className="min-w-0 flex-1 truncate">{it.name ?? it.sku ?? tl("assignCard", "Line")}</span>
                             <span className="shrink-0 text-xs text-muted-foreground">{variantOf(it)}</span>
                             <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">{it.sku}</span>
                           </button>
@@ -147,7 +148,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                 </div>
               </div>
             ) : q.trim() === "" ? (
-              <p className="py-3 text-xs text-muted-foreground">Type an order number or a customer name.</p>
+              <p className="py-3 text-xs text-muted-foreground">{tl("assignCard", "Type an order number or a customer name.")}</p>
             ) : matches.length === 0 ? (
               <p className="py-3 text-xs text-muted-foreground">Nothing matches “{q}”.</p>
             ) : (
@@ -172,10 +173,10 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{done ? "Done" : "Cancel"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{done ? tl("assignCard", "Done") : tl("assignCard", "Cancel")}</Button>
           {!done && (
             <Button onClick={submit} disabled={busy || !picked || !line}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : "Attach to this line"}
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : tl("assignCard", "Attach to this line")}
             </Button>
           )}
         </DialogFooter>

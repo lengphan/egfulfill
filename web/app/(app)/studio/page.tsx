@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cheapestImage, cheapestSize, cheapestVideo } from "@/lib/ai-cheapest"
 import { CircleNotch, Warning, X, DownloadSimple, FilmSlate, ArrowSquareOut, Prohibit } from "@phosphor-icons/react"
@@ -36,6 +37,7 @@ import {
  * THE PRICE IS ON SCREEN BEFORE THE PRESS, every time, like every other paid surface here.
  */
 export default function StudioPage() {
+  const tl = useLabelT()
   /**
    * ADMINS AND OPERATORS, SAID HERE TOO — the sidebar entry is gone for every other role,
    * and a removed link is not a guard: the URL still resolves. The pair mirrors the server's
@@ -247,11 +249,11 @@ export default function StudioPage() {
   if (role === undefined) return null
   if (role !== "admin" && role !== "operator") {
     return (
-      <SectionCard title="Studio" bodyClassName="p-4">
+      <SectionCard title={tl("studio", "Studio")} bodyClassName="p-4">
         <EmptyState
           icon={Prohibit}
-          title="Studio is for admins and operators"
-          note="Generating spends from the platform account. Listing photos are made from the publish dialog instead."
+          title={tl("studio", "Studio is for admins and operators")}
+          note={tl("studio", "Generating spends from the platform account. Listing photos are made from the publish dialog instead.")}
         />
       </SectionCard>
     )
@@ -260,13 +262,13 @@ export default function StudioPage() {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Studio"
+        title={tl("studio", "Studio")}
         actions={
           <div className="flex items-center gap-2">
             <Input value={product} onChange={(e) => retarget({ product: e.target.value })}
-              placeholder="What is it? e.g. canvas apron" className="h-8 w-52" />
+              placeholder={tl("studio", "What is it? e.g. canvas apron")} className="h-8 w-52" />
             <Input value={colour} onChange={(e) => retarget({ colour: e.target.value })}
-              placeholder="Colour" className="h-8 w-28" />
+              placeholder={tl("studio", "Colour")} className="h-8 w-28" />
           </div>
         }
         bodyClassName="space-y-4 p-4"
@@ -299,7 +301,7 @@ export default function StudioPage() {
                   <span className="absolute font-mono text-xs text-muted-foreground">{t.ratio}</span>
                   {t.motion && (
                     <span className="absolute right-2 top-2 rounded bg-pop px-1.5 py-0.5 text-2xs font-medium text-pop-foreground">
-                      Motion
+                      {tl("studio", "Motion")}
                     </span>
                   )}
                 </div>
@@ -317,26 +319,26 @@ export default function StudioPage() {
         <div ref={editorRef} className="scroll-mt-4">
         <SectionCard
           title={open.name}
-          actions={<Button variant="ghost" size="icon-sm" onClick={() => setOpen(null)} aria-label="Close"><X size={14} /></Button>}
+          actions={<Button variant="ghost" size="icon-sm" onClick={() => setOpen(null)} aria-label={tl("studio", "Close")}><X size={14} /></Button>}
           bodyClassName="space-y-3 p-4"
         >
           <div className="rounded-lg border border-input focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40">
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5}
               className="min-h-28 w-full resize-y border-0 bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none field-sizing-content" />
             <div className="flex flex-wrap items-center gap-1 border-t border-border px-1.5 py-1.5">
-              <DictateButton value={prompt} onChange={setPrompt} className="size-8 shrink-0" label="Describe it out loud" />
+              <DictateButton value={prompt} onChange={setPrompt} className="size-8 shrink-0" label={tl("studio", "Describe it out loud")} />
               <span className="font-mono text-2xs text-muted-foreground">{open.ratio} · {size}</span>
               <select value={count} onChange={(e) => setCount(Number(e.target.value))}
-                className="eg-control h-8 text-xs" aria-label="How many">
+                className="eg-control h-8 text-xs" aria-label={tl("studio", "How many")}>
                 {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-xs tabular-nums text-muted-foreground">
-                  {total > 0 ? <>{count} × {money(each)} = <span className="font-semibold text-foreground">{money(total)}</span></> : "no charge"}
+                  {total > 0 ? <>{count} × {money(each)} = <span className="font-semibold text-foreground">{money(total)}</span></> : tl("studio", "no charge")}
                 </span>
                 <Button size="sm" className="h-8" onClick={run} disabled={busy || !prompt.trim()}>
                   {busy && <CircleNotch size={14} className="animate-spin" />}
-                  {busy ? "Rendering…" : "Generate"}
+                  {busy ? tl("studio", "Rendering…") : tl("studio", "Generate")}
                 </Button>
               </div>
             </div>
@@ -373,7 +375,7 @@ export default function StudioPage() {
                 <div className="flex items-center justify-center gap-1 border-t border-border px-1 py-1">
                   <a href={s.url} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                    <DownloadSimple size={13} /> Open
+                    <DownloadSimple size={13} /> {tl("studio", "Open")}
                   </a>
                   {/* EITHER OUTPUT, FROM THE SAME PICTURE. The still is already paid for, so
                       this is the only place a clip can start without buying a second frame —
@@ -382,7 +384,7 @@ export default function StudioPage() {
                     <button type="button" onClick={() => void animate(s)}
                       title={`Animate this still — ${clipSpec.secs}s at ${clipSpec.res}, ${money(clipSpec.usd)}`}
                       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                      <FilmSlate size={13} /> Animate
+                      <FilmSlate size={13} /> {tl("studio", "Animate")}
                       <span className="tabular-nums opacity-70">{money(clipSpec.usd)}</span>
                     </button>
                   )}
@@ -391,7 +393,7 @@ export default function StudioPage() {
                       flight — a status this page has not heard of must not read as success. */}
                   {job && !["error", "failed", "done", "slow"].includes(job.status) && (
                     <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
-                      <CircleNotch size={13} className="animate-spin" /> Rendering
+                      <CircleNotch size={13} className="animate-spin" /> {tl("studio", "Rendering")}
                     </span>
                   )}
                   {/* WHERE IT WENT. The server posts the clip into your own chat thread, so
@@ -400,7 +402,7 @@ export default function StudioPage() {
                   {job?.status === "done" && (
                     <Link href="/chat"
                       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent">
-                      <FilmSlate size={13} /> Clip in chat <ArrowSquareOut size={11} />
+                      <FilmSlate size={13} /> {tl("studio", "Clip in chat")} <ArrowSquareOut size={11} />
                     </Link>
                   )}
                   {/* STILL RUNNING, and this page stopped watching. Not a failure and not a
@@ -408,12 +410,12 @@ export default function StudioPage() {
                   {job?.status === "slow" && (
                     <Link href="/chat"
                       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                      <FilmSlate size={13} /> Still rendering — it lands in chat <ArrowSquareOut size={11} />
+                      <FilmSlate size={13} /> {tl("studio", "Still rendering — it lands in chat")} <ArrowSquareOut size={11} />
                     </Link>
                   )}
                   {(job?.status === "error" || job?.status === "failed") && (
                     <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-alert" title={job.error ?? undefined}>
-                      <Warning size={13} /> Clip failed
+                      <Warning size={13} /> {tl("studio", "Clip failed")}
                     </span>
                   )}
                 </div>

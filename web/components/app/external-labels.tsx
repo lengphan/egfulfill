@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { FilePdf, ArrowSquareOut, UploadSimple, Barcode, Lock, X, Clock, CheckCircle, Warning } from "@phosphor-icons/react"
 import { buttonVariants } from "@/components/ui/button"
@@ -142,17 +143,17 @@ const DROP_CARD =
   "flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.02] px-6 py-8 text-center"
 
 function DropCardBody() {
+  const tl = useLabelT()
  return (
     <>
       <UploadSimple size={28} weight="duotone" className="text-primary" />
-      <span className="text-base font-semibold">Drop label PDFs here</span>
+      <span className="text-base font-semibold">{tl("externalLabels", "Drop label PDFs here")}</span>
       {/* Two facts, and only two: anywhere works, and dropping is not sending. Everything
  else this used to carry now lives in the row it creates. "or click to choose" went
  with the resting panel — this card only exists mid-drag now, where there is
  nothing to click; the picker is "Add label PDF" in the toolbar. */}
       <span className="max-w-md text-sm text-muted-foreground">
-        Anywhere on this page works. They join the queue below and nothing is sent to
- byeastside until you press Send.
+        {tl("externalLabels", "Anywhere on this page works. They join the queue below and nothing is sent to byeastside until you press Send.")}
       </span>
     </>
   )
@@ -172,16 +173,17 @@ function DropCardBody() {
  * it exists when no file is being dragged.
  */
 export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) => void; onError?: (msg: string | null) => void }) {
+  const tl = useLabelT()
  return (
     /* AN ACTION, so it wears a button — not .eg-control, which is FIELD chrome: same radius
        and border as an Input, normal weight, "something you set". This does something to the
        world. It has to be a <label> because it wraps a hidden file input and Base UI has no
        asChild, so it borrows buttonVariants rather than a hand-copied class list. */
     <label
- title="Choose label PDFs — or just drop them anywhere on this page"
+ title={tl("externalLabels", "Choose label PDFs — or just drop them anywhere on this page")}
  className={cn(buttonVariants({ variant: "outline", size: "default" }), "eg-tap cursor-pointer")}
     >
-      Add label PDF
+      {tl("externalLabels", "Add label PDF")}
       <input
  type="file" multiple className="sr-only" accept="application/pdf"
  onChange={(e) => {
@@ -216,6 +218,7 @@ export function AddLabelButton({ onStage, onError }: { onStage: (files: File[]) 
  * `types` includes "Files" only for a real file drag.
  */
 export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) {
+  const tl = useLabelT()
  const [depth, setDepth] = useState(0)
  const [err, setErr] = useState<string | null>(null)
 
@@ -255,7 +258,7 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
  return (
       <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[90vw] rounded-xl border border-alert/30 bg-alert/12 px-3 py-2 text-xs text-alert shadow-lg">
         {err}
-        <button onClick={() => setErr(null)} className="ml-2 font-semibold underline">Dismiss</button>
+        <button onClick={() => setErr(null)} className="ml-2 font-semibold underline">{tl("externalLabels", "Dismiss")}</button>
       </div>
     )
   }
@@ -332,6 +335,7 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
  onToggle: (key: string) => void
  onDiscard: (key: string) => void
 }) {
+  const tl = useLabelT()
  const k = stagedKeyOf(s)
  const p = s.parse
  return (
@@ -348,13 +352,13 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
               <ExternalTag />
             </span>
             <Recipient parse={p} />
-            <span className="truncate text-xs text-muted-foreground">On this machine</span>
+            <span className="truncate text-xs text-muted-foreground">{tl("externalLabels", "On this machine")}</span>
             <span className="text-xs text-muted-foreground">{p?.pages || "—"}</span>
             <span className="truncate text-xs text-muted-foreground" title={p?.addressLines.join(", ") || undefined}>
               {p?.shipTo || "—"}
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Clock size={13} weight="bold" className="shrink-0" /> Waiting to send
+              <Clock size={13} weight="bold" className="shrink-0" /> {tl("externalLabels", "Waiting to send")}
             </span>
             <span className="truncate text-xs tabular-nums text-muted-foreground" title={p?.tracking || undefined}>
               {p?.tracking || "—"}
@@ -367,7 +371,7 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDiscard(k) }}
  className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
  aria-label={`Discard ${s.name}`}
- title="Discard — this file was never sent anywhere"
+ title={tl("externalLabels", "Discard — this file was never sent anywhere")}
               >
                 <X size={13} weight="bold" />
               </button>
@@ -385,6 +389,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
  pulling: boolean
  onPullBack: (u: DispatchUpload) => void
 }) {
+  const tl = useLabelT()
  const k = uploadKeyOf(u)
  const p = progressOf(u)
  const PI = TONE_ICON[p.tone]
@@ -416,8 +421,8 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
                 ? <span className="truncate text-sm">{u.recipient}</span>
  : <span
  className="truncate text-xs italic text-muted-foreground"
- title="Either the label is a picture with no text in it, or it was sent before we started reading names off labels. Open the label to see who it's for."
-                  >No name on file</span>}
+ title={tl("externalLabels", "Either the label is a picture with no text in it, or it was sent before we started reading names off labels. Open the label to see who it's for.")}
+                  >{tl("externalLabels", "No name on file")}</span>}
             </span>
             <span className="truncate text-xs text-muted-foreground">byeastside</span>
             <span className="text-xs text-muted-foreground">{u.total_pages ?? "—"}</span>
@@ -446,7 +451,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
                 <a
  href={u.public_url} target="_blank" rel="noopener noreferrer"
  onClick={(e) => e.stopPropagation()}
- title="Open the label as they received it"
+ title={tl("externalLabels", "Open the label as they received it")}
  className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   <ArrowSquareOut size={13} weight="bold" />
@@ -463,7 +468,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPullBack(u) }}
  className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
  aria-label={`Pull back ${u.file_name || "label"}`}
- title="Pull this label back out of byeastside's queue"
+ title={tl("externalLabels", "Pull this label back out of byeastside's queue")}
                 >
                   {/* The SAME X the staged row uses. Two icons for one gesture — discard
  here, bin there — read as two different powers, and the row above is
@@ -487,9 +492,10 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
 /** The one thing a shared table must not blur: this row is not an order. Nothing is
  * charged for it, no stage moves, and no seller is behind it. */
 function ExternalTag() {
+  const tl = useLabelT()
  return (
     <span className="mt-0.5 w-fit rounded border border-border bg-muted px-1 py-px eg-label text-muted-foreground">
-      External
+      {tl("externalLabels", "External")}
     </span>
   )
 }
@@ -498,8 +504,9 @@ function ExternalTag() {
  * couldn't read this label" and "this label has no customer" would look identical, and
  * only one of them is worth someone typing the name in by hand. */
 function Recipient({ parse }: { parse: LabelParse | null }) {
+  const tl = useLabelT()
  if (!parse) {
- return <span className="truncate text-xs text-muted-foreground">Reading the label…</span>
+ return <span className="truncate text-xs text-muted-foreground">{tl("externalLabels", "Reading the label…")}</span>
   }
  if (parse.reason === "ok" && parse.name) {
  return <span className="truncate text-sm" title={parse.addressLines.join(", ")}>{parse.name}</span>

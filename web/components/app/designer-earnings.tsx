@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { CurrencyDollar, CircleNotch, Warning, Coins } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -13,6 +14,7 @@ const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).to
 // The designer wallet's ledger (credits in on approval, payouts/withdrawals out).
 // Its own page now — loads the shared 'designer' wallet directly.
 export function DesignerEarnings() {
+  const tl = useLabelT()
  const [ledger, setLedger] = useState<{ balance: number; rows: LedgerRow[] } | null>(null)
   // Telling a designer they have earned $0.00 when the ledger simply could not be read is
   // the worst lie this page can tell, so a failure is reported rather than zeroed. Both
@@ -43,8 +45,8 @@ export function DesignerEarnings() {
       <div className="flex items-center gap-3 md:hidden">
         <CurrencyDollar size={18} weight="regular" className="shrink-0 text-primary" />
         <div className="min-w-0">
-          <PageTitle>Earnings</PageTitle>
-          <p className="truncate text-sm text-muted-foreground">Credits land here when a design is approved. Every entry is on the ledger.</p>
+          <PageTitle>{tl("designerEarnings", "Earnings")}</PageTitle>
+          <p className="truncate text-sm text-muted-foreground">{tl("designerEarnings", "Credits land here when a design is approved. Every entry is on the ledger.")}</p>
         </div>
       </div>
 
@@ -58,17 +60,17 @@ export function DesignerEarnings() {
       ) : (
         <>
           <StatGrid>
-            <StatCard label="Balance" value={money(ledger.balance)} sub="designer wallet" tone={ledger.balance ? "pos" : undefined} />
-            <StatCard label="Total earned" value={money(earned)} sub="all time" />
-            <StatCard label="Entries" value={String(ledger.rows.length)} sub="ledger records" />
+            <StatCard label={tl("designerEarnings", "Balance")} value={money(ledger.balance)} sub={tl("designerEarnings", "designer wallet")} tone={ledger.balance ? "pos" : undefined} />
+            <StatCard label={tl("designerEarnings", "Total earned")} value={money(earned)} sub={tl("designerEarnings", "all time")} />
+            <StatCard label={tl("designerEarnings", "Entries")} value={String(ledger.rows.length)} sub={tl("designerEarnings", "ledger records")} />
           </StatGrid>
           <div className="overflow-hidden rounded-2xl border border-border">
             {ledger.rows.length === 0 ? (
-              <EmptyState icon={Coins} title="No earnings yet" note="Credit a designer from an approved card." />
+              <EmptyState icon={Coins} title={tl("designerEarnings", "No earnings yet")} note={tl("designerEarnings", "Credit a designer from an approved card.")} />
             ) : (
               <table className="w-full text-sm">
                 <thead className="border-b border-border text-left eg-label text-muted-foreground">
-                  <tr><th className="px-4 py-2.5">When</th><th className="px-4 py-2.5">Detail</th><th className="px-4 py-2.5">Type</th><th className="px-4 py-2.5 text-right">Amount</th></tr>
+                  <tr><th className="px-4 py-2.5">{tl("designerEarnings", "When")}</th><th className="px-4 py-2.5">{tl("designerEarnings", "Detail")}</th><th className="px-4 py-2.5">{tl("designerEarnings", "Type")}</th><th className="px-4 py-2.5 text-right">{tl("designerEarnings", "Amount")}</th></tr>
                 </thead>
                 <tbody>
                   {ledger.rows.map((r) => {

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { UploadSimple, CircleNotch, MagnifyingGlass, ArrowSquareOut } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -28,6 +29,7 @@ const destOf = (o: OrderRow) => {
 }
 
 export function SellerUploadHistory() {
+  const tl = useLabelT()
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [q, setQ] = useState("")
   const [filter, setFilter] = useState<SellerFilter>("All")
@@ -54,7 +56,7 @@ export function SellerUploadHistory() {
 
   return (
     <SectionCard
-      title="Upload history"
+      title={tl("uploadHistory", "Upload history")}
     >
       <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
         {/* A FILTER ROW, which CLAUDE.md puts under the same rule as tabs: the underline is
@@ -70,10 +72,10 @@ export function SellerUploadHistory() {
           className="border-b-0"
         />
         <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-muted-foreground sm:inline"><span className="font-semibold text-foreground tabular-nums">{today}</span> today · <span className="font-semibold text-foreground tabular-nums">{orders?.length ?? 0}</span> total</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline"><span className="font-semibold text-foreground tabular-nums">{today}</span> {tl("uploadHistory", "today ·")} <span className="font-semibold text-foreground tabular-nums">{orders?.length ?? 0}</span> total</span>
           <div className="relative w-full sm:w-56">
             <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search order, customer, tracking…" className="h-9 pl-8" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("uploadHistory", "Search order, customer, tracking…")} className="h-9 pl-8" />
           </div>
         </div>
       </div>
@@ -83,21 +85,21 @@ export function SellerUploadHistory() {
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
           <UploadSimple size={26} weight="duotone" className="opacity-50" />
-          <div className="text-sm font-medium text-foreground">{orders.length ? "Nothing matches that" : "Nothing uploaded yet"}</div>
-          <div className="text-xs">{orders.length ? "Try a different filter or search." : "Orders you import or create will show up here."}</div>
+          <div className="text-sm font-medium text-foreground">{orders.length ? tl("uploadHistory", "Nothing matches that") : tl("uploadHistory", "Nothing uploaded yet")}</div>
+          <div className="text-xs">{orders.length ? tl("uploadHistory", "Try a different filter or search.") : tl("uploadHistory", "Orders you import or create will show up here.")}</div>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Uploaded</TableHead>
-                {hasTeam && <TableHead>By</TableHead>}
-                <TableHead>Order</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead className="text-right">Charged</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{tl("uploadHistory", "Uploaded")}</TableHead>
+                {hasTeam && <TableHead>{tl("uploadHistory", "By")}</TableHead>}
+                <TableHead>{tl("uploadHistory", "Order")}</TableHead>
+                <TableHead>{tl("uploadHistory", "Items")}</TableHead>
+                <TableHead>{tl("uploadHistory", "Destination")}</TableHead>
+                <TableHead className="text-right">{tl("uploadHistory", "Charged")}</TableHead>
+                <TableHead>{tl("uploadHistory", "Status")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

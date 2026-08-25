@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, UploadSimple, CircleNotch, Package } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -69,6 +70,7 @@ type Item =
  * the catalogue after a heart was changed on the Favorites tab. `reload` keeps the
  * current grid on screen while it refetches, so the refresh doesn't flash. */
 export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
+  const tl = useLabelT()
  const isAdmin = getUser()?.role === "admin"
  const [search, setSearch] = useState("")
  const [debounced, setDebounced] = useState("")
@@ -536,7 +538,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
         <div className="relative max-w-md flex-1">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search all blanks by name, brand, style, SKU…" className="h-9 pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tl("allSuppliers", "Search all blanks by name, brand, style, SKU…")} className="h-9 pl-9" />
         </div>
         {total > 0 && <span className="text-xs text-muted-foreground">{total.toLocaleString()} blanks</span>}
         {isAdmin && (
@@ -554,8 +556,8 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  that now happens on a schedule. What is left is the deliberate one: a full
                 S&S catalogue pull, which is the only sync a person has any reason to force. */}
             <Button size="sm" variant="outline" onClick={onSyncAll} disabled={importing || refreshing}
- title="Force a full S&S catalogue pull now. SanMar refreshes nightly on the server; Otto is a file import.">
-              Refresh all styles
+ title={tl("allSuppliers", "Force a full S&S catalogue pull now. SanMar refreshes nightly on the server; Otto is a file import.")}>
+              {tl("allSuppliers", "Refresh all styles")}
             </Button>
           </>
         )}
@@ -593,7 +595,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       />
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Import a supplier catalogue</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("allSuppliers", "Import a supplier catalogue")}</DialogTitle></DialogHeader>
           <div className="space-y-2">
             {IMPORT_SOURCES.map((src) => (
               <div key={src.key} className="rounded-lg border border-border p-3">
@@ -601,10 +603,10 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
                   <span className="text-sm font-medium">{src.name}</span>
                   {src.needsFile ? (
                     <Button size="sm" onClick={() => { setImportOpen(false); fileRef.current?.click() }} disabled={importing}>
-                      <UploadSimple size={13} weight="bold" /> Choose file
+                      <UploadSimple size={13} weight="bold" /> {tl("allSuppliers", "Choose file")}
                     </Button>
                   ) : (
-                    <span className="shrink-0 whitespace-nowrap text-2xs font-medium text-shipped">Automatic</span>
+                    <span className="shrink-0 whitespace-nowrap text-2xs font-medium text-shipped">{tl("allSuppliers", "Automatic")}</span>
                   )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{src.how}</p>
@@ -619,17 +621,17 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       {items !== null && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm">
           <select value={sup} onChange={(e) => { setSup(e.target.value as "" | "ss" | "otto" | "sanmar"); setBrand(""); setCat("") }} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-            <option value="">All suppliers</option>
-            <option value="ss">S&amp;S Activewear</option>
-            <option value="otto">Otto Cap</option>
-            <option value="sanmar">SanMar</option>
+            <option value="">{tl("allSuppliers", "All suppliers")}</option>
+            <option value="ss">{tl("allSuppliers", "S&S Activewear")}</option>
+            <option value="otto">{tl("allSuppliers", "Otto Cap")}</option>
+            <option value="sanmar">{tl("allSuppliers", "SanMar")}</option>
           </select>
           <select value={brand} onChange={(e) => setBrand(e.target.value)} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-            <option value="">All brands</option>
+            <option value="">{tl("allSuppliers", "All brands")}</option>
             {brands.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
           <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-            <option value="">All categories</option>
+            <option value="">{tl("allSuppliers", "All categories")}</option>
             {cats.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="flex items-center gap-1">
@@ -638,7 +640,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
             <span className="text-muted-foreground">–</span>
             <Input value={maxP} onChange={(e) => setMaxP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={allFilters?.priceMax != null ? String(allFilters.priceMax) : "max"} inputMode="decimal" className="h-8 w-16 px-2" />
           </div>
-          {anyFilter && <button onClick={clearFilters} className="text-xs font-medium text-primary hover:underline">Clear filters</button>}
+          {anyFilter && <button onClick={clearFilters} className="text-xs font-medium text-primary hover:underline">{tl("allSuppliers", "Clear filters")}</button>}
           <span className="ml-auto text-xs text-muted-foreground">{visible.length.toLocaleString()} shown</span>
         </div>
       )}
@@ -646,7 +648,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       {msg && <div className="border-b border-border px-4 py-2 text-sm text-muted-foreground">{msg}</div>}
 
       {items === null ? (
-        <Loading label="Loading catalog…" />
+        <Loading label={tl("allSuppliers", "Loading catalog…")} />
       ) : (
         <>
           {visible.length === 0 ? (
@@ -729,7 +731,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  and the only thing left is a quiet line saying it is happening. */}
           {loading && items.length > 0 && (
             <div className="flex items-center justify-center gap-2 border-t border-border p-3 text-xs text-muted-foreground">
-              <CircleNotch size={13} className="animate-spin" /> Loading more blanks…
+              <CircleNotch size={13} className="animate-spin" /> {tl("allSuppliers", "Loading more blanks…")}
             </div>
           )}
         </>
@@ -746,7 +748,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  onSave={confirmAdd}
  newIdSeed={0}
  nextSku={previewNextSku}
- title="Review before adding"
+ title={tl("allSuppliers", "Review before adding")}
  ctaLabel="Add to Products"
  stockByColor={previewStock}
       />
