@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
@@ -64,6 +65,7 @@ function ThreadSelect({ value, options, onChange }: {
  options: Thread[]
  onChange: (code: string) => void
 }) {
+  const tl = useLabelT()
  const current = options.find((o) => o.code === value) ?? options[0]
  if (!current) return null
  return (
@@ -80,7 +82,7 @@ function ThreadSelect({ value, options, onChange }: {
             <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: o.hex }} />
             <span className="truncate">{o.name}</span>
             {i === 0 && (
-              <span className="shrink-0 rounded bg-muted px-1 py-px text-2xs font-medium text-muted-foreground">best match</span>
+              <span className="shrink-0 rounded bg-muted px-1 py-px text-2xs font-medium text-muted-foreground">{tl("canvas", "best match")}</span>
             )}
             <span className="ml-auto shrink-0 tabular-nums text-2xs text-muted-foreground">{o.code}</span>
             {o.code === value && <Check size={12} weight="bold" className="shrink-0 text-primary" />}
@@ -135,6 +137,7 @@ export function DesignStage({
   /** Shown instead of a bare icon when there's no blank yet. */
  emptyHint?: React.ReactNode
 }) {
+  const tl = useLabelT()
  const stageRef = useRef<HTMLDivElement>(null)
   /**
    * The artwork's natural width ÷ height, learned when it loads.
@@ -486,7 +489,7 @@ export function DesignStage({
         <button
  onPointerDown={locked ? undefined : startDrag(target, "rotate")}
  disabled={locked}
- title={locked ? "Locked" : "Drag to rotate"} aria-label="Rotate"
+ title={locked ? "Locked" : "Drag to rotate"} aria-label={tl("canvas", "Rotate")}
  className={stripBtn + " touch-none " + (locked ? "" : "cursor-grab")}
         >
           <ArrowClockwise size={stripIcon} weight="bold" />
@@ -503,18 +506,18 @@ export function DesignStage({
         </button>
         {onEraseBg && (
           <button type="button" onClick={onEraseBg} disabled={eraseBusy}
- title="Remove the background — clears the backdrop connected to the edges, in your browser"
- aria-label="Remove background" className={stripBtn}>
+ title={tl("canvas", "Remove the background — clears the backdrop connected to the edges, in your browser")}
+ aria-label={tl("canvas", "Remove background")} className={stripBtn}>
             {eraseBusy ? <CircleNotch size={stripIcon} className="animate-spin" /> : <Eraser size={stripIcon} weight="bold" />}
           </button>
         )}
         {onUndoErase && (
-          <button type="button" onClick={onUndoErase} title="Put the background back" aria-label="Undo background removal" className={stripBtn}>
+          <button type="button" onClick={onUndoErase} title={tl("canvas", "Put the background back")} aria-label={tl("canvas", "Undo background removal")} className={stripBtn}>
             <ArrowCounterClockwise size={stripIcon} weight="bold" />
           </button>
         )}
         {onRemove && (
-          <button type="button" onClick={onRemove} title="Remove this layer" aria-label="Remove this layer" className={stripBtn + " hover:bg-destructive hover:text-destructive-foreground"}>
+          <button type="button" onClick={onRemove} title={tl("canvas", "Remove this layer")} aria-label={tl("canvas", "Remove this layer")} className={stripBtn + " hover:bg-destructive hover:text-destructive-foreground"}>
             <Trash size={stripIcon} weight="bold" />
           </button>
         )}
@@ -575,7 +578,7 @@ export function DesignStage({
       ) : (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
           <ImageIcon size={38} weight="duotone" className="opacity-40" />
-          {emptyHint ?? <span className="text-xs">Pick a blank to start designing.</span>}
+          {emptyHint ?? <span className="text-xs">{tl("canvas", "Pick a blank to start designing.")}</span>}
         </div>
       )}
 
@@ -618,7 +621,7 @@ export function DesignStage({
         /* An image that cannot be fetched renders as nothing here, so say so. Silence was
  indistinguishable from "the upload didn't work", which is what it got reported as. */
         <div className="absolute inset-x-2 top-2 z-10 rounded-md bg-destructive/90 px-2 py-1 text-center text-2xs font-medium text-background">
-          This artwork couldn&apos;t be loaded — replace it, or remove it and upload again.
+          {tl("canvas", "This artwork couldn’t be loaded — replace it, or remove it and upload again.")}
         </div>
       )}
       {designUrl && (
@@ -735,7 +738,7 @@ export function DesignStage({
  className={"absolute touch-none outline-none " + (isEditing ? "cursor-text" : lockedIds[t.id] ? "cursor-default" : canEdit ? "cursor-move" : "cursor-move")}
  title={canEdit && !isEditing ? "Double-click to edit" : undefined}
         >
-          {t.text || "Text"}
+          {t.text || tl("canvas", "Text")}
           {sel === t.id && !isEditing && handles(t.id)}
         </div>
       )})}
@@ -796,6 +799,7 @@ const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
  * whoever is looking.
  */
 function CustomerFileThumb({ src }: { src: string }) {
+  const tl = useLabelT()
  const art = useArtworkSrc(src)
  const box = "size-14 shrink-0 rounded-md border border-border"
  if (art.loading) {
@@ -804,7 +808,7 @@ function CustomerFileThumb({ src }: { src: string }) {
  if (!art.src) {
  return (
       <a href={canvasReadableSrc(src)} target="_blank" rel="noreferrer"
- title="We can't render this file here — open it to view"
+ title={tl("canvas", "We can't render this file here — open it to view")}
  className={box + " grid place-items-center bg-muted text-2xs font-semibold text-muted-foreground hover:bg-accent"}>
         {art.pdf ? "PDF" : "FILE"}
       </a>
@@ -814,7 +818,7 @@ function CustomerFileThumb({ src }: { src: string }) {
   // proxy (not just for canvas reads — for display too). A rendered PDF is already a data
   // URL and passes through canvasReadableSrc untouched.
   // eslint-disable-next-line @next/next/no-img-element
- return <img src={canvasReadableSrc(art.src)} alt="Customer file" className={box + " object-cover"} />
+ return <img src={canvasReadableSrc(art.src)} alt={tl("canvas", "Customer file")} className={box + " object-cover"} />
 }
 
 export function DesignCanvasDialog({
@@ -848,6 +852,7 @@ export function DesignCanvasDialog({
    * that gets refused. */
  filesLocked?: boolean
 }) {
+  const tl = useLabelT()
  const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
   /**
    * THE FILE'S OWN NAME, kept so the row that appears afterwards can say which file it is.
@@ -1684,7 +1689,7 @@ export function DesignCanvasDialog({
  const applyFileToAll = useCallback(async () => {
  if (!latestMachine) return
  const ok = await confirm({
- title: "Use this machine file on every item?",
+ title: tl("canvas", "Use this machine file on every item?"),
  body: `${latestMachine.name} will apply to all items on this order, including any added later. Items with their own file keep it.`,
  confirmLabel: "Apply to all",
  destructive: false,
@@ -1881,7 +1886,7 @@ export function DesignCanvasDialog({
  const saved = !!artAtOpen && !!designUrl
  if (!saved) { setDesignUrl(""); setDesignName(null); setDesignSize(null); setFaceArt((prev) => ({ ...(prev ?? {}), [sideName]: null })); return }
  if (!(await confirm({
- title: "Take this artwork off the item?",
+ title: tl("canvas", "Take this artwork off the item?"),
  body: "It comes off this line. Any design charge already made stays — ask us if it needs reversing.",
  confirmLabel: "Remove artwork",
  destructive: true,
@@ -2309,12 +2314,12 @@ export function DesignCanvasDialog({
               */}
             <Popover>
               <PopoverTrigger
-                title="Files on this line — add one, or take a copy"
-                aria-label="Files on this line"
+                title={tl("canvas", "Files on this line — add one, or take a copy")}
+                aria-label={tl("canvas", "Files on this line")}
                 className={railBtn + " relative"}
               >
                 <UploadSimple size={18} weight="bold" />
-                <span className={railWord}>Files</span>
+                <span className={railWord}>{tl("canvas", "Files")}</span>
                 {/* GENUINELY ROUND, which is what a count badge is allowed to be (CLAUDE.md
                     §4). It is the only thing on this rail that reports state rather than
                     offering an action. */}
@@ -2347,14 +2352,14 @@ export function DesignCanvasDialog({
                 <Dropzone
                   icon={UploadSimple}
                   accept={"image/*," + MACHINE_EXT_LIST}
-                  label="Drop your files, or click to browse"
+                  label={tl("canvas", "Drop your files, or click to browse")}
                   hint={isEmb ? "PNG or JPG, and a stitch file — .EMB .PES .DST .EXP .JEF — together" : "PNG or JPG"}
                   multiple
                   onFiles={(f) => void takeFiles(f)}
                   onPick={() => uploadRef.current?.click()}
                   action={
                     <Button size="sm" variant="outline" onClick={() => { setLibSource("designs"); setLibOpen(true) }}>
-                      Pick from your library
+                      {tl("canvas", "Pick from your library")}
                     </Button>
                   }
                 />
@@ -2400,7 +2405,7 @@ export function DesignCanvasDialog({
  className={railBtn + (ownMockups[sideKey] ? " bg-primary/10 text-primary" : "")}
             >
               {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
-              <span className={railWord}>{ownMockups[sideKey] ? "Our photo" : "Mockup"}</span>
+              <span className={railWord}>{ownMockups[sideKey] ? tl("canvas", "Our photo") : tl("canvas", "Mockup")}</span>
             </button>
             {/**
               * SEND, on the rail with the rest.
@@ -2422,11 +2427,11 @@ export function DesignCanvasDialog({
  onClick={async () => { if (await save(false)) onSendToDesigner() }}
  disabled={!designUrl || saving}
  title={designUrl ? "Save this line and put it on the designers' board" : "Needs artwork first — there is nothing to digitise"}
- aria-label="Send this line to a designer"
+ aria-label={tl("canvas", "Send this line to a designer")}
  className={railBtn}
               >
                 {saving ? <CircleNotch size={18} className="animate-spin" /> : <PaperPlaneTilt size={18} weight="bold" />}
-                <span className={railWord}>Send</span>
+                <span className={railWord}>{tl("canvas", "Send")}</span>
               </button>
             )}
           </div>
@@ -2451,7 +2456,7 @@ export function DesignCanvasDialog({
  rather than scrolling it out of sight while you type. */}
           {tplName !== null && (
             <div className="absolute left-1/2 top-1/2 z-30 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-3 shadow-xl">
-              <label className="block text-2xs font-medium text-muted-foreground">Save as template</label>
+              <label className="block text-2xs font-medium text-muted-foreground">{tl("canvas", "Save as template")}</label>
               <input
  autoFocus
  value={tplName}
@@ -2461,13 +2466,13 @@ export function DesignCanvasDialog({
  if (e.key === "Escape") { e.preventDefault(); setTplName(null) }
                 }}
  placeholder={defaultTplName}
- aria-label="Template name"
+ aria-label={tl("canvas", "Template name")}
  className="mt-1.5 h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/30"
               />
               <div className="mt-1.5 flex items-center justify-end gap-1.5">
                 <button type="button" onClick={() => setTplName(null)}
  className="rounded-lg px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent">
-                  Cancel
+                  {tl("canvas", "Cancel")}
                 </button>
                 <button type="button" onClick={() => void saveAsTemplate(tplName)} disabled={tplBusy}
  className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-2xs font-semibold text-primary-foreground transition-opacity disabled:opacity-60">
@@ -2477,7 +2482,7 @@ export function DesignCanvasDialog({
               </div>
               {/* WHERE IT GOES, said once. A template that saves silently to a list you have
  not opened is indistinguishable from one that did not save. */}
-              <p className="mt-1 text-2xs text-muted-foreground">Into your library, for any order.</p>
+              <p className="mt-1 text-2xs text-muted-foreground">{tl("canvas", "Into your library, for any order.")}</p>
             </div>
           )}
           {designUrl && (
@@ -2498,7 +2503,7 @@ export function DesignCanvasDialog({
             <button
  type="button"
  onClick={() => uploadRef.current?.click()}
- aria-label="Add artwork — drop a file here or click to browse"
+ aria-label={tl("canvas", "Add artwork — drop a file here or click to browse")}
  className="absolute inset-0 grid place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {/* Same %-geometry the artwork itself uses, so this is a preview of the
@@ -2518,9 +2523,9 @@ export function DesignCanvasDialog({
                     PNG we digitise OR a machine file we only check, and which one you have
  decides both the fee and the wait. A DTG line has no such choice, so it
  is not offered one. */}
-                <span className="text-xs font-medium leading-tight">Drop a file<br />or click to browse</span>
+                <span className="text-xs font-medium leading-tight">{tl("canvas", "Drop a file")}<br />{tl("canvas", "or click to browse")}</span>
                 <span className="text-2xs font-normal leading-tight opacity-80">
-                  {isEmb ? "PNG or JPG — or a .EMB / .PES / .DST" : "PNG or JPG"}
+                  {isEmb ? tl("canvas", "PNG or JPG — or a .EMB / .PES / .DST") : tl("canvas", "PNG or JPG")}
                 </span>
               </span>
             </button>
@@ -2676,7 +2681,7 @@ export function DesignCanvasDialog({
             to load rather than as a line nobody has sent a file for. */}
         {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
-            <div className="mb-1.5 text-xs font-medium text-foreground">Files</div>
+            <div className="mb-1.5 text-xs font-medium text-foreground">{tl("canvas", "Files")}</div>
             {/* THE ARTWORK ON THIS FACE, first, whether it is saved or not — it is in NO
                 server list either way (artwork is an order_designs row, and this list is
                 design_file_data), so dropping it once saved left the picture named nowhere.
@@ -2765,20 +2770,20 @@ export function DesignCanvasDialog({
  type="button"
  onClick={rematch}
  disabled={rematching}
- title="Read the colours off your design again, undoing anything removed or changed here"
+ title={tl("canvas", "Read the colours off your design again, undoing anything removed or changed here")}
  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
                     >
                       <ArrowClockwise size={13} weight="bold" className={rematching ? "animate-spin" : ""} />
-                      {rematching ? "Reading…" : "Start over"}
+                      {rematching ? tl("canvas", "Reading…") : tl("canvas", "Start over")}
                     </button>
                   )}
                   <button
  type="button"
  onClick={() => setPicking((v) => !v)}
- title="Click this, then click anywhere on your design to add that colour"
+ title={tl("canvas", "Click this, then click anywhere on your design to add that colour")}
  className={"inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (picking ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
                   >
-                    <Eyedropper size={13} weight="bold" /> {picking ? "Click your design…" : "Add a colour"}
+                    <Eyedropper size={13} weight="bold" /> {picking ? tl("canvas", "Click your design…") : tl("canvas", "Add a colour")}
                   </button>
                 </div>
               )}
@@ -2793,15 +2798,15 @@ export function DesignCanvasDialog({
  stock. The colour is added and shown; the human picks a different one if it is
  wrong. */}
             {regions === null ? (
-              <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">Reading the colours in your image…</div>
+              <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">{tl("canvas", "Reading the colours in your image…")}</div>
             ) : regions.length === 0 ? (
               <div className="rounded-md border border-border bg-card px-3 py-4 text-center text-xs text-muted-foreground">
                 {/* Which of the two it is, not one message for both: "we couldn't open it"
  is a different problem for the seller than "we opened it and found
  nothing". */}
                 {threadErr
-                  ? "We couldn't open this image to read its colours — use “Add a colour” to pick them yourself."
- : "We didn't find any solid colours in this image — use “Add a colour” to pick them yourself."}
+                  ? tl("canvas", "We couldn't open this image to read its colours — use “Add a colour” to pick them yourself.")
+ : tl("canvas", "We didn't find any solid colours in this image — use “Add a colour” to pick them yourself.")}
               </div>
             ) : (
               <div className="rounded-md border border-border bg-card">
@@ -2875,7 +2880,7 @@ export function DesignCanvasDialog({
            */
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5">
             <div className="text-xs font-semibold text-foreground">
-              {item.personalization ? "Customer\u2019s note" : "Customer\u2019s file"}
+              {item.personalization ? tl("canvas", "Customer’s note") : tl("canvas", "Customer’s file")}
             </div>
             {/* NO decorative quotes around it. The buyer's text frequently contains its
                 own — this one is literally `"MRS. AUSTIN "` — and wrapping it produced
@@ -2900,10 +2905,10 @@ export function DesignCanvasDialog({
                        the row under the stage would have shown it. */
                     setDesignName(fileNameFrom(item.design_src!) ?? "Customer's file"); setDesignSize(null)
                   }}
-                    className="h-7 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:opacity-90">Use this</button>
+                    className="h-7 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:opacity-90">{tl("canvas", "Use this")}</button>
                   <a href={item.design_src} target="_blank" rel="noopener noreferrer"
                     className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium hover:bg-accent">
-                    Open <ArrowSquareOut size={11} weight="bold" />
+                    {tl("canvas", "Open")} <ArrowSquareOut size={11} weight="bold" />
                   </a>
                 </div>
               </div>
@@ -3015,8 +3020,8 @@ export function DesignCanvasDialog({
                 {!hasMachineFile && boardCard && (
                   <span className="truncate text-2xs text-muted-foreground">
                     {isStaff
-                      ? `Sent · ${boardCard.lane_label || boardCard.col || "Incoming"}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
- : "Sent — with our team"}
+                      ? `Sent · ${boardCard.lane_label || boardCard.col || tl("canvas", "Incoming")}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
+ : tl("canvas", "Sent — with our team")}
                   </span>
                 )}
               </div>
@@ -3043,7 +3048,7 @@ export function DesignCanvasDialog({
  title={boardCard ? "Already on the design board" : designUrl ? undefined : "Add an image first — a designer needs something to work from"}
  onClick={openSendPanel}
                   >
-                    {boardCard ? "Sent" : sending ? "Sending…" : "Send to Board"}
+                    {boardCard ? tl("canvas", "Sent") : sending ? tl("canvas", "Sending…") : tl("canvas", "Send to Board")}
                   </Button>
                 )}
 </div>
@@ -3052,8 +3057,8 @@ export function DesignCanvasDialog({
  the row read last before Save. Only when there IS another line to copy to. */}
               {latestMachine && !!siblings?.length && (
                 <Button variant="outline" size="sm" className="mt-2" disabled={fileBusy} onClick={() => void applyFileToAll()}
- title="Put this machine file on every other line of this order">
-                  {fileBusy ? "Applying…" : "Apply file to all lines"}
+ title={tl("canvas", "Put this machine file on every other line of this order")}>
+                  {fileBusy ? tl("canvas", "Applying…") : tl("canvas", "Apply file to all lines")}
                 </Button>
               )}
             </div>
@@ -3081,7 +3086,7 @@ export function DesignCanvasDialog({
             <div className="flex items-start gap-2 rounded-lg border border-shipped/25 bg-shipped/[0.07] px-2.5 py-2 text-sm text-foreground">
               <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-shipped" />
               <span className="min-w-0 flex-1">{notice}</span>
-              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"
+              <button type="button" onClick={() => setNotice(null)} aria-label={tl("canvas", "Dismiss")}
  className="grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                 <X size={11} weight="bold" />
               </button>
@@ -3143,7 +3148,7 @@ export function DesignCanvasDialog({
               under an ENABLED button is a subtitle and §4 forbids it; a refusal carries its
               reason, which is what this is. */}
           {!canSave && (
-            <p className="text-xs text-muted-foreground">Add your design or a machine file, then save.</p>
+            <p className="text-xs text-muted-foreground">{tl("canvas", "Add your design or a machine file, then save.")}</p>
           )}
           {/* ONE ACTION BAR. Apply-to-all sat halfway up a column while Save sat at the
  bottom, so the two things you press at the END of the job were in different
@@ -3160,7 +3165,7 @@ export function DesignCanvasDialog({
                 {designUrl && (
                   <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}
  title={`Put this ${sideName} image on every other line of this order`}>
-                    {applying ? "Applying…" : "Apply All"}
+                    {applying ? tl("canvas", "Applying…") : tl("canvas", "Apply All")}
                   </Button>
                 )}
                 {/* THE FILE'S COPY-TO-ALL MOVED into the Embroidery drawer, beside the file
@@ -3170,12 +3175,12 @@ export function DesignCanvasDialog({
  bar; the machine file's version is with the machine file. */}
               </div>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("canvas", "Cancel")}</Button>
             {/* "Save", not "Save design" — it saves the item: every face's artwork at once,
  and the threads with it. And enabled whenever ANY face carries artwork, not
  just the visible one: standing on an empty back with a finished front is not
  a reason to grey out Save. */}
-            <Button onClick={() => void save()} disabled={saving || !canSave}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save"}</Button>
+            <Button onClick={() => void save()} disabled={saving || !canSave}>{saving ? <CircleNotch size={15} className="animate-spin" /> : tl("canvas", "Save")}</Button>
           </div>
         </div>
         </div>
@@ -3224,10 +3229,10 @@ export function DesignCanvasDialog({
             for why this is an editor and not the confirmation it replaced. */}
         <Dialog open={confirmSend} onOpenChange={(v) => { if (!v) setConfirmSend(false) }}>
           <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Send to the design board</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{tl("canvas", "Send to the design board")}</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div>
-                <label htmlFor="send-card-title" className="mb-1 block text-sm font-medium">Title</label>
+                <label htmlFor="send-card-title" className="mb-1 block text-sm font-medium">{tl("canvas", "Title")}</label>
                 <Input
                   id="send-card-title"
                   value={cardTitle}
@@ -3240,7 +3245,7 @@ export function DesignCanvasDialog({
                   <button
                     type="button"
                     onClick={() => setZoom(designUrl)}
-                    title="See it full size"
+                    title={tl("canvas", "See it full size")}
                     className="size-28 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3248,21 +3253,21 @@ export function DesignCanvasDialog({
                   </button>
                 )}
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <label htmlFor="send-card-note" className="mb-1 text-sm font-medium">Description / notes</label>
+                  <label htmlFor="send-card-note" className="mb-1 text-sm font-medium">{tl("canvas", "Description / notes")}</label>
                   <textarea
                     id="send-card-note"
                     value={cardNote}
                     onChange={(e) => setCardNote(e.target.value)}
-                    placeholder="Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card."
+                    placeholder={tl("canvas", "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card.")}
                     className="min-h-[7rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                   />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirmSend(false)}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmSend(false)}>{tl("canvas", "Cancel")}</Button>
               <Button size="sm" disabled={sending} onClick={() => void sendToBoard()}>
-                {sending ? "Sending…" : "Send"}
+                {sending ? tl("canvas", "Sending…") : tl("canvas", "Send")}
               </Button>
             </div>
           </DialogContent>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, X, Package, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -77,6 +78,7 @@ const STAGE_WHY: Record<string, string> = {
 }
 
 export function SourcingView() {
+  const tl = useLabelT()
  const confirm = useConfirm()
   // Which view is showing, and whether the second one exists at all.
  const [tab, setTab] = useState<"prospects" | "find">("prospects")
@@ -284,7 +286,7 @@ export function SourcingView() {
  connected, or for a non-admin, this is just the prospect table as it always was. */}
       {canBrowse && (
         <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
-          {([["prospects", "Suppliers"], ["find", "Search"]] as const).map(([id, label]) => (
+          {([["prospects", tl("sourcing", "Suppliers")], ["find", tl("sourcing", "Search")]] as const).map(([id, label]) => (
             <button
  key={id}
  onClick={() => setTab(id)}
@@ -314,9 +316,9 @@ export function SourcingView() {
       <SectionCard>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <div className="flex-1">
-            <h2 className="text-sm font-semibold">Sourcing</h2>
+            <h2 className="text-sm font-semibold">{tl("sourcing", "Sourcing")}</h2>
             <p className="text-xs text-muted-foreground">
-              Where each product comes from and what it lands at, once freight is spread over the MOQ.
+              {tl("sourcing", "Where each product comes from and what it lands at, once freight is spread over the MOQ.")}
             </p>
           </div>
           {/* ONE LINE, not a panel. Whether Alibaba is connected is a fact about this page,
@@ -325,14 +327,14 @@ export function SourcingView() {
           <AlibabaStatus />
           {rows.length > 0 && (
             <Button size="sm" variant="outline" onClick={exportCsv}>
-              <DownloadSimple size={14} weight="bold" /> Export
+              <DownloadSimple size={14} weight="bold" /> {tl("sourcing", "Export")}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={openPicker} disabled={!!draft}>
-            From SpyDeck
+            {tl("sourcing", "From SpyDeck")}
           </Button>
           <Button size="sm" onClick={() => setDraft({ ...EMPTY })} disabled={!!draft}>
-            <Plus size={14} weight="bold" /> Add source
+            <Plus size={14} weight="bold" /> {tl("sourcing", "Add source")}
           </Button>
         </div>
 
@@ -343,7 +345,7 @@ export function SourcingView() {
         {rows.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
             <FilterMenu
- label="Stage"
+ label={tl("sourcing", "Stage")}
  anyLabel={`All stages (${rows.length})`}
  value={stageFilter}
  options={SOURCING_STAGES.map((st) => ({
@@ -360,13 +362,13 @@ export function SourcingView() {
         {pickerOpen && (
           <div className="border-b border-border p-4">
             <div className="mb-2 flex items-center gap-2">
-              <span className="text-xs font-semibold">Your SpyDeck saves</span>
+              <span className="text-xs font-semibold">{tl("sourcing", "Your SpyDeck saves")}</span>
               <button onClick={() => setPickerOpen(false)} className="ml-auto text-muted-foreground hover:text-foreground"><X size={14} /></button>
             </div>
             {picker === null ? <Loading />
  : picker.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Nothing saved yet. Heart a listing in SpyDeck and it will show up here.
+                  {tl("sourcing", "Nothing saved yet. Heart a listing in SpyDeck and it will show up here.")}
                 </p>
               ) : (
                 <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
@@ -380,7 +382,7 @@ export function SourcingView() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-medium">{l.title}</span>
                         <span className="block text-xs text-muted-foreground">
-                          {l.price_usd != null ? money(l.price_usd) : l.price != null ? money(l.price) : "no price"}
+                          {l.price_usd != null ? money(l.price_usd) : l.price != null ? money(l.price) : tl("sourcing", "no price")}
                           {l.shop_name ? ` · ${l.shop_name}` : ""}
                         </span>
                       </span>
@@ -394,14 +396,14 @@ export function SourcingView() {
         {draft && (
           <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
             <label className="text-xs sm:col-span-2">
-              <span className="text-muted-foreground">What it is</span>
-              <Input className="mt-1 h-9" value={draft.title} placeholder="Cat mom hoodie — blank"
+              <span className="text-muted-foreground">{tl("sourcing", "What it is")}</span>
+              <Input className="mt-1 h-9" value={draft.title} placeholder={tl("sourcing", "Cat mom hoodie — blank")}
  onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
             </label>
             <label className="text-xs sm:col-span-2">
-              <span className="text-muted-foreground">Link (optional)</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Link (optional)")}</span>
               <div className="mt-1 flex gap-2">
-                <Input className="h-9" value={draft.url ?? ""} placeholder="https://…"
+                <Input className="h-9" value={draft.url ?? ""} placeholder={tl("sourcing", "https://…")}
  onChange={(e) => setDraft({ ...draft, url: e.target.value })} />
                 <Button size="sm" variant="outline" onClick={tryFetch} disabled={!draft.url || fetching}>
                   {fetching && <CircleNotch size={14} className="animate-spin" />} Read listing
@@ -409,7 +411,7 @@ export function SourcingView() {
               </div>
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground">Unit price</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Unit price")}</span>
               <Input className="mt-1 h-9" inputMode="decimal" value={draft.cost ?? ""}
  onChange={(e) => setDraft({ ...draft, cost: numOrNull(e.target.value) })} />
             </label>
@@ -419,29 +421,29 @@ export function SourcingView() {
  onChange={(e) => setDraft({ ...draft, moq: numOrNull(e.target.value) })} />
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground">Freight (whole order)</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Freight (whole order)")}</span>
               <Input className="mt-1 h-9" inputMode="decimal" value={draft.shipTotal ?? ""}
  onChange={(e) => setDraft({ ...draft, shipTotal: numOrNull(e.target.value) })} />
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground">Lead time (days)</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Lead time (days)")}</span>
               <Input className="mt-1 h-9" inputMode="numeric" value={draft.leadDays ?? ""}
  onChange={(e) => setDraft({ ...draft, leadDays: numOrNull(e.target.value) })} />
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground">Decoration / unit</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Decoration / unit")}</span>
               <Input className="mt-1 h-9" inputMode="decimal" value={draft.decorationCost ?? ""}
  onChange={(e) => setDraft({ ...draft, decorationCost: numOrNull(e.target.value) })} />
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground">Your sell price</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Your sell price")}</span>
               <Input className="mt-1 h-9" inputMode="decimal" value={draft.sellPrice ?? ""}
  onChange={(e) => setDraft({ ...draft, sellPrice: numOrNull(e.target.value) })} />
             </label>
             <label className="text-xs sm:col-span-2">
-              <span className="text-muted-foreground">Image URL</span>
+              <span className="text-muted-foreground">{tl("sourcing", "Image URL")}</span>
               <div className="mt-1 flex items-center gap-2">
-                <Input className="h-9" value={draft.image ?? ""} placeholder="filled in by 'Read listing', or paste one"
+                <Input className="h-9" value={draft.image ?? ""} placeholder={tl("sourcing", "filled in by 'Read listing', or paste one")}
  onChange={(e) => setDraft({ ...draft, image: e.target.value || null })} />
                 {draft.image && /^https?:\/\//i.test(draft.image) && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -450,22 +452,22 @@ export function SourcingView() {
               </div>
             </label>
             <label className="text-xs sm:col-span-2">
-              <span className="text-muted-foreground">Note</span>
-              <Input className="mt-1 h-9" value={draft.note ?? ""} placeholder="contact, sample sent, quality…"
+              <span className="text-muted-foreground">{tl("sourcing", "Note")}</span>
+              <Input className="mt-1 h-9" value={draft.note ?? ""} placeholder={tl("sourcing", "contact, sample sent, quality…")}
  onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
             </label>
             <div className="flex items-end gap-2 lg:col-span-4">
               <Button size="sm" onClick={save} disabled={saving}>
                 {saving && <CircleNotch size={14} className="animate-spin" />} Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => { setDraft(null); setMsg(null) }}>Cancel</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setDraft(null); setMsg(null) }}>{tl("sourcing", "Cancel")}</Button>
             </div>
           </div>
         )}
 
         {rows.length === 0 && !draft ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            No sources saved yet. Add one to compare what a product lands at across suppliers.
+            {tl("sourcing", "No sources saved yet. Add one to compare what a product lands at across suppliers.")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -473,14 +475,14 @@ export function SourcingView() {
               <thead className="border-b border-border text-left eg-label text-muted-foreground">
                 <tr>
                   <th className="w-12 px-4 py-2" />
-                  <th className="px-4 py-2 text-left">Product</th>
-                  <th className="px-4 py-2 text-left">Source</th>
-                  <th className="px-4 py-2 text-right">Unit</th>
+                  <th className="px-4 py-2 text-left">{tl("sourcing", "Product")}</th>
+                  <th className="px-4 py-2 text-left">{tl("sourcing", "Source")}</th>
+                  <th className="px-4 py-2 text-right">{tl("sourcing", "Unit")}</th>
                   <th className="px-4 py-2 text-right">MOQ</th>
-                  <th className="px-4 py-2 text-right">Freight/unit</th>
-                  <th className="px-4 py-2 text-right">Landed</th>
-                  <th className="px-4 py-2 text-right">Lead</th>
-                  <th className="px-4 py-2 text-left">Stage</th>
+                  <th className="px-4 py-2 text-right">{tl("sourcing", "Freight/unit")}</th>
+                  <th className="px-4 py-2 text-right">{tl("sourcing", "Landed")}</th>
+                  <th className="px-4 py-2 text-right">{tl("sourcing", "Lead")}</th>
+                  <th className="px-4 py-2 text-left">{tl("sourcing", "Stage")}</th>
                   <th className="px-4 py-2" />
                 </tr>
               </thead>
@@ -528,7 +530,7 @@ export function SourcingView() {
                       <td className="px-4 py-2">
                         <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
  title={STAGE_WHY[r.stage || "prospect"]}>
-                          {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? "Saved"}
+                          {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? tl("sourcing", "Saved")}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right">
@@ -542,18 +544,18 @@ export function SourcingView() {
  so no supplier chat or store link can be constructed, and we genuinely
  cannot say which seller it is. Their "Contact Supplier" lives on the
  product page, which is where this goes. */
- title="Open the listing on Alibaba — their Contact Supplier is there. The search API returns no seller name.">
+ title={tl("sourcing", "Open the listing on Alibaba — their Contact Supplier is there. The search API returns no seller name.")}>
                               <ArrowSquareOut size={14} />
                             </a>
                           )}
                           <button onClick={(e) => { e.stopPropagation(); setSampleFor(r) }}
  className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
- title="Record a sample order — books its cost to the factory wallet">
+ title={tl("sourcing", "Record a sample order — books its cost to the factory wallet")}>
                             <Package size={14} />
                           </button>
                           <button onClick={(e) => { e.stopPropagation(); remove(r) }}
  className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive"
- title="Archive">
+ title={tl("sourcing", "Archive")}>
                             <Trash size={14} />
                           </button>
                         </div>
@@ -582,7 +584,7 @@ export function SourcingView() {
                   <span className="text-sm text-muted-foreground">from</span>
                   {active.supplierRef
                     ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">{active.supplierRef}</span>
- : <span className="text-sm font-medium">{active.shop || "an unnamed supplier"}</span>}
+ : <span className="text-sm font-medium">{active.shop || tl("sourcing", "an unnamed supplier")}</span>}
                   {rival && (
                     <span className="ml-auto text-xs text-muted-foreground">
  vs {rival.supplierRef || rival.shop}: landed{" "}
@@ -598,19 +600,19 @@ export function SourcingView() {
 
                 <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
                   <label className="text-xs">
-                    <span className="text-muted-foreground">Sell price</span>
+                    <span className="text-muted-foreground">{tl("sourcing", "Sell price")}</span>
                     <Input className="mt-1 h-9" inputMode="decimal" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} />
                   </label>
                   <label className="text-xs">
-                    <span className="text-muted-foreground">Shipping charged</span>
+                    <span className="text-muted-foreground">{tl("sourcing", "Shipping charged")}</span>
                     <Input className="mt-1 h-9" inputMode="decimal" value={shipCharged} placeholder="0.00" onChange={(e) => setShipCharged(e.target.value)} />
                   </label>
                   <label className="text-xs">
-                    <span className="text-muted-foreground">Your outbound shipping</span>
+                    <span className="text-muted-foreground">{tl("sourcing", "Your outbound shipping")}</span>
                     <Input className="mt-1 h-9" inputMode="decimal" value={outbound} onChange={(e) => setOutbound(e.target.value)} />
                   </label>
                   <label className="text-xs">
-                    <span className="text-muted-foreground">Channel</span>
+                    <span className="text-muted-foreground">{tl("sourcing", "Channel")}</span>
                     <select value={feeId} onChange={(e) => setFeeId(e.target.value)}
  className="eg-select mt-1 h-9 w-full rounded-md border border-border bg-card px-2 text-sm">
                       {FEE_MODELS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
@@ -628,10 +630,10 @@ export function SourcingView() {
                 )}
 
                 <div className={`grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4 ${missing.length ? "opacity-40" : ""}`}>
-                  <Stat label="Landed cost / unit" value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
+                  <Stat label={tl("sourcing", "Landed cost / unit")} value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
  sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : "no freight"} />
-                  <Stat label="Fees" value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
-                  <Stat label="Profit / unit" value={missing.length ? "—" : money(result.profit)}
+                  <Stat label={tl("sourcing", "Fees")} value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
+                  <Stat label={tl("sourcing", "Profit / unit")} value={missing.length ? "—" : money(result.profit)}
  sub={missing.length ? "not enough entered" : pct(result.marginPct) + " margin"}
  tone={missing.length ? undefined : result.profit >= 0 ? "good" : "bad"} />
                   <Stat label={`Profit at MOQ ${(active.moq ?? 1).toLocaleString()}`}
@@ -644,9 +646,9 @@ export function SourcingView() {
                   Break-even sell price is <strong className="text-foreground">{money(result.breakEvenPrice)}</strong>
                   {result.unitsToCoverFreight != null && <> · {result.unitsToCoverFreight} units cover the freight</>}
                   {(active.moq ?? 1) > 1 && (
-                    <> · you commit <strong className="text-foreground">
+                    <> {tl("sourcing", "· you commit")} <strong className="text-foreground">
                       {money((active.cost ?? 0) * (active.moq ?? 1) + (active.shipTotal ?? 0))}
-                    </strong> up front</>
+                    </strong> {tl("sourcing", "up front")}</>
                   )}
                 </div>
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
@@ -87,14 +88,15 @@ function complexityFlag(res: WilcomResult, pal?: ThreadColor[]): string | null {
 }
 
 export function DigitizerStudio() {
+  const tl = useLabelT()
  const [tab, setTab] = useState<Tab>("create")
  return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <Needle size={18} weight="regular" className="shrink-0 text-primary" />
         <div>
-          <PageTitle>Digitizer</PageTitle>
-          <p className="text-sm text-muted-foreground">Turn artwork into an embroidery preview and a machine file — or build one from scratch.</p>
+          <PageTitle>{tl("digitizer", "Digitizer")}</PageTitle>
+          <p className="text-sm text-muted-foreground">{tl("digitizer", "Turn artwork into an embroidery preview and a machine file — or build one from scratch.")}</p>
         </div>
       </div>
 
@@ -102,7 +104,7 @@ export function DigitizerStudio() {
           These were a capsule group with a filled active pill, which is the same shape a
           primary BUTTON has: three things that look pressable, one of which looks pressed. */}
       <nav className="-mb-px flex gap-5 border-b border-border">
-        {([{ id: "create", label: "Create", icon: PencilSimple }, { id: "library", label: "Library", icon: ImageSquare }, { id: "history", label: "History", icon: ClockCounterClockwise }] as const).map((t) => {
+        {([{ id: "create", label: tl("digitizer", "Create"), icon: PencilSimple }, { id: "library", label: tl("digitizer", "Library"), icon: ImageSquare }, { id: "history", label: tl("digitizer", "History"), icon: ClockCounterClockwise }] as const).map((t) => {
           const Icon = t.icon
           return (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -122,6 +124,7 @@ export function DigitizerStudio() {
 
 // ── Browse: order artwork + library + direct upload ─────────────────────────────
 function BrowseTab() {
+  const tl = useLabelT()
  const [orders, setOrders] = useState<OrderUpload[] | null>(null)
  const [lib, setLib] = useState<LibraryDesign[] | null>(null)
  const [palette, setPalette] = useState<ThreadColor[]>([])
@@ -149,7 +152,7 @@ function BrowseTab() {
       <div className="flex justify-end">
         <div className="relative w-full max-w-sm">
           <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search artwork…" className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("digitizer", "Search artwork…")} className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
         </div>
       </div>
 
@@ -157,14 +160,14 @@ function BrowseTab() {
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, i) => <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-muted" />)}</div>
         ) : list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">{q ? `Nothing matches “${q}”.` : "No artwork yet — buyer uploads and your design library will appear here."}</div>
+          <div className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">{q ? `Nothing matches “${q}”.` : tl("digitizer", "No artwork yet — buyer uploads and your design library will appear here.")}</div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {list.map((it) => (
               <button key={it.key} onClick={() => setOpen(it)} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow">
                 <div className="relative aspect-square overflow-hidden bg-muted">
                   <StudioThumb src={it.thumb} alt={it.name} className="absolute inset-0 size-full" />
-                  {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-shipped px-1.5 py-0.5 text-2xs font-semibold text-white">Generated</span>}
+                  {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-shipped px-1.5 py-0.5 text-2xs font-semibold text-white">{tl("digitizer", "Generated")}</span>}
                 </div>
                 <div className="p-2.5">
                   <div className="truncate text-sm font-medium">{it.name}</div>
@@ -217,6 +220,7 @@ const inToMm = (v: string) => Number(v) * 25.4
 
 // ── The detail modal: original ↔ big embroidery preview + thread matching ────────
 function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem; palette: ThreadColor[]; onClose: () => void; onGenerated: () => void }) {
+  const tl = useLabelT()
  const [status, setStatus] = useState<"idle" | "previewing" | "generating">("idle")
  const [res, setRes] = useState<WilcomResult | null>(null)
  const [err, setErr] = useState<string | null>(null)
@@ -300,7 +304,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
 
  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <button className="absolute inset-0 bg-foreground/50" aria-label="Close" onClick={onClose} />
+      <button className="absolute inset-0 bg-foreground/50" aria-label={tl("digitizer", "Close")} onClick={onClose} />
       <div className="relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
@@ -318,11 +322,11 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 <div className="grid size-full place-items-center"><CircleNotch size={24} className="animate-spin text-muted-foreground" /></div>
               ) : res?.trueview ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`data:image/png;base64,${res.trueview}`} alt="embroidery preview" className="absolute inset-0 size-full object-contain" />
+                <img src={`data:image/png;base64,${res.trueview}`} alt={tl("digitizer", "embroidery preview")} className="absolute inset-0 size-full object-contain" />
               ) : (
                 <Thumb src={item.thumb} alt="original" fit="contain" className="absolute inset-0 size-full" />
               )}
-              <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 eg-label text-muted-foreground">{res?.trueview ? "Embroidery" : "Original"}</span>
+              <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 eg-label text-muted-foreground">{res?.trueview ? tl("digitizer", "Embroidery") : tl("digitizer", "Original")}</span>
             </div>
 
             {/* TARGET SIZE — the thing that was missing. Embroidery is digitised FOR a
@@ -331,10 +335,10 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
  behaviour is unchanged and Wilcom picks. */}
             <div className="rounded-lg border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="eg-label text-muted-foreground">Finished size</span>
+                <span className="eg-label text-muted-foreground">{tl("digitizer", "Finished size")}</span>
                 <label className="flex cursor-pointer items-center gap-1.5 text-2xs text-muted-foreground">
                   <input type="checkbox" checked={lockRatio} onChange={(e) => setLockRatio(e.target.checked)} className="size-3 accent-primary" disabled={!aspect} />
-                  Keep proportions
+                  {tl("digitizer", "Keep proportions")}
                 </label>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -365,17 +369,17 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                 <label className="flex flex-1 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">W</span>
                   <input inputMode="decimal" value={size.w} onChange={(e) => setW(e.target.value)} placeholder="auto"
- className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished width in inches" />
+ className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label={tl("digitizer", "Finished width in inches")} />
                 </label>
                 <span className="text-xs text-muted-foreground">×</span>
                 <label className="flex flex-1 items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">H</span>
                   <input inputMode="decimal" value={size.h} onChange={(e) => setH(e.target.value)} placeholder="auto"
- className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label="Finished height in inches" />
+ className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm tabular-nums" aria-label={tl("digitizer", "Finished height in inches")} />
                 </label>
                 <span className="shrink-0 text-xs text-muted-foreground">in</span>
                 {(wNum > 0 || hNum > 0) && (
-                  <button onClick={() => setSize({ w: "", h: "" })} className="eg-tap shrink-0 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:text-foreground" title="Back to automatic">Auto</button>
+                  <button onClick={() => setSize({ w: "", h: "" })} className="eg-tap shrink-0 rounded-md px-1.5 py-1 text-2xs text-muted-foreground hover:text-foreground" title={tl("digitizer", "Back to automatic")}>{tl("digitizer", "Auto")}</button>
                 )}
               </div>
               {/* The fields ARE inches now, so this no longer repeats them. What is left is
@@ -405,7 +409,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                   <button onClick={() => { if (res.trueview) download(`${res.machineFile!.filename.replace(/\.[^.]+$/, "")}.png`, `data:image/png;base64,${res.trueview}`) }} disabled={!res.trueview} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50">
                     <DownloadSimple size={14} weight="bold" /> PNG
                   </button>
-                  <button onClick={() => run(true)} disabled={busy || areaOver} title="Regenerate" className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-50"><ArrowsClockwise size={15} /></button>
+                  <button onClick={() => run(true)} disabled={busy || areaOver} title={tl("digitizer", "Regenerate")} className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-accent disabled:opacity-50"><ArrowsClockwise size={15} /></button>
                 </>
               ) : (
                 <>
@@ -425,7 +429,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
             {flag && !routed && (
               <div className="flex items-start gap-2 rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
                 <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-                <span><b>This may need a human.</b> {flag} — send the original to a digitizer for a cleaner file.</span>
+                <span><b>{tl("digitizer", "This may need a human.")}</b> {flag} — send the original to a digitizer for a cleaner file.</span>
               </div>
             )}
 
@@ -441,30 +445,30 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
  : "border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")}
             >
               {routing ? <CircleNotch size={14} className="animate-spin" /> : routed ? <Check size={14} weight="bold" className="text-success" /> : <PaperPlaneTilt size={14} />}
-              {routed ? "Sent to Designer board" : "Send original to Designer board"}
+              {routed ? tl("digitizer", "Sent to Designer board") : tl("digitizer", "Send original to Designer board")}
             </button>
-            <p className="text-2xs leading-tight text-muted-foreground">For complex art — a person digitizes the original artwork by hand. Sends the source file, not the auto-preview.</p>
+            <p className="text-2xs leading-tight text-muted-foreground">{tl("digitizer", "For complex art — a person digitizes the original artwork by hand. Sends the source file, not the auto-preview.")}</p>
           </div>
 
           {/* RIGHT — details: facts, thread matches, original reference */}
           <div className="min-w-0 space-y-4">
             <div>
-              <div className="mb-2 eg-label text-muted-foreground">Design</div>
+              <div className="mb-2 eg-label text-muted-foreground">{tl("digitizer", "Design")}</div>
               {res ? (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <div><div className="text-xs text-muted-foreground">Stitches</div><div className="font-semibold tabular-nums">{res.stitches != null ? res.stitches.toLocaleString() : "—"}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Colours</div><div className="font-semibold tabular-nums">{res.colours ?? "—"}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Size</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${fmtIn(res.width)} × ${fmtIn(res.height)}` : "—"}</div></div>
-                  <div><div className="text-xs text-muted-foreground">Format</div><div className="font-semibold">{res.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : "preview"}</div></div>
+                  <div><div className="text-xs text-muted-foreground">{tl("digitizer", "Stitches")}</div><div className="font-semibold tabular-nums">{res.stitches != null ? res.stitches.toLocaleString() : "—"}</div></div>
+                  <div><div className="text-xs text-muted-foreground">{tl("digitizer", "Colours")}</div><div className="font-semibold tabular-nums">{res.colours ?? "—"}</div></div>
+                  <div><div className="text-xs text-muted-foreground">{tl("digitizer", "Size")}</div><div className="font-semibold tabular-nums">{res.width != null && res.height != null ? `${fmtIn(res.width)} × ${fmtIn(res.height)}` : "—"}</div></div>
+                  <div><div className="text-xs text-muted-foreground">{tl("digitizer", "Format")}</div><div className="font-semibold">{res.machineFile ? (res.machineFile.filename.split(".").pop()?.toUpperCase() || "EMB") : "preview"}</div></div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Preview to read the stitch count, colours and size.</p>
+                <p className="text-sm text-muted-foreground">{tl("digitizer", "Preview to read the stitch count, colours and size.")}</p>
               )}
             </div>
 
             {res && (
               <div>
-                <div className="mb-1.5 eg-label text-muted-foreground">Threads → your library</div>
+                <div className="mb-1.5 eg-label text-muted-foreground">{tl("digitizer", "Threads → your library")}</div>
                 {res.threads && res.threads.length > 0 ? (
                   <>
                     {/* Fixed columns so every row lines up: design swatch → cone swatch, name +
@@ -488,23 +492,23 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                                 </span>
                               </>
                             ) : (
-                              <span className="min-w-0 flex-1 text-muted-foreground">No close match in your library</span>
+                              <span className="min-w-0 flex-1 text-muted-foreground">{tl("digitizer", "No close match in your library")}</span>
                             )}
                             {m && poor && <span className="shrink-0 rounded-full bg-hold/15 px-2 py-0.5 eg-label text-hold">poor</span>}
                           </div>
                         )
                       })}
                     </div>
-                    <p className="mt-1.5 text-2xs leading-tight text-muted-foreground">Suggested from the admin thread library — a person confirms before it&apos;s used.</p>
+                    <p className="mt-1.5 text-2xs leading-tight text-muted-foreground">{tl("digitizer", "Suggested from the admin thread library — a person confirms before it’s used.")}</p>
                   </>
                 ) : (
-                  <div className="text-xs text-muted-foreground">{res.colours != null ? `${res.colours} colours — per-thread list not returned.` : "No thread data."}</div>
+                  <div className="text-xs text-muted-foreground">{res.colours != null ? `${res.colours} colours — per-thread list not returned.` : tl("digitizer", "No thread data.")}</div>
                 )}
               </div>
             )}
 
             <div>
-              <div className="mb-1.5 eg-label text-muted-foreground">Original artwork</div>
+              <div className="mb-1.5 eg-label text-muted-foreground">{tl("digitizer", "Original artwork")}</div>
               <div className="size-16 overflow-hidden rounded-lg border border-border bg-muted"><Thumb src={item.thumb} alt="original" fit="contain" className="size-full" /></div>
             </div>
           </div>
@@ -554,6 +558,7 @@ function toEwaTransform(tf: WilcomTransform, effWmm: number, effHmm: number) {
 }
 type DragState = { mode: "move" | "resize" | "rotate"; sx: number; sy: number; start: WilcomTransform; cx: number; cy: number; d0: number; a0: number; rw: number; rh: number }
 function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }: { tf: WilcomTransform; onChange: (t: WilcomTransform) => void; ghost: ReactNode; selected: boolean; onSelect: () => void; wmm: number; hmm: number; z: number }) {
+  const tl = useLabelT()
  const drag = useRef<DragState | null>(null)
 
   // Single handlers, no ref-in-render: the host rect is read off the DOM via closest() at
@@ -607,11 +612,11 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }
           <>
             {/* All four corners resize (scale from the centre); the top nub rotates. Works for
  images (re-digitize width) and text (letter height) alike. */}
-            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -left-2 cursor-nwse-resize"} />
-            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -right-2 cursor-nesw-resize"} />
-            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -left-2 cursor-nesw-resize"} />
-            <div title="Drag to resize" data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
-            <div title="Drag to rotate" data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-8 left-1/2 -translate-x-1/2 cursor-grab"} />
+            <div title={tl("digitizer", "Drag to resize")} data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -left-2 cursor-nwse-resize"} />
+            <div title={tl("digitizer", "Drag to resize")} data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-2 -right-2 cursor-nesw-resize"} />
+            <div title={tl("digitizer", "Drag to resize")} data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -left-2 cursor-nesw-resize"} />
+            <div title={tl("digitizer", "Drag to resize")} data-mode="resize" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -bottom-2 -right-2 cursor-nwse-resize"} />
+            <div title={tl("digitizer", "Drag to rotate")} data-mode="rotate" onPointerDown={down} onPointerMove={move} onPointerUp={up} className={nub + " -top-8 left-1/2 -translate-x-1/2 cursor-grab"} />
           </>
         )}
       </div>
@@ -622,6 +627,7 @@ function LayerBoxEditor({ tf, onChange, ghost, selected, onSelect, wmm, hmm, z }
 // ── Create — ONE workspace: drop an image AND/OR type text, combined into a single live
 // embroidery preview + machine file via the EWA combine endpoint (prototype). ──────────
 function CreateTab() {
+  const tl = useLabelT()
  const [text, setText] = useState("")
  const [alphabet, setAlphabet] = useState("")
  const [height, setHeight] = useState(20)
@@ -890,7 +896,7 @@ function CreateTab() {
               className={"relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border transition-colors lg:min-h-[620px] " + (over ? "border-primary ring-2 ring-ring/40" : "border-border")}
             >
               {!ready && (
-                <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">Drop an image here, or type text on the right.</div>
+                <div className="grid size-full place-items-center p-6 text-center text-sm text-muted-foreground">{tl("digitizer", "Drop an image here, or type text on the right.")}</div>
               )}
               {ready && err && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-30 m-2 flex items-start gap-2 rounded-lg bg-hold/10 px-3 py-2 text-sm text-hold"><Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span></div>
@@ -926,13 +932,13 @@ function CreateTab() {
                 )
               })}
             </div>
-            <div className="text-center text-2xs text-muted-foreground">Your arrangement — drag to position. Generate merges the layers into one file.</div>
+            <div className="text-center text-2xs text-muted-foreground">{tl("digitizer", "Your arrangement — drag to position. Generate merges the layers into one file.")}</div>
           </div>
           {res?.trueview && compare && (
             <div className="space-y-1">
               <div style={{ background: garment }} className="relative flex min-h-[440px] w-full items-center justify-center overflow-hidden rounded-2xl border border-border lg:min-h-[620px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`data:image/png;base64,${res.trueview}`} alt="Generated stitched output" className="max-h-full max-w-full object-contain p-3" />
+                <img src={`data:image/png;base64,${res.trueview}`} alt={tl("digitizer", "Generated stitched output")} className="max-h-full max-w-full object-contain p-3" />
               </div>
               <div className="text-center text-2xs text-muted-foreground">Stitched result — what EWA actually generated{shownStitches ? ` · ${shownStitches.toLocaleString()} stitches` : ""}. Regenerate after moving layers.</div>
             </div>
@@ -945,14 +951,14 @@ function CreateTab() {
       <div className="order-2 flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
         {/* Artwork — drop several. Each becomes its own layer you arrange + reorder below. */}
         <div>
-          <label className={labelCls}>Artwork</label>
+          <label className={labelCls}>{tl("digitizer", "Artwork")}</label>
           <div className="space-y-1.5">
             {imgLayers.map((im) => (
               <div key={im.id} className="flex items-center gap-3 rounded-lg border border-border bg-background p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={im.thumb} alt="" className="size-10 shrink-0 rounded-md border border-border object-contain" />
                 <span className="min-w-0 flex-1 truncate text-sm">{im.name}</span>
-                <button onClick={() => removeLayer(im.id)} title="Remove image" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-alert"><X size={14} /></button>
+                <button onClick={() => removeLayer(im.id)} title={tl("digitizer", "Remove image")} className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-alert"><X size={14} /></button>
               </div>
             ))}
             <label
@@ -962,26 +968,26 @@ function CreateTab() {
               className={"flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed py-2.5 text-center text-xs font-medium transition-colors " + (over ? "border-primary bg-primary/5" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
             >
               <ImageSquare size={15} />
-              {imgLayers.length ? "Add another image" : "Choose an image"}
+              {imgLayers.length ? tl("digitizer", "Add another image") : tl("digitizer", "Choose an image")}
               <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void addImages(e.target.files); e.currentTarget.value = "" }} />
             </label>
           </div>
         </div>
 
         <div>
-          <label className={labelCls}>Text {imgLayers.length ? "(stitched with the images)" : "(optional)"}</label>
-          <input value={text} onChange={(e) => onTextChange(e.target.value)} placeholder="Type to add lettering…" className={inputCls} />
+          <label className={labelCls}>Text {imgLayers.length ? tl("digitizer", "(stitched with the images)") : tl("digitizer", "(optional)")}</label>
+          <input value={text} onChange={(e) => onTextChange(e.target.value)} placeholder={tl("digitizer", "Type to add lettering…")} className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>Alphabet</label>
+            <label className={labelCls}>{tl("digitizer", "Alphabet")}</label>
             <select value={alphabet} onChange={(e) => setAlphabet(e.target.value)} className={inputCls}>
-              {alphabets.length === 0 && <option value="">Loading…</option>}
+              {alphabets.length === 0 && <option value="">{tl("digitizer", "Loading…")}</option>}
               {alphabets.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
           <div>
-            <label className={labelCls}>Height (mm)</label>
+            <label className={labelCls}>{tl("digitizer", "Height (mm)")}</label>
             <input type="number" min={5} max={50} value={height} onChange={(e) => setHeight(Number(e.target.value) || 20)} className={inputCls} />
           </div>
         </div>
@@ -989,9 +995,9 @@ function CreateTab() {
         {/* Colour — Wilcom's "change colour" as a named cone + a tucked-away palette. */}
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <span className={labelCls + " mb-0"}>Thread colour</span>
+            <span className={labelCls + " mb-0"}>{tl("digitizer", "Thread colour")}</span>
             {palette.length > 0 && (
-              <button onClick={() => setShowPalette((v) => !v)} className="text-2xs font-medium text-primary hover:underline">{showPalette ? "Done" : "Change colour"}</button>
+              <button onClick={() => setShowPalette((v) => !v)} className="text-2xs font-medium text-primary hover:underline">{showPalette ? tl("digitizer", "Done") : tl("digitizer", "Change colour")}</button>
             )}
           </div>
           {palette.length ? (
@@ -999,13 +1005,13 @@ function CreateTab() {
               <button onClick={() => setShowPalette((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40">
                 <span className="size-6 shrink-0 rounded-md border border-border" style={{ background: color }} />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">{selCone?.name ?? "Custom colour"}</span>
+                  <span className="block truncate text-sm font-medium">{selCone?.name ?? tl("digitizer", "Custom colour")}</span>
                   <span className="block tabular-nums text-2xs text-muted-foreground">{selCone?.code ?? color}</span>
                 </span>
               </button>
               {showPalette && (
                 <div className="mt-2 rounded-lg border border-border bg-background p-2.5">
-                  <input value={pQuery} onChange={(e) => setPQuery(e.target.value)} placeholder="Search cones by name or code…" className="mb-2 h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
+                  <input value={pQuery} onChange={(e) => setPQuery(e.target.value)} placeholder={tl("digitizer", "Search cones by name or code…")} className="mb-2 h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
                   <div className="grid max-h-44 grid-cols-8 gap-1.5 overflow-y-auto">
                     {cones.map((c) => (
                       <button key={c.code} onClick={() => { setColor(c.hex); setShowPalette(false); setPQuery("") }} title={`${c.name} · ${c.code}`} className={"aspect-square rounded-md border-2 transition-transform hover:scale-110 " + (color.toLowerCase() === c.hex.toLowerCase() ? "border-foreground" : "border-transparent")} style={{ background: c.hex }} />
@@ -1015,26 +1021,26 @@ function CreateTab() {
                 </div>
               )}
             </>
-          ) : <p className="text-xs text-muted-foreground">No thread library set — add cones in Settings › Thread palette.</p>}
+          ) : <p className="text-xs text-muted-foreground">{tl("digitizer", "No thread library set — add cones in Settings › Thread palette.")}</p>}
         </div>
 
         {/* Garment colour — the preview backdrop, so you can judge the stitching on the blank
             you'll actually embroider. Cosmetic (doesn't touch the .emb). */}
         <div>
-          <span className={labelCls}>Garment</span>
+          <span className={labelCls}>{tl("digitizer", "Garment")}</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {GARMENTS.map((g) => (
               <button key={g.color} title={g.name} onClick={() => setGarment(g.color)}
                 className={"size-5 rounded-full transition-transform hover:scale-110 " + (garment.toLowerCase() === g.color.toLowerCase() ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : "border border-black/15")}
                 style={{ background: g.color }} />
             ))}
-            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-2xs text-muted-foreground" title="Custom colour">
+            <label className="relative inline-flex size-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-2xs text-muted-foreground" title={tl("digitizer", "Custom colour")}>
               +<input type="color" value={garment} onChange={(e) => setGarment(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
             </label>
           </div>
           {res?.trueview && (
             <button onClick={() => setCompare((c) => !c)} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
-              <Eye size={13} />{compare ? "Hide stitched result" : "Compare with stitched result"}
+              <Eye size={13} />{compare ? tl("digitizer", "Hide stitched result") : tl("digitizer", "Compare with stitched result")}
             </button>
           )}
         </div>
@@ -1044,7 +1050,7 @@ function CreateTab() {
             beside it — the same two numbers twice. The floor sizes placements in inches, so
             that is the unit; mm survives underneath, because it is what EWA is given. */}
         <div>
-          <span className={labelCls}>Size (inches)</span>
+          <span className={labelCls}>{tl("digitizer", "Size (inches)")}</span>
           {/* Empty until there is something to measure. An enabled-looking input with no value
               reads as a field that failed to load, not as "nothing here yet". */}
           {!footprint ? (
@@ -1061,7 +1067,7 @@ function CreateTab() {
                   // you asked for instead of the one you got would hide that.
                   onBlur={() => { if (wDraft != null) { resizeTo(inToMm(wDraft)); setWDraft(null) } }}
                   onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setWDraft(null) }}
-                  aria-label="Design width in inches"
+                  aria-label={tl("digitizer", "Design width in inches")}
                   className="h-8 w-16 rounded-lg border border-input bg-background px-2 text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
                 <span className="text-sm text-muted-foreground">×</span>
@@ -1075,7 +1081,7 @@ function CreateTab() {
                   onChange={(e) => setHDraft(e.target.value)}
                   onBlur={() => { if (hDraft != null) { resizeToHeight(inToMm(hDraft)); setHDraft(null) } }}
                   onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setHDraft(null) }}
-                  aria-label="Design height in inches"
+                  aria-label={tl("digitizer", "Design height in inches")}
                   className="h-8 w-16 rounded-lg border border-input bg-background px-2 text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
               </div>
@@ -1104,7 +1110,7 @@ function CreateTab() {
                 eg-label, so it came out UPPERCASE and wrapped the heading over two lines in a
                 340px rail — a sentence of explanation sitting on top of a control that already
                 shows its own order and carries carets to change it. */}
-            <span className={labelCls} title="Top of the list stitches on top">Layers</span>
+            <span className={labelCls} title={tl("digitizer", "Top of the list stitches on top")}>{tl("digitizer", "Layers")}</span>
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {/* Reversed so the on-top (last-stitched) layer sits at the top of the list. */}
               {layers.slice().reverse().map((l) => {
@@ -1132,15 +1138,15 @@ function CreateTab() {
                           <span className="min-w-0 flex-1 truncate">“{text}”</span>
                         </>
                       )}
-                      <button onClick={() => moveLayer(l.id, 1)} disabled={ai === layers.length - 1} title="Bring forward" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretUp size={13} weight="bold" /></button>
-                      <button onClick={() => moveLayer(l.id, -1)} disabled={ai === 0} title="Send back" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretDown size={13} weight="bold" /></button>
-                      <button onClick={() => setOpenLayer((o) => (o === l.id ? null : l.id))} title="Move / resize / rotate" className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === l.id ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
-                      <button onClick={() => removeLayer(l.id)} title="Remove layer" className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-alert"><X size={13} /></button>
+                      <button onClick={() => moveLayer(l.id, 1)} disabled={ai === layers.length - 1} title={tl("digitizer", "Bring forward")} className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretUp size={13} weight="bold" /></button>
+                      <button onClick={() => moveLayer(l.id, -1)} disabled={ai === 0} title={tl("digitizer", "Send back")} className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-30"><CaretDown size={13} weight="bold" /></button>
+                      <button onClick={() => setOpenLayer((o) => (o === l.id ? null : l.id))} title={tl("digitizer", "Move / resize / rotate")} className={"shrink-0 rounded p-0.5 transition-colors hover:bg-accent " + (openLayer === l.id ? "text-primary" : "text-muted-foreground")}><ArrowsOutCardinal size={14} /></button>
+                      <button onClick={() => removeLayer(l.id)} title={tl("digitizer", "Remove layer")} className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-alert"><X size={13} /></button>
                     </div>
                     {openLayer === l.id && (
                       <div className="flex items-center justify-between gap-2 border-t border-border bg-primary/5 px-3 py-1.5 text-2xs text-muted-foreground">
-                        <span className="min-w-0 truncate">Drag the box on the canvas — corner to resize, top nub to rotate</span>
-                        <button type="button" onClick={() => setLayerTf(l.id, IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">Reset</button>
+                        <span className="min-w-0 truncate">{tl("digitizer", "Drag the box on the canvas — corner to resize, top nub to rotate")}</span>
+                        <button type="button" onClick={() => setLayerTf(l.id, IDENTITY_TF)} className="shrink-0 font-medium text-primary hover:underline">{tl("digitizer", "Reset")}</button>
                       </div>
                     )}
                   </div>
@@ -1158,11 +1164,11 @@ function CreateTab() {
         <div className="mt-auto space-y-2 border-t border-border pt-3">
           <div className="flex items-end justify-between">
             <div>
-              <div className="text-2xs text-muted-foreground">Stitches</div>
+              <div className="text-2xs text-muted-foreground">{tl("digitizer", "Stitches")}</div>
               <div className="text-base font-semibold tabular-nums">{shownStitches != null ? shownStitches.toLocaleString() : "—"}</div>
             </div>
             <div className="text-right">
-              <div className="text-2xs text-muted-foreground">File</div>
+              <div className="text-2xs text-muted-foreground">{tl("digitizer", "File")}</div>
               <div className="text-base font-semibold">{ext ?? "—"}</div>
             </div>
           </div>
@@ -1182,6 +1188,7 @@ function CreateTab() {
 
 // ── History ──────────────────────────────────────────────────────────────────────
 function HistoryTab() {
+  const tl = useLabelT()
  const [rows, setRows] = useState<WilcomGeneration[] | null>(null)
  const [q, setQ] = useState("")
  const [zoom, setZoom] = useState<string | null>(null) // lightbox image src
@@ -1194,34 +1201,34 @@ function HistoryTab() {
       <div className="mb-4 flex items-center gap-3">
         <div className="relative max-w-sm flex-1">
           <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by design, source or type…" className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("digitizer", "Search by design, source or type…")} className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
         </div>
-        <button onClick={() => { setRows(null); load() }} title="Refresh" className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"><ArrowsClockwise size={15} /></button>
+        <button onClick={() => { setRows(null); load() }} title={tl("digitizer", "Refresh")} className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"><ArrowsClockwise size={15} /></button>
       </div>
       {rows === null ? (
         <div className="h-40 animate-pulse rounded-2xl bg-muted" />
       ) : list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{q ? `No generations match “${q}”.` : "Nothing generated yet — generate a design from Create."}</div>
+        <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">{q ? `No generations match “${q}”.` : tl("digitizer", "Nothing generated yet — generate a design from Create.")}</div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-border text-left eg-label text-muted-foreground">
-                <th className="px-4 py-3"></th><th className="px-4 py-3">Design</th><th className="px-4 py-3">Source</th>
-                <th className="px-4 py-3 text-right">Stitches</th><th className="px-4 py-3 text-right">Colours</th>
-                <th className="px-4 py-3">Formats</th><th className="px-4 py-3">Generated</th><th className="px-4 py-3"></th>
+                <th className="px-4 py-3"></th><th className="px-4 py-3">{tl("digitizer", "Design")}</th><th className="px-4 py-3">{tl("digitizer", "Source")}</th>
+                <th className="px-4 py-3 text-right">{tl("digitizer", "Stitches")}</th><th className="px-4 py-3 text-right">{tl("digitizer", "Colours")}</th>
+                <th className="px-4 py-3">{tl("digitizer", "Formats")}</th><th className="px-4 py-3">{tl("digitizer", "Generated")}</th><th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {list.map((g) => (
                 <tr key={g.id} className="border-b border-border last:border-0 hover:bg-accent/50">
                   <td className="px-4 py-2.5">
-                    <button type="button" onClick={() => setZoom(g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? ""))} title="Zoom in" className="relative flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted transition-transform hover:scale-110">
+                    <button type="button" onClick={() => setZoom(g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? ""))} title={tl("digitizer", "Zoom in")} className="relative flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted transition-transform hover:scale-110">
                       <Thumb src={g.id ? `/api/wilcom/asset/${g.id}/tv` : (g.trueview_url ?? "")} className="absolute inset-0 size-full" />
                     </button>
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{g.name || "Untitled"}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{g.order_ref || (g.source === "maker" ? "Maker" : "—")}</td>
+                  <td className="px-4 py-2.5 font-medium">{g.name || tl("digitizer", "Untitled")}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{g.order_ref || (g.source === "maker" ? tl("digitizer", "Maker") : "—")}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.stitches != null ? g.stitches.toLocaleString() : "—"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{g.colours ?? "—"}</td>
                   <td className="px-4 py-2.5 tabular-nums text-xs text-muted-foreground">{(g.formats ?? []).join(" · ") || "—"}</td>
@@ -1240,7 +1247,7 @@ function HistoryTab() {
       )}
       {/* Lightbox — click a design thumbnail to zoom; click anywhere / Esc to close. */}
       {zoom && (
-        <div role="button" tabIndex={0} aria-label="Close full-size view" onClick={() => setZoom(null)} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(null) }} className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6">
+        <div role="button" tabIndex={0} aria-label={tl("digitizer", "Close full-size view")} onClick={() => setZoom(null)} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(null) }} className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={zoom} alt="" className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
         </div>

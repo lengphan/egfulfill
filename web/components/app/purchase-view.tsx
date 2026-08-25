@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { cartChanged } from "@/lib/cart-events"
 import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwise, ArrowSquareOut, FileText } from "@phosphor-icons/react"
@@ -62,10 +63,11 @@ const POOL: PurchaseOrder = { num: "__pool__", supplier: null, items: [], status
  * arrives. A dashed square means "no picture", never "still loading".
  */
 function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src: string, label: string) => void; label?: string }) {
+  const tl = useLabelT()
  if (!src) return <span className="size-11 shrink-0 rounded border border-dashed border-border" aria-hidden />
  return (
     <button type="button" onClick={() => onZoom?.(src, label ?? "")}
- title="Click to enlarge" aria-label={`Enlarge ${label || "product image"}`}
+ title={tl("purchase", "Click to enlarge")} aria-label={`Enlarge ${label || "product image"}`}
  className="shrink-0 rounded border border-border bg-white transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" loading="lazy" className="size-11 rounded object-contain" />
@@ -82,13 +84,14 @@ function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src:
  * scaling the thumbnail up into mush.
  */
 function ImageZoom({ img, onClose }: { img: { src: string; label: string } | null; onClose: () => void }) {
+  const tl = useLabelT()
  if (!img) return null
  const big = img.src.replace(/_(fs|fm)(\.[a-z]+)/i, "_fl$2")
  return (
     <Dialog open onOpenChange={(o: boolean) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="truncate text-base">{img.label || "Product image"}</DialogTitle>
+          <DialogTitle className="truncate text-base">{img.label || tl("purchase", "Product image")}</DialogTitle>
         </DialogHeader>
         <div className="flex items-center justify-center rounded-lg border border-border bg-white p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -104,6 +107,7 @@ function ImageZoom({ img, onClose }: { img: { src: string; label: string } | nul
 }
 
 function SourceTags({ line }: { line: POLine }) {
+  const tl = useLabelT()
  const src = Array.isArray(line.sources) ? line.sources : []
  if (!src.length && !line.auto) return null
  return (
@@ -114,8 +118,8 @@ function SourceTags({ line }: { line: POLine }) {
           "I put this here" from "production is waiting on this". It carries meaning, which
           is the only thing a pill may do. */}
       {line.auto && (
-        <span className="rounded bg-alert/10 px-1.5 py-0.5 text-2xs font-medium text-alert" title="The shelf was empty when an order needed this, so it was added for you.">
-          Out of stock
+        <span className="rounded bg-alert/10 px-1.5 py-0.5 text-2xs font-medium text-alert" title={tl("purchase", "The shelf was empty when an order needed this, so it was added for you.")}>
+          {tl("purchase", "Out of stock")}
         </span>
       )}
       {src.slice(0, 4).map((s, i) => {
@@ -204,6 +208,7 @@ function ottoQty(r: unknown): number | null {
  * the All-suppliers tab. `load` overwrites the lists in place, never blanking them, so
  * the refresh never flashes a spinner over a cart you're reading. */
 export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: boolean; refreshKey?: number }) {
+  const tl = useLabelT()
  const prompt = usePrompt()
  const confirm = useConfirm()
  const [inv, setInv] = useState<InventoryItem[] | null>(null)
@@ -775,7 +780,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  const entered = await prompt({
  title: `Cancel ${po.num} with S&S`,
  body: `No S&S order number is saved and we couldn't find one by PO number. Paste it (from the portal or confirmation email) to cancel via their API — or leave blank if you've already cancelled it with S&S directly.`,
- placeholder: "S&S order number",
+ placeholder: tl("purchase", "S&S order number"),
  required: false,
  confirmLabel: "Cancel order",
  cancelLabel: "Back",
@@ -1288,7 +1293,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
    */
  const confirmCredit = async (po: PurchaseOrder, r: PoReturn) => {
  const typed = await prompt({
- title: "How much was credited?",
+ title: tl("purchase", "How much was credited?"),
  body: `The amount ${po.supplier || "the supplier"} actually credited back.`,
  defaultValue: String(r.credit || ""),
  placeholder: "0.00",
@@ -1418,8 +1423,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                     </button>
                     {po.status === "placed" && !reallySent(po)
                       ? <span className="whitespace-nowrap text-xs font-medium text-hold"
- title="Built and recorded, but never transmitted — the supplier's live-order gate is off">
-                          Not sent
+ title={tl("purchase", "Built and recorded, but never transmitted — the supplier's live-order gate is off")}>
+                          {tl("purchase", "Not sent")}
                         </span>
                       // A SANDBOX order really was placed — it has an order number and Otto
                       // answered for it — but against their TEST environment, so it will
@@ -1428,12 +1433,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       // costs someone a search through a portal that has never seen it.
  : po.status === "placed" && isSandboxOrder(po)
                       ? <span className="whitespace-nowrap text-xs font-medium text-working"
- title="Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.">
-                          Sandbox
+ title={tl("purchase", "Placed against the supplier's SANDBOX environment, not the live account. No blanks are on their way — switch OTTOCAP_API_BASE to Otto's production host to order for real.")}>
+                          {tl("purchase", "Sandbox")}
                         </span>
- : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-packed">Placed</span>
- : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
- : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-shipped"><CheckCircle size={11} weight="fill" /> Received</span>}
+ : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-packed">{tl("purchase", "Placed")}</span>
+ : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("purchase", "Cancelled")}</span>
+ : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-shipped"><CheckCircle size={11} weight="fill" /> {tl("purchase", "Received")}</span>}
                     {/**
               * RECEIVE THE WHOLE DELIVERY, at the top where a box gets opened.
               *
@@ -1448,23 +1453,23 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             {po.items.some((l) => owedOn(l) > 0) && (
               <Button size="sm" variant="outline" onClick={() => void receiveAll(po)}
  disabled={busy === `recv:${po.num}` || busy === po.num}
- title="Book in everything this order is still waiting on and add it to the shelf">
-                {busy === `recv:${po.num}` ? "Receiving…" : "Receive all"}
+ title={tl("purchase", "Book in everything this order is still waiting on and add it to the shelf")}>
+                {busy === `recv:${po.num}` ? tl("purchase", "Receiving…") : tl("purchase", "Receive all")}
               </Button>
             )}
-                        <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
-                      Reorder
+                        <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title={tl("purchase", "Copy these items onto a new draft PO")}>
+                      {tl("purchase", "Reorder")}
                     </Button>
                     {/* Only where it makes sense: an order already settled is IN history. */}
                     {(po.status === "draft" || po.status === "placed") && (
                       <Button size="sm" variant="outline" onClick={() => archive([po])} disabled={busy === "archive"}
- title="Clear it off the board — the supplier is not contacted">
-                        To history
+ title={tl("purchase", "Clear it off the board — the supplier is not contacted")}>
+                        {tl("purchase", "To history")}
                       </Button>
                     )}
                     {po.status === "received" && (
                       <Button size="sm" variant="outline" onClick={() => setReturning(po)} disabled={busy === po.num}>
-                        Return
+                        {tl("purchase", "Return")}
                       </Button>
                     )}
                     {po.status === "placed" && (
@@ -1490,7 +1495,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  : sentSs
                                   ? `Cancels with S&S too — about ${Math.max(0, 10 - (mins ?? 0))} min left of their window`
  : "Cancel our record of this order"}>
-                              Cancel
+                              {tl("purchase", "Cancel")}
                             </button>
                           )
                         })()}
@@ -1515,15 +1520,15 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           {supplierOrderNo(po) && /s&s|activewear/i.test(po.supplier || "") ? (
                             <button onClick={() => fetchTracking(po)} disabled={tracking[po.num] === "loading"}
  className="font-medium text-primary hover:underline disabled:opacity-60">
-                              {tracking[po.num] === "loading" ? "Checking S&S…" : "Get tracking from S&S"}
+                              {tracking[po.num] === "loading" ? tl("purchase", "Checking S&S…") : tl("purchase", "Get tracking from S&S")}
                             </button>
                           ) : (
                             <label className="flex items-center gap-1.5 text-muted-foreground">
-                              Tracking
+                              {tl("purchase", "Tracking")}
                               <Input
  defaultValue={trackingOf(po)}
  onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
- placeholder="paste carrier number"
+ placeholder={tl("purchase", "paste carrier number")}
  className="h-7 w-48 tabular-nums text-xs"
                               />
                             </label>
@@ -1552,12 +1557,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       )}
                       {tracking[po.num] === "none" && (
                         <div className="border-b border-border py-2 text-xs text-muted-foreground">
-                          S&amp;S have no tracking for this order yet — it hasn&apos;t shipped.
+                          {tl("purchase", "S&S have no tracking for this order yet — it hasn’t shipped.")}
                         </div>
                       )}
                       {returnsOf(po).length > 0 && (
                         <div className="border-b border-border py-2.5">
-                          <div className="mb-1 text-xs font-medium text-muted-foreground">Returns</div>
+                          <div className="mb-1 text-xs font-medium text-muted-foreground">{tl("purchase", "Returns")}</div>
                           {returnsOf(po).map((r) => (
                             <div key={r.id} className="flex flex-wrap items-center gap-2 py-1 text-xs">
                               <span className="text-muted-foreground">
@@ -1578,7 +1583,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  supplier says so — not when the box went back. */}
                                   <button onClick={() => confirmCredit(po, r)} disabled={busy === po.num}
  className="font-medium text-primary hover:underline">
-                                    Credit received
+                                    {tl("purchase", "Credit received")}
                                   </button>
                                 </>
                               )}
@@ -1587,7 +1592,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         </div>
                       )}
                       {po.items.length === 0 ? (
-                        <div className="py-3 text-sm text-muted-foreground">No lines on this PO.</div>
+                        <div className="py-3 text-sm text-muted-foreground">{tl("purchase", "No lines on this PO.")}</div>
                       ) : po.items.map((l) => (
                         <div key={l.sku} className="flex items-center gap-3 py-2 text-sm">
                           <LineThumb src={l.image ?? poImgs[l.sku]} onZoom={(src, label) => setZoom({ src, label })}
@@ -1620,7 +1625,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  onClick={() => void receiveLine(po, l)}
  title={`Book in the ${owedOn(l)} still owed and add them to the shelf`}
                             >
-                              {busy === `recv:${po.num}:${l.sku}` ? "…" : "Receive"}
+                              {busy === `recv:${po.num}:${l.sku}` ? "…" : tl("purchase", "Receive")}
                             </Button>
                           )}
                           {/* THE RECORDED PRICE, and only that. A placed PO is not re-costed
@@ -1636,7 +1641,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           >
                             {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
                           </span>
-                          <button onClick={() => reorder(po, l)} className="text-muted-foreground hover:text-foreground" title="Reorder just this line">
+                          <button onClick={() => reorder(po, l)} className="text-muted-foreground hover:text-foreground" title={tl("purchase", "Reorder just this line")}>
                             <ArrowClockwise size={14} />
                           </button>
                         </div>
@@ -1653,8 +1658,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         <div className="flex items-center gap-3 md:hidden">
           <ShoppingCart size={18} weight="regular" className="shrink-0 text-primary" />
           <div className="min-w-0">
-            <h1 className="font-title text-2xl font-semibold tracking-tight">Purchase</h1>
-            <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
+            <h1 className="font-title text-2xl font-semibold tracking-tight">{tl("purchase", "Purchase")}</h1>
+            <p className="truncate text-sm text-muted-foreground">{tl("purchase", "Restock low inventory — draft POs per supplier, place via S&S / Otto, receive into stock.")}</p>
           </div>
         </div>
       )}
@@ -1671,13 +1676,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  against the PO line instead (the Receive button on each line), where the mapping
  to our sku was already made when the order was raised. */}
         <Button size="sm" variant="outline" onClick={() => setScanOpen(true)}>
-          Receive a box
+          {tl("purchase", "Receive a box")}
         </Button>
         {/* "Settings", not "Order settings": it sits on the purchasing board, where there is
  nothing else it could be the settings for, and the extra word was the longest
  thing in the row. */}
         <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
-          Settings
+          {tl("purchase", "Settings")}
         </Button>
         <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
           {busy === "new" && <CircleNotch size={13} className="animate-spin" />}
@@ -1686,20 +1691,20 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       </div>
 
       <StatGrid>
-        <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
-        <StatCard label="To order" value={String(saved.length)} sub="waiting to be placed" />
+        <StatCard label={tl("purchase", "Low stock")} value={String((inv ?? []).filter(isLow).length)} sub={tl("purchase", "need reorder")} tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
+        <StatCard label={tl("purchase", "To order")} value={String(saved.length)} sub={tl("purchase", "waiting to be placed")} />
         {/* Counts only what REALLY went. status === "placed" also covers a manual supplier
  recorded for hand-ordering and a dry run that never left the building — both
  already carry a "Not sent" badge in the list, so a tile reading "sent to
  suppliers" while counting them contradicted the rows underneath it. The unsent
  ones get their own tile rather than disappearing: they are the pile someone still
  has to act on. */}
-        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed" && reallySent(p)).length)} sub="sent to suppliers" />
+        <StatCard label={tl("purchase", "Placed")} value={String((pos ?? []).filter((p) => p.status === "placed" && reallySent(p)).length)} sub={tl("purchase", "sent to suppliers")} />
         {(() => {
  const unsent = (pos ?? []).filter((p) => p.status === "placed" && !reallySent(p)).length
- return unsent ? <StatCard label="Not sent" value={String(unsent)} sub="order these by hand" tone="neg" /> : null
+ return unsent ? <StatCard label={tl("purchase", "Not sent")} value={String(unsent)} sub={tl("purchase", "order these by hand")} tone="neg" /> : null
         })()}
-        <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
+        <StatCard label={tl("purchase", "Received")} value={String((pos ?? []).filter((p) => p.status === "received").length)} sub={tl("purchase", "into inventory")} tone="pos" />
       </StatGrid>
 
       {msg && (
@@ -1716,10 +1721,10 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  what is STILL in the pool — the orders that went through were removed from
  it, so a retry cannot double-order them. */}
               {msg.cardRetry && (
-                <Button size="sm" variant="outline" onClick={() => setNeedCard(true)}>Enter card &amp; retry</Button>
+                <Button size="sm" variant="outline" onClick={() => setNeedCard(true)}>{tl("purchase", "Enter card & retry")}</Button>
               )}
               {declineFix && !msg.ok && (
-                <Button size="sm" variant="outline" onClick={() => { setPickCard(declineFix.current); setPickerOpen(true) }}>Change payment</Button>
+                <Button size="sm" variant="outline" onClick={() => { setPickCard(declineFix.current); setPickerOpen(true) }}>{tl("purchase", "Change payment")}</Button>
               )}
             </span>
           </div>
@@ -1735,7 +1740,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                   <span className="opacity-70"> — {l.short}</span>
                   {l.detail && (
                     <details className="mt-0.5">
-                      <summary className="cursor-pointer select-none opacity-60 hover:opacity-100">Details</summary>
+                      <summary className="cursor-pointer select-none opacity-60 hover:opacity-100">{tl("purchase", "Details")}</summary>
                       <p className="mt-0.5 whitespace-pre-wrap opacity-80">{l.detail}</p>
                     </details>
                   )}
@@ -1749,13 +1754,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
       {/* Change S&S payment — pick a different saved card after a bank decline, in place. */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Change S&amp;S payment</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("purchase", "Change S&S payment")}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">The bank declined the saved card. Pick a different card on S&amp;S&apos;s account{declineFix?.email ? ` (${declineFix.email})` : ""}, then place the order again.</p>
           {declineFix && declineFix.profiles.length > 0 ? (
             <select value={pickCard} onChange={(e) => setPickCard(e.target.value)} className="eg-select h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-              <option value="">Account terms (no card)</option>
+              <option value="">{tl("purchase", "Account terms (no card)")}</option>
               {declineFix.profiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.name || "Saved card"}{p.type ? ` · ${p.type}` : ""}</option>
+                <option key={p.id} value={p.id}>{p.name || tl("purchase", "Saved card")}{p.type ? ` · ${p.type}` : ""}</option>
               ))}
             </select>
           ) : (
@@ -1764,8 +1769,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
-            <Button onClick={saveCardPick} disabled={pickSaving || !(declineFix && declineFix.profiles.length > 0)}>{pickSaving ? <><CircleNotch size={14} className="animate-spin" /> Saving…</> : "Save card"}</Button>
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>{tl("purchase", "Cancel")}</Button>
+            <Button onClick={saveCardPick} disabled={pickSaving || !(declineFix && declineFix.profiles.length > 0)}>{pickSaving ? <><CircleNotch size={14} className="animate-spin" /> {tl("purchase", "Saving…")}</> : tl("purchase", "Save card")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1783,7 +1788,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           <TabsTrigger value="ongoing">Ongoing{placed.length ? ` (${placed.length})` : ""}</TabsTrigger>
           {/* No count on History. It only grows — hundreds of POs eventually — and a
  number that always climbs and never needs acting on is decoration. */}
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="history">{tl("purchase", "History")}</TabsTrigger>
         </TabsList>
 
         {/* CART — what is short and about to be bought. Nothing here is a purchase order:
@@ -1804,14 +1809,14 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  a "draft PO": no purchase order exists until you place one. Until then this
  is a list of what's short, which is the only honest description of it. */}
         <SectionCard
- title="To order"
+ title={tl("purchase", "To order")}
  actions={
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
                 {saved.reduce((s, l) => s + num(l.qty), 0)} units{toOrderTotal > 0 ? ` · ${usd(toOrderTotal)}` : ""}
               </span>
               <Button size="sm" variant="outline" onClick={() => setAddTo(POOL)}>
-                Add items
+                {tl("purchase", "Add items")}
               </Button>
               {/* COUNTS WHAT WILL ACTUALLY GO. The label said "Place 2 orders" over a cart
  whose second supplier is ordered by hand, and the button stayed live on a
@@ -1826,7 +1831,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  : (handGroups.length ? "Every supplier in this cart is ordered by hand." : "Nothing to place.")}
               >
                 {busy === "place-all" && <CircleNotch size={14} className="animate-spin" />}
-                {autoGroups.length > 1 ? `Place ${autoGroups.length} orders` : "Place order"}
+                {autoGroups.length > 1 ? `Place ${autoGroups.length} orders` : tl("purchase", "Place order")}
               </Button>
             </div>
           }
@@ -1835,20 +1840,20 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             <EmptyState
               icon={ShoppingCart}
               size="sm"
-              title="Nothing waiting to be ordered"
-              note="Items land here when an order runs stock short — or add them yourself with Add items."
+              title={tl("purchase", "Nothing waiting to be ordered")}
+              note={tl("purchase", "Items land here when an order runs stock short — or add them yourself with Add items.")}
             />
           ) : (
             <div className="divide-y divide-border">
               {toOrderGroups.map((g) => (
                 <div key={g.key}>
                   <div className="flex flex-wrap items-center gap-2 bg-muted/40 px-5 py-2">
-                    <span className="text-sm font-semibold">{g.supplier ?? "Unassigned"}</span>
+                    <span className="text-sm font-semibold">{g.supplier ?? tl("purchase", "Unassigned")}</span>
                     {/* Only the exception is worth a chip. "Orders via API" was on the
  majority of rows saying nothing actionable; "order by hand" is the
  one that changes what you do next. */}
                     {!placeable(g.api) && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">order by hand</span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("purchase", "order by hand")}</span>
                     )}
                     {/* THEIR MINIMUM, said before it is keyed in rather than after they refuse
  it. Amber, not an error: this cart is legal, it just cannot be sent yet,
@@ -1889,7 +1894,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  onClick={(e) => e.stopPropagation()}
  className="mt-0.5 inline-flex items-center gap-1 text-2xs font-medium text-primary hover:underline"
                           >
-                            <ArrowSquareOut size={11} weight="bold" /> Where to buy
+                            <ArrowSquareOut size={11} weight="bold" /> {tl("purchase", "Where to buy")}
                           </a>
                         )}
                       </div>
@@ -1908,7 +1913,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       <div className="flex flex-1 flex-wrap items-start justify-center gap-2 sm:gap-2.5">
                         {g.api === "ss" && stock[l.sku] ? (
  stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
-                            <span className="self-center text-2xs font-medium text-destructive">No stock in any warehouse</span>
+                            <span className="self-center text-2xs font-medium text-destructive">{tl("purchase", "No stock in any warehouse")}</span>
                           ) : (
  stock[l.sku].warehouses
                               .filter((w) => w.qty > 0)
@@ -1949,7 +1954,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                                       <span className="tabular-nums text-muted-foreground">{w.qty}</span>
                                     </span>
                                     <span className="text-2xs leading-none text-muted-foreground">
-                                      {eta.deliveryAt ? fmtEta(eta.deliveryAt) : "no ETA"}
+                                      {eta.deliveryAt ? fmtEta(eta.deliveryAt) : tl("purchase", "no ETA")}
                                     </span>
                                   </label>
                                 )
@@ -1969,9 +1974,9 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  aria-label={`Quantity to order from Otto for ${l.sku}`}
  className="h-8 w-full px-1 text-center text-sm tabular-nums"
                             />
-                            <span className="text-2xs font-medium leading-none">Otto</span>
+                            <span className="text-2xs font-medium leading-none">{tl("purchase", "Otto")}</span>
                             <span className="text-2xs leading-none text-muted-foreground">
-                              {ottoStock[l.sku] == null ? "stock unknown" : `${ottoStock[l.sku]} avail`}
+                              {ottoStock[l.sku] == null ? tl("purchase", "stock unknown") : `${ottoStock[l.sku]} avail`}
                             </span>
                           </label>
                         ) : (
@@ -2008,7 +2013,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                         )
                       })()}
                       <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
- className="self-center text-muted-foreground hover:text-alert" title="Drop — not ordering this">
+ className="self-center text-muted-foreground hover:text-alert" title={tl("purchase", "Drop — not ordering this")}>
                         <Trash size={14} />
                       </button>
                      </div>
@@ -2035,9 +2040,9 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  order exists, so the panel says so and shows what it actually came to last
  time rather than an invented estimate. */}
           <aside className="space-y-4 xl:sticky xl:top-20">
-            <SectionCard title="Order total" bodyClassName="space-y-3 p-4 text-sm">
+            <SectionCard title={tl("purchase", "Order total")} bodyClassName="space-y-3 p-4 text-sm">
               {toOrderGroups.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nothing in the cart yet.</p>
+                <p className="text-xs text-muted-foreground">{tl("purchase", "Nothing in the cart yet.")}</p>
               ) : (
                 <>
                   <dl className="space-y-1.5">
@@ -2046,7 +2051,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  return (
                         <div key={g.key} className="flex items-baseline justify-between gap-3">
                           <dt className="min-w-0 truncate text-muted-foreground">
-                            {g.supplier ?? "Unassigned"}
+                            {g.supplier ?? tl("purchase", "Unassigned")}
                             <span className="ml-1 text-2xs">· {units} {units === 1 ? "unit" : "units"}</span>
                           </dt>
                           <dd className="shrink-0 tabular-nums">{usd(g.total)}</dd>
@@ -2056,7 +2061,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                   </dl>
 
                   <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 font-medium">
-                    <dt>Goods</dt>
+                    <dt>{tl("purchase", "Goods")}</dt>
                     <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
                   </div>
 
@@ -2068,16 +2073,16 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                       The note under the total already says freight is added at placement, so
  nothing true was lost with the paragraphs. */}
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-xs font-medium">Shipping</dt>
+                    <dt className="text-xs font-medium">{tl("purchase", "Shipping")}</dt>
                     <dd className="text-xs tabular-nums text-muted-foreground">—</dd>
                   </div>
 
                   <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2 text-base font-semibold">
-                    <dt>Total so far</dt>
+                    <dt>{tl("purchase", "Total so far")}</dt>
                     <dd className="tabular-nums">{usd(toOrderTotal)}</dd>
                   </div>
                   <p className="text-2xs text-muted-foreground">
-                    Goods only. Freight and any tax are added by the supplier at placement.
+                    {tl("purchase", "Goods only. Freight and any tax are added by the supplier at placement.")}
                   </p>
                 </>
               )}
@@ -2090,7 +2095,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         <TabsContent value="ongoing" className="mt-4 space-y-4">
           {placed.length > 0 && (
             <SectionCard
- title="On order"
+ title={tl("purchase", "On order")}
               // The bulk form of the same action, because a board that has drifted has
               // drifted by more than one row — clearing them one at a time is how it got
               // like this. Same confirm, same "the supplier is not contacted".
@@ -2105,12 +2110,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             </SectionCard>
           )}
           {pos !== null && drafts.length === 0 && placed.length === 0 && (
-            <SectionCard title="Nothing on order">
+            <SectionCard title={tl("purchase", "Nothing on order")}>
               <EmptyState
                 icon={FileText}
                 size="sm"
-                title="No drafts, nothing in flight"
-                note="Start one with New purchase order, or from a reorder suggestion above."
+                title={tl("purchase", "No drafts, nothing in flight")}
+                note={tl("purchase", "Start one with New purchase order, or from a reorder suggestion above.")}
               />
             </SectionCard>
           )}
@@ -2118,11 +2123,11 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
 
         {/* HISTORY — settled: received or cancelled. Nothing further is expected. */}
         <TabsContent value="history" className="mt-4 space-y-4">
-          <SectionCard title="Purchase history">
+          <SectionCard title={tl("purchase", "Purchase history")}>
             {pos === null ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
             ) : history.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">Nothing received or cancelled yet.</div>
+              <div className="py-12 text-center text-sm text-muted-foreground">{tl("purchase", "Nothing received or cancelled yet.")}</div>
             ) : (
               <div className="divide-y divide-border">{pagedHistory.pageItems.map(poRow)}</div>
             )}

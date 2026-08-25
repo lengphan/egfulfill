@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { ArrowRight, ArrowSquareOut, ArrowUUpLeft, CircleNotch, DownloadSimple, LinkBreak, Receipt, FilePdf, Warning } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -51,6 +52,7 @@ function NoLabel({
  restoring: boolean
  onRestore: () => void
 }) {
+  const tl = useLabelT()
  const unlinked = kind === "unlinked"
  const Icon = kind === "refunded" ? Receipt : unlinked ? LinkBreak : FilePdf
  return (
@@ -67,16 +69,16 @@ function NoLabel({
       </div>
       <div className="space-y-1">
         <p className="text-sm font-semibold">
-          {kind === "refunded" ? "Postage refunded" : unlinked ? "Tracking unlinked" : "No label yet"}
+          {kind === "refunded" ? tl("shipmentDetail", "Postage refunded") : unlinked ? tl("shipmentDetail", "Tracking unlinked") : tl("shipmentDetail", "No label yet")}
         </p>
         {/* The sentence answers the question the panel raises — where did the label go, and
  is this parcel in trouble — rather than restating the heading. */}
         <p className="mx-auto max-w-[15rem] text-xs leading-relaxed text-muted-foreground">
           {kind === "refunded"
-            ? "The label was cancelled with the carrier and its file went with it."
+            ? tl("shipmentDetail", "The label was cancelled with the carrier and its file went with it.")
  : unlinked
-              ? "It was taken off this order, not refunded. The postage is still bought and the parcel is still moving."
- : "Nothing has been bought for this parcel yet."}
+              ? tl("shipmentDetail", "It was taken off this order, not refunded. The postage is still bought and the parcel is still moving.")
+ : tl("shipmentDetail", "Nothing has been bought for this parcel yet.")}
         </p>
         {/* The number is NOT repeated here. It is four rows to the right, struck through, in
  the facts column — printing it twice on one screen makes a reader check whether
@@ -85,7 +87,7 @@ function NoLabel({
       {unlinked && canRestore && (
         <Button size="sm" variant="outline" onClick={onRestore} disabled={restoring} className="mt-1 bg-card">
           {restoring ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
-          {canRestore === "snapshot" ? "Put it back" : "Find it and put it back"}
+          {canRestore === "snapshot" ? tl("shipmentDetail", "Put it back") : tl("shipmentDetail", "Find it and put it back")}
         </Button>
       )}
       {unlinked && canRestore === "carrier" && (
@@ -94,8 +96,7 @@ function NoLabel({
         // destroyed with the label — pushing on a guess would email them twice. Saving the
         // order pushes it once someone knows.
         <p className="max-w-[16rem] text-2xs leading-relaxed text-muted-foreground">
-          If the carrier can&apos;t find it, nothing changes.
-          The marketplace isn&apos;t told either — we no longer know if the buyer has this number.
+          {tl("shipmentDetail", "If the carrier can’t find it, nothing changes. The marketplace isn’t told either — we no longer know if the buyer has this number.")}
         </p>
       )}
     </div>
@@ -127,6 +128,7 @@ export function ShipmentDetailDialog({
    * window was opened from is no longer what it was. */
  onChanged?: () => void
 }) {
+  const tl = useLabelT()
  const s = shipment
  const id = s?.id
  const hasLabel = !!s?.labelUrl
@@ -313,7 +315,7 @@ export function ShipmentDetailDialog({
               <Warning size={16} weight="fill" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-destructive">That didn&apos;t go through</p>
+              <p className="text-sm font-semibold text-destructive">{tl("shipmentDetail", "That didn’t go through")}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{detachErr}</p>
             </div>
           </div>
@@ -376,8 +378,7 @@ export function ShipmentDetailDialog({
  charged. Reading the price without knowing that is the trap. */}
           {s.test && (
             <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-              Bought on a test key: the tracking number and price are real in shape but nothing was
- ever charged, and the parcel will never move.
+              {tl("shipmentDetail", "Bought on a test key: the tracking number and price are real in shape but nothing was ever charged, and the parcel will never move.")}
             </p>
           )}
 
@@ -385,9 +386,9 @@ export function ShipmentDetailDialog({
               The marketplace leads because it is the first thing that decides where you go
  to check anything else. Postage is gone from here: it is in the title now. */}
           <div>
-            <Row label="Marketplace">{isLoose ? "No order — a loose label" : platformFromId(s.id)}</Row>
-            <Row label="Customer">{s.customer || "—"}</Row>
-            <Row label="Tracking" mono>
+            <Row label={tl("shipmentDetail", "Marketplace")}>{isLoose ? tl("shipmentDetail", "No order — a loose label") : platformFromId(s.id)}</Row>
+            <Row label={tl("shipmentDetail", "Customer")}>{s.customer || "—"}</Row>
+            <Row label={tl("shipmentDetail", "Tracking")} mono>
               {s.tracking ? s.tracking
  : s.voidedTracking
                   ? <span className="text-muted-foreground line-through decoration-destructive/70">{s.voidedTracking}</span>
@@ -395,19 +396,19 @@ export function ShipmentDetailDialog({
             </Row>
             {/* The full line, not the state alone — two parcels for one buyer are told apart
  by the street, and "did this go to the right place" is the question. */}
-            <Row label="Address">{s.address || s.state || "—"}</Row>
-            <Row label="Carrier">{s.carrier || "—"}</Row>
-            <Row label="Service">{s.method || "—"}</Row>
+            <Row label={tl("shipmentDetail", "Address")}>{s.address || s.state || "—"}</Row>
+            <Row label={tl("shipmentDetail", "Carrier")}>{s.carrier || "—"}</Row>
+            <Row label={tl("shipmentDetail", "Service")}>{s.method || "—"}</Row>
             {refunded && (
               // The provider's own word, in full, because this is the screen where someone
               // is deciding whether to chase it — and "pending" for two weeks is normal,
               // while "error" means the parcel actually shipped.
-              <Row label="Refund">
+              <Row label={tl("shipmentDetail", "Refund")}>
                 <span className="font-medium">${(s.refunded ?? 0).toFixed(2)}</span>
                 <span className="text-muted-foreground">
-                  {refundWord === "SUCCESS" ? " · settled"
- : refundWord === "ERROR" ? " · REFUSED, the label was used"
- : " · pending with the carrier"}
+                  {refundWord === "SUCCESS" ? tl("shipmentDetail", " · settled")
+ : refundWord === "ERROR" ? tl("shipmentDetail", " · REFUSED, the label was used")
+ : tl("shipmentDetail", " · pending with the carrier")}
                 </span>
               </Row>
             )}
@@ -421,20 +422,20 @@ export function ShipmentDetailDialog({
  what anyone does next, and stacked under the status they read as three
  separate facts when there is only one. */}
           <div>
-            <Row label="Carrier status">
+            <Row label={tl("shipmentDetail", "Carrier status")}>
               {s.delivery
                 ? <span>{deliveryWord(s.delivery)}</span>
- : <span className="text-muted-foreground">Not asked yet</span>}
+ : <span className="text-muted-foreground">{tl("shipmentDetail", "Not asked yet")}</span>}
             </Row>
-            <Row label="Dispatch status">
+            <Row label={tl("shipmentDetail", "Dispatch status")}>
               {s.scannedAt
                 ? <>
-                    <span>{VIA_WORD[s.scannedVia ?? ""] ?? "Scanned"}</span>
+                    <span>{VIA_WORD[s.scannedVia ?? ""] ?? tl("shipmentDetail", "Scanned")}</span>
                     <span className="block text-2xs text-muted-foreground">{when(s.scannedAt)}</span>
                   </>
- : <span className="text-muted-foreground">Not scanned out yet</span>}
+ : <span className="text-muted-foreground">{tl("shipmentDetail", "Not scanned out yet")}</span>}
             </Row>
-            <Row label="Created">{when(s.createdAt) ?? "—"}</Row>
+            <Row label={tl("shipmentDetail", "Created")}>{when(s.createdAt) ?? "—"}</Row>
           </div>
 
           {/* EVERY ACTION IN ONE PLACE, at the end, right-aligned.
@@ -453,21 +454,20 @@ export function ShipmentDetailDialog({
           {isLoose && (
             <div className="rounded-lg border border-border">
               <div className="border-b border-border px-3 py-2 eg-label text-muted-foreground">
-                {cands === null ? "Looking for its order…"
- : cands.length === 0 ? "No order matches this parcel"
- : cands.length === 1 ? "This parcel looks like it belongs to"
+                {cands === null ? tl("shipmentDetail", "Looking for its order…")
+ : cands.length === 0 ? tl("shipmentDetail", "No order matches this parcel")
+ : cands.length === 1 ? tl("shipmentDetail", "This parcel looks like it belongs to")
  : `${cands.length} orders could be this parcel`}
               </div>
               {matchErr && <div className="px-3 py-2 text-xs text-destructive">{matchErr}</div>}
               {cands === null ? (
                 <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-                  <CircleNotch size={13} className="animate-spin" /> Checking orders…
+                  <CircleNotch size={13} className="animate-spin" /> {tl("shipmentDetail", "Checking orders…")}
                 </div>
               ) : cands.length === 0 ? (
                 // A fact, not a shrug — and it names the second reason, which is not obvious.
                 <div className="px-3 py-3 text-xs text-muted-foreground">
-                  Nothing matches its address or name. Orders that already have tracking aren&apos;t
- offered, since a second number on one order means a parcel is unaccounted for.
+                  {tl("shipmentDetail", "Nothing matches its address or name. Orders that already have tracking aren’t offered, since a second number on one order means a parcel is unaccounted for.")}
                 </div>
               ) : (
                 <div className="divide-y divide-border">
@@ -475,16 +475,16 @@ export function ShipmentDetailDialog({
                     <div key={c.id} className="flex items-center gap-3 px-3 py-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="truncate text-sm font-medium">{c.customer || "No name on the order"}</span>
+                          <span className="truncate text-sm font-medium">{c.customer || tl("shipmentDetail", "No name on the order")}</span>
                           <span className="tabular-nums text-2xs text-muted-foreground">{c.id}</span>
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
                           {/* The import date earns its place: two orders for one buyer are
  told apart by when they arrived and by nothing else here. */}
                           <span>Imported {c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : "—"}</span>
-                          {c.matchedZip && <span className="text-shipped">· address matches</span>}
-                          {c.matchedName && <span className="text-packed">· name matches</span>}
-                          {!c.matchedZip && !c.matchedName && <span className="text-hold">· weak match</span>}
+                          {c.matchedZip && <span className="text-shipped">{tl("shipmentDetail", "· address matches")}</span>}
+                          {c.matchedName && <span className="text-packed">{tl("shipmentDetail", "· name matches")}</span>}
+                          {!c.matchedZip && !c.matchedName && <span className="text-hold">{tl("shipmentDetail", "· weak match")}</span>}
                         </div>
                       </div>
                       <Button size="sm" variant="outline" disabled={!!attaching}
@@ -516,7 +516,7 @@ export function ShipmentDetailDialog({
               <p className="min-w-0 flex-1 text-sm">
                 Take this tracking off the order?{" "}
                 <span className="text-muted-foreground">
-                  The postage stays bought — <strong className="font-medium text-foreground">not a refund</strong> — and you can put it back.
+                  {tl("shipmentDetail", "The postage stays bought —")} <strong className="font-medium text-foreground">{tl("shipmentDetail", "not a refund")}</strong> {tl("shipmentDetail", "— and you can put it back.")}
                 </span>
               </p>
               <div className="flex items-center gap-1">
@@ -525,7 +525,7 @@ export function ShipmentDetailDialog({
                   Yes, unlink it
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setConfirmDetach(false)} disabled={detaching}>
-                  Keep it
+                  {tl("shipmentDetail", "Keep it")}
                 </Button>
               </div>
             </div>
@@ -557,7 +557,7 @@ export function ShipmentDetailDialog({
  size="sm" variant="ghost"
  onClick={() => onRefund(s)}
  disabled={voiding === s.id}
- title="Refund the postage with the carrier. This cannot be undone."
+ title={tl("shipmentDetail", "Refund the postage with the carrier. This cannot be undone.")}
               >
                 {voiding === s.id ? <CircleNotch size={13} className="animate-spin" /> : null}
                 Refund postage
@@ -571,9 +571,9 @@ export function ShipmentDetailDialog({
  size="sm" variant="ghost"
  onClick={() => setConfirmDetach(true)}
  disabled={detaching || confirmDetach}
- title="Take this tracking off the order so a correct label can be bought. The postage is NOT refunded, and this can be undone."
+ title={tl("shipmentDetail", "Take this tracking off the order so a correct label can be bought. The postage is NOT refunded, and this can be undone.")}
               >
-                Wrong order?
+                {tl("shipmentDetail", "Wrong order?")}
               </Button>
             )}
             {/* The carrier's own copy still has a use — checking ours against theirs.
@@ -583,7 +583,7 @@ export function ShipmentDetailDialog({
               <a href={s.labelUrl} target="_blank" rel="noopener noreferrer"
  className={buttonVariants({ variant: "ghost", size: "sm" })}>
                 <ArrowSquareOut size={13} />
-                Open Label
+                {tl("shipmentDetail", "Open Label")}
               </a>
             )}
 
@@ -600,9 +600,9 @@ export function ShipmentDetailDialog({
                   <a
  href={`/orders/${encodeURIComponent(s.id)}`}
  className={buttonVariants({ variant: "outline", size: "sm" })}
- title="Open the full order this parcel belongs to"
+ title={tl("shipmentDetail", "Open the full order this parcel belongs to")}
                   >
-                    Open order
+                    {tl("shipmentDetail", "Open order")}
                     <ArrowRight size={13} />
                   </a>
                 )}
@@ -616,10 +616,10 @@ export function ShipmentDetailDialog({
                     + (labelSrc ? "" : " pointer-events-none opacity-50")}
                 >
                   <DownloadSimple size={13} />
-                  Download
+                  {tl("shipmentDetail", "Download")}
                 </a>
                 <Button size="sm" onClick={printLabel} disabled={!labelSrc}>
-                  Print
+                  {tl("shipmentDetail", "Print")}
                 </Button>
               </div>
             )}

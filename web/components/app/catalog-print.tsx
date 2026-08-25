@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { X, CircleNotch } from "@phosphor-icons/react"
@@ -105,6 +106,7 @@ function Editable({
  title?: string
  children: ReactNode
 }) {
+  const tl = useLabelT()
  const [open, setOpen] = useState(false)
  if (!editing) return <>{children}</>
  const commit = (v: string) => { setOpen(false); if (v !== value) onSave(v) }
@@ -115,7 +117,7 @@ function Editable({
  title={title ?? "Click to edit — this changes the catalogue, not the product"}
  className={"text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:decoration-neutral-500 " + (className ?? "")}
       >
-        {value ? children : <span className="text-neutral-400">{placeholder ?? "Add"}</span>}
+        {value ? children : <span className="text-neutral-400">{placeholder ?? tl("catalogPrint", "Add")}</span>}
       </button>
     )
   }
@@ -215,6 +217,7 @@ const hexOr = (v: unknown, fallback: string) =>
  * file. The label sheet prints the same way, so the print CSS already exists.
  */
 export function CatalogPrint({ onClose, exportId }: { onClose: () => void; exportId?: string }) {
+  const tl = useLabelT()
   /**
    * PORTALLED TO <body>, WHICH IS THE ONLY REASON THIS PRINTS.
    *
@@ -449,15 +452,14 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
       {frameDialog}
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
         <span className="text-sm font-medium">
-          {title ?? (rows === null ? "Loading…" : `${rows.length} style${rows.length === 1 ? "" : "s"}`)}
+          {title ?? (rows === null ? tl("catalogPrint", "Loading…") : `${rows.length} style${rows.length === 1 ? "" : "s"}`)}
         </span>
-        {exportId && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">saved copy</span>}
+        {exportId && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tl("catalogPrint", "saved copy")}</span>}
         <span className="text-xs text-muted-foreground">
-          Print → <strong>Save as PDF</strong>. Tick <strong>Background graphics</strong>, or the
- swatches and panels print white.
+          {tl("catalogPrint", "Print →")} <strong>{tl("catalogPrint", "Save as PDF")}</strong>{tl("catalogPrint", ". Tick")} <strong>{tl("catalogPrint", "Background graphics")}</strong>{tl("catalogPrint", ", or the swatches and panels print white.")}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          {saved && <span className="text-xs text-shipped">Saved — you can reopen this later.</span>}
+          {saved && <span className="text-xs text-shipped">{tl("catalogPrint", "Saved — you can reopen this later.")}</span>}
           {editErr && <span className="text-xs text-destructive">{editErr}</span>}
           {savingRef && <CircleNotch size={14} className="animate-spin text-muted-foreground" />}
           {/* Editing changes THIS DOCUMENT. Said on the button rather than in a help panel,
@@ -470,7 +472,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  after typing. */}
           {isAdmin && (
             <Button size="sm" variant="outline" onClick={() => setBrandOpen(true)} disabled={!rows?.length}>
-              Branding
+              {tl("catalogPrint", "Branding")}
             </Button>
           )}
           {canEdit && (
@@ -478,16 +480,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  size="sm" variant={editing ? "default" : "outline"}
  onClick={() => { setEditing((v) => !v); setEditErr(null) }}
  disabled={!rows?.length}
- title="Rewrite names, copy, prices and photos for this catalogue. The product itself is untouched."
+ title={tl("catalogPrint", "Rewrite names, copy, prices and photos for this catalogue. The product itself is untouched.")}
             >
-              {editing ? "Done editing" : "Edit"}
+              {editing ? tl("catalogPrint", "Done editing") : tl("catalogPrint", "Edit")}
             </Button>
           )}
           {/* Saving is separate from printing on purpose. Printing is a preview you might do
  five times; a saved copy is a record of what you SENT, and five identical rows
  in the history is a worse record than none. */}
           {!exportId && !saved && (
-            <Button size="sm" variant="outline" onClick={save} disabled={!rows?.length}>Save this version</Button>
+            <Button size="sm" variant="outline" onClick={save} disabled={!rows?.length}>{tl("catalogPrint", "Save this version")}</Button>
           )}
           {/* EDIT MODE OFF FIRST. A field left open is a text input, and an input prints as a
  box with a cursor in it. Leaving the mode is a state change, so the print call
@@ -497,9 +499,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  onClick={() => { setEditing(false); requestAnimationFrame(() => window.print()) }}
  disabled={!rows?.length}
           >
-            Print / Save as PDF
+            {tl("catalogPrint", "Print / Save as PDF")}
           </Button>
-          <Button size="sm" variant="outline" onClick={onClose}><X size={14} weight="bold" /> Close</Button>
+          <Button size="sm" variant="outline" onClick={onClose}><X size={14} weight="bold" /> {tl("catalogPrint", "Close")}</Button>
         </div>
       </div>
 
@@ -515,13 +517,13 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
       <div className="print-area mx-auto">
         {rows === null ? (
           <div className="flex items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
-            <CircleNotch size={16} className="animate-spin" /> Building the catalogue…
+            <CircleNotch size={16} className="animate-spin" /> {tl("catalogPrint", "Building the catalogue…")}
           </div>
         ) : err ? (
           <p className="py-24 text-center text-sm text-destructive">Couldn&apos;t load the catalogue: {err}</p>
         ) : rows.length === 0 ? (
           <p className="py-24 text-center text-sm text-muted-foreground">
-            Nothing is published yet — publish some products or supplier styles first.
+            {tl("catalogPrint", "Nothing is published yet — publish some products or supplier styles first.")}
           </p>
         ) : (
           <>
@@ -630,11 +632,10 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               >
                 <div className="mb-6 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
                 <h2 className="font-title text-4xl font-bold uppercase leading-none tracking-tight">
-                  What we make, and how
+                  {tl("catalogPrint", "What we make, and how")}
                 </h2>
                 <p className="mt-2 max-w-[150mm] text-sm leading-relaxed text-neutral-600">
-                  Blanks held and decorated to order — no minimums per design, and every piece
- printed, packed and shipped from one floor.
+                  {tl("catalogPrint", "Blanks held and decorated to order — no minimums per design, and every piece printed, packed and shipped from one floor.")}
                 </p>
 
                 <div className="mt-8 grid grid-cols-4 gap-6 border-y border-neutral-200 py-6">
@@ -658,7 +659,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  does not have a price for. */}
                 <div className="mt-8">
                   <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                    Decoration
+                    {tl("catalogPrint", "Decoration")}
                   </div>
                   <div className="mt-3 grid grid-cols-4 gap-3">
                     {PRODUCT_METHODS.map((m) => (
@@ -672,7 +673,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <div className="mt-auto flex items-end justify-between border-t border-neutral-200 pt-4 text-[10px] text-neutral-500">
                   <span>
                     {priced === rows.length
-                      ? "Every style in this book is priced."
+                      ? tl("catalogPrint", "Every style in this book is priced.")
  : `${priced} of ${rows.length} styles priced — ask us for the rest.`}
                   </span>
                   <span className="font-title text-sm font-semibold tracking-tight text-neutral-700">{brand.title}</span>
@@ -758,7 +759,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <div className="min-w-0">
                   <h2 className="font-title text-3xl font-bold uppercase leading-none tracking-tight">
                     <Editable
- editing={editing} value={st.name} placeholder="Name this style"
+ editing={editing} value={st.name} placeholder={tl("catalogPrint", "Name this style")}
                       // uppercase RE-DECLARED on the button: Tailwind's preflight sets
                       // `text-transform: none` on button/input, so the h2's uppercase stops at
                       // the edit affordance and the headline changed case when you toggled the
@@ -780,9 +781,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       <button
  type="button" onClick={() => revert(st)} disabled={savingRef === st.ref}
  className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200 print:hidden"
- title="Put the name, copy and photo back to what the catalogue says"
+ title={tl("catalogPrint", "Put the name, copy and photo back to what the catalogue says")}
                       >
-                        Edited · undo
+                        {tl("catalogPrint", "Edited · undo")}
                       </button>
                     )}
                   </div>
@@ -820,8 +821,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       <Editable
  editing={editing}
  value={sheetPrice(st) == null ? "" : String(sheetPrice(st))}
- placeholder="Set price"
- title="The trade rate for the blank. Printing and embroidery are added on top of it."
+ placeholder={tl("catalogPrint", "Set price")}
+ title={tl("catalogPrint", "The trade rate for the blank. Printing and embroidery are added on top of it.")}
  className="font-title text-4xl font-bold leading-none tabular-nums"
  inputClassName="w-28 text-right font-title text-2xl font-bold tabular-nums"
  onSave={(v) => {
@@ -853,7 +854,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                         mode to fix, and "N/A" on its own does not say what to do about it. */}
                     {editing && decoratedFrom(st) == null && (
                       <div className="mt-1 text-[9px] text-neutral-400 print:hidden">
-                        No decoration methods set on this style
+                        {tl("catalogPrint", "No decoration methods set on this style")}
                       </div>
                     )}
                   </div>
@@ -929,7 +930,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
  className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 shadow-sm hover:bg-white print:hidden"
                         >
-                          Replace photo
+                          {tl("catalogPrint", "Replace photo")}
                         </button>
                       )}
                     </div>
@@ -940,7 +941,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
  className="flex min-h-[60mm] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 print:hidden"
                     >
-                      Attach a photo for this style
+                      {tl("catalogPrint", "Attach a photo for this style")}
                     </button>
                   ) : null}
 
@@ -960,7 +961,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       <div className="mt-5">
                         <div className="flex items-baseline gap-2">
                           <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                            Available sizes
+                            {tl("catalogPrint", "Available sizes")}
                           </div>
                           {editing && st.sizes.length > 0 && (
                             <button
@@ -1004,7 +1005,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  return (
                         <div className="mt-4">
                           <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                            Size chart <span className="normal-case tracking-normal text-neutral-400">· inches</span>
+                            {tl("catalogPrint", "Size chart")} <span className="normal-case tracking-normal text-neutral-400">{tl("catalogPrint", "· inches")}</span>
                           </div>
                           {/* 8px was unreadable — the chart was present and might as well not
  have been, which is why the catalogue read as having none. 9.5px
@@ -1013,7 +1014,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                           <table className="mt-1.5 w-full border-collapse text-[9.5px]">
                             <thead>
                               <tr style={{ background: brand.accent, color: HOUSE.paper }}>
-                                <th className="rounded-l px-1.5 py-1 text-left font-bold">Size</th>
+                                <th className="rounded-l px-1.5 py-1 text-left font-bold">{tl("catalogPrint", "Size")}</th>
                                 {specNames.map((n, i) => (
                                   <th key={n}
  className={"px-1.5 py-1 text-left font-bold" + (i === specNames.length - 1 ? " rounded-r" : "")}>
@@ -1051,7 +1052,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       the room. */}
                   <div className="flex items-baseline gap-2">
                     <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                      Available colours
+                      {tl("catalogPrint", "Available colours")}
                     </div>
                     {editing && st.colors.length > 0 && (
                       <button
@@ -1064,7 +1065,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   </div>
                   {pickedColors.length === 0 ? (
                     <p className="mt-2 text-[11px] text-neutral-400">
-                      No colourway images on this style.
+                      {tl("catalogPrint", "No colourway images on this style.")}
                     </p>
                   ) : !pickedColors.some((c) => c.image) ? (
                     /* NAMES, when there are no pictures of them. A grid of bordered wells
@@ -1135,7 +1136,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  title={`Fix the ${c.name} picture`}
  className="absolute inset-0 z-10 flex items-end justify-center bg-black/0 pb-1 opacity-0 transition hover:bg-black/25 hover:opacity-100 print:hidden"
                               >
-                                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-neutral-700">Fix</span>
+                                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-neutral-700">{tl("catalogPrint", "Fix")}</span>
                               </button>
                             )}
                           </div>
@@ -1183,11 +1184,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       {/* Labelled, like the two sections above it. Unlabelled prose directly
                           under a grid of photographs reads as a caption for the photographs. */}
                       <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                        Details
+                        {tl("catalogPrint", "Details")}
                       </div>
                       <Editable
  editing={editing} value={st.description} multiline
- placeholder="Add a description"
+ placeholder={tl("catalogPrint", "Add a description")}
  className="mt-2 block text-[11px] text-neutral-500"
  onSave={(v) => patch(st, { description: v.trim() === "" ? null : v }, { description: v })}
                       >
@@ -1251,7 +1252,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <div className="mb-5 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
                 <div className="mb-6 border-b border-neutral-200 pb-4">
                   <h2 className="font-title text-3xl font-bold uppercase leading-none tracking-tight">
-                    Price list
+                    {tl("catalogPrint", "Price list")}
                   </h2>
                   <p className="mt-1.5 text-xs text-neutral-500">
                     Per unit, in USD{pages.length > 1 ? ` · sheet ${pi + 1} of ${pages.length}` : ""}
@@ -1261,18 +1262,18 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <table className="w-full border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-neutral-300 text-left align-bottom">
-                      <th className="pb-2 pr-3 text-[10px] uppercase tracking-wider text-neutral-500">Style</th>
-                      <th className="pb-2 pr-3 text-[10px] uppercase tracking-wider text-neutral-500">Sku</th>
+                      <th className="pb-2 pr-3 text-[10px] uppercase tracking-wider text-neutral-500">{tl("catalogPrint", "Style")}</th>
+                      <th className="pb-2 pr-3 text-[10px] uppercase tracking-wider text-neutral-500">{tl("catalogPrint", "Sku")}</th>
                       {/* "Base" was wrong: it printed catalog_price, the trade rate. This is the number
  a reader orders at, whichever of the two it resolves to. */}
                       {/* ONE COLUMN PER TECHNIQUE. "Unit" was the base plus whichever
  surcharge the product's first listed method carried, so a blank
  offered in both was quoted at one of them and the sheet was wrong
  about the other. Stitches cost more than ink. */}
-                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">Printing</th>
-                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">Embroidery</th>
-                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">First item<br />shipping</th>
-                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">Additional item<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">{tl("catalogPrint", "Printing")}</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">{tl("catalogPrint", "Embroidery")}</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">{tl("catalogPrint", "First item")}<br />shipping</th>
+                      <th className="pb-2 pl-3 text-right text-[10px] uppercase tracking-wider text-neutral-500">{tl("catalogPrint", "Additional item")}<br />shipping</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1343,13 +1344,13 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
 
             <div>
               <h2 className="font-title font-black leading-[0.9] tracking-tight" style={{ fontSize: "52px" }}>
-                How to<br />order
+                {tl("catalogPrint", "How to")}<br />order
               </h2>
               <ol className="mt-8 max-w-[120mm] space-y-4">
                 {[
- ["01", "Pick the style, colour and size", "Every sku in this catalogue is orderable as printed — the colour code beside each swatch is what we need."],
- ["02", "Send your artwork", "Print-ready files go straight through. We digitise embroidery ourselves if you'd rather."],
- ["03", "We make it and ship it", "Produced to order, packed, and tracking pushed back to your shop."],
+ ["01", tl("catalogPrint", "Pick the style, colour and size"), tl("catalogPrint", "Every sku in this catalogue is orderable as printed — the colour code beside each swatch is what we need.")],
+ ["02", tl("catalogPrint", "Send your artwork"), tl("catalogPrint", "Print-ready files go straight through. We digitise embroidery ourselves if you'd rather.")],
+ ["03", tl("catalogPrint", "We make it and ship it"), tl("catalogPrint", "Produced to order, packed, and tracking pushed back to your shop.")],
                 ].map(([n, h, b]) => (
                   <li key={n} className="flex gap-4">
                     <span className="font-title text-lg font-black leading-none" style={{ color: HOUSE.lime }}>{n}</span>
@@ -1371,7 +1372,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  back cover reads as a template nobody finished, which is worse than none. */}
               {(brand.email || brand.phone || brand.site || brand.address) && (
                 <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                  {([["Email", brand.email], ["Phone", brand.phone], ["Online", brand.site], ["Address", brand.address]] as const)
+                  {([[tl("catalogPrint", "Email"), brand.email], [tl("catalogPrint", "Phone"), brand.phone], [tl("catalogPrint", "Online"), brand.site], [tl("catalogPrint", "Address"), brand.address]] as const)
                     .filter(([, v]) => !!v)
                     .map(([k, v]) => (
                       <div key={k}>
