@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { Key, Copy, Check, CircleNotch, Warning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
@@ -49,14 +50,15 @@ type DevTab = "api" | "webhooks"
  * Module scope, not defined during render (react-hooks/static-components).
  */
 function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
+  const tl = useLabelT()
   // No icons — see the note in design-lab-tabs.tsx. Two words each; a mark in front of
   // them is decoration competing with the label.
  const items: { id: DevTab; label: string }[] = [
-    { id: "api", label: "API Explorer" },
-    { id: "webhooks", label: "Webhooks" },
+    { id: "api", label: tl("apiPlayground", "API Explorer") },
+    { id: "webhooks", label: tl("apiPlayground", "Webhooks") },
   ]
  return (
-    <nav aria-label="Developer sections" className={cn(tabsListVariants(), "h-8 w-fit")}>
+    <nav aria-label={tl("apiPlayground", "Developer sections")} className={cn(tabsListVariants(), "h-8 w-fit")}>
       {items.map(({ id, label }) => (
         <button
  key={id}
@@ -73,6 +75,7 @@ function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
 }
 
 export function ApiPlayground() {
+  const tl = useLabelT()
  const [tab, setTab] = useState<DevTab>("api")
  const [env, setEnv] = useState<"test" | "live">("test")
  const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
@@ -157,15 +160,15 @@ export function ApiPlayground() {
       {/* Getting started — collapsed by default so the test key is the focus */}
       <details className="group rounded-2xl border border-border bg-card">
         <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-semibold">
-          <BookOpen size={16} weight="duotone" className="text-primary" /> Getting started
+          <BookOpen size={16} weight="duotone" className="text-primary" /> {tl("apiPlayground", "Getting started")}
           <CaretRight size={13} weight="bold" className="ml-auto text-muted-foreground transition-transform group-open:rotate-90" />
         </summary>
         <div className="border-t border-border">
           <div className="grid gap-4 p-5 sm:grid-cols-3">
             {[
-              { n: "1", h: "Get a key", b: "Generate a key (egk_test_…) in Settings → API keys, then paste it below. Send it on every request as the X-API-Key header." },
-              { n: "2", h: "Build in the sandbox", b: "Every call hits /api/test/* — it validates auth and returns realistic responses but creates NO real orders, labels, or charges. Try the endpoints below." },
-              { n: "3", h: "Go live", b: "Once your integration works, live access (a production key + real order endpoints) is enabled per-account — reach out and we'll turn it on." },
+              { n: "1", h: tl("apiPlayground", "Get a key"), b: tl("apiPlayground", "Generate a key (egk_test_…) in Settings → API keys, then paste it below. Send it on every request as the X-API-Key header.") },
+              { n: "2", h: tl("apiPlayground", "Build in the sandbox"), b: tl("apiPlayground", "Every call hits /api/test/* — it validates auth and returns realistic responses but creates NO real orders, labels, or charges. Try the endpoints below.") },
+              { n: "3", h: tl("apiPlayground", "Go live"), b: tl("apiPlayground", "Once your integration works, live access (a production key + real order endpoints) is enabled per-account — reach out and we'll turn it on.") },
             ].map((s) => (
               <div key={s.n} className="rounded-xl border border-border p-4">
                 <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{s.n}</span>
@@ -175,20 +178,20 @@ export function ApiPlayground() {
             ))}
           </div>
           <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-            Two directions: pull orders <span className="font-medium text-foreground">from</span> a sales channel (Etsy/Shopify — Stores page), or let another system push orders <span className="font-medium text-foreground">to</span> EGFUL via this API. The sandbox is for the second.
+            {tl("apiPlayground", "Two directions: pull orders")} <span className="font-medium text-foreground">from</span> {tl("apiPlayground", "a sales channel (Etsy/Shopify — Stores page), or let another system push orders")} <span className="font-medium text-foreground">to</span> {tl("apiPlayground", "EGFUL via this API. The sandbox is for the second.")}
           </div>
         </div>
       </details>
 
       {/* Key bar */}
       <SectionCard
- title={<span className="flex items-center gap-2">Your API key
-          <span className={"rounded-full px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-alert/12 text-alert" : "bg-shipped/12 text-shipped")}>{env === "live" ? "Live" : "Sandbox"}</span>
+ title={<span className="flex items-center gap-2">{tl("apiPlayground", "Your API key")}
+          <span className={"rounded-full px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-alert/12 text-alert" : "bg-shipped/12 text-shipped")}>{env === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</span>
         </span>}
  actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(["test", "live"] as const).map((m) => (
-              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-alert text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? "Live" : "Sandbox"}</button>
+              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-alert text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</button>
             ))}
           </div>
         }
@@ -196,7 +199,7 @@ export function ApiPlayground() {
         <div className="space-y-3 p-5">
           {env === "live" && (
             <div className="flex items-start gap-2 rounded-lg border border-alert/30 bg-alert/12 px-3 py-2 text-sm text-alert">
-              <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> <span><b>Live mode</b> — a live key (egk_live_…) makes calls create <b>real</b> orders. Use a test key while building.</span>
+              <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> <span><b>{tl("apiPlayground", "Live mode")}</b> {tl("apiPlayground", "— a live key (egk_live_…) makes calls create")} <b>real</b> {tl("apiPlayground", "orders. Use a test key while building.")}</span>
             </div>
           )}
           <div className="flex flex-wrap items-center gap-2">
@@ -228,8 +231,8 @@ export function ApiPlayground() {
                   <button
  type="button"
  onClick={async () => { try { await navigator.clipboard.writeText(apiKey); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
- aria-label="Copy key"
- title="Copy"
+ aria-label={tl("apiPlayground", "Copy key")}
+ title={tl("apiPlayground", "Copy")}
  className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
@@ -240,10 +243,10 @@ export function ApiPlayground() {
             {/* Keys are created & managed in ONE place — Settings → API keys — so the
                 Explorer stays a pure try-it surface (no second generator to drift from it). */}
             <a href="/settings?tab=keys" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-input bg-card px-3 text-sm font-medium transition-colors hover:bg-accent">
-              <Key size={14} weight="bold" /> Manage keys
+              <Key size={14} weight="bold" /> {tl("apiPlayground", "Manage keys")}
             </a>
           </div>
-          <p className="text-xs text-muted-foreground">Keys are created &amp; managed in <a href="/settings?tab=keys" className="font-medium text-foreground underline underline-offset-2">Settings → API keys</a> — generate one there and paste it above. {env === "live" ? "A live key makes calls create real records." : "A sandbox key hits /api/test/* — no real orders, labels or charges."}</p>
+          <p className="text-xs text-muted-foreground">Keys are created &amp; managed in <a href="/settings?tab=keys" className="font-medium text-foreground underline underline-offset-2">{tl("apiPlayground", "Settings → API keys")}</a> — generate one there and paste it above. {env === "live" ? tl("apiPlayground", "A live key makes calls create real records.") : tl("apiPlayground", "A sandbox key hits /api/test/* — no real orders, labels or charges.")}</p>
         </div>
       </SectionCard>
 
@@ -284,7 +287,7 @@ export function ApiPlayground() {
 
               {selected.method === "POST" && (
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium">Request body</span>
+                  <span className="text-sm font-medium">{tl("apiPlayground", "Request body")}</span>
                   <textarea
  value={body}
  onChange={(e) => setBody(e.target.value)}
@@ -298,13 +301,13 @@ export function ApiPlayground() {
               <Button onClick={send} disabled={sending || !apiKey.trim()}>
                 {sending ? <CircleNotch size={15} className="animate-spin" /> : null} Send request
               </Button>
-              {!apiKey.trim() && <span className="ml-2 text-xs text-muted-foreground">Add a test key above to send.</span>}
+              {!apiKey.trim() && <span className="ml-2 text-xs text-muted-foreground">{tl("apiPlayground", "Add a test key above to send.")}</span>}
             </div>
           </SectionCard>
 
           {res && (
             <SectionCard
- title="Response"
+ title={tl("apiPlayground", "Response")}
  actions={
                 <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + (res.ok ? "bg-shipped/12 text-shipped" : "bg-alert/12 text-alert")}>
                   {res.status || "ERR"}

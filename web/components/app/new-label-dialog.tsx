@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useRef, useState } from "react"
 import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck, Package, Printer } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -37,6 +38,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
    * falls back to the stock mailer. */
  order?: { id: string; num?: string; to?: ShipAddress; items?: OrderItem[] }
 }) {
+  const tl = useLabelT()
  const [pasteText, setPasteText] = useState("")
  const [to, setTo] = useState<ShipAddress>({ ...BLANK })
  const confirm = useConfirm()
@@ -334,7 +336,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  setFactorySettings({ ship_from: from }).catch(() => {})
  try {
  const v = await validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
- if (v && !v.ok && v.error && !(await confirm({ title: "Address couldn't be verified", body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
+ if (v && !v.ok && v.error && !(await confirm({ title: tl("label", "Address couldn't be verified"), body: `${v.error} — buy the label anyway?`, confirmLabel: "Buy anyway" }))) return
       } catch { /* validation unavailable — proceed */ }
  const r = await buyUspsLabel({ to, from, orderId, weightOz, length: pkg.length, width: pkg.width, height: pkg.height, signature: svc.signature, insurance: svc.insurance || undefined, rateToken: picked.token, rate: { amount: picked.amount, carrier: picked.carrier, service: picked.service, carrierAccount: picked.carrierAccount } })
  if (!r.ok) {
@@ -373,7 +375,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  which is where the helper text settles onto two lines and a rate row fits without
  truncating the service name. */}
       <DialogContent className="sm:max-w-5xl">
-        <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : "New label"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{order ? `New label · ${order.num || order.id}` : tl("label", "New label")}</DialogTitle></DialogHeader>
 
         {result ? (
           <div className="space-y-3 py-2">
@@ -387,7 +389,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <iframe
  ref={frameRef}
  src={labelSrc}
- title="Shipping label"
+ title={tl("label", "Shipping label")}
  aria-hidden
  className="pointer-events-none fixed left-[-9999px] top-0 size-[1px] opacity-0"
               />
@@ -396,10 +398,10 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  made this so hard to place. "Preparing…" is also simply the truth in the
  second before anything can happen. */}
             <div className="text-xs text-muted-foreground">
-              {printStage.at === "fetching" && "Fetching the label…"}
-              {printStage.at === "rendering" && "Preparing the label…"}
-              {printStage.at === "printing" && "Opening the print dialog…"}
-              {printStage.at === "done" && "Sent to the printer."}
+              {printStage.at === "fetching" && tl("label", "Fetching the label…")}
+              {printStage.at === "rendering" && tl("label", "Preparing the label…")}
+              {printStage.at === "printing" && tl("label", "Opening the print dialog…")}
+              {printStage.at === "done" && tl("label", "Sent to the printer.")}
               {printStage.at === "idle" && printStage.why && (
                 <span className="text-hold">Didn&apos;t print automatically — {printStage.why}</span>
               )}
@@ -409,7 +411,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  wrong tray, or the second copy. */}
               {labelSrc && (
                 <Button onClick={() => void printPacket()}>
-                  <Printer size={14} weight="bold" /> {printStage.at === "done" ? "Print again" : "Print label"}
+                  <Printer size={14} weight="bold" /> {printStage.at === "done" ? tl("label", "Print again") : tl("label", "Print label")}
                 </Button>
               )}
               {/* THE OTHER DOCUMENT A PACKER NEEDS, one click away from the label that was
@@ -425,23 +427,23 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  const msg = printPackingSlips([{ id: order.id, num: order.num, items: order.items, address: order.to } as never])
  if (msg) setErr(msg)
                 }}>
-                  Packing slip
+                  {tl("label", "Packing slip")}
                 </Button>
               )}
               {result.labelUrl && (
                 <a href={result.labelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent">
-                  <ArrowSquareOut size={14} weight="bold" /> Open label
+                  <ArrowSquareOut size={14} weight="bold" /> {tl("label", "Open label")}
                 </a>
               )}
-              <Button variant="outline" onClick={reset}>Another</Button>
-              <Button onClick={() => onOpenChange(false)}>Done</Button>
+              <Button variant="outline" onClick={reset}>{tl("label", "Another")}</Button>
+              <Button onClick={() => onOpenChange(false)}>{tl("label", "Done")}</Button>
             </div>
           </div>
         ) : (
           <>
             <div className="grid gap-x-5 gap-y-3 py-1 md:grid-cols-2">
               <div className="space-y-3 md:col-span-1">
-              <div className="eg-label text-muted-foreground">Ship to</div>
+              <div className="eg-label text-muted-foreground">{tl("label", "Ship to")}</div>
               {/* Live validation status sits INSIDE the box, bottom-right; extra bottom padding
  keeps the last address line clear of it. */}
               <div className="relative">
@@ -457,21 +459,21 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <div className="pointer-events-none absolute bottom-2 right-2.5">
-                  {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> Checking…</span>}
-                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> Validated</span>}
-                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? "Couldn't verify" : "Not found"}</span>}
+                  {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("label", "Checking…")}</span>}
+                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("label", "Validated")}</span>}
+                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? tl("label", "Couldn't verify") : tl("label", "Not found")}</span>}
                 </div>
               </div>
-              <p className="text-2xs text-muted-foreground">Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).</p>
+              <p className="text-2xs text-muted-foreground">{tl("label", "Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).")}</p>
 
-              <div className="pt-1 eg-label text-muted-foreground">Parcel</div>
+              <div className="pt-1 eg-label text-muted-foreground">{tl("label", "Parcel")}</div>
 
               {/* THE PACKAGE FIRST. It is the choice that fills three of the five numbers
  below, so asking for it last meant typing dimensions and then overwriting
  them. Same control and same "Custom size…" escape hatch as the rate
  calculator, so the two screens ask the question identically. */}
               <label className="flex flex-col gap-1">
-                <span className="text-2xs text-muted-foreground">Package</span>
+                <span className="text-2xs text-muted-foreground">{tl("label", "Package")}</span>
                 <select
  value={customSize ? "custom" : (sizes.find((z) => sizeKey(z) === sizeKey(pkg)) ? sizeKey(pkg) : "custom")}
  onChange={(e) => {
@@ -489,13 +491,13 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   {sizes.map((z) => (
                     <option key={sizeKey(z)} value={sizeKey(z)}>{z.label || sizeLabel(z)}</option>
                   ))}
-                  <option value="custom">Custom size…</option>
+                  <option value="custom">{tl("label", "Custom size…")}</option>
                 </select>
               </label>
 
               {/* Weight always — it is the one thing no package can tell us. */}
               <div className="flex flex-wrap items-end gap-2">
-                <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">Weight lb</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
+                <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("label", "Weight lb")}</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => { setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 {/* The mailer's own size, stated rather than sitting in three boxes nobody
  needs to touch — five cramped inputs in a row was the "weird" part. */}
@@ -506,9 +508,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
 
               {(customSize || !sizes.some((z) => sizeKey(z) === sizeKey(pkg))) && (
                 <div className="flex flex-wrap items-end gap-2">
-                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">L in</span><Input type="number" min={1} value={pkg.length} onChange={(e) => { setPkg({ ...pkg, length: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
-                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">W in</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
-                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">H in</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("label", "L in")}</span><Input type="number" min={1} value={pkg.length} onChange={(e) => { setPkg({ ...pkg, length: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("label", "W in")}</span><Input type="number" min={1} value={pkg.width} onChange={(e) => { setPkg({ ...pkg, width: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
+                  <label className="flex w-16 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("label", "H in")}</span><Input type="number" min={1} value={pkg.height} onChange={(e) => { setPkg({ ...pkg, height: Number(e.target.value) }); invalidateRates() }} className="h-9" /></label>
                   {/* THE EMPTY PACKAGING'S OWN WEIGHT.
                       ────────────────────────────────
                       A poly mailer is a fraction of an ounce and rounds to nothing. A rigid
@@ -520,7 +522,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                       Asked here rather than beside the stock mailers, because this is the
  row where somebody is describing a box. */}
                   <label className="flex w-20 flex-col gap-1">
-                    <span className="text-2xs text-muted-foreground" title="What the empty box or mailer weighs — added to the contents">Box oz</span>
+                    <span className="text-2xs text-muted-foreground" title={tl("label", "What the empty box or mailer weighs — added to the contents")}>{tl("label", "Box oz")}</span>
                     <Input type="number" min={0} value={tareOz} onChange={(e) => { setTareOz(Math.max(0, Number(e.target.value) || 0)); invalidateRates() }} className="h-9" />
                   </label>
                   {/* Only offered when the dimensions are genuinely new — a button that saves
@@ -552,10 +554,10 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input type="checkbox" checked={svc.signature} onChange={(e) => { setSvc({ ...svc, signature: e.target.checked }); invalidateRates() }} className="size-4 accent-[var(--primary)]" />
-                  Signature
+                  {tl("label", "Signature")}
                 </label>
                 <label className="flex items-center gap-1.5 text-sm">
-                  <span className="text-muted-foreground">Insure $</span>
+                  <span className="text-muted-foreground">{tl("label", "Insure $")}</span>
                   <Input type="number" min={0} step={1} value={svc.insurance || ""} placeholder="0" onChange={(e) => { setSvc({ ...svc, insurance: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9 w-20" />
                 </label>
               </div>
@@ -567,9 +569,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  to reach. Its own column, its own scroll, so a long list of services
  never pushes the Buy button off screen. */}
               <div className="space-y-3 md:col-span-1">
-              <div className="eg-label text-muted-foreground">Rates</div>
+              <div className="eg-label text-muted-foreground">{tl("label", "Rates")}</div>
               <Button variant="outline" className="w-full" onClick={getRates} disabled={ratesLoading || !addrComplete(to) || !addrComplete(from)}>
-                {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> Getting rates…</> : rates ? "Refresh rates" : <><Truck size={14} weight="bold" /> Get rates</>}
+                {ratesLoading ? <><CircleNotch size={14} className="animate-spin" /> {tl("label", "Getting rates…")}</> : rates ? tl("label", "Refresh rates") : <><Truck size={14} weight="bold" /> {tl("label", "Get rates")}</>}
               </Button>
               {/* WHICH ENVIRONMENT BOUGHT THIS.
                   USPS's TEM host returns a real-looking PDF with a real-looking tracking
@@ -578,15 +580,12 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  here, above the button that spends money, rather than left to be inferred. */}
               {rates && rates.length > 0 && rates.some((r) => r.test) && (
                 <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
-                  <span className="font-semibold">Test environment.</span> Buying here produces a
- sample label — it is not valid postage and nothing is charged. Switch USPS to
-                  Live in Settings › API keys when you are ready to ship for real.
+                  <span className="font-semibold">{tl("label", "Test environment.")}</span> {tl("label", "Buying here produces a sample label — it is not valid postage and nothing is charged. Switch USPS to Live in Settings › API keys when you are ready to ship for real.")}
                 </div>
               )}
               {rates && (rates.length === 0 ? (
                 <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
-                  No rates for this parcel. Check the address and weight, and that a shipping
- provider is set up — Shippo, or USPS under Settings › API keys.
+                  {tl("label", "No rates for this parcel. Check the address and weight, and that a shipping provider is set up — Shippo, or USPS under Settings › API keys.")}
                 </div>
               ) : (
                 <div className="max-h-[26rem] space-y-1.5 overflow-y-auto pr-1">
@@ -596,7 +595,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                       <div className="min-w-0 flex-1">
                         <div className="font-medium">{r.carrier}{r.service ? ` · ${r.service}` : ""}</div>
                         <div className="text-2xs text-muted-foreground">
-                          {r.eta || (r.days != null ? `${r.days} day${r.days === 1 ? "" : "s"}` : "delivery est. n/a")}
+                          {r.eta || (r.days != null ? `${r.days} day${r.days === 1 ? "" : "s"}` : tl("label", "delivery est. n/a"))}
                         </div>
                       </div>
                       <div className="shrink-0 font-semibold tabular-nums">{usd(r.amount)}</div>
@@ -607,18 +606,18 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
 
               {!addrComplete(from) && (
                 <div className="rounded-lg border border-hold/30 bg-hold/10 px-3 py-2 text-xs text-hold">
-                  No warehouse ‘From’ address saved — set it in Settings › Platform before buying.
+                  {tl("label", "No warehouse ‘From’ address saved — set it in Settings › Platform before buying.")}
                 </div>
               )}
               {err && <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</div>}
               </div>{/* /right column */}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>{tl("label", "Cancel")}</Button>
               <Button onClick={buy} disabled={busy || !pickedToken}>
-                {busy ? <><CircleNotch size={14} className="animate-spin" /> Buying…</>
+                {busy ? <><CircleNotch size={14} className="animate-spin" /> {tl("label", "Buying…")}</>
  : pickedToken ? `Buy label · ${usd(rates?.find((r) => r.token === pickedToken)?.amount || 0)}`
- : "Buy label"}
+ : tl("label", "Buy label")}
               </Button>
             </DialogFooter>
           </>

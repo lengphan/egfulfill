@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CircleNotch, Sparkle, Warning, Check, X, Eraser, CaretDown, CaretLeft, CaretRight, ImageSquare, MagnifyingGlassPlus, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
@@ -198,6 +199,7 @@ export function ListingPhotoStudio({
   colors?: string[]
   listingTitle?: string
 }) {
+  const tl = useLabelT()
   const [cfg, setCfg] = useState<(DeskImageConfig & { quote?: AiQuote }) | null>(null)
   const [cfgErr, setCfgErr] = useState<string | null>(null)
   const [loadingCfg, setLoadingCfg] = useState(false)
@@ -610,7 +612,7 @@ export function ListingPhotoStudio({
             part in the header of a window whose whole problem was things moving. The two
             column headings below already say which side is which. */}
         <DialogTitle className="border-b border-border px-4 py-3 text-sm font-semibold">
-          Generate Images
+          {tl("photoStudio", "Generate Images")}
         </DialogTitle>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -669,8 +671,8 @@ export function ListingPhotoStudio({
                   <button
                     type="button"
                     onClick={() => openZoom("ref", heroRef)}
-                    aria-label="View this reference photo full size"
-                    title="View full size"
+                    aria-label={tl("photoStudio", "View this reference photo full size")}
+                    title={tl("photoStudio", "View full size")}
                     className="group size-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -692,7 +694,7 @@ export function ListingPhotoStudio({
                       <MagnifyingGlassPlus size={13} weight="bold" />
                     </span>
                   </button>
-                ) : <span className="text-xs text-muted-foreground">No reference photo</span>}
+                ) : <span className="text-xs text-muted-foreground">{tl("photoStudio", "No reference photo")}</span>}
               </Frame>
               {references.length > 1 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -725,8 +727,8 @@ export function ListingPhotoStudio({
                   <button
                     type="button"
                     onClick={() => openZoom("gen", heroGen)}
-                    aria-label="View this render full size"
-                    title="View full size"
+                    aria-label={tl("photoStudio", "View this render full size")}
+                    title={tl("photoStudio", "View full size")}
                     className="group size-full cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
                   >
                     {/* object-contain against a frame that is ALREADY this render's aspect —
@@ -764,7 +766,7 @@ export function ListingPhotoStudio({
                       {busy ? (
                         <span className="flex flex-col items-center gap-2 text-xs font-medium text-primary">
                           <CircleNotch size={26} className="animate-spin" />
-                          Rendering {count > 1 ? `${count} photos` : "a photo"}…
+                          Rendering {count > 1 ? `${count} photos` : tl("photoStudio", "a photo")}…
                         </span>
                       ) : null}
                       {/* The violet itself, not --brand-foreground. That token is the LIME half of the
@@ -779,12 +781,12 @@ export function ListingPhotoStudio({
               {hero && (
                 <>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" onClick={() => use(hero)}>Use this photo</Button>
+                    <Button size="sm" onClick={() => use(hero)}>{tl("photoStudio", "Use this photo")}</Button>
                     {/* Free, so it says so — every other button in this panel spends money. */}
                     <Button size="sm" variant="outline" onClick={() => cutOut(hero)} disabled={cutting === hero.url || hero.cutOut}
                       title={hero.cutOut ? "Background already removed" : "Lift the backdrop off and keep it as a PNG — done in your browser, no charge"}>
                       {cutting === hero.url ? <CircleNotch size={13} className="animate-spin" /> : <Eraser size={13} weight="bold" />}
-                      {hero.cutOut ? "Background removed" : cutting === hero.url ? "Removing…" : "Remove background"}
+                      {hero.cutOut ? tl("photoStudio", "Background removed") : cutting === hero.url ? tl("photoStudio", "Removing…") : tl("photoStudio", "Remove background")}
                     </Button>
                     {/* FEED IT BACK IN. A render can brief the next one, which is how this
                         work actually goes — the first pass sets the look and every pass after
@@ -800,7 +802,7 @@ export function ListingPhotoStudio({
                         : "Use this render as a reference for the next one"}
                     >
                       <Check size={13} weight="bold" />
-                      {usedAsRef.includes(hero.url) ? "Used as reference" : "Use as reference"}
+                      {usedAsRef.includes(hero.url) ? tl("photoStudio", "Used as reference") : tl("photoStudio", "Use as reference")}
                     </Button>
                     {/* THE WORDS THAT MADE IT. Only offered when the box does not already
                         hold them, and only on a render that came back from the history with
@@ -811,11 +813,11 @@ export function ListingPhotoStudio({
                       <Button size="sm" variant="ghost" className="text-muted-foreground"
                         onClick={() => { setPrompt(hero.prompt || ""); setPreset(null) }}
                         title={hero.prompt}>
-                        <Sparkle size={13} weight="fill" /> Use this brief
+                        <Sparkle size={13} weight="fill" /> {tl("photoStudio", "Use this brief")}
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => drop(hero.url)}>
-                      <X size={13} weight="bold" /> Discard
+                      <X size={13} weight="bold" /> {tl("photoStudio", "Discard")}
                     </Button>
                     {cands.length > 1 && <span className="text-2xs text-muted-foreground">{heroGen + 1} of {cands.length}</span>}
                   </div>
@@ -865,9 +867,9 @@ export function ListingPhotoStudio({
               <div className="space-y-2">
                 <div className="flex items-start gap-2 text-xs text-destructive">
                   <Warning size={14} className="mt-0.5 shrink-0" />
-                  <span>{cfgErr || "Couldn't load the generation settings."}</span>
+                  <span>{cfgErr || tl("photoStudio", "Couldn't load the generation settings.")}</span>
                 </div>
-                <Button size="sm" variant="outline" className="h-8" onClick={loadCfg}>Try again</Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={loadCfg}>{tl("photoStudio", "Try again")}</Button>
               </div>
             )}
 
@@ -875,8 +877,8 @@ export function ListingPhotoStudio({
               <div className="flex items-start gap-2 rounded-md bg-hold/10 p-2 text-xs text-hold">
                 <Warning size={14} className="mt-0.5 shrink-0" />
                 <span>{!cfg.keySet
-                  ? "No Google AI key is set. An admin can add one in Settings › Integrations."
-                  : "File storage isn't configured, so a generated photo couldn't be kept."}</span>
+                  ? tl("photoStudio", "No Google AI key is set. An admin can add one in Settings › Integrations.")
+                  : tl("photoStudio", "File storage isn't configured, so a generated photo couldn't be kept.")}</span>
               </div>
             )}
 
@@ -903,7 +905,7 @@ export function ListingPhotoStudio({
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={8}
-                    placeholder="Describe the photograph we want — or press Write from photos and edit what comes back."
+                    placeholder={tl("photoStudio", "Describe the photograph we want — or press Write from photos and edit what comes back.")}
                     /* Bigger, because this is a paragraph and it was being written through a
                        letterbox. field-sizing still grows it; the cap stops a long brief
                        pushing the toolbar off screen. */
@@ -940,9 +942,9 @@ export function ListingPhotoStudio({
                         : "Tick a reference photo above, or use one of our renders"}
                     >
                       {reading ? <CircleNotch size={13} className="animate-spin" /> : <Sparkle size={13} weight="fill" />}
-                      {reading ? "Reading…"
-                        : (!picked.length && !usedAsRef.length) ? "Pick a photo first"
-                        : prompt ? "Rewrite from photos" : "Write from photos"}
+                      {reading ? tl("photoStudio", "Reading…")
+                        : (!picked.length && !usedAsRef.length) ? tl("photoStudio", "Pick a photo first")
+                        : prompt ? tl("photoStudio", "Rewrite from photos") : tl("photoStudio", "Write from photos")}
                     </Button>
 
                     {/* A photograph brief is the longest free text anyone types in this app and
@@ -951,7 +953,7 @@ export function ListingPhotoStudio({
                       value={prompt}
                       onChange={setPrompt}
                       className="size-8 shrink-0"
-                      label="Describe the photo out loud"
+                      label={tl("photoStudio", "Describe the photo out loud")}
                     />
 
                     {/* FOUR SETTINGS, ONE CONTROL — the shape the chat composer already uses.
@@ -964,7 +966,7 @@ export function ListingPhotoStudio({
                         onClick={() => setSettingsOpen((o) => !o)}
                         aria-expanded={settingsOpen}
                         className="h-8 gap-1.5 text-xs font-normal tabular-nums"
-                        title="Model, shape, size and how many"
+                        title={tl("photoStudio", "Model, shape, size and how many")}
                       >
                         {ratio} · {effSize} · ×{count}
                         <CaretDown size={11} weight="bold" className="text-muted-foreground" />
@@ -975,7 +977,7 @@ export function ListingPhotoStudio({
                           <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setSettingsOpen(false)} />
                           <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 shadow-lg">
                             <div>
-                              <div className="mb-1 text-2xs text-muted-foreground">Model</div>
+                              <div className="mb-1 text-2xs text-muted-foreground">{tl("photoStudio", "Model")}</div>
                               <select value={model} className={selectCls}
                                 onChange={(e) => {
                                   const id = e.target.value; setModel(id)
@@ -986,20 +988,20 @@ export function ListingPhotoStudio({
                               </select>
                             </div>
                             <div>
-                              <div className="mb-1 text-2xs text-muted-foreground">Shape</div>
+                              <div className="mb-1 text-2xs text-muted-foreground">{tl("photoStudio", "Shape")}</div>
                               <select value={ratio} onChange={(e) => setRatio(e.target.value)} className={selectCls}>
                                 {cfg.ratios.map((r) => <option key={r} value={r}>{cfg.ratioHints[r] ? `${r} — ${cfg.ratioHints[r]}` : r}</option>)}
                               </select>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <div className="mb-1 text-2xs text-muted-foreground">Size</div>
+                                <div className="mb-1 text-2xs text-muted-foreground">{tl("photoStudio", "Size")}</div>
                                 <select value={effSize} onChange={(e) => setSize(e.target.value)} className={selectCls}>
                                   {(spec?.sizes || []).map((s) => <option key={s} value={s}>{s}</option>)}
                                 </select>
                               </div>
                               <div>
-                                <div className="mb-1 text-2xs text-muted-foreground">How many</div>
+                                <div className="mb-1 text-2xs text-muted-foreground">{tl("photoStudio", "How many")}</div>
                                 <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={selectCls}>
                                   {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
                                 </select>
@@ -1010,11 +1012,11 @@ export function ListingPhotoStudio({
                                 the choice belongs here, before the money moves. Grey is for white
  garments, which no colour-distance cut-out can lift off white. */}
                             <div>
-                              <div className="mb-1 text-2xs text-muted-foreground">Backdrop</div>
+                              <div className="mb-1 text-2xs text-muted-foreground">{tl("photoStudio", "Backdrop")}</div>
                               <select value={backdrop} onChange={(e) => setBackdrop(e.target.value as Backdrop | "")} className={selectCls}>
-                                <option value="">As described</option>
-                                <option value="white">Flat white — cut-out ready</option>
-                                <option value="grey">Flat grey — cut-out ready, for white garments</option>
+                                <option value="">{tl("photoStudio", "As described")}</option>
+                                <option value="white">{tl("photoStudio", "Flat white — cut-out ready")}</option>
+                                <option value="grey">{tl("photoStudio", "Flat grey — cut-out ready, for white garments")}</option>
                               </select>
                             </div>
                             {spec?.note && <p className="text-2xs leading-snug text-muted-foreground">{spec.note}</p>}
@@ -1030,13 +1032,13 @@ export function ListingPhotoStudio({
                       <span className="text-xs tabular-nums text-muted-foreground">
                         {batchCost > 0
                           ? <>{count} × {unit(perImage)} = <span className="font-semibold text-foreground">{money(batchCost)}</span></>
-                          : "no charge"}
+                          : tl("photoStudio", "no charge")}
                         {!staffViewer && freeLeft > 0 && <> · {freeLeft} free left this month</>}
                         {!staffViewer && quote?.imagesLeftToday != null && <> · {quote.imagesLeftToday} left today</>}
                       </span>
                       <Button size="sm" className="h-8" onClick={generate} disabled={busy || !prompt.trim()}>
                         {busy && <CircleNotch size={14} className="animate-spin" />}
-                        {busy ? "Rendering…" : "Generate"}
+                        {busy ? tl("photoStudio", "Rendering…") : tl("photoStudio", "Generate")}
                       </Button>
                     </div>
                   </div>
@@ -1080,7 +1082,7 @@ export function ListingPhotoStudio({
                 className="flex w-full items-center gap-1.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               >
                 <CaretDown size={11} weight="bold" className={"text-muted-foreground transition-transform " + (histOpen ? "" : "-rotate-90")} />
-                History
+                {tl("photoStudio", "History")}
                 <span className="tabular-nums text-muted-foreground">{history.length}</span>
               </button>
 
@@ -1101,7 +1103,7 @@ export function ListingPhotoStudio({
                               type="button"
                               onClick={() => openFromHistory(h)}
                               title={h.prompt || "Open this render"}
-                              aria-label="Open this render"
+                              aria-label={tl("photoStudio", "Open this render")}
                               className="size-20 overflow-hidden rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/60"
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1114,8 +1116,8 @@ export function ListingPhotoStudio({
                             <button
                               type="button"
                               onClick={() => forgetFromHistory(h)}
-                              aria-label="Remove this render from the history"
-                              title="Remove from history — the photo itself is kept"
+                              aria-label={tl("photoStudio", "Remove this render from the history")}
+                              title={tl("photoStudio", "Remove from history — the photo itself is kept")}
                               className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full border-2 border-white bg-black/45 text-white shadow-sm outline-none transition-colors hover:bg-destructive focus-visible:ring-2 focus-visible:ring-ring/60"
                             >
                               <Trash size={10} weight="bold" />
@@ -1175,15 +1177,15 @@ export function ListingPhotoStudio({
         <div className="flex items-center justify-between gap-2">
           <Button size="sm" variant="outline" onClick={toggleZoomedIn}>
             <MagnifyingGlassPlus size={13} weight="bold" />
-            {zoomedIn ? "Fit" : "Zoom in"}
+            {zoomedIn ? tl("photoStudio", "Fit") : tl("photoStudio", "Zoom in")}
           </Button>
           {zoomList.length > 1 && (
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => stepZoom(-1)} aria-label="Previous">
+              <Button size="sm" variant="outline" onClick={() => stepZoom(-1)} aria-label={tl("photoStudio", "Previous")}>
                 <CaretLeft size={13} weight="bold" />
               </Button>
               <span className="text-2xs tabular-nums text-muted-foreground">{(zoom?.index ?? 0) + 1} / {zoomList.length}</span>
-              <Button size="sm" variant="outline" onClick={() => stepZoom(1)} aria-label="Next">
+              <Button size="sm" variant="outline" onClick={() => stepZoom(1)} aria-label={tl("photoStudio", "Next")}>
                 <CaretRight size={13} weight="bold" />
               </Button>
             </div>

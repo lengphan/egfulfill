@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { Package, Barcode, MapPin, Warning, CircleNotch, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -37,6 +38,7 @@ const STATUS_TONE: Record<string, string> = {
  * seller, and the bins it lives in.
  */
 export function ConsignmentPanel() {
+  const tl = useLabelT()
  const [shipments, setShipments] = useState<ConsignmentShipment[] | null>(null)
  const [stock, setStock] = useState<ConsignmentStock[]>([])
  const [bins, setBins] = useState<WarehouseBin[]>([])
@@ -154,23 +156,22 @@ export function ConsignmentPanel() {
       )}
 
       <StatGrid>
-        <StatCard label="Inbound" value={String(stats.inbound)} sub="shipments announced" />
-        <StatCard label="Units expected" value={String(stats.unitsIn)} sub="declared, not yet counted" />
-        <StatCard label="On hand" value={String(stats.onHand)} sub="available to pick" />
-        <StatCard label="Sellers" value={String(stats.sellers)} sub="with stock here" />
+        <StatCard label={tl("consignment", "Inbound")} value={String(stats.inbound)} sub={tl("consignment", "shipments announced")} />
+        <StatCard label={tl("consignment", "Units expected")} value={String(stats.unitsIn)} sub={tl("consignment", "declared, not yet counted")} />
+        <StatCard label={tl("consignment", "On hand")} value={String(stats.onHand)} sub={tl("consignment", "available to pick")} />
+        <StatCard label={tl("consignment", "Sellers")} value={String(stats.sellers)} sub={tl("consignment", "with stock here")} />
       </StatGrid>
 
       {/* 1. Inbound — the declaration, so nothing arrives unannounced. */}
       <SectionCard
- title="Inbound shipments"
- actions={<Button size="sm" onClick={() => setAsnOpen(true)}><Plus size={13} weight="bold" /> Announce shipment</Button>}
+ title={tl("consignment", "Inbound shipments")}
+ actions={<Button size="sm" onClick={() => setAsnOpen(true)}><Plus size={13} weight="bold" /> {tl("consignment", "Announce shipment")}</Button>}
       >
         {shipments === null ? (
-          <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground"><CircleNotch size={15} className="animate-spin" /> Loading…</div>
+          <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground"><CircleNotch size={15} className="animate-spin" /> {tl("consignment", "Loading…")}</div>
         ) : inbound.length === 0 ? (
           <div className="p-5 text-sm text-muted-foreground">
-            Nothing inbound yet. Use <span className="font-medium text-foreground">Announce shipment</span> when a
- seller tells you stock is on the way — the declaration is what the counted quantities get checked against.
+            {tl("consignment", "Nothing inbound yet. Use")} <span className="font-medium text-foreground">{tl("consignment", "Announce shipment")}</span> {tl("consignment", "when a seller tells you stock is on the way — the declaration is what the counted quantities get checked against.")}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -193,13 +194,13 @@ export function ConsignmentPanel() {
                   {s.lines.map((l) => (
                     <div key={l.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2">
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{l.name || l.seller_sku || "Item"}</div>
+                        <div className="truncate text-sm font-medium">{l.name || l.seller_sku || tl("consignment", "Item")}</div>
                         <div className="truncate text-xs text-muted-foreground">
-                          {l.seller_sku ? `Seller SKU ${l.seller_sku}` : "No seller SKU"} · declared {l.qty_declared}
+                          {l.seller_sku ? `Seller SKU ${l.seller_sku}` : tl("consignment", "No seller SKU")} · declared {l.qty_declared}
                         </div>
                       </div>
                       <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                        Counted
+                        {tl("consignment", "Counted")}
                         <Input
  value={counts[l.id]?.qty ?? String(l.qty_declared)}
  onChange={(e) => setCounts((p) => ({ ...p, [l.id]: { qty: e.target.value.replace(/[^0-9]/g, ""), loc: p[l.id]?.loc ?? "" } }))}
@@ -207,7 +208,7 @@ export function ConsignmentPanel() {
                         />
                       </label>
                       <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                        Bin
+                        {tl("consignment", "Bin")}
                         <Input
  value={counts[l.id]?.loc ?? l.location ?? ""}
  onChange={(e) => setCounts((p) => ({ ...p, [l.id]: { qty: p[l.id]?.qty ?? String(l.qty_declared), loc: e.target.value.toUpperCase() } }))}
@@ -219,7 +220,7 @@ export function ConsignmentPanel() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-end gap-2">
-                  <span className="text-xs text-muted-foreground">Blank bin = we pick one for you</span>
+                  <span className="text-xs text-muted-foreground">{tl("consignment", "Blank bin = we pick one for you")}</span>
                   <Button size="sm" onClick={() => receive(s)} disabled={busy === s.id}>
                     {busy === s.id ? <CircleNotch size={14} className="animate-spin" /> : null}
                     Receive &amp; shelve
@@ -232,16 +233,16 @@ export function ConsignmentPanel() {
       </SectionCard>
 
       {/* 2. On hand — whose stock, where. */}
-      <SectionCard title="Seller stock on hand">
+      <SectionCard title={tl("consignment", "Seller stock on hand")}>
         {stock.length === 0 ? (
-          <div className="p-5 text-sm text-muted-foreground">No consigned stock yet.</div>
+          <div className="p-5 text-sm text-muted-foreground">{tl("consignment", "No consigned stock yet.")}</div>
         ) : (
           <div className="divide-y divide-border">
             {stock.map((r) => (
               <div key={`${r.internal_sku}-${r.location}`} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <Package size={16} weight="duotone" className="shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{r.name || r.seller_sku || "Item"}</div>
+                  <div className="truncate text-sm font-medium">{r.name || r.seller_sku || tl("consignment", "Item")}</div>
                   <div className="truncate tabular-nums text-2xs text-muted-foreground">{r.internal_sku}</div>
                 </div>
                 <span className="text-xs text-muted-foreground">{r.seller_name}</span>
@@ -256,7 +257,7 @@ export function ConsignmentPanel() {
  setLabels([{ sku: r.internal_sku ?? "", name: r.name || r.seller_sku, variant: [r.seller_name, r.location].filter(Boolean).join(" · ") || null, copies: 1 }])
  setLabelsOpen(true)
                   }}
- title="Reprint this barcode"
+ title={tl("consignment", "Reprint this barcode")}
  className="eg-tap flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   <Barcode size={14} weight="bold" />
@@ -269,71 +270,70 @@ export function ConsignmentPanel() {
 
       {/* Barcode labels for the units just received — printed straight after counting,
  because that's when the boxes are open and the SKUs exist. */}
-      <LabelSheet labels={labels} open={labelsOpen} onClose={() => setLabelsOpen(false)} title="consigned stock labels" />
+      <LabelSheet labels={labels} open={labelsOpen} onClose={() => setLabelsOpen(false)} title={tl("consignment", "consigned stock labels")} />
 
       {/* Announce — the declaration that starts the flow. Kept deliberately light: a
  seller telling you what's coming shouldn't be a data-entry chore, and the
  counted quantities at receiving are what actually matter. */}
       <Dialog open={asnOpen} onOpenChange={(v) => { if (!asnBusy) setAsnOpen(v) }}>
         <DialogContent className="sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Announce an inbound shipment</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{tl("consignment", "Announce an inbound shipment")}</DialogTitle></DialogHeader>
 
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Carrier</span>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("consignment", "Carrier")}</span>
                 <Input value={asn.carrier} onChange={(e) => setAsn({ ...asn, carrier: e.target.value })} placeholder="UPS" className="h-9" />
               </label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Tracking</span>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("consignment", "Tracking")}</span>
                 <Input value={asn.tracking} onChange={(e) => setAsn({ ...asn, tracking: e.target.value })} placeholder="1Z…" className="h-9" />
               </label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Expected</span>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("consignment", "Expected")}</span>
                 <Input type="date" value={asn.expected} onChange={(e) => setAsn({ ...asn, expected: e.target.value })} className="h-9" />
               </label>
             </div>
 
             <div className="space-y-2">
-              <div className="text-sm font-medium">What&apos;s arriving</div>
+              <div className="text-sm font-medium">{tl("consignment", "What’s arriving")}</div>
               {asnLines.map((l, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2">
                   <Input
  value={l.name}
  onChange={(e) => setAsnLines((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
- placeholder="Item name" className="h-9 min-w-0 flex-1"
+ placeholder={tl("consignment", "Item name")} className="h-9 min-w-0 flex-1"
                   />
                   <Input
  value={l.seller_sku}
  onChange={(e) => setAsnLines((p) => p.map((x, j) => (j === i ? { ...x, seller_sku: e.target.value } : x)))}
- placeholder="Their SKU" className="h-9 w-32"
+ placeholder={tl("consignment", "Their SKU")} className="h-9 w-32"
                   />
                   <Input
  value={l.qty}
  onChange={(e) => setAsnLines((p) => p.map((x, j) => (j === i ? { ...x, qty: e.target.value.replace(/[^0-9]/g, "") } : x)))}
- inputMode="numeric" placeholder="Qty" className="h-9 w-20"
+ inputMode="numeric" placeholder={tl("consignment", "Qty")} className="h-9 w-20"
                   />
                   {asnLines.length > 1 && (
-                    <button onClick={() => setAsnLines((p) => p.filter((_, j) => j !== i))} aria-label="Remove line"
+                    <button onClick={() => setAsnLines((p) => p.filter((_, j) => j !== i))} aria-label={tl("consignment", "Remove line")}
  className="eg-tap flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-destructive">×</button>
                   )}
                 </div>
               ))}
               <Button size="sm" variant="outline" onClick={() => setAsnLines((p) => [...p, { name: "", seller_sku: "", qty: "1" }])}>
-                <Plus size={13} weight="bold" /> Add line
+                <Plus size={13} weight="bold" /> {tl("consignment", "Add line")}
               </Button>
             </div>
 
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Note (optional)</span>
-              <Input value={asn.note} onChange={(e) => setAsn({ ...asn, note: e.target.value })} placeholder="Anything the floor should know" className="h-9" />
+            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">{tl("consignment", "Note (optional)")}</span>
+              <Input value={asn.note} onChange={(e) => setAsn({ ...asn, note: e.target.value })} placeholder={tl("consignment", "Anything the floor should know")} className="h-9" />
             </label>
 
             <p className="text-xs text-muted-foreground">
-              We keep this declaration and check the counted quantities against it, so a short or over
- shipment shows as a discrepancy instead of quietly becoming the new truth.
+              {tl("consignment", "We keep this declaration and check the counted quantities against it, so a short or over shipment shows as a discrepancy instead of quietly becoming the new truth.")}
             </p>
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setAsnOpen(false)} disabled={asnBusy}>Cancel</Button>
-            <Button onClick={submitAsn} disabled={asnBusy}>{asnBusy ? "Announcing…" : "Announce shipment"}</Button>
+            <Button variant="ghost" onClick={() => setAsnOpen(false)} disabled={asnBusy}>{tl("consignment", "Cancel")}</Button>
+            <Button onClick={submitAsn} disabled={asnBusy}>{asnBusy ? tl("consignment", "Announcing…") : tl("consignment", "Announce shipment")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -341,18 +341,18 @@ export function ConsignmentPanel() {
       {/* 3. Bins. Chaotic storage with an index — any SKU may live in any bin, so what
  matters is capacity and the scan that binds SKU to location. */}
       <SectionCard
- title="Bins"
+ title={tl("consignment", "Bins")}
  actions={
           <div className="flex items-center gap-2">
             <Input value={newBin} onChange={(e) => setNewBin(e.target.value.toUpperCase())} placeholder="A-03-2" className="h-8 w-28 text-xs" />
-            <Button size="sm" variant="outline" onClick={addBin}><Plus size={13} weight="bold" /> Add bin</Button>
+            <Button size="sm" variant="outline" onClick={addBin}><Plus size={13} weight="bold" /> {tl("consignment", "Add bin")}</Button>
           </div>
         }
       >
         {bins.length === 0 ? (
           <div className="flex items-start gap-2 p-5 text-sm text-muted-foreground">
             <Warning size={16} className="mt-0.5 shrink-0 text-hold" />
-            No bins defined yet — add some before receiving, or stock lands unassigned.
+            {tl("consignment", "No bins defined yet — add some before receiving, or stock lands unassigned.")}
           </div>
         ) : (
           <div className="flex flex-wrap gap-2 p-5">

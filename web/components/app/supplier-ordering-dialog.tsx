@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, CheckCircle, MapPin } from "@phosphor-icons/react"
 import {
@@ -69,6 +70,7 @@ function toOptions(raw: unknown): { value: string; label: string; group?: string
 export function SupplierOrderingDialog({
  open, onOpenChange,
 }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const tl = useLabelT()
  const [opts, setOpts] = useState<SupplierOptions | null>(null)
  const [loadErr, setLoadErr] = useState<string | null>(null)
  const [ssShip, setSsShip] = useState("")
@@ -170,9 +172,9 @@ export function SupplierOrderingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Order settings</DialogTitle>
+          <DialogTitle>{tl("supplierOrder", "Order settings")}</DialogTitle>
           <DialogDescription>
-            Where blanks are delivered, and how each supplier is paid. Applied to every order placed from this board.
+            {tl("supplierOrder", "Where blanks are delivered, and how each supplier is paid. Applied to every order placed from this board.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -191,32 +193,31 @@ export function SupplierOrderingDialog({
  answered them twice each, once per supplier, so comparing S&S's shipping
  to Otto's meant scrolling past everything else. */}
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="delivery">Delivery</TabsTrigger>
-                <TabsTrigger value="payment">Payment</TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
-                <TabsTrigger value="keys">API keys</TabsTrigger>
+                <TabsTrigger value="delivery">{tl("supplierOrder", "Delivery")}</TabsTrigger>
+                <TabsTrigger value="payment">{tl("supplierOrder", "Payment")}</TabsTrigger>
+                <TabsTrigger value="email">{tl("supplierOrder", "Email")}</TabsTrigger>
+                <TabsTrigger value="keys">{tl("supplierOrder", "API keys")}</TabsTrigger>
               </TabsList>
 
               {/* ── DELIVERY ─────────────────────────────────────────────────── */}
               <TabsContent value="delivery" className="mt-4 space-y-5">
                 <section className="space-y-2">
-                  <h3 className="flex items-center gap-1.5 text-sm font-semibold"><MapPin size={14} weight="fill" /> Deliver to</h3>
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold"><MapPin size={14} weight="fill" /> {tl("supplierOrder", "Deliver to")}</h3>
                   {opts.shipToComplete ? (
                     <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">{addrLine}</div>
                   ) : (
                     <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
                       <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
                       <span>
-                        Your warehouse address is incomplete, so supplier orders have nowhere to be delivered.
-                        Fill it in at <strong>Settings › Ship-from address</strong> — it&apos;s the same address labels ship from.
+                        {tl("supplierOrder", "Your warehouse address is incomplete, so supplier orders have nowhere to be delivered. Fill it in at")} <strong>{tl("supplierOrder", "Settings › Ship-from address")}</strong> {tl("supplierOrder", "— it’s the same address labels ship from.")}
                       </span>
                     </div>
                   )}
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">S&amp;S Activewear</h3>
-                  <Field label="Shipping method">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">{tl("supplierOrder", "S&S Activewear")}</h3>
+                  <Field label={tl("supplierOrder", "Shipping method")}>
                     <select value={ssShip} onChange={(e) => setSsShip(e.target.value)} disabled={busy}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                       {opts.suppliers.ss.shippingMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -224,7 +225,7 @@ export function SupplierOrderingDialog({
                   </Field>
                   {transit && transit.length > 0 && (
                     <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-                      <div className="mb-1 text-xs font-medium">Transit to your warehouse</div>
+                      <div className="mb-1 text-xs font-medium">{tl("supplierOrder", "Transit to your warehouse")}</div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         {transit.slice(0, 6).map((w) => (
                           <span key={w.warehouse}>
@@ -239,20 +240,20 @@ export function SupplierOrderingDialog({
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">Otto Cap</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">{tl("supplierOrder", "Otto Cap")}</h3>
                   {!opts.suppliers.otto.available ? (
                     <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
                       <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-                      <span>{opts.suppliers.otto.reason ?? "Otto Cap isn't connected."}</span>
+                      <span>{opts.suppliers.otto.reason ?? tl("supplierOrder", "Otto Cap isn't connected.")}</span>
                     </div>
                   ) : (
-                    <Field label="Shipping method">
+                    <Field label={tl("supplierOrder", "Shipping method")}>
                       <select value={ottoShip} onChange={(e) => setOttoShip(e.target.value)} disabled={busy}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                         <option value="">
                           {ottoShipOpts.length
                             ? `Otto's default (${ottoShipOpts[0].label})`
- : "Otto's default"}
+ : tl("supplierOrder", "Otto's default")}
                         </option>
                         {ottoShipOpts.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select>
@@ -264,36 +265,36 @@ export function SupplierOrderingDialog({
               {/* ── PAYMENT ──────────────────────────────────────────────────── */}
               <TabsContent value="payment" className="mt-4 space-y-5">
                 <section className="space-y-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">S&amp;S Activewear</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">{tl("supplierOrder", "S&S Activewear")}</h3>
                   {/* No full number exists in their API — the label already carries the
  last four — so there is nothing stored here that could leak. */}
-                  <Field label="Pays with">
+                  <Field label={tl("supplierOrder", "Pays with")}>
                     {opts.suppliers.ss.paymentProfiles?.available ? (
                       <select value={ssCard} onChange={(e) => setSsCard(e.target.value)} disabled={busy}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
-                        <option value="">Account terms (no card)</option>
+                        <option value="">{tl("supplierOrder", "Account terms (no card)")}</option>
                         {opts.suppliers.ss.paymentProfiles.profiles.map((p) => (
                           <option key={p.id} value={p.id}>{maskCard(p.name)}{p.type ? ` · ${p.type}` : ""}</option>
                         ))}
                       </select>
                     ) : (
                       <p className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
-                        {opts.suppliers.ss.paymentProfiles?.reason ?? "No saved cards on this account — S&S will bill the account on file."}
+                        {opts.suppliers.ss.paymentProfiles?.reason ?? tl("supplierOrder", "No saved cards on this account — S&S will bill the account on file.")}
                       </p>
                     )}
                   </Field>
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">Otto Cap</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">{tl("supplierOrder", "Otto Cap")}</h3>
                   {!opts.suppliers.otto.available ? (
                     <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3 py-2 text-sm text-hold">
                       <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
-                      <span>{opts.suppliers.otto.reason ?? "Otto Cap isn't connected."}</span>
+                      <span>{opts.suppliers.otto.reason ?? tl("supplierOrder", "Otto Cap isn't connected.")}</span>
                     </div>
                   ) : (
                     <>
-                      <Field label="Pays with">
+                      <Field label={tl("supplierOrder", "Pays with")}>
                         <select value={ottoPay} onChange={(e) => setOttoPay(e.target.value)} disabled={busy}
  className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                           {ottoPayOpts.length === 0 && <option value="net30">net30</option>}
@@ -301,8 +302,7 @@ export function SupplierOrderingDialog({
                         </select>
                       </Field>
                       <p className="text-xs text-muted-foreground">
-                        Billing terms from your Otto account — they expose no saved cards, so a
- card-paid order carries the card below.
+                        {tl("supplierOrder", "Billing terms from your Otto account — they expose no saved cards, so a card-paid order carries the card below.")}
                       </p>
                       {/* The card lives HERE rather than in a dialog at placement. Otto need it
  on every credit-card order, so asking at placement meant typing the
@@ -313,24 +313,24 @@ export function SupplierOrderingDialog({
                       </div>
                       {/* Otto REQUIRE both on every order and they come from their
                           Customer API, so they're picked here rather than typed. */}
-                      <Field label="Order as">
+                      <Field label={tl("supplierOrder", "Order as")}>
                         <select value={ottoCust} onChange={(e) => { setOttoCust(e.target.value); setOttoContact("") }}
  disabled={busy} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
-                          <option value="">— choose a customer —</option>
+                          <option value="">{tl("supplierOrder", "— choose a customer —")}</option>
                           {(opts.ottoCustomers ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                       </Field>
-                      <Field label="Contact">
+                      <Field label={tl("supplierOrder", "Contact")}>
                         <select value={ottoContact} onChange={(e) => setOttoContact(e.target.value)}
  disabled={busy || !ottoCust} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
-                          <option value="">— choose a contact —</option>
+                          <option value="">{tl("supplierOrder", "— choose a contact —")}</option>
                           {((opts.ottoCustomers ?? []).find((c) => c.id === ottoCust)?.contacts ?? [])
                             .map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
                         </select>
                       </Field>
                       {!(opts.ottoCustomers ?? []).length && (
                         <p className="text-xs text-hold">
-                          Otto returned no customers — orders will be rejected until this is set.
+                          {tl("supplierOrder", "Otto returned no customers — orders will be rejected until this is set.")}
                         </p>
                       )}
                     </>
@@ -344,21 +344,21 @@ export function SupplierOrderingDialog({
  emails, and S&S look payment profiles up BY EMAIL — so a single shared
  field would fetch the wrong person's cards, or none at all. */}
                 <section className="space-y-2">
-                  <h3 className="text-sm font-semibold">S&amp;S Activewear</h3>
-                  <Field label="Account email">
+                  <h3 className="text-sm font-semibold">{tl("supplierOrder", "S&S Activewear")}</h3>
+                  <Field label={tl("supplierOrder", "Account email")}>
                     <Input value={ssEmail} onChange={(e) => setSsEmail(e.target.value)} disabled={busy}
- placeholder="the address this S&S account is registered to" className="h-9" />
+ placeholder={tl("supplierOrder", "the address this S&S account is registered to")} className="h-9" />
                   </Field>
                   <p className="text-xs text-muted-foreground">
-                    Decides whose saved cards appear under <strong>Payment</strong>. Save after changing it.
+                    {tl("supplierOrder", "Decides whose saved cards appear under")} <strong>{tl("supplierOrder", "Payment")}</strong>{tl("supplierOrder", ". Save after changing it.")}
                   </p>
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="text-sm font-semibold">Otto Cap</h3>
-                  <Field label="Account email">
+                  <h3 className="text-sm font-semibold">{tl("supplierOrder", "Otto Cap")}</h3>
+                  <Field label={tl("supplierOrder", "Account email")}>
                     <Input value={ottoEmail} onChange={(e) => setOttoEmail(e.target.value)} disabled={busy}
- placeholder="the address this Otto account is registered to" className="h-9" />
+ placeholder={tl("supplierOrder", "the address this Otto account is registered to")} className="h-9" />
                   </Field>
                 </section>
               </TabsContent>
@@ -370,13 +370,13 @@ export function SupplierOrderingDialog({
                     S&amp;S Activewear
                     {opts.keys?.ss?.set
                       ? <span className="whitespace-nowrap text-2xs font-medium text-shipped">connected</span>
- : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">no key</span>}
+ : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("supplierOrder", "no key")}</span>}
                   </h3>
-                  <KeyRow label="Account number" name="SS_ACCOUNT_NUMBER" shown={opts.keys?.ss?.account ?? null}
+                  <KeyRow label={tl("supplierOrder", "Account number")} name="SS_ACCOUNT_NUMBER" shown={opts.keys?.ss?.account ?? null}
  isAdmin={isAdmin} editing={editKey === "SS_ACCOUNT_NUMBER"} value={keyVal} busy={keyBusy}
  onEdit={() => { setEditKey("SS_ACCOUNT_NUMBER"); setKeyVal("") }}
  onChange={setKeyVal} onSave={() => saveKey("SS_ACCOUNT_NUMBER")} onCancel={() => setEditKey(null)} />
-                  <KeyRow label="API key" name="SS_API_KEY" shown={opts.keys?.ss?.masked ?? null}
+                  <KeyRow label={tl("supplierOrder", "API key")} name="SS_API_KEY" shown={opts.keys?.ss?.masked ?? null}
  isAdmin={isAdmin} editing={editKey === "SS_API_KEY"} value={keyVal} busy={keyBusy}
  onEdit={() => { setEditKey("SS_API_KEY"); setKeyVal("") }}
  onChange={setKeyVal} onSave={() => saveKey("SS_API_KEY")} onCancel={() => setEditKey(null)} />
@@ -387,14 +387,14 @@ export function SupplierOrderingDialog({
                     Otto Cap
                     {opts.keys?.otto?.set
                       ? <span className="whitespace-nowrap text-2xs font-medium text-shipped">connected</span>
- : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">no key</span>}
+ : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("supplierOrder", "no key")}</span>}
                   </h3>
                   {/* Username/password aren't in the editable set server-side — only the
                       OAuth client pair is — so the username is shown, not offered. */}
-                  <KeyRow label="Username" name="OTTOCAP_USERNAME" shown={opts.keys?.otto?.user ?? null}
+                  <KeyRow label={tl("supplierOrder", "Username")} name="OTTOCAP_USERNAME" shown={opts.keys?.otto?.user ?? null}
  isAdmin={false} editing={false} value="" busy={false}
  onEdit={() => {}} onChange={() => {}} onSave={() => {}} onCancel={() => {}} />
-                  <KeyRow label="Client secret" name="OTTOCAP_CLIENT_SECRET" shown={opts.keys?.otto?.masked ?? null}
+                  <KeyRow label={tl("supplierOrder", "Client secret")} name="OTTOCAP_CLIENT_SECRET" shown={opts.keys?.otto?.masked ?? null}
  isAdmin={isAdmin} editing={editKey === "OTTOCAP_CLIENT_SECRET"} value={keyVal} busy={keyBusy}
  onEdit={() => { setEditKey("OTTOCAP_CLIENT_SECRET"); setKeyVal("") }}
  onChange={setKeyVal} onSave={() => saveKey("OTTOCAP_CLIENT_SECRET")} onCancel={() => setEditKey(null)} />
@@ -405,7 +405,7 @@ export function SupplierOrderingDialog({
  with its audit trail. */}
                 {!isAdmin && (
                   <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-                    Only an admin can change these.
+                    {tl("supplierOrder", "Only an admin can change these.")}
                   </p>
                 )}
               </TabsContent>
@@ -422,7 +422,7 @@ export function SupplierOrderingDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>Close</Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>{tl("supplierOrder", "Close")}</Button>
           <Button size="sm" onClick={save} disabled={busy || !opts}>
             {busy ? <CircleNotch size={13} className="animate-spin" /> : null} Save
           </Button>
@@ -444,22 +444,23 @@ function KeyRow({ label, shown, isAdmin, editing, value, busy, onEdit, onChange,
  value: string; busy: boolean
  onEdit: () => void; onChange: (v: string) => void; onSave: () => void; onCancel: () => void
 }) {
+  const tl = useLabelT()
  return (
     <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs">
       <span className="w-32 shrink-0 text-muted-foreground">{label}</span>
       {editing ? (
         <>
           <Input value={value} onChange={(e) => onChange(e.target.value)} disabled={busy}
- placeholder="paste the new value" autoFocus className="h-7 flex-1 tabular-nums text-xs" />
-          <Button size="sm" className="h-7" onClick={onSave} disabled={busy || !value.trim()}>Save</Button>
-          <button onClick={onCancel} disabled={busy} className="text-muted-foreground hover:text-foreground">Cancel</button>
+ placeholder={tl("supplierOrder", "paste the new value")} autoFocus className="h-7 flex-1 tabular-nums text-xs" />
+          <Button size="sm" className="h-7" onClick={onSave} disabled={busy || !value.trim()}>{tl("supplierOrder", "Save")}</Button>
+          <button onClick={onCancel} disabled={busy} className="text-muted-foreground hover:text-foreground">{tl("supplierOrder", "Cancel")}</button>
         </>
       ) : (
         <>
-          <span className="flex-1 truncate tabular-nums">{shown ?? "not set"}</span>
+          <span className="flex-1 truncate tabular-nums">{shown ?? tl("supplierOrder", "not set")}</span>
           {isAdmin && (
             <button onClick={onEdit} className="font-medium text-primary hover:underline">
-              {shown ? "Change" : "Set"}
+              {shown ? tl("supplierOrder", "Change") : tl("supplierOrder", "Set")}
             </button>
           )}
         </>

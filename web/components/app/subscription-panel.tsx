@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, MagnifyingGlass, Sparkle } from "@phosphor-icons/react"
@@ -37,6 +38,7 @@ const fmtDate = (s?: string | null) => {
 // charges for real through /api/billing/subscribe — the price is decided server-side, so
 // the client can't name its own amount.
 export function SubscriptionPanel() {
+  const tl = useLabelT()
   // Session-backed; read after mount to avoid hydration mismatch.
  const [plan, setPlanState] = useState<PlanId>("starter")
  const [spydeckAddon, setAddonState] = useState(false)
@@ -164,7 +166,7 @@ export function SubscriptionPanel() {
  return (
     <div className="space-y-4">
       {/* Current plan */}
-      <SectionCard title="Your plan">
+      <SectionCard title={tl("subscription", "Your plan")}>
         <div className="p-5">
           <div className="flex items-end justify-between gap-4 rounded-xl border border-border bg-muted/40 p-5">
             <div>
@@ -210,7 +212,7 @@ export function SubscriptionPanel() {
                 <>
                   <span>Renews monthly on {fmtDate(billing.renews_at)}.</span>
                   <button onClick={() => toggleRenew(false)} disabled={renewBusy} className="font-medium text-foreground underline underline-offset-2 hover:no-underline disabled:opacity-50">
-                    Turn off auto-renew
+                    {tl("subscription", "Turn off auto-renew")}
                   </button>
                 </>
               ) : (
@@ -249,7 +251,7 @@ export function SubscriptionPanel() {
                 <div className="font-semibold">{t.name}</div>
                 {t.id === "pro" && (
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 eg-label text-primary">
-                    Popular
+                    {tl("subscription", "Popular")}
                   </span>
                 )}
               </div>
@@ -283,16 +285,16 @@ export function SubscriptionPanel() {
               <div className="mt-5">
                 {isCurrent ? (
                   <Button variant="outline" className="w-full" disabled>
-                    Current plan
+                    {tl("subscription", "Current plan")}
                   </Button>
                 ) : downgradeScheduled && t.id === "starter" ? (
                   <Button variant="outline" className="w-full" disabled title={`Starts ${fmtDate(billing?.renews_at)}`}>
-                    Scheduled
+                    {tl("subscription", "Scheduled")}
                   </Button>
                 ) : t.id === "enterprise" ? (
                   // Enterprise is negotiated, not self-serve — the server rejects it too.
-                  <Button variant="outline" className="w-full" disabled title="Enterprise is set up with our team">
-                    Contact sales
+                  <Button variant="outline" className="w-full" disabled title={tl("subscription", "Enterprise is set up with our team")}>
+                    {tl("subscription", "Contact sales")}
                   </Button>
                 ) : (
                   <Button
@@ -311,18 +313,18 @@ export function SubscriptionPanel() {
       </div>
 
       {/* SpyDeck add-on */}
-      <SectionCard title="SpyDeck">
+      <SectionCard title={tl("subscription", "SpyDeck")}>
         <div className="flex flex-wrap items-start justify-between gap-4 p-5">
           <div className="min-w-0 max-w-lg">
             <div className="flex items-center gap-2">
               <MagnifyingGlass size={18} weight="bold" className="shrink-0 text-primary" />
-              <div className="font-semibold">SpyDeck research</div>
+              <div className="font-semibold">{tl("subscription", "SpyDeck research")}</div>
               <span className="rounded-full bg-primary/10 px-2 py-0.5 eg-label text-primary">
-                Research
+                {tl("subscription", "Research")}
               </span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Product-research add-on — trending listings, keyword &amp; sales estimates, and one-click add-to-store.
+              {tl("subscription", "Product-research add-on — trending listings, keyword & sales estimates, and one-click add-to-store.")}
             </p>
           </div>
           <div className="shrink-0 text-right">
@@ -333,11 +335,11 @@ export function SubscriptionPanel() {
             ) : spydeckAddon ? (
               <div className="flex flex-col items-end gap-2">
                 <div className="text-sm text-muted-foreground">
-                  ${cfg.price}/mo · <span className="font-semibold text-success">Active</span>
+                  ${cfg.price}/mo · <span className="font-semibold text-success">{tl("subscription", "Active")}</span>
                 </div>
                 <Button variant="outline" size="sm" disabled={!mounted}
- onClick={() => { setErr(null); setShort(null); setPending({ addon: false, label: "Remove SpyDeck" }) }}>
-                  Remove
+ onClick={() => { setErr(null); setShort(null); setPending({ addon: false, label: tl("subscription", "Remove SpyDeck") }) }}>
+                  {tl("subscription", "Remove")}
                 </Button>
               </div>
             ) : (
@@ -347,8 +349,8 @@ export function SubscriptionPanel() {
                   <span className="text-xs font-normal text-muted-foreground">/mo</span>
                 </div>
                 <Button size="sm" disabled={!mounted}
- onClick={() => { setErr(null); setShort(null); setPending({ addon: true, label: "Add SpyDeck" }) }}>
-                  Add SpyDeck
+ onClick={() => { setErr(null); setShort(null); setPending({ addon: true, label: tl("subscription", "Add SpyDeck") }) }}>
+                  {tl("subscription", "Add SpyDeck")}
                 </Button>
               </div>
             )}
@@ -364,10 +366,10 @@ export function SubscriptionPanel() {
             <DialogTitle>{pending?.label}</DialogTitle>
             <DialogDescription>
               {(priceOf(pending ?? {}) ?? 0) > 0
-                ? "This charges your wallet now and bills monthly from today."
+                ? tl("subscription", "This charges your wallet now and bills monthly from today.")
  : isDowngrade
-                ? "This is scheduled — it takes effect when your paid period ends. Nothing is charged now."
- : "This takes effect now. Nothing is charged."}
+                ? tl("subscription", "This is scheduled — it takes effect when your paid period ends. Nothing is charged now.")
+ : tl("subscription", "This takes effect now. Nothing is charged.")}
             </DialogDescription>
           </DialogHeader>
 
@@ -378,11 +380,11 @@ export function SubscriptionPanel() {
  made with the facts, and offer the obvious alternative: wait it out. */}
           {isDowngrade && billing?.renews_at && daysLeft > 0 && (
             <div className="rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
-              <div className="font-medium">You keep {currentTier?.shortName ?? "your current plan"} until {fmtDate(billing.renews_at)}.</div>
+              <div className="font-medium">You keep {currentTier?.shortName ?? tl("subscription", "your current plan")} until {fmtDate(billing.renews_at)}.</div>
               <p className="mt-1">
-                Nothing is charged now. You&apos;ll keep {currentTier?.shortName ?? "your plan"}
-                {includedFree || spydeckAddon ? " and SpyDeck" : ""} for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left,
- then move to {pendingTier?.shortName ?? "Starter"} on {fmtDate(billing.renews_at)}. Change your mind before
+                Nothing is charged now. You&apos;ll keep {currentTier?.shortName ?? tl("subscription", "your plan")}
+                {includedFree || spydeckAddon ? tl("subscription", " and SpyDeck") : ""} for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left,
+ then move to {pendingTier?.shortName ?? tl("subscription", "Starter")} on {fmtDate(billing.renews_at)}. Change your mind before
  then and it&apos;s cancelled at no charge.
               </p>
             </div>
@@ -391,7 +393,7 @@ export function SubscriptionPanel() {
           {/* Returning to a tier this paid month already covers — no second charge. */}
           {!isDowngrade && pending?.plan && alreadyPaidFor(pending.plan) && (priceOf(pending) ?? 0) === 0 && billing?.renews_at && (
             <div className="rounded-lg border border-shipped/30 bg-shipped/12 p-3 text-sm text-shipped">
-              <div className="font-medium">Already paid — nothing to charge.</div>
+              <div className="font-medium">{tl("subscription", "Already paid — nothing to charge.")}</div>
               <p className="mt-1">
                 Your {pendingTier?.shortName ?? "plan"} month runs through {fmtDate(billing.renews_at)}
                 {daysLeft > 0 ? ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}. Switching back now costs $0,
@@ -403,11 +405,11 @@ export function SubscriptionPanel() {
           {billing && (priceOf(pending ?? {}) ?? 0) > 0 && (
             <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Due now</dt>
+                <dt className="text-muted-foreground">{tl("subscription", "Due now")}</dt>
                 <dd className="font-semibold tabular-nums">{usd(priceOf(pending ?? {}) ?? 0)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Wallet balance</dt>
+                <dt className="text-muted-foreground">{tl("subscription", "Wallet balance")}</dt>
                 <dd className="tabular-nums">{usd(billing.balance)}</dd>
               </div>
             </dl>
@@ -421,10 +423,10 @@ export function SubscriptionPanel() {
           {err && !short && <p className="text-sm text-destructive">{err}</p>}
 
           <DialogFooter>
-            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
-            <Button variant="ghost" onClick={() => setPending(null)} disabled={busy}>Cancel</Button>
+            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>{tl("subscription", "Top up wallet")}</Button>}
+            <Button variant="ghost" onClick={() => setPending(null)} disabled={busy}>{tl("subscription", "Cancel")}</Button>
             <Button onClick={commit} disabled={busy}>
-              {busy ? "Working…" : (priceOf(pending ?? {}) ?? 0) > 0 ? `Pay ${usd(priceOf(pending ?? {}) ?? 0)}` : "Confirm"}
+              {busy ? tl("subscription", "Working…") : (priceOf(pending ?? {}) ?? 0) > 0 ? `Pay ${usd(priceOf(pending ?? {}) ?? 0)}` : tl("subscription", "Confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

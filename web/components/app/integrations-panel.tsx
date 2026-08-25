@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowsClockwise, Sparkle, Check, PencilSimple, X, CircleNotch, Warning, ImageSquare } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -21,6 +22,7 @@ import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfi
  * fixed pair of hosts is a choice, and an identifier is a plain field you can read back.
  */
 function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
+  const tl = useLabelT()
  const [busy, setBusy] = useState(false)
  const [draft, setDraft] = useState(s.value ?? "")
  const [editing, setEditing] = useState(false)
@@ -79,7 +81,7 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
         </span>
       ) : (
         <span className="flex items-center gap-1.5">
-          <span className={s.value ? "text-foreground" : "text-muted-foreground"}>{s.value || "not set"}</span>
+          <span className={s.value ? "text-foreground" : "text-muted-foreground"}>{s.value || tl("integrations", "not set")}</span>
           {s.editable && (
             <button onClick={() => { setDraft(s.value ?? ""); setEditing(true) }} className="text-muted-foreground transition-colors hover:text-primary" aria-label={`Edit ${s.label}`}>
               <PencilSimple size={12} />
@@ -92,6 +94,7 @@ function PlainSettingRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void })
 }
 
 function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
+  const tl = useLabelT()
  const [editing, setEditing] = useState(false)
  const [val, setVal] = useState("")
  const [busy, setBusy] = useState(false)
@@ -112,9 +115,9 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
  return (
       <div className="flex items-center gap-1.5">
         <span className="w-28 shrink-0 truncate text-sm text-muted-foreground">{s.label}</span>
-        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-8 flex-1 font-mono text-sm" autoFocus />
+        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder={tl("integrations", "Paste new value")} className="h-8 flex-1 font-mono text-sm" autoFocus />
         <Button size="sm" className="h-7 px-2" disabled={busy || !val.trim()} onClick={() => save(false)}>{busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}</Button>
-        {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-alert" title="Clear" disabled={busy} onClick={() => save(true)}>Clear</Button>}
+        {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-alert" title={tl("integrations", "Clear")} disabled={busy} onClick={() => save(true)}>{tl("integrations", "Clear")}</Button>}
         <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => { setEditing(false); setVal("") }}><X size={12} /></Button>
       </div>
     )
@@ -124,9 +127,9 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
       <div className="flex items-center justify-between gap-2 text-sm">
         <span className="text-muted-foreground">{s.label}</span>
         <span className="flex items-center gap-1.5 font-mono">
-          {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">not set</span>}
+          {s.set ? <span className="text-foreground">{s.masked || `••••${s.last4 ?? ""}`}</span> : <span className="text-muted-foreground">{tl("integrations", "not set")}</span>}
           {s.editable && (
-            <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label="Edit credential">
+            <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label={tl("integrations", "Edit credential")}>
               <PencilSimple size={12} />
             </button>
           )}
@@ -135,7 +138,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
       {pending && (
         <div className="flex items-start gap-1.5 rounded-md bg-hold/10 px-2 py-1 text-2xs text-hold">
           <Warning size={11} weight="fill" className="mt-0.5 shrink-0" />
-          <span>Saved, but not in use yet — this one is read when the API starts. Restart it, then this row is what&apos;s live.</span>
+          <span>{tl("integrations", "Saved, but not in use yet — this one is read when the API starts. Restart it, then this row is what’s live.")}</span>
         </div>
       )}
     </div>
@@ -381,6 +384,7 @@ function statusText(r: Result): string {
 }
 
 export function IntegrationsPanel() {
+  const tl = useLabelT()
  const [results, setResults] = useState<Record<string, Result>>(
     Object.fromEntries(INTEGRATIONS.map((i) => [i.key, { level: "checking" as Level }]))
   )
@@ -472,8 +476,8 @@ export function IntegrationsPanel() {
   // (byeastside is Shipping but sits last), and the picker's headings should read in the
   // order the groups were designed in.
  const options: PickerOption[] = [
-    { value: AI_KEY, label: "AI Assistant (Claude)", group: "Assistant", status: aiStatus },
-    { value: IMAGE_KEY, label: "Image AI (Nano Banana)", group: "Assistant", status: imgStatus },
+    { value: AI_KEY, label: tl("integrations", "AI Assistant (Claude)"), group: "Assistant", status: aiStatus },
+    { value: IMAGE_KEY, label: tl("integrations", "Image AI (Nano Banana)"), group: "Assistant", status: imgStatus },
     ...GROUPS.flatMap((g) =>
       INTEGRATIONS.filter((i) => i.group === g).map((i): PickerOption => {
  const res = results[i.key] ?? { level: "checking" as Level }
@@ -496,11 +500,11 @@ export function IntegrationsPanel() {
 
  return (
     <SectionCard
- title="Connected services"
+ title={tl("integrations", "Connected services")}
  actions={
         <Button size="sm" variant="outline" onClick={runChecks} disabled={checking}>
           <ArrowsClockwise size={14} weight="bold" className={checking ? "animate-spin" : ""} />
-          {checking ? "Checking…" : "Recheck all"}
+          {checking ? tl("integrations", "Checking…") : tl("integrations", "Recheck all")}
         </Button>
       }
     >
@@ -528,11 +532,9 @@ export function IntegrationsPanel() {
               <div className="flex items-start gap-2 text-sm">
                 <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-hold" />
                 <div className="min-w-0">
-                  <div className="font-medium">Keys with no integration card</div>
+                  <div className="font-medium">{tl("integrations", "Keys with no integration card")}</div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    These are configured on the server but name a card that doesn&apos;t exist, so
- they can&apos;t be edited here. Point their <code>integration</code> at a real
- card key in <code>SECRET_DEFS</code>.
+                    {tl("integrations", "These are configured on the server but name a card that doesn’t exist, so they can’t be edited here. Point their")} <code>integration</code> {tl("integrations", "at a real card key in")} <code>SECRET_DEFS</code>.
                   </p>
                   <ul className="mt-1.5 space-y-0.5 text-xs">
                     {orphans.map(([k, list]) => (
@@ -552,7 +554,7 @@ export function IntegrationsPanel() {
  panel is open below — instead of 19 collapsed rows that each had to be clicked
  to say one word. */}
         <div className="border-b border-border px-5 py-3">
-          <PanelPicker value={sel} onChange={setSel} options={options} label="Choose a connected service" />
+          <PanelPicker value={sel} onChange={setSel} options={options} label={tl("integrations", "Choose a connected service")} />
         </div>
 
         {/* The panel. Keyed so switching service resets the panel's own state rather than
@@ -593,7 +595,7 @@ export function IntegrationsPanel() {
  title={`Refresh ${active.name}`}
  className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
                   >
-                    Recheck
+                    {tl("integrations", "Recheck")}
                   </button>
                 </span>
               </div>
@@ -623,7 +625,7 @@ export function IntegrationsPanel() {
                 // "this service has no editable keys" and "the secrets call failed".
                 <div className="border-t border-border pt-3 text-xs text-muted-foreground">
                   {activeRes.level === "restricted"
-                    ? "Credentials are admin-only — sign in as an admin to see them."
+                    ? tl("integrations", "Credentials are admin-only — sign in as an admin to see them.")
  : `No editable credentials for ${active.name}. Its keys live in the server env.`}
                 </div>
               )}
@@ -637,6 +639,7 @@ export function IntegrationsPanel() {
 
 // ── AI Assistant (Claude) — the one editable credential + model selector ──────
 function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
+  const tl = useLabelT()
  const [cfg, setCfg] = useState<AiConfig | null>(null)
  const [keyInput, setKeyInput] = useState("")
  const [editingKey, setEditingKey] = useState(false)
@@ -711,26 +714,26 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
         <div className="flex items-center gap-2">
           <Sparkle size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
-            <div className="font-semibold">AI Assistant (Claude)</div>
-            <div className="text-xs text-muted-foreground">Powers the account-aware auto-reply in seller Support chat.</div>
+            <div className="font-semibold">{tl("integrations", "AI Assistant (Claude)")}</div>
+            <div className="text-xs text-muted-foreground">{tl("integrations", "Powers the account-aware auto-reply in seller Support chat.")}</div>
           </div>
         </div>
         <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
-          {cfg?.keySet ? "Active" : "Inactive"}
+          {cfg?.keySet ? tl("integrations", "Active") : tl("integrations", "Inactive")}
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Anthropic API key</span>
+          <span className="text-sm font-medium">{tl("integrations", "Anthropic API key")}</span>
           {/* Key shown next to its input, not up in the status chip. The input stays hidden
  behind "Replace" so you don't accidentally overwrite a working key. */}
           {cfg?.keySet && !editingKey ? (
             <div className="flex h-9 items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3">
               <span className="flex-1 truncate font-mono text-xs text-foreground">{cfg.masked || `••••${cfg.last4 ?? ""}`}</span>
               {cfg.fromEnv
-                ? <span className="shrink-0 text-2xs text-muted-foreground">from env</span>
- : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">Replace</button>}
+                ? <span className="shrink-0 text-2xs text-muted-foreground">{tl("integrations", "from env")}</span>
+ : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">{tl("integrations", "Replace")}</button>}
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -738,16 +741,16 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
  type="password"
  value={keyInput}
  onChange={(e) => { setKeyInput(e.target.value); setSaved(false) }}
- placeholder="sk-ant-…"
+ placeholder={tl("integrations", "sk-ant-…")}
  className="flex-1 font-mono text-xs"
  autoFocus={editingKey}
               />
-              {editingKey && <button type="button" onClick={() => { setEditingKey(false); setKeyInput("") }} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">Cancel</button>}
+              {editingKey && <button type="button" onClick={() => { setEditingKey(false); setKeyInput("") }} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">{tl("integrations", "Cancel")}</button>}
             </div>
           )}
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Model</span>
+          <span className="text-sm font-medium">{tl("integrations", "Model")}</span>
           <select
  value={model}
  onChange={(e) => { setModel(e.target.value); setSaved(false) }}
@@ -763,14 +766,14 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
 
       {err && <div className="mt-2 text-sm text-destructive">{err}</div>}
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? tl("integrations", "Saving…") : tl("integrations", "Save")}</Button>
         {cfg?.keySet && (
-          <Button size="sm" variant="outline" onClick={test} disabled={testing}>{testing ? "Testing…" : "Test key"}</Button>
+          <Button size="sm" variant="outline" onClick={test} disabled={testing}>{testing ? tl("integrations", "Testing…") : tl("integrations", "Test key")}</Button>
         )}
         {cfg?.keySet && !cfg.fromEnv && (
-          <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>Remove key</Button>
+          <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>{tl("integrations", "Remove key")}</Button>
         )}
-        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> {tl("integrations", "Saved")}</span>}
       </div>
       {testResult && (
         <div className={"mt-2 text-sm " + (testResult.ok ? "text-success" : "text-destructive")}>
@@ -778,7 +781,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
           {testResult.msg}
         </div>
       )}
-      <p className="mt-2 text-xs text-muted-foreground">A saved key overrides the server env. Haiku 4.5 runs about a fifth of a cent per question. Admin only.</p>
+      <p className="mt-2 text-xs text-muted-foreground">{tl("integrations", "A saved key overrides the server env. Haiku 4.5 runs about a fifth of a cent per question. Admin only.")}</p>
     </div>
   )
 }
@@ -788,6 +791,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
 // PRICE, and "Test key" warns that it spends money. There is no free ping on an image
 // endpoint — a test is a real render — so the button must not read like the Claude one.
 function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
+  const tl = useLabelT()
  const [cfg, setCfg] = useState<ImageAiConfig | null>(null)
  const [keyInput, setKeyInput] = useState("")
  const [editingKey, setEditingKey] = useState(false)
@@ -854,12 +858,12 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
         <div className="flex items-center gap-2">
           <ImageSquare size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
-            <div className="font-semibold">Image AI (Nano Banana)</div>
-            <div className="text-xs text-muted-foreground">Product images from a prompt, in staff&rsquo;s own My EG chat. Not offered to sellers.</div>
+            <div className="font-semibold">{tl("integrations", "Image AI (Nano Banana)")}</div>
+            <div className="text-xs text-muted-foreground">{tl("integrations", "Product images from a prompt, in staff’s own My EG chat. Not offered to sellers.")}</div>
           </div>
         </div>
         <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (active ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
-          {active ? "Active" : "Inactive"}
+          {active ? tl("integrations", "Active") : tl("integrations", "Inactive")}
         </span>
       </div>
 
@@ -868,33 +872,33 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
       {active && cfg?.storageReady === false && (
         <div className="mt-3 flex items-start gap-2 rounded-md bg-hold/10 p-2 text-xs text-hold">
           <Warning size={14} className="mt-0.5 shrink-0" />
-          <span>The key is set, but object storage isn&rsquo;t configured — a generated image couldn&rsquo;t be kept, so generation stays off.</span>
+          <span>{tl("integrations", "The key is set, but object storage isn’t configured — a generated image couldn’t be kept, so generation stays off.")}</span>
         </div>
       )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Google AI API key</span>
+          <span className="text-sm font-medium">{tl("integrations", "Google AI API key")}</span>
           {cfg?.keySet && !editingKey ? (
             <div className="flex h-9 items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3">
               <span className="flex-1 truncate font-mono text-xs text-foreground">{cfg.masked || `••••${cfg.last4 ?? ""}`}</span>
               {cfg.fromEnv
-                ? <span className="shrink-0 text-2xs text-muted-foreground">from env</span>
- : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">Replace</button>}
+                ? <span className="shrink-0 text-2xs text-muted-foreground">{tl("integrations", "from env")}</span>
+ : <button type="button" onClick={() => setEditingKey(true)} className="shrink-0 text-xs font-medium text-primary hover:underline">{tl("integrations", "Replace")}</button>}
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Input
  type="password" value={keyInput}
  onChange={(e) => { setKeyInput(e.target.value); setSaved(false) }}
- placeholder="AIza…" className="flex-1 font-mono text-xs" autoFocus={editingKey}
+ placeholder={tl("integrations", "AIza…")} className="flex-1 font-mono text-xs" autoFocus={editingKey}
               />
-              {editingKey && <button type="button" onClick={() => { setEditingKey(false); setKeyInput("") }} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">Cancel</button>}
+              {editingKey && <button type="button" onClick={() => { setEditingKey(false); setKeyInput("") }} className="shrink-0 text-xs text-muted-foreground hover:text-foreground">{tl("integrations", "Cancel")}</button>}
             </div>
           )}
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Model</span>
+          <span className="text-sm font-medium">{tl("integrations", "Model")}</span>
           <select
  value={model}
  onChange={(e) => { setModel(e.target.value); setSaved(false) }}
@@ -917,15 +921,15 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
 
       {err && <div className="mt-2 text-sm text-destructive">{err}</div>}
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? tl("integrations", "Saving…") : tl("integrations", "Save")}</Button>
         {(cfg?.keySet || keyInput.trim()) && (
           // Says what it costs, because unlike the Claude test this one spends money.
-          <Button size="sm" variant="outline" onClick={test} disabled={testing}>{testing ? "Rendering…" : "Test key (~$0.03)"}</Button>
+          <Button size="sm" variant="outline" onClick={test} disabled={testing}>{testing ? tl("integrations", "Rendering…") : tl("integrations", "Test key (~$0.03)")}</Button>
         )}
         {cfg?.keySet && !cfg.fromEnv && (
-          <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>Remove key</Button>
+          <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>{tl("integrations", "Remove key")}</Button>
         )}
-        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> Saved</span>}
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-success"><Check size={14} weight="bold" /> {tl("integrations", "Saved")}</span>}
       </div>
       {testResult && (
         <div className={"mt-2 text-sm " + (testResult.ok ? "text-success" : "text-destructive")}>
@@ -934,7 +938,7 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
         </div>
       )}
       <p className="mt-2 text-xs text-muted-foreground">
-        A saved key overrides the server env. Get one from Google AI Studio. Testing renders a real image, so it costs about 3&cent;. Admin only.
+        {tl("integrations", "A saved key overrides the server env. Get one from Google AI Studio. Testing renders a real image, so it costs about 3&cent;. Admin only.")}
       </p>
     </div>
   )
