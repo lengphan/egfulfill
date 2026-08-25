@@ -176,7 +176,15 @@ export function OrdersList() {
     const id = setTimeout(() => { if (consumeImportOpen()) setImportOpen(true) }, 0)
     return () => clearTimeout(id)
   }, [])
- const [expanded, setExpanded] = useState<string | null>(null)
+  /**
+   * A SET, SO A ROW STAYS OPEN UNTIL ITS OWN ARROW CLOSES IT.
+   *
+   * This held ONE id, so opening a second order closed the first — an accordion, on a board
+   * whose whole use is comparing rows. Nothing asked for that behaviour; it is what a single
+   * id does. Every other board here already keeps a Set (orders-hub, dispatch-board,
+   * purchase-view, inbound-panel, alibaba-orders); this was the last one that did not.
+   */
+ const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // Placed artwork per order. Fetched only when a row is opened: pulling designs for
   // every row on load would be a request per order for imagery most sellers never expand.
  const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
@@ -208,19 +216,30 @@ export function OrdersList() {
  setDesigns((p) => ({ ...p, [oid]: bySku }))
     }).catch(() => {})
   }, [])
- useEffect(() => {
- if (!expanded || designs[expanded]) return
- const oid = expanded
- const t = setTimeout(() => {
- getOrderDesigns(oid).then((r) => {
- const list = Array.isArray(r) ? r : (r?.designs ?? [])
- const bySku: Record<string, OrderDesign> = {}
-        Object.assign(bySku, indexDesigns(list))
- setDesigns((p) => ({ ...p, [oid]: bySku }))
-      }).catch(() => {})
-    }, 0)
- return () => clearTimeout(t)
-  }, [expanded, designs])
+  /**
+   * OPENING A ROW IS AN EVENT, so the artwork is fetched on the CLICK — CLAUDE.md §2.8.
+   *
+   * It was an effect keyed on `[expanded, designs]` that wrote `designs`, i.e. re-running on
+   * the state its own fetch produced. It settled, because the `designs[expanded]` guard went
+   * true after the write — but that is the shape §2.8 is about, and it only stayed safe
+   * while exactly one id could be open. Widening it to a Set means the guard becomes "which
+   * of these are missing", which is a condition the fetch's own result edits — the precise
+   * thing that rule forbids relying on.
+   *
+   * A click cannot recur on its own, so there is nothing to bound. Fetched only when the row
+   * OPENS and only when we do not already hold it: pulling designs for every row on load
+   * would be a request per order for imagery most sellers never expand.
+   */
+ const toggleExpanded = useCallback((id: string) => {
+ const opening = !expanded.has(id)
+ setExpanded((prev) => {
+ const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+ if (opening && !designs[id]) reloadDesigns(id)
+  }, [expanded, designs, reloadDesigns])
   // Column layout is per-device; read after mount so prerender and hydration agree.
   // Powers the inline variant pickers below — an unsubmitted line can be set up right in
   // the row instead of opening the order first.
@@ -400,16 +419,16 @@ export function OrdersList() {
             <TableBody>
               {paged.pageItems.map((o) => {
  const items = o.items ?? []
- const open = expanded === o.id
+ const open = expanded.has(o.id)
  return (
                   <Fragment key={o.id}>
                     <TableRow
- onClick={() => setExpanded(open ? null : o.id)}
+ onClick={() => toggleExpanded(o.id)}
  className={"cursor-pointer focus-visible:bg-accent focus-visible:outline-none " + (open ? "bg-accent/40" : "")}
                     >
                       <TableCell className="pr-0">
                         <button
- onClick={(e) => { e.stopPropagation(); setExpanded(open ? null : o.id) }}
+ onClick={(e) => { e.stopPropagation(); toggleExpanded(o.id) }}
  aria-label={open ? `Collapse order ${numOf(o)}` : `Expand order ${numOf(o)}`}
  aria-expanded={open}
  className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
