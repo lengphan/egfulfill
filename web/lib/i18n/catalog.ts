@@ -122,6 +122,12 @@ const en: Dict = {
   "help.responseTime": "Our team usually replies within 2 hours on working days.",
   "help.emailSupport": "Email support",
   "help.liveChat": "Live chat",
+  // The article page's chrome — breadcrumb, Related list, footer. Rendered by
+  // HelpArticleChrome, a client island, because the page itself is static and server-only.
+  "help.breadcrumb": "Help",
+  "help.related": "Related",
+  "help.allTopics": "All help topics",
+  "help.email": "Email",
 }
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
@@ -635,6 +641,10 @@ const vi: Dict = {
   "help.responseTime": "Đội ngũ của chúng tôi thường phản hồi trong vòng 2 giờ vào ngày làm việc.",
   "help.emailSupport": "Gửi email hỗ trợ",
   "help.liveChat": "Trò chuyện trực tiếp",
+  "help.breadcrumb": "Trợ giúp",
+  "help.related": "Liên quan",
+  "help.allTopics": "Tất cả chủ đề trợ giúp",
+  "help.email": "Email",
 
   // Help categories — keyed by their English title/description (useLabelT).
   "helpCat.Getting started": "Bắt đầu",
