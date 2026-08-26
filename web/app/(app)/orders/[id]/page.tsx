@@ -790,7 +790,7 @@ export default function OrderDetailPage() {
  const unit = qLine ? Number(qLine.unitCost) || 0
  : Number(it.unit_cost ?? 0) || Number(it.unit_price) || 0
  return (
-                    <div key={i} className="relative flex items-start gap-4 px-5 py-4">
+                    <div key={i} className="relative flex flex-wrap items-start gap-4 px-5 py-4">
                       {/* The line's number, where the eye lands last — same number the drop
  zone's targets carry. */}
                       <span className="absolute bottom-3 right-4 flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1}`}>
@@ -964,11 +964,6 @@ export default function OrderDetailPage() {
                           </div>
                         </div>
 
-                        {canEditVariants ? (
-                          <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
-                        ) : (
-                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-2" />
-                        )}
 
                         {(it.sku || it.line_id) && (
                           <>
@@ -992,6 +987,26 @@ export default function OrderDetailPage() {
                               )}
                             </div>
                           </>
+                        )}
+                      </div>
+                      {/* THE SPEC, ACROSS THE WHOLE CARD — owner's call, 2026-08-26.
+                          It sat inside the copy column, so four fields shared whatever width
+                          the 144px artwork left them and Method was permanently cramped. As
+                          its own basis-full row it gets the card, and the four tracks finally
+                          have room to hold a real blank name.
+
+                          It reads LAST deliberately. The column above answers what this line
+                          IS and what to do about it; the strip answers what it will be MADE
+                          from, which is the question you ask once the first two are settled.
+
+                          Locked and editable keep the same four labelled fields — see
+                          VariantStrip: a settled line and an editable one describe the same
+                          thing, so they must not be two different shapes. */}
+                      <div className="w-full basis-full">
+                        {canEditVariants ? (
+                          <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
+                        ) : (
+                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked />
                         )}
                       </div>
                     </div>
