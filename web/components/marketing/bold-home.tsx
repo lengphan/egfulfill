@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, CARD, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band } from "@/components/marketing/bold-kit"
 import { LabelRule, CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
 
@@ -183,12 +183,13 @@ export function BoldHome({ content }: { content: SiteContent }) {
         *
         * Skipped entirely when the list is empty, which is how an admin removes the section.
         */}
+      {/* The figures get the WHITE band — the first change of ground on the page, and the
+          moment the reader learns this site has more than one surface. A hairline over
+          parchment said "another paragraph"; a surface says "another kind of thing". */}
       {stats.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 sm:px-10">
-          <div className="border-t pt-12" style={{ borderColor: HAIRLINE }}>
-            <SpecStrip items={stats} path="stats" />
-          </div>
-        </section>
+        <Band tone="card">
+          <SpecStrip items={stats} path="stats" />
+        </Band>
       )}
 
       {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
@@ -210,12 +211,20 @@ export function BoldHome({ content }: { content: SiteContent }) {
         <NumberedCards items={features.cards} path="features.cards" className="mt-14" />
       </section>
 
-      {/* ── STEPS — numbers oversized, the way the style wants ────────────────────
-          Divided from what is above by a RULE, not by a tinted band. The 3%-black band this
-          used to sit in was a second, muddier ground laid over the page's own, and it is the
-          thing that made a full-width section look like a mistake. */}
-      <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
-        <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
+      {/* ── STEPS — THE DARK BLOCK ────────────────────────────────────────────────
+          This section used to sit on the page's own ground behind a hairline rule, and the
+          note here argued against a band because the 3%-black one it replaced was "a second,
+          muddier ground laid over the page's own". That was right about a TINT and is wrong
+          about a SURFACE, and the difference is the whole point of the direction: 3% black
+          over parchment is neither one thing nor the other, which is exactly what reads as a
+          mistake. #14140F is not a tint of the page — it is the third surface in a system of
+          three, and the light/dark alternation between them IS the page's rhythm.
+
+          It also earns its keep structurally: with no shadows anywhere, a change of ground is
+          the only way one section can separate from the next, so a rule between two identical
+          grounds was never dividing anything. */}
+      <Band tone="dark">
+        <div>
           <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             <EditableText path="steps.heading">{steps.heading}</EditableText>
           </h2>
@@ -228,16 +237,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 viewport={{ once: true, margin: "0px 0px -12% 0px" }}
                 transition={{ duration: 0.55, delay: i * 0.09, ease: EASE }}
               >
-                <div className="font-display font-semibold leading-none tracking-tighter" style={{ fontSize: "clamp(3.5rem, 7vw, 5.5rem)", color: INK, opacity: 0.13 }}>
+                {/* ACID, not ink at 13%. On the dark block a faint ink numeral is simply
+                    invisible; on this ground the accent is the one thing that can carry a
+                    figure this large without competing with the heading. */}
+                <div className="font-display font-semibold leading-none tracking-tighter" style={{ fontSize: "clamp(3.5rem, 7vw, 5.5rem)", color: ACID }}>
                   {String(i + 1).padStart(2, "0")}
                 </div>
                 <h3 className="mt-3 text-xl font-bold tracking-tight"><EditableText path={`steps.items.${i}.title`}>{s.title}</EditableText></h3>
-                <p className="mt-2 text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}><EditableText path={`steps.items.${i}.body`}>{s.body}</EditableText></p>
+                <p className="mt-2 text-[15px] leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.7 }}><EditableText path={`steps.items.${i}.body`}>{s.body}</EditableText></p>
               </motion.div>
             ))}
           </div>
         </div>
-      </section>
+      </Band>
 
       {/* ── TESTIMONIALS ─────────────────────────────────────────────────────────
               Guarded on the list, not just mapped over it. An unattributable quote is a
@@ -245,8 +257,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
               default is NO testimonials — and an unguarded section would then render a
               headline over an empty grid, which looks broken rather than empty. */}
       {testimonials.items.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
-          <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
+        <Band tone="card">
+          <div>
             <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
               <EditableText path="testimonials.heading">{testimonials.heading}</EditableText>
             </h2>
@@ -255,8 +267,12 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 <motion.figure
                   key={t.name}
                   /* Same cut corner as the numbered cards — one card shape on the page. */
-                  className="rounded-[22px] rounded-tr-[4px] p-7"
-                  style={{ background: CARD, border: `1px solid ${HAIRLINE}` }}
+                  /* PARCHMENT, not CARD — this sits INSIDE the white band, and a white card
+                     on a white ground is not a card, it is a border drawn for nothing. The
+                     surfaces invert: on parchment a card is white, on white a card is
+                     parchment. One radius, 26px, and no shadow either way. */
+                  className="rounded-[26px] p-7"
+                  style={{ background: SURFACE }}
                   initial={reduce ? { opacity: 0 } : { opacity: 0, y: 22 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "0px 0px -12% 0px" }}
@@ -274,7 +290,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
               ))}
             </div>
           </div>
-        </section>
+        </Band>
       )}
 
       {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for free,

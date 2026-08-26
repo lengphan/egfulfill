@@ -22,7 +22,19 @@
  */
 
 import { motion, useReducedMotion } from "motion/react"
-import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE, ObjectTile } from "@/components/marketing/bold-kit"
+import { ThreadCone, Printhead, ShippingBox, FoldedTee, HeatPress, EmbroideryHoop } from "@/components/marketing/objects"
+
+/**
+ * WHICH OBJECT A FEATURE CARD GETS, in order.
+ *
+ * A fixed sequence rather than a per-card field: whoever adds a feature in Settings › Site
+ * content should not have to pick an illustration, and a content editor picking one is how a
+ * set of nine drawn to one weight turns into a random assortment. The order runs
+ * make → print → press → finish → pack, which is the factory's own order and therefore reads
+ * as deliberate even though nothing binds a given card to a given object.
+ */
+const CARD_OBJECTS = [ThreadCone, Printhead, HeatPress, ShippingBox, FoldedTee, EmbroideryHoop] as const
 import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
 import { EditableText } from "@/components/marketing/edit-mode"
 
@@ -436,25 +448,47 @@ export function NumberedCards({ items, className = "", path }: { items: Numbered
              * box loses its border on the clipped edge — and the light cards here are held
              * together by their border.
              */
-            className={`p-7 rounded-[22px] ${i % 2 === 0 ? "rounded-tr-[4px]" : "rounded-tl-[4px]"}`}
+            /* ONE RADIUS, 26px. The cut corner that used to alternate along the row went
+               with the direction it belonged to: it was the pitch-deck reference's mark, and
+               Workshop's mark is that EVERY bounded box is the same conspicuous 26px. Two
+               shape languages on one page is how a system stops being one. */
+            className="p-7 rounded-[26px]"
             style={dark
               ? { background: ACCENT, color: "var(--mk-accent-ink)" }
               /* A LIGHT CARD LIFTS OFF THE PANEL rather than merely being outlined on it.
                  On `signal` the panel is grey, so a card mixed toward white separates by tone
                  the way the board's do; on `studio` the panel is already white and the mix is
                  a no-op, leaving exactly the bordered card that shipped before. */
-              : { background: `color-mix(in oklch, ${CARD} 55%, white)`, border: `1px solid ${HAIRLINE}`, color: INK }}
+              /* WHITE, flat, no border. On the parchment page a white card separates by
+                 VALUE — that is the entire depth model now, and it is why there are no
+                 shadows anywhere. The old mix-toward-white plus a hairline was solving for a
+                 white page, where a white card genuinely has nothing to sit against. */
+              : { background: CARD, color: INK }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, delay: i * 0.07, ease: EASE }}
           >
-            {/* The numeral is the card's mark. Big, tabular, and followed by a rule, because
-                a number floating above a paragraph reads as a page number. */}
-            <div className="font-title text-3xl font-semibold tabular-nums tracking-tight">
-              {String(i + 1).padStart(2, "0")}
-            </div>
-            <div className="my-4 h-px" style={{ background: dark ? "rgba(255,255,255,0.18)" : HAIRLINE }} />
+            {/* AN OBJECT, not a numeral.
+              *
+              * The number was the card's mark because there was nothing else to use — the
+              * page had no vocabulary of its own, so it counted. It also implied a SEQUENCE
+              * these cards do not have: four features are not four steps, and numbering them
+              * told the reader to look for an order that was never there.
+              *
+              * The object family is what the direction added, and this is its first real job:
+              * a thread cone, a printhead, a box — the reader meets the factory rather than a
+              * list. Assigned by index from a fixed order so it is deterministic and an
+              * editor adding a card never has to pick one.
+              *
+              * On a lime tile, so the object is ink on lime whatever the card is under it. */}
+            <ObjectTile size={52}>
+              {(() => {
+                const Obj = CARD_OBJECTS[i % CARD_OBJECTS.length]
+                return <Obj className="h-[76%] w-[76%]" />
+              })()}
+            </ObjectTile>
+            <div className="my-5 h-px" style={{ background: dark ? "rgba(255,255,255,0.18)" : HAIRLINE }} />
             <div className="text-lg font-semibold leading-snug tracking-[-0.01em]"><Words path={path && `${path}.${i}.title`}>{it.title}</Words></div>
             {it.body && <p className="mt-2 text-sm leading-relaxed opacity-70"><Words path={path && `${path}.${i}.body`}>{it.body}</Words></p>}
             {/*

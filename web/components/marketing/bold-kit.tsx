@@ -509,3 +509,99 @@ export function PlateHero({ title, accent, sub, children, path }: {
     </section>
   )
 }
+
+/**
+ * ── BAND — the page's rhythm, as a component ────────────────────────────────────────────
+ *
+ * THE PROBLEM IT SOLVES. Every section of the marketing site was `<section class="mx-auto
+ * max-w-[88rem] px-6 pt-24">` on the same ground, divided by hairline rules. That is a
+ * single flat sheet with lines drawn across it, and it is why the page reads as one long
+ * undifferentiated scroll no matter how good the type is. A rule between two identical
+ * grounds does not make two sections; it makes one section with a line in it.
+ *
+ * The direction's answer is not a divider, it is a CHANGE OF GROUND. Sections alternate
+ * parchment → white → dark, edge to edge, with no rule between them at all. The value change
+ * IS the division, and it is also the entire depth model — there are no shadows anywhere in
+ * this system, so a surface separates from its neighbour by being a different surface.
+ *
+ * WHY A COMPONENT AND NOT A CONVENTION. The last four rules written as prose were violated
+ * across a dozen files each, because there was nothing to import and every new section was
+ * fresh Tailwind. A band that is a component cannot drift: the padding, the container width
+ * and the icon variables are decided once, here.
+ *
+ * IT CARRIES THE ICON VARIABLES, which is the part worth knowing. The object family reads
+ * --eg-icon-ink and --eg-icon-void, so an object dropped into a dark band inverts on its own
+ * and one SVG serves every ground. Put an object inside a Band and it is simply correct;
+ * that is the whole reason those two variables exist.
+ *
+ * THE RULES A BAND CANNOT ENFORCE FOR YOU:
+ *   · Never two dark bands adjacent. The alternation is the rhythm; two in a row is a hole.
+ *   · `lime` is at most ONCE per page, and never next to the lime CTA.
+ */
+export function Band({
+  tone = "paper",
+  children,
+  className = "",
+  full = false,
+  id,
+}: {
+  tone?: "paper" | "card" | "dark" | "lime"
+  children: React.ReactNode
+  className?: string
+  /** Skip the inner container — for a band whose content is itself edge-to-edge (a marquee). */
+  full?: boolean
+  id?: string
+}) {
+  const tones = {
+    paper: { background: SURFACE, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": SURFACE },
+    card: { background: CARD, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": CARD },
+    dark: { background: ACCENT, color: ACCENT_INK, "--eg-icon-ink": ACCENT_INK, "--eg-icon-void": ACCENT },
+    lime: { background: ACID, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": ACID },
+  } as const
+  return (
+    <section id={id} style={tones[tone] as React.CSSProperties} className={`w-full ${className}`}>
+      {full ? children : (
+        <div className="mx-auto max-w-[88rem] px-6 py-[clamp(3.5rem,7vw,6rem)] sm:px-10">{children}</div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * An object from the family, on its own tile — the mark half of "the four parts".
+ *
+ * A 20px stroke floating in whitespace is decoration the eye reads past; the same glyph on a
+ * small filled square is an object it lands on. That difference is the single biggest reason
+ * an empty region reads as a PLACE rather than as a gap, and it is why this is a tile and not
+ * a bare icon.
+ *
+ * The tile takes the lime, so the object inside it takes ink — which is the direction's one
+ * colour rule stated as a component: lime is a ground carrying ink, never the ink itself.
+ */
+export function ObjectTile({
+  children,
+  size = 56,
+  className = "",
+}: {
+  children: React.ReactNode
+  size?: number
+  className?: string
+}) {
+  return (
+    <span
+      className={`inline-grid shrink-0 place-items-center rounded-[18px] ${className}`}
+      style={{
+        width: size,
+        height: size,
+        background: ACID,
+        // Inside the tile the ground is lime whatever the band is, so the object's own
+        // variables are re-pointed here rather than inherited — otherwise an object on a
+        // dark band would draw its outline in parchment on a lime tile and vanish.
+        ["--eg-icon-ink" as string]: INK,
+        ["--eg-icon-void" as string]: ACID,
+      }}
+    >
+      {children}
+    </span>
+  )
+}
