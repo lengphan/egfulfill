@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { CaretDown, Check, Storefront, Wallet, Package } from "@phosphor-icons/react"
+import { CaretDown, CaretRight, Check } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { getEtsyConnections, getShopifyConnections, getTiktokConnections } from "@/lib/api"
 
@@ -35,7 +35,11 @@ const OPEN_KEY = "eg_getstarted_open"
 const read = (k: string) => { try { return localStorage.getItem(k) } catch { return null } }
 const write = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } }
 
-export function GetStarted({ orders, balance }: {
+export function GetStarted({ orders, balance, clip }: {
+  /** A short screen-recording for the open step, if one has been uploaded. Absent is a real
+   *  answer — the copy simply takes the width. A grey rectangle where a film should be is
+   *  the placeholder this codebase already deleted once from the marketing hero. */
+  clip?: string
   /** Null while the dashboard is still loading — the banner waits rather than guessing. */
   orders: number | null
   balance: number | null
@@ -91,16 +95,19 @@ export function GetStarted({ orders, balance }: {
   if (done || !ready || allDone || unverifiable) return null
 
   const steps = [
-    { id: "store", ok: hasStore, icon: Storefront, href: "/stores",
+    { id: "store", ok: hasStore, href: "/stores",
       label: tl("getStarted", "Connect a store"),
+      headline: tl("getStarted", "Bring your first store in."),
       body: tl("getStarted", "Sign in to Etsy, Shopify or TikTok Shop. Existing orders import straight away."),
       cta: tl("getStarted", "Connect a store") },
-    { id: "funds", ok: hasFunds, icon: Wallet, href: "/wallet",
+    { id: "funds", ok: hasFunds, href: "/wallet",
       label: tl("getStarted", "Fund the wallet"),
+      headline: tl("getStarted", "Put something in the wallet."),
       body: tl("getStarted", "An order is charged when you submit it, and refunded in full if you cancel before production."),
       cta: tl("getStarted", "Top up") },
-    { id: "order", ok: hasOrder, icon: Package, href: "/orders/new",
+    { id: "order", ok: hasOrder, href: "/orders/new",
       label: tl("getStarted", "Send your first order"),
+      headline: tl("getStarted", "Send us your first order."),
       body: tl("getStarted", "Pick a blank, place your artwork, and submit it to the floor."),
       cta: tl("getStarted", "New order") },
   ]
@@ -112,19 +119,24 @@ export function GetStarted({ orders, balance }: {
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="text-sm font-semibold">{tl("getStarted", "Get started")}</span>
         <div className="flex flex-wrap items-center gap-1.5">
-          {steps.map((s) => (
+          {steps.map((s, n) => (
             <span
               key={s.id}
               className={
-                "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs " +
-                (s.ok ? "text-muted-foreground"
-                  : s === next ? "border border-border bg-card font-semibold text-foreground"
-                  : "text-muted-foreground")
+                "inline-flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs " +
+                (s === next ? "border border-border bg-card font-semibold text-foreground" : "text-muted-foreground")
               }
             >
-              {s.ok
-                ? <Check size={11} weight="bold" className="text-success" />
-                : <s.icon size={11} weight="regular" />}
+              <span
+                className={
+                  "inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums " +
+                  (s.ok ? "bg-success/15 text-success"
+                    : s === next ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground")
+                }
+              >
+                {s.ok ? <Check size={9} weight="bold" /> : n + 1}
+              </span>
               {s.label}
             </span>
           ))}
@@ -144,17 +156,21 @@ export function GetStarted({ orders, balance }: {
       </div>
 
       {open && next && (
-        <div className="flex flex-wrap items-center gap-4 border-t border-brand/30 px-4 py-4">
+        <div className="flex flex-wrap items-center gap-6 border-t border-brand/30 px-4 py-5">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold tracking-tight">{next.label}</h2>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">{next.body}</p>
+            <h2 className="text-xl font-semibold tracking-tight">{next.headline}</h2>
+            <p className="mt-1.5 max-w-prose text-sm text-muted-foreground">{next.body}</p>
+            <Link
+              href={next.href}
+              className="eg-tap mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >
+              {next.cta} <CaretRight size={12} weight="bold" />
+            </Link>
           </div>
-          <Link
-            href={next.href}
-            className="eg-tap inline-flex h-9 shrink-0 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
-            {next.cta}
-          </Link>
+          {clip && (
+            /* eslint-disable-next-line @next/next/no-img-element -- an admin-supplied URL. */
+            <img src={clip} alt="" className="hidden h-[168px] w-[300px] shrink-0 rounded-xl object-cover sm:block" />
+          )}
         </div>
       )}
     </section>
