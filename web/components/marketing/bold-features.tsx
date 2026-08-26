@@ -2,9 +2,9 @@
 
 
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, PlateHero, Band, Rise } from "@/components/marketing/bold-kit"
-import { CutoutFigure } from "@/components/marketing/bold-figure"
-import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, PlateHero, Rise, MediaBand } from "@/components/marketing/bold-kit"
+import { CalloutList } from "@/components/marketing/bold-figure"
+import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * Features, in the house style. The same six capabilities and the same copy — restated as a
@@ -84,8 +84,6 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
   const { on: editing } = useEditMode()
   /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
   const figureSrc = useEditableSrc("featuresPage.figure.image", p.figure.image)
-  const figureScale = useEditableNum("featuresPage.figure.imageScale", p.figure.imageScale)
-  const figureRotate = useEditableNum("featuresPage.figure.imageRotate", p.figure.imageRotate)
 
   /* Computed once for the whole wall rather than per tile: a span depends on how many items
      there are in total, which an individual tile cannot know. */
@@ -117,22 +115,33 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
       {/* THE PAGE'S FIGURE, REPLACEABLE WHERE IT SITS — same overlay the homepage hero has:
           generate a picture from a prompt, or drop a file on it. In edit mode it renders even
           when empty, because otherwise there is nothing on the page to drop a picture ONTO —
-          the one gesture the mode exists for would be the one it could not offer. */}
+      {/* ── THE PAGE'S PICTURE, FULL BLEED ─────────────────────────────────────────
+          Was a CutoutFigure on a soft wash inside a Band. The photography is now shot on a
+          COLOURED SEAMLESS, and cutting a subject out of one carries the studio colour through
+          the hair and shoulder edge — the subject arrives wearing a halo. So the frame stays
+          whole and the studio ground becomes the band. On this page it is the violet ground — the one place that token is painted since the figures band went.
+
+          Still replaceable where it sits, and still rendered empty in edit mode: with no
+          picture there is nothing on the page to drop one ONTO, and the one gesture the mode
+          exists for would be the one it could not offer. MediaBand's own guard means a visitor
+          sees nothing rather than a grey box.
+
+          The callouts survive the move and now sit ON the picture under the scrim — the
+          annotated-figure device the reference boards use, which the cut-out was carrying
+          before. `ink` tone is the LIGHT lettering, which is what a scrim needs. */}
       {(figureSrc || editing) && (
-        <Band tone="paper">
-          <EditableImage path="featuresPage.figure.image">
-            <CutoutFigure
-              src={figureSrc}
-              alt={p.figure.imageAlt}
-              ghost={p.figure.ghostWord}
-              ghostPath="featuresPage.figure.ghostWord"
-              scale={figureScale}
-              rotate={figureRotate}
-              callouts={p.figure.callouts}
-              calloutsPath="featuresPage.figure.callouts"
-            />
-          </EditableImage>
-        </Band>
+        <EditableImage path="featuresPage.figure.image" transform={false}>
+          <MediaBand media={figureSrc} alt={p.figure.imageAlt}>
+            {p.figure.callouts.length > 0 && (
+              <CalloutList
+                items={p.figure.callouts}
+                path="featuresPage.figure.callouts"
+                tone="ink"
+                className="flex-wrap gap-x-10 gap-y-5"
+              />
+            )}
+          </MediaBand>
+        </EditableImage>
       )}
 
       {/* ── THE WALL ──────────────────────────────────────────────────────────────

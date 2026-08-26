@@ -358,7 +358,23 @@ function wrapDeg(d: number) { return ((d + 180) % 360 + 360) % 360 - 180 }
  * `children` is the figure as it renders publicly. In edit mode it gets an overlay rather
  * than a replacement, so what you are judging is still the real thing at the real size.
  */
-export function EditableImage({ path, children }: { path: ContentPath; children: React.ReactNode }) {
+export function EditableImage({ path, children, transform = true }: {
+  path: ContentPath
+  children: React.ReactNode
+  /**
+   * WHETHER THIS FIGURE CAN BE SCALED AND SPUN AT ALL, and there is now a slot where it
+   * genuinely cannot: a full-bleed MediaBand paints its picture with object-cover, so the
+   * frame is the section's and scale has nothing to multiply and rotation nothing to turn.
+   *
+   * transformPaths derives the two sibling paths from the path alone, which is what stops a
+   * new call site forgetting to wire them — the right property for a CutoutFigure and the
+   * wrong one here, because it would draw zoom and rotate buttons that write to
+   * `…imageScale` and `…imageRotate` and be read by nothing. The comment on useEditableNum
+   * already names that failure by name: a control that reports a change it did not make is
+   * worse than no control. So the derivation stays and the call site can decline it.
+   */
+  transform?: boolean
+}) {
   const { on, read, write } = useEditMode()
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -370,7 +386,7 @@ export function EditableImage({ path, children }: { path: ContentPath; children:
   const current = read(path)
   /* How this figure sits. Derived from the path so no call site has to wire it — see
      transformPaths. A path that is not a figure's yields null and the group is not drawn. */
-  const tp = transformPaths(path)
+  const tp = transform ? transformPaths(path) : null
   const rawScale = tp ? read(tp.scale) : undefined
   const rawRotate = tp ? read(tp.rotate) : undefined
   const scaleV = typeof rawScale === "number" && Number.isFinite(rawScale) ? rawScale : 1

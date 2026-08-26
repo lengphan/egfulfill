@@ -803,6 +803,86 @@ export function WindowSkeleton({ rows = 5 }: { rows?: number }) {
 }
 
 /**
+ * ── BLEED MEDIA — the picture layer every full-bleed band shares ─────────────────────────
+ *
+ * ONE IMPLEMENTATION, because there are now two bands that bleed and the video rules are the
+ * fiddly kind that rot when copied: muted and playsInline are the CONDITIONS a browser
+ * autoplays under rather than preferences, and without playsInline iOS takes the whole screen
+ * the moment playback starts. A second copy works on the day it is written and drifts the
+ * first time one of them is fixed.
+ *
+ * REDUCED MOTION PAUSES IT, like everything else on these pages (§4). A paused <video> paints
+ * its poster, or its first frame once metadata has loaded, so the still is a real frame of the
+ * film rather than a blank rectangle and the type still has something to stand on.
+ *
+ * aria-hidden, and the alt text does NOT move here: a loop behind a heading is decoration, the
+ * words carry the meaning, and a screen reader describing the wallpaper before them is noise.
+ * That is the difference from the <img> branch, where the picture may be the only content.
+ *
+ * See lib/media.ts for why the image/video decision is made on the extension.
+ */
+function BleedMedia({ media, alt }: { media: string; alt?: string }) {
+  const reduce = useReducedMotion()
+  const cls = "absolute inset-0 -z-10 h-full w-full object-cover"
+  if (isVideoSrc(media)) {
+    return <video src={media} className={cls} autoPlay={!reduce} muted loop playsInline preload="metadata" aria-hidden />
+  }
+  // An admin-supplied absolute URL from Settings › Site content; next/image would need every
+  // host allow-listed.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={media} alt={alt || ""} className={cls} />
+}
+
+/**
+ * ── MEDIA BAND — a full-bleed picture as a SECTION, not as a hero ────────────────────────
+ *
+ * WHY THIS EXISTS RATHER THAN CutoutFigure. The two page figures were cut-outs floating on a
+ * soft radial wash, which is a good device and the wrong one for photography shot on a
+ * COLOURED seamless: cutting a subject out of a chartreuse studio takes that colour with it
+ * through the hair and the shoulder edge, so it lands on the page wearing a green halo.
+ *
+ * The resolution is to stop cutting the picture out and let the studio ground BE the band.
+ * That is also what makes the three pages read as one campaign instead of three good
+ * photographs — each is a whole frame in the palette (chartreuse, violet, near-black) rather
+ * than a subject borrowed out of one.
+ *
+ * NO MEDIA RENDERS NOTHING. Never a grey box where a photograph should be — that is the
+ * empty-state-that-looks-broken §4 forbids, and the guard belongs here rather than at each
+ * call site so a new page cannot forget it.
+ *
+ * THE SCRIM IS CONDITIONAL, exactly as on MediaHero: a band with nothing over it is a
+ * photograph, and darkening it for a caption that does not exist is damage.
+ *
+ * SHORTER THAN THE HERO by design. This sits mid-page with copy above and below; at the
+ * hero's height it stops being a section and becomes a second first screen.
+ */
+export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34rem)" }: {
+  media?: string
+  alt?: string
+  children?: React.ReactNode
+  minH?: string
+}) {
+  if (!media) return null
+  return (
+    <section className="relative isolate w-full overflow-hidden" style={{ minHeight: minH, background: ACCENT }}>
+      <BleedMedia media={media} alt={alt} />
+      {children && (
+        <>
+          <div
+            aria-hidden
+            className="absolute inset-0 -z-10"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.42) 34%, rgba(0,0,0,.10) 68%, rgba(0,0,0,0) 100%)" }}
+          />
+          <div className="relative mx-auto flex h-full max-w-[88rem] flex-col justify-end px-6 pb-[clamp(2rem,4vw,3.5rem)] pt-[clamp(3rem,8vw,6rem)] sm:px-10">
+            {children}
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+/**
  * THE FULL-BLEED MEDIA HERO — direction A, locked 2026-08-26.
  *
  * WHAT IT IS. One edge-to-edge block of media with the headline standing on it. The page's
@@ -829,16 +909,7 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
   children: React.ReactNode
   minH?: string
 }) {
-  const reduce = useReducedMotion()
   const hasMedia = !!media
-  /*
-   * THE SLOT TAKES MOTION — added 2026-08-26. One field, and the URL decides: this is the one
-   * surface on the marketing site where a moving picture is the point, and it would have been
-   * a mistake to give it a second content field that an admin has to keep in step with the
-   * first. See lib/media.ts for why the decision is made on the extension.
-   */
-  const isVideo = isVideoSrc(media)
-  const mediaClass = "absolute inset-0 -z-10 h-full w-full object-cover"
   return (
     <section
       className="relative isolate w-full overflow-hidden"
@@ -846,42 +917,7 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
     >
       {hasMedia && (
         <>
-          {isVideo ? (
-            /*
-             * MUTED AND playsInline ARE NOT PREFERENCES — they are the conditions under which
-             * a browser will autoplay at all. iOS additionally refuses fullscreen-less
-             * playback without playsInline, so without it the video takes over the screen the
-             * moment it starts, which is a hero that hijacks the phone.
-             *
-             * REDUCED MOTION STOPS IT, like everything else on these pages (§4). A paused
-             * <video> paints its poster, or its first frame once metadata has loaded — so the
-             * still is a real frame of the film rather than a blank rectangle, and the
-             * headline still has something to stand on.
-             *
-             * aria-hidden, and the alt text does NOT move here. A background loop behind a
-             * headline is decoration: the words carry the meaning, and a screen reader
-             * announcing a description of the wallpaper before them is noise. That is the
-             * difference from the <img> branch, where the picture may be the only content.
-             */
-            <video
-              src={media}
-              className={mediaClass}
-              autoPlay={!reduce}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              aria-hidden
-            />
-          ) : (
-            /* eslint-disable-next-line @next/next/no-img-element -- a seller-supplied absolute
-                URL from Settings › Site content; next/image would need every host allow-listed. */
-            <img
-              src={media}
-              alt={alt || ""}
-              className={mediaClass}
-            />
-          )}
+          <BleedMedia media={media!} alt={alt} />
           {/* THE SCRIM EXISTS SO THE TYPE IS LEGIBLE ON ANY UPLOAD, not for mood. Weighted to
               the bottom-left because that is where the headline stands; the top stays open so
               the picture is still a picture. */}

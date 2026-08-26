@@ -1,9 +1,9 @@
 "use client"
 
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, PlateHero, Band, Rise } from "@/components/marketing/bold-kit"
-import { CutoutFigure, NumberedCards } from "@/components/marketing/bold-figure"
-import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, PlateHero, Band, Rise, MediaBand } from "@/components/marketing/bold-kit"
+import { CalloutList, NumberedCards } from "@/components/marketing/bold-figure"
+import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * How it works. Three steps, then the seller-facing status flow.
@@ -56,8 +56,6 @@ export function BoldHow({ content }: { content: SiteContent }) {
   const { on: editing } = useEditMode()
   /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
   const figureSrc = useEditableSrc("howPage.figure.image", p.figure.image)
-  const figureScale = useEditableNum("howPage.figure.imageScale", p.figure.imageScale)
-  const figureRotate = useEditableNum("howPage.figure.imageRotate", p.figure.imageRotate)
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
@@ -82,25 +80,33 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * space where a diagram should be is precisely the empty-state-that-looks-broken §4
         * forbids. No picture means no section, and the steps follow the figures directly.
         */}
-      {/* REPLACEABLE WHERE IT SITS — the same overlay the homepage hero has. In edit mode the
-          section renders with no picture too, because otherwise there is nothing to drop one
-          ONTO; a visitor still sees nothing. */}
+      {/* ── THE PAGE'S PICTURE, FULL BLEED ─────────────────────────────────────────
+          Was a CutoutFigure on a soft wash inside a Band. The photography is now shot on a
+          COLOURED SEAMLESS, and cutting a subject out of one carries the studio colour through
+          the hair and shoulder edge — the subject arrives wearing a halo. So the frame stays
+          whole and the studio ground becomes the band. On this page the picture is shot on the near-black ground, which is the plate the cut-out used to sit on drawn as a photograph instead.
+
+          Still replaceable where it sits, and still rendered empty in edit mode: with no
+          picture there is nothing on the page to drop one ONTO, and the one gesture the mode
+          exists for would be the one it could not offer. MediaBand's own guard means a visitor
+          sees nothing rather than a grey box.
+
+          The callouts survive the move and now sit ON the picture under the scrim — the
+          annotated-figure device the reference boards use, which the cut-out was carrying
+          before. `ink` tone is the LIGHT lettering, which is what a scrim needs. */}
       {(figureSrc || editing) && (
-        <Band tone="paper">
-          <EditableImage path="howPage.figure.image">
-            <CutoutFigure
-              tone="ink"
-              src={figureSrc}
-              alt={p.figure.imageAlt}
-              ghost={p.figure.ghostWord}
-              ghostPath="howPage.figure.ghostWord"
-              scale={figureScale}
-              rotate={figureRotate}
-              callouts={p.figure.callouts}
-              calloutsPath="howPage.figure.callouts"
-            />
-          </EditableImage>
-        </Band>
+        <EditableImage path="howPage.figure.image" transform={false}>
+          <MediaBand media={figureSrc} alt={p.figure.imageAlt}>
+            {p.figure.callouts.length > 0 && (
+              <CalloutList
+                items={p.figure.callouts}
+                path="howPage.figure.callouts"
+                tone="ink"
+                className="flex-wrap gap-x-10 gap-y-5"
+              />
+            )}
+          </MediaBand>
+        </EditableImage>
       )}
 
       {/*
