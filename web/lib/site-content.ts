@@ -165,7 +165,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     headline: "What if every order",
     accent: "printed itself?",
     subhead:
-      "Etsy, Shopify & TikTok orders sync into one queue, print on a vetted network, and ship with tracking pushed back — completely hands off.",
+      "Etsy, Shopify and TikTok Shop orders land in one queue. We print, embroider, pack and ship them in our own factory — then push the tracking back to your storefront.",
     ctaPrimary: "Start for free",
     ctaSecondary: "See how it works",
     worksWithLabel: "Works with",
@@ -203,7 +203,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
    */
   stats: [
     { value: "3", label: "Marketplaces", note: "Etsy, Shopify and TikTok Shop sync in" },
-    { value: "7", label: "Print methods", note: "One network, every decoration" },
+    { value: "7", label: "Print methods", note: "One factory, every decoration" },
     { value: "$0", label: "Platform fee", note: "You pay per order, never per month" },
     { value: "1", label: "Queue", note: "However many stores you run" },
     { value: "24h", label: "Artwork check", note: "Before anything reaches a press" },
@@ -213,7 +213,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     subhead: "From the moment an order lands to the tracking number your buyer sees.",
     cards: [
       { title: "Every store, one queue", body: "Orders from Etsy, Shopify & TikTok Shop sync in automatically — no CSV exports, no copy-paste, no missed orders." },
-      { title: "Vetted print network", body: "Quality-checked partners with QC at every stage — not a black box." },
+      { title: "Our factory, not a broker", body: "We own the machines. Checked at intake, after decoration and at pack, by the people who made it." },
       { title: "Tracking, automatic", body: "Cheapest label bought and tracking pushed back to the marketplace for you." },
       { title: "Transparent wallet", body: "A prepaid wallet with clear per-order charges and instant payouts. Always know exactly what you paid and why." },
     ],
@@ -223,7 +223,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     items: [
       { n: "01", title: "Connect your stores", body: "OAuth into Etsy, Shopify or TikTok Shop in about two minutes." },
       { n: "02", title: "Upload your designs", body: "Map artwork to products once — we handle placement and print files." },
-      { n: "03", title: "We fulfill, hands-off", body: "Print, pack, ship, and track. You just watch orders go out." },
+      { n: "03", title: "We make it and ship it", body: "Printed or stitched on our own floor, packed, labelled, and the tracking pushed back." },
     ],
   },
   /**
@@ -245,12 +245,12 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       { q: "Is there a monthly fee?", a: "No. The platform is free — you only pay the per-order fulfillment cost when an order ships, funded from your prepaid wallet." },
       { q: "How does shipping pricing work?", a: "We rate-shop across carriers and buy the cheapest available label, billed at cost. You always see the exact charge on each order." },
       { q: "Can I use my own designs?", a: "Yes. Upload artwork to your library, map it to products once, and our mini designer handles placement and print-ready files." },
-      { q: "What about quality control?", a: "Every order is quality-checked at each stage on a vetted print network — intake, print, and pack — before it ships." },
+      { q: "What about quality control?", a: "We make everything ourselves — there is no third-party print network in the middle. Each order is checked at intake, after decoration and again at pack, by the people who made it." },
     ],
   },
   cta: {
-    heading: "Ready to put fulfillment on autopilot?",
-    subhead: "Connect a store and send your first hands-off order today. No monthly fee.",
+    heading: "Send us your next order.",
+    subhead: "Connect a store and your first order can be on a machine today. No monthly fee.",
     button: "Start for free",
   },
 
@@ -286,7 +286,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
        carries; 3 QC stages is the intake/print/pack run named in the copy below. */
     stats: [
       { value: "3", label: "Marketplaces", note: "Etsy, Shopify and TikTok Shop" },
-      { value: "7", label: "Print methods", note: "One network, every decoration" },
+      { value: "7", label: "Print methods", note: "One factory, every decoration" },
       { value: "3", label: "QC stages", note: "Intake, print and pack" },
       { value: "$0", label: "Monthly fee", note: "You pay per order, never per month" },
       { value: "1", label: "Queue", note: "However many stores you run" },
@@ -303,8 +303,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         points: ["Reusable design library", "Auto placement & print files", "Embroidery thread matching"],
       },
       {
-        title: "Vetted print network",
-        body: "Your orders print on a quality-checked partner network with QC at intake, print and pack. Not a black box — you can see each order's stage in real time.",
+        title: "Our factory, not a broker",
+        body: "Your orders are made on our own machines, checked at intake, after decoration and at pack. Not a black box — you can see the stage every order is at.",
         points: ["QC at every stage", "Per-order status visibility", "Consistent quality"],
       },
       {
@@ -319,7 +319,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       },
       {
         title: "Quality you can trust",
-        body: "Every order is inspected on a vetted network before it ships. Issues are caught early, so your buyers get exactly what they ordered.",
+        body: "Every order is checked before it ships by the people who made it. Problems are caught on the floor rather than at your buyer's door.",
         points: ["Pre-ship inspection", "Early issue detection", "Reprints handled for you"],
       },
     ],
@@ -349,7 +349,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
          the process rather than a photograph with adjectives stuck to it. */
       callouts: [
         { label: "Your artwork", note: "Mapped to the product once, reused forever" },
-        { label: "Our press", note: "Printed or stitched on a vetted network" },
+        { label: "Our press", note: "Printed or stitched on our own machines" },
         { label: "Their doorstep", note: "Cheapest label, tracking pushed back" },
       ],
     },
@@ -373,7 +373,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       },
       {
         title: "We make and ship it",
-        body: "You submit an order; we accept it, produce it on a vetted network, buy the cheapest label, and push tracking back to your shop. You watch orders go out.",
+        body: "You submit an order and we make it on our own machines, buy the cheapest label across carriers, and push the tracking back to your shop.",
         points: ["Reviewed before production", "Cheapest-label shipping", "Tracking pushed back"],
       },
     ],
