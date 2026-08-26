@@ -255,7 +255,7 @@ export function SupportBubble() {
   }
 
  return (
-    <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl">
+    <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-[26px] border border-[var(--mk-hairline)] bg-[var(--mk-card)] shadow-2xl">
       <div className="flex items-center justify-between px-4 py-3 text-[var(--mk-accent-ink)]" style={{ background: ACCENT }}>
         <span className="text-sm font-bold">Ask EGFUL</span>
         <button onClick={() => setOpen(false)} aria-label="Close"><X size={16} weight="bold" /></button>
@@ -268,7 +268,7 @@ export function SupportBubble() {
  asks the question the widget exists for. */}
         {msgs.length === 0 && (
           <div className="mb-3">
-            <span className="inline-block max-w-[85%] rounded-2xl bg-black/[0.05] px-3 py-2 text-sm leading-relaxed text-[var(--mk-ink)]">
+            <span className="inline-block max-w-[85%] rounded-[26px] bg-[var(--mk-ink)]/[0.05] px-3 py-2 text-sm leading-relaxed text-[var(--mk-ink)]">
               Hi — how can we help? Ask us anything about products, pricing or how fulfilment
  works, and a person can pick it up whenever you&apos;d rather have one.
             </span>
@@ -284,7 +284,7 @@ export function SupportBubble() {
  key={f.q}
  type="button"
  onClick={() => askFaq(f)}
- className="rounded-full border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 transition-colors hover:border-black/45 hover:text-[var(--mk-ink)]"
+ className="rounded-[var(--radius-control)] border border-[var(--mk-auth-edge)] px-3 py-1.5 text-xs font-semibold text-[var(--mk-ink)]/70 transition-colors hover:border-[var(--mk-ink)] hover:text-[var(--mk-ink)]"
               >
                 {f.q}
               </button>
@@ -316,12 +316,12 @@ export function SupportBubble() {
  that they got one, or the escalation looks unanswered while its answer is on
  screen. */}
             {m.role === "staff" && startsRun && (
-              <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">EGFUL support</span>
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--mk-ink)]/45">EGFUL support</span>
             )}
-            <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed " +
+            <span className={"inline-block max-w-[85%] whitespace-pre-wrap rounded-[26px] px-3 py-2 text-sm leading-relaxed " +
               (m.role === "user" ? INK_ON_ACID
- : m.role === "staff" ? "border border-black/10 bg-white text-[var(--mk-ink)]"
- : "bg-black/[0.05] text-[var(--mk-ink)]")}>
+ : m.role === "staff" ? "border border-[var(--mk-hairline)] bg-[var(--mk-card)] text-[var(--mk-ink)]"
+ : "bg-[var(--mk-ink)]/[0.05] text-[var(--mk-ink)]")}>
               {m.text}
               {/* The page that answers it properly. On the canned replies only — a model
  answer has no fixed destination, and inventing one would send people to a
@@ -347,7 +347,7 @@ export function SupportBubble() {
           * itself. A visitor writing at 2am otherwise waits at a silent window.
           */}
         {msgs.length > 0 && msgs[msgs.length - 1].role === "user" && !done && office && office.open === false && (
-          <p className="mt-3 text-xs leading-relaxed text-black/45">
+          <p className="mt-3 text-xs leading-relaxed text-[var(--mk-ink)]/50">
             {`The team is out of office right now${office.resumesLabel ? ` — back ${office.resumesLabel}` : ""}. Your message is with them${email ? `, and they'll email ${email}` : ""}.`}
           </p>
         )}
@@ -381,29 +381,29 @@ export function SupportBubble() {
       {needIdentity ? (
         /* The question is already saved server-side, which is why this can be asked calmly
  rather than as a gate the visitor must pass to be heard. */
-        <div className="space-y-2 border-t border-black/10 p-3">
-          <p className="text-xs leading-relaxed text-black/55">
+        <div className="space-y-2 border-t border-[var(--mk-hairline)] p-3">
+          <p className="text-xs leading-relaxed text-[var(--mk-ink)]/60">
             {pendingEscalate
               ? "Who are we passing this to a person for? We'll reply by email — you can close this."
  : "Who should we reply to? We'll email you if you close this."}
           </p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name"
- className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
+ className="w-full rounded-lg border border-[var(--mk-auth-edge)] px-3 py-2 text-sm outline-none focus:border-[var(--mk-ink)]" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" type="email"
- className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50" />
+ className="w-full rounded-lg border border-[var(--mk-auth-edge)] px-3 py-2 text-sm outline-none focus:border-[var(--mk-ink)]" />
           <button onClick={onIdentity} disabled={busy}
  className={`w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${INK_ON_ACID}`}>
             {pendingEscalate ? "Send to support" : "Continue"}
           </button>
         </div>
       ) : (
-        <div className="border-t border-black/10 p-3">
+        <div className="border-t border-[var(--mk-hairline)] p-3">
           <div className="flex items-end gap-2">
             <textarea
  value={draft} onChange={(e) => setDraft(e.target.value)} rows={1}
  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() } }}
  placeholder="Type your question…"
- className="max-h-24 flex-1 resize-none rounded-lg border border-black/15 px-3 py-2 text-sm outline-none focus:border-black/50"
+ className="max-h-24 flex-1 resize-none rounded-lg border border-[var(--mk-auth-edge)] px-3 py-2 text-sm outline-none focus:border-[var(--mk-ink)]"
             />
             <button onClick={onSend} disabled={busy || !draft.trim()} aria-label="Send"
  className={`flex size-9 shrink-0 items-center justify-center rounded-lg disabled:opacity-40 ${INK_ON_ACID}`}>
@@ -419,7 +419,7 @@ export function SupportBubble() {
  were just given. */}
           {msgs.length > 0 && !done && !withPerson && (
             <button onClick={escalate} disabled={busy}
- className="mt-2 text-xs font-semibold text-black/50 underline underline-offset-4 hover:text-[var(--mk-ink)]">
+ className="mt-2 text-xs font-semibold text-[var(--mk-ink)]/55 underline underline-offset-4 hover:text-[var(--mk-ink)]">
               Talk to support
             </button>
           )}

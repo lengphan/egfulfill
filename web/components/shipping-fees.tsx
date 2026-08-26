@@ -70,14 +70,18 @@ export function ShippingFees({
     <div
       className={
         (marketing
-          ? "rounded-2xl border border-black/[0.09] px-5 py-4"
+          /* THE MARKETING BLOCK IS A SURFACE, NOT AN OUTLINE. It was a bordered box with
+             black-literal ink — one more of the outlined cards §4 is removing, and a colour
+             the runtime skin could not reach. White on the product page's paper separates by
+             VALUE, which is the whole depth model on that side of the product. */
+          ? "rounded-[26px] bg-[var(--mk-card)] px-5 py-4"
           : "rounded-xl border border-border bg-card px-4 py-3") + " " + className
       }
     >
       <div
         className={
           marketing
-            ? "text-xs font-bold uppercase tracking-[0.18em] text-black/45"
+            ? "text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50"
             : "text-2xs font-semibold uppercase tracking-wide text-muted-foreground"
         }
       >
@@ -86,10 +90,11 @@ export function ShippingFees({
       <dl className={marketing ? "mt-3 space-y-2" : "mt-2 space-y-1.5"}>
         {rows.map((r) => (
           <div key={r.label} className="flex items-baseline justify-between gap-4">
-            <dt className={marketing ? "text-sm text-black/70" : "text-xs text-muted-foreground"}>
+            <dt className={marketing ? "text-sm text-[var(--mk-ink)]/70" : "text-xs text-muted-foreground"}>
               {r.label}
             </dt>
-            <dd className={marketing ? "text-sm font-black tabular-nums" : "text-sm font-semibold tabular-nums"}>
+            <dd className={/* semibold, not black — §4: display weight is semibold, and a fee is not a headline. */
+              marketing ? "text-sm font-semibold tabular-nums" : "text-sm font-semibold tabular-nums"}>
               {r.value}
             </dd>
           </div>
@@ -99,7 +104,7 @@ export function ShippingFees({
           number applies; beside three it does not, and "why is my hoodie dearer" is the
           question this sentence exists to answer before it is asked. */}
       {firstRows.length > 1 && (
-        <p className={marketing ? "mt-3 text-xs text-black/45" : "mt-2 text-2xs text-muted-foreground"}>
+        <p className={marketing ? "mt-3 text-xs text-[var(--mk-ink)]/50" : "mt-2 text-2xs text-muted-foreground"}>
           The first item is charged at its garment&rsquo;s rate. A product with its own
           shipping fee uses that instead.
         </p>
