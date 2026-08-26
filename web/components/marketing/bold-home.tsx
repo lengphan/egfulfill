@@ -2,8 +2,8 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band } from "@/components/marketing/bold-kit"
-import { CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, ProofBlocks } from "@/components/marketing/bold-kit"
+import { CalloutList, CutoutFigure, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
 import { ThreadField } from "@/components/marketing/thread-field"
 
@@ -206,9 +206,14 @@ export function BoldHome({ content }: { content: SiteContent }) {
       {/* The figures get the WHITE band — the first change of ground on the page, and the
           moment the reader learns this site has more than one surface. A hairline over
           parchment said "another paragraph"; a surface says "another kind of thing". */}
+      {/* THE FIGURES BECOME VIOLET BLOCKS.
+          They were a plain strip on a white band, which is a caption under the hero. A figure
+          in a saturated block reads as a SPECIFICATION; the same figure in a bordered card
+          reads as a claim someone typed. This is the one place the palette's violet is used,
+          and the only place it is allowed — see the fence on --mk-violet. */}
       {stats.length > 0 && (
         <Band tone="card">
-          <SpecStrip items={stats} path="stats" />
+          <ProofBlocks items={stats} />
         </Band>
       )}
 

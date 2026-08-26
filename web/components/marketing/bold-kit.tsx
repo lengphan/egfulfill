@@ -639,3 +639,121 @@ export function ObjectTile({
     </span>
   )
 }
+
+/**
+ * ── WINDOW — a screenshot presented as an interface, not as a picture ────────────────────
+ *
+ * Direction E's whole device, and the most-repeated pattern in the reference study: a dark
+ * shell holding a light UI. customer.io, webflow.com, openphone.com and cakeequity.com all
+ * do the same thing, because it solves the same problem — a bare screenshot dropped onto a
+ * page reads as a document someone attached, while the same screenshot inside a frame reads
+ * as software running.
+ *
+ * The shell is the brand's, the contents are the product's. That separation is the point:
+ * nothing about the screenshot is restyled to match the page, so what a visitor sees is what
+ * they get after signing up. A marketing site that prettifies its own screenshots is lying in
+ * a way that is discovered on day one.
+ *
+ * THE TRAFFIC LIGHTS ARE NOT MACOS. One accent dot and two neutral ones — enough to say
+ * "window" without pretending to be an operating system we do not ship on.
+ *
+ * NO IMAGE, NO FAKE. If `src` is missing the frame renders EMPTY with its caption, and that
+ * is deliberate: the previous version of this site had a drawn mock of our own app in the
+ * hero and it was deleted on purpose. An invented screenshot is the one asset that damages
+ * trust rather than merely failing to build it — a visitor compares it to the real thing.
+ */
+export function Window({
+  src,
+  alt = "",
+  caption,
+  tilt = 0,
+  className = "",
+}: {
+  src?: string
+  alt?: string
+  /** Small label under the frame — what this screen is. Not a sentence. */
+  caption?: string
+  /** Degrees of perspective. The references use 2–4; past about 5 it reads as a stock mockup. */
+  tilt?: number
+  className?: string
+}) {
+  return (
+    <figure className={`m-0 ${className}`}>
+      <div
+        className="overflow-hidden rounded-[26px] p-2.5"
+        style={{
+          background: ACCENT,
+          transform: tilt ? `perspective(1400px) rotateY(${tilt}deg)` : undefined,
+          transformStyle: tilt ? "preserve-3d" : undefined,
+        }}
+      >
+        <div className="flex items-center gap-1.5 px-2 pb-2.5 pt-1">
+          <span className="size-2 rounded-full" style={{ background: ACID }} />
+          <span className="size-2 rounded-full" style={{ background: ACCENT_INK, opacity: 0.28 }} />
+          <span className="size-2 rounded-full" style={{ background: ACCENT_INK, opacity: 0.28 }} />
+        </div>
+        <div className="overflow-hidden rounded-[18px]" style={{ background: CARD }}>
+          {src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={src} alt={alt} className="block h-auto w-full" loading="lazy" />
+          ) : (
+            <div className="aspect-[16/10] w-full" style={{ background: CARD }} />
+          )}
+        </div>
+      </div>
+      {caption && (
+        <figcaption
+          className="mt-3 text-[11px] font-medium uppercase tracking-[0.1em]"
+          style={{ color: INK, opacity: 0.5 }}
+        >
+          {caption}
+        </figcaption>
+      )}
+    </figure>
+  )
+}
+
+/**
+ * ── PROOF BLOCKS — figures as full colour panels ─────────────────────────────────────────
+ *
+ * Nebius stacks its numbers in saturated violet cards at enormous size, and it works because
+ * a figure in a coloured block reads as a SPECIFICATION while the same figure in a bordered
+ * card reads as a claim someone typed. It is the one place this palette's violet earns its
+ * keep.
+ *
+ * THE VIOLET IS MARKETING-ONLY, and this component is why the fence exists. `--mk-violet` is
+ * 0.052 in OKLab from the app's `pending` indigo — on a board nobody could tell the brand from
+ * an order state. There is no status vocabulary on a marketing page, so it is safe here and
+ * only here. Do not lift this component into the app: see the note beside the token.
+ *
+ * White on the violet is 5.95:1 and the accent on it is 4.73:1, so both the figure and its
+ * label are real readable type rather than decoration.
+ */
+export function ProofBlocks({
+  items,
+  className = "",
+}: {
+  items: { value: string; label: string; note?: string }[]
+  className?: string
+}) {
+  if (!items.length) return null
+  return (
+    <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${className}`}>
+      {items.slice(0, 4).map((s, i) => (
+        <div
+          key={`${s.label}-${i}`}
+          className="rounded-[26px] p-7"
+          style={{ background: "var(--mk-violet)", color: "var(--mk-violet-ink)" }}
+        >
+          {/* tabular-nums so a row of figures lines up — the thing that makes a set of
+              numbers read as a spec sheet rather than as four separate sentences. */}
+          <div className="font-display text-[clamp(2rem,3.4vw,3rem)] font-bold leading-none tracking-[-0.03em] tabular-nums">
+            {s.value}
+          </div>
+          <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] opacity-90">{s.label}</div>
+          {s.note && <p className="mt-2 text-[13.5px] leading-snug opacity-75">{s.note}</p>}
+        </div>
+      ))}
+    </div>
+  )
+}
