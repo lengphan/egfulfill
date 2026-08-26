@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { CircleNotch } from "@phosphor-icons/react"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
+import { useRailCollapsed } from "@/lib/rail"
 import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { TopBar } from "@/components/app/topbar"
@@ -17,6 +18,7 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
   useAccent()
   const router = useRouter()
   const pathname = usePathname()
+  const [collapsed, toggleRail] = useRailCollapsed()
   const [ok, setOk] = useState<boolean | null>(null)
   useEffect(() => {
     const id = setTimeout(() => {
@@ -49,8 +51,11 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
   return (
     <ConfirmProvider>
     <div className="min-h-svh bg-background">
-      <StaffSidebar />
-      <div className="md:pl-60">
+      {/* THE SECOND SHELL. Board routes do not go through app-shell.tsx — they have their
+          own copy of this layout, which is why wiring the rail there alone left every board
+          with a toggle that did nothing. Both shells read the same hook. */}
+      <StaffSidebar collapsed={collapsed} onToggle={toggleRail} />
+      <div className={collapsed ? "md:pl-16" : "md:pl-60"}>
         <TopBar />
         {/* eg-content is THE page container — one width and one gutter for every page,
             no per-page opt-out. See app/globals.css. */}

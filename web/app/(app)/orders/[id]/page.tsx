@@ -773,7 +773,7 @@ export default function OrderDetailPage() {
 
             One surface per column, no rules inside it. The grey goes back to being the gap
             BETWEEN surfaces, which is the only job a page colour has. */}
-        <div className="min-w-0 space-y-5 rounded-[var(--radius)] border border-border bg-card p-5">
+        <div className="min-w-0 space-y-5 rounded-[var(--radius)] bg-card p-5 ring-1 ring-foreground/5">
           <TabBar
             ariaLabel="Order sections"
             value={detailTab}
@@ -1289,7 +1289,7 @@ export default function OrderDetailPage() {
             child stops drawing its own border, corner and ring, and this container draws
             them once for the set. divide-y puts a hairline between the sections, so the
             four read as one object with four parts rather than four objects. */}
-        <div className="min-w-0 space-y-6 rounded-[var(--radius)] border border-border bg-card p-5">
+        <div className="min-w-0 space-y-6 rounded-[var(--radius)] bg-card p-5 ring-1 ring-foreground/5">
           {/* THE FACTORY NOTE, IN THE RAIL — moved 2026-08-26.
               Still one field, overwritten, staff-only: "the thing to know about this
               order", and still deliberately separate from the activity thread, which is a

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { SignOut, ChatCircleDots, Gear } from "@phosphor-icons/react"
+import { SignOut, ChatCircleDots, Gear, CaretLineLeft } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { staffNav, staffTools, type StaffNavItem } from "@/lib/staff-nav"
 import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
@@ -11,10 +11,18 @@ import { useLabelT } from "@/lib/i18n"
 import { getUser, clearSession } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 
-export function StaffSidebar() {
+export function StaffSidebar({ collapsed = false, onToggle }: {
+  /** Set by the shell, which owns the fact — see lib/rail.ts. */
+  collapsed?: boolean
+  onToggle?: () => void
+}) {
   const tl = useLabelT()
   const pathname = usePathname()
   const router = useRouter()
+  const itemCls = cn(
+    "flex items-center rounded-lg py-2 text-sm font-medium transition-colors",
+    collapsed ? "justify-center px-0" : "gap-3 px-3",
+  )
   const nl = useLabelT()
   const [items, setItems] = useState<StaffNavItem[]>([])
   const [tools, setTools] = useState<StaffNavItem[]>([])
@@ -49,17 +57,22 @@ export function StaffSidebar() {
   return (
     <>
     <MobileNav sections={mobileSections} onLogout={logout} role={role} />
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
-      <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-5">
+    <aside className={cn(
+      "fixed inset-y-0 left-0 z-30 hidden flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
+      collapsed ? "w-16" : "w-60",
+    )}>
+      <div className={cn("flex h-16 shrink-0 items-center gap-2", collapsed ? "justify-center px-0" : "px-5")}>
         {/* Brand, so it keeps the marketing face — see sidebar.tsx. */}
-        <span className="font-display text-2xl font-semibold tracking-tight">egful</span>
+        <span className="font-display text-2xl font-semibold tracking-tight" title="egful">{collapsed ? "e" : "egful"}</span>
         {/* WHICH ROLE YOU ARE IN, not a badge for it. This was a filled pill beside the
             wordmark on every single screen — the loudest thing in the sidebar header, saying
             something nobody needs shouted. Small caps carry it just as clearly and stop it
             competing with the nav item that is actually selected. */}
-        {role && <span className="ml-auto text-2xs font-semibold uppercase tracking-widest text-sidebar-foreground/50">{role}</span>}
+        {role && !collapsed && <span className="ml-auto text-2xs font-semibold uppercase tracking-widest text-sidebar-foreground/50">{role}</span>}
       </div>
 
+      {/* One string, three renderings. They were three copies of the same twelve classes,
+          which is how a collapse rule ends up applied to two of them. */}
       <nav className="eg-scroll-slim flex-1 overflow-y-auto p-3">
         {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/")
@@ -68,13 +81,14 @@ export function StaffSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? nl("nav", item.label) : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                itemCls,
                 active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
               <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/75")} />
-              {nl("nav", item.label)}
+              {!collapsed && nl("nav", item.label)}
             </Link>
           )
         })}
@@ -82,14 +96,14 @@ export function StaffSidebar() {
         {/* Seller-side tools this role may use (admin: all; operator/warehouse: a curated set). */}
         {tools.length > 0 && (
           <>
-            <div className="px-3 pb-2 pt-5 eg-label text-sidebar-foreground/70">{nl("nav", "Tools")}</div>
+            <div className={cn("pb-2 pt-5 eg-label text-sidebar-foreground/70", collapsed ? "px-0 text-center" : "px-3")}>{nl("nav", "Tools")}</div>
             {tools.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
               return (
-                <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
+                <Link key={item.href} href={item.href} title={collapsed ? nl("nav", item.label) : undefined} className={cn(itemCls, active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
                   <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/75")} />
-                  {nl("nav", item.label)}
+                  {!collapsed && nl("nav", item.label)}
                 </Link>
               )
             })}
@@ -97,23 +111,41 @@ export function StaffSidebar() {
         )}
 
         {/* Common to every staff member — profile + factory chat. */}
-        <div className="px-3 pb-2 pt-5 eg-label text-sidebar-foreground/70">{nl("nav", "Account")}</div>
+        <div className={cn("pb-2 pt-5 eg-label text-sidebar-foreground/70", collapsed ? "px-0 text-center" : "px-3")}>{nl("nav", "Account")}</div>
         {[{ label: tl("staffSidebar", "Chat"), href: "/chat", icon: ChatCircleDots }, { label: tl("staffSidebar", "Settings"), href: "/settings", icon: Gear }].map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/")
           const Icon = item.icon
           return (
-            <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
+            <Link key={item.href} href={item.href} title={collapsed ? nl("nav", item.label) : undefined} className={cn(itemCls, active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
               <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/75")} />
-              {nl("nav", item.label)}
+              {!collapsed && nl("nav", item.label)}
             </Link>
           )
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-border p-3">
-        <button onClick={logout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+      {/* THE TOGGLE — a deliberate, remembered choice, never hover. It sits at the foot with
+          log out because both are about the rail rather than about a page. */}
+      <div className="shrink-0 p-3 pb-0">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand the menu" : "Collapse the menu"}
+          className={cn(itemCls, "w-full text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}
+        >
+          <CaretLineLeft size={19} className={cn("shrink-0 transition-transform", collapsed && "rotate-180")} />
+          {!collapsed && <span className="flex-1 text-left">Collapse</span>}
+        </button>
+      </div>
+      <div className="shrink-0 p-3">
+        <button
+          onClick={logout}
+          title={collapsed ? nl("nav", "Log out") : undefined}
+          className={cn(itemCls, "w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}
+        >
           <SignOut size={19} className="text-sidebar-foreground/75" />
-          {nl("nav", "Log out")}
+          {!collapsed && nl("nav", "Log out")}
         </button>
       </div>
     </aside>

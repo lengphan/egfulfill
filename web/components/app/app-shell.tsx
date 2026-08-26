@@ -1,5 +1,6 @@
 "use client"
 
+import { useRailCollapsed } from "@/lib/rail"
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Sidebar } from "@/components/app/sidebar"
@@ -23,6 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [mode, setMode] = useState<"loading" | "seller" | "staff">("loading")
+  const [collapsed, toggleRail] = useRailCollapsed()
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -80,12 +82,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (mode === "loading") return null
 
+  /* The rail's width and the shell's left padding are ONE fact held in two places. They are
+     siblings in the tree, so the shell owns the state and hands it down rather than each
+     reading storage and drifting a frame apart on load. */
+  const railPad = collapsed ? "md:pl-16" : "md:pl-60"
+
   if (mode === "staff") {
     return (
       <ConfirmProvider>
       <div className="min-h-svh bg-background">
-        <StaffSidebar />
-        <div className="md:pl-60">
+        <StaffSidebar collapsed={collapsed} onToggle={toggleRail} />
+        <div className={railPad}>
           <TopBar />
           {/* eg-content is THE page container — one width and one gutter for every page,
               no per-page opt-out. See app/globals.css. */}
@@ -101,8 +108,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ConfirmProvider>
     <div className="min-h-svh bg-background">
-      <Sidebar />
-      <div className="md:pl-60">
+      <Sidebar collapsed={collapsed} onToggle={toggleRail} />
+      <div className={railPad}>
         <TopBar />
         <main className="eg-content mx-auto space-y-4 px-4 py-5 md:px-10 md:py-8">
           {/* Seller-only, and above the page rather than on one screen: a short wallet
