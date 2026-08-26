@@ -400,18 +400,37 @@
    *
    * Selected = the violet block with the cream green on it, 5.07:1. Same pair as the hero,
    * so "you are here" in the app is the same gesture as the accent phrase on the site. */
-    --sidebar: oklch(0.9667 0.0017 247.84);
-    --sidebar-foreground: oklch(0.1822 0.0000 89.88);
-  /* THE SELECTED ROW INVERTS rather than taking an accent. It was a lime fill; pink is not
-     allowed to fill a control, and reaching for a fourth colour to solve one row is how a
-     palette stops being three colours. Parchment on the dark block is 16.84:1 and is the
-     loudest thing available without introducing anything new. */
-    --sidebar-primary: oklch(1 0 0);
+  /* THE PANEL IS INK — 2026-08-26.
+   *
+   * `--sidebar` and `--background` were the SAME TOKEN, byte for byte:
+   * oklch(0.9667 0.0017 247.84) both. So there was no sidebar. There was a page with a line
+   * drawn down it, and the nav sat on the same sheet as the 700-row queue beside it.
+   *
+   * The states were no better. Hover was 0.9840 against a 0.9667 ground — a 1.7% lightness
+   * shift, 1.05:1, which is not a state, it is a rounding error. Selected reached 1.10:1.
+   * "Washed out" was the accurate reading of measured values, not a matter of taste.
+   *
+   * §4 has said all along that the sidebar carries the colour: one bounded block, never
+   * underneath the data, because a tint behind a long queue is a sheet you read THROUGH all
+   * day. Ink is that block, and it is the app's version of the marketing plate — same
+   * gesture, same colour, opposite end of the product.
+   *
+   * The panel is 16.26:1 against the page, so the app finally has two surfaces instead of
+   * one. Every pair below is measured; none is eyeballed. */
+    --sidebar: oklch(0.205 0.004 250);
+    --sidebar-foreground: oklch(0.900 0.004 250);
+  /* SELECTED IS THE LIME, and this is the one place in the app it fills something. §4
+     reserves it as the single bright thing and forbids it as a text colour — a filled block
+     with ink on it is exactly the shape that rule permits, and "you are here" is the one
+     marker worth spending it on. Ink on lime is 14.87:1; the block is 14.21:1 against the
+     panel, so it reads across a room. */
+    --sidebar-primary: oklch(0.9114 0.1870 118.57);
     --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
-    --sidebar-accent: oklch(0.9840 0 0);
-    --sidebar-accent-foreground: oklch(0.1822 0.0000 89.88);
-    --sidebar-border: oklch(0.8979 0.0077 241.67);
-    --sidebar-ring: oklch(0.1822 0.0000 89.88);
+  /* Hover is a real step now: 1.31:1 against the panel rather than 1.05:1. */
+    --sidebar-accent: oklch(0.300 0.006 250);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(0.300 0.006 250);
+    --sidebar-ring: oklch(0.9114 0.1870 118.57);
 }
 
 .dark {
@@ -506,8 +525,11 @@
      * reserved use of lime never appeared. The nav was violet on violet-tinted panel on
      * violet-tinted canvas, which is why the dark app reads as having no accent at all.
      * Ink on this lime is 16.56:1; the violet block it replaces was 4.9:1 against the panel. */
-    --sidebar-primary: oklch(0.955 0 0);
-    --sidebar-primary-foreground: oklch(0.145 0 0);
+  /* THE COMMENT ABOVE FINALLY MATCHES THE VALUE. It described "the acid block with ink on
+   * it" as dark mode's one reserved use of lime, and then set white — so the thing the
+   * paragraph promised had never once rendered. Light and dark now select the same way. */
+    --sidebar-primary: oklch(0.9114 0.1870 118.57);
+    --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
     --sidebar-accent: oklch(0.235 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.315 0 0);
