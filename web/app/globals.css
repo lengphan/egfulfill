@@ -1111,7 +1111,14 @@ td[align="right"] {
    * is the first one where that scoping is load-bearing rather than tidy.
    *
    * IF THE APP EVER WANTS A VIOLET BLOCK it is #3F2AB0 — the first step down the ramp that
-   * clears the floor, at 0.177 from `pending`, with white at 9.68:1 and lime at 8.57:1. */
+   * clears the floor, at 0.177 from `pending`, with white at 9.68:1 and lime at 8.57:1.
+   *
+   * NOTHING PAINTS IT AS OF 2026-08-26. Its one call site was ProofBlocks, the four figure
+   * panels under the homepage hero, and that band was removed from all three marketing pages
+   * that carried one. The token stays because the measurement above is the expensive part and
+   * it is still true; the fence stays for the same reason. Treat it as reserved, not as free
+   * paint looking for a wall — if a section reaches for it, the question is whether that
+   * section has facts of its own, which is exactly what ProofBlocks did not. */
   --mk-violet: #614EFA;
   --mk-violet-ink: #FFFFFF;
 

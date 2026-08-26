@@ -35,7 +35,7 @@ import { ThreadCone, Printhead, ShippingBox, FoldedTee, HeatPress, EmbroideryHoo
  * as deliberate even though nothing binds a given card to a given object.
  */
 const CARD_OBJECTS = [ThreadCone, Printhead, HeatPress, ShippingBox, FoldedTee, EmbroideryHoop] as const
-import type { Callout, Stat, NumberedItem } from "@/lib/site-content"
+import type { Callout, NumberedItem } from "@/lib/site-content"
 import { EditableText } from "@/components/marketing/edit-mode"
 
 /** The caps label these boards use everywhere: small, wide, quiet. One definition, because
@@ -74,27 +74,9 @@ function Words({ path, children }: { path?: string; children: string }) {
   return <EditableText path={path}>{children}</EditableText>
 }
 
-export function LabelRule({ left, right, tone = "ink", className = "", leftPath, rightPath }: {
-  left: string
-  right?: string
-  /** Where each word lives in the content blob, so the rule is editable in place. */
-  leftPath?: string
-  rightPath?: string
-  /** Which ground it is drawn on. `light` is the same rule inverted, for a dark panel — a
-   *  hairline at HAIRLINE's value simply does not exist against the accent. */
-  tone?: "ink" | "light"
-  className?: string
-}) {
-  if (!left && !right) return null
-  const fg = tone === "light" ? ACCENT_INK : INK
-  return (
-    <div className={`flex items-center gap-4 ${className}`} style={{ color: fg }}>
-      {left && <span className={`${CAPS} shrink-0 opacity-70`}><Words path={leftPath}>{left}</Words></span>}
-      <span className="h-px flex-1" style={{ background: tone === "light" ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE }} />
-      {right && <span className={`${CAPS} shrink-0 text-right opacity-70`}><Words path={rightPath}>{right}</Words></span>}
-    </div>
-  )
-}
+/* LABEL RULE IS GONE — deleted 2026-08-26. It set a caps word, a hairline and a second caps
+ * word across the top of the figures band, and it had no other call site: the thing it
+ * labelled went, so it went. */
 
 /**
  * THE GIANT GHOST WORD.
@@ -356,62 +338,15 @@ export function CalloutList({ items, tone = "paper", className = "", path }: {
   )
 }
 
-/**
- * THE SPEC STRIP — a band of figures divided by rules.
+/* THE SPEC STRIP IS GONE — deleted 2026-08-26 from /features and /how-it-works.
  *
- * AUREL's is five across under the hero: a value, what it measures, and a rule between each.
- * It is the same data a row of cards would carry, minus four borders and four shadows — and
- * that is the point, because a figure inside a box reads as a claim someone made, while a
- * figure in a band reads as a specification.
+ * A band of figures under the hero is the pitch-deck opening: state your size before you
+ * state what you do. On both pages every value in it was a count of something the page
+ * itself enumerated further down — 4 statuses is the journey strip, 7 print methods is the
+ * features wall — so the strip was a summary of copy the reader had not read yet.
  *
- * The vertical rules are on the ITEM, not between items, so the strip wraps at any count
- * without a divider ending up dangling at the start of a row.
- */
-export function SpecStrip({ items, className = "", path }: { items: Stat[]; className?: string; path?: string }) {
-  const reduce = useReducedMotion()
-  if (!items.length) return null
-  return (
-    /*
-     * THE PADDING IS THE DIVIDER'S, SO IT ONLY EXISTS WHERE THE DIVIDER DOES.
-     *
-     * This was `px-6 first:pl-0` at every width. Stacked on a phone that put figure 1 flush
-     * with the margin and figures 2–5 indented 24px — five values in one column on two
-     * different left edges, which is precisely the "four different left margins in one
-     * screen" §4 names as what "nothing is aligned" actually is.
-     *
-     * The 24px was only ever breathing room either side of the vertical rule, and the rule is
-     * `lg` only. So the padding is `lg` only, and below that a column gap does the separating.
-     */
-    <div className={`grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-x-0 ${className}`}>
-      {items.slice(0, 5).map((s, i) => (
-        <motion.div
-          key={`${s.label}-${i}`}
-          /* NO VERTICAL RULES between the figures — stripped 2026-08-26.
-           *
-           * The divider bars were the pitch-deck reference's grammar: a spec sheet drawn as
-           * a table because a board's slide has no room to breathe. This direction separates
-           * things with SPACE and with a change of ground, and it has exactly one line
-           * weight for one job — a card's hairline. A rule standing between two figures on
-           * the same surface is drawing a boundary that is not there.
-           *
-           * The strip already sits on its own white band, so the section is divided; the
-           * figures inside it do not need dividing from each other as well. */
-          className="lg:px-0"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.55, delay: i * 0.07, ease: EASE }}
-        >
-          {/* tabular-nums so a row of figures lines up on the decimal — the thing that makes
-              a strip read as a spec sheet rather than as five separate sentences. */}
-          <div className="font-title text-2xl font-semibold tabular-nums tracking-tight" style={{ color: INK }}><Words path={path && `${path}.${i}.value`}>{s.value}</Words></div>
-          <div className={`${CAPS} mt-2`} style={{ color: INK, opacity: 0.5 }}><Words path={path && `${path}.${i}.label`}>{s.label}</Words></div>
-          {s.note && <div className="mt-1.5 text-sm leading-snug" style={{ color: INK, opacity: 0.6 }}><Words path={path && `${path}.${i}.note`}>{s.note}</Words></div>}
-        </motion.div>
-      ))}
-    </div>
-  )
-}
+ * The stats still live in the content blob and in Settings › Site content. Leaving the data
+ * costs nothing and keeps an admin's edits intact; nothing reads it. */
 
 /**
  * NUMBERED CARDS, ALTERNATING LIGHT AND DARK.

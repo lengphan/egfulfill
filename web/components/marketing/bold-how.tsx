@@ -2,7 +2,7 @@
 
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, PlateHero, Band, Rise } from "@/components/marketing/bold-kit"
-import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
+import { CutoutFigure, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
@@ -63,27 +63,11 @@ export function BoldHow({ content }: { content: SiteContent }) {
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <PlateHero title={p.title} accent={p.accent} sub={p.sub} path="howPage" />
 
-      {/*
-        * ── THE BAND OF FIGURES ────────────────────────────────────────────────────
-        *
-        * Directly under the hero, exactly where the reference puts it, and for the reason
-        * given on SpecStrip: a number in a band reads as a specification, a number in a card
-        * reads as a claim somebody made. Every figure here is one we can point at — "2 min"
-        * is the OAuth round trip the copy below describes, "4" is the four statuses the strip
-        * at the bottom of this very page enumerates.
-        *
-        * Emptied in the editor, the whole section goes — same as the homepage.
-        */}
-      {p.stats.length > 0 && (
-        /* THE WHITE BAND — the first change of ground, and the moment the reader learns
-           this page has more than one surface. The rule that used to sit above the strip is
-           gone with it: a band IS the division, and a line drawn inside one divides nothing.
-           LabelRule stays, because it labels rather than separates. */
-        <Band tone="card">
-          <LabelRule left={p.ruleLeft} right={p.ruleRight} leftPath="howPage.ruleLeft" rightPath="howPage.ruleRight" className="mb-12" />
-          <SpecStrip items={p.stats} path="howPage.stats" />
-        </Band>
-      )}
+      {/* NO BAND OF FIGURES UNDER THE HERO — removed 2026-08-26 from all three pages that
+          carried one. See the note on /features. On THIS page it was the weakest of the three:
+          "4 statuses" is the journey strip at the bottom of this very page, counted, and "2
+          min" is the connect step the copy immediately below describes in words. A figure that
+          summarises the section under it makes the reader read the same thing twice. */}
 
       {/*
         * ── THE DIAGRAM ────────────────────────────────────────────────────────────

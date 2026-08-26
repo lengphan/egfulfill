@@ -3,7 +3,7 @@
 
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, PlateHero, Band, Rise } from "@/components/marketing/bold-kit"
-import { LabelRule, CutoutFigure, SpecStrip } from "@/components/marketing/bold-figure"
+import { CutoutFigure } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
@@ -95,17 +95,14 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
       <PlateHero title={p.title} accent={p.accent} sub={p.sub} path="featuresPage" />
 
-      {/* The band of figures, where the reference puts it: directly under the hero, divided by
-          rules rather than boxed. Every value is a countable fact — see the note in
-          lib/site-content.ts on why none of them is a rate or a total. */}
-      {p.stats.length > 0 && (
-        /* The white band, matching /how-it-works exactly: the change of ground is the
-           division, so the rule that used to sit above the strip has gone with it. */
-        <Band tone="card">
-          <LabelRule left={p.ruleLeft} right={p.ruleRight} leftPath="featuresPage.ruleLeft" rightPath="featuresPage.ruleRight" className="mb-12" />
-          <SpecStrip items={p.stats} path="featuresPage.stats" />
-        </Band>
-      )}
+      {/* NO BAND OF FIGURES UNDER THE HERO — removed 2026-08-26, and on all three pages that
+          carried one. It was the pitch-deck reference's opening move: four countable facts in
+          a strip so the page states its size before it states what it does. The confirmed
+          prototype does not have it, and the reason it does not is that the figures were the
+          smallest claims on the page — 3 marketplaces and 7 print methods are facts the
+          integrations row and the features wall already carry, said once each and in the place
+          a reader is actually looking for them. Restating them as a spec sheet buys a band of
+          scrolling and tells nobody anything new. Do not reinstate it as "social proof". */}
 
       {/*
         * THE PRODUCT.

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight } from "@phosphor-icons/react"
 import { entrance, type PresetName } from "@/lib/motion"
+import { isVideoSrc } from "@/lib/media"
 import { useMotionPreset } from "./motion-provider"
 import { EditableText, useEditMode } from "@/components/marketing/edit-mode"
 
@@ -734,50 +735,16 @@ export function Window({
   )
 }
 
-/**
- * ── PROOF BLOCKS — figures as full colour panels ─────────────────────────────────────────
+/* PROOF BLOCKS ARE GONE — deleted 2026-08-26 with the band of figures they drew.
  *
- * Nebius stacks its numbers in saturated violet cards at enormous size, and it works because
- * a figure in a coloured block reads as a SPECIFICATION while the same figure in a bordered
- * card reads as a claim someone typed. It is the one place this palette's violet earns its
- * keep.
+ * They were four saturated violet panels under the homepage hero, and before that the same
+ * four numbers as a plain strip. Two treatments for one band is what a section looks like
+ * when the problem is the section: every figure in it was already stated elsewhere on the
+ * page, so no amount of colour made it new information.
  *
- * THE VIOLET IS MARKETING-ONLY, and this component is why the fence exists. `--mk-violet` is
- * 0.052 in OKLab from the app's `pending` indigo — on a board nobody could tell the brand from
- * an order state. There is no status vocabulary on a marketing page, so it is safe here and
- * only here. Do not lift this component into the app: see the note beside the token.
- *
- * White on the violet is 5.95:1 and the accent on it is 4.73:1, so both the figure and its
- * label are real readable type rather than decoration.
- */
-export function ProofBlocks({
-  items,
-  className = "",
-}: {
-  items: { value: string; label: string; note?: string }[]
-  className?: string
-}) {
-  if (!items.length) return null
-  return (
-    <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${className}`}>
-      {items.slice(0, 4).map((s, i) => (
-        <div
-          key={`${s.label}-${i}`}
-          className="rounded-[26px] p-7"
-          style={{ background: "var(--mk-violet)", color: "var(--mk-violet-ink)" }}
-        >
-          {/* tabular-nums so a row of figures lines up — the thing that makes a set of
-              numbers read as a spec sheet rather than as four separate sentences. */}
-          <div className="font-display text-[clamp(2rem,3.4vw,3rem)] font-bold leading-none tracking-[-0.03em] tabular-nums">
-            {s.value}
-          </div>
-          <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] opacity-90">{s.label}</div>
-          {s.note && <p className="mt-2 text-[13.5px] leading-snug opacity-75">{s.note}</p>}
-        </div>
-      ))}
-    </div>
-  )
-}
+ * --mk-violet was painted here and nowhere else. The token and its fence survive in
+ * globals.css; nothing renders it. If a real specification ever needs a coloured block,
+ * write it against a page that has facts of its own — do not restore this one. */
 
 /**
  * ── WINDOW SKELETON — a placeholder that is visibly a placeholder ────────────────────────
@@ -856,13 +823,22 @@ export function WindowSkeleton({ rows = 5 }: { rows?: number }) {
  * there is something to scrim.
  */
 export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)" }: {
-  /** A public image URL. Empty is a legitimate answer — see above. */
+  /** A public image OR video URL. Empty is a legitimate answer — see above. */
   media?: string
   alt?: string
   children: React.ReactNode
   minH?: string
 }) {
+  const reduce = useReducedMotion()
   const hasMedia = !!media
+  /*
+   * THE SLOT TAKES MOTION — added 2026-08-26. One field, and the URL decides: this is the one
+   * surface on the marketing site where a moving picture is the point, and it would have been
+   * a mistake to give it a second content field that an admin has to keep in step with the
+   * first. See lib/media.ts for why the decision is made on the extension.
+   */
+  const isVideo = isVideoSrc(media)
+  const mediaClass = "absolute inset-0 -z-10 h-full w-full object-cover"
   return (
     <section
       className="relative isolate w-full overflow-hidden"
@@ -870,13 +846,42 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
     >
       {hasMedia && (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- a seller-supplied absolute
-              URL from Settings › Site content; next/image would need every host allow-listed. */}
-          <img
-            src={media}
-            alt={alt || ""}
-            className="absolute inset-0 -z-10 h-full w-full object-cover"
-          />
+          {isVideo ? (
+            /*
+             * MUTED AND playsInline ARE NOT PREFERENCES — they are the conditions under which
+             * a browser will autoplay at all. iOS additionally refuses fullscreen-less
+             * playback without playsInline, so without it the video takes over the screen the
+             * moment it starts, which is a hero that hijacks the phone.
+             *
+             * REDUCED MOTION STOPS IT, like everything else on these pages (§4). A paused
+             * <video> paints its poster, or its first frame once metadata has loaded — so the
+             * still is a real frame of the film rather than a blank rectangle, and the
+             * headline still has something to stand on.
+             *
+             * aria-hidden, and the alt text does NOT move here. A background loop behind a
+             * headline is decoration: the words carry the meaning, and a screen reader
+             * announcing a description of the wallpaper before them is noise. That is the
+             * difference from the <img> branch, where the picture may be the only content.
+             */
+            <video
+              src={media}
+              className={mediaClass}
+              autoPlay={!reduce}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element -- a seller-supplied absolute
+                URL from Settings › Site content; next/image would need every host allow-listed. */
+            <img
+              src={media}
+              alt={alt || ""}
+              className={mediaClass}
+            />
+          )}
           {/* THE SCRIM EXISTS SO THE TYPE IS LEGIBLE ON ANY UPLOAD, not for mood. Weighted to
               the bottom-left because that is where the headline stands; the top stays open so
               the picture is still a picture. */}

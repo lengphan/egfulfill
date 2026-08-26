@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, ProofBlocks, Window, ObjectTile, MediaHero } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, Window, ObjectTile, MediaHero } from "@/components/marketing/bold-kit"
 import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/marketing/objects"
 
 /** One object per feature section, in factory order: make → print → pack → label. */
@@ -30,7 +30,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
   // keystroke; the plain string is the honest thing to edit and the animation is what a
   // visitor sees.
   const { on: editing } = useEditMode()
-  const { hero, stats, features, steps, testimonials, faq, cta } = content
+  const { hero, features, steps, testimonials, faq, cta } = content
   const reduce = useReducedMotion()
   // The scroll-linked parallax went with the app panel it moved. Nothing on this page
   // tracks scroll any more.
@@ -132,29 +132,18 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </motion.div>
       </div>
 
-      {/*
-        * ── THE STRIP OF FIGURES ────────────────────────────────────────────────
-        *
-        * The stats, said the way a spec sheet says them: a value, what it measures, why it
-        * matters, and a rule between each. No box around them — a figure inside a card reads
-        * as a claim somebody made, while a figure in a band divided by rules reads as a
-        * specification, which is the whole reason the reference puts one under its hero.
-        *
-        * Skipped entirely when the list is empty, which is how an admin removes the section.
-        */}
-      {/* The figures get the WHITE band — the first change of ground on the page, and the
-          moment the reader learns this site has more than one surface. A hairline over
-          parchment said "another paragraph"; a surface says "another kind of thing". */}
-      {/* THE FIGURES BECOME VIOLET BLOCKS.
-          They were a plain strip on a white band, which is a caption under the hero. A figure
-          in a saturated block reads as a SPECIFICATION; the same figure in a bordered card
-          reads as a claim someone typed. This is the one place the palette's violet is used,
-          and the only place it is allowed — see the fence on --mk-violet. */}
-      {stats.length > 0 && (
-        <Band tone="card">
-          <ProofBlocks items={stats} />
-        </Band>
-      )}
+      {/* NO BAND OF FIGURES UNDER THE HERO — removed 2026-08-26 from all three pages that
+          carried one (/, /features, /how-it-works). It had been a plain strip on a white band
+          and then four saturated violet blocks, and the second version was the tell: the same
+          four numbers were restyled twice looking for a treatment that made them land, when
+          the problem was never the treatment. "3 marketplaces" is the channel marquee two
+          screens up, counted. "$0 monthly fee" is the pricing page's whole first line. A band
+          that says again, in bigger type, what the page has already shown is scrolling the
+          reader pays for and gets nothing back.
+
+          THIS IS ALSO THE ONLY PLACE --mk-violet WAS EVER PAINTED. The token and its fence
+          stay put — a colour with no call site is cheap to keep and expensive to re-derive —
+          but nothing renders it now. See the note beside it in globals.css. */}
 
       {/* ── FEATURES — ALTERNATING TEXT AND WINDOW ────────────────────────────────
           Was a four-card grid of prose: four boxes of similar length that the eye skims and
