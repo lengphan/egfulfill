@@ -1,8 +1,8 @@
 "use client"
 
-import { Check } from "@phosphor-icons/react"
+
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import { LabelRule, CutoutFigure, SpecStrip, CAPS } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
@@ -80,47 +80,61 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
         </section>
       )}
 
-      <section className="mx-auto max-w-5xl px-6 py-12">
-        <div className="divide-y" style={{ borderColor: HAIRLINE }}>
-          {p.items.map((f, i) => (
-            /*
-              * A FIXED TRACK FOR THE NUMERAL, because every row is its own grid.
-              *
-              * This was `auto`, which sizes to the widest thing in THAT row — and each row is
-              * a separate Rise with a separate grid, so "01" resolved narrower than "04" and
-              * the six headings started at 328, 340, 341, 342… px. Six near-misses read as a
-              * column that isn't straight, which is exactly the defect people then chase cell
-              * by cell. One track at the container fixes all six at once, and tabular-nums
-              * keeps the digits themselves from shifting.
-              */
-            <Rise key={`${f.title}-${i}`} preset="drift" index={i} className="grid gap-6 py-12 md:grid-cols-[5.5rem_1fr_auto] md:gap-10">
-              {/* The number is the ordering cue a card grid can't give. Set big and quiet —
-                  it's a position, not a value, so it shouldn't compete with the heading. */}
-              <div className="font-display font-semibold leading-none tracking-tighter tabular-nums text-black/[0.13]" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)" }}>
-                {String(i + 1).padStart(2, "0")}
-              </div>
+      {/* ── THE WALL ──────────────────────────────────────────────────────────────
+          Was a numbered divide-y list, and before that a card grid. Both threw away the only
+          interesting thing about these methods: they leave physically DIFFERENT SURFACES.
+          Embroidery is raised and directional; DTG has no hand at all. A numeral and a
+          paragraph say none of that, and an icon in a rounded box says less.
 
-              <div className="min-w-0">
-                {/* No icon plate. The big number to the left is already the ordering cue, so a
-                    filled accent tile beside the heading said nothing the row wasn't saying —
-                    it just put a second coloured object in front of the words. The heading is
-                    the thing to read. */}
-                <h2 className="text-2xl font-bold tracking-tight"><EditableText path={`featuresPage.items.${i}.title`}>{f.title}</EditableText></h2>
-                {f.body && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-black/60"><EditableText path={`featuresPage.items.${i}.body`}>{f.body}</EditableText></p>}
-              </div>
+          So: an irregular mosaic of full-bleed tiles, no card chrome, 3px seams. The first
+          three run tall because embroidery is the signature and the eye should land there.
 
-              {f.points && f.points.length > 0 && (
-                <ul className="space-y-2 md:w-56">
-                  {f.points.map((pt, j) => (
-                    <li key={pt} className="flex items-start gap-2 text-[13px] text-black/70">
-                      <Check size={13} weight="bold" className="mt-0.5 shrink-0" />
-                      <EditableText path={`featuresPage.items.${i}.points.${j}`}>{pt}</EditableText>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Rise>
-          ))}
+          NO COMPARISON TABLE YET, deliberately. The design calls for one — best on, colour
+          range, minimum, feel — and not one of those facts exists in the content model.
+          Inventing them would be fabricating product claims on a public page, so the table
+          waits until the fields do. The wall is the half that can be built truthfully today.
+
+          A tile has no image because there is no per-item image field. It renders as the ink
+          plate with its name on it, which is a real design rather than a gap — the same call
+          the hero makes when nobody has uploaded a picture. */}
+      <section className="py-12">
+        <div className="grid grid-cols-12 gap-[3px] px-[3px]">
+          {p.items.map((f, i) => {
+            /* Spans that RESOLVE. Seven items in a four-up grid orphans the last three, and
+               widening them mid-grid produces two card widths in one row — which reads as
+               broken. 5+4+3 then 3+3+3+3 fills both rows exactly. */
+            const span = i < 3 ? [5, 4, 3][i] : 3
+            const tall = i < 3
+            return (
+              <Rise
+                key={`${f.title}-${i}`}
+                preset="drift"
+                index={i}
+                className="relative flex items-end p-5 sm:p-6"
+                style={{ background: ACCENT, gridColumn: `span ${span} / span ${span}`, minHeight: tall ? "clamp(15rem,22vw,20rem)" : "clamp(11rem,15vw,13.5rem)" }}
+              >
+                <div className="relative z-10 min-w-0">
+                  <h2 className="font-display text-[clamp(1.15rem,1.7vw,1.55rem)] font-semibold leading-tight tracking-[-0.02em]" style={{ color: ACCENT_INK }}>
+                    <EditableText path={`featuresPage.items.${i}.title`}>{f.title}</EditableText>
+                  </h2>
+                  {f.body && (
+                    <p className="mt-2 max-w-[34ch] text-[13px] leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.66 }}>
+                      <EditableText path={`featuresPage.items.${i}.body`}>{f.body}</EditableText>
+                    </p>
+                  )}
+                  {f.points && f.points.length > 0 && (
+                    <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
+                      {f.points.map((pt, j) => (
+                        <li key={pt} className="text-[11.5px]" style={{ color: ACID }}>
+                          <EditableText path={`featuresPage.items.${i}.points.${j}`}>{pt}</EditableText>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </Rise>
+            )
+          })}
         </div>
       </section>
 
