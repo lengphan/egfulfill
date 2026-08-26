@@ -19,7 +19,7 @@ import { setInternalNote } from "@/lib/api"
  * Lived privately inside orders-hub.tsx, so the order page — the screen where an order is
  * actually worked — had no factory note at all.
  */
-export function InternalNote({ orderId, value }: { orderId: string; value: string }) {
+export function InternalNote({ hideLabel = false, orderId, value }: { /** The section already names this field. */ hideLabel?: boolean; orderId: string; value: string }) {
   const tl = useLabelT()
   const [text, setText] = useState(value)
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle")
@@ -32,7 +32,11 @@ export function InternalNote({ orderId, value }: { orderId: string; value: strin
   return (
     <div>
       <div className="mb-0.5 flex items-center gap-2">
-        <span className="eg-label text-muted-foreground">{tl("internalNote", "Factory note")}</span>
+        {/* The label is the CONTROL's, and it is redundant when a section heading has already
+            named the field — the order page rail said "Factory note" in bold and then
+            "FACTORY NOTE" again immediately under it. The save state beside it is not
+            redundant and always shows: it is the only feedback this textarea gives. */}
+        {!hideLabel && <span className="eg-label text-muted-foreground">{tl("internalNote", "Factory note")}</span>}
         <span className="text-2xs text-muted-foreground">
           {state === "saving" ? tl("internalNote", "saving…") : state === "saved" ? "saved" : state === "error" ? tl("internalNote", "couldn't save") : tl("internalNote", "staff only")}
         </span>

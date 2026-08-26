@@ -762,7 +762,18 @@ export default function OrderDetailPage() {
             BOTH PANELS STAY MOUNTED and are hidden with `hidden` rather than unmounted —
             switching tabs must not refetch the thread or drop a half-typed message, and an
             unmounted panel takes its scroll position and its draft with it. */}
-        <div className="min-w-0 space-y-5">
+        {/* THE COLUMN IS A SURFACE. Measured on the live page: both columns computed
+            `background: rgba(0,0,0,0)` with `border-width: 0`, so every word on this screen
+            sat directly on the page grey and the content had nothing to stand on.
+
+            That was an over-correction. The complaint the strip-out answered was DIVIDERS —
+            four stacked boxes with rules between them — and removing those was right. But a
+            divider and a ground are different things, and taking the second away with the
+            first left the page reading as one undifferentiated field of #F3F4F5.
+
+            One surface per column, no rules inside it. The grey goes back to being the gap
+            BETWEEN surfaces, which is the only job a page colour has. */}
+        <div className="min-w-0 space-y-5 rounded-[var(--radius)] border border-border bg-card p-5">
           <TabBar
             ariaLabel="Order sections"
             value={detailTab}
@@ -1248,7 +1259,7 @@ export default function OrderDetailPage() {
             child stops drawing its own border, corner and ring, and this container draws
             them once for the set. divide-y puts a hairline between the sections, so the
             four read as one object with four parts rather than four objects. */}
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-6 rounded-[var(--radius)] border border-border bg-card p-5">
           {/* THE FACTORY NOTE, IN THE RAIL — moved 2026-08-26.
               Still one field, overwritten, staff-only: "the thing to know about this
               order", and still deliberately separate from the activity thread, which is a
@@ -1263,6 +1274,7 @@ export default function OrderDetailPage() {
           {isStaff && (
             <SectionCard title="Factory note" bodyClassName="p-5" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <InternalNote
+ hideLabel
                 orderId={order.id}
                 value={(order as { internal_note?: string | null }).internal_note ?? ""}
               />
