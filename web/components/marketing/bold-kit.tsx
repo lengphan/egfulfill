@@ -253,8 +253,22 @@ export function MaskedWords({ text, className = "", delay = 0 }: { text: string;
         <span key={`${w}-${i}`} className="inline-block overflow-hidden pt-[0.18em] pb-[0.3em] -mt-[0.18em] -mb-[0.3em] align-bottom">
           <motion.span
             className="inline-block"
-            initial={reduce ? { opacity: 0 } : { y: "140%" }}
-            animate={reduce ? { opacity: 1 } : { y: "0%" }}
+            /* THE REDUCED-MOTION BRANCH MUST RESET `y`, AND THIS IS WHY.
+             *
+             * `useReducedMotion()` is a client hook: during hydration it returns FALSE, so the
+             * motion branch runs and every word is translated to y:140% — below its own
+             * `overflow-hidden` mask. A moment later the hook flips TRUE, and the reduced
+             * branch animates only `opacity`. Nothing ever puts `y` back.
+             *
+             * The result was a headline at opacity 1, correctly in the DOM, sitting 82px below
+             * a clipping container: readable to a crawler, invisible to a reader. Anyone
+             * browsing with reduced motion — a setting people turn on for migraine or
+             * vestibular reasons — saw half the hero missing and no error anywhere.
+             *
+             * Setting y in BOTH branches is the fix: whichever way the hook resolves, and
+             * however late it changes its mind, the word ends at y:0. */
+            initial={reduce ? { opacity: 0, y: "0%" } : { y: "140%" }}
+            animate={reduce ? { opacity: 1, y: "0%" } : { y: "0%" }}
             transition={reduce ? { duration: 0.3, delay } : { duration: 0.75, delay: delay + i * 0.055, ease: EASE }}
           >
             {w}

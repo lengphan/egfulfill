@@ -5,6 +5,7 @@ import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band } from "@/components/marketing/bold-kit"
 import { CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
+import { ThreadField } from "@/components/marketing/thread-field"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -57,7 +58,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
           own, and puts an edge between sections that the eye then has to cross. The devices
           worth taking off those boards — the label rule, the ghost word, the numbered
           checker, the ring pill — all work at full width, which is where they are now. */}
-      <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10 sm:pt-14">
+      <section className="relative mx-auto max-w-[88rem] px-6 pt-10 sm:px-10 sm:pt-14">
+        {/* THE THREAD FIELD sits BEHIND the hero, not instead of it.
+            The reference carries its hero entirely on a generative field, which works when
+            there is no product to show. There is one here — a real Studio cut-out — and a
+            photograph of the actual garment outargues any graphic. So the field becomes the
+            GROUND the product stands on: it bleeds off the right edge, passes behind the
+            figure, and gives the page the ambient movement it had none of, without displacing
+            the one honest thing in the composition.
+            Inert to the pointer and hidden from screen readers — it carries no information. */}
+        {/* z-0 under content at z-10 — NOT a negative z-index. A negative index pushes the layer
+            behind the nearest ancestor that paints a background, and this page has an opaque
+            one two levels up, so the field rendered perfectly and was never visible. */}
+        <ThreadField className="absolute inset-y-0 right-0 z-0 w-[76%]" />
         {/* THE LABEL RULE IS GONE — stripped 2026-08-26.
             A small-caps word at each end of a hairline spanning the page is a masthead, and a
             masthead belongs to a PRINTED SHEET: it tells you which document you are holding.
@@ -83,7 +96,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           * so a screen reader meets the product before the pitch, and nothing needs `order-`
           * to disagree with the markup.
           */}
-        <div className="grid items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,44%)_minmax(0,1fr)]">
+        <div className="relative z-10 grid items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,44%)_minmax(0,1fr)]">
           {/* IN EDIT MODE AN EMPTY FIGURE STILL RENDERS, because otherwise there is nothing on
               the page to drop a picture onto — the one gesture that mode exists for would be
               the one it cannot offer. A visitor still sees nothing, and with no picture the
