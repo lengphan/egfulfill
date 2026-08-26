@@ -27,6 +27,11 @@ CLAUDE (Rules Based).md
 agents/
 rules/
 skills/
+# The skills CLI installs to .agents/skills/, which the bare `skills/` rule above already
+# catches — but only its CONTENTS. Naming the directory means anything the tool writes
+# beside it is covered too. §2.5: Caddy serves the repo root, so a new top-level directory
+# is PUBLIC unless something stops it, and .gitignore is the stop that needs no deploy.
+.agents/
 projects/
 agent-memory/
 
