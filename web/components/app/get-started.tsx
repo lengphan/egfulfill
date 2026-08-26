@@ -44,7 +44,11 @@ export function GetStarted({ orders, balance }: {
   // Read once, synchronously, so a finished account never even schedules the lookups.
   const [done, setDone] = useState<boolean>(() => read(DONE_KEY) === "1")
   const [open, setOpen] = useState<boolean>(() => read(OPEN_KEY) !== "0")
-  const [stores, setStores] = useState<number | null>(null)
+  /** Number of connected shops, or "unknown" when a lookup did not answer. A failed check
+   *  and a genuinely empty account must NOT look the same (CLAUDE.md §4) — the first is our
+   *  problem, the second is the seller's, and nagging someone to connect a store they
+   *  already have because a request 403'd is the worst version of this banner. */
+  const [stores, setStores] = useState<number | "unknown" | null>(null)
 
   useEffect(() => {
     if (done) return
@@ -52,16 +56,22 @@ export function GetStarted({ orders, balance }: {
     Promise.allSettled([getEtsyConnections(), getShopifyConnections(), getTiktokConnections()])
       .then((rs) => {
         if (!live) return
-        const n = rs.reduce((sum, r) => sum + (r.status === "fulfilled" && Array.isArray(r.value) ? r.value.length : 0), 0)
-        setStores(n)
+        // Every lookup must answer. One rejection means we cannot say whether a shop is
+        // connected — allSettled would otherwise fold that into a confident zero.
+        const answered = rs.every((r) => r.status === "fulfilled" && Array.isArray(r.value))
+        if (!answered) { setStores("unknown"); return }
+        setStores(rs.reduce((sum, r) => sum + (r as PromiseFulfilledResult<unknown[]>).value.length, 0))
       })
     return () => { live = false }
   }, [done])
 
-  const hasStore = (stores ?? 0) > 0
+  const known = typeof stores === "number"
+  const hasStore = known && stores > 0
   const hasFunds = (balance ?? 0) > 0
   const hasOrder = (orders ?? 0) > 0
   const ready = stores !== null && orders !== null && balance !== null
+  // Could not check the shops: say nothing rather than ask for something already done.
+  const unverifiable = stores === "unknown"
   const allDone = ready && hasStore && hasFunds && hasOrder
 
   // Latch the finished state so the lookups stop happening on every later visit.
@@ -78,7 +88,7 @@ export function GetStarted({ orders, balance }: {
   }, [])
 
   // Nothing to say while the page is still loading, and nothing to say once it is finished.
-  if (done || !ready || allDone) return null
+  if (done || !ready || allDone || unverifiable) return null
 
   const steps = [
     { id: "store", ok: hasStore, icon: Storefront, href: "/stores",
