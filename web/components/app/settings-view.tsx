@@ -26,7 +26,6 @@ import { PanelPicker } from "@/components/app/panel-picker"
 import { UsagePanel } from "@/components/app/usage-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { VolumeBoard } from "@/components/app/volume-board"
-import { SiteContentPanel } from "@/components/app/site-content-panel"
 import { SupplierOrderingSettings } from "@/components/app/supplier-ordering-settings"
 import { getUser, updateUser, canSeeMoney } from "@/lib/auth"
 import { VolumeTiersPanel } from "@/components/app/volume-tiers-panel"
@@ -3411,7 +3410,6 @@ export function SettingsView() {
             takes the same boundary as Suppliers above rather than canPlatform's. */}
         {canPlatform && canSeeMoney() && <TabsTrigger value="usage"><TabLabel>{tl("settings", "Usage")}</TabLabel></TabsTrigger>}
         {/* Marketing-home copy — admin only, public-facing brand surface. */}
-        {isAdmin && <TabsTrigger value="site"><TabLabel>{tl("settings", "Site content")}</TabLabel></TabsTrigger>}
         {isAdmin && <TabsTrigger value="branding"><TabLabel>{tl("settings", "Branding")}</TabLabel></TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity"><TabLabel>{tl("settings", "Activity")}</TabLabel></TabsTrigger>}
         {/* Backups — admin-only. Restoring a lost database is the least reversible thing on
@@ -3514,11 +3512,6 @@ export function SettingsView() {
       {isAdmin && (
         <TabsContent value="branding">
           <BrandingPanel />
-        </TabsContent>
-      )}
-      {isAdmin && (
-        <TabsContent value="site">
-          <SiteContentPanel />
         </TabsContent>
       )}
       {/* Same condition as the trigger — gating the two differently would render a tab
