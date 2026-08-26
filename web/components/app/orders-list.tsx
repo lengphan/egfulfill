@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
-import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken, getUser } from "@/lib/auth"
 import { matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
@@ -36,7 +35,7 @@ import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, revenueOf, customerOf, storeOf, itemsLabel, itemsParts, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { ORDER_COLS, ITEMS_MIN_PX, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
+import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 import { DesignQuoteBanner } from "@/components/app/design-quote-banner"
 import { OrderedVariant } from "@/components/app/ordered-variant"
 import { EmptyState } from "@/components/app/empty-state"
@@ -62,21 +61,20 @@ const cellClass = (id: OrderColId) => {
  const base = id === "items" ? "" : "truncate"
  return [base, c.align === "right" ? "text-right" : ""].filter(Boolean).join(" ")
 }
-function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderDesign>, catalog?: CatalogProduct[]): React.ReactNode {
+function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
  switch (id) {
  case "order": return <span className="tabular-nums text-xs font-medium">{numOf(o)}</span>
  case "store": return <span className="text-muted-foreground">{storeOf(o)}</span>
  case "customer": return <span className="font-medium">{customerOf(o)}</span>
  case "items": return (
       <div className="flex min-w-0 items-center gap-2.5">
-        {/* ONE PICTURE PER ROW.
-            The strip drew up to three overlapping thumbs, and on a seller's own board that is
-            the same number said three times: `itemsLabel` beside it already prints "Tote +2",
-            the line under that counts the units, and the photos are what a row is SCANNED by
-            — a smudge of two artworks tucked behind each other is worse at that job than one
-            picture of the first item. The factory boards keep the stack: they are reading
-            what is in the parcel, not which of their own orders this is. */}
-        <PhotoStack items={o.items ?? []} designs={designs} catalog={catalog} max={1} showExtra={false} />
+        {/* NO PICTURE IN THE PARENT ROW — owner's call, 2026-08-26.
+            It carried one thumbnail, on the argument that photos are what a row is SCANNED
+            by. The counter-argument won: at row height the artwork is too small to actually
+            judge, so it bought recognition rather than information — while the full-bleed
+            artwork one click down in the expanded row is big enough to decide from. The row
+            is identity, stage and the two controls; the picture lives where it can be read.
+            The factory boards keep their stack: they are reading what is in the parcel. */}
         <div className="min-w-0">
           {/* The "+2" SITS OUTSIDE THE TRUNCATION. It is the only place the other lines are
               counted now that the photo strip is one picture, and a long first name would
@@ -447,7 +445,7 @@ export function OrdersList() {
                         </button>
                       </TableCell>
                       {visibleCols.map((id) => (
-                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o, designs[o.id], catalog)}</TableCell>
+                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o)}</TableCell>
                       ))}
                     </TableRow>
 

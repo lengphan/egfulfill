@@ -28,9 +28,16 @@ export type OrderColDef = {
   locked?: boolean
 }
 
-/** What the Items column must keep: the 72px photo, its gap, and enough of a listing name to
- *  recognise the product. Below this the cell stops answering the question it exists for. */
-export const ITEMS_MIN_PX = 260
+/** What the Items column must keep: enough of a listing name to recognise the product.
+ *
+ *  It used to also reserve a 72px photo and its gap — the seller row carried one thumbnail.
+ *  That picture was removed on 2026-08-26 (it was too small at row height to judge, and the
+ *  full-bleed artwork in the expanded row does that job), so the reservation is name-only.
+ *
+ *  CURRENTLY READ BY NOTHING. Kept because the fixed-width budget below is written against
+ *  it: every pixel spent on a fixed column is taken from Items, which is the only flexible
+ *  one. Delete it and the next person widening a column has no number to check against. */
+export const ITEMS_MIN_PX = 178
 
 // Widths are deliberately tight: the table is `table-fixed`, so every pixel spent
 // here is taken from Items — the only flexible column, and the one carrying the
