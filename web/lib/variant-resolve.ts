@@ -192,9 +192,29 @@ export function setTypeMockups(types: { name: string; sides?: string[]; mockups?
 const specFor = (p: CatalogProduct | null): TypeSpec | null =>
   TYPE_SPECS[String(p?.type ?? "").toLowerCase()] ?? null
 
-/** The category outline for a product's side, if its type defines one. */
+/**
+ * BUNDLED BLANKS — the outline a type falls back to when nobody has uploaded one.
+ *
+ * TYPE_SPECS is filled at runtime from Settings › Platform, so before an admin uploads
+ * anything every type resolved to "" and the design stage opened empty. A seller could not
+ * place artwork on a t-shirt until somebody had first supplied a picture of a t-shirt.
+ *
+ * These ship with the app instead. They are technical flats — white body, fine seam
+ * stitching, a grey shadow inside the collar — drawn for placement rather than for looks:
+ * the artwork sits ON them, so they must not compete with it.
+ *
+ * An admin upload still wins. This is the floor, not the ceiling.
+ */
+const BUNDLED_MOCKUPS: Record<string, Record<string, string>> = {
+  tshirt: { front: "/blanks/tshirt-front.png" },
+}
+
+/** The category outline for a product's side: the admin's, else the one we ship. */
 export function typeMockupOf(p: CatalogProduct | null, side = "front"): string {
-  return specFor(p)?.mockups?.[side] ?? ""
+  const own = specFor(p)?.mockups?.[side]
+  if (own) return own
+  const key = String(p?.type ?? "").toLowerCase()
+  return BUNDLED_MOCKUPS[key]?.[side] ?? ""
 }
 /** Sides this product can be designed on — its own faces, else its category's. */
 export function typeSidesOf(p: CatalogProduct | null): string[] {

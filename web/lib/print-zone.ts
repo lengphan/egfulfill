@@ -28,7 +28,11 @@ export function printSizeOf(p: CatalogProduct | null, side = "front"): PrintSize
 // fallback printable area per garment type, used when a product carries no
 // operator-defined printAreas.
 const PRODUCT_ZONES: Record<string, [number, number, number, number]> = {
-  tshirt: [0.34, 0.22, 0.30, 0.32],
+  // CALIBRATED against the bundled flat (public/blanks/tshirt-front.png, 1152x928): its
+  // body spans roughly 252-848px, so the centre is 550 and the old 0.34 start put the box
+  // 18px right of it. Measured rather than inherited — the previous row was ported verbatim
+  // from design-maker.html and drawn for no particular picture.
+  tshirt: [0.322, 0.24, 0.311, 0.34],
   hoodie: [0.33, 0.28, 0.32, 0.28],
   sweatshirt: [0.34, 0.24, 0.30, 0.30],
   cap: [0.26, 0.15, 0.46, 0.52],
