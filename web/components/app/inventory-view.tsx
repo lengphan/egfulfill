@@ -366,7 +366,29 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         * it is not a view — it is a fact about the stock you are already looking at, and it
         * lives in each row's title where it can be read against that row's own number.
         */}
-      <SectionCard title={tl("inventory", "Stock")}>
+      {/**
+        * THE TWO FIGURES THE TAB ROW TOOK WITH IT.
+        *
+        * Four stat tiles became four tabs, and two numbers did not survive the move: the SKU
+        * total, which had been the badge on "All", and Reserved, which I put in a row's
+        * tooltip and called relocation. A figure that is on the page in the morning and in a
+        * hover by the afternoon has been deleted, whatever the commit said.
+        *
+        * They are a count line on the card head, which is where the drawing had them —
+        * "38 styles · 412 SKUs". Not a subtitle: no sentence, no explanation of a control,
+        * just the two totals this table is a view of. Reserved is here rather than in the
+        * tab row because it is not a VIEW — there is no list of reserved stock to switch to;
+        * it is a fact about everything below.
+        */}
+      <SectionCard
+ title={tl("inventory", "Stock")}
+ actions={
+          <div className="text-xs tabular-nums text-muted-foreground">
+            {stats.total} {tl("inventory", "SKUs")}
+            {stats.reserved > 0 && <> · {stats.reserved} {tl("inventory", "reserved")}</>}
+          </div>
+        }
+      >
         {/* The row sits INSIDE the card, above the controls that narrow it — a view is chosen
             first and then filtered, and the order on screen says so. */}
         <div className="px-4 pt-3">
