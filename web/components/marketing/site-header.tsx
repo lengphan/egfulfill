@@ -48,7 +48,13 @@ export function SiteHeader() {
       className="sticky top-0 z-30"
       style={{ background: SURFACE }}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
+      {/* THE HEADER SHARES THE PAGE'S CONTAINER — 88rem with a 40px gutter, the same one every
+          band uses. It was max-w-6xl (72rem), so on a 1440 screen the wordmark sat 136px in
+          while the headline under it started at 48px: the first two things the eye meets on
+          the site were on two different left edges. §4 — a page has one left margin, and it is
+          set once. Read off a screenshot; it is invisible at the widths a container query
+          collapses to. */}
+      <div className="mx-auto flex h-16 max-w-[88rem] items-center gap-8 px-6 sm:px-10">
         <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + ink}>
           egful
         </Link>

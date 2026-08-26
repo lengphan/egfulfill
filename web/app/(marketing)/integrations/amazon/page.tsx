@@ -1,4 +1,6 @@
-import { Reveal } from "@/components/motion/reveal"
+import Link from "next/link"
+import { DocHero, DocSections, DocFoot, DocMail } from "@/components/marketing/bold-doc"
+import { SURFACE } from "@/components/marketing/bold-kit"
 
 export const metadata = {
   title: "Amazon integration — EGFUL",
@@ -65,101 +67,70 @@ const dataHandling = [
   },
 ]
 
+/**
+ * PRICING AND STATUS ARE ROWS, NOT TWO MORE HAND-ROLLED SECTIONS.
+ *
+ * They were each a heading and a paragraph written straight into the JSX, which is how the
+ * same shape ends up with four different vertical rhythms on one page. They are rows of the
+ * document like every other row; the only thing that made them look different was that they
+ * were typed rather than mapped.
+ *
+ * The status wording is unchanged and stays deliberately plain. Amazon reviews an application
+ * BEFORE granting access, so a "coming soon" badge would be decoration over the one sentence
+ * on this page an assessor actually has to trust.
+ */
+const closing = [
+  {
+    h: "Pricing",
+    p: (
+      <>
+        Connecting Amazon costs nothing, and there is no monthly platform fee. You pay the per-order production
+        and shipping cost when an order ships, funded from your prepaid wallet, and you see that figure on the
+        order before it prints. Shipping is rate-shopped across carriers and billed at cost. Full detail is on the{" "}
+        <Link href="/pricing" className="font-medium underline decoration-1 underline-offset-[3px] hover:opacity-70">pricing page</Link>.
+      </>
+    ),
+  },
+  {
+    h: "Status",
+    p: "Etsy, Shopify and TikTok Shop are live today — sellers connect them, orders sync, and tracking is pushed back. The Amazon channel is in Amazon's developer registration process; the connection opens to sellers once that approval is granted. The fulfilment platform it plugs into is the one already running for the other three channels.",
+  },
+]
+
 export default function AmazonIntegrationPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
-      <Reveal>
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Integration
-        </div>
-        <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-          EGFUL for Amazon sellers
-        </h1>
-        <p className="mt-6 text-muted-foreground text-pretty">
-          EGFUL is a print-on-demand fulfillment platform. You connect the marketplaces you sell
-          on, we produce and ship the orders, and tracking goes back to the channel. This page
-          describes what the Amazon connection does, exactly what seller and buyer data it uses,
-          and why each piece is needed — the same description that applies to our Etsy, Shopify
-          and TikTok Shop channels.
-        </p>
-      </Reveal>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
+      <DocHero eyebrow="Integration" title="EGFUL for Amazon sellers">
+        EGFUL is a print-on-demand fulfilment platform. You connect the marketplaces you sell on, we produce
+        and ship the orders, and tracking goes back to the channel. This page describes what the Amazon
+        connection does, exactly what seller and buyer data it uses, and why each piece is needed — the same
+        description that applies to our Etsy, Shopify and TikTok Shop channels.
+      </DocHero>
 
-      <Reveal>
-        <h2 className="mt-14 font-display text-2xl font-semibold tracking-tight">
-          What the connection does
-        </h2>
-      </Reveal>
+      {/* THE ROLE MOVES ABOVE THE HEADING AND THE CARD GOES. Five bordered boxes in a column
+          made the API role read as a badge decorating a card; in the document's own eyebrow
+          track it reads as what it is — the permission this capability spends. That is the
+          one thing an assessor is scanning for, and it now sits in a column of its own. */}
+      <DocSections
+        tone="card"
+        title="What the connection does"
+        items={capabilities.map((c) => ({ h: c.h, p: c.p, k: c.role }))}
+      />
 
-      <div className="mt-8 space-y-8">
-        {capabilities.map((c) => (
-          <Reveal key={c.h}>
-            <div className="rounded-2xl border border-border p-6">
-              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                {c.role}
-              </div>
-              <h3 className="mt-1 font-display text-xl font-semibold tracking-tight">{c.h}</h3>
-              <p className="mt-2 text-muted-foreground text-pretty">{c.p}</p>
-            </div>
-          </Reveal>
-        ))}
-      </div>
+      <DocSections
+        tone="paper"
+        title="Seller and buyer data"
+        intro="We access your Amazon data only through Amazon's official API, only with the authorisation you grant, and only to run the fulfilment service for you."
+        items={dataHandling}
+      />
 
-      <Reveal>
-        <h2 className="mt-14 font-display text-2xl font-semibold tracking-tight">
-          Seller and buyer data
-        </h2>
-        <p className="mt-2 text-muted-foreground text-pretty">
-          We access your Amazon data only through Amazon&apos;s official API, only with the
-          authorization you grant, and only to run the fulfillment service for you.
-        </p>
-      </Reveal>
+      <DocSections tone="card" items={closing} />
 
-      <div className="mt-8 space-y-8">
-        {dataHandling.map((d) => (
-          <Reveal key={d.h}>
-            <h3 className="font-display text-lg font-semibold tracking-tight">{d.h}</h3>
-            <p className="mt-2 text-muted-foreground text-pretty">{d.p}</p>
-          </Reveal>
-        ))}
-      </div>
-
-      <Reveal>
-        <h2 className="mt-14 font-display text-2xl font-semibold tracking-tight">Pricing</h2>
-        <p className="mt-2 text-muted-foreground text-pretty">
-          Connecting Amazon costs nothing, and there is no monthly platform fee. You pay the
-          per-order production and shipping cost when an order ships, funded from your prepaid
-          wallet, and you see that figure on the order before it prints. Shipping is rate-shopped
-          across carriers and billed at cost. Full detail is on the{" "}
-          <a href="/pricing" className="font-medium text-foreground hover:underline">
-            pricing page
-          </a>
-          .
-        </p>
-      </Reveal>
-
-      <Reveal>
-        <h2 className="mt-14 font-display text-2xl font-semibold tracking-tight">Status</h2>
-        <p className="mt-2 text-muted-foreground text-pretty">
-          Etsy, Shopify and TikTok Shop are live today — sellers connect them, orders sync, and
-          tracking is pushed back. The Amazon channel is in Amazon&apos;s developer registration
-          process; the connection opens to sellers once that approval is granted. The fulfillment
-          platform it plugs into is the one already running for the other three channels.
-        </p>
-      </Reveal>
-
-      <Reveal>
-        <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
-          Questions about the Amazon integration? Email the EGFUL team at{" "}
-          <a href="mailto:linh@embroiderygoods.com" className="font-medium text-foreground hover:underline">
-            linh@embroiderygoods.com
-          </a>
-          , or read the{" "}
-          <a href="/privacy" className="font-medium text-foreground hover:underline">
-            Privacy Policy
-          </a>
-          .
-        </p>
-      </Reveal>
+      <DocFoot cta={{ href: "/contact", label: "Contact us" }}>
+        Questions about the Amazon integration? Email the EGFUL team at{" "}
+        <DocMail address="linh@embroiderygoods.com" onPlate />, or read the{" "}
+        <Link href="/privacy" className="font-medium underline decoration-1 underline-offset-[3px] hover:opacity-70">Privacy Policy</Link>.
+      </DocFoot>
     </div>
   )
 }

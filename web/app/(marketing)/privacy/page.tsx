@@ -1,4 +1,5 @@
-import { Reveal } from "@/components/motion/reveal"
+import { DocHero, DocSections, DocFoot, DocMail } from "@/components/marketing/bold-doc"
+import { SURFACE } from "@/components/marketing/bold-kit"
 
 export const metadata = { title: "Privacy Policy — EGFUL" }
 
@@ -47,34 +48,18 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
-      <Reveal>
-        <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: August 12, 2026</p>
-        <p className="mt-6 text-muted-foreground text-pretty">
-          EGFUL (&ldquo;we&rdquo;, &ldquo;us&rdquo;) respects your privacy. This policy explains what information we
-          collect, how we use it, and the choices you have. It applies to our website, dashboards, and services.
-        </p>
-      </Reveal>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
+      <DocHero title="Privacy Policy" meta="Last updated: 12 August 2026">
+        EGFUL (&ldquo;we&rdquo;, &ldquo;us&rdquo;) respects your privacy. This policy explains what information we
+        collect, how we use it, and the choices you have. It applies to our website, dashboards, and services.
+      </DocHero>
 
-      <div className="mt-10 space-y-8">
-        {sections.map((s) => (
-          <Reveal key={s.h}>
-            <h2 className="font-display text-xl font-semibold tracking-tight">{s.h}</h2>
-            <p className="mt-2 text-muted-foreground text-pretty">{s.p}</p>
-          </Reveal>
-        ))}
-      </div>
+      <DocSections items={sections} />
 
-      <Reveal>
-        <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
-          Questions or data requests? Contact us at{" "}
-          <a href="mailto:linh@embroiderygoods.com" className="font-medium text-foreground hover:underline">
-            linh@embroiderygoods.com
-          </a>
-          .
-        </p>
-      </Reveal>
+      <DocFoot cta={{ href: "/contact", label: "Contact us" }}>
+        Questions or data requests? Write to <DocMail address="linh@embroiderygoods.com" onPlate />. We respond
+        within the applicable legal timeframes.
+      </DocFoot>
     </div>
   )
 }

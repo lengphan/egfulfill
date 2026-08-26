@@ -1,4 +1,6 @@
 import type { Metadata } from "next"
+import { DocHero } from "@/components/marketing/bold-doc"
+import { SURFACE } from "@/components/marketing/bold-kit"
 import { API_ENDPOINTS } from "@/lib/api-endpoints"
 import { DocsNav } from "./docs-nav"
 import { EndpointCard } from "./endpoint-card"
@@ -67,68 +69,78 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 export default function DocsPage() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
-      <header className="max-w-2xl space-y-3 pb-10">
-        {/* Lowercase, and only the brand word carries the display serif — that echoes the
-            wordmark in the header instead of competing with it, which is what "The
-            EGFUL API" in all-caps Fraunces was doing. "API" stays in the body face so
-            the line reads as a label, not a second logo. */}
-        <h1 className="text-3xl font-semibold tracking-tight">
-          <span className="font-display">egful</span> API
-        </h1>
-        <p className="text-muted-foreground">
-          Push orders into our factory and get production status and tracking back. REST over HTTPS,
-          JSON in and out, API-key auth, signed webhooks.
-        </p>
-      </header>
+    /* THE REFERENCE SITS ON THE MARKETING PALETTE, not the app's.
+     *
+     * Every neutral on this page was a shadcn token — `text-muted-foreground`, `border-border`,
+     * `bg-muted`. Those are the APP's chroma-0 tokens, tuned for a queue you read all day, and
+     * they do not move with `[data-skin]`: switching skin restyled five marketing pages and
+     * left the API reference looking like a screen from a different product. The values are
+     * `--mk-*` now, so this page changes with the site.
+     *
+     * The LAYOUT is unchanged and deliberately so. A rail of anchors beside a long reference is
+     * correct for a document you scan for one endpoint, and it is not the marketing scroll —
+     * what it owed the rest of the site was its palette and its opening, not its structure.
+     */
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
+      <DocHero eyebrow="Developers" title="egful API">
+        Push orders into our factory and get production status and tracking back. REST over HTTPS,
+        JSON in and out, API-key auth, signed webhooks.
+      </DocHero>
 
-      <div className="grid gap-12 lg:grid-cols-[200px_1fr]">
+      <div className="w-full" style={{ background: "var(--mk-card)" }}>
+      {/* THE SAME 88rem CONTAINER as the header, the hero and every band — it was max-w-[80rem],
+          so the anchor rail began 80px right of the wordmark directly above it. */}
+      <div className="mx-auto grid max-w-[88rem] gap-12 px-6 py-[clamp(3.5rem,7vw,6rem)] sm:px-10 lg:grid-cols-[200px_minmax(0,1fr)]">
         {/* Client component: it highlights the section you're on, which needs scroll
             position. Keeping it separate lets this page stay a server component. */}
         <DocsNav sections={SECTIONS} />
 
-        <div className="min-w-0 space-y-14">
+        {/* THE MEASURE IS ON THE PROSE, NOT ON THE COLUMN. Widening the container to match the
+            page would otherwise set body copy 1,100px long, which cannot be read — but a table
+            of scopes and a curl block genuinely want the width. So paragraphs and lists cap at
+            a reading measure and everything else fills the track. */}
+        <div className="min-w-0 space-y-14 [&_li]:max-w-[76ch] [&_p]:max-w-[76ch]">
         <Section id="auth" title="Authentication">
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Every request carries an API key in the <Code>X-API-Key</Code> header. Generate one in
             your dashboard under Settings → API keys.
           </p>
           <Block>{`curl ${BASE}/api/v1/ping \\
   -H "X-API-Key: egk_test_..."`}</Block>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Keys come in two modes, and the prefix tells you which you are holding.
           </p>
-          <ul className="space-y-2 text-muted-foreground">
+          <ul className="space-y-2 text-[var(--mk-auth-muted)]">
             <li><Code>egk_test_…</Code> — the sandbox. Nothing is produced and nothing is billed, but
               pricing and validation are <strong>identical to live</strong>, so an order that succeeds here
               succeeds there. Webhooks still fire, flagged <Code>test: true</Code>.</li>
             <li><Code>egk_live_…</Code> — real. Orders enter the factory queue and are billed.</li>
           </ul>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--mk-auth-muted)]">
             The full key is shown once, at creation, and never again. We store only a hash.
           </p>
 
           <h3 className="pt-2 font-medium">Scopes</h3>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             A key can be limited to what an integration actually needs. Grant the narrowest set
             that works — this is a credential you are handing to someone else.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-border text-left text-muted-foreground">
+              <thead><tr className="border-b border-[var(--mk-hairline)] text-left text-[var(--mk-auth-muted)]">
                 <th className="py-2 font-medium">Scope</th><th className="py-2 font-medium">Allows</th>
               </tr></thead>
               <tbody>
                 {SCOPES.map((s) => (
-                  <tr key={s.name} className="border-b border-border/60 align-top">
+                  <tr key={s.name} className="border-b border-[var(--mk-hairline)] align-top">
                     <td className="py-2 pr-4 tabular-nums text-xs">{s.name}</td>
-                    <td className="py-2 text-muted-foreground">{s.allows}</td>
+                    <td className="py-2 text-[var(--mk-auth-muted)]">{s.allows}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--mk-auth-muted)]">
             A call outside a key&apos;s scopes returns <Code>403</Code> with <Code>insufficient_scope</Code>
             and names what was required. A key created without any scopes has full access, which keeps
             older integrations working — but new keys should name theirs.
@@ -138,12 +150,12 @@ export default function DocsPage() {
         <Section id="limits" title="Rate limits">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-border text-left text-muted-foreground">
+              <thead><tr className="border-b border-[var(--mk-hairline)] text-left text-[var(--mk-auth-muted)]">
                 <th className="py-2 font-medium">Scope</th><th className="py-2 font-medium">Limit</th>
               </tr></thead>
               <tbody>
                 {LIMITS.map((l) => (
-                  <tr key={l.scope} className="border-b border-border/60">
+                  <tr key={l.scope} className="border-b border-[var(--mk-hairline)]">
                     <td className="py-2">{l.scope}</td>
                     <td className="py-2 tabular-nums text-xs">{l.limit}</td>
                   </tr>
@@ -151,7 +163,7 @@ export default function DocsPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Every response carries <Code>X-RateLimit-Limit</Code>, <Code>X-RateLimit-Remaining</Code> and
             <Code>X-RateLimit-Reset</Code> (seconds until the window rolls) — so you can slow down before
             you are cut off rather than after. Exceeding a limit returns <Code>429</Code> with
@@ -160,7 +172,7 @@ export default function DocsPage() {
         </Section>
 
         <Section id="endpoints" title="Endpoints">
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Base URL <Code>{BASE}</Code>. All paths take and return <Code>application/json</Code>.
           </p>
           <div className="space-y-3">
@@ -171,7 +183,7 @@ export default function DocsPage() {
         </Section>
 
         <Section id="billing" title="Billing">
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             <Code>GET /api/v1/balance</Code> returns what is currently on account.
             <Code>GET /api/v1/statement?from=YYYY-MM-DD&amp;to=YYYY-MM-DD</Code> returns every movement
             in a period, defaulting to the current calendar month. Both need <Code>billing.read</Code>.
@@ -188,12 +200,12 @@ export default function DocsPage() {
       "amount": -24.50, "balance": -12.20 }
   ]
 }`}</Block>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Charges are negative, credits positive, and every line carries the running balance
             after it. <Code>opening_balance + totals.net</Code> always equals
             <Code>closing_balance</Code> — if it does not, tell us rather than working around it.
           </p>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             There is no separate invoice object, deliberately. The ledger is append-only, so a
             statement for a closed period cannot change after the fact; inventing an invoice record
             alongside it would create a second thing that can disagree about what is owed.
@@ -201,21 +213,21 @@ export default function DocsPage() {
         </Section>
 
         <Section id="webhooks" title="Webhooks">
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Rather than polling for status, register a URL and we POST to it when something happens.
             Add one in your dashboard under Developers → Webhooks, where you can also fire a test
             delivery and read the history of every attempt.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-border text-left text-muted-foreground">
+              <thead><tr className="border-b border-[var(--mk-hairline)] text-left text-[var(--mk-auth-muted)]">
                 <th className="py-2 font-medium">Event</th><th className="py-2 font-medium">Fires when</th>
               </tr></thead>
               <tbody>
                 {EVENTS.map((e) => (
-                  <tr key={e.name} className="border-b border-border/60 align-top">
+                  <tr key={e.name} className="border-b border-[var(--mk-hairline)] align-top">
                     <td className="py-2 pr-4 tabular-nums text-xs">{e.name}</td>
-                    <td className="py-2 text-muted-foreground">{e.when}</td>
+                    <td className="py-2 text-[var(--mk-auth-muted)]">{e.when}</td>
                   </tr>
                 ))}
               </tbody>
@@ -235,11 +247,11 @@ X-EG-Signature: sha256=<hex>
     "total": 24.50
   }
 }`}</Block>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Your endpoint must be public <strong>https</strong> and should answer <Code>2xx</Code> quickly —
             we abort a delivery after 10 seconds. Acknowledge first, then do the slow work.
           </p>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Failed deliveries retry three times with backoff. A <Code>5xx</Code>, <Code>429</Code> or
             <Code>408</Code> is treated as transient; any other <Code>4xx</Code> is a rejection and we stop.
             Because retries exist, <strong>the same event can arrive more than once</strong> — make
@@ -249,7 +261,7 @@ X-EG-Signature: sha256=<hex>
         </Section>
 
         <Section id="verify" title="Verifying signatures">
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Anyone can POST to your URL. The signature is the only thing that proves a delivery came
             from us. It is an HMAC-SHA256 of the <strong>raw request body</strong>, keyed with the secret
             shown once when you created the endpoint.
@@ -268,14 +280,14 @@ app.post("/hooks/egful", express.raw({ type: "application/json" }), (req, res) =
   res.sendStatus(200)                        // acknowledge first
   process(JSON.parse(req.body.toString()))   // then work
 })`}</Block>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--mk-auth-muted)]">
             Compare in constant time. A plain <Code>===</Code> leaks timing information about the
             expected value.
           </p>
         </Section>
 
         <Section id="errors" title="Errors">
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Every error returns a JSON body with <Code>error</Code> in plain words and a{" "}
             <Code>code</Code> to switch on. A validation failure also names the fields it is
             missing under <Code>missing</Code>; an order we cannot price names the lines under{" "}
@@ -292,7 +304,7 @@ app.post("/hooks/egful", express.raw({ type: "application/json" }), (req, res) =
   "code": "unpriceable_lines",
   "unpriced": [{ "line": 2, "sku": "NOT-OURS", "size": "L", "method": "DTG" }]
 }`}</Block>
-          <ul className="space-y-1.5 text-sm text-muted-foreground">
+          <ul className="space-y-1.5 text-sm text-[var(--mk-auth-muted)]">
             <li><Code>400</Code> — the request is wrong. The body names what.</li>
             <li><Code>401</Code> — missing or revoked key.</li>
             <li><Code>429</Code> — rate limited. Wait <Code>Retry-After</Code> seconds.</li>
@@ -300,14 +312,14 @@ app.post("/hooks/egful", express.raw({ type: "application/json" }), (req, res) =
               one: we buy labels ourselves when shipping your order, so read tracking from the order
               instead.</li>
           </ul>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Every line of an order must resolve to a product in our catalogue. We refuse an order we
             cannot price rather than inventing a number and producing it — check your SKUs against{" "}
             <Code>GET /api/v1/products</Code>.
           </p>
 
           <h3 className="pt-2 font-medium">If we refuse an order after accepting it</h3>
-          <p className="text-muted-foreground">
+          <p className="text-[var(--mk-auth-muted)]">
             Some things are only discovered on the floor — a blank out of stock in one colour, artwork
             that cannot be produced at the size ordered. When that happens the order is cancelled and
             you are told why, both on the <Code>order.cancelled</Code> event and on the order itself,
@@ -323,13 +335,14 @@ app.post("/hooks/egful", express.raw({ type: "application/json" }), (req, res) =
   "rejected_by": "factory",
   "rejected_at": "2026-07-21T17:04:11.882Z"
 }`}</Block>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--mk-auth-muted)]">
             <Code>rejected_by</Code> is <Code>factory</Code> when we refused it and <Code>seller</Code>{" "}
             when it was cancelled from your side — they are the same event otherwise, and you almost
             certainly want to treat them differently.
           </p>
         </Section>
         </div>
+      </div>
       </div>
     </div>
   )

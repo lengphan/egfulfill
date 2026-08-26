@@ -1,4 +1,5 @@
-import { Reveal } from "@/components/motion/reveal"
+import { DocHero, DocSections, DocFoot, DocMail } from "@/components/marketing/bold-doc"
+import { SURFACE } from "@/components/marketing/bold-kit"
 
 export const metadata = { title: "Terms of Service — EGFUL" }
 
@@ -35,34 +36,17 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
-      <Reveal>
-        <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Terms of Service</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: June 2, 2026</p>
-        <p className="mt-6 text-muted-foreground text-pretty">
-          These terms govern your use of EGFUL. By creating an account or using the service, you agree to them.
-          Please read them carefully.
-        </p>
-      </Reveal>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
+      <DocHero title="Terms of Service" meta="Last updated: 2 June 2026">
+        These terms govern your use of EGFUL. By creating an account or using the service, you agree to them.
+        Please read them carefully.
+      </DocHero>
 
-      <div className="mt-10 space-y-8">
-        {sections.map((s) => (
-          <Reveal key={s.h}>
-            <h2 className="font-display text-xl font-semibold tracking-tight">{s.h}</h2>
-            <p className="mt-2 text-muted-foreground text-pretty">{s.p}</p>
-          </Reveal>
-        ))}
-      </div>
+      <DocSections items={sections} />
 
-      <Reveal>
-        <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
-          Questions? Contact us at{" "}
-          <a href="mailto:linh@embroiderygoods.com" className="font-medium text-foreground hover:underline">
-            linh@embroiderygoods.com
-          </a>
-          .
-        </p>
-      </Reveal>
+      <DocFoot cta={{ href: "/contact", label: "Contact us" }}>
+        Questions? Write to <DocMail address="linh@embroiderygoods.com" onPlate />.
+      </DocFoot>
     </div>
   )
 }

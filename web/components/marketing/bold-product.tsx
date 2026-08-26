@@ -164,7 +164,7 @@ export function BoldProduct({ product, shipping }: {
       <div className="mx-auto max-w-[88rem] px-6 pb-20 pt-10 sm:px-10">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-black/55 transition-colors hover:text-[var(--mk-ink)]"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--mk-ink)]/60 transition-colors hover:text-[var(--mk-ink)]"
         >
           <ArrowLeft size={14} weight="bold" /> All products
         </Link>
@@ -225,7 +225,7 @@ export function BoldProduct({ product, shipping }: {
                         aria-pressed={colorIdx === i}
                         className={
                           "relative aspect-square w-16 shrink-0 overflow-hidden rounded-xl border transition-colors sm:w-full " +
-                          (colorIdx === i ? "border-[var(--mk-ink)]" : "border-black/[0.09] hover:border-black/40")
+                          (colorIdx === i ? "border-[var(--mk-ink)]" : "border-[var(--mk-hairline)] hover:border-[var(--mk-ink)]")
                         }
                       >
                         <Image src={c.image} alt="" fill unoptimized sizes="80px" className="object-cover" />
@@ -236,7 +236,7 @@ export function BoldProduct({ product, shipping }: {
                 </div>
               )}
               <div
-                className="relative aspect-square min-w-0 flex-1 overflow-hidden rounded-2xl border border-black/[0.09] bg-white"
+                className="relative aspect-square min-w-0 flex-1 overflow-hidden rounded-[26px] border border-[var(--mk-hairline)] bg-[var(--mk-card)]"
                 style={{ background: hero ? "#fff" : ACCENT }}
               >
                 {hero ? (
@@ -277,7 +277,7 @@ export function BoldProduct({ product, shipping }: {
                         onClick={() => stepShot(d)}
                         aria-label={d < 0 ? "Previous colour" : "Next colour"}
                         className={
-                          "absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-black/[0.09] text-[var(--mk-ink)] shadow-sm transition-transform hover:scale-105 " +
+                          "absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-[var(--mk-hairline)] text-[var(--mk-ink)] transition-transform hover:scale-105 " +
                           (d < 0 ? "left-3" : "right-3")
                         }
                         style={{ background: SURFACE }}
@@ -294,7 +294,7 @@ export function BoldProduct({ product, shipping }: {
           {/* ── The facts ────────────────────────────────────────────────── */}
           <Rise preset="drift">
             {(product.category || product.brand) && (
-              <div className="text-xs font-bold uppercase tracking-[0.18em] text-black/45">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50">
                 {[product.brand, product.category].filter(Boolean).join(" · ")}
               </div>
             )}
@@ -302,21 +302,21 @@ export function BoldProduct({ product, shipping }: {
               {product.name}
             </h1>
 
-            <div className="mt-7 border-y border-black/[0.09] py-6">
+            <div className="mt-7 border-y border-[var(--mk-hairline)] py-6">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 {/* "from" ONLY while no size is chosen. Once one is, this is not a range any
                     more — it is the price of that size, and still calling it "from" would be
                     hedging a number we now know exactly. */}
                 {product.priceVaries && !size && (
-                  <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-black/45">from</span>
+                  <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-[var(--mk-ink)]/50">from</span>
                 )}
                 <span className="text-4xl font-semibold tracking-tight tabular-nums">{usd(size ? shown : (product.priceFrom ?? product.price))}</span>
-                {size && <span className="text-sm font-semibold text-black/55">for {size}</span>}
+                {size && <span className="text-sm font-semibold text-[var(--mk-ink)]/60">for {size}</span>}
               </div>
               {/* Say WHOSE price this is. It's what a seller pays us to make and ship one —
                   not a retail price, and not our cost. Leaving that ambiguous on a public
                   page invites both wrong readings. */}
-              <p className="mt-2 text-sm leading-relaxed text-black/55">
+              <p className="mt-2 text-sm leading-relaxed text-[var(--mk-ink)]/60">
                 What you pay us to make one, before your own retail markup. Shipping is
                 charged per parcel, below.
               </p>
@@ -338,9 +338,9 @@ export function BoldProduct({ product, shipping }: {
 
             {methods.length > 0 && (
               <div className="mt-6">
-                <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
-                  <span>Print method <span className="text-black/30">· {methods.length}</span></span>
-                  {method && <span className="normal-case tracking-normal text-black/40">guidelines below follow this</span>}
+                <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50">
+                  <span>Print method <span className="text-[var(--mk-ink)]/35">· {methods.length}</span></span>
+                  {method && <span className="normal-case tracking-normal text-[var(--mk-ink)]/45">guidelines below follow this</span>}
                 </div>
                 {/* SAME PILL AS THE SIZES, because it is the same kind of choice — and the
                     house rule is that shape says KIND. A second shape here would say these
@@ -357,10 +357,10 @@ export function BoldProduct({ product, shipping }: {
                         onClick={() => setMethod(on ? null : m)}
                         aria-pressed={on}
                         className={
-                          "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
+                          "rounded-[var(--radius-control)] border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
                           (on
                             ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
-                            : "border-black/[0.14] text-black/70 hover:border-black/50 hover:text-[var(--mk-ink)]")
+                            : "border-[var(--mk-auth-edge)] text-[var(--mk-ink)]/70 hover:border-[var(--mk-ink)] hover:text-[var(--mk-ink)]")
                         }
                       >
                         {m}
@@ -379,8 +379,8 @@ export function BoldProduct({ product, shipping }: {
                     a word cannot do. Swatches say it in a glance and in a tenth of the space;
                     the selected NAME moves up here, where it is read once instead of hunted
                     for among its neighbours. */}
-                <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
-                  <span>Colours <span className="text-black/30">· {product.colors.length}</span></span>
+                <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50">
+                  <span>Colours <span className="text-[var(--mk-ink)]/35">· {product.colors.length}</span></span>
                   {chosen && (
                     <span className="truncate text-[13px] font-semibold normal-case tracking-normal text-[var(--mk-ink)]">
                       {chosen.name}
@@ -409,8 +409,8 @@ export function BoldProduct({ product, shipping }: {
                         className={
                           "size-7 rounded-full border transition-shadow " +
                           (colorIdx === i
-                            ? "border-black/25 ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-accent-ink)]"
-                            : "border-black/20 hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-accent-ink)]")
+                            ? "border-[var(--mk-ink)]/25 ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-accent-ink)]"
+                            : "border-[var(--mk-ink)]/20 hover:ring-2 hover:ring-[var(--mk-ink)]/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-accent-ink)]")
                         }
                         style={swatchChipStyle(c.name, c.image)}
                       />
@@ -421,7 +421,7 @@ export function BoldProduct({ product, shipping }: {
                   <button
                     type="button"
                     onClick={() => setAllColors((v) => !v)}
-                    className="mt-3 text-sm font-semibold text-black/70 underline underline-offset-4 transition-colors hover:text-[var(--mk-ink)]"
+                    className="mt-3 text-sm font-semibold text-[var(--mk-ink)]/70 underline underline-offset-4 transition-colors hover:text-[var(--mk-ink)]"
                   >
                     {allColors ? "Show fewer" : `Show all ${product.colors.length}`}
                   </button>
@@ -436,9 +436,9 @@ export function BoldProduct({ product, shipping }: {
                     holding the moment the price moved by size, because the answer to "what
                     does a 2XL cost" is a fact, not a submission. */}
                 <div className="mt-6">
-                  <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-black/45">
-                    <span>Sizes <span className="text-black/30">· {product.sizes.length}</span></span>
-                    {product.priceVaries && <span className="normal-case tracking-normal text-black/40">pick one for its price</span>}
+                  <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50">
+                    <span>Sizes <span className="text-[var(--mk-ink)]/35">· {product.sizes.length}</span></span>
+                    {product.priceVaries && <span className="normal-case tracking-normal text-[var(--mk-ink)]/45">pick one for its price</span>}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {product.sizes.map((s) => {
@@ -452,15 +452,15 @@ export function BoldProduct({ product, shipping }: {
                           onClick={() => setSize(on ? null : s)}
                           aria-pressed={on}
                           className={
-                            "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
+                            "rounded-[var(--radius-control)] border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
                             (on
                               ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
-                              : "border-black/[0.14] text-black/70 hover:border-black/50 hover:text-[var(--mk-ink)]")
+                              : "border-[var(--mk-auth-edge)] text-[var(--mk-ink)]/70 hover:border-[var(--mk-ink)] hover:text-[var(--mk-ink)]")
                           }
                         >
                           {s}
                           {product.priceVaries && (
-                            <span className={"ml-2 text-xs font-medium tabular-nums " + (on ? "text-[var(--mk-accent-ink)]/70" : "text-black/40")}>
+                            <span className={"ml-2 text-xs font-medium tabular-nums " + (on ? "text-[var(--mk-accent-ink)]/70" : "text-[var(--mk-ink)]/45")}>
                               {usd(priceOfSize(s))}
                             </span>
                           )}
@@ -482,8 +482,8 @@ export function BoldProduct({ product, shipping }: {
                   */}
                 <p className="mt-3 text-sm">
                   {specNames.length > 0
-                    ? <a href="#size-chart" className="font-semibold text-black/70 underline underline-offset-4">Size chart &amp; measurements</a>
-                    : <a href="mailto:orders@egful.store" className="font-semibold text-black/70 underline underline-offset-4">Ask us for measurements</a>}
+                    ? <a href="#size-chart" className="font-semibold text-[var(--mk-ink)]/70 underline underline-offset-4">Size chart &amp; measurements</a>
+                    : <a href="mailto:orders@egful.store" className="font-semibold text-[var(--mk-ink)]/70 underline underline-offset-4">Ask us for measurements</a>}
                 </p>
               </>
             )}
@@ -492,7 +492,7 @@ export function BoldProduct({ product, shipping }: {
               <Pill href="/signup" tone="primary">Start free</Pill>
               <Pill href="/pricing" tone="ghost">See pricing</Pill>
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-black/50">
+            <p className="mt-4 text-sm leading-relaxed text-[var(--mk-ink)]/55">
               Connect Etsy, Shopify or TikTok Shop and this product is orderable from your queue.
               Nothing to pay until you submit an order.
             </p>
@@ -517,7 +517,7 @@ export function BoldProduct({ product, shipping }: {
             {specNames.length > 0 && (
             <Rise preset="cut">
                 <h2 id="size-chart" className="scroll-mt-24 font-display text-2xl font-semibold tracking-tight">Size chart</h2>
-                <p className="mt-1.5 text-sm text-black/50">
+                <p className="mt-1.5 text-sm text-[var(--mk-ink)]/55">
                   Garment measurements from the manufacturer, in inches.
                 </p>
                 {(<>
@@ -537,10 +537,10 @@ export function BoldProduct({ product, shipping }: {
                     </thead>
                     <tbody>
                       {sizeNames.map((z, ri) => (
-                        <tr key={z} className={ri % 2 ? "bg-black/[0.03]" : ""}>
+                        <tr key={z} className={ri % 2 ? "bg-[var(--mk-ink)]/[0.03]" : ""}>
                           <td className="px-3 py-2 font-bold">{z}</td>
                           {specNames.map((n) => (
-                            <td key={n} className="px-3 py-2 tabular-nums text-black/70">{specAt(z, n)}</td>
+                            <td key={n} className="px-3 py-2 tabular-nums text-[var(--mk-ink)]/70">{specAt(z, n)}</td>
                           ))}
                         </tr>
                       ))}
@@ -554,7 +554,7 @@ export function BoldProduct({ product, shipping }: {
             {methods.length > 0 && (
               <Rise preset="cut" index={1}>
                 <h2 className="font-display text-2xl font-semibold tracking-tight">Where we can print</h2>
-                <p className="mt-1.5 text-sm text-black/50">
+                <p className="mt-1.5 text-sm text-[var(--mk-ink)]/55">
                   Placements available on this garment.
                 </p>
                 {/* OURS, not the supplier's. A manufacturer's feed describes the blank; where
@@ -581,7 +581,7 @@ export function BoldProduct({ product, shipping }: {
                           */}
                         <ul className="mt-2.5 flex flex-wrap gap-1.5">
                           {spots.map((sp) => (
-                            <li key={sp} className="rounded-full border border-black/[0.14] px-3 py-1 text-sm text-black/70">
+                            <li key={sp} className="rounded-[var(--radius-control)] border border-[var(--mk-auth-edge)] px-3 py-1 text-sm text-[var(--mk-ink)]/70">
                               {sp}
                             </li>
                           ))}

@@ -513,10 +513,27 @@ export function PlateHero({ title, accent, sub, children, path }: {
   // (CLAUDE.md 4). The full-bleed plate was the drift.
   //
   // Measured on this ground: ink 17.40:1, the violet accent phrase 5.33:1.
+  /**
+   * ── LEFT, NOT CENTRED (2026-08-26) ──────────────────────────────────────────────────
+   *
+   * This hero was `text-center` inside a max-w-6xl while every band beneath it — and the home
+   * page's own hero — is left-aligned in an 88rem container. So each interior page opened on
+   * one alignment and one measure, then switched to another and never went back. §4 makes the
+   * point about `items-center` being the house default for CROSS-AXIS alignment; it is not an
+   * argument for centring a display headline over left-aligned prose.
+   *
+   * Centred display type also costs the thing this direction is built on: a 90px line set flush
+   * left has an edge the eye can track down the page, and the bands below inherit it for free.
+   * Centred, the reader re-finds the left margin at every section.
+   *
+   * The container widens to 88rem with it, because the two have to agree — a 72rem centred
+   * block inside an 88rem page is a fifth margin. The HEADLINE keeps its own cap in rem: the
+   * container is the page's, the measure is the type's, and they are not the same number.
+   */
   return (
     <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
-      <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pt-20">
-        <h1 className="mx-auto max-w-5xl text-center font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ ...DISPLAY, color: INK }}>
+      <div className="mx-auto max-w-[88rem] px-6 pb-20 pt-14 sm:px-10 sm:pt-20">
+        <h1 className="max-w-[20ch] font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ ...DISPLAY, color: INK }}>
           {path && editing
             ? <EditableText path={`${path}.title`}>{title}</EditableText>
             : <MaskedWords text={title} />}
@@ -526,8 +543,11 @@ export function PlateHero({ title, accent, sub, children, path }: {
         </h1>
         {sub && (
           <motion.p
-            className="mx-auto mt-7 max-w-xl text-center text-[17px] leading-relaxed"
-            style={{ color: "rgba(11,11,12,0.62)" }}
+            className="mt-7 max-w-xl text-[17px] leading-relaxed"
+            /* THE SUB READS THE INK VARIABLE. It was a literal rgba of the press ink, so on
+               every other skin this one paragraph stayed the old colour — the same class of
+               bug as the journey chip, and invisible for exactly as long. */
+            style={{ color: INK, opacity: 0.62 }}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35, ease: EASE }}

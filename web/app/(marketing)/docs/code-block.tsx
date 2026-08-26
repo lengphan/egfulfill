@@ -32,7 +32,7 @@ export function TitledBlock({ title, actions, children }: {
   children: string
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-black/10">
+    <div className="overflow-hidden rounded-lg border border-[var(--mk-hairline)]">
       <div className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold ${CODE_HEADER}`}>
         {title}
         {actions && <span className="ml-auto flex items-center gap-1">{actions}</span>}
@@ -51,7 +51,7 @@ export function TitledBlock({ title, actions, children }: {
  */
 export function Block({ children }: { children: string }) {
   return (
-    <pre className={`overflow-x-auto rounded-lg border border-black/10 p-4 tabular-nums text-xs leading-relaxed ${CODE_SURFACE}`}>
+    <pre className={`overflow-x-auto rounded-lg border border-[var(--mk-hairline)] p-4 tabular-nums text-xs leading-relaxed ${CODE_SURFACE}`}>
       {children}
     </pre>
   )
@@ -63,5 +63,5 @@ export function Block({ children }: { children: string }) {
  * barcode. The block is the machine surface; inline code is a word wearing a label.
  */
 export function Code({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-muted px-1.5 py-0.5 tabular-nums text-[0.85em]">{children}</code>
+  return <code className="rounded bg-[var(--mk-ink)]/[0.06] px-1.5 py-0.5 tabular-nums text-[0.85em]">{children}</code>
 }

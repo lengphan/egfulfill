@@ -43,7 +43,7 @@ export function DocsNav({ sections }: { sections: [string, string][] }) {
 
   return (
     <nav aria-label="Contents" className="hidden self-start lg:sticky lg:top-24 lg:block">
-      <div className="space-y-1 border-l border-border">
+      <div className="space-y-1 border-l border-[var(--mk-hairline)]">
         {sections.map(([id, label]) => {
           const on = active === id
           return (
@@ -54,8 +54,8 @@ export function DocsNav({ sections }: { sections: [string, string][] }) {
               className={
                 "-ml-px block border-l py-1 pl-4 text-sm transition-colors " +
                 (on
-                  ? "border-primary font-medium text-foreground"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground")
+                  ? "border-[var(--mk-ink)] font-medium text-[var(--mk-ink)]"
+                  : "border-transparent text-[var(--mk-auth-muted)] hover:border-[var(--mk-hairline)] hover:text-[var(--mk-ink)]")
               }
             >
               {label}

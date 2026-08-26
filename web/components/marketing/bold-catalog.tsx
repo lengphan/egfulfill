@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { TShirt, MagnifyingGlass } from "@phosphor-icons/react"
-import { ACCENT, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, CARD, HEADING, INK, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
 import { swatchBg, swatchChipStyle, NEUTRAL_CHIP, colorFamily, COLOR_FAMILIES } from "@/lib/color-swatch"
@@ -83,10 +83,10 @@ function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () 
       onClick={onClick}
       aria-pressed={on}
       className={
-        "rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors " +
+        "rounded-[var(--radius-control)] border px-2.5 py-1 text-[12px] font-semibold transition-colors " +
         (on
           ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
-          : "border-black/[0.14] text-black/70 hover:border-black/40 hover:text-[var(--mk-ink)]")
+          : "border-[var(--mk-auth-edge)] text-[var(--mk-ink)]/70 hover:border-[var(--mk-ink)] hover:text-[var(--mk-ink)]")
       }
     >
       {label}
@@ -115,8 +115,8 @@ function SwatchDot({ name, on, onClick }: { name: string; on: boolean; onClick: 
       aria-label={name}
       title={name}
       className={
-        "size-6 rounded-full border border-black/20 transition-shadow " +
-        (on ? "ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-surface)]" : "hover:ring-2 hover:ring-black/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-surface)]")
+        "size-6 rounded-full border border-[var(--mk-ink)]/20 transition-shadow " +
+        (on ? "ring-2 ring-[var(--mk-ink)] ring-offset-2 ring-offset-[var(--mk-surface)]" : "hover:ring-2 hover:ring-[var(--mk-ink)]/20 hover:ring-offset-2 hover:ring-offset-[var(--mk-surface)]")
       }
       style={{ background: swatchBg(name) ?? NEUTRAL_CHIP }}
     />
@@ -152,7 +152,11 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
   const from = p.priceVaries ? (p.priceFrom ?? p.price) : p.price
   return (
     <Rise preset="bloom" index={Math.min(index, 6)}
-          className="group overflow-hidden rounded-2xl border border-black/[0.09] bg-white transition-colors hover:border-black/30">
+          /* NO BORDER. A white card on the paper page is held by its own value — that is the
+             entire depth model here, and it is why there are no shadows either. The hover
+             was a darkening border, which is a second hover on a card whose photo already
+             scales; the picture is the affordance. */
+          className="group overflow-hidden rounded-[26px]" style={{ background: CARD }}>
       <Link href={`/catalog/${p.slug}`} className="block">
         {/* WHITE UNDER A PHOTO, accent only when there ISN'T one — the same rule the product
             page follows for its hero. This well was accent unconditionally, and the photos are
@@ -180,7 +184,7 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
         </div>
         <div className="p-4">
           {showCategory && p.category && (
-            <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">{p.category}</div>
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--mk-ink)]/45">{p.category}</div>
           )}
           <div className="line-clamp-2 text-[15px] font-semibold leading-snug">{p.name}</div>
           <div className="mt-2 flex items-baseline justify-between gap-2">
@@ -189,11 +193,11 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
                 a single price must not be dressed up as a range either. The server says which
                 it is (priceVaries); this only reads it. */}
             <span className="text-lg font-semibold tabular-nums">
-              {p.priceVaries && <span className="mr-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-black/45">from</span>}
+              {p.priceVaries && <span className="mr-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--mk-ink)]/50">from</span>}
               {usd(from)}
             </span>
             {sizeRangeLabel(p.sizes) && (
-              <span className="shrink-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-black/45">
+              <span className="shrink-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--mk-ink)]/50">
                 {sizeRangeLabel(p.sizes)}
               </span>
             )}
@@ -207,13 +211,13 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
                   onMouseEnter={() => setHovered(c.image)}
                   className={
                     "size-4 rounded-full border bg-center transition-transform " +
-                    (hovered && hovered === c.image ? "scale-125 border-black/60" : "border-black/15")
+                    (hovered && hovered === c.image ? "scale-125 border-[var(--mk-ink)]/60" : "border-[var(--mk-ink)]/20")
                   }
                   style={chipStyle(c)}
                 />
               ))}
               {p.colors.length > 5 && (
-                <span className="text-[12px] font-medium text-black/45">+{p.colors.length - 5}</span>
+                <span className="text-[12px] font-medium text-[var(--mk-ink)]/50">+{p.colors.length - 5}</span>
               )}
             </div>
           )}
@@ -364,9 +368,9 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
           so it cannot be in this row either. Empty until someone ticks something, and the
           row simply doesn't render then. */}
       {!failed && picked.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 pt-10">
+        <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10">
           <h2 className="text-[22px] font-bold tracking-tight">Starter essentials</h2>
-          <p className="mt-1 text-[15px] text-black/55">
+          <p className="mt-1 text-[15px] text-[var(--mk-ink)]/60">
             Hand-picked blanks to start with — the ones we keep stocked and know print well.
           </p>
           <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -379,18 +383,23 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
 
       {/* pt-8: the browse row and the shelf above already separate this from the hero, and
           64px more put the first product below the fold on a laptop. */}
-      <section className="mx-auto max-w-[88rem] px-6 pb-16 pt-8">
+      <section className="mx-auto max-w-[88rem] px-6 pb-16 pt-8 sm:px-10">
         {failed ? (
-          <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
+          /* THE THREE EMPTY REGIONS ON THIS PAGE NOW SHARE ONE SHAPE — a white block, no
+             border, text flush left. They were centred bordered boxes, which is a fourth
+             alignment and one more outlined card; and §4's own rule is that a region that
+             cannot be read must not look like one that does not exist, which is carried by
+             the WORDS here, not by the chrome. All three keep their distinct sentence. */
+          <Rise className="rounded-[26px] px-8 py-16" style={{ background: CARD }}>
             <h2 className="text-xl font-bold tracking-tight">We couldn&apos;t load the catalogue</h2>
-            <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-black/55">
+            <p className="mt-2 max-w-md text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.6 }}>
               This is a problem on our side, not an empty catalogue — please try again shortly.
             </p>
           </Rise>
         ) : all.length === 0 ? (
-          <Rise className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
+          <Rise className="rounded-[26px] px-8 py-16" style={{ background: CARD }}>
             <h2 className="text-xl font-bold tracking-tight">The catalogue isn&apos;t published yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-black/55">
+            <p className="mt-2 max-w-md text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.6 }}>
               Products appear here as soon as they&apos;re published. Nothing is hidden — there is
               simply nothing to show yet.
             </p>
@@ -409,16 +418,16 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                 filter that fades in is a filter that is briefly unclickable, and one whose
                 entrance doesn't fire is a page that looks like it has no filters at all. */}
             {facets.length > 0 && (
-              <aside className="mb-10 border-b border-black/[0.09] pb-8 lg:sticky lg:top-24 lg:mb-0 lg:w-52 lg:shrink-0 lg:border-b-0 lg:pb-0">
+              <aside className="mb-10 border-b border-[var(--mk-hairline)] pb-8 lg:sticky lg:top-24 lg:mb-0 lg:w-52 lg:shrink-0 lg:border-b-0 lg:pb-0">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-black/40">Filter</span>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--mk-ink)]/45">Filter</span>
                   {/* Only ever shown when there is something TO clear — a permanent Clear
                       button on an unfiltered page is a control that does nothing. */}
                   {activeCount > 0 && (
                     <button
                       type="button"
                       onClick={() => { setSel(NO_SELECTION); setQuery("") }}
-                      className="text-[12px] font-semibold underline underline-offset-4 text-black/55 hover:text-[var(--mk-ink)]"
+                      className="text-[12px] font-semibold underline underline-offset-4 text-[var(--mk-ink)]/60 hover:text-[var(--mk-ink)]"
                     >
                       Clear
                     </button>
@@ -427,7 +436,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
 
                 {facets.map((f) => (
                   <div key={f.key} className="mt-6">
-                    <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">
+                    <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--mk-ink)]/45">
                       {f.label}
                     </div>
                     <div className={f.swatch ? "flex flex-wrap gap-2.5" : "flex flex-wrap gap-1.5"}>
@@ -446,7 +455,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                     well as what is showing, so a short grid reads as a narrow filter rather
                     than a small catalogue. */}
                 {activeCount > 0 && (
-                  <div className="mt-7 border-t border-black/[0.09] pt-4 text-[13px] font-semibold">
+                  <div className="mt-7 border-t border-[var(--mk-hairline)] pt-4 text-[13px] font-semibold">
                     {list.length} of {all.length} products
                   </div>
                 )}
@@ -463,20 +472,20 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
                 is not the place to invent a select. */}
             <div className="mb-6 flex flex-wrap items-center gap-3">
               <label className="relative min-w-0 flex-1 sm:max-w-xs">
-                <MagnifyingGlass size={15} weight="bold" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-black/40" />
+                <MagnifyingGlass size={15} weight="bold" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--mk-ink)]/45" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search products"
                   aria-label="Search products"
-                  className="h-10 w-full rounded-full border border-black/[0.12] bg-white pl-9 pr-3 text-[14px] outline-none placeholder:text-black/35 focus:border-black/40"
+                  className="h-10 w-full rounded-[var(--radius-control)] border border-[var(--mk-auth-edge)] bg-[var(--mk-card)] pl-9 pr-3 text-[14px] outline-none placeholder:text-[var(--mk-ink)]/40 focus:border-[var(--mk-ink)]"
                 />
               </label>
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
                 aria-label="Sort products"
-                className="h-10 rounded-full border border-black/[0.12] bg-white px-3 text-[14px] font-semibold outline-none focus:border-black/40"
+                className="h-10 rounded-[var(--radius-control)] border border-[var(--mk-auth-edge)] bg-[var(--mk-card)] px-3 text-[14px] font-semibold outline-none focus:border-[var(--mk-ink)]"
               >
                 <option value="newest">Newest</option>
                 <option value="price-asc">Price: low to high</option>
@@ -485,7 +494,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
               </select>
               {/* Always present, not only when filtered: "13 products" is the scale of the
                   catalogue, and it is the first thing a buyer sizing us up wants. */}
-              <span className="ml-auto text-[13px] font-semibold text-black/55">
+              <span className="ml-auto text-[13px] font-semibold text-[var(--mk-ink)]/60">
                 {list.length === all.length
                   ? `${all.length} product${all.length === 1 ? "" : "s"}`
                   : `${list.length} of ${all.length}`}
@@ -494,9 +503,9 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
             {list.length === 0 ? (
               /* A filter that matched nothing is NOT an empty catalogue, and must not borrow
                  its words — the products are still there and one click brings them back. */
-              <div className="rounded-2xl border border-black/[0.09] bg-white px-8 py-16 text-center">
+              <div className="rounded-[26px] px-8 py-16" style={{ background: CARD }}>
                 <h2 className="text-xl font-bold tracking-tight">Nothing matches that</h2>
-                <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-black/55">
+                <p className="mt-2 max-w-md text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.6 }}>
                   All {all.length} products are still here — no combination of what you picked
                   or typed appears on one of them.
                 </p>
@@ -521,15 +530,15 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
       </section>
 
 
-      <section className="px-6 pb-16">
-        <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
+      <section className="px-6 py-24 sm:px-10" style={{ background: ACCENT }}>
+        <div className="mx-auto max-w-[88rem]">
+          <h2 className="max-w-[48rem] font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: ACCENT_INK }}>
             Pick a blank, upload art, ship it.
           </h2>
-          <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="primary">Start free</Pill>
+          <div className="mt-10">
+            <Pill href="/signup" tone="invert" ring>Start free</Pill>
           </div>
-        </Rise>
+        </div>
       </section>
     </div>
   )

@@ -1,4 +1,6 @@
-import { Reveal } from "@/components/motion/reveal"
+import Link from "next/link"
+import { DocHero, DocSections, DocFoot, DocMail } from "@/components/marketing/bold-doc"
+import { Band, INK, SURFACE } from "@/components/marketing/bold-kit"
 
 export const metadata = {
   title: "Contact — EGFUL",
@@ -39,63 +41,62 @@ const routes = [
 
 export default function ContactPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-20 sm:py-24">
-      <Reveal>
-        <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Contact EGFUL</h1>
-        <p className="mt-6 text-muted-foreground text-pretty">
-          EGFUL is the print-on-demand fulfillment platform behind{" "}
-          <span className="font-medium text-foreground">app.egful.store</span>. Orders from your
-          connected marketplaces sync into one queue, we print and ship them, and tracking is
-          pushed back to the channel. The EGFUL team answers every address below.
-        </p>
-      </Reveal>
+    <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
+      <DocHero title="Contact EGFUL">
+        EGFUL is the print-on-demand fulfilment platform behind app.egful.store. Orders from your connected
+        marketplaces sync into one queue, we print and ship them, and tracking is pushed back to the channel.
+        The EGFUL team answers every address below.
+      </DocHero>
 
-      <Reveal>
-        <div className="mt-10 rounded-2xl border border-border p-6">
-          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            EGFUL team
-          </div>
+      {/* ── THE ADDRESS, AT DISPLAY SIZE ─────────────────────────────────────────
+          One mailbox answers all four routes, so the routes below are a description of what
+          to say rather than four different places to send it. Setting the address as type is
+          the page answering its own question before the reader has to read a list — the same
+          call /pricing makes with $0.
+
+          It was a bordered card with the address at 24px. The border was drawing a box around
+          the one thing on the page nobody could miss. */}
+      <Band tone="card">
+        <div className="grid gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end">
           <a
             href="mailto:linh@embroiderygoods.com"
-            className="mt-2 block font-display text-2xl font-semibold tracking-tight hover:underline"
+            className="font-display font-semibold leading-[0.95] tracking-[-0.032em] underline decoration-[3px] underline-offset-[10px] transition-opacity hover:opacity-70"
+            style={{ fontSize: "clamp(1.75rem, 4.4vw, 3.4rem)", color: INK, textDecorationColor: "var(--mk-acid)" }}
           >
             linh@embroiderygoods.com
           </a>
-          <p className="mt-3 text-sm text-muted-foreground">
-            We reply within one business day, Monday to Friday. Include your store name and, where
-            it helps, the order number — it is the fastest way to an answer.
+          {/* THE LIME IS THE UNDERLINE, not the lettering. It is a fill in this system and
+              measures 1.03:1 as type on the page — as a 3px rule under ink it is the one
+              place the accent can appear in a paragraph without being unreadable. */}
+          <p className="max-w-[46ch] text-[16px] leading-relaxed" style={{ color: INK, opacity: 0.62 }}>
+            We reply within one business day, Monday to Friday. Include your store name and, where it helps,
+            the order number — it is the fastest way to an answer.
           </p>
         </div>
-      </Reveal>
+      </Band>
 
-      <div className="mt-10 space-y-8">
-        {routes.map((r) => (
-          <Reveal key={r.h}>
-            <h2 className="font-display text-xl font-semibold tracking-tight">{r.h}</h2>
-            <p className="mt-2 text-muted-foreground text-pretty">{r.p}</p>
-            <a
-              href={`mailto:${r.email}`}
-              className="mt-2 inline-block text-sm font-medium text-foreground hover:underline"
-            >
-              {r.email}
-            </a>
-          </Reveal>
-        ))}
-      </div>
+      <DocSections
+        tone="paper"
+        items={routes.map((r) => ({
+          h: r.h,
+          p: (
+            <>
+              {r.p}
+              <span className="mt-4 block">
+                <DocMail address={r.email} />
+              </span>
+            </>
+          ),
+        }))}
+      />
 
-      <Reveal>
-        <p className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
-          EGFUL · print-on-demand fulfillment for Etsy, Shopify and TikTok Shop sellers. Our{" "}
-          <a href="/privacy" className="font-medium text-foreground hover:underline">
-            Privacy Policy
-          </a>{" "}
-          and{" "}
-          <a href="/terms" className="font-medium text-foreground hover:underline">
-            Terms of Service
-          </a>{" "}
-          apply to everything on this site.
-        </p>
-      </Reveal>
+      <DocFoot>
+        EGFUL &middot; print-on-demand fulfilment for Etsy, Shopify and TikTok Shop sellers. Our{" "}
+        <Link href="/privacy" className="font-medium underline decoration-1 underline-offset-[3px] hover:opacity-70">Privacy Policy</Link>{" "}
+        and{" "}
+        <Link href="/terms" className="font-medium underline decoration-1 underline-offset-[3px] hover:opacity-70">Terms of Service</Link>{" "}
+        apply to everything on this site.
+      </DocFoot>
     </div>
   )
 }

@@ -68,8 +68,9 @@ export default async function MarketingLayout({ children }: { children: React.Re
           The same three routes remain in the footer nav below, which is where you look when
           you already know what you want. */}
 
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+      <footer className="border-t border-[var(--mk-hairline)]">
+        {/* Same container as the header and every band — see the note in site-header.tsx. */}
+        <div className="mx-auto flex max-w-[88rem] flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-10">
           {/* The identity block. It names the company, the app and the way to reach us.
               The address itself used to sit here in the clear; it is on /contact now — which
               is a PAGE a marketplace reviewing us for API access can cite, rather than a
@@ -78,34 +79,37 @@ export default async function MarketingLayout({ children }: { children: React.Re
               method, so if this link goes, /contact must still publish the address. */}
           <div>
             <div className="font-display text-xl font-semibold tracking-tight">egful</div>
-            <div className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-1 text-sm text-[var(--mk-auth-muted)]">
               EGFUL — hands-off print-on-demand fulfillment.
             </div>
             <Link
               href="/contact"
-              className="mt-2 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              className="mt-2 inline-block text-sm text-[var(--mk-auth-muted)] underline underline-offset-4 hover:text-[var(--mk-ink)]"
             >
               Contact us
             </Link>
           </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <Link href="/catalog" className="hover:text-foreground">Products</Link>
-            <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
-            <Link href="/how-it-works" className="hover:text-foreground">How it works</Link>
-            <Link href="/features" className="hover:text-foreground">Features</Link>
-            <Link href="/integrations/amazon" className="hover:text-foreground">Amazon</Link>
-            <Link href="/docs" className="hover:text-foreground">API</Link>
-            <Link href="/contact" className="hover:text-foreground">Contact</Link>
-            <Link href="/login" className="hover:text-foreground">Log in</Link>
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--mk-auth-muted)]">
+            <Link href="/catalog" className="hover:text-[var(--mk-ink)]">Products</Link>
+            <Link href="/pricing" className="hover:text-[var(--mk-ink)]">Pricing</Link>
+            <Link href="/how-it-works" className="hover:text-[var(--mk-ink)]">How it works</Link>
+            <Link href="/features" className="hover:text-[var(--mk-ink)]">Features</Link>
+            <Link href="/integrations/amazon" className="hover:text-[var(--mk-ink)]">Amazon</Link>
+            <Link href="/docs" className="hover:text-[var(--mk-ink)]">API</Link>
+            <Link href="/contact" className="hover:text-[var(--mk-ink)]">Contact</Link>
+            <Link href="/login" className="hover:text-[var(--mk-ink)]">Log in</Link>
+            <Link href="/privacy" className="hover:text-[var(--mk-ink)]">Privacy</Link>
+            <Link href="/terms" className="hover:text-[var(--mk-ink)]">Terms</Link>
           </nav>
         </div>
-        <div className="flex flex-col items-center justify-between gap-2 border-t border-border py-4 text-xs text-muted-foreground sm:flex-row sm:px-6">
+        {/* The legal line sits in the SAME container as the block above it. It was outside one
+            entirely (`sm:px-6` and no max-width), so on a wide screen the copyright ran to the
+            window edge while the footer nav above it stopped at the page margin. */}
+        <div className="mx-auto flex max-w-[88rem] flex-col items-center justify-between gap-2 border-t border-[var(--mk-hairline)] px-6 py-4 text-xs text-[var(--mk-auth-muted)] sm:flex-row sm:px-10">
           <span>© 2026 EGFUL. All rights reserved.</span>
           <span className="flex gap-4">
-            <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>
+            <Link href="/privacy" className="hover:text-[var(--mk-ink)]">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[var(--mk-ink)]">Terms of Service</Link>
           </span>
         </div>
       </footer>

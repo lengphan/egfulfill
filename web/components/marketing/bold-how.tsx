@@ -1,8 +1,8 @@
 "use client"
 
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACID, HAIRLINE, HEADING, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
-import { LabelRule, CutoutFigure, SpecStrip, NumberedCards, CAPS } from "@/components/marketing/bold-figure"
+import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, PlateHero, Band, Rise } from "@/components/marketing/bold-kit"
+import { LabelRule, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
@@ -33,8 +33,14 @@ import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMod
  * neutral rather than to nothing, because a strip that loses a row when someone fixes a typo
  * is worse than one that renders it quietly.
  */
+/* The neutral fallback is mixed from the INK VARIABLE, not from `black`. A literal here is
+   invisible to the runtime skin, so this one row would have stayed press-coloured while every
+   real status beside it moved — a strip where one chip is off-palette reads as a bug in the
+   product, not in the page. */
+const NEUTRAL_CHIP = "bg-[color-mix(in_oklch,var(--mk-ink)_8%,transparent)] text-[color-mix(in_oklch,var(--mk-ink)_65%,transparent)]"
+
 const JOURNEY_TONE: Record<string, string> = {
-  draft: "bg-black/[0.06] text-black/60",
+  draft: NEUTRAL_CHIP,
   pending: "bg-pending/12 text-pending",
   "in process": "bg-working/12 text-working",
   "in production": "bg-working/12 text-working",
@@ -43,7 +49,7 @@ const JOURNEY_TONE: Record<string, string> = {
   cancelled: "bg-alert/12 text-alert",
   refunded: "bg-alert/12 text-alert",
 }
-const toneFor = (label: string) => JOURNEY_TONE[label.trim().toLowerCase()] ?? "bg-black/[0.06] text-black/60"
+const toneFor = (label: string) => JOURNEY_TONE[label.trim().toLowerCase()] ?? NEUTRAL_CHIP
 
 export function BoldHow({ content }: { content: SiteContent }) {
   const p = content.howPage
@@ -69,12 +75,14 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * Emptied in the editor, the whole section goes — same as the homepage.
         */}
       {p.stats.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 sm:px-10 pb-4">
-          <LabelRule left={p.ruleLeft} right={p.ruleRight} leftPath="howPage.ruleLeft" rightPath="howPage.ruleRight" className="mb-10" />
-          <div className="border-t pt-10" style={{ borderColor: HAIRLINE }}>
-            <SpecStrip items={p.stats} path="howPage.stats" />
-          </div>
-        </section>
+        /* THE WHITE BAND — the first change of ground, and the moment the reader learns
+           this page has more than one surface. The rule that used to sit above the strip is
+           gone with it: a band IS the division, and a line drawn inside one divides nothing.
+           LabelRule stays, because it labels rather than separates. */
+        <Band tone="card">
+          <LabelRule left={p.ruleLeft} right={p.ruleRight} leftPath="howPage.ruleLeft" rightPath="howPage.ruleRight" className="mb-12" />
+          <SpecStrip items={p.stats} path="howPage.stats" />
+        </Band>
       )}
 
       {/*
@@ -94,7 +102,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
           section renders with no picture too, because otherwise there is nothing to drop one
           ONTO; a visitor still sees nothing. */}
       {(figureSrc || editing) && (
-        <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-14">
+        <Band tone="paper">
           <EditableImage path="howPage.figure.image">
             <CutoutFigure
               tone="ink"
@@ -108,7 +116,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
               calloutsPath="howPage.figure.callouts"
             />
           </EditableImage>
-        </section>
+        </Band>
       )}
 
       {/*
@@ -121,24 +129,36 @@ export function BoldHow({ content }: { content: SiteContent }) {
         * The "— No CSV exports" run under each step survived: it moved onto NumberedItem so
         * the card draws it, rather than being lost or hand-rolled beside the component.
         */}
-      <section className="mx-auto max-w-[88rem] px-6 sm:px-10 py-14">
+      {/* The steps keep the PAPER ground: NumberedCards draws its light cards in CARD white,
+          and a white card on a white band is a border drawn for nothing. The surfaces invert —
+          on paper a card is white, on white a card is paper. */}
+      <Band tone="paper">
         <NumberedCards items={p.steps} path="howPage.steps" />
-      </section>
+      </Band>
 
       {/* The real status flow. Tones are the product's own, deliberately not re-tinted. */}
       {p.journey.length > 0 && (
-        <section className="mx-auto max-w-[88rem] px-6 py-16 sm:px-10">
-          {/* A RULE, NOT A TINTED BAND. This section sat in 3% black, which is a second
-              ground laid over the page's own — two near-identical off-whites held apart by
-              nothing, which is what makes a full-width section read as a mistake rather than
-              as a section. The divider does the same job and adds no colour. */}
-          <div className="max-w-4xl border-t pt-16" style={{ borderColor: HAIRLINE }}>
-            <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
-              <EditableText path="howPage.journeyHeading">{p.journeyHeading}</EditableText>
-            </h2>
-            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-black/55">
-              <EditableText path="howPage.journeyNote">{p.journeyNote}</EditableText>
-            </p>
+        /* A SURFACE, NOT A RULE — reversed 2026-08-26, and the note it replaces was right
+           about the wrong thing. It argued against "a second, muddier ground laid over the
+           page's own", and that is a fair description of a 3% BLACK TINT: neither one ground
+           nor another, which is exactly what reads as a mistake. It is not a description of a
+           SURFACE. White is the second of three real grounds here, and with no shadows in the
+           system a change of value is the only way one section can separate from the next. */
+        <Band tone="card">
+          {/* HEADING LEFT, ROWS RIGHT — the same two-track reading grid as the document pages
+              and the pricing lists. It was `max-w-4xl` inside an 88rem band, which left the
+              right half of every row empty: the heading, the note and four status rows all
+              stopped at 60% of the page and the band read as unfinished rather than as a
+              column. A measure is for PROSE; a section does not inherit it. */}
+          <div className="grid gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
+            <div>
+              <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={HEADING}>
+                <EditableText path="howPage.journeyHeading">{p.journeyHeading}</EditableText>
+              </h2>
+              <p className="mt-5 max-w-sm text-[16px] leading-relaxed" style={{ color: INK, opacity: 0.62 }}>
+                <EditableText path="howPage.journeyNote">{p.journeyNote}</EditableText>
+              </p>
+            </div>
 
             {/*
               * A DIVIDED BAND, NOT FOUR CARDS.
@@ -152,7 +172,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
               * it with sm:w-28, which worked — a grid track says the same thing once, at the
               * container, instead of on every child.
               */}
-            <div className="mt-10 divide-y" style={{ borderColor: HAIRLINE, borderTopWidth: 1, borderBottomWidth: 1 }}>
+            <div className="divide-y lg:mt-2" style={{ borderColor: HAIRLINE, borderTopWidth: 1, borderBottomWidth: 1 }}>
               {p.journey.map((j, i) => (
                 <Rise
                   key={`${j.label}-${i}`}
@@ -163,30 +183,33 @@ export function BoldHow({ content }: { content: SiteContent }) {
                   <span className={"inline-flex w-fit rounded-full px-3 py-1 text-[13px] font-semibold " + toneFor(j.label)}>
                     <EditableText path={`howPage.journey.${i}.label`}>{j.label}</EditableText>
                   </span>
-                  <span className="text-[15px] leading-relaxed text-black/65"><EditableText path={`howPage.journey.${i}.body`}>{j.body}</EditableText></span>
+                  <span className="text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.68 }}><EditableText path={`howPage.journey.${i}.body`}>{j.body}</EditableText></span>
                 </Rise>
               ))}
             </div>
           </div>
-        </section>
+        </Band>
       )}
 
-      <section className="px-6 py-16">
-        <Rise preset="settle" className="mx-auto max-w-5xl rounded-3xl px-8 py-14 text-center" style={{ background: ACCENT }}>
-          {/* The closing band gets the rule too, in the plate's own foreground — it is the one
-              device that ties the bottom of the page to the top. */}
-          <div className="mx-auto mb-8 flex max-w-sm items-center gap-4 opacity-70">
-            <span className="h-px flex-1" style={{ background: "color-mix(in oklch, var(--mk-accent-ink) 40%, transparent)" }} />
-            <span className={CAPS} style={{ color: ACID }}>EGFULFILL</span>
-            <span className="h-px flex-1" style={{ background: "color-mix(in oklch, var(--mk-accent-ink) 40%, transparent)" }} />
-          </div>
-          <h2 className="mx-auto max-w-2xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: SURFACE }}>
+      {/* ── CTA — EDGE TO EDGE ───────────────────────────────────────────────────
+          It was a rounded box inside a max-w-5xl, centred. Two things were wrong with that
+          and only one of them is shape: a band that stops short of both margins reads as an
+          advert pasted onto the page rather than as the page ending, and a CENTRED closing
+          block on a site whose every other section is left-aligned is a third alignment
+          appearing once, at the bottom, for no reason. The home page settled this already —
+          this is the same band, and the two pages now end the same way.
+
+          The EGFULFILL rule goes with the centring. It was there to give a narrow centred
+          box something to hold its top edge; a full-bleed plate needs nothing holding it. */}
+      <section className="px-6 py-24 sm:px-10" style={{ background: ACCENT }}>
+        <div className="mx-auto max-w-[88rem]">
+          <h2 className="max-w-[48rem] font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ ...HEADING, color: ACCENT_INK }}>
             <EditableText path="howPage.cta.heading">{p.cta.heading}</EditableText>
           </h2>
-          <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="primary"><EditableText path="howPage.cta.button">{p.cta.button}</EditableText></Pill>
+          <div className="mt-10">
+            <Pill href="/signup" tone="invert" ring><EditableText path="howPage.cta.button">{p.cta.button}</EditableText></Pill>
           </div>
-        </Rise>
+        </div>
       </section>
     </div>
   )

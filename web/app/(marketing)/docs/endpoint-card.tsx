@@ -80,7 +80,7 @@ function CopyButton({ text, label, onAccent }: { text: string; label: string; on
         "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " +
         (onAccent
           ? "text-white/80 hover:bg-white/15 hover:text-white"
- : "text-muted-foreground hover:bg-accent hover:text-foreground")
+ : "text-[var(--mk-auth-muted)] hover:bg-[var(--mk-ink)]/[0.05] hover:text-[var(--mk-ink)]")
       }
     >
       {done ? <><Check size={12} weight="bold" /> Copied</> : <><Copy size={12} weight="bold" /> Copy</>}
@@ -97,7 +97,7 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
  const code = snippet(e, lang)
 
  return (
-    <div className="rounded-lg border border-border p-4 transition-colors hover:border-primary/30">
+    <div className="rounded-lg border border-[var(--mk-hairline)] p-4 transition-colors hover:border-[var(--mk-ink)]/30">
       <div className="flex flex-wrap items-center gap-2">
         <span className={
           "rounded px-1.5 py-0.5 tabular-nums text-[11px] font-semibold " +
@@ -107,7 +107,7 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
         <span className="ml-auto text-sm font-medium">{e.title}</span>
       </div>
 
-      <p className="mt-2 text-sm text-muted-foreground">{e.description}</p>
+      <p className="mt-2 text-sm text-[var(--mk-auth-muted)]">{e.description}</p>
 
       {/* Request, in whichever language they actually write in. The language tabs live
           IN the header strip now rather than floating above the block — they name what
