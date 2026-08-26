@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, MagnifyingGlassPlus, type Icon } from "@phosphor-icons/react"
+import { UploadSimple, TextT, CursorClick, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, MagnifyingGlassPlus, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -12,6 +12,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
 import { Thumb } from "@/components/app/thumb"
 import { TabBar } from "@/components/app/tab-bar"
+import { EmptyState } from "@/components/app/empty-state"
 import { useLightbox } from "@/components/app/image-lightbox"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, getDesignLibrary, getDesignLibraryItem, deleteDesignLibrary, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate, type LibraryDesign } from "@/lib/api"
@@ -1328,7 +1329,12 @@ export function DesignMaker() {
               {bg.msg && <p className="text-2xs text-muted-foreground">{bg.msg}</p>}
             </div>
           ) : (
-            <div className="border-t border-border pt-3 text-sm text-muted-foreground">{tl("designMaker", "Pick a blank, then place artwork or add text from the tools on the left. Select a layer and its controls appear here.")}</div>
+            <EmptyState
+              icon={CursorClick}
+              size="sm"
+              title={tl("noLayerSelected", "No layer selected")}
+              note={tl("noLayerSelectedNote", "Select artwork or text on the blank to edit it here.")}
+            />
           )}
 
           {/* What publishing will and won't carry. Kept next to the work rather than on the

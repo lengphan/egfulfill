@@ -7,6 +7,7 @@ import { MagnifyingGlass, Package } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { BlankOutline, hasBlankOutline } from "@/components/app/blank-outline"
 import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
@@ -80,6 +81,24 @@ export function ProductPickerDialog({
   const tl = useLabelT()
   const [products, setProducts] = useState<CatalogProduct[] | null>(null)
   const [query, setQuery] = useState("")
+  /** Null means every type. Set by the outline row, cleared by picking it again. */
+  const [type, setType] = useState<string | null>(null)
+
+  /**
+   * THE TYPES THIS CATALOGUE ACTUALLY HAS, in the order they first appear.
+   *
+   * Derived rather than hard-coded: a fixed list of ten would offer a filter for blankets
+   * nobody stocks and silently omit whatever gets added upstream. Counted, so a type with
+   * one product does not look the same as one with forty.
+   */
+  const types = useMemo(() => {
+    const seen = new Map<string, number>()
+    for (const p of products ?? []) {
+      const t = String(p.type ?? "").trim().toLowerCase()
+      if (t) seen.set(t, (seen.get(t) ?? 0) + 1)
+    }
+    return [...seen.entries()].map(([id, n]) => ({ id, n }))
+  }, [products])
 
   useEffect(() => {
     if (!open) return
@@ -96,8 +115,10 @@ export function ProductPickerDialog({
     const q = query.trim().toLowerCase()
     const list = products ?? []
     if (!q) return list
-    return list.filter((p) => `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase().includes(q))
-  }, [products, query])
+    const byType = type ? list.filter((p) => String(p.type ?? "").toLowerCase() === type) : list
+    if (!q) return byType
+    return byType.filter((p) => `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase().includes(q))
+  }, [products, query, type])
 
   const pick = (p: CatalogProduct) => {
     onPick(toPickedProduct(p))
@@ -111,6 +132,33 @@ export function ProductPickerDialog({
           <DialogTitle>{tl("productPicker", "Add from catalog")}</DialogTitle>
         </DialogHeader>
 
+        {/* PICK THE SHAPE, NOT THE WORD. Finding a hoodie meant typing "hoodie"; a row of
+            outlines is recognised without reading, and it is the same gesture whatever
+            language the seller has the app in. A type with no drawing shows its name — it
+            still filters, it just does not get a picture it has not been given. */}
+        {types.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {types.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setType((cur) => (cur === t.id ? null : t.id))}
+                aria-pressed={type === t.id}
+                className={
+                  "eg-tap flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-[10px] capitalize transition-colors " +
+                  (type === t.id
+                    ? "border-primary bg-accent font-semibold text-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/25 hover:text-foreground")
+                }
+              >
+                {hasBlankOutline(t.id)
+                  ? <BlankOutline type={t.id} className="h-8 w-full" />
+                  : <span className="flex h-8 items-center text-xs">{t.id.slice(0, 3)}</span>}
+                <span className="truncate">{t.id}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="relative">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tl("productPicker", "Search products…")} className="pl-9" autoFocus />
@@ -125,7 +173,8 @@ export function ProductPickerDialog({
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
-              <Package size={22} weight="duotone" /> No products match “{query}”.
+              <Package size={22} weight="duotone" />
+              {query ? `No products match “${query}”` : "Nothing stocked in this category yet"}{type ? ` in ${type}.` : "."}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
