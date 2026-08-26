@@ -208,7 +208,23 @@
    * White on it measures 6.02:1 and it measures 5.82:1 as text on the page, so both of
    * --primary's jobs — 210 fills and 281 pieces of text — clear AA on the same value.
    * ── */
-    --background: oklch(0.9674 0.0132 106.64);
+  /* LIGHTENED 2026-08-26, one day after landing, on the owner's report that the canvas was
+   * "way too dark" behind the dashboard. This is the reversal the note above predicted and
+   * pre-authorised: the fix for a canvas that strains under dense data is to LIGHTEN THE
+   * CANVAS, never to add a shadow back.
+   *
+   * #F5F5EB → #F9F9F3. L 0.9674 → 0.9805, and the warmth is kept (hue 106.5) because "no
+   * cool grey" is still the rule. Graphite on it improves to 4.87:1.
+   *
+   * THE COST, STATED: a white card now separates from the canvas at 1.057 rather than 1.097,
+   * which is too little on its own. Cards therefore rely on the stone --border here, exactly
+   * as the direction says they must once they sit on something near-white. If the canvas is
+   * ever lightened again, the border is what has to get firmer — not a shadow.
+   *
+   * MARKETING IS NOT AFFECTED. --mk-surface stays #F5F5EB: that page alternates big parchment
+   * and dark blocks where the deeper value is doing real work, and nobody reads a 700-row
+   * queue through it. */
+    --background: oklch(0.9805 0.0079 106.54);
     --foreground: oklch(0.1893 0.0098 107.30);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.1893 0.0098 107.30);
