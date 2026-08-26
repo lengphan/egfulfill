@@ -164,7 +164,7 @@ function BrowseTab() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {list.map((it) => (
-              <button key={it.key} onClick={() => setOpen(it)} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left shadow-sm transition-shadow hover:shadow">
+              <button key={it.key} onClick={() => setOpen(it)} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-shadow hover:shadow">
                 <div className="relative aspect-square overflow-hidden bg-muted">
                   <StudioThumb src={it.thumb} alt={it.name} className="absolute inset-0 size-full" />
                   {done.has(it.key) && <span className="absolute left-1.5 top-1.5 z-10 rounded bg-shipped px-1.5 py-0.5 text-2xs font-semibold text-white">{tl("digitizer", "Generated")}</span>}
@@ -305,7 +305,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <button className="absolute inset-0 bg-foreground/50" aria-label={tl("digitizer", "Close")} onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card ">
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{item.name}</div>
@@ -1249,7 +1249,7 @@ function HistoryTab() {
       {zoom && (
         <div role="button" tabIndex={0} aria-label={tl("digitizer", "Close full-size view")} onClick={() => setZoom(null)} onKeyDown={(e) => { if (e.key === "Escape" || e.key === "Enter") setZoom(null) }} className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoom} alt="" className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
+          <img src={zoom} alt="" className="max-h-full max-w-full rounded-lg object-contain " />
         </div>
       )}
     </>

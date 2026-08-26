@@ -30,7 +30,7 @@ export function MobileNav({ sections, onLogout, role }: { sections: MobileNavSec
       {open && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[82%] flex-col border-r border-border bg-card shadow-xl">
+          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[82%] flex-col border-r border-border bg-card ">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
               <span className="font-display text-xl font-semibold tracking-tight">egful</span>
               <button onClick={() => setOpen(false)} aria-label={nl("nav", "Close menu")} className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent">

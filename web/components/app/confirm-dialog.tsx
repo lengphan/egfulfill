@@ -109,7 +109,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
  onChange={(e) => setValue(e.target.value)}
  placeholder={promptOpts?.placeholder}
  rows={3}
- className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+ className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               />
             ) : (
               <Input

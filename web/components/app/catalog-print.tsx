@@ -534,7 +534,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               "colour pop" is that it opened straight onto a white spec sheet. A cover is
  also what makes the PDF read as a document rather than as a print-out. */}
           <section
- className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+ className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] print:mb-0 print:shadow-none"
  style={{ height: "210mm", background: brand.accent, color: HOUSE.paper }}
           >
             <div className="flex items-start justify-between">
@@ -628,7 +628,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             )
  return (
               <section
- className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+ className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[18mm] print:mb-0 print:shadow-none"
  style={{ height: "210mm" }}
               >
                 <div className="mb-6 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
@@ -746,7 +746,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             // which is the one thing that makes a printed catalogue look homemade.
             <section
  key={st.ref}
- className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
+ className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[14mm] print:mb-0 print:shadow-none"
  style={{ height: "210mm" }}
             >
               {/* PRICE FIRST, top right, in the display face. It was tucked at the foot of
@@ -929,7 +929,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       {editing && (
                         <button
  type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
- className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 shadow-sm hover:bg-white print:hidden"
+ className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 hover:bg-white print:hidden"
                         >
                           {tl("catalogPrint", "Replace photo")}
                         </button>
@@ -1247,7 +1247,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  return pages.map((page, pi) => (
               <section
  key={`prices-${pi}`}
- className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+ className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[18mm] print:mb-0 print:shadow-none"
  style={{ height: "210mm" }}
               >
                 <div className="mb-5 h-1.5 w-full rounded-full" style={{ background: brand.accent }} />
@@ -1338,7 +1338,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  next step. This one says how to order and who to ask — and closes on the same
  plate it opened with, so the document is bookended rather than just ending. */}
           <section
- className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] shadow-sm print:mb-0 print:shadow-none"
+ className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] print:mb-0 print:shadow-none"
  style={{ height: "210mm", background: brand.accent, color: HOUSE.paper }}
           >
             <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>

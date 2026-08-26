@@ -571,7 +571,7 @@ export function POAddItems({
  key={k}
  type="button"
  onClick={() => setTab(k)}
- className={"flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " + (tab === k ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")}
+ className={"flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " + (tab === k ? "bg-background " : "text-muted-foreground hover:text-foreground")}
             >
               {label}
             </button>

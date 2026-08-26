@@ -1653,7 +1653,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  with a tiny check squeezed in the middle. Empty ring when unused,
  solid fill with a plain check when used: the same two states every
  checkbox in the world has. */
- className={"absolute left-1 top-1 z-10 grid size-5 place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
+ className={"absolute left-1 top-1 z-10 grid size-5 place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
                           (refPicked.includes(i)
                             /* SAME RING, FILLED IN — that is the whole state change.
                                A solid violet disc was a third colour dropped onto a

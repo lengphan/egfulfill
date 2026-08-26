@@ -76,7 +76,7 @@ function ShopRow({ s, index, saved, onToggle, onOpen }: { s: SpyShop; index: num
   }, [s.shop_id, index])
 
  return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md lg:flex-row">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 transition-shadow lg:flex-row">
       {/* LEFT — identity, stats, actions (fixed column) */}
       <div className="flex w-full shrink-0 flex-col gap-3 lg:w-60">
         <div className="flex items-start gap-3">
@@ -256,7 +256,7 @@ export function StoresTab(h: Handlers) {
           <div className="ml-auto flex items-center gap-1 rounded-full bg-muted p-1">
             {(["gallery", "cards"] as const).map((v) => (
               <button key={v} type="button" onClick={() => setCatView(v)}
- className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (catView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+ className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (catView === v ? "bg-card text-foreground " : "text-muted-foreground hover:text-foreground")}>
                 {v === "gallery" ? tl("spydeckStores", "Gallery") : tl("spydeckStores", "Details")}
               </button>
             ))}
@@ -275,7 +275,7 @@ export function StoresTab(h: Handlers) {
           <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {catalog.map((l) => (
               <a key={l.listing_id} href={l.url} target="_blank" rel="noopener noreferrer" title={l.title}
- className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted transition-shadow hover:shadow-md">
+ className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted transition-shadow ">
                 {(l.thumb || l.image) ? (
                   <ThumbFill src={l.thumb || l.image || ""} alt={l.title} sizes="(max-width:640px) 50vw, 20vw" className="transition-transform duration-300 group-hover:scale-105" />
                 ) : (
@@ -333,7 +333,7 @@ export function StoresTab(h: Handlers) {
         <div className="flex items-center gap-1 rounded-full bg-muted p-1">
           {(["search", "saved"] as const).map((t) => (
             <button key={t} type="button" onClick={() => { setTab(t); setPage(0) }}
- className={"rounded-full px-3 py-1 text-xs font-medium transition-colors " + (tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+ className={"rounded-full px-3 py-1 text-xs font-medium transition-colors " + (tab === t ? "bg-card text-foreground " : "text-muted-foreground hover:text-foreground")}>
               {t === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : tl("spydeckStores", "Results")}
             </button>
           ))}

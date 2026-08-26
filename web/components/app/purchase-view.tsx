@@ -68,7 +68,7 @@ function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src:
  return (
     <button type="button" onClick={() => onZoom?.(src, label ?? "")}
  title={tl("purchase", "Click to enlarge")} aria-label={`Enlarge ${label || tl("purchase", "product image")}`}
- className="shrink-0 rounded border border-border bg-white transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+ className="shrink-0 rounded border border-border bg-white transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" loading="lazy" className="size-11 rounded object-contain" />
     </button>

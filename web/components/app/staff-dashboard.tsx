@@ -73,7 +73,7 @@ function MiniStat({
 }) {
   const tl = useLabelT()
  return (
-    <div className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm">
+    <div className="rounded-2xl border border-border/70 bg-card/85 p-4 backdrop-blur-sm">
       <div className="flex items-start gap-3">
         {/* The glyph goes LIME on dark. "Large fills only, never text" is a rule about the
  light theme, where the accent measures 1.19:1 on white and disappears; on the

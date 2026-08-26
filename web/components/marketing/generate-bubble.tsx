@@ -222,7 +222,7 @@ export function GenerateBubble({ onDone, onClose }: {
     /* ROOM TO WRITE THE PROMPT. 22rem was a chat popover holding a 4,000-character field: the
        prompt is the only part of this panel a person has an opinion about, and it had less
        width than the three selects underneath it. */
-    <div className="w-[34rem] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background p-4 text-left shadow-xl">
+    <div className="w-[34rem] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background p-4 text-left ">
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkle size={14} weight="fill" /> Generate a picture
@@ -391,7 +391,7 @@ export function CopyBubble({ kind, current, onDone, onClose }: {
   }
 
   return (
-    <span className="block w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background p-3 text-left font-sans text-foreground shadow-xl">
+    <span className="block w-[20rem] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background p-3 text-left font-sans text-foreground ">
       <span className="mb-2 flex items-center justify-between gap-2">
         {/* The slot is named, because "at most 8 words" is the thing the person most needs to
             know before they write the instruction — and it is not adjustable, so it is a

@@ -18,7 +18,7 @@ import { isVideoSrc, MEDIA_ACCEPT } from "@/lib/media"
 // Module-scope so they're stable across renders (react-hooks/static-components forbids
 // defining components inside render).
 const AREA_CLS =
-  "flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none " +
+  "flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm  outline-none " +
   "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 
 function Field({ label, hint, value, onChange, mono }: {

@@ -33,7 +33,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "max-h-[var(--available-height)] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg outline-none",
+            "max-h-[var(--available-height)] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground  outline-none",
             "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
             className
           )}

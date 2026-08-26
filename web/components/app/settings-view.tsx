@@ -1857,7 +1857,7 @@ function PlatformPanel() {
                               // documented invariant (mockup mirrors mockups.front) true.
  setType(sd === "front" ? { mockups: m, mockup: null } : { mockups: m })
                             }}
- className="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border border-background bg-foreground/85 text-background shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
+ className="absolute -right-2 -top-2 z-10 grid size-6 place-items-center rounded-full border border-background bg-foreground/85 text-background transition-colors hover:bg-destructive hover:text-destructive-foreground"
  aria-label={`Clear ${sd} outline`}
  title={`Clear the ${sd} outline`}
                           >

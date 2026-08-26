@@ -950,7 +950,7 @@ export function DesignMaker() {
         <Input
  value={name} onChange={(e) => setName(e.target.value)}
  placeholder={tl("designMaker", "Untitled design")} aria-label={tl("designMaker", "Design name")}
- className="h-8 w-40 min-w-0 border-transparent bg-transparent px-2 text-sm font-medium shadow-none hover:border-border focus:border-border lg:w-56"
+ className="h-8 w-40 min-w-0 border-transparent bg-transparent px-2 text-sm font-medium hover:border-border focus:border-border lg:w-56"
         />
         {msg && <span className={"truncate text-xs " + (msg.tone === "ok" ? "text-success" : "text-destructive")}>{msg.text}</span>}
         <div className="ml-auto flex shrink-0 items-center gap-2">

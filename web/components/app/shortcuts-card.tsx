@@ -163,7 +163,7 @@ export function ShortcutsCard({
                 <button
  aria-label={t("dash.removeShortcut", { label: nl("nav", q.label) })}
  onClick={() => remove(q.href)}
- className="eg-tap absolute right-1.5 bottom-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground shadow-sm transition-colors hover:text-alert"
+ className="eg-tap absolute right-1.5 bottom-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground transition-colors hover:text-alert"
                 >
                   <X size={11} weight="bold" />
                 </button>
@@ -189,7 +189,7 @@ export function ShortcutsCard({
         {addOpen && menuPos && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setAddOpen(false)} />
-            <div className="fixed z-50 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 shadow-xl" style={{ top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, maxHeight: menuPos.maxHeight }}>
+            <div className="fixed z-50 w-56 overflow-auto rounded-xl border border-border bg-card p-1.5 " style={{ top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left, maxHeight: menuPos.maxHeight }}>
               {available.map((c) => {
  const Icon = c.icon
  return (

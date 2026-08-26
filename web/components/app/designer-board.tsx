@@ -755,7 +755,7 @@ export function DesignerBoard() {
                         // the image (a button can't be nested inside the image button).
                         // EMB-check cards get a distinct amber frame so the floor spots "already
                         // digitised — verify only", set apart from normal and pink vendor cards.
- className={"group relative shrink-0 overflow-hidden rounded-xl border text-left shadow-sm transition-shadow hover:shadow " + (isEmbCard(c) ? "border-hold/40 bg-hold/10/60 " : "border-border bg-background ") + (c.vendor && !isAdmin ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
+ className={"group relative shrink-0 overflow-hidden rounded-xl border text-left transition-shadow hover:shadow " + (isEmbCard(c) ? "border-hold/40 bg-hold/10/60 " : "border-border bg-background ") + (c.vendor && !isAdmin ? "cursor-default" : "cursor-grab active:cursor-grabbing")}
                       >
                         {/* IMAGE = open full details on a single click. FIXED-height cover (h-48)
  so every card is the same height; object-cover fills the frame at any
@@ -817,7 +817,7 @@ export function DesignerBoard() {
                             })
  if (ok) void removeCard(c.id)
                           }}
- className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-alert focus-visible:opacity-100 group-hover:opacity-100"
+ className="eg-tap absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 transition-opacity hover:text-alert focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <X size={11} weight="bold" />
                         </button>}
@@ -1049,7 +1049,7 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 z-50 mt-1 w-72 rounded-xl border border-border bg-card p-2 shadow-xl">
+                <div className="absolute right-0 z-50 mt-1 w-72 rounded-xl border border-border bg-card p-2 ">
                   <div className="px-1 pb-1 eg-label text-muted-foreground">{tl("designer", "Columns — drag to reorder, toggle & rename")}</div>
                   {/* Shown columns, in display order — drag the handle to reorder. */}
                   {shown.map((col, idx) => (
@@ -1571,7 +1571,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
  className="fixed inset-0 z-[60] flex cursor-zoom-out items-center justify-center bg-black/80 p-6"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={String(card.thumb)} alt={card.title || tl("designer", "Design")} className="max-h-full max-w-full rounded-lg object-contain shadow-2xl" />
+            <img src={String(card.thumb)} alt={card.title || tl("designer", "Design")} className="max-h-full max-w-full rounded-lg object-contain " />
           </div>
         )}
       </DialogContent>

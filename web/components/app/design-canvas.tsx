@@ -476,7 +476,7 @@ export function DesignStage({
     <>
       <div className="pointer-events-none absolute inset-0 rounded-sm outline outline-2 -outline-offset-1 outline-primary/70" />
       <div
- className="absolute -top-14 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-md"
+ className="absolute -top-14 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-border bg-card p-1 "
         // The strip is chrome, not canvas: a drag that starts here must never also start a
         // move on the layer underneath it.
  onPointerDown={(e) => e.stopPropagation()}
@@ -535,7 +535,7 @@ export function DesignStage({
         >
           <span
  className={
-              "block bg-background shadow-sm ring-1 ring-primary " +
+              "block bg-background  ring-1 ring-primary " +
               (g.ux === 0 ? "h-1.5 w-4 rounded-full"          // top / bottom: a horizontal bar
  : g.uy === 0 ? "h-4 w-1.5 rounded-full"        // left / right: a vertical bar
  : "size-3 rounded-full")                     // corners
@@ -686,7 +686,7 @@ export function DesignStage({
  ref={loupeRef}
  width={LOUPE}
  height={LOUPE}
- className="block rounded-full border-2 border-white shadow-lg ring-1 ring-black/20"
+ className="block rounded-full border-2 border-white ring-1 ring-black/20"
  style={{ width: LOUPE, height: LOUPE }}
           />
           <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-2xs font-medium text-background">
@@ -2294,7 +2294,7 @@ export function DesignCanvasDialog({
               file browser instead of the panel. It went unnoticed while the rail's first
               entry was Upload, because hitting the overlay did the same thing as hitting the
               button. The moment that entry became a panel, the two stopped agreeing. */}
-          <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
+          <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 backdrop-blur">
             {/**
               * ONE DOOR FOR FILES, not three beside each other.
               *
@@ -2455,7 +2455,7 @@ export function DesignCanvasDialog({
  is plainly a small form, and the field is wide enough to show the end of a name
  rather than scrolling it out of sight while you type. */}
           {tplName !== null && (
-            <div className="absolute left-1/2 top-1/2 z-30 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-3 shadow-xl">
+            <div className="absolute left-1/2 top-1/2 z-30 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-3 ">
               <label className="block text-2xs font-medium text-muted-foreground">{tl("canvas", "Save as template")}</label>
               <input
  autoFocus
@@ -2491,7 +2491,7 @@ export function DesignCanvasDialog({
  above). What stays here is what the strip cannot say: the sentence the
  eraser leaves behind when it finds nothing flat to cut. */}
               {bg.msg && (
-                <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground shadow-sm backdrop-blur">{bg.msg}</span>
+                <span className="pointer-events-auto rounded-lg bg-card/95 px-2 py-1 text-2xs text-muted-foreground backdrop-blur">{bg.msg}</span>
               )}
               {/* THE STITCH TOGGLE MOVED into the Embroidery drawer. It is stitch
  apparatus — it only exists when there is a machine file — and it was

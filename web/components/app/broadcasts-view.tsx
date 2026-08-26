@@ -75,7 +75,7 @@ const dt = (s: string | null) =>
  s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"
 
 const TEXTAREA_CLS =
-  "flex min-h-40 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none " +
+  "flex min-h-40 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm  outline-none " +
   "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 " +
   "disabled:cursor-not-allowed disabled:opacity-50"
 
@@ -213,7 +213,7 @@ function EmailBrandingCard() {
         {/* Chrome-only preview — the body copy is per-broadcast. Light-only, like the mail. */}
         <div>
           <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("broadcasts", "Preview")}</span>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white ">
             {b.preset === "branded" && <div className="h-1" style={{ background: b.accent }} />}
             <div className="px-5 py-4" style={b.preset === "bold" ? { background: b.accent } : undefined}>
               {b.logoUrl ? (
@@ -257,7 +257,7 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
  const b = branding ?? { preset: "branded", accent: "#604cfa", logoUrl: "", heading: "egful", footerNote: "" }
  const paras = body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
  return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white ">
       {b.preset === "branded" && <div className="h-1" style={{ background: b.accent }} />}
       <div className="px-5 py-4" style={b.preset === "bold" ? { background: b.accent } : undefined}>
         {b.logoUrl ? (

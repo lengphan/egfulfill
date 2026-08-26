@@ -55,7 +55,7 @@ export function ImageLightbox({ src, label, onClose }: {
         src={src} alt={label || ""}
         // Bounded by BOTH axes. A portrait design capped only by width runs off the top and
         // bottom of the viewport, which is the one thing a "see it bigger" cannot do.
-        className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
+        className="max-h-[85vh] max-w-full rounded-lg object-contain "
         onClick={(e) => e.stopPropagation()}
       />
       {label && <span className="max-w-full truncate text-sm text-white/80">{label}</span>}

@@ -296,7 +296,7 @@ export default function StudioPage() {
                     set read as broken rather than as varied. The proportion is drawn INSIDE
                     a fixed frame instead — you still see the shape, and the rows align. */}
                 <div className="relative flex h-32 items-center justify-center bg-muted/60">
-                  <span aria-hidden className="rounded-sm bg-background/70 shadow-sm"
+                  <span aria-hidden className="rounded-sm bg-background/70 "
                     style={{ aspectRatio: t.ratio.replace(":", " / "), height: "4.5rem", maxWidth: "80%" }} />
                   <span className="absolute font-mono text-xs text-muted-foreground">{t.ratio}</span>
                   {t.motion && (

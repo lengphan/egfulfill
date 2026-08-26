@@ -225,7 +225,7 @@ export default function OAuthCallbackPage() {
 
  return (
     <div className="flex min-h-svh items-center justify-center bg-background px-6">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center ">
         {state.kind === "working" && (
           <>
             <CircleNotch size={40} weight="bold" className="mx-auto animate-spin text-primary" />

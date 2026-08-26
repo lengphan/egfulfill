@@ -45,7 +45,7 @@ export function SupplierFlag({ label, className }: { label: string; className?: 
   return (
     <span
       className={
-        "inline-flex items-center rounded-md bg-white px-1.5 py-1 shadow-sm ring-1 ring-black/10 " + (className ?? "")
+        "inline-flex items-center rounded-md bg-white px-1.5 py-1  ring-1 ring-black/10 " + (className ?? "")
       }
       title={logo.alt}
     >

@@ -1237,7 +1237,7 @@ export default function ChatPage() {
                   <img src={gen.imageUrl} alt="" className="size-16 rounded-lg border border-border object-cover" />
                   <button
  onClick={() => setGen(null)} aria-label={tl("chat", "Don't animate this")}
- className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+ className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
                   </button>
@@ -1260,7 +1260,7 @@ export default function ChatPage() {
                   <button
  onClick={() => setCont({ kind: "none" })} aria-label={tl("chat", "Start from a blank page instead")}
  title={tl("chat", "Start from a blank page instead")}
- className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+ className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
                   </button>
@@ -1282,7 +1282,7 @@ export default function ChatPage() {
                   )}
                   <button
  onClick={() => setPendingAtt(null)} aria-label={tl("chat", "Remove attachment")}
- className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+ className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background transition-colors hover:bg-foreground"
                   >
                     <X size={11} weight="bold" />
                   </button>
@@ -1306,7 +1306,7 @@ export default function ChatPage() {
               {/* @-mention autocomplete: type "@" then part of a teammate's name or an order
  number/name, and pick one — a person gets notified, an order gets tagged. */}
               {mention && mentionMatches.length > 0 && (
-                <div className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-md overflow-hidden rounded-lg border border-border bg-card ">
                   <div className="border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">{tl("chat", "Mention a teammate or tag an order")}</div>
                   {mentionMatches.map((it, i) => (
                     <button
@@ -1358,7 +1358,7 @@ export default function ChatPage() {
  disabled={signedOut || !activeId || readOnly}
                 // Borderless: the CONTAINER is the control now, so a second border inside it
                 // would draw a box within a box.
- className="h-12 w-full rounded-none border-0 bg-transparent px-3 text-sm shadow-none focus-visible:ring-0"
+ className="h-12 w-full rounded-none border-0 bg-transparent px-3 text-sm focus-visible:ring-0"
               />
             </div>
 
@@ -1403,7 +1403,7 @@ export default function ChatPage() {
                   <>
                     {/* click-away to close */}
                     <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setEmojiOpen(false)} />
-                    <div className="absolute bottom-full left-0 z-20 mb-1 grid w-72 grid-cols-8 gap-0.5 rounded-lg border border-border bg-card p-2 shadow-lg">
+                    <div className="absolute bottom-full left-0 z-20 mb-1 grid w-72 grid-cols-8 gap-0.5 rounded-lg border border-border bg-card p-2 ">
                       {EMOJIS.map((e) => (
                         <button key={e} type="button" onMouseDown={(ev) => { ev.preventDefault(); insertEmoji(e) }}
  className="rounded p-1 text-lg leading-none hover:bg-accent" aria-label={`Insert ${e}`}>{e}</button>

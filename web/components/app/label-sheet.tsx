@@ -125,7 +125,7 @@ export function LabelSheet({
      * .eg-print-card / .eg-print-body), so what prints is unchanged.
      */
     <div className="eg-print-root fixed inset-0 z-50 grid place-items-center overflow-auto bg-black/45 p-4 backdrop-blur-sm">
-      <div className="eg-print-card flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="eg-print-card flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card ">
       {/* THE HEADER SAYS WHAT THIS IS AND HOW TO LEAVE. Close was a button in the middle of a
           wrapping row of selects, which is where nobody looks for it — an X in the corner is
           where every window in the app puts it. */}

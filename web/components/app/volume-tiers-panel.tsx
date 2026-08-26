@@ -184,7 +184,7 @@ export function VolumeTiersPanel() {
                       onChange={(e) => setCell(i, "name", e.target.value)}
                       placeholder={`Tier ${i + 1}`}
                       aria-label={`Name for tier ${i + 1}`}
-                      className="h-8 border-transparent bg-transparent px-2 font-medium shadow-none focus-visible:border-border focus-visible:bg-card"
+                      className="h-8 border-transparent bg-transparent px-2 font-medium focus-visible:border-border focus-visible:bg-card"
                     />
                     <Input
                       value={Number.isFinite(t.minUnits) ? String(t.minUnits) : ""}

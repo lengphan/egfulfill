@@ -236,7 +236,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           // change nothing can tween, which is why the row jumped the moment the listing
           // photo slid behind.
           className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-muted transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
-            + (showBoth && !listingFront ? " z-20 border-2 border-background shadow-md" : " z-0")}
+            + (showBoth && !listingFront ? " z-20 border-2 border-background " : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
           <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
@@ -270,7 +270,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             }}
             title={listingFront ? tl("itemAvatar", "View the buyer's listing photo") : tl("itemAvatar", "Bring the listing photo forward")}
             className={
-              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted shadow-md transition-all hover:brightness-105 " +
+              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted  transition-all hover:brightness-105 " +
               (listingFront ? "z-20" : "z-0")
             }
             // NO `transform` here. Tailwind v4 compiles -translate-y-1/2 to the `translate`
@@ -297,7 +297,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             title={showListing ? tl("itemAvatar", "Show what we'll print") : tl("itemAvatar", "Show the buyer's listing photo")}
             aria-pressed={showListing}
             className={
-              "eg-tap absolute -right-1 -bottom-1 grid size-4 place-items-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-opacity " +
+              "eg-tap absolute -right-1 -bottom-1 grid size-4 place-items-center rounded-full border border-border bg-background text-muted-foreground  transition-opacity " +
               // No hover on touch, so the control has to stay put there.
               (showListing ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover/avatar:opacity-100 sm:focus-visible:opacity-100")
             }

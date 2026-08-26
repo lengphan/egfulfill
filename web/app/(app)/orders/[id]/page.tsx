@@ -787,7 +787,7 @@ export default function OrderDetailPage() {
           />
 
           <div className={detailTab === "items" ? "space-y-5" : "hidden"}>
-          <SectionCard className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0"
+          <SectionCard className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0"
  title={`Items (${items.length})`}
  actions={canAddItem ? (
                   <Button size="sm" variant="outline" onClick={() => void addItem()} disabled={adding}
@@ -1236,7 +1236,7 @@ export default function OrderDetailPage() {
                       )}
                       <button
  onClick={() => setPendingAtt(null)} aria-label="Remove attachment"
- className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background shadow-sm transition-colors hover:bg-foreground"
+ className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground/80 p-0.5 text-background transition-colors hover:bg-foreground"
                       >
                         <X size={10} weight="bold" />
                       </button>
@@ -1302,7 +1302,7 @@ export default function OrderDetailPage() {
               it must not cost a scroll to reach. The rail is already where everything that
               is not an item lives, and it is short enough to keep the note in view. */}
           {isStaff && (
-            <SectionCard title="Factory note" bodyClassName="p-5" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+            <SectionCard title="Factory note" bodyClassName="p-5" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <InternalNote
  hideLabel
                 orderId={order.id}
@@ -1310,7 +1310,7 @@ export default function OrderDetailPage() {
               />
             </SectionCard>
           )}
-          <SectionCard title="Customer" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+          <SectionCard title="Customer" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
             <div className="space-y-3 p-5 text-sm">
               <div>
                 <div className="font-medium">{cust.name || "—"}</div>
@@ -1417,7 +1417,7 @@ export default function OrderDetailPage() {
  label exists on TikTok's side before the number reaches us, and a Shipping card
  that isn't there reads as "nothing has shipped". */}
           {(order.tracking || order.carrier || canFetchTiktokLabel(order)) && (
-            <SectionCard title="Shipping" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+            <SectionCard title="Shipping" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <div className="flex items-start gap-2 p-5 text-sm">
                 <Truck size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
@@ -1491,7 +1491,7 @@ export default function OrderDetailPage() {
             {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
    we'll charge to produce this); once submitted the price is frozen and it
    falls back to the order's own totals. */}
-            <SectionCard title="Summary" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+            <SectionCard title="Summary" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <dl className="space-y-2 p-5 text-sm">
                 {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
    the alternative is a card that looks like an order nobody has priced. */}

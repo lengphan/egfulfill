@@ -597,7 +597,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
           <div
             ref={menuRef}
             style={{ position: "fixed", left: menu.left, top: menu.top, minWidth: Math.max(menu.width, 180), maxWidth: 320 }}
-            className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-xs shadow-lg"
+            className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-xs "
           >
             {shown.map((o) => (
               <button

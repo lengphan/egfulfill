@@ -256,7 +256,7 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
  if (!depth && !err) return null
  if (!depth) {
  return (
-      <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[90vw] rounded-xl border border-alert/30 bg-alert/12 px-3 py-2 text-xs text-alert shadow-lg">
+      <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[90vw] rounded-xl border border-alert/30 bg-alert/12 px-3 py-2 text-xs text-alert ">
         {err}
         <button onClick={() => setErr(null)} className="ml-2 font-semibold underline">{tl("externalLabels", "Dismiss")}</button>
       </div>
@@ -265,7 +265,7 @@ export function PageDropZone({ onStage }: { onStage: (files: File[]) => void }) 
  return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-8 backdrop-blur-sm">
       {/* The SAME card, scaled up and shadowed — the resting one lifting off the page. */}
-      <div className={DROP_CARD + " w-full max-w-lg scale-105 border-primary bg-card/95 shadow-xl"}>
+      <div className={DROP_CARD + " w-full max-w-lg scale-105 border-primary bg-card/95 "}>
         <DropCardBody />
       </div>
     </div>

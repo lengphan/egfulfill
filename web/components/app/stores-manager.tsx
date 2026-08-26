@@ -562,7 +562,7 @@ export function StoresManager() {
  onClick={() => setPending(null)}
         >
           <div
- className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+ className="w-full max-w-md rounded-2xl border border-border bg-card p-5 "
  onClick={(e) => e.stopPropagation()}
           >
             <div className="text-base font-semibold">Import orders from {channelName(pending)}</div>

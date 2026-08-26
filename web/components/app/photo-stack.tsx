@@ -79,7 +79,7 @@ export function PhotoStack({
            * edge in both directions — the ring separates a pale photo from a pale neighbour,
            * the shadow separates a dark one from the page.
            */
-          className={"relative rounded-md shadow-sm ring-1 ring-black/10 " + (i && overlap ? "-ml-2.5" : "")}
+          className={"relative rounded-md ring-1 ring-black/10 " + (i && overlap ? "-ml-2.5" : "")}
           style={{ zIndex: shown.length - i }}
         >
           <ItemAvatar
@@ -96,7 +96,7 @@ export function PhotoStack({
       ))}
       {extra > 0 && showExtra && (
         <span
-          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground shadow-sm ring-1 ring-black/10"}
+          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground  ring-1 ring-black/10"}
           style={{ width: size, height: size }}
         >
           +{extra}

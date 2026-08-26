@@ -165,7 +165,7 @@ function RefTile({ src, i, picked, current, onShow, onToggle }: {
         aria-label={picked ? `Stop using reference photo ${i + 1}` : `Use reference photo ${i + 1}`}
         title={picked ? tl("photoStudio", "Using this one — click to drop it") : tl("photoStudio", "Not used — click to add it")}
         /* Same two states as the grid on the publish page: one ring, filled or not. */
-        className={"absolute -right-1 -top-1 grid place-items-center rounded-full border-2 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
+        className={"absolute -right-1 -top-1 grid place-items-center rounded-full border-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60 " +
           "size-4 " +
           (picked ? "border-white bg-white text-draft" : "border-white/90 bg-black/25 text-transparent hover:bg-black/40")}
       >
@@ -846,7 +846,7 @@ export function ListingPhotoStudio({
                       {/* The SAME mark the reference strip uses, so "this one is feeding the
                           render" looks identical on both sides of the window. */}
                       {usedAsRef.includes(c.url) && (
-                        <span aria-hidden className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-2 border-white bg-white text-draft shadow-sm">
+                        <span aria-hidden className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-2 border-white bg-white text-draft ">
                           <Check size={9} weight="bold" />
                         </span>
                       )}
@@ -976,7 +976,7 @@ export function ListingPhotoStudio({
                         <>
                           {/* Click-away, same as the composer's emoji sheet. */}
                           <button aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setSettingsOpen(false)} />
-                          <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 shadow-lg">
+                          <div className="absolute bottom-full left-0 z-20 mb-1.5 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 ">
                             <div>
                               <div className="mb-1 text-2xs text-muted-foreground">{tl("photoStudio", "Model")}</div>
                               <select value={model} className={selectCls}
@@ -1119,7 +1119,7 @@ export function ListingPhotoStudio({
                               onClick={() => forgetFromHistory(h)}
                               aria-label={tl("photoStudio", "Remove this render from the history")}
                               title={tl("photoStudio", "Remove from history — the photo itself is kept")}
-                              className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full border-2 border-white bg-black/45 text-white shadow-sm outline-none transition-colors hover:bg-destructive focus-visible:ring-2 focus-visible:ring-ring/60"
+                              className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full border-2 border-white bg-black/45 text-white outline-none transition-colors hover:bg-destructive focus-visible:ring-2 focus-visible:ring-ring/60"
                             >
                               <Trash size={10} weight="bold" />
                             </button>

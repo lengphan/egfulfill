@@ -177,7 +177,7 @@ export function EditModeProvider({ initial, children }: { initial: SiteContent; 
           {/* One bar, and it says what state the page is in. A control that toggles between
               "editing" and "not editing" has to show WHICH, or the only way to find out is to
               click something and see whether it turns into a text box. */}
-          <div className="flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-2 shadow-lg backdrop-blur">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-2 backdrop-blur">
             {!on ? (
               <button
                 type="button"
@@ -431,7 +431,7 @@ export function EditableImage({ path, children, transform = true }: {
           and the two landed on top of each other — the figure's own controls were underneath
           the Save button, which is the one place they must not be. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end p-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-1.5 shadow-md backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-1.5 backdrop-blur">
           {/* GENERATE COMES FIRST, because it is the one that does not need you to already
               have a file. Upload is the fallback for a picture that exists. */}
           <button

@@ -220,7 +220,7 @@ export function ProductCombobox({
         <div
           ref={panelRef}
           style={{ position: "fixed", top: 0, left: 0, width: 0 }}
-          className="z-50 overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
+          className="z-50 overflow-hidden rounded-lg border border-border bg-popover "
         >
           <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
             {matches.length === 0 ? (

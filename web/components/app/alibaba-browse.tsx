@@ -190,7 +190,7 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
  const id = String(p.id ?? p.url ?? "")
  const isSaved = saved.has(id)
  return (
-                <div key={id} className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+                <div key={id} className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow ">
                   {/* The photo goes to the product, because that is what a photo in a
  results grid is for — every other shopping surface behaves this way,
  and clicking one here did nothing at all. Same destination as

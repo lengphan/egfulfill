@@ -43,7 +43,7 @@ export function RegionMark({
     // than as the object the region is about. A tile is a white card lifted off the ground:
     // border, faint shadow, dark glyph. That contrast is the whole reason part 1 exists.
     <span className={cn(
-      "grid place-items-center rounded-xl border border-border bg-background text-foreground shadow-xs",
+      "grid place-items-center rounded-xl border border-border bg-background text-foreground ",
       box, className,
     )}>
       {busy ? <CircleNotch size={glyph} className="animate-spin text-muted-foreground" /> : <I size={glyph} />}

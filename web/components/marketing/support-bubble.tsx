@@ -246,7 +246,7 @@ export function SupportBubble() {
       <button
  onClick={() => setOpen(true)}
  aria-label="Ask us a question"
- className="fixed bottom-5 right-5 z-50 flex size-14 items-center justify-center rounded-full text-[var(--mk-accent-ink)] shadow-lg transition-transform hover:scale-105"
+ className="fixed bottom-5 right-5 z-50 flex size-14 items-center justify-center rounded-full text-[var(--mk-accent-ink)] transition-transform hover:scale-105"
  style={{ background: ACCENT }}
       >
         <ChatCircleDots size={26} weight="fill" />
@@ -255,7 +255,7 @@ export function SupportBubble() {
   }
 
  return (
-    <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-[26px] border border-[var(--mk-hairline)] bg-[var(--mk-card)] shadow-2xl">
+    <div className="fixed bottom-5 right-5 z-50 flex h-[30rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-[26px] border border-[var(--mk-hairline)] bg-[var(--mk-card)] ">
       <div className="flex items-center justify-between px-4 py-3 text-[var(--mk-accent-ink)]" style={{ background: ACCENT }}>
         <span className="text-sm font-bold">Ask EGFUL</span>
         <button onClick={() => setOpen(false)} aria-label="Close"><X size={16} weight="bold" /></button>

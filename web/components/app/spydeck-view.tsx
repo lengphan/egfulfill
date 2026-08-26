@@ -192,7 +192,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
  const thin = !p && !l.product
 
  return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow ">
       <div className="relative aspect-square overflow-hidden bg-muted/40">
         {/**
           * THE ZOOM IS NOT CONDITIONAL ON THE THUMBNAIL.
@@ -229,7 +229,7 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
         {/* State, not a "trending" flag — the one thing you open this tab to check. Every
  publish lands as a DRAFT; the seller activates it on the marketplace. */}
         <span className={
-          "absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 eg-label text-white shadow-sm " +
+          "absolute left-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 eg-label text-white  " +
           (live ? "bg-shipped" : "bg-hold")
         }>
           {live ? <><CheckCircle size={11} weight="fill" /> Live</> : <>Draft</>}
@@ -386,12 +386,12 @@ const UploadedCard = memo(function UploadedCard({ l, onRemove, onEdit }: { l: Up
                   <>
                     <button type="button" aria-label="Previous photo"
  onClick={() => setShot((i) => (i - 1 + gallery.length) % gallery.length)}
- className="eg-tap absolute left-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background/85 text-foreground shadow-sm transition-colors hover:bg-background">
+ className="eg-tap absolute left-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background">
                       <CaretLeft size={14} weight="bold" />
                     </button>
                     <button type="button" aria-label="Next photo"
  onClick={() => setShot((i) => (i + 1) % gallery.length)}
- className="eg-tap absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background/85 text-foreground shadow-sm transition-colors hover:bg-background">
+ className="eg-tap absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background/85 text-foreground transition-colors hover:bg-background">
                       <CaretRight size={14} weight="bold" />
                     </button>
                     <span className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-2xs font-medium text-white">
@@ -469,7 +469,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
  try { await navigator.clipboard.writeText(tags.join(", ")); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
   }
  return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow ">
       <button
  type="button"
  onClick={(ev) => { ev.preventDefault(); onToggleSave(l, saved) }}
@@ -494,7 +494,7 @@ export const ResultCard = memo(function ResultCard({ l, saved, uploaded, opening
             <div className="flex size-full items-center justify-center text-muted-foreground"><Binoculars size={22} weight="duotone" /></div>
           )}
           {trending && (
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 eg-label text-white shadow-sm">
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 eg-label text-white ">
               <TrendUp size={11} weight="bold" /> Trending
             </span>
           )}
