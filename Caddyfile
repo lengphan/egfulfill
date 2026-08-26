@@ -96,7 +96,17 @@ egful.store {
 	# full architecture doc. Markdown at the root is blocked too — CLAUDE.md is only
 	# absent today because it's gitignored, so it would go public the moment anyone
 	# commits it, which is not a safe thing to depend on.
-	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /tools /tools/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md
+	#
+	# /images CANNOT be blocked wholesale — the legacy static pages (index.html,
+	# products-dash.html, admin.html, warehouse.html) genuinely serve their photos
+	# from there, so a blanket rule would break production pages that §2.7 freezes.
+	# What IS blocked is every file type that is never a web asset: a shipping label
+	# PDF (a real buyer's address), a supplier catalogue, a customer's .PES/.DST
+	# embroidery file. images/SS-Activewear-logo.png and images/otto-updatedlogo_0.png
+	# were tracked and returning 200 on the live apex — they name S&S and Otto Cap
+	# outright, which is exactly the §2.9 disclosure that must never be reachable.
+	# They are named individually because .png cannot be blocked by extension here.
+	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /tools /tools/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md /images/*.pdf /images/*.PDF /images/*.pes /images/*.PES /images/*.dst /images/*.DST /images/*.emb /images/*.EMB /images/SS-Activewear-logo.png /images/otto-updatedlogo_0.png
 	handle @hidden {
 		respond 404
 	}

@@ -39,3 +39,23 @@ agent-memory/
 # Vercel project link — contains org/project IDs, and a stray one in a subfolder
 # can re-point a deploy at the wrong directory.
 .vercel/
+
+# ── images/ is served PUBLICLY (Caddy's webroot is the repo; §2.5) ──
+# The legacy static pages genuinely need images/*.jpg|png|webp, so the directory
+# cannot be blocked wholesale. But nothing there is ever legitimately a document:
+# a shipping label (real buyer address), a supplier catalogue, or a customer's
+# embroidery file has no reason to be reachable from a browser.
+# images/SS-Activewear-logo.png, images/otto-updatedlogo_0.png and a real USPS
+# label PDF were tracked, deployed and returning 200 on the live apex — the first
+# two name our suppliers outright, which is the §2.9 breach this blocks.
+# Caddy 404s these extensions too; this is the half that stops them re-deploying.
+images/*.pdf
+images/*.PDF
+images/*.pes
+images/*.PES
+images/*.dst
+images/*.DST
+images/*.emb
+images/*.EMB
+images/SS-Activewear-logo.png
+images/otto-updatedlogo_0.png
