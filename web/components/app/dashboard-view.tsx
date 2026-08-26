@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Sparkle, Warning, House, Receipt, CurrencyDollar, Package, Wallet } from "@phosphor-icons/react"
+import { GetStarted } from "@/components/app/get-started"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -137,6 +138,7 @@ export function DashboardView() {
         </div>
       </div>
 
+      <GetStarted orders={orders === null ? null : orders.length} balance={balance} />
       {/* Labels and captions translate; the VALUES stay USD in every locale (see `usd`). */}
       <StatGrid>
         <StatCard label={cl("kpi", "Orders (30d)")} value={orders === null ? "—" : String(stats.count30)} sub={cl("kpisub", "last 30 days")} icon={Receipt} />
