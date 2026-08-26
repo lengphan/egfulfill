@@ -181,12 +181,31 @@ exists to protect.
 `api.egful.store` exists so the browser can POST 60MB base64 print files **directly**,
 bypassing Vercel's ~4.5MB proxy body limit. The apex `A` record → the VPS is load-bearing.
 
-### The VPS is `82.25.92.217` (moved 2026-07-31)
+### The VPS is `187.52.126.233` — Hostinger, Jakarta (moved 2026-08-26)
 
-The DigitalOcean droplet `68.183.113.72` was **destroyed 2026-08-03** — it could not be
-downsized (DO cannot shrink a disk) and cost $48/mo. Any reference to that IP anywhere is
-stale. Repo lives at `/root/egfulfill`; `ssh root@82.25.92.217` with the key already on
-the MacBook.
+**`82.25.92.217` was DELETED on 2026-08-26** and `68.183.113.72` before it, on 2026-08-03.
+Any reference to either IP anywhere is stale. Repo lives at `/root/egfulfill`;
+`ssh root@187.52.126.233` with the key already on the MacBook.
+
+**The 2026-08-26 deletion took the whole stack with it**, and the recovery is written up in
+[docs/DISASTER-RECOVERY.md](docs/DISASTER-RECOVERY.md) — read it before touching this box in
+anger. What the day established, so it is not re-learned:
+
+- **The data survived only because a nightly `pg_dump` to R2 happened to be working**, and
+  nothing would have told anyone if it had not. A guard now runs daily at 07:30 UTC
+  (`/root/backup-guard.sh`) that DOWNLOADS the newest dump and runs `pg_restore -l` on it —
+  existence is not integrity — and mails on failure only.
+- **`.env` did not survive, and `app_secrets` did.** Ten integration keys came back inside the
+  dump because someone had entered them in Settings › Integrations; the twenty in `.env` were
+  re-fetched by hand from ten dashboards. **Put a key in the UI whenever the UI has a field.**
+  `/root/env-backup.sh` now ships an AES-256 copy of `.env` to R2 on every change, with the
+  passphrase deliberately NOT on the server.
+- **A seller's OAuth token surviving is not the same as being able to refresh it.**
+  `platform_connections` is inside the dump, so orders keep syncing — but a refresh needs OUR
+  app credentials, so Etsy/Shopify/TikTok keys must be re-added promptly or the connection
+  dies quietly at renewal.
+- The R2 bucket is **`egfulfill-files`** (hyphen — S3 rejects underscores, and says so only in
+  the response body). Dumps are at `backups/db/`, the encrypted env at `backups/env/`.
 
 ```bash
 # VPS — full stack; server/db/schema.sql loads on FIRST init only
