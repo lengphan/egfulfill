@@ -822,7 +822,7 @@ export default function OrderDetailPage() {
  const unit = qLine ? Number(qLine.unitCost) || 0
  : Number(it.unit_cost ?? 0) || Number(it.unit_price) || 0
  return (
-                    <div key={i} className="relative flex flex-wrap items-start gap-4 px-5 py-4">
+                    <div key={i} className="relative flex flex-wrap items-start gap-4 overflow-hidden px-5 py-4">
                       {/* The line's number, where the eye lands last — same number the drop
  zone's targets carry. */}
                       <span className="absolute bottom-3 right-4 flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1}`}>
@@ -836,7 +836,7 @@ export default function OrderDetailPage() {
  digitiser sent or from Wilcom. Staff only: the render route is
  requireStaff, and a seller is looking at their own product, not at
  our production check. */}
-                      <div className="flex shrink-0 items-start gap-2">
+                      <div className="-my-4 -ml-5 flex shrink-0 items-center justify-center self-stretch bg-foreground px-4 py-4">
                       <div className="relative shrink-0">
                         {/* The line's files, on the corner of its own picture — see
                             LineDownloads for why they are not a link under the text. */}
@@ -853,6 +853,8 @@ export default function OrderDetailPage() {
                           // At 144 the composite (blank + placed artwork) is legible without
                           // opening the preview.
  size={144}
+ bare
+ className="rounded-none"
  onEdit={() => setCustomize(it)}
                         />
                         {artwork && (
