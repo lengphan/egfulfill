@@ -104,26 +104,91 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
+  /* ── NO SHADOWS, ENFORCED AT THE TOKEN (Workshop, 2026-08-26) ───────────────
+   *
+   * The direction has exactly one depth model: parchment → white → dark. A change of
+   * background value IS the elevation, and a blur under a card is the thing that makes a
+   * flat palette look like a bootstrap theme.
+   *
+   * There were 88 `shadow-*` utilities across 43 files. Sweeping them by hand would have
+   * been 43 diffs, every one of them an opportunity to break a layout, and it would not have
+   * stopped the 89th being written next week. Redefining the scale to `none` makes every
+   * existing call site a no-op and every future one inert — the rule enforces itself, which
+   * is the only kind of rule that survives.
+   *
+   * The classes are intentionally left in the components. They are harmless now, they make
+   * this one line reversible, and deleting 88 of them is a mechanical cleanup that should
+   * ride along with whatever else touches those files rather than being its own risk.
+   *
+   * IF SOMETHING NEEDS TO SEPARATE: change what it sits on, or give it the stone hairline.
+   * A dialog separates from the page with a scrim (#14140F at 40%), never a shadow. */
+    --shadow-2xs: none;
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+    --shadow-2xl: none;
+    --shadow-inner: none;
+
+  /* FLATTENED ON PURPOSE (Workshop, 2026-08-26).
+   *
+   * These were seven derived steps off one base. That is a sensible scale for a system whose
+   * radius is incidental, and the wrong shape entirely for one where the radius IS the
+   * identity: `rounded-sm` through `rounded-4xl` gave any file seven legal answers to "how
+   * round is this box", which is how 490 outlined cards ended up at radii nobody chose.
+   *
+   * Every step now resolves to the same 26px, so the utility a developer reaches for stops
+   * mattering — `rounded-lg` and `rounded-2xl` are the same box, and the shape stays one
+   * decision made here. `rounded-full` is untouched: it is Tailwind's own 9999px and remains
+   * correct for the things that are genuinely round (avatars, count dots, icon buttons).
+   *
+   * `rounded-badge` is the single exception the direction allows — the chip is the one
+   * element SQUARER than a button, which is what now distinguishes it. */
+    --radius-sm: var(--radius);
+    --radius-md: var(--radius);
     --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-xl: var(--radius);
+    --radius-2xl: var(--radius);
+    --radius-3xl: var(--radius);
+    --radius-4xl: var(--radius);
+    --radius-badge: var(--radius-badge);
 }
 
 :root {
-    /* Modern NEUTRAL base (true grey, chroma 0) + one violet accent that pops (Stripe-inspired). */
-    /* PAPER, not a tinted canvas. A periwinkle page behind a dense queue is a coloured sheet
-     * you have to read THROUGH all day — the tint that gave cards their edge also sat under
-     * every row and strained to look at. The colour moves to the SIDEBAR instead: one bounded
-     * block that's pleasant in the corner of your eye and never underneath the data. Cards
-     * keep their separation from a slightly firmer border rather than from a tinted backdrop. */
-  /* ── INK AND ONE SIGNAL ─────────────────────────────────────────────────────
-   * The chrome carries NO hue. Every neutral below is chroma 0 — background, card,
-   * muted, secondary, border, input — which is what lets a single accent read as a
-   * decision rather than as one colour among several.
+  /* ── WORKSHOP · WARM NEUTRALS ON PARCHMENT (2026-08-26) ──────────────────────
+   *
+   * READ THIS BEFORE CHANGING A VALUE BELOW. The two notes that used to sit here — "every
+   * neutral is chroma 0" and "PAPER, not a tinted canvas, the colour moves to the SIDEBAR"
+   * — described the palette this replaces. Both are now false, and both are kept in the
+   * paragraph below rather than deleted, because each was written for a real reason and the
+   * reasons still deserve an answer.
+   *
+   * WHAT CHANGED, AND THE ANSWER TO WHY IT WAS FORBIDDEN BEFORE:
+   *
+   * 1. The canvas IS tinted now — #F5F5EB, hue 106.6. The old rule was written about a
+   *    PERIWINKLE canvas: a chromatic sheet you read a 700-row queue through all day. This
+   *    is a near-neutral at chroma 0.013 and 96.7% lightness — a 4% step off white, not a
+   *    colour. It is what lets a white card lift with no shadow, which is the whole depth
+   *    model. It is still the reversal with the most risk: WATCH IT ON THE DENSE BOARDS,
+   *    and if it strains there, the fix is to lighten the canvas, never to add a shadow.
+   *
+   * 2. The sidebar is no longer the page — it is the DARK BLOCK, #14140F, with parchment
+   *    lettering and a lime active row. The old note moved colour out of the panel because a
+   *    full-height block of brand hue dated the app fastest. That still holds and this obeys
+   *    it: the block carries no hue at all, and the one chromatic thing on screen is the
+   *    single selected row.
+   *
+   * 3. Neutrals are warm, hue ~106.7, converted from the locked hexes rather than nudged.
+   *    "No cool grey anywhere" is a hard rule of the direction: a cool border over a warm
+   *    ground is the specific thing that reads as an unconsidered palette.
+   *
+   * Contrast was measured, not assumed — ink on parchment 16.84:1, graphite on parchment
+   * 4.69:1, --input edge 3.38:1 on parchment and 3.71:1 on card (the 3:1 control floor),
+   * lime 1.09:1 as text on parchment, which is why lime can only ever be a FILL.
+   *
+   * The single accent argument below is unchanged and still the reason this works:
    *
    * It replaces a palette that pulled three ways at once: surfaces at chroma 0, muted
    * and secondary warm at hue 91 (yellow), accent cool at hue 285. A grey fill, a tinted
@@ -143,12 +208,12 @@
    * White on it measures 6.02:1 and it measures 5.82:1 as text on the page, so both of
    * --primary's jobs — 210 fills and 281 pieces of text — clear AA on the same value.
    * ── */
-    --background: oklch(0.988 0 0);
-    --foreground: oklch(0.145 0 0);
+    --background: oklch(0.9674 0.0132 106.64);
+    --foreground: oklch(0.1893 0.0098 107.30);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    --card-foreground: oklch(0.1893 0.0098 107.30);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
+    --popover-foreground: oklch(0.1893 0.0098 107.30);
   /* BRAND GREEN — the marketing accent, brought into the app.
    *
    * TWO tokens, because --primary does two jobs here: it fills 206 buttons AND inks 247
@@ -193,12 +258,12 @@
    * The CANVAS stays white on purpose. A tinted page behind a 700-row queue is a sheet you
    * read THROUGH all day; the warmth belongs to the bounded surfaces, not underneath the
    * data. */
-    --secondary: oklch(0.965 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.965 0 0);
-    --muted-foreground: oklch(0.545 0 0);
-    --accent: oklch(0.962 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.9491 0.0146 106.67);
+    --secondary-foreground: oklch(0.1893 0.0098 107.30);
+    --muted: oklch(0.9491 0.0146 106.67);
+    --muted-foreground: oklch(0.5352 0.0152 106.90);
+    --accent: oklch(0.9491 0.0146 106.67);
+    --accent-foreground: oklch(0.1893 0.0098 107.30);
   /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-shipped` was used in 56 places
    * as the "positive" signal — and being a hardcoded shade it had no dark variant, so it
    * measured 3.77:1 on the light card and 4.06:1 on the dark one. It failed the 4.5:1 body
@@ -263,9 +328,9 @@
  band. Contrast is the thing that makes a line look thin; the width was never the
  problem. Dark mode is left alone — its border shares hue 285 with its own surface,
  which is the same rule, already satisfied. */
-    --border: oklch(0.905 0 0);
-    --input: oklch(0.928 0 0);
-    --ring: oklch(0.38 0 0);
+    --border: oklch(0.8610 0.0136 106.68);
+    --input: oklch(0.6152 0.0164 98.43);
+    --ring: oklch(0.9247 0.2090 127.77);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
    * every one clears 3:1 against the chart surface. Amber and green are deliberately not
@@ -278,7 +343,20 @@
     --chart-3: oklch(0.6449 0.1198 224.9); /* teal    #0E9CC4 */
     --chart-4: oklch(0.5839 0.1981 358.4); /* magenta #D0357A */
     --chart-5: oklch(0.4707 0.1254 139.7); /* green   #2F6B1F */
-    --radius: 0.625rem;
+  /* ── ONE RADIUS (Workshop, 2026-08-26) ──────────────────────────────────────
+   * 26px on everything bounded — cards, buttons, inputs, image frames, dialogs. It was
+   * 10px, which is the value every shadcn app in the world ships and therefore says
+   * nothing. A single conspicuous radius IS the shape language here, so this is not a
+   * taste tweak: soften it back toward 12–16px "to be safe" and the direction collapses.
+   *
+   * The derived scale below it is deliberately FLATTENED. Multiplying 26px by 0.6/0.8/1.4
+   * would reintroduce four more radii through the back door — exactly the drift the single
+   * value exists to stop — so sm/md/lg all resolve to the same 26px and only the badge step
+   * differs. Badges are the ONE thing squarer than a button now; see --radius-badge.
+   *
+   * Table rows, dividers and inline links never take a radius at all. */
+    --radius: 1.625rem;
+    --radius-badge: 0.5rem;
   /* THE NAV IS THE PAGE. The sidebar takes the background colour and separates with a
    * border alone — a coloured panel beside white content is a second surface competing
    * with the data, and a full-height block of brand hue is the single thing that dated the
@@ -295,14 +373,14 @@
    *
    * Selected = the violet block with the cream green on it, 5.07:1. Same pair as the hero,
    * so "you are here" in the app is the same gesture as the accent phrase on the site. */
-    --sidebar: oklch(0.968 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.175 0 0);
-    --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(0.925 0 0);
-    --sidebar-accent-foreground: oklch(0.145 0 0);
-    --sidebar-border: oklch(0.895 0 0);
-    --sidebar-ring: oklch(0.38 0 0);
+    --sidebar: oklch(0.1893 0.0098 107.30);
+    --sidebar-foreground: oklch(0.9674 0.0132 106.64);
+    --sidebar-primary: oklch(0.9247 0.2090 127.77);
+    --sidebar-primary-foreground: oklch(0.1893 0.0098 107.30);
+    --sidebar-accent: oklch(0.2600 0.0110 107.00);
+    --sidebar-accent-foreground: oklch(0.9674 0.0132 106.64);
+    --sidebar-border: oklch(0.2600 0.0110 107.00);
+    --sidebar-ring: oklch(0.9247 0.2090 127.77);
 }
 
 .dark {
@@ -465,8 +543,11 @@
   [data-face="grotesk"] .font-display {
     font-family: var(--font-grotesk);
   }
+  /* Its own variable now, not --font-sans. The body stack moved to Plus Jakarta Sans on
+     2026-08-26, so pointing this at --font-sans would have made the "inter" option render
+     Jakarta — a picker with two entries that do the same thing. */
   [data-face="inter"] .font-display {
-    font-family: var(--font-sans);
+    font-family: var(--font-inter);
   }
 }
 
@@ -938,7 +1019,64 @@ td[align="right"] {
  * 1.1:1 and simply disappears. That constraint is unchanged from the violet era; what
  * changed is the plate it sits on.
  */
+/* ── WORKSHOP · THE HOUSE STYLE (locked 2026-08-26) ───────────────────────────
+ *
+ * Parchment page, white card, near-black block, one lime. Chosen from three researched
+ * directions; primary reference TravelPerk, catalogue treatment from Portrait.
+ *
+ * IT IS THE `:root` DEFAULT, which is deliberate and is also what keeps this a front-end
+ * change: a skin an admin can PICK has to be allow-listed by the server (branding.js), but
+ * the value that applies when nothing is stored is decided here. To put Workshop in the
+ * Settings › Branding picker, add the key to that allow-list — one entry, no logic.
+ *
+ * Measured, not asserted:
+ *   ink on parchment 16.84:1 · ink on card 18.47:1 · ink on lime 15.49:1
+ *   graphite on parchment 4.69:1 · auth-edge on parchment 3.38:1 (3:1 control floor)
+ *   lime as text on parchment 1.09:1 — which is the proof it can only ever be a FILL.
+ *
+ * THE RULES THIS PALETTE ONLY WORKS UNDER:
+ *   · One lime element per viewport. Never two adjacent, never lettering.
+ *   · No shadow at any level — elevation is parchment → white → dark, nothing else.
+ *   · No cool grey. Every neutral here sits at hue ~106.7.
+ */
 :root,
+[data-skin="workshop"] {
+  --mk-surface: #F5F5EB;
+  --mk-ink: #14140F;
+  /* THE PLATE IS THE DARK BLOCK, NOT THE LIME — and the gate is why that is written down.
+
+     The first draft of this skin set the plate to lime and the acid to lime as well, which
+     measured 1.00:1 for "the accent on the plate": the same colour twice, an accent that
+     cannot be seen. check-skins.mjs failed it before a single pixel rendered.
+
+     The fix is not a different acid, it is the right plate. In this direction lime is the
+     ONE bright thing and it is always carried BY a surface — a CTA fill, a highlight chip,
+     a selected row. The full-bleed emphasis band is the near-black block, and the light/dark
+     alternation between that block and the parchment page IS the page rhythm. So the plate
+     is #14140F, everything on it is parchment or lime, and lime never has to sit on itself. */
+  --mk-accent: #14140F;
+  --mk-accent-ink: #F5F5EB;
+  --mk-plate-accent: #BEFF50;
+  --mk-acid: #BEFF50;
+  /* Auth fields are WHITE on the parchment page, so the field's own fill separates it and
+     the edge only has to be findable. #87857A measures 3.38:1 here — over the 3:1 floor,
+     and deliberately not lighter. */
+  --mk-auth-field: #FFFFFF;
+  --mk-auth-edge: #87857A;
+  --mk-auth-muted: #6E6E64;
+  /* Stone. A card's rule, not a control's — no floor, and quiet enough that a white card on
+     parchment usually needs no border at all. */
+  --mk-hairline: #D2D2C8;
+  --mk-card: #FFFFFF;
+  /* The app's large-fill brand IS the marketing plate, so the product and the site are one
+     decision. Lime fills; it never inks. --primary stays near-black for that job. */
+  --brand: oklch(0.9247 0.2090 127.77);
+  --brand-foreground: oklch(0.1893 0.0098 107.30);
+}
+
+/* ── STUDIO · ink on white, the default until 2026-08-26 ──────────────────────
+ * Kept and still measured. It is no longer the house style, but a picker with one option
+ * is not a picker — and this palette is contrast-checked and working. */
 [data-skin="studio"] {
   --mk-surface: #FFFFFF;
   --mk-ink: #0A0A0A;

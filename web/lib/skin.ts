@@ -26,9 +26,10 @@
  *
  * Gate: `node tools/check-skins.mjs`.
  */
-export type SkinKey = "studio" | "press"
+export type SkinKey = "workshop" | "studio" | "press"
 
 export const SKINS: { key: SkinKey; label: string; what: string }[] = [
+  { key: "workshop", label: "Workshop", what: "Parchment page, white cards, one lime. The house style." },
   { key: "studio", label: "Studio", what: "Ink on white. One bright accent." },
   { key: "press", label: "Press", what: "Violet plate over warm paper." },
 ]
@@ -45,12 +46,13 @@ export const SKINS: { key: SkinKey; label: string; what: string }[] = [
  * Mirrors FACES in server/src/routes/branding.js — that file is the allow-list, this is the
  * label. Adding one means a next/font call in app/layout.tsx and a line in globals.css too.
  */
-export type FaceKey = "inter" | "outfit" | "grotesk"
+export type FaceKey = "sans" | "inter" | "outfit" | "grotesk"
 
 export const FACES: { key: FaceKey; label: string; what: string }[] = [
-  { key: "outfit", label: "Outfit", what: "Wide, geometric. The default." },
+  { key: "sans", label: "Plus Jakarta Sans", what: "The body stack. One face everywhere — the default." },
+  { key: "outfit", label: "Outfit", what: "Wide, geometric. A second alphabet on the public pages." },
   { key: "grotesk", label: "Space Grotesk", what: "Narrower, more technical." },
-  { key: "inter", label: "Inter", what: "The body sans, set heavier. One face everywhere." },
+  { key: "inter", label: "Inter", what: "The body sans until 2026-08-26." },
 ]
 
 const STORE_KEY = "eg_skin"

@@ -137,7 +137,7 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
             <EditableText path="featuresPage.cta.heading">{p.cta.heading}</EditableText>
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="ink"><EditableText path="featuresPage.cta.button">{p.cta.button}</EditableText></Pill>
+            <Pill href="/signup" tone="primary"><EditableText path="featuresPage.cta.button">{p.cta.button}</EditableText></Pill>
           </div>
         </Rise>
       </section>

@@ -184,7 +184,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
             <EditableText path="howPage.cta.heading">{p.cta.heading}</EditableText>
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="ink"><EditableText path="howPage.cta.button">{p.cta.button}</EditableText></Pill>
+            <Pill href="/signup" tone="primary"><EditableText path="howPage.cta.button">{p.cta.button}</EditableText></Pill>
           </div>
         </Rise>
       </section>

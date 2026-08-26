@@ -51,8 +51,11 @@ const DEFAULT_ACCENT = 'rose';
  * the floor's status vocabulary, or --pop. Adding one means adding it to globals.css AND
  * here, then running `node tools/check-skins.mjs`.
  */
-const SKINS = ['studio', 'press'];
-const DEFAULT_SKIN = 'studio';
+// `workshop` is the house style locked 2026-08-26 — parchment page, white cards, one lime.
+// It is FIRST because it is also DEFAULT_SKIN. `studio` and `press` are kept: both are
+// contrast-checked palettes and a picker with one option is not a picker.
+const SKINS = ['workshop', 'studio', 'press'];
+const DEFAULT_SKIN = 'workshop';
 
 /**
  * THE DISPLAY FACE — on exactly the terms the skin and the accent already run on.
@@ -75,8 +78,11 @@ const DEFAULT_SKIN = 'studio';
  * selector), AND here. There is no gate to run: a typeface has no contrast to measure, which
  * is exactly why it can be a free-ish choice where a colour cannot.
  */
-const FACES = ['inter', 'outfit', 'grotesk'];
-const DEFAULT_FACE = 'outfit';
+// `sans` means NO override: `font-display` falls through to the body stack, which is Plus
+// Jakarta Sans since 2026-08-26. It needs no rule in globals.css, and that is the point —
+// ONE FACE is the house rule, so the default has to be the absence of a second one.
+const FACES = ['sans', 'inter', 'outfit', 'grotesk'];
+const DEFAULT_FACE = 'sans';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_FAVICON = path.join(HERE, '..', 'assets', 'default-favicon.png');
 

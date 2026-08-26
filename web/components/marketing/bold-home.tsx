@@ -123,7 +123,14 @@ export function BoldHome({ content }: { content: SiteContent }) {
               {/* Filled, then outlined with the ring. Two buttons of identical shape read as
                   one control repeated; the ring separates "the thing to do" from "the thing
                   to read first". */}
-              <Pill href="/signup" tone="accent"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
+              {/* PRIMARY, not `accent`. The hero's main action was an ink fill carrying a lime
+                  label; under Workshop the loudest control on the page is the lime ground with
+                  ink on it, which is the same pair the header CTA now runs.
+                  Both being lime is deliberate: they are the SAME action — "start free" —
+                  duplicated for reach, so they read as one decision repeated rather than as
+                  two accents competing. Two lime elements offering DIFFERENT actions would
+                  break the one-per-viewport rule; this does not. */}
+              <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
               <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
             </motion.div>
 

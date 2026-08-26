@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { SURFACE, ACCENT, ACID } from "@/components/marketing/bold-kit"
+import { SURFACE, ACID, INK } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -76,11 +76,20 @@ export function SiteHeader() {
               </Link>
               <Link
                 href="/signup"
-                // Violet fill, lime label — the one loud thing in the bar, and the same pair
-                // the app's primary button uses. Acid alone cannot work here: on paper it is
-                // 1.05:1 and the button would have no shape at all.
-                className="rounded-full px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
-                style={{ background: ACCENT, color: ACID }}
+                /* LIME FILL, INK LABEL — inverted 2026-08-26.
+                 *
+                 * It was ink fill with a lime label, and the note under it argued acid could
+                 * not be the fill because "on paper it is 1.05:1 and the button would have no
+                 * shape at all". That was measured against the old white page, and it was
+                 * right then. Two things changed: the page is parchment, and the button now
+                 * carries a 1px ink border, so its shape comes from the border rather than
+                 * from the fill needing to out-contrast the page.
+                 *
+                 * This is the direction's rule, not a preference: lime is a GROUND CARRYING
+                 * INK and never lettering. Ink on lime measures 15.49:1 — louder as a button
+                 * and more readable as a label than the pair it replaces. */
+                className="rounded-full border border-[var(--mk-ink)] px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
+                style={{ background: ACID, color: INK }}
               >
                 Start free
               </Link>

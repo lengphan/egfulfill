@@ -527,7 +527,7 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
             Pick a blank, upload art, ship it.
           </h2>
           <div className="mt-8 flex justify-center">
-            <Pill href="/signup" tone="ink">Start free</Pill>
+            <Pill href="/signup" tone="primary">Start free</Pill>
           </div>
         </Rise>
       </section>

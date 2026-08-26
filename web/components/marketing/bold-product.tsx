@@ -489,7 +489,7 @@ export function BoldProduct({ product, shipping }: {
             )}
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Pill href="/signup" tone="ink">Start free</Pill>
+              <Pill href="/signup" tone="primary">Start free</Pill>
               <Pill href="/pricing" tone="ghost">See pricing</Pill>
             </div>
             <p className="mt-4 text-sm leading-relaxed text-black/50">

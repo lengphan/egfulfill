@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Outfit, Space_Grotesk } from "next/font/google"
+import { Geist_Mono, Inter, Outfit, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,7 +7,31 @@ import { LanguageProvider } from "@/lib/i18n"
 import { SITE_URL } from "@/lib/site-url"
 import { cn } from "@/lib/utils"
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+/**
+ * THE FACE, AND WHY IT IS NOT INTER ANY MORE (2026-08-26).
+ *
+ * The Workshop direction asks for a high x-height grotesque with rounded terminals — Inter
+ * has the x-height and none of the roundness, which is exactly why the pages read as a
+ * template rather than as a brand. One face still runs the whole product; only which face
+ * changed.
+ *
+ * VIETNAMESE IS THE BINDING CONSTRAINT, not taste. The app ships ~3,460 translated keys and
+ * a seller reads `ế ộ ữ ằ` all day, so a face without the `vietnamese` subset is disqualified
+ * however well it sets English. That rules out most of the obvious candidates — Figtree,
+ * Outfit, DM Sans and Onest all stop at latin-ext, and latin-ext skips U+1EA0–1EF1 where
+ * most Vietnamese precomposed characters live. The browser then falls back mid-sentence,
+ * which is the "some words look different" bug nobody can ever point at.
+ *
+ * Plus Jakarta Sans carries `vietnamese`, is variable across 200–800, and has the tabular
+ * figures the queues need. `@expo-google-fonts/plus-jakarta-sans` exists, so the phone can
+ * follow with a package rather than a hand-bundled .ttf — which is what keeps ONE FACE true
+ * across both front-ends rather than true only on the web.
+ *
+ * Inter stays LOADED but no longer default: `data-face="inter"` is still an option an admin
+ * can pick in Settings › Branding, and removing the family would have broken that picker.
+ */
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin", "vietnamese"], variable: "--font-sans" })
+const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" })
 
 /**
  * A SECOND FACE, AND ITS SCOPE IS THE POINT.
@@ -121,7 +145,15 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, outfit.variable, grotesk.variable)}
+      className={cn(
+        "antialiased",
+        fontMono.variable,
+        "font-sans",
+        jakarta.variable,
+        inter.variable,
+        outfit.variable,
+        grotesk.variable,
+      )}
     >
       <body>
         {/* Zoom, applied BEFORE first paint.

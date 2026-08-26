@@ -353,8 +353,8 @@ export function TypedPhrase({ text, color = ACCENT_INK, lastWordColor }: { text:
 
 /** Pill button. The arrow travels on hover — a 200ms cue that the thing goes somewhere,
  *  which is the whole reason the arrow is there. */
-export function Pill({ href, children, tone = "ink", ring = false, className = "" }: {
-  href: string; children: React.ReactNode; tone?: "ink" | "accent" | "acid" | "ghost" | "ghostLight"
+export function Pill({ href, children, tone = "primary", ring = false, className = "" }: {
+  href: string; children: React.ReactNode; tone?: "primary" | "accent" | "acid" | "ghost" | "ghostLight"
   /**
    * THE ARROW IN A RING — the board's third pill.
    *
@@ -368,11 +368,18 @@ export function Pill({ href, children, tone = "ink", ring = false, className = "
 }) {
   const base = "group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
   const tones = {
-    // ACID (#D4F897) lettering, not cream. The ink pill is the CTA on every marketing page,
-    // and a black-on-violet box with cream type was the one place the accent went missing —
-    // the green now carries the label and the arrow, tying the button to the plate it sits
-    // on. 16.56:1 on the ink ground, so it is louder AND more readable than the cream was.
-    ink: "bg-[var(--mk-ink)] text-[var(--mk-acid)] hover:bg-[color-mix(in_oklch,var(--mk-ink)_86%,white)] focus-visible:ring-[var(--mk-ink)]",
+    /* THE PRIMARY CTA — lime ground, ink label, ink border. Inverted 2026-08-26.
+     *
+     * This tone was `ink`: an ink fill carrying an acid label, chosen when the page was white
+     * and a lime fill would have had no shape against it. The page is parchment now and the
+     * button carries a 1px ink border, so the shape comes from the border and the fill is free
+     * to be the loud one.
+     *
+     * The direction's rule is that lime is a GROUND CARRYING INK and is never lettering. Ink
+     * on lime is 15.49:1, so this is both louder as a control and more readable as a label.
+     * The KEY was renamed with the value — a tone called `ink` that renders lime is the kind
+     * of quiet lie the palette gate exists to catch. */
+    primary: "border border-[var(--mk-ink)] text-[var(--mk-ink)] hover:brightness-95 focus-visible:ring-[var(--mk-ink)]",
     // Violet fill, LIME label — the same action pair as the app's default button and the
     // selected nav item. It used to be violet with INK on it, which measures 2.75:1 and
     // fails outright; the tone was unused, so it shipped broken rather than being noticed.
@@ -386,7 +393,7 @@ export function Pill({ href, children, tone = "ink", ring = false, className = "
     ghostLight: "border border-[var(--mk-accent-ink)]/30 text-[var(--mk-accent-ink)] hover:border-[var(--mk-accent-ink)]/60 hover:bg-[var(--mk-accent-ink)]/10 focus-visible:ring-[var(--mk-accent-ink)]",
   }
   return (
-    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "accent" ? { background: ACCENT } : tone === "acid" ? { background: ACID } : undefined}>
+    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "primary" || tone === "acid" ? { background: ACID } : tone === "accent" ? { background: ACCENT } : undefined}>
       {children}
       {ring ? (
         /* -mr-2.5 pulls the ring back into the pill's own padding: a 28px circle inside a
