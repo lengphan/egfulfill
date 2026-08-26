@@ -14,7 +14,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -1532,19 +1532,34 @@ export function OrdersHub() {
   // back and forth is free and the expansion effect skips whatever this already loaded.
  const pageIds = paged.pageItems.map((o) => o.id).join(",")
  const designsRef = useRef<Record<string, boolean>>({})
- const loadDesigns = useCallback((oid: string) => {
- if (designsRef.current[oid]) return
- designsRef.current[oid] = true
- getOrderDesigns(oid).then((r) => {
- const list = Array.isArray(r) ? r : (r?.designs ?? [])
- const bySku: Record<string, OrderDesign> = {}
-      Object.assign(bySku, indexDesigns(list))
- setDesigns((p) => ({ ...p, [oid]: bySku }))
-    }).catch(() => {})
+ /**
+  * ONE REQUEST FOR THE WHOLE PAGE, not one per row.
+  *
+  * This fired /api/orders/:id/designs per order — fifty round trips to paint fifty rows.
+  * The queries were never the cost: each answers in single-digit milliseconds, so on a link
+  * with 260ms of latency fifty of them is thirteen seconds before the first photo appears.
+  *
+  * The dedupe ref stays and still works per ORDER, so paging back and forth is free and only
+  * ids never seen before are asked for. A failed page is forgotten rather than remembered as
+  * loaded, so it can be retried.
+  */
+ const loadDesigns = useCallback((oids: string[]) => {
+ const want = oids.filter((oid) => oid && !designsRef.current[oid])
+ if (!want.length) return
+ for (const oid of want) designsRef.current[oid] = true
+ getOrderDesignsBatch(want).then((byOrder) => {
+ setDesigns((p) => {
+ const next = { ...p }
+ for (const [oid, list] of Object.entries(byOrder ?? {})) {
+ next[oid] = indexDesigns(Array.isArray(list) ? list : [])
+ }
+ return next
+ })
+ }).catch(() => { for (const oid of want) delete designsRef.current[oid] })
   }, [])
  useEffect(() => {
  const id = setTimeout(() => {
- for (const oid of pageIds ? pageIds.split(",") : []) loadDesigns(oid)
+ loadDesigns(pageIds ? pageIds.split(",") : [])
     }, 0)
  return () => clearTimeout(id)
   }, [pageIds, loadDesigns])
@@ -1583,7 +1598,7 @@ export function OrdersHub() {
  getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
         // Designs are fetched by the page-level effect above and deduped in its own ref,
         // so expanding a row no longer re-requests them.
- loadDesigns(oid)
+ loadDesigns([oid])
       }
     }, 0)
  return () => clearTimeout(id)

@@ -3664,6 +3664,54 @@ export function ordersRoutes(app, requireAuth) {
     return reply.send(obj.body);
   });
 
+  /**
+   * EVERY ORDER'S ARTWORK ON ONE PAGE, IN ONE REQUEST.
+   *
+   * The factory board draws a photo on every collapsed row, so it was fetching
+   * /api/orders/:id/designs once PER ROW — fifty round trips to paint one page. On a link
+   * with 260ms of latency that is thirteen seconds of waiting before anything appears, and
+   * none of it is the database: each query answers in single-digit milliseconds.
+   *
+   * PERMISSION IS STILL PER ORDER. canSeeOrder runs for every id and unreadable ones are
+   * dropped from the result rather than refused — a batch must never widen what a caller
+   * can see, and one forbidden order in a page must not fail the other forty-nine. That is
+   * N cheap local checks in exchange for N-1 network round trips, which is the whole trade.
+   *
+   * Capped at 200 ids so a hand-written query string cannot ask for the table.
+   *
+   * Registered BEFORE /api/orders/:id/designs deliberately. Fastify prefers a static
+   * segment over a parameterised one, so 'designs' could not be read as an :id either way —
+   * but reading them in this order is how the next person sees that they do not collide.
+   */
+  app.get('/api/orders/designs', { preHandler: requireAuth }, async (req) => {
+    const raw = String(req.query?.ids || '').trim();
+    if (!raw) return {};
+    const ids = [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 200);
+    if (!ids.length) return {};
+    const allowed = [];
+    for (const id of ids) { if (await canSeeOrder(req.user, id)) allowed.push(id); }
+    if (!allowed.length) return {};
+    const r = await q(
+      `select order_id, sku, line_id, kind, coalesce(side,'front') as side, data, storage_key,
+              art_hash, name, pos, template_id
+         from order_designs where order_id = any($1::text[])`,
+      [allowed]
+    );
+    // Every allowed id gets a key, empty or not: the client can then tell "no artwork" from
+    // "not fetched" without a second source of truth.
+    const out = {};
+    for (const id of allowed) out[id] = [];
+    for (const row of r.rows) {
+      const url = designUrlOf(row);
+      const designId = row.art_hash ? `D-${String(row.art_hash).slice(0, 8).toUpperCase()}` : null;
+      (out[row.order_id] ||= []).push({
+        sku: row.sku, line_id: row.line_id, kind: row.kind, side: row.side, name: row.name,
+        pos: row.pos, data: url || row.data, url, design_id: designId,
+        template_id: row.template_id || null,
+      });
+    }
+    return out;
+  });
   app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     // art_hash IS SELECTED, and has to be: designUrlOf prefers the same-origin re-serve

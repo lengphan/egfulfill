@@ -2724,6 +2724,13 @@ export function postOrderThreads(id: string, sku: string, threads: { code: strin
   })
 }
 
+/** Artwork for a whole page of orders in ONE request — see the route's own note. Returns a
+ *  map keyed by order id; an id the caller may not see is simply absent. */
+export function getOrderDesignsBatch(ids: string[]) {
+  const list = [...new Set(ids.filter(Boolean))].slice(0, 200)
+  if (!list.length) return Promise.resolve({} as Record<string, OrderDesign[]>)
+  return api<Record<string, OrderDesign[]>>(`/api/orders/designs?ids=${encodeURIComponent(list.join(","))}`)
+}
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
 }
