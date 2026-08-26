@@ -697,7 +697,8 @@ export function Window({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={src} alt={alt} className="block h-auto w-full" loading="lazy" />
           ) : (
-            <div className="aspect-[16/10] w-full" style={{ background: CARD }} />
+            /* No capture yet — a wireframe, never a drawing of the app. See WindowSkeleton. */
+            <WindowSkeleton />
           )}
         </div>
       </div>
@@ -754,6 +755,62 @@ export function ProofBlocks({
           {s.note && <p className="mt-2 text-[13.5px] leading-snug opacity-75">{s.note}</p>}
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * ── WINDOW SKELETON — a placeholder that is visibly a placeholder ────────────────────────
+ *
+ * WHAT THIS IS FOR. The boards are being reskinned, so a real capture would be out of date
+ * the day it was taken. This stands in so the LAYOUT can be judged now — column rhythm, how
+ * much room a window needs beside its copy, whether the alternating sections breathe.
+ *
+ * WHY IT IS ABSTRACT AND NOT A DRAWING OF THE APP. There is a real difference between a
+ * placeholder and a fake, and it is whether a visitor could mistake it for the product. Bars
+ * and blocks cannot be mistaken for anything: no invented order numbers, no made-up revenue,
+ * no customer names, no percentages. The previous version of this site carried a drawn mock
+ * of our own app in the hero and it was deleted deliberately — an invented screenshot is
+ * discovered the week after signup and costs more trust than an empty frame ever would.
+ *
+ * The ONE piece of real information is the shape: a toolbar, a filter row, a table of rows
+ * with a status chip on the right. That is what the queue genuinely looks like, and it is the
+ * thing the layout has to accommodate.
+ *
+ * REPLACE IT with `<Window src="…" />` the moment a board is worth photographing. This
+ * component should end up unused, and if it is still here in a month that is the signal.
+ */
+export function WindowSkeleton({ rows = 5 }: { rows?: number }) {
+  const bar = (w: string, o = 0.14) => (
+    <span className="block h-2.5 rounded-full" style={{ width: w, background: INK, opacity: o }} />
+  )
+  return (
+    <div className="p-5" style={{ background: CARD }}>
+      <div className="flex items-center gap-3 pb-4">
+        {bar("92px", 0.5)}
+        <span className="ml-auto block h-6 w-[84px] rounded-full" style={{ background: INK, opacity: 0.07 }} />
+        <span className="block h-6 w-[64px] rounded-full" style={{ background: ACID }} />
+      </div>
+      <div className="flex items-center gap-2 border-t pb-3 pt-3" style={{ borderColor: HAIRLINE }}>
+        {bar("46px", 0.28)}{bar("38px")}{bar("52px")}{bar("34px")}
+      </div>
+      <div className="flex flex-col">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex items-center gap-3 border-t py-3.5" style={{ borderColor: HAIRLINE }}>
+            <span className="block size-8 shrink-0 rounded-[9px]" style={{ background: INK, opacity: 0.08 }} />
+            <span className="flex min-w-0 flex-col gap-1.5">
+              {bar(["104px", "88px", "116px", "96px", "108px"][i % 5], 0.34)}
+              {bar(["148px", "132px", "170px", "140px", "156px"][i % 5], 0.13)}
+            </span>
+            {/* The one coloured element — a status chip, because that is the thing the eye
+                actually goes to in the real queue and the layout has to leave room for it. */}
+            <span
+              className="ml-auto block h-5 w-[62px] shrink-0 rounded-[8px]"
+              style={{ background: i % 3 === 0 ? ACID : INK, opacity: i % 3 === 0 ? 1 : 0.08 }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

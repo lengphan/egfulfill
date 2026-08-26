@@ -2,9 +2,13 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, ProofBlocks } from "@/components/marketing/bold-kit"
-import { CalloutList, CutoutFigure, NumberedCards } from "@/components/marketing/bold-figure"
-import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, ProofBlocks, Window, ObjectTile } from "@/components/marketing/bold-kit"
+import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/marketing/objects"
+
+/** One object per feature section, in factory order: make → print → pack → label. */
+const FEATURE_OBJECTS = [ThreadCone, Printhead, ShippingBox, HangTag] as const
+import { CalloutList } from "@/components/marketing/bold-figure"
+import { EditableText, useEditMode } from "@/components/marketing/edit-mode"
 import { ThreadField } from "@/components/marketing/thread-field"
 
 /**
@@ -28,11 +32,6 @@ export function BoldHome({ content }: { content: SiteContent }) {
   // visitor sees.
   const { on: editing } = useEditMode()
   const { hero, stats, features, steps, testimonials, faq, cta } = content
-  /** The hero figure as the DRAFT has it, so a replacement shows up before Save. */
-  const heroImage = useEditableSrc("hero.image", hero.image)
-  /** How it sits, from the draft, so the rotate and resize buttons move the figure now. */
-  const heroScale = useEditableNum("hero.imageScale", hero.imageScale)
-  const heroRotate = useEditableNum("hero.imageRotate", hero.imageRotate)
   const reduce = useReducedMotion()
   // The scroll-linked parallax went with the app panel it moved. Nothing on this page
   // tracks scroll any more.
@@ -70,7 +69,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
         {/* z-0 under content at z-10 — NOT a negative z-index. A negative index pushes the layer
             behind the nearest ancestor that paints a background, and this page has an opaque
             one two levels up, so the field rendered perfectly and was never visible. */}
-        <ThreadField className="absolute inset-y-0 right-0 z-0 w-[76%]" />
+        <ThreadField className="absolute inset-0 z-0" />
         {/* THE LABEL RULE IS GONE — stripped 2026-08-26.
             A small-caps word at each end of a hairline spanning the page is a masthead, and a
             masthead belongs to a PRINTED SHEET: it tells you which document you are holding.
@@ -96,73 +95,48 @@ export function BoldHome({ content }: { content: SiteContent }) {
           * so a screen reader meets the product before the pitch, and nothing needs `order-`
           * to disagree with the markup.
           */}
-        <div className="relative z-10 grid items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,44%)_minmax(0,1fr)]">
-          {/* IN EDIT MODE AN EMPTY FIGURE STILL RENDERS, because otherwise there is nothing on
-              the page to drop a picture onto — the one gesture that mode exists for would be
-              the one it cannot offer. A visitor still sees nothing, and with no picture the
-              grid collapses to the copy alone rather than leaving a hole where it would be. */}
-          {(heroImage || editing) && (
-            <EditableImage path="hero.image">
-              {/* The DRAFT's picture, not the published one — see useEditableSrc. A generated
-                  or uploaded figure has to appear where the old one was, immediately. */}
-              {/* NO GHOST WORD. A giant washed-out wordmark behind the subject is the board's device
-                  for filling a slide, and here it put a second, blurrier logo on a page that
-                  already has a real one in the header — competing with the product it sits
-                  behind. The cut-out is the hero; it does not need a backdrop. */}
-              <CutoutFigure src={heroImage} alt={hero.imageAlt} scale={heroScale} rotate={heroRotate} tall />
-            </EditableImage>
-          )}
+        {/* ── HERO — TYPE OVER THE FIELD, NO FIGURE ────────────────────────────────
+            The garment cut-out is GONE, at the owner's call. It had been kept on the argument
+            that a photograph of the real product outargues any graphic, which is true when the
+            graphic is decoration — and this one is not. The thread field says what the company
+            does; the tee only said "a t-shirt exists".
 
-          <div>
-            <h1 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: INK }}>
-              <span style={{ fontSize: "clamp(2.4rem, 4.4vw, 3.9rem)" }}>
-                {editing
-                  ? <EditableText path="hero.headline">{hero.headline}</EditableText>
-                  : <MaskedWords text={hero.headline} />}{" "}
-                {editing
-                  ? <EditableText path="hero.accent">{hero.accent}</EditableText>
-                  : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
-              </span>
-            </h1>
+            Removing it also settles the composition. The figure forced a 44/56 split that left
+            the headline in a column too narrow for its own scale, which is why the hero read as
+            cramped on the left and empty on the right. Type over a full-bleed field is the
+            reference's own hero archetype and it lets the headline run at the size it wants. */}
+        <div className="relative z-10 max-w-3xl py-[clamp(3rem,9vw,7rem)]">
+          <h1 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: INK }}>
+            <span style={{ fontSize: "clamp(2.6rem, 6vw, 5rem)" }}>
+              {editing
+                ? <EditableText path="hero.headline">{hero.headline}</EditableText>
+                : <MaskedWords text={hero.headline} />}{" "}
+              {editing
+                ? <EditableText path="hero.accent">{hero.accent}</EditableText>
+                : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
+            </span>
+          </h1>
 
-            <motion.p
-              className="mt-6 max-w-lg text-[17px] leading-relaxed text-[var(--mk-ink)]/62"
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
-            >
-              <EditableText path="hero.subhead">{hero.subhead}</EditableText>
-            </motion.p>
+          <motion.p
+            className="mt-7 max-w-xl text-[18px] leading-relaxed text-[var(--mk-ink)]/62"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
+          >
+            <EditableText path="hero.subhead">{hero.subhead}</EditableText>
+          </motion.p>
 
-            <motion.div
-              className="mt-8 flex flex-wrap items-center gap-3"
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
-            >
-              {/* Filled, then outlined with the ring. Two buttons of identical shape read as
-                  one control repeated; the ring separates "the thing to do" from "the thing
-                  to read first". */}
-              {/* PRIMARY, not `accent`. The hero's main action was an ink fill carrying a lime
-                  label; under Workshop the loudest control on the page is the lime ground with
-                  ink on it, which is the same pair the header CTA now runs.
-                  Both being lime is deliberate: they are the SAME action — "start free" —
-                  duplicated for reach, so they read as one decision repeated rather than as
-                  two accents competing. Two lime elements offering DIFFERENT actions would
-                  break the one-per-viewport rule; this does not. */}
-              <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
-              <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
-            </motion.div>
+          <motion.div
+            className="mt-9 flex flex-wrap items-center gap-3"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
+          >
+            <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
+            <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
+          </motion.div>
 
-            {/* UNDER THE COPY, not beside the picture — see the CalloutList note. Three facts
-                in a row across the text column, so the fold carries a claim, a subhead, two
-                routes on and the evidence, which is four things instead of one big line. */}
-            {hero.callouts.length > 0 && (
-              <div className="mt-12 border-t pt-8" style={{ borderColor: HAIRLINE }}>
-                <CalloutList items={hero.callouts} path="hero.callouts" className="flex-col gap-6 sm:flex-row sm:gap-8" />
-              </div>
-            )}
-          </div>
+          <CalloutList items={hero.callouts} path="hero.callouts" className="mt-14 flex-wrap gap-x-10 gap-y-6" />
         </div>
       </section>
 
@@ -217,24 +191,47 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </Band>
       )}
 
-      {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-[88rem] px-6 pt-24 sm:px-10">
+      {/* ── FEATURES — ALTERNATING TEXT AND WINDOW ────────────────────────────────
+          Was a four-card grid of prose: four boxes of similar length that the eye skims and
+          forgets, and which say nothing a competitor could not also write. This is the most
+          repeated structure in the reference study — customer.io, webflow, openphone and
+          cakeequity all run it — because the screenshot does the arguing and the copy only
+          has to name what is being shown.
+
+          Grounds alternate under it, so the sections divide by surface rather than by rule,
+          and the window flips side each time so the page has a left-right rhythm instead of
+          four identical rows. */}
+      <Band tone="paper">
         <h2 className="max-w-3xl font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
           <EditableText path="features.heading">{features.heading}</EditableText>
         </h2>
-        <p className="mt-4 max-w-xl text-[17px] leading-relaxed" style={{ color: INK, opacity: 0.55 }}><EditableText path="features.subhead">{features.subhead}</EditableText></p>
+        <p className="mt-4 max-w-xl text-[17px] leading-relaxed" style={{ color: INK, opacity: 0.6 }}>
+          <EditableText path="features.subhead">{features.subhead}</EditableText>
+        </p>
+      </Band>
 
-        {/*
-          * NUMBERED, ALTERNATING LIGHT AND DARK, ONE CORNER CUT.
-          *
-          * These ARE cards, and they are the one place on the page that should be: they are
-          * four discrete things you compare, not a container drawn round a section. Four
-          * identical bordered boxes read as a list you skim and forget — §4 has been counting
-          * those, 490 outlined boxes across the app — so the board's checker does real work
-          * here: it makes four things read as four things.
-          */}
-        <NumberedCards items={features.cards} path="features.cards" className="mt-14" />
-      </section>
+      {features.cards.slice(0, 4).map((c, i) => {
+        const Obj = FEATURE_OBJECTS[i % FEATURE_OBJECTS.length]
+        const flip = i % 2 === 1
+        return (
+          <Band key={`${c.title}-${i}`} tone={flip ? "card" : "paper"}>
+            <div className="grid items-center gap-x-14 gap-y-8 lg:grid-cols-2">
+              <div className={flip ? "lg:order-2" : undefined}>
+                <ObjectTile size={52}><Obj className="h-full w-full" /></ObjectTile>
+                <h3 className="mt-6 font-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-semibold leading-[1.05] tracking-[-0.025em]">
+                  <EditableText path={`features.cards.${i}.title`}>{c.title}</EditableText>
+                </h3>
+                <p className="mt-3 max-w-md text-[16px] leading-relaxed" style={{ color: INK, opacity: 0.62 }}>
+                  <EditableText path={`features.cards.${i}.body`}>{c.body}</EditableText>
+                </p>
+              </div>
+              {/* No `src` yet — the frame draws a wireframe rather than a fake screenshot.
+                  Swap in a real capture per card once the boards are reskinned. */}
+              <Window tilt={flip ? -2 : 2} caption={c.title} className={flip ? "lg:order-1" : undefined} />
+            </div>
+          </Band>
+        )
+      })}
 
       {/* ── STEPS — THE DARK BLOCK ────────────────────────────────────────────────
           This section used to sit on the page's own ground behind a hairline rule, and the
