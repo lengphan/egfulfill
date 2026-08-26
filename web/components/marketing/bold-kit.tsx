@@ -379,17 +379,18 @@ export function Pill({ href, children, tone = "primary", ring = false, className
      * on lime is 15.49:1, so this is both louder as a control and more readable as a label.
      * The KEY was renamed with the value — a tone called `ink` that renders lime is the kind
      * of quiet lie the palette gate exists to catch. */
-    /* THE PRIMARY IS INK — reverted to a dark fill 2026-08-26 when the accent became pink.
+    /* THE PRIMARY IS A LIME FILL CARRYING INK.
      *
-     * It was briefly a lime fill with an ink label, which was right for lime: lime is a
-     * light colour and can only ever be a ground carrying ink. Pink is governed by the
-     * opposite rule — it is for illustration and brand marks and NEVER an interactive
-     * state — so the loudest control on the page goes back to the ink it was before, and
-     * the accent stays out of the controls entirely.
+     * This control has now been ink → lime → ink → lime across one day, and the round trip
+     * is the record of a real mistake rather than indecision. Lime was pulled because the
+     * page looked wrong; the page looked wrong because it was BEIGE, and buddy.works runs
+     * essentially this same chartreuse (#BFFF5A to our #E0FF4F) on a cool near-white where
+     * it reads as confident. I changed the accent when the neutrals were the fault.
      *
-     * White on ink is 18.47:1, the strongest pair in the system, on the most-pressed
-     * control in the product. */
-    primary: "text-[var(--mk-accent-ink)] hover:brightness-125 focus-visible:ring-[var(--mk-ink)]",
+     * Lime is a light colour, so the rule that governs it is fixed: it can only ever be a
+     * GROUND CARRYING INK — never lettering, where it measures 1.03:1 on the page and
+     * disappears. Ink on lime is 12.99:1. */
+    primary: "border border-[var(--mk-ink)] text-[var(--mk-ink)] hover:brightness-95 focus-visible:ring-[var(--mk-ink)]",
     // Violet fill, LIME label — the same action pair as the app's default button and the
     // selected nav item. It used to be violet with INK on it, which measures 2.75:1 and
     // fails outright; the tone was unused, so it shipped broken rather than being noticed.
@@ -409,7 +410,7 @@ export function Pill({ href, children, tone = "primary", ring = false, className
     ghostLight: "border border-[var(--mk-accent-ink)]/30 text-[var(--mk-accent-ink)] hover:border-[var(--mk-accent-ink)]/60 hover:bg-[var(--mk-accent-ink)]/10 focus-visible:ring-[var(--mk-accent-ink)]",
   }
   return (
-    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "primary" || tone === "accent" ? { background: ACCENT } : tone === "invert" ? { background: ACCENT_INK } : undefined}>
+    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "primary" ? { background: ACID } : tone === "accent" ? { background: ACCENT } : tone === "invert" ? { background: ACCENT_INK } : undefined}>
       {children}
       {ring ? (
         /* -mr-2.5 pulls the ring back into the pill's own padding: a 28px circle inside a

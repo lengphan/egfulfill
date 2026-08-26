@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { SURFACE, ACCENT_INK, INK } from "@/components/marketing/bold-kit"
+import { SURFACE, ACID, INK } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -100,8 +100,8 @@ export function SiteHeader() {
                  * This is the direction's rule, not a preference: lime is a GROUND CARRYING
                  * INK and never lettering. Ink on lime measures 15.49:1 — louder as a button
                  * and more readable as a label than the pair it replaces. */
-                className="rounded-full px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
-                style={{ background: INK, color: ACCENT_INK }}
+                className="rounded-full border border-[var(--mk-ink)] px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
+                style={{ background: ACID, color: INK }}
               >
                 Start free
               </Link>
