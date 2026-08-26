@@ -1047,18 +1047,6 @@ export default function OrderDetailPage() {
             </SectionCard>
           )}
 
-          {/* THE FACTORY NOTE, above the activity thread and deliberately separate from it.
-              One field, overwritten, staff-only: "the thing to know about this order".
-              The thread below is the sequence of events. Conflating them is how a note
- becomes forty messages nobody reads, or a note nobody can find. */}
-          {isStaff && (
-            <SectionCard title="Factory note" bodyClassName="p-5">
-              <InternalNote
- orderId={order.id}
- value={(order as { internal_note?: string | null }).internal_note ?? ""}
-              />
-            </SectionCard>
-          )}
 
           <SectionCard title="Order activity">
             {/* THE WHOLE CARD ACCEPTS A DROP — thread and composer alike. A picture gets
@@ -1207,6 +1195,25 @@ export default function OrderDetailPage() {
 
         {/* summary */}
         <div className="min-w-0 space-y-5">
+          {/* THE FACTORY NOTE, IN THE RAIL — moved 2026-08-26.
+              Still one field, overwritten, staff-only: "the thing to know about this
+              order", and still deliberately separate from the activity thread, which is a
+              sequence of events. Conflating them is how a note becomes forty messages
+              nobody reads, or a note nobody can find.
+
+              What changed is WHERE. It sat in the left column above the thread, so it was
+              below the item list and off-screen on any order with more than a couple of
+              lines — and it is written WHILE DOING SOMETHING ELSE, mid-call or mid-pick, so
+              it must not cost a scroll to reach. The rail is already where everything that
+              is not an item lives, and it is short enough to keep the note in view. */}
+          {isStaff && (
+            <SectionCard title="Factory note" bodyClassName="p-5">
+              <InternalNote
+                orderId={order.id}
+                value={(order as { internal_note?: string | null }).internal_note ?? ""}
+              />
+            </SectionCard>
+          )}
           <SectionCard title="Customer">
             <div className="space-y-3 p-5 text-sm">
               <div>
