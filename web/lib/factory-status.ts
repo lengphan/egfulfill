@@ -19,6 +19,7 @@
 // exactly one mention in the whole codebase — this line. Two of the dead entries were also
 // near-identical ambers (qc 700, hold 800) for unrelated meanings, which is the kind of
 // thing that only stays harmless while it stays unreachable.
+import { STATUS_TONE } from "@/lib/status-tone"
 import {
   normalizeStage, isException, isFactoryOrder, nextStage, stageDenialReason, canSetStage,
   isMoneyStage, lineFor, posOf,
@@ -244,13 +245,13 @@ export function stageOptionsFor(role: string, current: string | null | undefined
 }
 
 export const TONE_CLASS: Record<FactoryTone, string> = {
-  new: "bg-muted text-muted-foreground",
-  review: "bg-indigo-100 text-indigo-700",
-  neutral: "bg-slate-100 text-slate-700",
-  prod: "bg-violet-100 text-violet-700",
-  shipped: "bg-emerald-100 text-emerald-700",
-  hold: "bg-amber-100 text-amber-800",
-  // No strikethrough. The word already says it — "Cancelled" struck through is the same
-  // fact twice, and struck text is harder to read for no gain. Muted carries "settled".
-  closed: "bg-muted text-muted-foreground",
+  // No strikethrough, and no colour. The word already says it — "Cancelled" struck through
+  // is the same fact twice. Weight carries it now; lib/status-tone.ts records why.
+  new: STATUS_TONE.settled,
+  review: STATUS_TONE.live,
+  neutral: STATUS_TONE.live,
+  prod: STATUS_TONE.live,
+  shipped: STATUS_TONE.settled,
+  hold: STATUS_TONE.attention,
+  closed: STATUS_TONE.settled,
 }

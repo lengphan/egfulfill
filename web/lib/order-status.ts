@@ -1,3 +1,4 @@
+import { STATUS_TONE } from "@/lib/status-tone"
 // Canonical seller-facing order status — ported VERBATIM from egfulfill-store.js
 // `SELLER_STATUS`. The seller deliberately sees COLLAPSED stages: every production
 // sub-state (awaiting_scan/scanned/printing/qc/packed/…) shows as "In
@@ -7,14 +8,16 @@
 export type SellerStatusInfo = { label: string; tone: string; group: SellerGroup }
 export type SellerGroup = "draft" | "pending" | "production" | "shipped" | "attention" | "closed"
 
-// Design-token tones (grey neutral, violet accent, indigo wait, green ship, amber hold, red alert).
+// Weight, not colour — see lib/status-tone.ts. This table and factory-status.ts's had
+// already drifted (`wait` here against `review` there for one idea), which is what a second
+// copy always does. Both read from one definition now.
 const TONE = {
-  neutral: "bg-muted text-muted-foreground",
-  wait: "bg-indigo-100 text-indigo-700",
-  prod: "bg-violet-100 text-violet-700",
-  shipped: "bg-emerald-100 text-emerald-700",
-  hold: "bg-amber-100 text-amber-800",
-  alert: "bg-red-100 text-red-700",
+  neutral: STATUS_TONE.settled,
+  wait: STATUS_TONE.live,
+  prod: STATUS_TONE.live,
+  shipped: STATUS_TONE.settled,
+  hold: STATUS_TONE.attention,
+  alert: STATUS_TONE.attention,
 }
 
 const P = (label: string, tone: string, group: SellerGroup): SellerStatusInfo => ({ label, tone, group })

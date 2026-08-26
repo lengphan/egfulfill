@@ -838,7 +838,13 @@ export default function OrderDetailPage() {
                     <div key={i} className="relative flex flex-wrap items-start gap-4 overflow-hidden px-5 py-4">
                       {/* The line's number, where the eye lands last — same number the drop
  zone's targets carry. */}
-                      <span className="absolute bottom-3 right-4 flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1}`}>
+                      {/* ON THE PICTURE'S CORNER, not the row's. It was anchored
+                          `bottom-3 right-4` against the row — but the variant strip is
+                          `basis-full`, so it wraps onto its own line and the row's
+                          bottom-right corner is now INSIDE that strip. The ordinal was
+                          sitting on top of the last field. The well's top-left corner is
+                          the item's own zone and nothing else is in it. */}
+                      <span className="pointer-events-none absolute left-1 top-1 flex size-6 items-center justify-center rounded-full bg-primary text-2xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1}`}>
                         {i + 1}
                       </span>
                       {/* The blank with its artwork placed — the seller sees the same
@@ -849,7 +855,24 @@ export default function OrderDetailPage() {
  digitiser sent or from Wilcom. Staff only: the render route is
  requireStaff, and a seller is looking at their own product, not at
  our production check. */}
-                      <div className="-my-4 -ml-5 flex shrink-0 items-center justify-center self-stretch bg-foreground px-4 py-4">
+                      {/* A WELL, NOT A BLEED — and it had been claiming to be both.
+                          `-my-4 -ml-5` pulled a black slab out to the card's edge and then
+                          `px-4 py-4` pushed the picture back in by 16px, so what shipped was
+                          a heavy frame around two white product photos rather than artwork
+                          reaching an edge.
+
+                          Full bleed cannot work here anyway. ItemAvatar shows TWO pictures
+                          at once on purpose — the buyer's listing photo offset behind, the
+                          composite we are about to print in front — and that offset only
+                          reads as two objects because there is room around them. Bleeding
+                          the pair crops the back card and takes the comparison with it,
+                          which is the one question this tile exists to answer.
+
+                          So: an inset well in a quiet neutral. It gives two white photos an
+                          edge on a white card without framing them in black, and
+                          `self-stretch` goes because the well belongs to the picture, not to
+                          the full height of a row that now wraps. */}
+                      <div className="flex shrink-0 items-center justify-center rounded-xl bg-muted p-4">
                       <div className="relative shrink-0">
                         {/* The line's files, on the corner of its own picture — see
                             LineDownloads for why they are not a link under the text. */}
@@ -1018,7 +1041,14 @@ export default function OrderDetailPage() {
                               {/* Partner chip + the tucked-away send action. Staff only —
  it renders nothing when design-status can't be read, which
  is what a seller gets. */}
-                              {designStatus && it.sku && (
+                              {/* `designStatus?.bySku`, not `designStatus`. Truthiness was the
+                                  wrong question: an empty ARRAY passes it, and the next line
+                                  reads .bySku off it and throws — which white-screens the whole
+                                  order page, not just this chip. Found with a stub API rather
+                                  than in production, and the real endpoint does return the
+                                  right shape, so this is a guard that was checking existence
+                                  when it needed to check shape. */}
+                              {designStatus?.bySku && it.sku && (
                                 <ItemDesignActions
  orderId={id}
  sku={String(it.sku)}
