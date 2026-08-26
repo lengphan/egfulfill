@@ -294,7 +294,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     items: [
       {
         title: "Every store, one queue",
-        body: "Connect Etsy, Shopify, TikTok Shop and WooCommerce. Orders sync in automatically — no CSV exports, no copy-paste, no missed orders. Tracking is pushed back to each marketplace the moment a label is bought.",
+        body: "Connect Etsy, Shopify and TikTok Shop. Orders sync in automatically — no CSV exports, no copy-paste, no missed orders. Tracking is pushed back to each marketplace the moment a label is bought.",
         points: ["OAuth in ~2 minutes", "Real-time order sync", "Tracking pushed back automatically"],
       },
       {
@@ -363,7 +363,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     steps: [
       {
         title: "Connect your stores",
-        body: "Sign in to Etsy, Shopify, TikTok Shop or WooCommerce in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
+        body: "Sign in to Etsy, Shopify or TikTok Shop in about two minutes. Existing orders import right away, and new ones stream into one queue from then on.",
         points: ["No CSV exports", "Every store, one login", "Existing orders backfilled"],
       },
       {

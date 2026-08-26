@@ -814,3 +814,62 @@ export function WindowSkeleton({ rows = 5 }: { rows?: number }) {
     </div>
   )
 }
+
+/**
+ * THE FULL-BLEED MEDIA HERO — direction A, locked 2026-08-26.
+ *
+ * WHAT IT IS. One edge-to-edge block of media with the headline standing on it. The page's
+ * first screen is the thing we make, not a diagram of it, because this company sells a
+ * FACTORY and the software that runs it — and the factory is the half a visitor can see and
+ * believe in one glance. The software gets a reserved panel further down.
+ *
+ * WHY IT DOES NOT SIT UNDER THE HEADER, unlike `PlateHero`. The header is deliberately ONE
+ * appearance at every scroll position — the transparent-over-plate variant was removed
+ * because it drifted from what the pages actually rendered and read as a glitch. Putting the
+ * nav back on top of a photograph would reverse that decision AND make the header's legibility
+ * depend on how dark someone's uploaded image happens to be at the top. So the block starts
+ * below the bar and bleeds horizontally only. Same composition, no new failure mode.
+ *
+ * THE EMPTY STATE IS NOT A PLACEHOLDER. With no media it renders the ink plate and the
+ * headline alone, which is a real design rather than a gap — the hero object was deleted once
+ * on purpose and a fake app panel must never come back in its place. A scrim only appears when
+ * there is something to scrim.
+ */
+export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)" }: {
+  /** A public image URL. Empty is a legitimate answer — see above. */
+  media?: string
+  alt?: string
+  children: React.ReactNode
+  minH?: string
+}) {
+  const hasMedia = !!media
+  return (
+    <section
+      className="relative isolate w-full overflow-hidden"
+      style={{ minHeight: minH, background: ACCENT }}
+    >
+      {hasMedia && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a seller-supplied absolute
+              URL from Settings › Site content; next/image would need every host allow-listed. */}
+          <img
+            src={media}
+            alt={alt || ""}
+            className="absolute inset-0 -z-10 h-full w-full object-cover"
+          />
+          {/* THE SCRIM EXISTS SO THE TYPE IS LEGIBLE ON ANY UPLOAD, not for mood. Weighted to
+              the bottom-left because that is where the headline stands; the top stays open so
+              the picture is still a picture. */}
+          <div
+            aria-hidden
+            className="absolute inset-0 -z-10"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 38%, rgba(0,0,0,.12) 72%, rgba(0,0,0,0) 100%)" }}
+          />
+        </>
+      )}
+      <div className="relative mx-auto flex h-full max-w-[88rem] flex-col justify-end px-6 pb-[clamp(2.5rem,5vw,4.5rem)] pt-[clamp(4rem,10vw,8rem)] sm:px-10">
+        {children}
+      </div>
+    </section>
+  )
+}

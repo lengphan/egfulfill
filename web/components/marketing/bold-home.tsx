@@ -2,14 +2,13 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, ProofBlocks, Window, ObjectTile } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, ProofBlocks, Window, ObjectTile, MediaHero } from "@/components/marketing/bold-kit"
 import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/marketing/objects"
 
 /** One object per feature section, in factory order: make → print → pack → label. */
 const FEATURE_OBJECTS = [ThreadCone, Printhead, ShippingBox, HangTag] as const
 import { CalloutList } from "@/components/marketing/bold-figure"
 import { EditableText, useEditMode } from "@/components/marketing/edit-mode"
-import { ThreadField } from "@/components/marketing/thread-field"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -49,95 +48,61 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      {/* ── HERO ─────────────────────────────────────────────────────────────────
-          FULL WIDTH, NO CONTAINER. The reference this page borrows from is a PITCH DECK —
-          its "cards" are slides, and a slide is a light panel on a ground because that is
-          what a slide IS. A website has no slides, so a panel here is a box drawn around
-          content for no reason: it narrows every line, adds a second inset inside the page's
-          own, and puts an edge between sections that the eye then has to cross. The devices
-          worth taking off those boards — the label rule, the ghost word, the numbered
-          checker, the ring pill — all work at full width, which is where they are now. */}
-      <section className="relative mx-auto max-w-[88rem] px-6 pt-10 sm:px-10 sm:pt-14">
-        {/* THE THREAD FIELD sits BEHIND the hero, not instead of it.
-            The reference carries its hero entirely on a generative field, which works when
-            there is no product to show. There is one here — a real Studio cut-out — and a
-            photograph of the actual garment outargues any graphic. So the field becomes the
-            GROUND the product stands on: it bleeds off the right edge, passes behind the
-            figure, and gives the page the ambient movement it had none of, without displacing
-            the one honest thing in the composition.
-            Inert to the pointer and hidden from screen readers — it carries no information. */}
-        {/* z-0 under content at z-10 — NOT a negative z-index. A negative index pushes the layer
-            behind the nearest ancestor that paints a background, and this page has an opaque
-            one two levels up, so the field rendered perfectly and was never visible. */}
-        <ThreadField className="absolute inset-0 z-0" />
-        {/* THE LABEL RULE IS GONE — stripped 2026-08-26.
-            A small-caps word at each end of a hairline spanning the page is a masthead, and a
-            masthead belongs to a PRINTED SHEET: it tells you which document you are holding.
-            A website's header already answers that, permanently, six lines above this. It was
-            the loudest surviving piece of the pitch-deck reference and the first thing a
-            visitor met, so it set the page's voice as the wrong one before the headline
-            arrived. Nothing replaces it — the hero starts at the hero. */}
+      {/* ── HERO — FULL-BLEED MEDIA, DIRECTION A (locked 2026-08-26) ─────────────
+          The first screen is the THING WE MAKE. This company sells a factory and the software
+          that runs it, and almost every reference sells one or the other — which is why no
+          borrowed hero shape ever fitted. The resolution: imagery carries the factory, and the
+          software gets one reserved panel further down rather than five screenshots up here.
 
-        {/*
-          * TWO COLUMNS — PICTURE LEFT, WORDS RIGHT.
-          *
-          * The single-column version put a 7rem headline across the full 88rem and orphaned
-          * the picture underneath it, which produced the two things that actually looked
-          * wrong: an empty right half beside the headline, and a figure centred under copy
-          * that was hard left, so nothing on the page shared an edge with anything else.
-          *
-          * Side by side, the width is USED, and the headline no longer has to be enormous to
-          * fill a line — it drops from 7rem to 3.9rem, which is what lets the subhead, the
-          * buttons and three facts about the product all sit above the fold together. That
-          * density is most of what separates the reference from a page of big type.
-          *
-          * The picture is FIRST in the DOM and first on the page, which is the same order —
-          * so a screen reader meets the product before the pitch, and nothing needs `order-`
-          * to disagree with the markup.
-          */}
-        {/* ── HERO — TYPE OVER THE FIELD, NO FIGURE ────────────────────────────────
-            The garment cut-out is GONE, at the owner's call. It had been kept on the argument
-            that a photograph of the real product outargues any graphic, which is true when the
-            graphic is decoration — and this one is not. The thread field says what the company
-            does; the tee only said "a t-shirt exists".
+          THE THREAD FIELD IS GONE FROM THE HERO. It was the ground the type stood on while
+          there was no picture; a photograph of the actual floor outargues a generative field,
+          and running both would be two backgrounds fighting for the same job.
 
-            Removing it also settles the composition. The figure forced a 44/56 split that left
-            the headline in a column too narrow for its own scale, which is why the hero read as
-            cramped on the left and empty on the right. Type over a full-bleed field is the
-            reference's own hero archetype and it lets the headline run at the size it wants. */}
-        <div className="relative z-10 max-w-3xl py-[clamp(3rem,9vw,7rem)]">
-          <h1 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: INK }}>
-            <span style={{ fontSize: "clamp(2.6rem, 6vw, 5rem)" }}>
-              {editing
-                ? <EditableText path="hero.headline">{hero.headline}</EditableText>
-                : <MaskedWords text={hero.headline} />}{" "}
-              {editing
-                ? <EditableText path="hero.accent">{hero.accent}</EditableText>
-                : <TypedPhrase text={hero.accent} color={INK} lastWordColor={ACCENT} />}
-            </span>
-          </h1>
+          NO MEDIA IS A REAL ANSWER — MediaHero draws the ink plate and the headline alone.
+          A fake app panel was deleted from this page once, deliberately, and must not return
+          as a stand-in for an image nobody has uploaded yet. */}
+      <MediaHero media={hero.image} alt={hero.imageAlt}>
+        {/* Capped in rem, not ch. A ch cap on display type measures the "0" glyph of whatever
+            face has actually loaded, so it collapsed to about a third of its intended width and
+            broke a five-word headline onto five lines — which then pushed the buttons off the
+            first screen. A rem cap cannot drift with the font. */}
+        <h1 className="font-display max-w-[54rem] font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: ACCENT_INK }}>
+          <span style={{ fontSize: "clamp(2.6rem, 6.4vw, 5.2rem)" }}>
+            {editing
+              ? <EditableText path="hero.headline">{hero.headline}</EditableText>
+              : <MaskedWords text={hero.headline} />}{" "}
+            {editing
+              ? <EditableText path="hero.accent">{hero.accent}</EditableText>
+              : <TypedPhrase text={hero.accent} color={ACCENT_INK} lastWordColor={ACID} />}
+          </span>
+        </h1>
 
-          <motion.p
-            className="mt-7 max-w-xl text-[18px] leading-relaxed text-[var(--mk-ink)]/62"
-            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
-          >
-            <EditableText path="hero.subhead">{hero.subhead}</EditableText>
-          </motion.p>
+        <motion.p
+          className="mt-7 max-w-xl text-[18px] leading-relaxed"
+          style={{ color: ACCENT_INK, opacity: 0.78 }}
+          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          animate={{ opacity: 0.78, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
+        >
+          <EditableText path="hero.subhead">{hero.subhead}</EditableText>
+        </motion.p>
 
-          <motion.div
-            className="mt-9 flex flex-wrap items-center gap-3"
-            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
-          >
-            <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
-            <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
-          </motion.div>
+        <motion.div
+          className="mt-9 flex flex-wrap items-center gap-3"
+          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
+        >
+          <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
+          <Pill href="/how-it-works" tone="ghostLight" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
+        </motion.div>
+      </MediaHero>
 
-          <CalloutList items={hero.callouts} path="hero.callouts" className="mt-14 flex-wrap gap-x-10 gap-y-6" />
-        </div>
+      {/* THE THREE FACTS move out of the hero and onto the page beneath it. On the plate they
+          were light type over a photograph at 13px, which is the first thing that stops being
+          readable when someone uploads a busy image. */}
+      <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10">
+        <CalloutList items={hero.callouts} path="hero.callouts" className="flex-wrap gap-x-10 gap-y-6" />
       </section>
 
       {/* ── THE CHANNEL MARQUEE ──────────────────────────────────────────────────

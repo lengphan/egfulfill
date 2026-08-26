@@ -146,13 +146,20 @@
    *
    * `rounded-badge` is the single exception the direction allows — the chip is the one
    * element SQUARER than a button, which is what now distinguishes it. */
-    --radius-sm: var(--radius);
-    --radius-md: var(--radius);
-    --radius-lg: var(--radius);
+    /* CONTROL STEPS. sm/md/lg are what Button, Input and .eg-control resolve through, and
+     * pointing them at --radius its 26px made every 32px control a full capsule — a badge
+     * shape on an action, which the direction reserves for things that are genuinely round.
+     * They take --radius-control instead. The panel steps below are untouched: a card reads
+     * through --radius-4xl and stays at 26px, so this separates control from surface without
+     * reintroducing a derived scale. Three NAMED steps, not seven multiplied ones. */
+    --radius-sm: var(--radius-control);
+    --radius-md: var(--radius-control);
+    --radius-lg: var(--radius-control);
     --radius-xl: var(--radius);
     --radius-2xl: var(--radius);
     --radius-3xl: var(--radius);
     --radius-4xl: var(--radius);
+    --radius-control: var(--radius-control);
     --radius-badge: var(--radius-badge);
 }
 
@@ -225,11 +232,11 @@
    * and dark blocks where the deeper value is doing real work, and nobody reads a 700-row
    * queue through it. */
     --background: oklch(0.9667 0.0017 247.84);
-    --foreground: oklch(0.2765 0.0590 240.86);
+    --foreground: oklch(0.1822 0.0000 89.88);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.2765 0.0590 240.86);
+    --card-foreground: oklch(0.1822 0.0000 89.88);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.2765 0.0590 240.86);
+    --popover-foreground: oklch(0.1822 0.0000 89.88);
   /* BRAND GREEN — the marketing accent, brought into the app.
    *
    * TWO tokens, because --primary does two jobs here: it fills 206 buttons AND inks 247
@@ -245,7 +252,7 @@
    * Status colours are untouched: emerald still means shipped, amber still means warning.
    * Those carry meaning on the floor and must not be crowded by a brand hue.
    */
-    --primary: oklch(0.2765 0.0590 240.86);
+    --primary: oklch(0.1822 0.0000 89.88);
   /* WHITE, NOT LIME. Every filled button in the product read as lime on electric violet —
    * 5.08:1, the weakest pair in the app, on the most-pressed control. White on cobalt is
    * 6.02:1: more contrast and one less colour. */
@@ -275,11 +282,11 @@
    * read THROUGH all day; the warmth belongs to the bounded surfaces, not underneath the
    * data. */
     --secondary: oklch(0.9417 0.0052 247.88);
-    --secondary-foreground: oklch(0.2765 0.0590 240.86);
+    --secondary-foreground: oklch(0.1822 0.0000 89.88);
     --muted: oklch(0.9417 0.0052 247.88);
     --muted-foreground: oklch(0.4967 0.0272 236.48);
     --accent: oklch(0.9417 0.0052 247.88);
-    --accent-foreground: oklch(0.2765 0.0590 240.86);
+    --accent-foreground: oklch(0.1822 0.0000 89.88);
   /* SUCCESS is a TOKEN, not a fixed Tailwind shade. `text-shipped` was used in 56 places
    * as the "positive" signal — and being a hardcoded shade it had no dark variant, so it
    * measured 3.77:1 on the light card and 4.06:1 on the dark one. It failed the 4.5:1 body
@@ -349,7 +356,7 @@
   /* INK, not the accent. A focus ring is a boundary and carries a 3:1 floor; pink measures
      1.84:1 on parchment, so an accent-coloured ring would be a focus indicator you cannot
      see — the exact failure the palette gate exists to catch. */
-    --ring: oklch(0.2765 0.0590 240.86);
+    --ring: oklch(0.1822 0.0000 89.88);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
    * every one clears 3:1 against the chart surface. Amber and green are deliberately not
@@ -375,6 +382,7 @@
    *
    * Table rows, dividers and inline links never take a radius at all. */
     --radius: 1.625rem;
+    --radius-control: 0.625rem;
     --radius-badge: 0.5rem;
   /* THE NAV IS THE PAGE. The sidebar takes the background colour and separates with a
    * border alone — a coloured panel beside white content is a second surface competing
@@ -392,18 +400,18 @@
    *
    * Selected = the violet block with the cream green on it, 5.07:1. Same pair as the hero,
    * so "you are here" in the app is the same gesture as the accent phrase on the site. */
-    --sidebar: oklch(0.2765 0.0590 240.86);
-    --sidebar-foreground: oklch(0.9667 0.0017 247.84);
+    --sidebar: oklch(0.9667 0.0017 247.84);
+    --sidebar-foreground: oklch(0.1822 0.0000 89.88);
   /* THE SELECTED ROW INVERTS rather than taking an accent. It was a lime fill; pink is not
      allowed to fill a control, and reaching for a fourth colour to solve one row is how a
      palette stops being three colours. Parchment on the dark block is 16.84:1 and is the
      loudest thing available without introducing anything new. */
-    --sidebar-primary: oklch(0.9471 0.1954 119.02);
-    --sidebar-primary-foreground: oklch(0.2765 0.0590 240.86);
-    --sidebar-accent: oklch(0.3400 0.0520 241.00);
-    --sidebar-accent-foreground: oklch(0.9667 0.0017 247.84);
-    --sidebar-border: oklch(0.3400 0.0520 241.00);
-    --sidebar-ring: oklch(0.9471 0.1954 119.02);
+    --sidebar-primary: oklch(1 0 0);
+    --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
+    --sidebar-accent: oklch(0.9840 0 0);
+    --sidebar-accent-foreground: oklch(0.1822 0.0000 89.88);
+    --sidebar-border: oklch(0.8979 0.0077 241.67);
+    --sidebar-ring: oklch(0.1822 0.0000 89.88);
 }
 
 .dark {
@@ -1078,11 +1086,11 @@ td[align="right"] {
    * never type · edge 3.13:1 on page and 3.44:1 on white, over the 3:1 control floor ·
    * muted 5.49:1 · white card on page 1.101, so a card separates without a shadow. */
   --mk-surface: #F3F4F5;
-  --mk-ink: #052B42;
-  --mk-accent: #052B42;
+  --mk-ink: #121212;
+  --mk-accent: #121212;
   --mk-accent-ink: #F3F4F5;
-  --mk-plate-accent: #E0FF4F;
-  --mk-acid: #E0FF4F;
+  --mk-plate-accent: #D6F24B;
+  --mk-acid: #D6F24B;
   --mk-auth-field: #FFFFFF;
   --mk-auth-edge: #7F8C97;
   --mk-auth-muted: #546570;
@@ -1108,8 +1116,8 @@ td[align="right"] {
   --mk-violet-ink: #FFFFFF;
 
   /* Lime fills, ink labels — 12.99:1. The app's large-fill brand IS the marketing accent. */
-  --brand: oklch(0.9471 0.1954 119.02);
-  --brand-foreground: oklch(0.2765 0.0590 240.86);
+  --brand: oklch(0.9114 0.1870 118.57);
+  --brand-foreground: oklch(0.1822 0.0000 89.88);
 }
 
 /* ── STUDIO · ink on white, the default until 2026-08-26 ──────────────────────
