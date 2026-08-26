@@ -19,7 +19,23 @@ import { getUser } from "@/lib/auth"
  * Staff-only by API (GET /api/audit/entity requires staff), so this renders empty for a
  * seller rather than leaking who on the floor touched their order.
  */
-export function OrderHistory({ orderId, items = [] }: { orderId: string; items?: OrderItem[] }) {
+export function OrderHistory({ orderId, items = [], startOpen = false }: {
+  orderId: string
+  items?: OrderItem[]
+  /**
+   * OPEN ON ARRIVAL, for a caller where getting here was already the decision.
+   *
+   * The panel collapses because it used to sit at the foot of the money column, where it
+   * was passed by everyone and wanted by few. Behind a tab named History that reasoning
+   * inverts: pressing the word IS the request, and a second click to see what you just
+   * asked for is the click this whole change exists to remove.
+   *
+   * The §2.8 guarantee survives intact. The load still hangs off an EVENT, not an effect —
+   * the caller simply does not mount this until the tab is pressed, so a page view that
+   * never opens History still costs no audit query.
+   */
+  startOpen?: boolean
+}) {
   const tl = useLabelT()
   // "FFL-mssfifwo0l05v" means nothing to a reader. The order knows which line that is, so
   // the log borrows the SAME number the item rows and the drop zone use.
@@ -59,7 +75,21 @@ export function OrderHistory({ orderId, items = [] }: { orderId: string; items?:
    * say "load this now" is an EVENT — a click cannot recur on its own. It also takes one
    * audit query off every order page load, since most of them never open this.
    */
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(startOpen)
+  /**
+   * Mounted already open means the click that would have loaded it never happens, so the
+   * arrival has to ask.
+   *
+   * SAFE UNDER §2.8, and worth saying why, because "an effect that fetches" is the shape
+   * that rule is about. The condition here is `startOpen` and `load`'s identity — neither
+   * of which this fetch can alter: `load` closes over orderId and allowed, and writes only
+   * `rows`, which is in nobody's dependency list. It runs at most twice, once refused while
+   * the role check is still pending and once for real when `allowed` flips, and there is no
+   * state it writes that can bring it back round.
+   */
+  useEffect(() => {
+    if (startOpen) load()
+  }, [startOpen, load])
   const toggle = () => {
     setOpen((v) => {
       if (!v && rows === null) load()

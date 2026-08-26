@@ -21,6 +21,7 @@ import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { OrderHistory } from "@/components/app/order-history"
+import { TabBar } from "@/components/app/tab-bar"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
@@ -137,7 +138,18 @@ export default function OrderDetailPage() {
  const [addrErr, setAddrErr] = useState<string | null>(null)
  const [messages, setMessages] = useState<ChatEntry[]>([])
  const [msg, setMsg] = useState("")
- const [detailTab, setDetailTab] = useState<"items" | "activity">("items")
+ const [detailTab, setDetailTab] = useState<"items" | "files" | "history" | "activity">("items")
+  /**
+   * WHICH TABS HAVE BEEN OPENED. Panels stay mounted once visited so a switch never drops a
+   * draft or a scroll position — but History costs an audit query, and mounting it on page
+   * load would spend that on every visit including the majority that never ask. Pressing the
+   * tab is the event that pays for it.
+   */
+ const [seen, setSeen] = useState<Set<string>>(() => new Set(["items"]))
+ const goTab = (t: "items" | "files" | "history" | "activity") => {
+ setDetailTab(t)
+ setSeen((s) => (s.has(t) ? s : new Set(s).add(t)))
+  }
  const [customize, setCustomize] = useState<OrderItem | null>(null)
   // Design-partner state per line. Read separately from the order so a failure costs the
   // chip, not the page — and it 403s for sellers, which is exactly the intended result:
@@ -751,27 +763,17 @@ export default function OrderDetailPage() {
             switching tabs must not refetch the thread or drop a half-typed message, and an
             unmounted panel takes its scroll position and its draft with it. */}
         <div className="min-w-0 space-y-5">
-          <div className="flex gap-6 border-b border-border">
-            {([
-              { id: "items" as const, label: `Items (${items.length})` },
+          <TabBar
+            ariaLabel="Order sections"
+            value={detailTab}
+            onChange={goTab}
+            items={[
+              { id: "items" as const, label: "Items", count: items.length },
+              { id: "files" as const, label: "Files" },
+              { id: "history" as const, label: "History" },
               { id: "activity" as const, label: "Activity" },
-            ]).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setDetailTab(t.id)}
-                aria-current={detailTab === t.id}
-                className={
-                  "eg-tap -mb-px border-b-2 pb-2.5 text-sm transition-colors " +
-                  (detailTab === t.id
-                    ? "border-primary font-semibold text-foreground"
-                    : "border-transparent font-medium text-muted-foreground hover:text-foreground")
-                }
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+            ]}
+          />
 
           <div className={detailTab === "items" ? "space-y-5" : "hidden"}>
           <SectionCard className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0"
@@ -1051,16 +1053,25 @@ export default function OrderDetailPage() {
           </SectionCard>
 
           </div>
-          <div className={detailTab === "activity" ? "space-y-5" : "hidden"}>
-          {/* Design deliverables — the seller's .pes files. Factory .emb/mockups are
- filtered out server-side and the bytes are paywalled there too, so this
- renders nothing when there's nothing they can buy. */}
-          <SectionCard title="Design files">
-            {/* `designs` is the same map the item rows draw their mockups from, so the card
- lists the artwork that is already ON this order instead of announcing that
- nothing has arrived. */}
-            <div className="p-5"><SellerDesignFiles orderId={String(id)} items={items} designs={designSides} onAttached={reloadDesigns} /></div>
-          </SectionCard>
+          {/* FILES IS ITS OWN TAB. Design deliverables were the first card inside Activity,
+              so the artwork on an order was found by pressing a word that means messages —
+              and anyone looking for a file had to know that. Factory .emb/mockups are
+              filtered out server-side and the bytes are paywalled there too, so this renders
+              nothing when there is nothing the seller can buy. */}
+          <div className={detailTab === "files" ? "space-y-5" : "hidden"}>
+            {/* `designs` is the same map the item rows draw their mockups from, so the tab
+                lists the artwork already ON this order rather than announcing that nothing
+                has arrived. */}
+            <SellerDesignFiles orderId={String(id)} items={items} designs={designSides} onAttached={reloadDesigns} />
+          </div>
+
+          {/* HISTORY IS ITS OWN TAB TOO. It was at the bottom of the right-hand column, under
+              the money — worth having, rarely worth looking at, so it was put last and closed.
+              That is the right instinct for a column and the wrong one for a question people
+              do ask: "what happened to this order" is now a word you press, not a scroll to
+              the end of the summary. The staff timeline sits with it, since they answer the
+              same question at two grains. */}
+          <div className={detailTab === "history" ? "space-y-5" : "hidden"}>
 
           {/* FACTORY ONLY. A seller's order page shows them what they need to act on; the
  blow-by-blow of who moved it where is internal, and the chat is where anything
@@ -1082,8 +1093,10 @@ export default function OrderDetailPage() {
               </ol>
             </SectionCard>
           )}
+            {seen.has("history") && <OrderHistory orderId={String(id)} items={items} startOpen />}
+          </div>
 
-
+          <div className={detailTab === "activity" ? "space-y-5" : "hidden"}>
           <SectionCard title="Order activity">
             {/* THE WHOLE CARD ACCEPTS A DROP — thread and composer alike. A picture gets
  dropped on the box you type in, so a target that stops at the message list is
@@ -1643,19 +1656,12 @@ export default function OrderDetailPage() {
             </>
           )}
 
-          {/*
-            * THE RECORD, at the FOOT of the page and collapsed.
-            *
-            * It used to sit in the left column above the factory note and the activity
-            * thread — so the two panels anyone actually works from were pushed down by a
-            * scrolling audit list nobody reads on most visits. Worth having, rarely worth
-            * looking at: that is a thing you put last and closed, not first and open.
-            *
-            * Under the money rather than beside it because this column already runs
-            * Customer -> Shipping -> Summary -> Refund, which is the order the questions
-            * come in. "What has happened to this order" is the one you ask last.
-            */}
-          <OrderHistory orderId={String(id)} items={items} />
+          {/* THE RECORD MOVED TO ITS OWN TAB. It sat here, last and collapsed, under
+              Customer -> Shipping -> Summary -> Refund — the order the questions come in,
+              with "what has happened to this order" asked last. That reasoning holds for a
+              column and stops holding once the question has a word of its own: a person
+              looking for it should press History, not scroll past the money to find a
+              closed panel. */}
         </div>
       </div>
 
