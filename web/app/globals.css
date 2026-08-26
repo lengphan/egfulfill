@@ -346,7 +346,10 @@
  which is the same rule, already satisfied. */
     --border: oklch(0.8610 0.0136 106.68);
     --input: oklch(0.6152 0.0164 98.43);
-    --ring: oklch(0.9247 0.2090 127.77);
+  /* INK, not the accent. A focus ring is a boundary and carries a 3:1 floor; pink measures
+     1.84:1 on parchment, so an accent-coloured ring would be a focus indicator you cannot
+     see — the exact failure the palette gate exists to catch. */
+    --ring: oklch(0.1893 0.0098 107.30);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
    * every one clears 3:1 against the chart surface. Amber and green are deliberately not
@@ -391,7 +394,11 @@
    * so "you are here" in the app is the same gesture as the accent phrase on the site. */
     --sidebar: oklch(0.1893 0.0098 107.30);
     --sidebar-foreground: oklch(0.9674 0.0132 106.64);
-    --sidebar-primary: oklch(0.9247 0.2090 127.77);
+  /* THE SELECTED ROW INVERTS rather than taking an accent. It was a lime fill; pink is not
+     allowed to fill a control, and reaching for a fourth colour to solve one row is how a
+     palette stops being three colours. Parchment on the dark block is 16.84:1 and is the
+     loudest thing available without introducing anything new. */
+    --sidebar-primary: oklch(0.9674 0.0132 106.64);
     --sidebar-primary-foreground: oklch(0.1893 0.0098 107.30);
     --sidebar-accent: oklch(0.2600 0.0110 107.00);
     --sidebar-accent-foreground: oklch(0.9674 0.0132 106.64);
@@ -1072,8 +1079,23 @@ td[align="right"] {
      is #14140F, everything on it is parchment or lime, and lime never has to sit on itself. */
   --mk-accent: #14140F;
   --mk-accent-ink: #F5F5EB;
-  --mk-plate-accent: #BEFF50;
-  --mk-acid: #BEFF50;
+  /* ── THE ACCENT IS PINK, NOT LIME (2026-08-26, same day) ─────────────────────
+   * The lime was rejected on sight once it was on real screens: too saturated, and it
+   * read sports-drink rather than made. Everything structural stays — the bands, the one
+   * radius, the absent shadows, the face — because none of it was ever the accent's job.
+   * A palette here is a skin, so this is a token change and not a rebuild.
+   *
+   * #FF90E8 comes from Gumroad, and so does the rule that makes it work: the pink is for
+   * ILLUSTRATION AND BRAND MARKS ONLY — never an interactive state, never text on a light
+   * ground. That is why the primary button below goes BLACK rather than pink. Lime failed
+   * partly because it was doing both jobs at once.
+   *
+   * Measured: ink on pink 9.16:1 · pink on ink 9.16:1 (so it CAN letter the dark band) ·
+   * pink on parchment 1.84:1, which is the proof it can never be type on the page.
+   * Nearest reserved status is backorder at 0.231 in OKLab — clear (the coral that was
+   * rejected outright sat at 0.042). */
+  --mk-plate-accent: #FF90E8;
+  --mk-acid: #FF90E8;
   /* Auth fields are WHITE on the parchment page, so the field's own fill separates it and
      the edge only has to be findable. #87857A measures 3.38:1 here — over the 3:1 floor,
      and deliberately not lighter. */
@@ -1086,8 +1108,11 @@ td[align="right"] {
   --mk-card: #FFFFFF;
   /* The app's large-fill brand IS the marketing plate, so the product and the site are one
      decision. Lime fills; it never inks. --primary stays near-black for that job. */
-  --brand: oklch(0.9247 0.2090 127.77);
-  --brand-foreground: oklch(0.1893 0.0098 107.30);
+  /* --brand FILLS buttons, and pink may not fill an interactive control — so the app's
+     large fill is the ink, exactly as `studio` has it. Pink reaches the product through
+     --mk-acid (object tiles, marks), never through a control. */
+  --brand: oklch(0.1893 0.0098 107.30);
+  --brand-foreground: oklch(0.9674 0.0132 106.64);
 }
 
 /* ── STUDIO · ink on white, the default until 2026-08-26 ──────────────────────

@@ -354,7 +354,7 @@ export function TypedPhrase({ text, color = ACCENT_INK, lastWordColor }: { text:
 /** Pill button. The arrow travels on hover — a 200ms cue that the thing goes somewhere,
  *  which is the whole reason the arrow is there. */
 export function Pill({ href, children, tone = "primary", ring = false, className = "" }: {
-  href: string; children: React.ReactNode; tone?: "primary" | "accent" | "acid" | "ghost" | "ghostLight"
+  href: string; children: React.ReactNode; tone?: "primary" | "accent" | "invert" | "ghost" | "ghostLight"
   /**
    * THE ARROW IN A RING — the board's third pill.
    *
@@ -379,13 +379,29 @@ export function Pill({ href, children, tone = "primary", ring = false, className
      * on lime is 15.49:1, so this is both louder as a control and more readable as a label.
      * The KEY was renamed with the value — a tone called `ink` that renders lime is the kind
      * of quiet lie the palette gate exists to catch. */
-    primary: "border border-[var(--mk-ink)] text-[var(--mk-ink)] hover:brightness-95 focus-visible:ring-[var(--mk-ink)]",
+    /* THE PRIMARY IS INK — reverted to a dark fill 2026-08-26 when the accent became pink.
+     *
+     * It was briefly a lime fill with an ink label, which was right for lime: lime is a
+     * light colour and can only ever be a ground carrying ink. Pink is governed by the
+     * opposite rule — it is for illustration and brand marks and NEVER an interactive
+     * state — so the loudest control on the page goes back to the ink it was before, and
+     * the accent stays out of the controls entirely.
+     *
+     * White on ink is 18.47:1, the strongest pair in the system, on the most-pressed
+     * control in the product. */
+    primary: "text-[var(--mk-accent-ink)] hover:brightness-125 focus-visible:ring-[var(--mk-ink)]",
     // Violet fill, LIME label — the same action pair as the app's default button and the
     // selected nav item. It used to be violet with INK on it, which measures 2.75:1 and
     // fails outright; the tone was unused, so it shipped broken rather than being noticed.
-    accent: "text-[var(--mk-acid)] hover:brightness-110 focus-visible:ring-[var(--mk-ink)]",
-    // Ink on acid is 15.19:1. White on acid is 1.30:1 — never do that.
-    acid: "text-[var(--mk-ink)] hover:brightness-95 focus-visible:ring-[var(--mk-ink)]",
+    accent: "text-[var(--mk-accent-ink)] hover:brightness-125 focus-visible:ring-[var(--mk-ink)]",
+    /* `invert` — the primary as it appears ON the dark band. Parchment fill, ink label.
+     *
+     * This tone used to be `acid`: a fill of the accent itself. That works while the accent
+     * is a light colour you can put ink on, and stops working the moment the accent is a
+     * brand mark rather than a surface. Inverting against the block needs no accent at all
+     * and measures 16.84:1, which is the loudest thing available without inventing a fourth
+     * colour to solve one button. */
+    invert: "text-[var(--mk-ink)] hover:brightness-95 focus-visible:ring-[var(--mk-accent-ink)]",
     // The secondary on a LIGHT ground: an ink outline. This was a copy of ghostLight —
     // cream on cream — which is only ever right over a dark plate.
     ghost: "border border-[var(--mk-ink)]/25 text-[var(--mk-ink)] hover:border-[var(--mk-ink)]/60 hover:bg-[var(--mk-ink)]/[0.04] focus-visible:ring-[var(--mk-ink)]",
@@ -393,7 +409,7 @@ export function Pill({ href, children, tone = "primary", ring = false, className
     ghostLight: "border border-[var(--mk-accent-ink)]/30 text-[var(--mk-accent-ink)] hover:border-[var(--mk-accent-ink)]/60 hover:bg-[var(--mk-accent-ink)]/10 focus-visible:ring-[var(--mk-accent-ink)]",
   }
   return (
-    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "primary" || tone === "acid" ? { background: ACID } : tone === "accent" ? { background: ACCENT } : undefined}>
+    <Link href={href} className={`${base} ${tones[tone]} ${className}`} style={tone === "primary" || tone === "accent" ? { background: ACCENT } : tone === "invert" ? { background: ACCENT_INK } : undefined}>
       {children}
       {ring ? (
         /* -mr-2.5 pulls the ring back into the pill's own padding: a 28px circle inside a
@@ -545,7 +561,7 @@ export function Band({
   full = false,
   id,
 }: {
-  tone?: "paper" | "card" | "dark" | "lime"
+  tone?: "paper" | "card" | "dark" | "accent"
   children: React.ReactNode
   className?: string
   /** Skip the inner container — for a band whose content is itself edge-to-edge (a marquee). */
@@ -553,10 +569,10 @@ export function Band({
   id?: string
 }) {
   const tones = {
-    paper: { background: SURFACE, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": SURFACE },
-    card: { background: CARD, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": CARD },
-    dark: { background: ACCENT, color: ACCENT_INK, "--eg-icon-ink": ACCENT_INK, "--eg-icon-void": ACCENT },
-    lime: { background: ACID, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": ACID },
+    paper: { background: SURFACE, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": SURFACE, "--eg-icon-fill": ACID },
+    card: { background: CARD, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": CARD, "--eg-icon-fill": ACID },
+    dark: { background: ACCENT, color: ACCENT_INK, "--eg-icon-ink": ACCENT_INK, "--eg-icon-void": ACCENT, "--eg-icon-fill": ACID },
+    accent: { background: ACID, color: INK, "--eg-icon-ink": INK, "--eg-icon-void": ACID, "--eg-icon-fill": CARD },
   } as const
   return (
     <section id={id} style={tones[tone] as React.CSSProperties} className={`w-full ${className}`}>
@@ -568,38 +584,41 @@ export function Band({
 }
 
 /**
- * An object from the family, on its own tile — the mark half of "the four parts".
+ * An object from the family, drawn straight onto whatever it sits on.
  *
- * A 20px stroke floating in whitespace is decoration the eye reads past; the same glyph on a
- * small filled square is an object it lands on. That difference is the single biggest reason
- * an empty region reads as a PLACE rather than as a gap, and it is why this is a tile and not
- * a bare icon.
+ * IT USED TO HAVE A TILE — a lime square behind it — on the argument that a loose glyph in
+ * whitespace is decoration the eye reads past while the same glyph on a filled square is an
+ * object it lands on. That argument is sound for an EMPTY STATE's mark, and it is wrong here,
+ * for two reasons found by putting it on a real page.
  *
- * The tile takes the lime, so the object inside it takes ink — which is the direction's one
- * colour rule stated as a component: lime is a ground carrying ink, never the ink itself.
+ * First, the reference does not do it: Gumroad floats its objects directly on the canvas with
+ * nothing behind them, and the object reads perfectly well because it has its own fill and a
+ * heavy outline. A tile is what you need when the mark is a thin monochrome stroke.
+ *
+ * Second, and more usefully, the tile CREATED the bug it was hiding. A pink tile with a pink
+ * object on it is invisible, so the tile forced the object's fill to be a different colour
+ * from the accent — which is exactly how nine objects ended up rendering lime after the
+ * accent had already moved to pink.
+ *
+ * Nothing behind it, then. The object carries the accent as its own fill and reads its
+ * outline from the band. The tiled version survives as `ObjectMark` for empty states, where
+ * the original argument still holds.
  */
 export function ObjectTile({
   children,
   size = 56,
   className = "",
+  style,
 }: {
   children: React.ReactNode
   size?: number
   className?: string
+  style?: React.CSSProperties
 }) {
   return (
     <span
-      className={`inline-grid shrink-0 place-items-center rounded-[18px] ${className}`}
-      style={{
-        width: size,
-        height: size,
-        background: ACID,
-        // Inside the tile the ground is lime whatever the band is, so the object's own
-        // variables are re-pointed here rather than inherited — otherwise an object on a
-        // dark band would draw its outline in parchment on a lime tile and vanish.
-        ["--eg-icon-ink" as string]: INK,
-        ["--eg-icon-void" as string]: ACID,
-      }}
+      className={`inline-grid shrink-0 place-items-center ${className}`}
+      style={{ width: size, height: size, ...style }}
     >
       {children}
     </span>

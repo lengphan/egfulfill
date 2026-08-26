@@ -22,7 +22,7 @@
  */
 
 import { motion, useReducedMotion } from "motion/react"
-import { ACCENT, ACCENT_INK, ACID, CARD, INK, HAIRLINE, EASE, ObjectTile } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, CARD, INK, HAIRLINE, EASE, ObjectTile } from "@/components/marketing/bold-kit"
 import { ThreadCone, Printhead, ShippingBox, FoldedTee, HeatPress, EmbroideryHoop } from "@/components/marketing/objects"
 
 /**
@@ -323,23 +323,27 @@ export function CalloutList({ items, tone = "paper", className = "", path }: {
   if (!items.length) return null
   const ink = tone === "ink"
   const fg = ink ? ACCENT_INK : INK
-  const rule = ink ? `color-mix(in oklch, ${ACCENT_INK} 28%, transparent)` : HAIRLINE
-  const dot = ink ? ACID : ACCENT
   return (
     <div className={`flex gap-7 ${className}`}>
       {items.slice(0, 4).map((c, i) => (
         <motion.div
           key={`${c.label}-${i}`}
-          className="flex min-w-0 items-start gap-3"
+          className="min-w-0"
           initial={reduce ? { opacity: 0 } : { opacity: 0, x: 18 }}
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.35 + i * 0.1, ease: EASE }}
         >
-          {/* mt-[0.4rem] lands the dot on the CAP HEIGHT of the label beside it rather than on
-              its line box, which is what makes a row of them look aligned. */}
-          <span className="mt-[0.4rem] size-1.5 shrink-0 rounded-full" style={{ background: dot }} />
-          <span className="mt-[0.45rem] hidden h-px w-8 shrink-0 lg:block" style={{ background: rule }} />
+          {/* THE DOT AND THE DASH ARE GONE — stripped 2026-08-26.
+            *
+            * A bullet followed by a short rule followed by a label is three marks to say one
+            * thing, and all three belonged to the pitch-deck reference: on a slide a fact
+            * needs a tether because it is floating on a board. On a page it is a line of
+            * type under a heading, and the heading already told the reader what it is.
+            *
+            * What replaces them is nothing. The caps label carries the fact and the space
+            * does the separating — which is this direction's whole argument about dividers,
+            * applied to the smallest thing on the page rather than only to sections. */}
           <span className="min-w-0">
             <span className={`${CAPS} block`} style={{ color: fg }}><Words path={path && `${path}.${i}.label`}>{c.label}</Words></span>
             {/* 0.7 on the plate, not 0.55: a note at paper's strength against a dark ground
@@ -382,8 +386,17 @@ export function SpecStrip({ items, className = "", path }: { items: Stat[]; clas
       {items.slice(0, 5).map((s, i) => (
         <motion.div
           key={`${s.label}-${i}`}
-          className="lg:border-l lg:px-6 lg:first:border-l-0 lg:first:pl-0"
-          style={{ borderColor: HAIRLINE }}
+          /* NO VERTICAL RULES between the figures — stripped 2026-08-26.
+           *
+           * The divider bars were the pitch-deck reference's grammar: a spec sheet drawn as
+           * a table because a board's slide has no room to breathe. This direction separates
+           * things with SPACE and with a change of ground, and it has exactly one line
+           * weight for one job — a card's hairline. A rule standing between two figures on
+           * the same surface is drawing a boundary that is not there.
+           *
+           * The strip already sits on its own white band, so the section is divided; the
+           * figures inside it do not need dividing from each other as well. */
+          className="lg:px-0"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -482,10 +495,19 @@ export function NumberedCards({ items, className = "", path }: { items: Numbered
               * editor adding a card never has to pick one.
               *
               * On a lime tile, so the object is ink on lime whatever the card is under it. */}
-            <ObjectTile size={52}>
+            {/* The card sets the object's variables itself: it is not a Band, and a dark
+                card needs a parchment outline or the drawing vanishes into its own ground.
+                The FILL is the accent on both — pink is 9.16:1 on ink and reads as the brand
+                mark it is, which is the one job the accent has in this direction. */}
+            <ObjectTile
+              size={56}
+              style={dark
+                ? { ["--eg-icon-ink" as string]: ACCENT_INK, ["--eg-icon-void" as string]: ACCENT }
+                : { ["--eg-icon-ink" as string]: INK, ["--eg-icon-void" as string]: CARD }}
+            >
               {(() => {
                 const Obj = CARD_OBJECTS[i % CARD_OBJECTS.length]
-                return <Obj className="h-[76%] w-[76%]" />
+                return <Obj className="h-full w-full" />
               })()}
             </ObjectTile>
             <div className="my-5 h-px" style={{ background: dark ? "rgba(255,255,255,0.18)" : HAIRLINE }} />

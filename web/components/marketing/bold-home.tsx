@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band } from "@/components/marketing/bold-kit"
-import { LabelRule, CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
+import { CalloutList, CutoutFigure, SpecStrip, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditMode, useEditableNum, useEditableSrc } from "@/components/marketing/edit-mode"
 
 /**
@@ -58,10 +58,13 @@ export function BoldHome({ content }: { content: SiteContent }) {
           worth taking off those boards — the label rule, the ghost word, the numbered
           checker, the ring pill — all work at full width, which is where they are now. */}
       <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10 sm:pt-14">
-        {/* The brand at one end, who this is for at the other, a hairline between. ONCE, at
-            the top of the page — the boards repeat it because each slide is a fresh sheet,
-            and repeating it down one continuous page is just the same line four times. */}
-        <LabelRule left={hero.ruleLeft} right={hero.ruleRight} leftPath="hero.ruleLeft" rightPath="hero.ruleRight" className="mb-12" />
+        {/* THE LABEL RULE IS GONE — stripped 2026-08-26.
+            A small-caps word at each end of a hairline spanning the page is a masthead, and a
+            masthead belongs to a PRINTED SHEET: it tells you which document you are holding.
+            A website's header already answers that, permanently, six lines above this. It was
+            the loudest surviving piece of the pitch-deck reference and the first thing a
+            visitor met, so it set the page's voice as the wrong one before the headline
+            arrived. Nothing replaces it — the hero starts at the hero. */}
 
         {/*
           * TWO COLUMNS — PICTURE LEFT, WORDS RIGHT.
@@ -89,7 +92,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
             <EditableImage path="hero.image">
               {/* The DRAFT's picture, not the published one — see useEditableSrc. A generated
                   or uploaded figure has to appear where the old one was, immediately. */}
-              <CutoutFigure src={heroImage} alt={hero.imageAlt} ghost={hero.ghostWord} scale={heroScale} rotate={heroRotate} tall />
+              {/* NO GHOST WORD. A giant washed-out wordmark behind the subject is the board's device
+                  for filling a slide, and here it put a second, blurrier logo on a page that
+                  already has a real one in the header — competing with the product it sits
+                  behind. The cut-out is the hero; it does not need a backdrop. */}
+              <CutoutFigure src={heroImage} alt={hero.imageAlt} scale={heroScale} rotate={heroRotate} tall />
             </EditableImage>
           )}
 
@@ -330,7 +337,6 @@ export function BoldHome({ content }: { content: SiteContent }) {
         transition={{ duration: 0.7, ease: EASE }}
       >
         <div className="mx-auto max-w-[88rem]">
-          <LabelRule left={hero.ruleLeft} right={hero.ruleRight} leftPath="hero.ruleLeft" rightPath="hero.ruleRight" tone="light" className="mb-16" />
           {/* THE HEADING IS PAPER, NOT ACID — changed 2026-08-26.
             *
             * Acid on the plate is legitimate type and always was: check-skins measures it at
@@ -345,7 +351,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           </h2>
           <p className="mt-5 max-w-lg text-[17px] leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.72 }}><EditableText path="cta.subhead">{cta.subhead}</EditableText></p>
           <div className="mt-10">
-            <Pill href="/signup" tone="acid" ring><EditableText path="cta.button">{cta.button}</EditableText></Pill>
+            <Pill href="/signup" tone="invert" ring><EditableText path="cta.button">{cta.button}</EditableText></Pill>
           </div>
         </div>
       </motion.section>

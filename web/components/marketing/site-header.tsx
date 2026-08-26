@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { SURFACE, ACID, INK } from "@/components/marketing/bold-kit"
+import { SURFACE, ACCENT_INK, INK } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -76,7 +76,19 @@ export function SiteHeader() {
               </Link>
               <Link
                 href="/signup"
-                /* LIME FILL, INK LABEL — inverted 2026-08-26.
+                /* INK FILL, PARCHMENT LABEL — settled 2026-08-26.
+                 *
+                 * This went ink → lime → ink inside a day, and the round trip is worth
+                 * recording because the reason changed each time. Ink-with-a-lime-label was
+                 * wrong (the accent was doing lettering). Lime fill was right for LIME, which
+                 * is a light colour and can only ever be a ground carrying ink. Then the
+                 * accent became pink, which is governed by the opposite rule — brand marks
+                 * only, never an interactive state — so the button returns to ink and the
+                 * accent leaves the controls for good.
+                 *
+                 * Parchment on ink is 16.84:1. The old note below is kept because its
+                 * measurement was correct and only its conclusion expired. */
+                /* was: LIME FILL, INK LABEL — inverted 2026-08-26.
                  *
                  * It was ink fill with a lime label, and the note under it argued acid could
                  * not be the fill because "on paper it is 1.05:1 and the button would have no
@@ -88,8 +100,8 @@ export function SiteHeader() {
                  * This is the direction's rule, not a preference: lime is a GROUND CARRYING
                  * INK and never lettering. Ink on lime measures 15.49:1 — louder as a button
                  * and more readable as a label than the pair it replaces. */
-                className="rounded-full border border-[var(--mk-ink)] px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
-                style={{ background: ACID, color: INK }}
+                className="rounded-full px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
+                style={{ background: INK, color: ACCENT_INK }}
               >
                 Start free
               </Link>
