@@ -295,8 +295,8 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
       {/* ── FAQ — plain disclosure elements: keyboard and screen-reader behaviour for free,
               and no state to get wrong. ─────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-[88rem] px-6 pb-24 pt-24 sm:px-10">
-        <div className="border-t pt-16" style={{ borderColor: HAIRLINE }}>
+      <Band tone="paper">
+        <div>
           <h2 className="font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 4.6vw, 3.6rem)" }}>
             <EditableText path="faq.heading">{faq.heading}</EditableText>
           </h2>
@@ -315,7 +315,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
             ))}
           </div>
         </div>
-      </section>
+      </Band>
 
       {/* ── CTA — EDGE TO EDGE, and the only full-bleed colour on the page ────────
           It used to be a rounded box inside a max-w-5xl, which is a card again: a band that
@@ -331,9 +331,16 @@ export function BoldHome({ content }: { content: SiteContent }) {
       >
         <div className="mx-auto max-w-[88rem]">
           <LabelRule left={hero.ruleLeft} right={hero.ruleRight} leftPath="hero.ruleLeft" rightPath="hero.ruleRight" tone="light" className="mb-16" />
-          {/* ACID on the accent — 16.66:1 on `studio`, 5.07 on `press`. Measured on every skin
-              by tools/check-skins.mjs, which is the only reason this line can be written. */}
-          <h2 className="max-w-[48rem] font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 5.4vw, 4.4rem)", color: ACID }}>
+          {/* THE HEADING IS PAPER, NOT ACID — changed 2026-08-26.
+            *
+            * Acid on the plate is legitimate type and always was: check-skins measures it at
+            * 15.49:1 on this ground, which is why the old note could be written at all. The
+            * problem was never contrast, it was COUNT. A lime headline above a lime button
+            * puts two lime things in one viewport, and the direction allows one — so the
+            * button, which is the whole purpose of the band, stopped being the loud thing.
+            *
+            * Paper lettering, lime button. The accent fires once and it fires on the action. */}
+          <h2 className="max-w-[48rem] font-display font-semibold leading-[0.95] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 5.4vw, 4.4rem)", color: ACCENT_INK }}>
             <EditableText path="cta.heading">{cta.heading}</EditableText>
           </h2>
           <p className="mt-5 max-w-lg text-[17px] leading-relaxed" style={{ color: ACCENT_INK, opacity: 0.72 }}><EditableText path="cta.subhead">{cta.subhead}</EditableText></p>
