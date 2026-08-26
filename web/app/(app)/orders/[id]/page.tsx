@@ -774,7 +774,7 @@ export default function OrderDetailPage() {
           </div>
 
           <div className={detailTab === "items" ? "space-y-5" : "hidden"}>
-          <SectionCard
+          <SectionCard className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0"
  title={`Items (${items.length})`}
  actions={canAddItem ? (
                   <Button size="sm" variant="outline" onClick={() => void addItem()} disabled={adding}
@@ -1235,7 +1235,7 @@ export default function OrderDetailPage() {
             child stops drawing its own border, corner and ring, and this container draws
             them once for the set. divide-y puts a hairline between the sections, so the
             four read as one object with four parts rather than four objects. */}
-        <div className="min-w-0 divide-y divide-border overflow-hidden rounded-[min(var(--radius-4xl),24px)] bg-card ring-1 ring-foreground/5">
+        <div className="min-w-0 space-y-6">
           {/* THE FACTORY NOTE, IN THE RAIL — moved 2026-08-26.
               Still one field, overwritten, staff-only: "the thing to know about this
               order", and still deliberately separate from the activity thread, which is a
@@ -1248,14 +1248,14 @@ export default function OrderDetailPage() {
               it must not cost a scroll to reach. The rail is already where everything that
               is not an item lives, and it is short enough to keep the note in view. */}
           {isStaff && (
-            <SectionCard title="Factory note" bodyClassName="p-5" className="rounded-none bg-transparent shadow-none ring-0">
+            <SectionCard title="Factory note" bodyClassName="p-5" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <InternalNote
                 orderId={order.id}
                 value={(order as { internal_note?: string | null }).internal_note ?? ""}
               />
             </SectionCard>
           )}
-          <SectionCard title="Customer" className="rounded-none bg-transparent shadow-none ring-0">
+          <SectionCard title="Customer" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
             <div className="space-y-3 p-5 text-sm">
               <div>
                 <div className="font-medium">{cust.name || "—"}</div>
@@ -1362,7 +1362,7 @@ export default function OrderDetailPage() {
  label exists on TikTok's side before the number reaches us, and a Shipping card
  that isn't there reads as "nothing has shipped". */}
           {(order.tracking || order.carrier || canFetchTiktokLabel(order)) && (
-            <SectionCard title="Shipping" className="rounded-none bg-transparent shadow-none ring-0">
+            <SectionCard title="Shipping" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <div className="flex items-start gap-2 p-5 text-sm">
                 <Truck size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
@@ -1436,7 +1436,7 @@ export default function OrderDetailPage() {
             {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
    we'll charge to produce this); once submitted the price is frozen and it
    falls back to the order's own totals. */}
-            <SectionCard title="Summary" className="rounded-none bg-transparent shadow-none ring-0">
+            <SectionCard title="Summary" className="rounded-none border-0 bg-transparent shadow-none ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
               <dl className="space-y-2 p-5 text-sm">
                 {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
    the alternative is a card that looks like an order nobody has priced. */}
