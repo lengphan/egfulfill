@@ -3,11 +3,10 @@
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree, Warning } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree, Warning, CaretDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
-import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -22,7 +21,7 @@ import { getToken } from "@/lib/auth"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { variantSku, variantLabel, productSizes, productColors } from "@/lib/variant-sku"
 import { prettyColorName } from "@/lib/color-name"
-import { bySize, isOneSize } from "@/lib/size-order"
+import { bySize, isOneSize, isSize } from "@/lib/size-order"
 import { PageTitle } from "@/components/app/page-title"
 import { TabBar } from "@/components/app/tab-bar"
 import { EmptyState } from "@/components/app/empty-state"
@@ -75,7 +74,8 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
  const [search, setSearch] = useState("")
   /** Restocking asks one question — what is short — so the Low and Out counts are a filter,
    * not a readout. Null is "everything", which is what you want when receiving. */
- const [needs, setNeeds] = useState<null | "low" | "out">(null)
+ const [view, setView] = useState<"all" | "low" | "out" | "unavailable">("all")
+ const needs: null | "low" | "out" = view === "low" || view === "out" ? view : null
  const [queuing, setQueuing] = useState(false)
   /** What the last bulk action did. This view had no message channel of its own — the one
    *  `err` in this file belongs to another component — and an action that quietly moves rows
@@ -85,7 +85,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
  const [cat, setCat] = useState("")
  const [vis, setVis] = useState<"" | SkuVisibility>("")
   /** Show only the rows no supplier catalogue still lists — the ones to review and clear. */
- const [onlyUnavailable, setOnlyUnavailable] = useState(false)
+ const onlyUnavailable = view === "unavailable"
   /** Supplier/variant resolved per sku — see the effect below. Declared here because
    * the filter reads it, and the filter is computed before that effect is defined. */
  const [meta, setMeta] = useState<Record<string, { supplier?: string | null; variant?: string | null; api?: string | null }>>({})
@@ -352,28 +352,38 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
         </div>
       ) : (
       <>
-      <StatGrid>
-        <StatCard label={tl("inventory", "SKUs")} value={String(stats.total)} sub={tl("inventory", "variants tracked")} />
-        {/**
-          * THE COUNTS ARE THE FILTER.
-          *
-          * "74 out of stock" is the answer to the question this page is opened with —
-          * restocking — and it was a number you could only read. Every route to acting on
-          * it went through typing something into the search box or scrolling 77 skus, so
-          * the figure that names the job was the one thing on the page you could not press.
-          */}
-        <button type="button" onClick={() => setNeeds(needs === "low" ? null : "low")} className="text-left">
-          <StatCard label={tl("inventory", "Low stock")} value={String(stats.low)} sub={needs === "low" ? tl("inventory", "showing these") : tl("inventory", "at/below reorder")}
- tone={stats.low ? "neg" : undefined} />
-        </button>
-        <button type="button" onClick={() => setNeeds(needs === "out" ? null : "out")} className="text-left">
-          <StatCard label={tl("inventory", "Out of stock")} value={String(stats.out)} sub={needs === "out" ? tl("inventory", "showing these") : tl("inventory", "need reorder")}
- tone={stats.out ? "neg" : undefined} />
-        </button>
-        <StatCard label={tl("inventory", "Reserved")} value={String(stats.reserved)} sub={tl("inventory", "on open orders")} />
-      </StatGrid>
-
+      {/**
+        * THE COUNTS ARE THE FILTER — and now they are the only thing they were ever read as.
+        *
+        * Four stat tiles ran across the top: SKUs, Low stock, Out of stock, Reserved. Two of
+        * them were secretly buttons, one was a total nobody acts on, and "No longer stocked"
+        * — the fourth way of narrowing this list — was a checkbox further down in the toolbar.
+        * So the page had four ways to filter itself wearing three different kinds of control,
+        * none of which looked like a filter.
+        *
+        * They are one row of tabs, which is what they always were: a set of mutually exclusive
+        * views of one list, with the count of each on it. RESERVED is not among them because
+        * it is not a view — it is a fact about the stock you are already looking at, and it
+        * lives in each row's title where it can be read against that row's own number.
+        */}
       <SectionCard title={tl("inventory", "Stock")}>
+        {/* The row sits INSIDE the card, above the controls that narrow it — a view is chosen
+            first and then filtered, and the order on screen says so. */}
+        <div className="px-4 pt-3">
+          <TabBar
+ size="sm"
+ spacing="none"
+ ariaLabel={tl("inventory", "Filter stock")}
+ value={view}
+ onChange={setView}
+ items={[
+              { id: "all" as const, label: tl("inventory", "All") },
+              { id: "low" as const, label: tl("inventory", "Low stock"), count: stats.low },
+              { id: "out" as const, label: tl("inventory", "Out"), count: stats.out },
+              { id: "unavailable" as const, label: tl("inventory", "No longer stocked") },
+            ]}
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-4">
           <div className="relative max-w-md flex-1">
             <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -385,20 +395,7 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
-          {/* The clean-up filter. Off by default: this table's job is what we HOLD, and a
- blank we can no longer buy is still stock on a shelf until someone decides
- otherwise. */}
-          {/* A CHECKBOX LOOKS LIKE A CHECKBOX. This wore .eg-control — the field chrome — so a
-              tick-box sat inside a bordered lozenge the same height and radius as the select
-              beside it and the button at the end of the row. Three different KINDS of control
-              in one shape, which is the thing that makes a toolbar unreadable: nothing about
-              any of them said what it did until you read the words. CLAUDE.md is explicit —
-              never give a checkbox a button's chrome; if it toggles, it looks like a toggle.
-              The box goes, the tick stays. */}
-          <label className="inline-flex h-8 cursor-pointer items-center gap-2 whitespace-nowrap px-1 text-sm">
-            <input type="checkbox" checked={onlyUnavailable} onChange={(e) => setOnlyUnavailable(e.target.checked)} className="size-3.5 accent-[var(--primary)]" />
-            <span className={onlyUnavailable ? "text-foreground" : "text-muted-foreground"}>{tl("inventory", "No longer stocked")}</span>
-          </label>
+
           <select
  value={vis}
  onChange={(e) => setVis(e.target.value as "" | SkuVisibility)}
@@ -573,6 +570,89 @@ function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: num
  * "Out / Low / In stock" about numbers that are on screen saying it themselves, in a column
  * that cost width all day.
  */
+/**
+ * THE SIZE OF A ROW, WITHOUT A CATALOGUE ENTRY.
+ *
+ * StockMatrix decomposes a sku against its catalog product — precise, and unavailable for
+ * everything imported straight from a supplier, which is most of this table. The ladder has
+ * to work on those too, so it reads the variant string the row already carries and takes the
+ * first segment that IS a size. "Adjustable · Black" -> Adjustable; "Black · L" -> L,
+ * whichever order the feed happened to write them in.
+ *
+ * The sku is the fallback because a variant is optional and a sku never is.
+ */
+function sizeOfRow(it: InventoryItem): string {
+  for (const seg of String(it.variant || "").split(/[·,/|]|\s+-\s+/)) {
+    const t = seg.trim()
+    if (t && isSize(t)) return t
+  }
+  for (const seg of String(it.sku || "").split("-")) {
+    // Purely numeric segments are excluded HERE and not in isSize, because the ladder is the
+    // only caller that reads raw sku fragments. "3230" really is a waist-and-inseam size when
+    // a variant declares it — but in a sku it is overwhelmingly the style number, and
+    // EG-22-ADJUSTABLE-BLACK was drawing a size band labelled "22".
+    if (seg && !/^\d+$/.test(seg) && isSize(seg)) return seg
+  }
+  return ""
+}
+
+/**
+ * STOCK ACROSS SIZES, ON THE COLLAPSED ROW.
+ *
+ * The table opened every product at once: 38 styles times every variant, so a cap with 17
+ * colours pushed the next style off the screen — and the question this page is opened with,
+ * what is short, could only be answered by scrolling through everything that is not.
+ *
+ * The ladder answers it without opening anything. It is the SIZE axis and not the colour one
+ * because a size runs out on its own: 2XL going while every other size is deep is the normal
+ * shape of a shortage, and it is invisible inside a single total.
+ *
+ * Amber and red are the reserved status colours doing their reserved job — at or below the
+ * reorder point, and nothing on the shelf. No other hue appears here.
+ */
+function SizeLadder({ rows, lowAt }: { rows: InventoryItem[]; lowAt: (it: InventoryItem) => number }) {
+  const bands = useMemo(() => {
+    const acc = new Map<string, { n: number; low: boolean; out: boolean }>()
+    for (const r of rows) {
+      const z = sizeOfRow(r) || "—"
+      const cur = acc.get(z) ?? { n: 0, low: false, out: false }
+      cur.n += num(r.in_stock)
+      acc.set(z, cur)
+    }
+    // A band is short when its TOTAL is at or below the reorder point, not when one colour
+    // inside it is — the ladder prints a per-size figure, so its colour has to mean the same
+    // thing that figure does.
+    for (const [z, v] of acc) {
+      const forSize = rows.filter((r) => (sizeOfRow(r) || "—") === z)
+      const point = Math.max(0, ...forSize.map(lowAt))
+      v.out = v.n <= 0
+      v.low = !v.out && v.n <= point
+      acc.set(z, v)
+    }
+    return [...acc.entries()].sort((a, b) => bySize(a[0], b[0]))
+  }, [rows, lowAt])
+
+  if (bands.length === 0) return null
+  if (bands.length === 1 && bands[0][0] === "—") return null
+  return (
+    <div className="hidden shrink-0 items-end gap-1 lg:flex">
+      {bands.map(([z, v]) => (
+        <div
+          key={z}
+          title={(isOneSize(z) ? "One size" : z) + " — " + v.n + " on the shelf"}
+          className={"w-11 rounded-md px-1 py-1 text-center leading-none "
+            + (v.out ? "bg-alert/10 text-alert"
+              : v.low ? "bg-hold/10 text-hold"
+              : "bg-muted/50 text-foreground")}
+        >
+          <div className="truncate text-[9px] uppercase tracking-wide opacity-70">{isOneSize(z) ? "OS" : z}</div>
+          <div className="mt-0.5 text-xs font-semibold tabular-nums">{v.n}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ProductSheet({
  group, selected, onSelect, meta, sel, setSel, edit, setVisibility, remove,
  onProductHistory, onZoom, onOrder,
@@ -593,6 +673,13 @@ function ProductSheet({
   const tl = useLabelT()
   // Second press arms the removal — the count is the warning, so it is in the label.
  const [killing, setKilling] = useState(false)
+  /**
+   * SHUT UNTIL ASKED. Every product rendered its full grid, so the page was as long as the
+   * catalogue and the styles below the fold were unreachable without scrolling past every
+   * variant of the ones above. The ladder carries what the grid was being opened FOR, so
+   * opening it becomes a choice rather than the only way to see anything.
+   */
+ const [open, setOpen] = useState(false)
  const stock = group.rows.reduce((n, r) => n + num(r.in_stock), 0)
  const reserved = group.rows.reduce((n, r) => n + num(r.reserved), 0)
  const out = group.rows.filter(isOut).length
@@ -624,6 +711,7 @@ function ProductSheet({
             {supplier && <span> · {supplier}</span>}
           </div>
         </div>
+        <SizeLadder rows={group.rows} lowAt={(it) => Number(it.reorder_at ?? 25)} />
         {/* THE TOTAL IS A CAPTION, NOT A COLUMN. It used to sit in the Stock column beside
  editable variant counts, which made a figure nobody can type into look like one
  they should. Held is in the title, where it was already. */}
@@ -636,6 +724,16 @@ function ProductSheet({
             {out === group.rows.length ? tl("inventory", "none on the shelf") : out ? `${out} out` : tl("inventory", "on the shelf")}
           </div>
         </div>
+        <button
+ type="button"
+ onClick={() => setOpen((v) => !v)}
+ aria-expanded={open}
+ aria-label={(open ? "Collapse " : "Expand ") + group.name}
+ title={open ? "Hide the size and colour grid" : "Show the size and colour grid"}
+ className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <CaretDown size={14} weight="bold" className={"transition-transform " + (open ? "rotate-180" : "")} />
+        </button>
         <Popover>
           <PopoverTrigger
  aria-label={`Actions for ${group.name}`}
@@ -707,14 +805,16 @@ function ProductSheet({
           </PopoverContent>
         </Popover>
       </header>
-      <StockMatrix
+      {open && (
+        <StockMatrix
  group={group}
  sel={sel}
  setSel={setSel}
  onOrder={onOrder}
  edit={(s, _f, v) => edit(s, "in_stock", v)}
  lowAt={(it) => Number(it.reorder_at ?? 25)}
-      />
+        />
+      )}
     </section>
   )
 }

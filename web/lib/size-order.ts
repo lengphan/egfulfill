@@ -77,3 +77,21 @@ export function sizeRangeLabel(sizes: readonly string[] | null | undefined): str
   const first = sorted[0], last = sorted[sorted.length - 1]
   return first === last ? first : `${first}–${last}`
 }
+
+/**
+ * IS THIS TOKEN A SIZE AT ALL?
+ *
+ * The ladder above can ORDER sizes but could never tell one from a colour, so every caller
+ * that needed the question answered — "which half of `Adjustable · Black` is the size?" —
+ * was re-deriving it with its own regex. sizeRank already knows: it parks anything it does
+ * not recognise in the trailing group, so membership is simply "did it land somewhere else".
+ *
+ * Kept here rather than at a call site because a second copy would disagree the first time
+ * a supplier ships a spelling only one of them handles.
+ */
+export function isSize(raw: string): boolean {
+  const s = String(raw || "").trim()
+  if (!s) return false
+  const [group] = sizeRank(s)
+  return group !== 90 && group !== 99
+}
