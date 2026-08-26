@@ -137,6 +137,7 @@ export default function OrderDetailPage() {
  const [addrErr, setAddrErr] = useState<string | null>(null)
  const [messages, setMessages] = useState<ChatEntry[]>([])
  const [msg, setMsg] = useState("")
+ const [detailTab, setDetailTab] = useState<"items" | "activity">("items")
  const [customize, setCustomize] = useState<OrderItem | null>(null)
   // Design-partner state per line. Read separately from the order so a failure costs the
   // chip, not the page — and it 403s for sellers, which is exactly the intended result:
@@ -740,8 +741,39 @@ export default function OrderDetailPage() {
  the whole grid past its container — the page then scrolls sideways. There was
  slack to absorb it at 1600px; at the reading width there isn't. */}
       <div className="grid gap-5 lg:grid-cols-[2.1fr_1fr]">
-        {/* items + timeline */}
+        {/* THE LEFT COLUMN IS TABBED — 2026-08-26.
+            Five cards stacked meant the item list, which is what this page is FOR, was
+            followed by four more before the fold, and Design files sat below however many
+            lines the order happened to have. Items and Activity are two different
+            questions; each gets its own word and the items get the height they need.
+
+            BOTH PANELS STAY MOUNTED and are hidden with `hidden` rather than unmounted —
+            switching tabs must not refetch the thread or drop a half-typed message, and an
+            unmounted panel takes its scroll position and its draft with it. */}
         <div className="min-w-0 space-y-5">
+          <div className="flex gap-6 border-b border-border">
+            {([
+              { id: "items" as const, label: `Items (${items.length})` },
+              { id: "activity" as const, label: "Activity" },
+            ]).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setDetailTab(t.id)}
+                aria-current={detailTab === t.id}
+                className={
+                  "eg-tap -mb-px border-b-2 pb-2.5 text-sm transition-colors " +
+                  (detailTab === t.id
+                    ? "border-primary font-semibold text-foreground"
+                    : "border-transparent font-medium text-muted-foreground hover:text-foreground")
+                }
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={detailTab === "items" ? "space-y-5" : "hidden"}>
           <SectionCard
  title={`Items (${items.length})`}
  actions={canAddItem ? (
@@ -1016,6 +1048,8 @@ export default function OrderDetailPage() {
             )}
           </SectionCard>
 
+          </div>
+          <div className={detailTab === "activity" ? "space-y-5" : "hidden"}>
           {/* Design deliverables — the seller's .pes files. Factory .emb/mockups are
  filtered out server-side and the bytes are paywalled there too, so this
  renders nothing when there's nothing they can buy. */}
@@ -1191,6 +1225,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
           </SectionCard>
+          </div>
         </div>
 
         {/* summary */}
