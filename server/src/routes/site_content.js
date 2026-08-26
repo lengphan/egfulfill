@@ -201,14 +201,44 @@ export function siteContentRoutes(app, requireAdmin) {
   // is served on every homepage view; storage holds the image, the blob holds a URL.
   const IMG_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
   const MAX_IMG_BYTES = 8 * 1024 * 1024; // a hero photo, not a video
+
+  /*
+   * THE HERO SLOT TAKES A VIDEO TOO — added 2026-08-26, because the hero is the one surface
+   * where a moving picture is the point and everything else on these pages is a cut-out.
+   *
+   * SEPARATE MAP AND SEPARATE CEILING, deliberately. Folding video into IMG_TYPES would have
+   * given an mp4 the 8MB image limit and the error text "resize it first", which is advice
+   * nobody can act on for a video. The two are different media with different failure modes,
+   * so they get different gates and different sentences.
+   *
+   * 48MB against the app's 60MB body limit. A data URL is base64, so it arrives ~4/3 the size
+   * of the file — 48MB of bytes is about 64MB on the wire, which is why the browser sends this
+   * straight to api.egful.store rather than through Vercel's ~4.5MB proxy (lib/api.ts routes a
+   * large body there on its own). A hero loop is seconds long; anything near this ceiling is a
+   * film that wants encoding down, not a bigger limit.
+   *
+   * NO TRANSCODE HERE. The bytes are stored as uploaded, so what plays is what was handed in —
+   * h.264 in an .mp4 is the safe answer and .webm is accepted for anyone who prefers it.
+   */
+  const VID_TYPES = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
+  const MAX_VID_BYTES = 48 * 1024 * 1024;
   app.post('/api/site-content/hero-image', { preHandler: requireAdmin }, async (req, reply) => {
     if (!storageEnabled()) { reply.code(503); return { error: 'Object storage is not configured on the server.' }; }
     const dataUrl = req.body && req.body.dataUrl;
     if (!dataUrl || typeof dataUrl !== 'string') { reply.code(400); return { error: 'dataUrl required' }; }
     const { mime, buffer } = fromDataUrl(dataUrl);
-    const ext = IMG_TYPES[mime];
-    if (!ext) { reply.code(415); return { error: 'Image must be JPEG, PNG, WebP, AVIF or GIF.' }; }
-    if (buffer.length > MAX_IMG_BYTES) { reply.code(413); return { error: 'Image is over 8MB — resize it first.' }; }
+    // Video is checked FIRST only so the branch reads in the order the sizes do; the two maps
+    // are disjoint, so the order cannot change which one matches.
+    const isVideo = !!VID_TYPES[mime];
+    const ext = isVideo ? VID_TYPES[mime] : IMG_TYPES[mime];
+    if (!ext) { reply.code(415); return { error: 'Must be an image (JPEG, PNG, WebP, AVIF, GIF) or a video (MP4, WebM, MOV).' }; }
+    const cap = isVideo ? MAX_VID_BYTES : MAX_IMG_BYTES;
+    if (buffer.length > cap) {
+      reply.code(413);
+      return { error: isVideo
+        ? 'That video is over 48MB — export it shorter or at a lower bitrate.'
+        : 'Image is over 8MB — resize it first.' };
+    }
     // A timestamped key so a re-upload never collides with or overwrites the previous one,
     // and cached CDN copies of the old URL don't serve stale bytes.
     const name = `hero-${Date.now()}.${ext}`;
@@ -242,6 +272,49 @@ export function siteContentRoutes(app, requireAdmin) {
       // Keys are timestamped and never overwritten, so cache hard — this keeps repeat views
       // off the storage backend entirely after the first fetch.
       reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+
+      /*
+       * ── RANGE REQUESTS, WHICH THE HERO VIDEO NEEDS TO PLAY AT ALL ──────────────────
+       *
+       * This is not an optimisation. Safari opens a <video> by asking for `bytes=0-1` and
+       * requires a 206 back; served a plain 200 with the whole body it decides the resource
+       * is not seekable and refuses to play — silently, with no console error, which is the
+       * worst version of this bug because the markup looks correct. Chrome and Firefox are
+       * more forgiving, so a video that "works on my machine" and is dead on every iPhone is
+       * exactly the shape this produces. Announced with Accept-Ranges on every asset.
+       *
+       * The slice is cheap because getObject already buffers the whole object — it is one
+       * subarray, not a second fetch. That buffering is also the ceiling on this route: a
+       * 48MB video is 48MB of process memory per concurrent cold request, which is fine for
+       * a hero everyone's browser caches immutably and would not be fine for a library. If
+       * this route ever serves many videos, stream the storage GET instead of buffering it.
+       */
+      const total = obj.body.length;
+      reply.header('Accept-Ranges', 'bytes');
+      const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || '').trim());
+      if (m && (m[1] !== '' || m[2] !== '')) {
+        let start, end;
+        if (m[1] === '') {
+          // A SUFFIX RANGE ("bytes=-500") means the LAST n bytes, not "from 0 to 500". Read
+          // the wrong way it serves the head of the file where the tail was asked for, and
+          // the player shows a frozen first frame rather than an error.
+          start = Math.max(0, total - Number(m[2]));
+          end = total - 1;
+        } else {
+          start = Number(m[1]);
+          end = m[2] === '' ? total - 1 : Math.min(Number(m[2]), total - 1);
+        }
+        if (!Number.isFinite(start) || start >= total || start > end) {
+          reply.code(416);
+          reply.header('Content-Range', `bytes */${total}`);
+          return reply.send();
+        }
+        reply.code(206);
+        reply.header('Content-Range', `bytes ${start}-${end}/${total}`);
+        reply.header('Content-Length', String(end - start + 1));
+        return reply.send(obj.body.subarray(start, end + 1));
+      }
+      reply.header('Content-Length', String(total));
       return reply.send(obj.body);
     } catch {
       reply.code(502); return { error: 'asset unavailable' };

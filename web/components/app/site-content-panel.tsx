@@ -12,7 +12,8 @@ import { DEFAULT_SITE_CONTENT, type SiteContent, type PageFigure } from "@/lib/s
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { MotionEditor } from "@/components/app/motion-editor"
 import { Dropzone } from "@/components/app/dropzone"
-import { downscaleImage } from "@/lib/image-downscale"
+import { downscaleImage, fileToDataUrl } from "@/lib/image-downscale"
+import { isVideoSrc, MEDIA_ACCEPT } from "@/lib/media"
 
 // Module-scope so they're stable across renders (react-hooks/static-components forbids
 // defining components inside render).
@@ -75,7 +76,7 @@ function Intro({ children }: { children: React.ReactNode }) {
  * error line shared by all three; what varies is only WHERE the resulting URL is written, so
  * that is the callback.
  */
-function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, preview, broken, onBroken, hint }: {
+function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, preview, broken, onBroken, hint, video = false }: {
   figure: PageFigure
   /** Scoped to this page's figure, so a call site can't write to the wrong one. */
   edit: (fn: (f: PageFigure) => void) => void
@@ -91,6 +92,17 @@ function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, p
   broken: boolean
   onBroken: () => void
   hint: string
+  /**
+   * WHETHER THIS SLOT TAKES MOTION, and it is off for two of the three call sites on purpose.
+   *
+   * Only the homepage hero renders a video — the other two figures are CutoutFigure, which
+   * wants a PNG with a real alpha channel and has nothing to do with a film. Accepting an mp4
+   * everywhere would let an admin drop one into /features, watch it upload successfully, save,
+   * and then find the page renders nothing at all: every step reports success and the result
+   * is a blank section. The picker is the only place that mismatch can still be refused with a
+   * sentence, so it is refused here.
+   */
+  video?: boolean
 }) {
   const tl = useLabelT()
   /* Each editor owns its own input. A single shared ref in the parent would need a second
@@ -99,7 +111,7 @@ function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, p
   const fileRef = useRef<HTMLInputElement>(null)
   return (
     <>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { onPickFile(e.target.files?.[0]); if (fileRef.current) fileRef.current.value = "" }} />
+      <input ref={fileRef} type="file" accept={video ? MEDIA_ACCEPT : "image/*"} className="hidden" onChange={(e) => { onPickFile(e.target.files?.[0]); if (fileRef.current) fileRef.current.value = "" }} />
       <div>
         <span className="mb-1 block text-xs font-medium text-muted-foreground">{tl("siteContent", "Figure")}</span>
         {(preview || figure.image) ? (
@@ -113,9 +125,19 @@ function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, p
                 <span className="max-w-sm">{tl("siteContent", "Its URL was saved, but the browser can’t open it — usually the storage bucket / CDN isn’t public. Re-upload, or check")} <code>SPACES_CDN</code> {tl("siteContent", "and public-read on the server.")}</span>
               </div>
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview || figure.image} alt={tl("siteContent", "Figure preview")} onError={onBroken}
-                className="max-h-44 w-full rounded-lg border border-border object-contain" />
+              /* THE PREVIEW MATCHES WHAT THE PAGE WILL DRAW. An <img> pointed at an mp4 fires
+                 onError and lands on the "isn't loading" branch above — which would blame the
+                 storage bucket for a file that uploaded perfectly. Muted and looping, like the
+                 hero, so what is previewed is what ships; controls are on because this one IS
+                 a thing to inspect rather than a background. */
+              isVideoSrc(preview || figure.image) ? (
+                <video src={preview || figure.image} onError={onBroken} controls muted loop playsInline
+                  className="max-h-44 w-full rounded-lg border border-border object-contain" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview || figure.image} alt={tl("siteContent", "Figure preview")} onError={onBroken}
+                  className="max-h-44 w-full rounded-lg border border-border object-contain" />
+              )
             )}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
@@ -131,7 +153,7 @@ function FigureEditor({ figure, edit, onPickFile, onRemove, uploading, saving, p
              under a control, which is the thing §4 keeps having to delete. */
           <Dropzone
             icon={ImageIcon}
-            accept="image/*"
+            accept={video ? MEDIA_ACCEPT : "image/*"}
             disabled={uploading}
             busy={uploading ? "Uploading…" : null}
             onFiles={(files) => onPickFile(files[0])}
@@ -286,15 +308,29 @@ export function SiteContentPanel() {
   // back a URL — so nothing on the server needed to change to support three of these.
  const onPickImage = async (file: File | undefined, key: string, apply: (c: SiteContent, url: string) => void) => {
  if (!file) return
- if (!file.type.startsWith("image/")) { setErr("That file isn't an image — pick a JPEG, PNG, WebP or AVIF."); return }
+    /*
+     * TWO MEDIA, TWO GATES. A video cannot go through downscaleImage — that draws the file
+     * onto a canvas and re-encodes it as a JPEG, so an mp4 would come back as a single still
+     * frame, upload happily, and play as a frozen picture. The branch is not a size
+     * optimisation; it is the difference between storing the film and storing a screenshot
+     * of it.
+     *
+     * The ceilings differ for the same reason the server's do (site_content.js): 40MB of
+     * photo is a mistake, 40MB of video is a Tuesday. Nothing here re-encodes the video, so
+     * what this admits is what gets stored — and the data URL is base64, about 4/3 the file,
+     * which lib/api.ts routes to api.egful.store on size rather than through Vercel's proxy.
+     */
+ const isVid = file.type.startsWith("video/")
+ if (!isVid && !file.type.startsWith("image/")) { setErr("That file isn't an image or a video — pick a JPEG, PNG, WebP, AVIF, MP4, WebM or MOV."); return }
     // Generous ceiling only as a sanity check — anything reasonable is downscaled below the
     // proxy limit before it's sent, so a big camera photo is fine.
- if (file.size > 40 * 1024 * 1024) { setErr("That image is over 40MB — pick a smaller one."); return }
+ if (!isVid && file.size > 40 * 1024 * 1024) { setErr("That image is over 40MB — pick a smaller one."); return }
+ if (isVid && file.size > 48 * 1024 * 1024) { setErr("That video is over 48MB — export it shorter or at a lower bitrate."); return }
  setUploading(true); setErr(null); setImgBroken(null)
  try {
       // Resize + re-encode in the browser FIRST. A raw photo base64's past Vercel's ~4.5MB
       // proxy body limit and the upload fails; the downscaled data URL comfortably fits.
- const dataUrl = await downscaleImage(file)
+ const dataUrl = isVid ? await fileToDataUrl(file) : await downscaleImage(file)
       // Instant local preview, so the banner shows immediately and stays visible even if the
       // stored URL later can't load.
  setLocalPreview({ key, url: dataUrl })
@@ -382,9 +418,12 @@ export function SiteContentPanel() {
           </div>
           <Field label={tl("siteContent", "'Works with' label")} value={c.hero.worksWithLabel} onChange={(v) => edit((x) => { x.hero.worksWithLabel = v })} />
 
-          {/* The hero figure — see the note on SiteContent.hero.image. */}
+          {/* The hero figure — see the note on SiteContent.hero.image. `video` is passed HERE
+              and nowhere else: this is the only slot whose component (MediaHero) can draw a
+              film. The two page figures below are CutoutFigure and take a still with alpha. */}
           <FigureEditor
-            {...figureProps("hero", (x) => x.hero, "A cut-out PNG stands on the page, a JPEG sits on it. Make one in Studio: Backdrop → cut-out ready, then Remove background.")}
+            video
+            {...figureProps("hero", (x) => x.hero, "A full-bleed picture the headline sits on. An MP4 or WebM works too — it plays muted and looping, and holds on a frame under reduced motion.")}
           />
 
           <div className="grid gap-3 sm:grid-cols-2">

@@ -108,3 +108,26 @@ async function downscaleFrom(
  return original
   }
 }
+
+
+/**
+ * A FILE, VERBATIM, AS A DATA URL — no canvas, no re-encode.
+ *
+ * The counterpart to downscaleImage, and it exists because that function is the wrong tool
+ * for anything that is not a still: it paints the file onto a canvas and exports a JPEG, so
+ * handed a video it returns one frame and every later step succeeds on the wrong bytes.
+ *
+ * Nothing here shrinks anything. The caller has already decided the file is small enough to
+ * send — this only changes its encoding, and base64 makes it about a third larger on the
+ * wire, which is the size lib/api.ts uses to route past the proxy.
+ */
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => resolve(String(fr.result))
+    // The DOMException is on the reader, not on the event — reading it off the event gives
+    // "undefined" in the error line, which is the least useful thing a failed upload can say.
+    fr.onerror = () => reject(fr.error || new Error("Couldn't read that file."))
+    fr.readAsDataURL(file)
+  })
+}
