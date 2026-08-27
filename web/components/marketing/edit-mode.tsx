@@ -565,7 +565,12 @@ export function EditableImage({ path, children, transform = true }: {
       {/* TOP-RIGHT, not bottom-centre: the page-level toolbar is fixed to the bottom middle,
           and the two landed on top of each other — the figure's own controls were underneath
           the Save button, which is the one place they must not be. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end p-3">
+      {/* z-20 SO THE BAR OUTRANKS THE DRAG SURFACE. The surface is z-[5] and this had no
+          z-index at all, and `auto` loses to any positive value no matter which came first in
+          the DOM — so arming Reposition painted the drag layer straight over this bar and
+          Done became unclickable. The mode could be entered and not left. Anything that turns
+          a mode ON must stay reachable to turn it off. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-end p-3">
         <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-background/95 px-2 py-1.5 backdrop-blur">
           {/* GENERATE COMES FIRST, because it is the one that does not need you to already
               have a file. Upload is the fallback for a picture that exists. */}
