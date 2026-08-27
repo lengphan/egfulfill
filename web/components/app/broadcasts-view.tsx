@@ -291,7 +291,11 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
  * mirrors the backend — drafting is reversible, and a send to the whole seller base is the
  * least reversible thing in the product.
  */
-export function BroadcastsView() {
+export function BroadcastsView({ embedded }: {
+  /** The page around it already says "Broadcasts". Drop the card's own title; its actions
+   *  stay in place. */
+  embedded?: boolean
+} = {}) {
   const tl = useLabelT()
  const [rows, setRows] = useState<Broadcast[]>([])
  const [mailOk, setMailOk] = useState(true)
@@ -541,7 +545,7 @@ export function BroadcastsView() {
 
  if (loading) {
  return (
-      <SectionCard title={tl("broadcasts", "Broadcasts")}>
+      <SectionCard title={embedded ? undefined : tl("broadcasts", "Broadcasts")}>
         <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
       </SectionCard>
     )
@@ -550,7 +554,7 @@ export function BroadcastsView() {
  return (
     <div className="space-y-4">
       <SectionCard
- title={tl("broadcasts", "Broadcasts")}
+ title={embedded ? undefined : tl("broadcasts", "Broadcasts")}
  actions={
           <div className="flex items-center gap-2">
             {/* Branding is a one-time setup behind this button (admin-only), not a panel. */}

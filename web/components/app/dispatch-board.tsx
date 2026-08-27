@@ -217,7 +217,14 @@ const HIST_FILTERS: { key: "all" | DispKey; label: string }[] = [
   { key: "attention", label: "Needs a look" },
 ]
 
-export function DispatchBoard() {
+export function DispatchBoard({ segmented }: {
+  /** ONE IDIOM FOR THE FILTER ROW. Measured on this strip: five filters wearing two
+   *  different treatments — "All" a filled chip, the other four bare grey text, so four
+   *  controls doing the same job did not read as controls at all. Segmented gives them one
+   *  track, one height with the search field beside them, and an active state that is a
+   *  raised tile rather than a colour. Off by default; /shipping is unchanged. */
+  segmented?: boolean
+} = {}) {
   const tl = useLabelT()
  const role = getUser()?.role || ""
   // Operators work this board too — they are the ones who notice a label shouldn't go
@@ -1047,7 +1054,7 @@ export function DispatchBoard() {
             value={view}
             onChange={setView}
           />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("dispatch", "Search order, customer or tracking…")} className="h-9 max-w-xs" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("dispatch", "Search order, customer or tracking…")} className={(segmented ? "h-8 min-w-[180px] flex-1 max-w-sm" : "h-9 max-w-xs")} />
           {view === "history" && (
             <div className="flex flex-wrap items-center gap-1">
               {HIST_FILTERS.map((f) => (
@@ -1065,14 +1072,21 @@ export function DispatchBoard() {
               Counted, so an empty list is never ambiguous between "nothing matches this
  filter" and "nothing is here at all". */}
           {view === "queue" && (
-            <div className="flex flex-wrap items-center gap-1">
+            <div className={segmented
+              ? "flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+              : "flex flex-wrap items-center gap-1"}>
               {QUEUE_FILTERS.map((f) => (
                 <button
  key={f.key}
  onClick={() => setQFilter(f.key)}
  disabled={f.key !== "all" && !filterCounts[f.key]}
- className={"rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
-                    (qFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                  className={segmented
+                    ? ("h-8 rounded-md px-2.5 text-xs font-medium transition-colors disabled:opacity-40 " +
+                       (qFilter === f.key
+                         ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                         : "text-muted-foreground hover:text-foreground"))
+                    : ("rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
+                       (qFilter === f.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"))}
                 >
                   {tl("dispatch", f.label)}{filterCounts[f.key] ? ` · ${filterCounts[f.key]}` : ""}
                 </button>

@@ -77,7 +77,13 @@ const STAGE_WHY: Record<string, string> = {
  archived: "Archived.",
 }
 
-export function SourcingView() {
+export function SourcingView({ embedded }: {
+  /** The page around it already says "Sourcing". Drop the view's own heading — and the
+   *  sentence under it, which is the §4 prose-under-a-control shape: a subtitle explaining
+   *  a heading the reader has just read. The actions in that row stay exactly where they
+   *  are. */
+  embedded?: boolean
+} = {}) {
   const tl = useLabelT()
  const confirm = useConfirm()
   // Which view is showing, and whether the second one exists at all.
@@ -315,12 +321,14 @@ export function SourcingView() {
       <div className={canBrowse && tab === "find" ? "hidden" : undefined}>
       <SectionCard>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-          <div className="flex-1">
-            <h2 className="text-sm font-semibold">{tl("sourcing", "Sourcing")}</h2>
-            <p className="text-xs text-muted-foreground">
-              {tl("sourcing", "Where each product comes from and what it lands at, once freight is spread over the MOQ.")}
-            </p>
-          </div>
+          {embedded ? <div className="flex-1" /> : (
+            <div className="flex-1">
+              <h2 className="text-sm font-semibold">{tl("sourcing", "Sourcing")}</h2>
+              <p className="text-xs text-muted-foreground">
+                {tl("sourcing", "Where each product comes from and what it lands at, once freight is spread over the MOQ.")}
+              </p>
+            </div>
+          )}
           {/* ONE LINE, not a panel. Whether Alibaba is connected is a fact about this page,
  and the only action it ever needs is Connect — which is nobody's job but an
  admin's, and only once. A card for it would out-weigh the search it enables. */}

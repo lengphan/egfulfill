@@ -1,5 +1,8 @@
+"use client"
+
 import type { ElementType } from "react"
 import { Card } from "@/components/ui/card"
+import { RailPortal, useInRail, useRailNode } from "@/components/app/console-shell"
 
 export type Tone = "pos" | "neg" | "mut"
 
@@ -39,6 +42,7 @@ export function StatCard({
   /** That slice is the one currently on screen. */
   active?: boolean
 }) {
+  const inRail = useInRail()
   // Type carries the hierarchy; nothing else needs to. The label was 11.5px and the sub
   // 12.5px — below comfortable reading size for a figure someone checks in passing, which
   // is what made these tiles feel cramped rather than calm. Both go up, the value grows,
@@ -64,6 +68,34 @@ export function StatCard({
       {tone === "pos" && <span className="mt-2.5 block h-[3px] w-9 rounded-full bg-[var(--brand-foreground)]" />}
     </>
   )
+
+  /* INSIDE A CONSOLE RAIL the same tile is drawn as type: the label above, the figure
+     under it, no border and no ground. Nothing about the caller changes — a page opts in by
+     being wrapped in ConsoleShell, and every StatGrid outside one is untouched. The lead
+     bar goes ABSOLUTE here because in flow it makes the flagged figure taller than its
+     neighbours, and `items-end` then drops the labels onto different lines; a rail whose
+     figures do not share a baseline is not comparable, which is the only reason to put them
+     in a row. */
+  if (inRail) {
+    const fig = (
+      <>
+        <span className="block eg-label whitespace-nowrap text-muted-foreground">{label}</span>
+        <span className="mt-1 block text-2xl font-semibold leading-none tracking-tight tabular-nums">{value}</span>
+        {tone === "pos" && <span className="absolute bottom-0 left-0 h-[3px] w-8 rounded-full bg-[var(--brand-foreground)]" />}
+      </>
+    )
+    if (!onClick) return <div className="relative shrink-0 pb-[7px]">{fig}</div>
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className="eg-tap relative shrink-0 cursor-pointer rounded-md pb-[7px] text-left transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        {fig}
+      </button>
+    )
+  }
 
   if (!onClick) {
     return <Card className="relative gap-0 overflow-hidden p-4 sm:p-6">{body}</Card>
@@ -93,5 +125,20 @@ export function StatCard({
  * comfortably in half a phone; giving them the whole width bought nothing and cost the page.
  */
 export function StatGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      {/* Inside a ConsoleShell these go to the page header instead, as figures. Outside one
+          RailPortal renders nothing, so the grid below is the only output and every existing
+          board is byte-identical. */}
+      <RailPortal>{children}</RailPortal>
+      <StatGridInPlace>{children}</StatGridInPlace>
+    </>
+  )
+}
+
+/** The original 4-up grid. Hidden when a rail has taken the figures. */
+function StatGridInPlace({ children }: { children: React.ReactNode }) {
+  const rail = useRailNode()
+  if (rail) return null
   return <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">{children}</div>
 }
