@@ -90,8 +90,29 @@ export type PageFigure = {
 /** The rule across the top of a section: a word at each end, a hairline between. */
 export type RuleLabels = { ruleLeft: string; ruleRight: string }
 
-/** What a marketing page's opening plate says. */
-export type PageHead = { title: string; accent: string; sub: string }
+/**
+ * What a marketing page's opening block says — and now what it SHOWS.
+ *
+ * `heroImage` is empty on every page until someone sets one, and empty is the honest answer:
+ * the page falls back to the ink plate it has always drawn rather than a grey box where a
+ * photograph should be. That fallback is what lets a page be converted without being broken —
+ * see PlateHero/MediaHero at the call sites.
+ *
+ * The three adjustment fields are the same trio a full-bleed picture always needs and mean
+ * exactly what they mean on `hero` — see FOCUS_MIN. Repeated here rather than shared with
+ * PageFigure because a page's BANNER and a page's FIGURE are two different pictures, and one
+ * shape covering both is how they end up unable to differ.
+ */
+export type PageHead = {
+  title: string
+  accent: string
+  sub: string
+  heroImage: string
+  heroImageAlt: string
+  heroImageScale: number
+  heroImageFocusX: number
+  heroImageFocusY: number
+}
 
 /** /features — the six capabilities, as a numbered run. */
 export type FeaturesPage = PageHead & RuleLabels & {
@@ -294,6 +315,12 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     title: "Everything after",
     accent: "the sale.",
     sub: "Six things this platform does so you don't have to. Every one of them runs whether you're watching or not.",
+    /* Empty is deliberate — the page draws its plate until someone sets a picture. */
+    heroImage: "",
+    heroImageAlt: "",
+    heroImageScale: 1,
+    heroImageFocusX: 50,
+    heroImageFocusY: 50,
     ruleLeft: "EGFULFILL",
     ruleRight: "WHAT THE PLATFORM DOES",
     figure: {
@@ -366,6 +393,12 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     title: "Three steps.",
     accent: "Then it runs.",
     sub: "Connect, upload, submit. Everything after that happens without you opening a shipping screen.",
+    /* Empty is deliberate — the page draws its plate until someone sets a picture. */
+    heroImage: "",
+    heroImageAlt: "",
+    heroImageScale: 1,
+    heroImageFocusX: 50,
+    heroImageFocusY: 50,
     ruleLeft: "EGFULFILL",
     ruleRight: "HOW IT WORKS",
     figure: {
@@ -463,6 +496,17 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   /* image / ghostWord / callouts are kept AS TYPED — blank is a deliberate choice for all
      three (no picture, no ghost word, no labels) and `str` would resurrect a default the
      admin had just cleared. Same three fields, same reasoning, as the hero above. */
+  /* A PAGE'S BANNER, read the same way for every page that has one. The three adjustment
+     fields go through the same clamps `hero` uses, so a value typed into one page's editor
+     cannot mean something different from the same value on another. */
+  const bannerOf = (stored: Record<string, unknown>, dflt: PageHead) => ({
+    heroImage: typeof stored.heroImage === "string" ? stored.heroImage : dflt.heroImage,
+    heroImageAlt: str(stored.heroImageAlt, dflt.heroImageAlt),
+    heroImageScale: num(stored.heroImageScale, dflt.heroImageScale, FIGURE_SCALE_MIN, FIGURE_SCALE_MAX),
+    heroImageFocusX: num(stored.heroImageFocusX, dflt.heroImageFocusX, FOCUS_MIN, FOCUS_MAX),
+    heroImageFocusY: num(stored.heroImageFocusY, dflt.heroImageFocusY, FOCUS_MIN, FOCUS_MAX),
+  })
+
   const figureOf = (stored: Record<string, unknown>, dflt: PageFigure): PageFigure => ({
     image: typeof stored.image === "string" ? stored.image : dflt.image,
     imageAlt: str(stored.imageAlt, dflt.imageAlt),
@@ -533,6 +577,7 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       title: str(featuresPage.title, d.featuresPage.title),
       accent: str(featuresPage.accent, d.featuresPage.accent),
       sub: str(featuresPage.sub, d.featuresPage.sub),
+      ...bannerOf(featuresPage, d.featuresPage),
       ruleLeft: typeof featuresPage.ruleLeft === "string" ? featuresPage.ruleLeft : d.featuresPage.ruleLeft,
       ruleRight: typeof featuresPage.ruleRight === "string" ? featuresPage.ruleRight : d.featuresPage.ruleRight,
       figure: figureOf(nest(featuresPage, "figure"), d.featuresPage.figure),
@@ -549,6 +594,7 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       title: str(howPage.title, d.howPage.title),
       accent: str(howPage.accent, d.howPage.accent),
       sub: str(howPage.sub, d.howPage.sub),
+      ...bannerOf(howPage, d.howPage),
       ruleLeft: typeof howPage.ruleLeft === "string" ? howPage.ruleLeft : d.howPage.ruleLeft,
       ruleRight: typeof howPage.ruleRight === "string" ? howPage.ruleRight : d.howPage.ruleRight,
       figure: figureOf(nest(howPage, "figure"), d.howPage.figure),

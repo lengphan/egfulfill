@@ -2,9 +2,10 @@
 
 
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, PlateHero, Rise, MediaBand } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, MediaBand } from "@/components/marketing/bold-kit"
 import { CalloutList } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { PageBanner } from "@/components/marketing/page-banner"
 
 /**
  * Features, in the house style. The same six capabilities and the same copy — restated as a
@@ -95,7 +96,7 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero title={p.title} accent={p.accent} sub={p.sub} path="featuresPage" />
+      <PageBanner head={p} pathPrefix="featuresPage" />
 
       {/* NO BAND OF FIGURES UNDER THE HERO — removed 2026-08-26, and on all three pages that
           carried one. It was the pitch-deck reference's opening move: four countable facts in

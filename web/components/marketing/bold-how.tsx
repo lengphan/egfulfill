@@ -1,9 +1,10 @@
 "use client"
 
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, PlateHero, Band, Rise, MediaBand } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, Band, Rise, MediaBand } from "@/components/marketing/bold-kit"
 import { CalloutList, NumberedCards } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { PageBanner } from "@/components/marketing/page-banner"
 
 /**
  * How it works. Three steps, then the seller-facing status flow.
@@ -63,7 +64,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero title={p.title} accent={p.accent} sub={p.sub} path="howPage" />
+      <PageBanner head={p} pathPrefix="howPage" />
 
       {/* NO BAND OF FIGURES UNDER THE HERO — removed 2026-08-26 from all three pages that
           carried one. See the note on /features. On THIS page it was the weakest of the three:

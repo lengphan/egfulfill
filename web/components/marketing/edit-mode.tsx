@@ -348,7 +348,10 @@ function transformPaths(path: ContentPath): { scale: ContentPath; rotate: Conten
 /** The same derivation for a FULL-BLEED picture, where the adjustable thing is the crop
  *  rather than the figure. Same reason it is derived, same failure it prevents. */
 function bleedPaths(path: ContentPath): { scale: ContentPath; fx: ContentPath; fy: ContentPath } | null {
-  if (!path.endsWith(".image")) return null
+  /* `hero.image` and `featuresPage.heroImage` are both picture keys and both derive their
+     siblings the same way — append Scale / FocusX / FocusY. Matching only ".image" excluded
+     every page banner, which is the whole reason a page could not carry one. */
+  if (!/[Ii]mage$/.test(path)) return null
   return { scale: `${path}Scale`, fx: `${path}FocusX`, fy: `${path}FocusY` }
 }
 
