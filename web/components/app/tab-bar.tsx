@@ -33,7 +33,7 @@ export type TabBarItem<T extends string> = {
 }
 
 export function TabBar<T extends string>({
-  items, value, onChange, size = "md", spacing = "default", className, ariaLabel,
+  items, value, onChange, size = "md", spacing = "default", className, ariaLabel, look = "line",
 }: {
   items: readonly TabBarItem<T>[]
   value: T
@@ -61,6 +61,18 @@ export function TabBar<T extends string>({
   spacing?: "default" | "none"
   className?: string
   ariaLabel?: string
+  /**
+   * SHAPE SAYS LEVEL.
+   *
+   * `line` is a PAGE's tabs — which section of this page am I on. `segmented` is a level
+   * BELOW that: a lens on the section already chosen.
+   *
+   * Purchasing stacked two `line` bars 60px apart — All suppliers/Favorites/Cart/Sample over
+   * Cart/Ongoing/History — drawn identically, so nothing on screen said which of the two you
+   * were reading. §4 already says shape must carry kind; this is the same rule one level
+   * down. Never put two `line` bars on one screen.
+   */
+  look?: "line" | "segmented"
 }) {
   const text = size === "sm" ? "text-xs" : "text-sm"
   const pad = size === "sm" ? "pb-1.5" : "pb-2"
@@ -76,7 +88,16 @@ export function TabBar<T extends string>({
     // and the active tab's ::after sits at -bottom-px — one pixel of vertical overflow, which
     // is all macOS needs to park a full-height scrollbar between the last tab and whatever is
     // beside it. That bar appeared in the library picker, next to Templates.
-    <nav aria-label={ariaLabel} className={cn("eg-scroll-none flex overflow-x-auto border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap, className)}>
+    <nav
+      aria-label={ariaLabel}
+      className={cn(
+        "eg-scroll-none flex overflow-x-auto",
+        look === "segmented"
+          ? cn("w-fit gap-0.5 rounded-lg bg-muted p-0.5", spacing === "none" ? "" : "mb-6")
+          : cn("border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap),
+        className,
+      )}
+    >
       {items.map((t) => {
         const on = value === t.id
         const I = t.icon
@@ -92,12 +113,17 @@ export function TabBar<T extends string>({
               // and the ::after rule — which spans the button — was drawn under the second
               // line, half the width of the word above it. A bar that does not fit should
               // overflow, not fold.
-              "eg-tap relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors", text, pad,
-              on
-                // The rule is drawn by ::after rather than a border, so switching tabs never
-                // moves the text by a pixel — a border-bottom on the active one only would.
-                ? "font-medium text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-foreground"
-                : "text-muted-foreground hover:text-foreground",
+              "eg-tap relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors", text,
+              look === "segmented" ? "rounded-md px-2.5 py-1" : pad,
+              look === "segmented"
+                ? (on
+                    ? "bg-background font-medium text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground")
+                : (on
+                    // The rule is drawn by ::after rather than a border, so switching tabs never
+                    // moves the text by a pixel — a border-bottom on the active one only would.
+                    ? "font-medium text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-foreground"
+                    : "text-muted-foreground hover:text-foreground"),
             )}
           >
             {I && <I size={size === "sm" ? 14 : 15} />}

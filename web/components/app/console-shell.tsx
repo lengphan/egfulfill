@@ -26,10 +26,30 @@ import { useLabelT } from "@/lib/i18n"
  * lint config rejects.
  */
 const RailNode = createContext<HTMLElement | null>(null)
+/** Where a view's own action row goes, so a page has ONE band of actions and not three. */
+const ActionNode = createContext<HTMLElement | null>(null)
 /** True only inside the rail. StatCard reads it to draw a figure instead of a card. */
 const InRail = createContext(false)
 
 export const useRailNode = () => useContext(RailNode)
+export const useActionNode = () => useContext(ActionNode)
+
+/**
+ * Hoists a view's action row into the page band.
+ *
+ * Purchasing stacked SIX horizontal bands before any content: the top bar, the figure rail,
+ * the page tabs, a floating Receive/Settings/New-PO row sitting on bare canvas belonging to
+ * nothing, the Cart/Ongoing/History tabs, and finally the panel's own header. Shipping did
+ * the same with Print/Add-label/More/Scanned/Finish.
+ *
+ * Wrapping that row in this puts it where the page's other actions already are. Outside a
+ * ConsoleShell it renders in place exactly as before, so no existing caller changes.
+ */
+export function ActionsPortal({ children }: { children: ReactNode }) {
+  const node = useActionNode()
+  if (!node) return <>{children}</>
+  return createPortal(children, node)
+}
 export const useInRail = () => useContext(InRail)
 
 /** Renders `children` into the page header's figure rail, as figures rather than cards. */
@@ -58,16 +78,26 @@ export function ConsoleShell({
 }) {
   const tl = useLabelT()
   const [rail, setRail] = useState<HTMLDivElement | null>(null)
+  const [acts, setActs] = useState<HTMLSpanElement | null>(null)
 
   return (
     <RailNode.Provider value={rail}>
+    <ActionNode.Provider value={acts}>
       <div className="space-y-4">
         {/* The rule belongs to whatever is LAST. A tab bar carries its own underline rail,
             so a border here as well draws two horizontal lines 20px apart, which reads as a
             rendering fault rather than a division. */}
         <div className={tabs ? undefined : "border-b border-border"}>
           <div className="flex flex-wrap items-end gap-x-6 gap-y-3 pb-4">
-            <div className="flex min-w-0 items-center gap-2.5 pb-[7px]">
+            {/* MOBILE ONLY, and that is not a responsive nicety — it is the difference
+                between one page title and two.
+                topbar.tsx is `hidden … md:flex` and renders its own <h1> from the nav, so on
+                desktop the page is ALREADY named above this band. Repeating it here printed
+                "Purchasing" twice on every one of these pages and put two <h1>s in the
+                document. Below md the top bar is gone, so the page has to name itself —
+                which is exactly the `md:hidden` hero the original views carried before this
+                component replaced them. */}
+            <div className="flex min-w-0 items-center gap-2.5 pb-[7px] md:hidden">
               {Icon && <Icon size={20} weight="regular" className="shrink-0 text-muted-foreground" />}
               <h1 className="font-title text-2xl font-semibold tracking-tight">{tl("nav", title)}</h1>
             </div>
@@ -78,15 +108,25 @@ export function ConsoleShell({
                 an empty rail must not leave a stray vertical rule beside the title. */}
             <div
               ref={setRail}
-              className="-mx-1 flex min-w-0 flex-1 items-end gap-6 overflow-x-auto px-1 pb-0.5 empty:hidden sm:gap-9 [&:not(:empty)]:border-l [&:not(:empty)]:border-border/70 [&:not(:empty)]:pl-6 sm:[&:not(:empty)]:pl-8"
+              /* The left rule and its padding exist to separate the rail from the MOBILE
+                 title beside it. On desktop there is no title here, so the rail starts at
+                 the page's own left edge like everything else on the page. */
+              className="-mx-1 flex min-w-0 flex-1 items-end gap-6 overflow-x-auto px-1 pb-0.5 empty:hidden sm:gap-9 max-md:[&:not(:empty)]:border-l max-md:[&:not(:empty)]:border-border/70 max-md:[&:not(:empty)]:pl-6"
             />
 
-            {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
+            {/* One row, whatever fills it: `actions` passed by the page, plus anything a
+                view hoists in through ActionsPortal. empty:hidden so a page with neither
+                does not leave a gap. */}
+            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 empty:hidden">
+              {actions}
+              <span ref={setActs} className="contents" />
+            </div>
           </div>
           {tabs}
         </div>
         {children}
       </div>
+    </ActionNode.Provider>
     </RailNode.Provider>
   )
 }

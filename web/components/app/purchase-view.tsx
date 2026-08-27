@@ -7,6 +7,7 @@ import { ShoppingCart, CircleNotch, CheckCircle, Trash, CaretRight, ArrowClockwi
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { ActionsPortal } from "@/components/app/console-shell"
 import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1664,7 +1665,15 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2">
+      {/* Hoisted into the page's action band when there is one (see ConsoleShell): this row
+          used to sit on bare canvas between the tabs and the panel, belonging to neither.
+          Outside a shell ActionsPortal renders it exactly where it always was. */}
+      <ActionsPortal>
+        {/* The flex row stays INSIDE the portal. Dropping it when this became a portal left
+            the three buttons with no gap on the live page — "Receive a boxSettingsNew
+            purchase order" — because outside a ConsoleShell ActionsPortal renders children
+            straight into the page with no row of its own. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
         {/* WORDS, NOT ICONS. A barcode, a truck and a plus sat in a row above the board and
  each needed decoding before its label was read — three small pictures competing
  with three short phrases that already said it. The spinner stays on the one
@@ -1688,7 +1697,8 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
           {busy === "new" && <CircleNotch size={13} className="animate-spin" />}
           New purchase order
         </Button>
-      </div>
+        </div>
+      </ActionsPortal>
 
       <StatGrid>
         <StatCard label={tl("purchase", "Low stock")} value={String((inv ?? []).filter(isLow).length)} sub={tl("purchase", "need reorder")} tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
@@ -1783,7 +1793,13 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
             Cart and Ongoing shared one "Active" tab, so the thing you were mid-way through
  deciding sat directly above orders that only needed watching, and neither read
  cleanly. */}
-        <TabsList>
+        {/* THE TRAY, DELIBERATELY — the one case tabs.tsx says it is kept for.
+            This bar sits 60px under the page's own All suppliers / Favorites / Cart / Sample
+            bar. Drawn as `line` too, the two were identical rules at two different levels and
+            nothing on screen said which one you were reading. The outer bar picks the SECTION;
+            this picks a lens within it, so it takes the segmented shape. §4: shape says kind —
+            here it says level. */}
+        <TabsList variant="default">
           <TabsTrigger value="cart">Cart{saved.length ? ` (${saved.length})` : ""}</TabsTrigger>
           <TabsTrigger value="ongoing">Ongoing{placed.length ? ` (${placed.length})` : ""}</TabsTrigger>
           {/* No count on History. It only grows — hundreds of POs eventually — and a
