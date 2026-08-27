@@ -57,6 +57,12 @@ export function ShippingPreview() {
         />
       }
     >
+      {/* CHANNEL STAYS AT 6.5rem. Widening it to 9.5 stopped "Etsy · Wildgrain Co"
+          truncating and immediately pushed the row past the container, cutting the TRACKING
+          column instead — which dispatch-grid.ts warns about in as many words: a tracking
+          number exists to be compared against a parcel, and a truncated one cannot be. The
+          row has no spare width, so this needs the store name to move cell rather than the
+          column to grow. Left alone until then. */}
       {tab === "dispatch" ? <DispatchBoard segmented /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
     </ConsoleShell>
   )

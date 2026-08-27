@@ -29,8 +29,16 @@
  * tracking number beside it. A column sized to its shortest label is a column that lies
  * about how much room the longest one needs.
  */
+/**
+ * CHANNEL IS A VARIABLE, not a constant, and only because it is mid-change.
+ *
+ * 6.5rem holds "Etsy" but not "Etsy · Wildgrain Co", so with a store name attached it
+ * truncated on every row — "Shopify · Northb…". The fix is ~9.5rem, and the fallback here
+ * keeps every existing surface exactly where it was while the console shell tries the wider
+ * one. When that lands, inline it and delete this note.
+ */
 export const DISPATCH_GRID =
-  "grid items-center gap-3 px-5 grid-cols-[1rem_8rem_minmax(6.5rem,1fr)_6.5rem_3.5rem_minmax(8.5rem,1.4fr)_10.5rem_12rem_4rem]"
+  "grid items-center gap-3 px-5 grid-cols-[1rem_8rem_minmax(6.5rem,1fr)_var(--disp-ch,6.5rem)_3.5rem_minmax(8.5rem,1.4fr)_10.5rem_12rem_4rem]"
 
 /** Header strip shared by both lists — same type, same rule, same rhythm. */
 export const DISPATCH_HEAD =

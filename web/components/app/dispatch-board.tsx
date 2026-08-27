@@ -9,6 +9,7 @@ import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, List
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
@@ -227,6 +228,10 @@ export function DispatchBoard({ segmented }: {
 } = {}) {
   const tl = useLabelT()
  const role = getUser()?.role || ""
+  /* Is a ConsoleShell above us? If so the page already has a title and an action band, and
+     this card should not print a second of each. Outside one every branch below falls back
+     to exactly what shipped. */
+ const inShell = useActionNode() !== null
   // Operators work this board too — they are the ones who notice a label shouldn't go
   // out. What they cannot do is claim a parcel LEFT: "Mark scanned" asserts physical
   // custody and stays warehouse/admin (canSetStage refuses it server-side anyway).
@@ -869,64 +874,13 @@ export function DispatchBoard({ segmented }: {
  return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
   }
 
- return (
-    <div className="space-y-4">
-      <StatGrid>
-        <StatCard label={tl("dispatch", "To scan")} value={String(queue.length)} sub={tl("dispatch", "labelled, not scanned yet")} tone="pos" />
-        <StatCard label={tl("dispatch", "With byeastside")} value={String(withPartner.length)} sub={tl("dispatch", "in their queue, not picked yet")} tone={withPartner.length ? "neg" : "mut"} />
-      </StatGrid>
-
-      {/* Stuck with the partner: still linked (dispatch_pdf_id) but off the board and unscanned,
- because the recall failed. Admin-only force-clear — the ONE way to un-stick the amber
-          Scan tag when byeastside won't take the label back. */}
-      {role === "admin" && stuck.length > 0 && (
-        <div className="rounded-xl border border-hold/30 bg-hold/10 p-3.5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-hold">
-            <Warning size={15} weight="fill" />
-            {stuck.length} order{stuck.length === 1 ? "" : "s"} still linked to byeastside but off the board
-          </div>
-          <p className="mt-1 text-xs text-hold">
-            {tl("dispatch", "Their recall failed, so the Scan tag stays amber.")} <b>{tl("dispatch", "Only after you’ve confirmed the label is removed on byeastside")}</b>{tl("dispatch", ", force-clear our link — it may still be in their queue otherwise.")}
-          </p>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {stuck.map((o) => (
-              <button
- key={o.id} type="button" disabled={busy} onClick={() => void forceClear([o.id])}
- className="eg-tap inline-flex items-center gap-1 rounded-lg border border-hold/40 bg-white px-2 py-1 text-xs font-medium text-hold transition-colors hover:bg-hold/15 disabled:opacity-50"
- title={`Force-clear ${numOf(o)}'s byeastside link`}
-              >
-                <span className="tabular-nums">{numOf(o)}</span> {tl("dispatch", "· Force-clear")}
-              </button>
-            ))}
-            {stuck.length > 1 && (
-              <button
- type="button" disabled={busy} onClick={() => void forceClear(stuck.map((o) => o.id))}
- className="eg-tap inline-flex items-center gap-1 rounded-lg bg-hold px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-hold disabled:opacity-50"
-              >
-                Force-clear all {stuck.length}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* The one thing someone could reasonably assume wrong, said once, next to the rows
- it describes. Sharing a table with orders makes "this is not an order" MORE worth
- saying, not less — and it only appears once such a row exists. */}
-      {view !== "history" && (staged.length > 0 || uploads.length > 0) && (
-        <p className="px-1 text-xs text-muted-foreground">
-          {/* The explicit spaces are load-bearing: the compiler drops the one after a
- closing tag mid-line, which shipped as "Externalare labels from outside". */}
-          Rows tagged <b>{tl("dispatch", "External")}</b>{" "}
- are labels from outside — they&apos;re not attached to an
-          EGFUL order and nothing is charged for them. Tick one and press{" "}
-          <b>{tl("dispatch", "Send to byeastside")}</b> to put it in their pre-scan queue.
-        </p>
-      )}
-
-      <SectionCard
- title={tl("dispatch", "Dispatch")}
- actions={view === "history" ? undefined : (
+  /* THE CARD'S ACTION ROW, lifted out of the JSX so it goes to exactly one place.
+     Left as `actions={...}` on SectionCard it drew a header strip the portal then emptied —
+     a 35px band of nothing above the queue, because SectionCard renders its header whenever
+     `actions` is truthy and a portal element still is. Inside a shell the card gets nothing
+     and the row is portaled into the page band; outside one it is the card's header exactly
+     as before. */
+  const headActions = view === "history" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
                 USPS SCAN form. All are "produce a document" actions, none touch the scan. */}
@@ -1035,7 +989,73 @@ export function DispatchBoard({ segmented }: {
               </Button>
             )}
           </div>
-        )}
+  )
+
+ return (
+    <div className="space-y-4">
+      {inShell && headActions && <ActionsPortal>{headActions}</ActionsPortal>}
+      <StatGrid>
+        <StatCard label={tl("dispatch", "To scan")} value={String(queue.length)} sub={tl("dispatch", "labelled, not scanned yet")} tone="pos" />
+        <StatCard label={tl("dispatch", "With byeastside")} value={String(withPartner.length)} sub={tl("dispatch", "in their queue, not picked yet")} tone={withPartner.length ? "neg" : "mut"} />
+      </StatGrid>
+
+      {/* Stuck with the partner: still linked (dispatch_pdf_id) but off the board and unscanned,
+ because the recall failed. Admin-only force-clear — the ONE way to un-stick the amber
+          Scan tag when byeastside won't take the label back. */}
+      {role === "admin" && stuck.length > 0 && (
+        <div className="rounded-xl border border-hold/30 bg-hold/10 p-3.5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-hold">
+            <Warning size={15} weight="fill" />
+            {stuck.length} order{stuck.length === 1 ? "" : "s"} still linked to byeastside but off the board
+          </div>
+          <p className="mt-1 text-xs text-hold">
+            {tl("dispatch", "Their recall failed, so the Scan tag stays amber.")} <b>{tl("dispatch", "Only after you’ve confirmed the label is removed on byeastside")}</b>{tl("dispatch", ", force-clear our link — it may still be in their queue otherwise.")}
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {stuck.map((o) => (
+              <button
+ key={o.id} type="button" disabled={busy} onClick={() => void forceClear([o.id])}
+ className="eg-tap inline-flex items-center gap-1 rounded-lg border border-hold/40 bg-white px-2 py-1 text-xs font-medium text-hold transition-colors hover:bg-hold/15 disabled:opacity-50"
+ title={`Force-clear ${numOf(o)}'s byeastside link`}
+              >
+                <span className="tabular-nums">{numOf(o)}</span> {tl("dispatch", "· Force-clear")}
+              </button>
+            ))}
+            {stuck.length > 1 && (
+              <button
+ type="button" disabled={busy} onClick={() => void forceClear(stuck.map((o) => o.id))}
+ className="eg-tap inline-flex items-center gap-1 rounded-lg bg-hold px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-hold disabled:opacity-50"
+              >
+                Force-clear all {stuck.length}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* The one thing someone could reasonably assume wrong, said once, next to the rows
+ it describes. Sharing a table with orders makes "this is not an order" MORE worth
+ saying, not less — and it only appears once such a row exists. */}
+      {/* PROSE ABOVE THE WORK (§4). Two lines explaining one filter, printed above a queue
+          people read all day and read first every time. Inside the console shell it is gone
+          and the sentence lives on the External chip's own title, where it is asked for
+          rather than served. Outside the shell nothing changes. */}
+      {!inShell && view !== "history" && (staged.length > 0 || uploads.length > 0) && (
+        <p className="px-1 text-xs text-muted-foreground">
+          {/* The explicit spaces are load-bearing: the compiler drops the one after a
+ closing tag mid-line, which shipped as "Externalare labels from outside". */}
+          Rows tagged <b>{tl("dispatch", "External")}</b>{" "}
+ are labels from outside — they&apos;re not attached to an
+          EGFUL order and nothing is charged for them. Tick one and press{" "}
+          <b>{tl("dispatch", "Send to byeastside")}</b> to put it in their pre-scan queue.
+        </p>
+      )}
+
+      <SectionCard
+ /* The page's tab already reads "Dispatch" and the top bar already reads "Shipping".
+    A third naming is the duplicate-title defect one level down. */
+ title={inShell ? undefined : tl("dispatch", "Dispatch")}
+ actions={inShell ? undefined : headActions}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
           {/* Waiting-to-scan vs. history: two VIEWS of this card, kept here rather than on a
@@ -1054,7 +1074,13 @@ export function DispatchBoard({ segmented }: {
             value={view}
             onChange={setView}
           />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("dispatch", "Search order, customer or tracking…")} className={(segmented ? "h-8 min-w-[180px] flex-1 max-w-sm" : "h-9 max-w-xs")} />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={segmented
+              /* The row is full — tabs, search, five counted filters and Select-all. Taking
+                 width for the long placeholder pushes a filter out; keeping it clipped it to
+                 "…customer or trac". The label is what gives way, because it is the only
+                 thing here that is a hint rather than a control. */
+              ? tl("dispatch", "Search orders…")
+              : tl("dispatch", "Search order, customer or tracking…")} className={(segmented ? "h-8 min-w-[180px] flex-1 max-w-sm" : "h-9 max-w-xs")} />
           {view === "history" && (
             <div className="flex flex-wrap items-center gap-1">
               {HIST_FILTERS.map((f) => (
@@ -1080,6 +1106,11 @@ export function DispatchBoard({ segmented }: {
  key={f.key}
  onClick={() => setQFilter(f.key)}
  disabled={f.key !== "all" && !filterCounts[f.key]}
+                 /* The sentence that used to sit above the whole queue, on the one control
+                    it was ever about. */
+                 title={f.key === "external"
+                   ? tl("dispatch", "Labels from outside — not attached to an EGFUL order, and nothing is charged for them. Tick one and press Send to byeastside to put it in their pre-scan queue.")
+                   : undefined}
                   className={segmented
                     ? ("h-8 rounded-md px-2.5 text-xs font-medium transition-colors disabled:opacity-40 " +
                        (qFilter === f.key
