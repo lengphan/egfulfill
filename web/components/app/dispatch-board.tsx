@@ -232,6 +232,14 @@ export function DispatchBoard({ segmented }: {
      this card should not print a second of each. Outside one every branch below falls back
      to exactly what shipped. */
  const inShell = useActionNode() !== null
+  /* CELL TYPE, MEASURED AGAINST THE ORDERS PAGE.
+     /orders — the surface people point at as the readable one — sets its cell content at
+     14px/500 (32 of its elements). This board set Channel, Units, Ship-to and Tracking at
+     12px/400 muted (31 elements), two steps lighter and 2px smaller. A ship-to address and
+     a 22-digit tracking number are the two things on the row someone reads against a
+     physical parcel, and they were the smallest type on the page.
+     Muted stays — that is real hierarchy. Only the SIZE was wrong. */
+ const cell = inShell ? "text-sm" : "text-xs"
   // Operators work this board too — they are the ones who notice a label shouldn't go
   // out. What they cannot do is claim a parcel LEFT: "Mark scanned" asserts physical
   // custody and stays warehouse/admin (canSetStage refuses it server-side anyway).
@@ -1066,7 +1074,7 @@ export function DispatchBoard({ segmented }: {
           <TabBar
             size="sm"
             ariaLabel="Dispatch view"
-            className="shrink-0 border-b-0"
+            className={"shrink-0 border-b-0 " + (inShell ? "order-1" : "")}
             items={[
               { id: "queue" as const, label: tl("dispatch", "To scan") },
               { id: "history" as const, label: tl("dispatch", "History"), count: history.length || undefined },
@@ -1080,9 +1088,15 @@ export function DispatchBoard({ segmented }: {
                  "…customer or trac". The label is what gives way, because it is the only
                  thing here that is a hint rather than a control. */
               ? tl("dispatch", "Search orders…")
-              : tl("dispatch", "Search order, customer or tracking…")} className={(segmented ? "h-8 min-w-[180px] flex-1 max-w-sm" : "h-9 max-w-xs")} />
+              : tl("dispatch", "Search order, customer or tracking…")} className={(segmented ? "h-8 min-w-[180px] flex-1 max-w-sm order-4" : "h-9 max-w-xs")} />
+          {/* TWO ROWS, THE WAY /orders DOES IT — filters on their own line, then search and
+              the selection utilities. One line held the view tabs, the search, five counted
+              filters and Select-all: thirteen controls in ~150px, which is the "messy" of it.
+              Done with flex `order` and a full-basis break rather than by restructuring the
+              JSX, so nothing here changes owner and every control keeps its handler. */}
+          {inShell && <div className="order-3 basis-full" aria-hidden="true" />}
           {view === "history" && (
-            <div className="flex flex-wrap items-center gap-1">
+            <div className={"flex flex-wrap items-center gap-1 " + (inShell ? "order-2" : "")}>
               {HIST_FILTERS.map((f) => (
                 <button
  key={f.key}
@@ -1098,9 +1112,9 @@ export function DispatchBoard({ segmented }: {
               Counted, so an empty list is never ambiguous between "nothing matches this
  filter" and "nothing is here at all". */}
           {view === "queue" && (
-            <div className={segmented
+            <div className={(segmented
               ? "flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
-              : "flex flex-wrap items-center gap-1"}>
+              : "flex flex-wrap items-center gap-1") + (inShell ? " order-2" : "")}>
               {QUEUE_FILTERS.map((f) => (
                 <button
  key={f.key}
@@ -1112,7 +1126,7 @@ export function DispatchBoard({ segmented }: {
                    ? tl("dispatch", "Labels from outside — not attached to an EGFUL order, and nothing is charged for them. Tick one and press Send to byeastside to put it in their pre-scan queue.")
                    : undefined}
                   className={segmented
-                    ? ("h-8 rounded-md px-2.5 text-xs font-medium transition-colors disabled:opacity-40 " +
+                    ? ("h-8 rounded-md px-2.5 text-sm font-medium transition-colors disabled:opacity-40 " +
                        (qFilter === f.key
                          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                          : "text-muted-foreground hover:text-foreground"))
@@ -1128,13 +1142,14 @@ export function DispatchBoard({ segmented }: {
  wrapped to a second line one at a time and reading as stray controls. Pinned
  right, they wrap together as the pair they are. */}
           {view === "queue" && chosen.length + extPicked.size > 0 && (
-            <span className="ml-auto text-xs text-muted-foreground">{chosen.length + extPicked.size} in this batch</span>
+            <span className={"ml-auto text-muted-foreground " + (inShell ? "order-5 text-sm" : "text-xs")}>{chosen.length + extPicked.size} in this batch</span>
           )}
           {/* ONE select-all for one table. It used to be two — this one for orders, another
  in the external card's header — which meant "select all" never selected all of
  what was on screen, and the count in each button was a count of half the list. */}
           {view === "queue" && (
-            <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}>
+            <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}
+              className={inShell ? "order-6 ml-auto" : undefined}>
               {allSelected ? tl("dispatch", "Clear selection") : `Select all ${selectableAll}`}
             </Button>
           )}
@@ -1380,11 +1395,11 @@ export function DispatchBoard({ segmented }: {
                     <OrderNumber order={o} editable onSaved={() => load()} />
                   </span>
                   <span className="truncate text-sm">{customerOf(o)}</span>
-                  <span className="truncate text-xs text-muted-foreground" title={o.store || undefined}>
+                  <span className={"truncate text-muted-foreground " + cell} title={o.store || undefined}>
                     {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
                   </span>
-                  <span className="text-xs text-muted-foreground">{unitsOf(o)}</span>
-                  <span className="truncate text-xs text-muted-foreground" title={addrLine(o) || undefined}>{addrLine(o) || "—"}</span>
+                  <span className={"text-muted-foreground " + cell}>{unitsOf(o)}</span>
+                  <span className={"truncate text-muted-foreground " + cell} title={addrLine(o) || undefined}>{addrLine(o) || "—"}</span>
                   {/* The label's OWN status — not the production readiness pills, which belong
  on the make boards. "Sent to partner" is the byeastside hand-off (pushed
  but not scanned back yet), so it's visible whether a parcel is out for
@@ -1393,7 +1408,7 @@ export function DispatchBoard({ segmented }: {
                     {sentOut ? <DispStatus k="removed" label={tl("dispatch", "Sent to partner")} /> : <DispStatus k={d.key} label={d.label} />}
                   </span>
                   {o.tracking ? (
-                    <span className="truncate text-xs tabular-nums text-muted-foreground" title={o.tracking}>{o.tracking}</span>
+                    <span className={"truncate tabular-nums text-muted-foreground " + cell} title={o.tracking}>{o.tracking}</span>
                   ) : (
                     // No label yet → give the action right here rather than a dead gap. Buys
                     // the label for this order (stopPropagation: the row is a <label>).
