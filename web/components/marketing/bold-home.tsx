@@ -2,7 +2,8 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, Window, ObjectTile, MediaHero } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, Window, ObjectTile, MediaHero, MediaBand } from "@/components/marketing/bold-kit"
+import { RotaryBadge } from "@/components/marketing/stickers"
 import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/marketing/objects"
 
 /** One object per feature section, in factory order: make → print → pack → label. */
@@ -202,6 +203,40 @@ export function BoldHome({ content }: { content: SiteContent }) {
           </Band>
         )
       })}
+
+      {/* ── THE FLOOR ─────────────────────────────────────────────────────────────
+          The one photograph on this page of the thing we actually do. Everything above it is
+          the software; this is the factory, and the factory is the half a visitor can believe
+          in one glance.
+
+          IT IS BRIGHT ON PURPOSE, and that reverses the plan it was shot against. This band
+          was going to be the page's dark punctuation — the machine-room beat. Shot dark it
+          measured 49/255 mean with 67% of the frame crushed under 40, and it read as
+          somewhere orders disappear rather than somewhere you would trust them. 189/255 now.
+
+          The badge is SLATE, not the periwinkle it would be anywhere else: a photograph is
+          admin-replaceable and periwinkle on a pale one measures 1.52:1 and vanishes. A dark
+          disc with light letters reads on any picture that can land here. */}
+      <MediaBand
+        media="/frames/floor-conveyor.jpg"
+        alt="Poly mailers travelling a conveyor through a modern fulfilment floor"
+        tone="ink"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-8">
+          <p
+            className="max-w-[20ch] font-display text-[clamp(1.6rem,3.4vw,2.6rem)] font-semibold leading-[1.02] tracking-[-0.03em]"
+            style={{ color: INK }}
+          >
+            Every order leaves here with a label already on it.
+          </p>
+          <RotaryBadge
+            className="hidden w-[104px] shrink-0 sm:block"
+            text="SHIPPED AT COST"
+            fill={ACCENT}
+            ink={ACCENT_INK}
+          />
+        </div>
+      </MediaBand>
 
       {/* ── STEPS — THE DARK BLOCK ────────────────────────────────────────────────
           This section used to sit on the page's own ground behind a hairline rule, and the

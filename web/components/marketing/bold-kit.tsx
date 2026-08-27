@@ -883,7 +883,7 @@ function BleedMedia({ media, alt, focusX = 50, focusY = 50, scale = 1 }: {
  * SHORTER THAN THE HERO by design. This sits mid-page with copy above and below; at the
  * hero's height it stops being a section and becomes a second first screen.
  */
-export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34rem)", focusX, focusY, scale }: {
+export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34rem)", focusX, focusY, scale, tone = "light" }: {
   media?: string
   alt?: string
   children?: React.ReactNode
@@ -892,19 +892,34 @@ export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34r
   focusX?: number
   focusY?: number
   scale?: number
+  /** Which way the lettering runs, and therefore which veil. Same contract as MediaHero —
+   *  `light` is the safe default for any upload, `ink` is for a band whose ground is pinned
+   *  bright. A high-key photograph under light type is the one case the black scrim cannot
+   *  rescue: it only weights the bottom, and a headline sitting anywhere else has nothing
+   *  behind it. */
+  tone?: "light" | "ink"
 }) {
   if (!media) return null
   return (
-    <section className="relative isolate w-full overflow-hidden" style={{ minHeight: minH, background: ACCENT }}>
+    /* FLEX COLUMN, and the inner block grows. `justify-end` on a child with `h-full` inside a
+       section that only carries `min-height` resolves against an auto height, so it did
+       nothing at all and the content floated wherever the top padding left it — which on a
+       tall band is the middle of the picture. The intent was always bottom-aligned; this is
+       what actually does it. */
+    <section className="relative isolate flex w-full flex-col overflow-hidden" style={{ minHeight: minH, background: ACCENT }}>
       <BleedMedia media={media} alt={alt} focusX={focusX} focusY={focusY} scale={scale} />
       {children && (
         <>
           <div
             aria-hidden
             className="absolute inset-0 -z-10"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.42) 34%, rgba(0,0,0,.10) 68%, rgba(0,0,0,0) 100%)" }}
+            style={{
+              background: tone === "ink"
+                ? `linear-gradient(to top, color-mix(in srgb, ${SURFACE} 58%, transparent) 0%, color-mix(in srgb, ${SURFACE} 28%, transparent) 40%, transparent 76%)`
+                : "linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.42) 34%, rgba(0,0,0,.10) 68%, rgba(0,0,0,0) 100%)",
+            }}
           />
-          <div className="relative mx-auto flex h-full max-w-[88rem] flex-col justify-end px-6 pb-[clamp(2rem,4vw,3.5rem)] pt-[clamp(3rem,8vw,6rem)] sm:px-10">
+          <div className="relative mx-auto flex w-full max-w-[88rem] flex-1 flex-col justify-end px-6 pb-[clamp(2rem,4vw,3.5rem)] pt-[clamp(3rem,8vw,6rem)] sm:px-10">
             {children}
           </div>
         </>
