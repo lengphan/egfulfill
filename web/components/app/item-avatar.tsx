@@ -213,7 +213,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   if (readOnly) {
     return (
       <span
-        className={"relative block shrink-0 overflow-hidden rounded-md bg-card ring-1 ring-foreground/[0.06] " + (bare ? "" : "border border-border ") + (className ?? "")}
+        className={"relative block shrink-0 overflow-hidden rounded-md bg-card " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
         <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
@@ -239,7 +239,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           // modes. Going from `size-full` in flow to absolutely positioned is a discrete
           // change nothing can tween, which is why the row jumped the moment the listing
           // photo slid behind.
-          className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-card ring-1 ring-foreground/[0.06] transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
+          className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-card transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
             + (showBoth && !listingFront ? " z-20 border-2 border-background " : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >

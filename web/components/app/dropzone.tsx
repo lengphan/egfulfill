@@ -248,7 +248,12 @@ export function Dropzone({
         // barely taller than the row of type inside it, so it read as a notice rather than as
         // a space with room in it. The radius goes up with the box: 12px on something this
         // large is the corner of a table cell.
-        slim ? "gap-2 rounded-lg px-3 py-2" : "gap-4 rounded-2xl px-6 py-12 text-center",
+        // SLIM IS STILL A TARGET. It was py-2 — a strip about as tall as its own text, which
+        // you have to aim a dragged file at. A drop zone is the one control whose AREA is
+        // the affordance: you cannot hover it to find out where it is, you have to already
+        // be holding something. py-5 keeps it one quiet row beneath the files that are
+        // already attached, while giving it something to hit.
+        slim ? "gap-2 rounded-lg px-4 py-5" : "gap-4 rounded-2xl px-6 py-12 text-center",
         disabled ? "cursor-not-allowed border-border bg-muted/40 opacity-60"
           // The drag state is the one moment this control should be loud: a solid edge, so
           // dashed→solid is itself the signal that the file will land here.

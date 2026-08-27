@@ -43,7 +43,11 @@ export function RegionMark({
     // than as the object the region is about. A tile is a white card lifted off the ground:
     // border, faint shadow, dark glyph. That contrast is the whole reason part 1 exists.
     <span className={cn(
-      "grid place-items-center rounded-xl border border-border bg-background text-foreground ",
+      // rounded-LG, not xl. --radius-xl maps to --radius (26px), and 26px on a 44px box is a
+      // circle — which is exactly the "loose outline" this component was written to replace.
+      // The tile has to read as a SQUARE with softened corners or it stops being an object
+      // the eye lands on. --radius-control (10px) is the right step for something this size.
+      "grid place-items-center rounded-lg border border-border bg-background text-foreground ",
       box, className,
     )}>
       {busy ? <CircleNotch size={glyph} className="animate-spin text-muted-foreground" /> : <I size={glyph} />}

@@ -66,12 +66,17 @@ export function LineDownloads({ design, files, item }: {
    * button, mirroring the item number badge on the opposite corner, with a count when the
    * line has more than one file. Always visible rather than hover-only — a control that
    * appears on hover does not exist on a phone, and this is a floor tool.
-   */
+   *
+   * INSIDE THE CORNER, NOT HANGING OFF IT (2026-08-27). It sat at `-bottom-1.5 -left-1.5`,
+   * so it broke the picture's edge and read as a blemish ON the photograph rather than as a
+   * control OVER it — and there is one on every row of a long order. Moved within the tile's
+   * bounds with a hair of translucency behind it, which is the ordinary grammar for a
+   * control laid over an image. Still always visible: the paragraph above still holds. */
   return (
     <Popover>
       <PopoverTrigger
         title={`${count} file${count === 1 ? "" : "s"} on this line — artwork${machine.length ? tl("lineDownloads", " and stitch file") : ""}`}
-        className="eg-tap absolute -bottom-1.5 -left-1.5 z-10 inline-flex items-center gap-0.5 rounded-full border border-border bg-card px-1.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+        className="eg-tap absolute bottom-1 left-1 z-10 inline-flex items-center gap-0.5 rounded-lg border border-border bg-card/95 px-1.5 py-1 text-xs font-semibold text-muted-foreground backdrop-blur-[2px] transition-colors hover:border-primary hover:text-primary"
       >
         <DownloadSimple size={12} weight="bold" />
         {count > 1 && count}
