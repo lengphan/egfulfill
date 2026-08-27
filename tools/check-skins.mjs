@@ -115,6 +115,88 @@ for (const key of SKINS) {
   }
 }
 
+/* ── --brand, the app's one skinnable fill ────────────────────────────────────────
+ *
+ * WHY IT IS CHECKED HERE AND NOT WITH THE PAIRS ABOVE. Those are `--mk-*` hex literals and a
+ * contrast ratio is the whole question. `--brand` is an oklch() and its real failure mode is
+ * not contrast at all: it is RESEMBLING AN ORDER STATUS. A brand fill a seller cannot tell
+ * from `pending` is not a legibility problem, it is a comprehension one, and no contrast
+ * figure would ever have caught it.
+ *
+ * It went uncaught for exactly that reason. check-skins tested only the --mk-* pairs and
+ * check-pop-presets tests the MOBILE accent, so the one token that fills every primary button
+ * in the product was measured by nothing. It drifted to #7974E8 — 0.150 from pending against
+ * a 0.171 floor — and was found by eye months later.
+ *
+ * THE FLOOR IS DERIVED, NOT DECLARED: the distance between `hold` and `alert`, a pair already
+ * proven readable side by side. Same rule check-pop-presets uses, so the two gates cannot
+ * disagree about what "far enough apart" means.
+ *
+ * BOTH THEMES, because dark lifts every status into the pale band and a value that is clear of
+ * them in light can be sitting inside them in dark.
+ */
+const oklchOf = (v) => {
+  const m = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(v || '')
+  return m ? [+m[1], +m[2], +m[3]] : null
+}
+const oklab = ([L, C, H]) => { const h = (H * Math.PI) / 180; return [L, C * Math.cos(h), C * Math.sin(h)] }
+const deltaE = (a, b) => { const [x, y, z] = oklab(a), [p, q, r] = oklab(b); return Math.hypot(x - p, y - q, z - r) }
+const oklchToHex = ([L, C, H]) => {
+  const h = (H * Math.PI) / 180, a = C * Math.cos(h), b = C * Math.sin(h)
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3
+  const rgb = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+  ]
+  return '#' + rgb.map((v) => {
+    const c = Math.max(0, Math.min(1, v))
+    const g = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055
+    return Math.round(g * 255).toString(16).padStart(2, '0')
+  }).join('')
+}
+/** Every oklch token inside a block, by selector text. */
+const oklchBlock = (selector) => {
+  const i = CSS.indexOf(selector); if (i < 0) return null
+  const body = CSS.slice(i, CSS.indexOf('\n}', i))
+  const out = {}
+  for (const [, k, v] of body.matchAll(/(--[\w-]+):\s*(oklch\([^)]*\))/g)) out[k] = oklchOf(v)
+  return out
+}
+const THEME = { light: oklchBlock(':root {'), dark: oklchBlock('.dark {') }
+const reserved = (t) => Object.entries(t || {}).filter(([k]) => k.startsWith('--status-') || k === '--success')
+
+console.log('\n--brand vs the reserved order statuses')
+if (!THEME.light || !THEME.dark) {
+  console.error('  FAIL  could not read the :root / .dark status blocks'); failed++
+} else {
+  for (const key of SKINS) {
+    /* The LIGHT value is the skin block's own. The DARK value is whatever a
+       `.dark [data-skin="key"]` block sets — and if there is none, the skin block's value is
+       what renders in dark too, because custom properties inherit from the nearer ancestor
+       and [data-skin] sits inside <html class="dark">. That inheritance is precisely why the
+       `--brand` in the .dark block never applied. */
+    const lightRaw = (skinBlock(key) || {})['--brand']
+    const darkBlk = oklchBlock(`.dark [data-skin="${key}"]`)
+    const light = oklchOf(lightRaw)
+    const dark = (darkBlk && darkBlk['--brand']) || light
+    if (!light) { console.error(`  FAIL  ${key}: --brand is not an oklch() (${lightRaw})`); failed++; continue }
+    if (!darkBlk) console.log(`  note  ${key}: no .dark override — the light value renders in dark too`)
+    for (const [theme, val] of [['light', light], ['dark', dark]]) {
+      const t = THEME[theme]
+      const floor = deltaE(t['--status-hold'], t['--status-alert'])
+      let near = { k: '', d: Infinity }
+      for (const [k, v] of reserved(t)) { const d = deltaE(val, v); if (d < near.d) near = { k, d } }
+      const ok = near.d >= floor
+      if (!ok) failed++
+      console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${key} ${theme.padEnd(5)} ${oklchToHex(val)}  nearest ` +
+        `${near.k.replace('--status-', '').padEnd(9)} ΔE ${near.d.toFixed(3)} (floor ${floor.toFixed(3)})`)
+    }
+  }
+}
+
 /* ── and the literals that mirror the default ─────────────────────────────────── */
 console.log('\nbold-kit HEX vs the default skin')
 const dflt = skinBlock(DEFAULT_SKIN) || {}
