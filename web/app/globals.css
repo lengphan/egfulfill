@@ -1183,6 +1183,30 @@ td[align="right"] {
   --brand-foreground: oklch(1 0 0);
 }
 
+/**
+ * ── THE BRAND, INVERTED FOR DARK ─────────────────────────────────────────────
+ *
+ * A DESCENDANT SELECTOR, and it has to be. `.dark` sits on <html>; `[data-skin]` sits on a
+ * div INSIDE it. Custom properties inherit, so the value set on the nearer ancestor wins no
+ * matter what the specificity says — which means the `--brand` in the `.dark` block above has
+ * never once applied since skins were introduced. It was setting a near-white that nothing
+ * ever read. This selector matches the skin div while the theme class is on the root, so it
+ * is the first thing that can actually override it.
+ *
+ * WHY THE VALUE FLIPS RATHER THAN DARKENS. #1F1B41 is a near-black: correct on a white card,
+ * invisible on a #17191C canvas. A fill has to contrast with the surface it sits on, so on a
+ * dark surface the brand becomes a light one — the same hue at the other end of the ramp.
+ *
+ * Measured on the dark theme: ink on it 15.6:1 · 14.7:1 against the canvas · nearest status
+ * ΔE 0.183 against a 0.154 floor. The pale end is crowded — dark mode lifts every status into
+ * it — so this sits deliberately at the top of the range rather than in the middle of it.
+ */
+.dark [data-skin="workshop"],
+.dark:root {
+  --brand: oklch(0.940 0.030 285);
+  --brand-foreground: oklch(0.145 0 0);
+}
+
 /* ── STUDIO · ink on white, the default until 2026-08-26 ──────────────────────
  * Kept and still measured. It is no longer the house style, but a picker with one option
  * is not a picker — and this palette is contrast-checked and working. */
