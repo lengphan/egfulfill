@@ -1,7 +1,9 @@
 "use client"
 
 import { Check } from "@phosphor-icons/react"
-import { ACCENT, ACCENT_INK, ACID, HAIRLINE, INK, SURFACE, Pill, PlateHero, Band, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, ACID, HAIRLINE, INK, SURFACE, Pill, Band, Rise } from "@/components/marketing/bold-kit"
+import { PageBanner } from "@/components/marketing/page-banner"
+import type { PageHead } from "@/lib/site-content"
 
 /**
  * Pricing, in the ink + lime direction (2026-08-26).
@@ -52,14 +54,13 @@ const wallet = [
 
 const CAPS = "text-[11px] font-semibold uppercase tracking-[0.2em]"
 
-export function BoldPricing() {
+export function BoldPricing({ head }: { head: PageHead }) {
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero
-        title="Simple,"
-        accent="pay-as-you-go."
-        sub="No monthly fee. No minimums. You pay the per-order fulfilment cost when an order actually ships — funded from your wallet."
-      />
+      {/* The three strings moved to stored content unchanged, so the page's opening copy is
+          editable where it is read — and so it has somewhere to put a picture. With none set
+          this still draws the plate exactly as it did. */}
+      <PageBanner head={head} pathPrefix="pricingPage" />
 
       {/* ── THE ANSWER ───────────────────────────────────────────────────────────
           $0 at display size, and the list beside it as rule-divided rows rather than

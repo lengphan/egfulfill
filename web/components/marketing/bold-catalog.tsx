@@ -4,7 +4,9 @@ import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { TShirt, MagnifyingGlass } from "@phosphor-icons/react"
-import { ACCENT, ACCENT_INK, CARD, HEADING, INK, SURFACE, Pill, PlateHero, Rise } from "@/components/marketing/bold-kit"
+import { ACCENT, ACCENT_INK, CARD, HEADING, INK, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
+import { PageBanner } from "@/components/marketing/page-banner"
+import type { PageHead } from "@/lib/site-content"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
 import { swatchBg, swatchChipStyle, NEUTRAL_CHIP, colorFamily, COLOR_FAMILIES } from "@/lib/color-swatch"
@@ -227,7 +229,7 @@ function ProductCard({ p, showCategory, index }: { p: PublicProduct; showCategor
   )
 }
 
-export function BoldCatalog({ products }: { products: PublicProduct[] | null }) {
+export function BoldCatalog({ products, head }: { products: PublicProduct[] | null; head: PageHead }) {
   // null = the catalogue could not be READ; [] = it is genuinely empty. The house rule is
   // that those two must never look the same, so the caller distinguishes them and this
   // renders each honestly.
@@ -352,11 +354,10 @@ export function BoldCatalog({ products }: { products: PublicProduct[] | null }) 
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
-      <PlateHero
-        title="What we"
-        accent="can make."
-        sub="Live from our catalogue — every product here is one you can order today, at the price shown."
-      />
+      {/* Head copy moved to stored content verbatim; the GRID below stays live from the API.
+          A catalogue whose products could be edited as text would be a page that disagrees
+          with what is actually stocked. */}
+      <PageBanner head={head} pathPrefix="catalogPage" />
 
       {/* WIDER THAN THE PROSE PAGES, on purpose. A catalogue is scanned, not read: nothing
           in the grid runs left-to-right, so width buys products per row rather than costing

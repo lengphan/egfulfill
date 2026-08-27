@@ -1,5 +1,6 @@
 import { BoldCatalog } from "@/components/marketing/bold-catalog"
 import { getPublicProducts } from "@/lib/api"
+import { getSiteContent } from "@/lib/site-content"
 
 export const metadata = { title: "Products — EGFUL" }
 // Re-read periodically rather than baking the catalogue into the build: publishing a product
@@ -19,5 +20,6 @@ export default async function CatalogPage() {
   } catch {
     products = null
   }
-  return <BoldCatalog products={products} />
+  const content = await getSiteContent()
+  return <BoldCatalog products={products} head={content.catalogPage} />
 }

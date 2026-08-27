@@ -195,6 +195,21 @@ export type SiteContent = {
   featuresPage: FeaturesPage
   howPage: HowPage
   /**
+   * /pricing and /catalog, as a HEAD ONLY.
+   *
+   * Both pages passed literal strings straight to PlateHero, so their opening copy could only
+   * be changed by a deploy — and they had nowhere at all to put a picture. A PageHead fixes
+   * both at once: the three strings become editable where they are read, and the page gains
+   * the banner slot every other page now has.
+   *
+   * DELIBERATELY NOT THE WHOLE PAGE. /pricing's tiers are computed from the real fee table and
+   * /catalog's grid is the live published catalogue — neither is copy, and moving either into
+   * a text blob would let an admin edit a page into disagreeing with what the product actually
+   * charges and stocks. Only the head is words.
+   */
+  pricingPage: PageHead
+  catalogPage: PageHead
+  /**
    * HOW the marketing pages animate — see lib/motion.ts.
    *
    * It rides in the copy blob rather than getting a settings key of its own, and that is a
@@ -311,6 +326,28 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
    * capabilities that each carry a body and a three-item spec column. The run's own big
    * numerals already give the reading order a card grid can't.
    */
+  /* Verbatim from bold-pricing.tsx / bold-catalog.tsx — not a word changed in the move. */
+  pricingPage: {
+    title: "Simple,",
+    accent: "pay-as-you-go.",
+    sub: "No monthly fee. No minimums. You pay the per-order fulfilment cost when an order actually ships — funded from your wallet.",
+    heroImage: "",
+    heroImageAlt: "",
+    heroImageScale: 1,
+    heroImageFocusX: 50,
+    heroImageFocusY: 50,
+  },
+  catalogPage: {
+    title: "What we",
+    accent: "can make.",
+    sub: "Live from our catalogue — every product here is one you can order today, at the price shown.",
+    heroImage: "",
+    heroImageAlt: "",
+    heroImageScale: 1,
+    heroImageFocusX: 50,
+    heroImageFocusY: 50,
+  },
+
   featuresPage: {
     title: "Everything after",
     accent: "the sale.",
@@ -499,6 +536,15 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   /* A PAGE'S BANNER, read the same way for every page that has one. The three adjustment
      fields go through the same clamps `hero` uses, so a value typed into one page's editor
      cannot mean something different from the same value on another. */
+  /* A whole head, for a page that is nothing but one. Built on bannerOf so a page's banner is
+     read identically whether the page has six other sections or none. */
+  const headOf = (stored: Record<string, unknown>, dflt: PageHead): PageHead => ({
+    title: str(stored.title, dflt.title),
+    accent: str(stored.accent, dflt.accent),
+    sub: str(stored.sub, dflt.sub),
+    ...bannerOf(stored, dflt),
+  })
+
   const bannerOf = (stored: Record<string, unknown>, dflt: PageHead) => ({
     heroImage: typeof stored.heroImage === "string" ? stored.heroImage : dflt.heroImage,
     heroImageAlt: str(stored.heroImageAlt, dflt.heroImageAlt),
@@ -519,6 +565,8 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   })
   const featuresPage = obj("featuresPage")
   const howPage = obj("howPage")
+  const pricingPage = obj("pricingPage")
+  const catalogPage = obj("catalogPage")
   const fCta = nest(featuresPage, "cta")
   const hCta = nest(howPage, "cta")
 
@@ -573,6 +621,8 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       subhead: str(cta.subhead, d.cta.subhead),
       button: str(cta.button, d.cta.button),
     },
+    pricingPage: headOf(pricingPage, d.pricingPage),
+    catalogPage: headOf(catalogPage, d.catalogPage),
     featuresPage: {
       title: str(featuresPage.title, d.featuresPage.title),
       accent: str(featuresPage.accent, d.featuresPage.accent),
