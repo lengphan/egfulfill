@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, Window, ObjectTile, MediaHero, MediaBand } from "@/components/marketing/bold-kit"
-import { RotaryBadge } from "@/components/marketing/stickers"
+import { Arrow, RotaryBadge, SwingTag } from "@/components/marketing/stickers"
 import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/marketing/objects"
 
 /** One object per feature section, in factory order: make → print → pack → label. */
@@ -197,8 +197,35 @@ export function BoldHome({ content }: { content: SiteContent }) {
                 </p>
               </div>
               {/* No `src` yet — the frame draws a wireframe rather than a fake screenshot.
-                  Swap in a real capture per card once the boards are reskinned. */}
-              <Window tilt={flip ? -2 : 2} caption={c.title} className={flip ? "lg:order-1" : undefined} />
+                  Swap in a real capture per card once the boards are reskinned.
+
+                  THE CAPTION IS NOW A TAG STUCK TO THE PANEL, and it is the SAME STRING — the
+                  card's own title, straight from stored content. A sticker that states a fact
+                  of its own would be a fact an admin cannot edit and the page would eventually
+                  lie; taking the label that already exists cannot go out of date.
+
+                  It hangs off the corner deliberately. A label inside the frame is a caption;
+                  one breaking the edge is something applied to the object afterwards, which is
+                  the whole device — and it is why the wrapper is `relative` with no clipping. */}
+              <div className={"relative " + (flip ? "lg:order-1" : "")}>
+                <Window tilt={flip ? -2 : 2} />
+                <SwingTag
+                  label={c.title}
+                  rotate={flip ? 4 : -4}
+                  className="absolute -top-3 left-3 z-10 sm:-left-4 sm:top-4"
+                />
+                {/* ONE ARROW ON THE PAGE, on the first card only. It points from the sentence
+                    to the panel that sentence is about, which is a relationship that is true
+                    by POSITION rather than by copy — so it survives any edit. A second one
+                    further down would make both read as decoration. */}
+                {i === 0 && (
+                  <Arrow
+                    dir="downRight"
+                    className="pointer-events-none absolute -left-16 top-1/2 hidden w-20 -translate-y-1/2 xl:block"
+                    aria-hidden
+                  />
+                )}
+              </div>
             </div>
           </Band>
         )
