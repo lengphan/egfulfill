@@ -34,8 +34,14 @@ const buttonVariants = cva(
          * all once the violet went.
          */
         default: "bg-brand text-brand-foreground hover:bg-[color-mix(in_oklch,var(--brand),var(--background)_18%)]",
+        // A CONTROL EDGE, NOT A CARD RULE — and they are different tokens for a reason.
+        // `--border` is a card's rule: it separates two surfaces and is allowed to be
+        // faint. On the page ground it measures 1.23:1, and CLAUDE.md sets a 3:1 FLOOR for a
+        // control's edge, because a button you cannot find is not a button. `--input` is
+        // that token — the one the fields already use — and it measures 3.13:1 on the page
+        // and 3.44:1 on a card. 231 outline buttons stop dissolving into the background.
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
+          "border-input bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:

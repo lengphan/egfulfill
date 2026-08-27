@@ -7,11 +7,12 @@ import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { useParams, useRouter } from "next/navigation"
-import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X } from "@phosphor-icons/react"
+import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
+import { deleteOrderItem } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
@@ -67,6 +68,7 @@ import { printPackingSlips } from "@/lib/packing-slip"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { designSrc } from "@/lib/order-image"
 import { OrderedVariant } from "@/components/app/ordered-variant"
+import { useConfirm } from "@/components/app/confirm-dialog"
 import { LineDownloads } from "@/components/app/line-downloads"
 import { designLabel } from "@/lib/design-id"
 import { TrackingNumber } from "@/components/app/tracking-number"
@@ -214,6 +216,7 @@ export default function OrderDetailPage() {
    */
   /** Whatever the last row action refused with. Shown at the Items card rather than
    * swallowed: a quantity that snaps back with no explanation reads as a broken field. */
+ const confirm = useConfirm()
  const [rowErr, setRowErr] = useState<string | null>(null)
  const [adding, setAdding] = useState(false)
 
@@ -236,6 +239,34 @@ export default function OrderDetailPage() {
   }
 
   /** Add a blank line for staff to fill in with the pickers already on every row. */
+  /**
+   * REMOVE A LINE — a buyer orders the wrong thing and somebody has to fix it.
+   *
+   * Its own control rather than an entry in ItemDesignActions, because that menu renders
+   * only when design status AND a sku are present — and a line added by mistake has neither.
+   * The row you most need to delete would have been the one row with no way to.
+   *
+   * The server refuses this past review; the button is hidden on the same test so the
+   * refusal is never the first thing you learn.
+   */
+ const removeItem = async (it: OrderItem) => {
+ const key = it.line_id ?? it.sku
+ if (!key) { setRowErr("This line has no id, so it can't be removed safely."); return }
+ const ok = await confirm({
+ title: "Remove this line?",
+ body: `${it.name || it.sku || "This item"} comes off the order. Its artwork goes with it.`,
+ confirmLabel: "Remove line",
+    })
+ if (!ok) return
+ setRowErr(null)
+ try {
+ const r = await deleteOrderItem(String(id), String(key))
+ if (r?.error) throw new Error(r.error)
+    } catch (e) {
+ setRowErr(e instanceof Error ? e.message : "Couldn't remove that line.")
+    } finally { reloadOne() }
+  }
+
  const addItem = async () => {
  setAdding(true); setRowErr(null)
  try {
@@ -787,8 +818,10 @@ export default function OrderDetailPage() {
           />
 
           <div className={detailTab === "items" ? "space-y-5" : "hidden"}>
+          {/* NO TITLE. The tab immediately above says "Items 2" — a heading repeating it
+              is the same fact twice with nothing to tell the two apart. SectionCard still
+              renders its head for the action. */}
           <SectionCard className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0"
- title={`Items (${items.length})`}
  actions={canAddItem ? (
                   <Button size="sm" variant="outline" onClick={() => void addItem()} disabled={adding}
  title="Add a line to this order — set its blank and variants with the pickers on the row">
@@ -872,7 +905,12 @@ export default function OrderDetailPage() {
                           edge on a white card without framing them in black, and
                           `self-stretch` goes because the well belongs to the picture, not to
                           the full height of a row that now wraps. */}
-                      <div className="flex shrink-0 items-center justify-center rounded-xl bg-muted p-4">
+                      {/* NO GROUND AT ALL. The well went in to give two white product photos
+                          an edge — but ItemAvatar already draws its own white tile with its
+                          own radius, so the grey sat as a box around a box, which is what
+                          made it read as a frame rather than a surface. The picture is its
+                          own object; it does not need a second one behind it. */}
+                      <div className="flex shrink-0 items-center justify-center">
                       <div className="relative shrink-0">
                         {/* The line's files, on the corner of its own picture — see
                             LineDownloads for why they are not a link under the text. */}
@@ -915,7 +953,11 @@ export default function OrderDetailPage() {
                             {/* The catalogue row is what turns a blank NAME into the sku
  production actually keys on — resolveProduct is the shared
  resolver (CLAUDE.md §5), not a private copy. */}
-                            <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} />
+                            {/* `showQty` off only when the price line below is actually
+                                printing "× N". An unpriced row renders no multiplication at
+                                all, so it keeps the count here — otherwise de-duplicating
+                                would have deleted it. */}
+                            <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} showQty={unit <= 0} />
                             {/* THIS LINE's board state, with the lane named. "Sent to design"
  and "Approved" are different answers, and until now the only
  signal was an order-wide chip that lit for every item the
@@ -1032,6 +1074,27 @@ export default function OrderDetailPage() {
                               </>
                             )}
                           </div>
+                          {/* REMOVE, at the row it removes. Hidden on the same test the
+                              server enforces — staff, and before approval — so a refusal is
+                              never the first thing you learn about the rule. Its own control
+                              rather than a menu entry: ItemDesignActions renders only with a
+                              sku AND a design status, and a line added by mistake has
+                              neither — so the row most needing this would have had no way. */}
+                          {canAddItem && (
+                            <button
+                              type="button"
+                              onClick={() => void removeItem(it)}
+                              title="Remove this line from the order"
+                              aria-label={"Remove " + (it.name || it.sku || "this line")}
+                              className="eg-tap -mr-1 shrink-0 self-start rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-alert/10 hover:text-alert focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                            >
+                              {/* X, NOT A TRASH CAN. Removing a mis-ordered line before
+                                  approval is a correction, not destruction — and a bin
+                                  overstates it. X also pairs with "Add item" as its opposite,
+                                  and matches the confirm dialog that follows. */}
+                              <X size={15} />
+                            </button>
+                          )}
                         </div>
 
 
@@ -1289,7 +1352,11 @@ export default function OrderDetailPage() {
             child stops drawing its own border, corner and ring, and this container draws
             them once for the set. divide-y puts a hairline between the sections, so the
             four read as one object with four parts rather than four objects. */}
-        <div className="min-w-0 space-y-6 rounded-[var(--radius)] bg-card p-5 ring-1 ring-foreground/5">
+        {/* A STACK OF CARDS, not one card with rules in it. Each rail section answers a
+            different question — what the factory should know, who it goes to, what was
+            charged — and a shared surface made them read as one long thing you scroll past.
+            Separate cards on the page ground let the eye land on the one it wants. */}
+        <div className="min-w-0 space-y-4">
           {/* THE FACTORY NOTE, IN THE RAIL — moved 2026-08-26.
               Still one field, overwritten, staff-only: "the thing to know about this
               order", and still deliberately separate from the activity thread, which is a
@@ -1302,7 +1369,7 @@ export default function OrderDetailPage() {
               it must not cost a scroll to reach. The rail is already where everything that
               is not an item lives, and it is short enough to keep the note in view. */}
           {isStaff && (
-            <SectionCard title="Factory note" bodyClassName="p-5" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+            <SectionCard title="Factory note" bodyClassName="p-5">
               <InternalNote
  hideLabel
                 orderId={order.id}
@@ -1310,7 +1377,7 @@ export default function OrderDetailPage() {
               />
             </SectionCard>
           )}
-          <SectionCard title="Customer" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+          <SectionCard title="Customer">
             <div className="space-y-3 p-5 text-sm">
               <div>
                 <div className="font-medium">{cust.name || "—"}</div>
@@ -1351,7 +1418,13 @@ export default function OrderDetailPage() {
                 <div className="flex items-start gap-2 border-t border-border pt-3 text-muted-foreground">
                   <MapPin size={15} className="mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
-                    {addr.name && <div>{addr.name}</div>}
+                    {/* ONLY WHEN IT DIFFERS. `cust.name` is who bought it and `addr.name`
+                        is who receives it — genuinely different fields, and on a gift order
+                        they differ and both matter. On the common order they are the same
+                        person, and printing it twice under a heading that already said it
+                        is the repetition. Compared case- and space-insensitively, because
+                        two marketplaces spell one name two ways. */}
+                    {addr.name && addr.name.trim().toLowerCase() !== String(cust.name ?? "").trim().toLowerCase() && <div>{addr.name}</div>}
                     {addr.line1 && <div>{addr.line1}</div>}
                     {addr.line2 && <div>{addr.line2}</div>}
                     {/* The gap, said out loud. A blank where the street belongs is the one
@@ -1417,7 +1490,7 @@ export default function OrderDetailPage() {
  label exists on TikTok's side before the number reaches us, and a Shipping card
  that isn't there reads as "nothing has shipped". */}
           {(order.tracking || order.carrier || canFetchTiktokLabel(order)) && (
-            <SectionCard title="Shipping" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+            <SectionCard title="Shipping">
               <div className="flex items-start gap-2 p-5 text-sm">
                 <Truck size={15} className="mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
@@ -1491,7 +1564,7 @@ export default function OrderDetailPage() {
             {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
    we'll charge to produce this); once submitted the price is frozen and it
    falls back to the order's own totals. */}
-            <SectionCard title="Summary" className="rounded-none border-0 bg-transparent ring-0 [&>div:first-child]:border-b-0 [&>div:first-child]:px-0 [&>div:first-child]:pb-1.5 [&>div:first-child]:pt-0">
+            <SectionCard title="Summary">
               <dl className="space-y-2 p-5 text-sm">
                 {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
    the alternative is a card that looks like an order nobody has priced. */}

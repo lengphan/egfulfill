@@ -32,7 +32,18 @@ const CSS = fs.readFileSync(new URL('../web/app/globals.css', import.meta.url), 
 const KIT = fs.readFileSync(new URL('../web/components/marketing/bold-kit.tsx', import.meta.url), 'utf8')
 
 /** The skin that a page with no data-skin attribute renders — the `:root` half of the pair. */
-const DEFAULT_SKIN = 'studio'
+/**
+ * WORKSHOP, not studio — corrected 2026-08-27.
+ *
+ * globals.css declares the shipping palette as `:root, [data-skin="workshop"]`, so workshop
+ * is what renders when nobody has picked anything — which is almost everybody. `studio` is a
+ * plain [data-skin] block and never applies unless selected.
+ *
+ * This constant said 'studio', so the HEX check below was measuring bold-kit's literals
+ * against a palette the site does not use. It passed, and it was checking the wrong thing —
+ * the same failure mode as the dead PLATE_ACCENT export this file was written to catch.
+ */
+const DEFAULT_SKIN = 'workshop'
 
 /* ── colour maths ─────────────────────────────────────────────────────────────── */
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))

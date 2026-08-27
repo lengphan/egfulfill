@@ -417,20 +417,20 @@
    *
    * The panel is 16.26:1 against the page, so the app finally has two surfaces instead of
    * one. Every pair below is measured; none is eyeballed. */
-    --sidebar: oklch(0.205 0.004 250);
-    --sidebar-foreground: oklch(0.900 0.004 250);
+    --sidebar: oklch(0.335 0.010 250);
+    --sidebar-foreground: oklch(0.905 0.005 250);
   /* SELECTED IS THE LIME, and this is the one place in the app it fills something. §4
      reserves it as the single bright thing and forbids it as a text colour — a filled block
      with ink on it is exactly the shape that rule permits, and "you are here" is the one
      marker worth spending it on. Ink on lime is 14.87:1; the block is 14.21:1 against the
      panel, so it reads across a room. */
-    --sidebar-primary: oklch(0.9114 0.1870 118.57);
+    --sidebar-primary: oklch(0.845 0.110 282);
     --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
-  /* Hover is a real step now: 1.31:1 against the panel rather than 1.05:1. */
-    --sidebar-accent: oklch(0.300 0.006 250);
+  /* Hover is a real step: 1.34:1 against the panel, where ink could only reach 1.23. */
+    --sidebar-accent: oklch(0.407 0.011 250);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.300 0.006 250);
-    --sidebar-ring: oklch(0.9114 0.1870 118.57);
+    --sidebar-border: oklch(0.407 0.011 250);
+    --sidebar-ring: oklch(0.845 0.110 282);
 }
 
 .dark {
@@ -517,8 +517,8 @@
    * ink on it. On a near-black page the loud colour has to be the fill rather than the label
    * — an acid *label* on near-black is legible but quiet, while the filled block reads across
    * the room, which is what a "you are here" marker is for. */
-    --sidebar: oklch(0.175 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar: oklch(0.245 0.010 250);
+    --sidebar-foreground: oklch(0.900 0.005 250);
     /* THE SWAP THE COMMENT ABOVE ALREADY DESCRIBED. These two carried the LIGHT arrangement
      * verbatim — violet block, acid label — so the paragraph promising "the acid block with
      * ink on it" sat directly on top of values doing the opposite, and dark mode's one
@@ -528,11 +528,11 @@
   /* THE COMMENT ABOVE FINALLY MATCHES THE VALUE. It described "the acid block with ink on
    * it" as dark mode's one reserved use of lime, and then set white — so the thing the
    * paragraph promised had never once rendered. Light and dark now select the same way. */
-    --sidebar-primary: oklch(0.9114 0.1870 118.57);
+    --sidebar-primary: oklch(0.790 0.115 282);
     --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
-    --sidebar-accent: oklch(0.235 0 0);
+    --sidebar-accent: oklch(0.320 0.011 250);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.315 0 0);
+    --sidebar-border: oklch(0.330 0.011 250);
     --sidebar-ring: oklch(0.72 0 0);
 }
 
@@ -1109,10 +1109,13 @@ td[align="right"] {
    * muted 5.49:1 · white card on page 1.101, so a card separates without a shadow. */
   --mk-surface: #F3F4F5;
   --mk-ink: #121212;
-  --mk-accent: #121212;
+  /* SLATE, not ink — 2026-08-27. A near-black plate made the site's hero and the app's
+     sidebar the same slab, so the accent was doing all the work of telling them apart.
+     Slate is the value the sidebar now carries: two halves of one product, one surface. */
+  --mk-accent: #33373C;
   --mk-accent-ink: #F3F4F5;
-  --mk-plate-accent: #D6F24B;
-  --mk-acid: #D6F24B;
+  --mk-plate-accent: #C0C4FF;
+  --mk-acid: #C0C4FF;
   --mk-auth-field: #FFFFFF;
   --mk-auth-edge: #7F8C97;
   --mk-auth-muted: #546570;
@@ -1145,7 +1148,16 @@ td[align="right"] {
   --mk-violet-ink: #FFFFFF;
 
   /* Lime fills, ink labels — 12.99:1. The app's large-fill brand IS the marketing accent. */
-  --brand: oklch(0.9114 0.1870 118.57);
+  /* TWO JOBS, TWO VALUES — and this is why they cannot share one.
+     A light accent works on a DARK ground and fails on a light one. The rail is slate, so
+     the SELECTED item takes the light periwinkle #C0C4FF at 7.2:1. A filled BUTTON sits on
+     a white card and needs 3:1 against it (WCAG 1.4.11) — light periwinkle manages 1.67:1,
+     and the lime it replaces was worse at 1.26:1, which is why the primary button has always
+     read as a floating word rather than a button.
+     So --brand is a DEEPER periwinkle: 3.83:1 on a card, 3.48:1 on the page, ink at 4.89:1.
+     It cannot go deeper — #6359D2 reaches 5.39:1 but lands 0.118 from PENDING indigo, and a
+     primary button that reads as an order status is the one thing it must not do. */
+  --brand: oklch(0.620 0.170 282);
   --brand-foreground: oklch(0.1822 0.0000 89.88);
 }
 

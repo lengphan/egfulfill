@@ -2586,6 +2586,19 @@ export function postItemSetup(id: string, body: { line_id?: string; sku?: string
  * the order is approved. It adds something to MAKE — the charge was frozen at submit and
  * is not reopened, so an added line is produced and not invoiced.
  */
+/**
+ * Remove a line. Staff only, and refused by the server once the order is past review —
+ * that gate is what keeps this away from money, because the charge happens at submit.
+ *
+ * Keyed on line_id, never sku: two lines of the same sku are different jobs (§5).
+ */
+export function deleteOrderItem(id: string, lineId: string) {
+  return api<{ ok?: boolean; error?: string }>(
+    `/api/orders/${encodeURIComponent(id)}/items/${encodeURIComponent(lineId)}`,
+    { method: "DELETE" },
+  )
+}
+
 export function addOrderItem(id: string, body: { name?: string; sku?: string; blank?: string; color?: string; size?: string; printType?: string; qty?: number }) {
   return api<{ ok?: boolean; lineId?: string; error?: string }>(`/api/orders/${encodeURIComponent(id)}/items`, {
     method: "POST", body: JSON.stringify(body),

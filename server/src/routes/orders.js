@@ -2812,6 +2812,46 @@ export function ordersRoutes(app, requireAuth) {
   });
 
   /**
+   * REMOVE A LINE — because a buyer orders the wrong thing and somebody has to fix it.
+   *
+   * MIRRORS THE ADD ROUTE EXACTLY, and that is what makes it safe. Staff only, and only
+   * while the order is unsubmitted or in review — which is BEFORE chargeForSubmit runs, so
+   * there is no wallet leg to unwind. A delete allowed after approval would need a refund
+   * and would rewrite a settled charge; it is refused instead, with the same sentence the
+   * add route uses, because the honest answer at that point is to cancel and raise again.
+   *
+   * A SYNCED LINE DELETES LIKE ANY OTHER. It is our copy of what the marketplace sent, and
+   * removing it changes nothing at Etsy or Shopify — sync must never overwrite what it did
+   * not author (§2.6), and this does not write upstream at all.
+   *
+   * The audit carries the whole row as `before`. §"recorded history never changes silently":
+   * a line that existed and now does not is exactly the case where the record has to say
+   * what was there.
+   */
+  app.delete('/api/orders/:id/items/:lineId', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
+    const stageNow = await q('select factory_status from orders where id=$1', [req.params.id])
+      .then((r) => (r.rowCount ? normalizeStage(r.rows[0].factory_status) : null)).catch(() => null);
+    if (stageNow === null) { reply.code(404); return { error: 'order not found' }; }
+    if (!(stageNow === '' || stageNow === 'in_review')) {
+      reply.code(409);
+      return { error: 'This order has been approved — remove a line before approval, or cancel and raise a new order.' };
+    }
+    // line_id is line IDENTITY (§5). Deleting by sku would take every sibling of the same
+    // sku with it, which on a two-colour order is the wrong line half the time.
+    const found = await q(
+      'select * from order_items where order_id=$1 and line_id=$2',
+      [req.params.id, String(req.params.lineId)]
+    );
+    if (!found.rowCount) { reply.code(404); return { error: 'line not found' }; }
+    await q('delete from order_items where order_id=$1 and line_id=$2', [req.params.id, String(req.params.lineId)]);
+    audit(req, 'item.remove', { entityType: 'order', entityId: req.params.id, before: found.rows[0] });
+    egBroadcast({ type: 'orders' });
+    return { ok: true };
+  });
+
+  /**
    * DUPLICATE AN ORDER INTO A FRESH DRAFT.
    *
    * A cancelled order is settled — it was cancelled, and if it had been charged the seller

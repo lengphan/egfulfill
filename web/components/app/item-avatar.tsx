@@ -206,10 +206,14 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   // listing, so letting the main image swap to the listing too would show it twice.
   const thumbShowsListing = showBoth ? false : (listingFirst ? !!listing : showListing)
 
+  // A FRAME, NOT A SLAB. `bg-muted` filled the whole tile, and on a line with no artwork
+  // yet that is a 144px block of grey sitting where the product should be — the single
+  // loudest thing in the row, saying nothing. A hairline ring marks the slot without
+  // claiming it holds something.
   if (readOnly) {
     return (
       <span
-        className={"relative block shrink-0 overflow-hidden rounded-md bg-muted " + (bare ? "" : "border border-border ") + (className ?? "")}
+        className={"relative block shrink-0 overflow-hidden rounded-md bg-card ring-1 ring-foreground/[0.06] " + (bare ? "" : "border border-border ") + (className ?? "")}
         style={{ width: size, height: size }}
       >
         <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || tl("itemAvatar", "Item")} blankMissing={blankMissing} color={item.color} />
@@ -235,7 +239,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           // modes. Going from `size-full` in flow to absolutely positioned is a discrete
           // change nothing can tween, which is why the row jumped the moment the listing
           // photo slid behind.
-          className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-muted transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
+          className={"eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md bg-card ring-1 ring-foreground/[0.06] transition-all duration-300 ease-out " + (bare ? "" : "border border-border hover:border-foreground/25")
             + (showBoth && !listingFront ? " z-20 border-2 border-background " : " z-0")}
           style={{ left: showBoth ? Math.round(size * PEEK) : 0, width: size, height: size }}
         >
@@ -270,7 +274,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             }}
             title={listingFront ? tl("itemAvatar", "View the buyer's listing photo") : tl("itemAvatar", "Bring the listing photo forward")}
             className={
-              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-muted  transition-all hover:brightness-105 " +
+              "eg-tap absolute top-1/2 -translate-y-1/2 overflow-hidden rounded-md border-2 border-background bg-card  transition-all hover:brightness-105 " +
               (listingFront ? "z-20" : "z-0")
             }
             // NO `transform` here. Tailwind v4 compiles -translate-y-1/2 to the `translate`
@@ -316,7 +320,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
             <OrderedVariant item={item} className="pr-6" />
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
-            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
+            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-card">
               {/* THE ZOOM IS FOR LOOKING, so it may show the listing photo the tile refuses
                   to. With no blank picked and no artwork there is nothing else to show, and
                   someone who clicked a thumbnail wants a picture, not a bigger placeholder —

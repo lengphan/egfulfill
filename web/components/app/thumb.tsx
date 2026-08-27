@@ -58,7 +58,7 @@ export function Thumb({ src, alt = "", fit = "cover", className = "", icon, note
   if (!src || badSrc === src) {
     return (
       <span
-        className={"flex items-center justify-center bg-muted text-muted-foreground/40 " + className}
+        className={"flex items-center justify-center bg-card text-muted-foreground/45 ring-1 ring-inset ring-foreground/[0.06] " + className}
         title={note ?? (src ? tl("thumb", "This image couldn't be loaded") : tl("thumb", "No image"))}
         aria-label={alt || undefined}
         role={alt ? "img" : undefined}
@@ -105,7 +105,7 @@ export function ThumbFill({ src, alt = "", fit = "cover", sizes, className = "",
   if (!src || badSrc === src) {
     return (
       <span
-        className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground/40"
+        className="absolute inset-0 flex items-center justify-center bg-card text-muted-foreground/45 ring-1 ring-inset ring-foreground/[0.06]"
         title={note ?? (src ? tl("thumb", "This image couldn't be loaded") : tl("thumb", "No image"))}
         aria-label={alt || undefined}
         role={alt ? "img" : undefined}

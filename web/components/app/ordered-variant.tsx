@@ -26,10 +26,20 @@ import { decodeEntities } from "@/lib/order-format"
  *
  * Renders nothing when the line carries neither, so a manual order gains no empty strip.
  */
-export function OrderedVariant({ item, className = "", after, blankSku }: {
+export function OrderedVariant({ item, className = "", after, blankSku, showQty = true }: {
   item: OrderItem
   className?: string
   after?: React.ReactNode
+  /**
+   * Whether to print the quantity. Defaults ON, because for three of the four callers this
+   * strip is the only place it appears.
+   *
+   * The order detail page is the exception: its price line reads "$42.99 × 1", so the strip
+   * was saying the same number a few pixels away. It turns this off only when that line is
+   * actually rendering — an unpriced row has no "× 1" at all, and hiding it there
+   * unconditionally would have deleted the quantity rather than de-duplicated it.
+   */
+  showQty?: boolean
   /**
    * The BLANK we buy against, resolved by a caller that has the catalogue.
    *
@@ -117,10 +127,14 @@ export function OrderedVariant({ item, className = "", after, blankSku }: {
       <span className="tabular-nums">{blankSku || blank}</span>
     </span>
   )
-  // ALWAYS PRESENT, including x1. An absent count and a count of one must never look the
-  // same to someone pulling stock. Emphasised past one so a 6 catches the eye where a 1
-  // should not.
-  parts.push(
+  // PRESENT WHENEVER IT IS PRESENT AT ALL — including x1. An absent count and a count of
+  // one must never look the same to someone pulling stock, so this never abbreviates itself
+  // away. Emphasised past one so a 6 catches the eye where a 1 should not.
+  //
+  // `showQty` is the one exception and it is a DE-DUPLICATION, not a suppression: the order
+  // detail page prints "$42.99 × 1" a few pixels away, and only turns this off when that
+  // line is actually rendering.
+  if (showQty) parts.push(
     <span key="q">
       <span className="font-medium text-foreground/70">{tl("orderedVariant", "Qty")}</span>{" "}
       <span className={qty > 1 ? "font-semibold text-foreground" : ""}>{qty}</span>
