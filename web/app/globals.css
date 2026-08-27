@@ -1147,18 +1147,40 @@ td[align="right"] {
   --mk-violet: #614EFA;
   --mk-violet-ink: #FFFFFF;
 
-  /* Lime fills, ink labels — 12.99:1. The app's large-fill brand IS the marketing accent. */
   /* TWO JOBS, TWO VALUES — and this is why they cannot share one.
      A light accent works on a DARK ground and fails on a light one. The rail is slate, so
      the SELECTED item takes the light periwinkle #C0C4FF at 7.2:1. A filled BUTTON sits on
-     a white card and needs 3:1 against it (WCAG 1.4.11) — light periwinkle manages 1.67:1,
-     and the lime it replaces was worse at 1.26:1, which is why the primary button has always
-     read as a floating word rather than a button.
-     So --brand is a DEEPER periwinkle: 3.83:1 on a card, 3.48:1 on the page, ink at 4.89:1.
-     It cannot go deeper — #6359D2 reaches 5.39:1 but lands 0.118 from PENDING indigo, and a
-     primary button that reads as an order status is the one thing it must not do. */
-  --brand: oklch(0.620 0.170 282);
-  --brand-foreground: oklch(0.1822 0.0000 89.88);
+     a white card and needs 3:1 against it (WCAG 1.4.11), which the light periwinkle cannot
+     reach at 1.67:1.
+
+     ── A NEAR-BLACK THAT LEANS VIOLET, 2026-08-27 ─────────────────────────────────────
+     This was a mid-tone periwinkle, oklch(0.620 0.170 282) = #7974E8, and it failed the
+     status floor: ΔE 0.150 from PENDING against a floor of 0.171. A seller could not tell
+     the brand from a state their order was in, which is the one thing this hue may not do.
+
+     THE NOTE ABOVE THIS ONE SAID IT "CANNOT GO DEEPER", and that was the error. It tried
+     #6359D2 — L 0.52, still a mid-tone — found 0.118 from pending, and concluded the
+     direction was closed. It was not deep enough. Every status sits at L 0.50–0.79 in light
+     and higher in dark, so a mid-tone is inside their band by construction. Drop to L 0.25
+     and the whole question disappears.
+
+     WHY NOT LOUDER. Escaping sideways works too — #4E00FC clears everything at chroma 0.295
+     — but a saturated violet would be the loudest thing in a product whose entire palette is
+     pale periwinkle, slate and cool grey. It passes the gate and fails the room.
+
+     WHY NOT SLATE. #33373C passes, but by +0.019: `draft` is itself a neutral grey, so the
+     two are the same family at different lightnesses. It also vanishes on the sidebar, which
+     is slate. This clears by +0.086, four times the margin.
+
+     WHY NOT TRUE BLACK. The hue is what keeps it a brand rather than an absence — beside a
+     pure black it reads visibly violet. The same reasoning already governs every neutral in
+     this file, which sits at hue ~245 rather than 0: chosen, not inherited.
+
+     Measured: white on it 16.3:1 · 15.6:1 against a white card, far past the 3:1 fill floor ·
+     nearest status ΔE 0.086 clear of the floor in BOTH themes. `node tools/check-skins.mjs`
+     covers --brand now, so the next move of this token is checked rather than argued. */
+  --brand: oklch(0.250 0.070 285);
+  --brand-foreground: oklch(1 0 0);
 }
 
 /* ── STUDIO · ink on white, the default until 2026-08-26 ──────────────────────

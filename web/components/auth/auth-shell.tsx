@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Wordmark } from "@/components/marketing/wordmark"
 import { Stickers } from "@/components/auth/stickers"
 import type { CSSProperties, ReactNode } from "react"
 import {
@@ -115,10 +116,11 @@ export function AuthShell({ subtitle, children }: { subtitle: string; children: 
                 would be the same word twice on one screen. */}
             <Link
               href="/"
-              className="mb-8 block w-fit text-lg font-semibold tracking-tight"
+              aria-label="EGFUL home"
+              className="mb-8 block w-fit"
               style={{ color: INK }}
             >
-              egful
+              <Wordmark className="h-[21px] w-auto" />
             </Link>
 
             {/* NO CARD HERE. The card exists because a form alone on white has no shape; the

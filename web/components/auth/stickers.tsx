@@ -1,6 +1,8 @@
 "use client"
 
 import type { CSSProperties } from "react"
+import { ACCENT, ACCENT_INK, ACID, CARD, INK } from "@/components/marketing/bold-kit"
+import { Wordmark } from "@/components/marketing/wordmark"
 
 /**
  * A few stickers on the picture — the one bit of play on an otherwise straight page.
@@ -18,7 +20,7 @@ import type { CSSProperties } from "react"
  * a control: aria-hidden, no focus, no pointer events.
  */
 type Sticker = {
-  kind: "word" | "blob"
+  kind: "word" | "blob" | "mark"
   text?: string
   /** % of the panel, from the top-left. */
   x: number
@@ -32,10 +34,14 @@ type Sticker = {
 }
 
 const STICKERS: Sticker[] = [
-  { kind: "word", text: "egful", x: 7, y: 11, rotate: -8, dur: 11, delay: 0, ground: "#0A0A0A", ink: "#FFFFFF" },
-  { kind: "word", text: "made to order", x: 58, y: 24, rotate: 7, dur: 14, delay: 1.6, ground: "#D4F897", ink: "#0A0A0A" },
-  { kind: "blob", x: 76, y: 68, rotate: 14, dur: 9, delay: 0.8, ground: "#D4F897", ink: "#0A0A0A" },
-  { kind: "word", text: "one at a time", x: 9, y: 80, rotate: 5, dur: 13, delay: 2.4, ground: "#FFFFFF", ink: "#0A0A0A" },
+  /* TOKENS, NOT HEXES. These carried #D4F897 and #0A0A0A — the retired STUDIO lime and its
+     ink — so they went on rendering the old palette after the site moved to periwinkle, on
+     the one page a person sees before they are logged in. A literal cannot follow a skin;
+     that is the whole reason the kit exports variables. */
+  { kind: "mark", x: 7, y: 11, rotate: -8, dur: 11, delay: 0, ground: ACCENT, ink: ACCENT_INK },
+  { kind: "word", text: "made to order", x: 58, y: 24, rotate: 7, dur: 14, delay: 1.6, ground: ACID, ink: INK },
+  { kind: "blob", x: 76, y: 68, rotate: 14, dur: 9, delay: 0.8, ground: ACID, ink: INK },
+  { kind: "word", text: "one at a time", x: 9, y: 80, rotate: 5, dur: 13, delay: 2.4, ground: CARD, ink: INK },
 ]
 
 export function Stickers() {
@@ -75,6 +81,15 @@ export function Stickers() {
                   fill={s.ground}
                 />
               </svg>
+            ) : s.kind === "mark" ? (
+              /* The one sticker that is the BRAND carries the mark, not the name set in Inter.
+                 currentColor via `ink`, so it takes the sticker's own lettering colour. */
+              <span
+                className="block rounded-full px-3.5 py-2"
+                style={{ background: s.ground, color: s.ink }}
+              >
+                <Wordmark className="h-[13px] w-auto" />
+              </span>
             ) : (
               <span
                 className="block whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-semibold tracking-tight"
