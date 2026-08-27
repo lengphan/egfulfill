@@ -12,7 +12,7 @@ import { ConsoleShell } from "@/components/app/console-shell"
  */
 export function SourcingPreview() {
   return (
-    <ConsoleShell title="Sourcing" icon={Compass}>
+    <ConsoleShell bare title="Sourcing" icon={Compass}>
       <SourcingView embedded />
     </ConsoleShell>
   )

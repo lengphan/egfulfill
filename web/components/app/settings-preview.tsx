@@ -12,7 +12,7 @@ import { ConsoleShell } from "@/components/app/console-shell"
  */
 export function SettingsPreview() {
   return (
-    <ConsoleShell title="Settings" icon={Gear}>
+    <ConsoleShell bare title="Settings" icon={Gear}>
       <SettingsView />
     </ConsoleShell>
   )

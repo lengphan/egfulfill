@@ -64,6 +64,7 @@ export function ConsoleShell({
   icon: Icon,
   actions,
   tabs,
+  bare,
   children,
 }: {
   /** ENGLISH, used as its own key in the `nav` namespace — same contract as PageTitle, so a
@@ -74,6 +75,9 @@ export function ConsoleShell({
   actions?: ReactNode
   /** A tab bar, under the rule, so the tabs read as belonging to the page. */
   tabs?: ReactNode
+  /** This page has no figures and no page-level actions, so on desktop there is no band to
+   *  draw. The mobile hero still renders, because below md the top bar is gone. */
+  bare?: boolean
   children: ReactNode
 }) {
   const tl = useLabelT()
@@ -87,8 +91,13 @@ export function ConsoleShell({
         {/* The rule belongs to whatever is LAST. A tab bar carries its own underline rail,
             so a border here as well draws two horizontal lines 20px apart, which reads as a
             rendering fault rather than a division. */}
-        <div className={tabs ? undefined : "border-b border-border"}>
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 pb-4">
+        {/* NO BAND AT ALL when a page has nothing to put in it. Sourcing has no StatGrid and
+            passes no actions, so on desktop — where naming the page is the top bar's job —
+            this drew a rule and 4rem of padding around nothing. `:empty` cannot detect it:
+            the rail and action slots are always present as elements, they just hide
+            themselves. So the page says so. */}
+        <div className={tabs ? undefined : (bare ? "max-md:border-b max-md:border-border" : "border-b border-border")}>
+          <div className={"flex flex-wrap items-end gap-x-6 gap-y-3 pb-4" + (bare ? " md:hidden" : "")}>
             {/* MOBILE ONLY, and that is not a responsive nicety — it is the difference
                 between one page title and two.
                 topbar.tsx is `hidden … md:flex` and renders its own <h1> from the nav, so on

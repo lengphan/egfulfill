@@ -281,6 +281,19 @@ export function SourcingView({ embedded }: {
   }
 
  if (rows === null) return <Loading />
+  const stageFilterEl = (
+    <FilterMenu
+      label={tl("sourcing", "Stage")}
+      anyLabel={`All stages (${rows.length})`}
+      value={stageFilter}
+      options={SOURCING_STAGES.map((st) => ({
+        value: st.id,
+        label: `${st.label} (${stageCounts[st.id] ?? 0})`,
+      }))}
+      onPick={(v) => setStageFilter(v as "" | SourcingStage)}
+    />
+  )
+
 
  return (
     <div className="space-y-4">
@@ -318,10 +331,11 @@ export function SourcingView({ embedded }: {
         <AlibabaBrowse onConnectedChange={setCanBrowse} initialQuery={incoming} onSaved={load} />
       </div>
 
+      {/* Defined once; rendered either in the header row (embedded) or in its own band. */}
       <div className={canBrowse && tab === "find" ? "hidden" : undefined}>
       <SectionCard>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-          {embedded ? <div className="flex-1" /> : (
+          {embedded ? <div className="flex-1">{rows.length > 0 && stageFilterEl}</div> : (
             <div className="flex-1">
               <h2 className="text-sm font-semibold">{tl("sourcing", "Sourcing")}</h2>
               <p className="text-xs text-muted-foreground">
@@ -350,18 +364,14 @@ export function SourcingView({ embedded }: {
             The pills were the same rounded shape as the stage BADGES in the table below,
  so a control and a read-only label looked identical — and being filled with the
  accent, they read as actions sitting beside the real ones above. */}
-        {rows.length > 0 && (
+        {/* ONE BAND, not two. Embedded, the row above this had an empty left half (the
+            heading moved to the page) while the stage filter sat alone in a band of its own
+            directly under it — two rules and two paddings for one line of controls. The
+            filter goes in that empty half: filter left, actions right, which is the shape
+            /orders uses for its own utility row. */}
+        {!embedded && rows.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-            <FilterMenu
- label={tl("sourcing", "Stage")}
- anyLabel={`All stages (${rows.length})`}
- value={stageFilter}
- options={SOURCING_STAGES.map((st) => ({
- value: st.id,
- label: `${st.label} (${stageCounts[st.id] ?? 0})`,
-              }))}
- onPick={(v) => setStageFilter(v as "" | SourcingStage)}
-            />
+            {stageFilterEl}
           </div>
         )}
 
@@ -479,19 +489,23 @@ export function SourcingView({ embedded }: {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            {/* table-fixed, or the w-* on the headers are only hints: auto layout hands the
+                numeric columns whatever they ask for and squeezes the one column holding a
+                sentence, which is why every product name wrapped to three lines while LEAD
+                had a whole column for "24d". */}
+            <table className="w-full table-fixed text-sm">
               <thead className="border-b border-border text-left eg-label text-muted-foreground">
                 <tr>
-                  <th className="w-12 px-4 py-2" />
+                  <th className="w-10 px-4 py-2" />
                   <th className="px-4 py-2 text-left">{tl("sourcing", "Product")}</th>
-                  <th className="px-4 py-2 text-left">{tl("sourcing", "Source")}</th>
-                  <th className="px-4 py-2 text-right">{tl("sourcing", "Unit")}</th>
-                  <th className="px-4 py-2 text-right">MOQ</th>
-                  <th className="px-4 py-2 text-right">{tl("sourcing", "Freight/unit")}</th>
-                  <th className="px-4 py-2 text-right">{tl("sourcing", "Landed")}</th>
-                  <th className="px-4 py-2 text-right">{tl("sourcing", "Lead")}</th>
-                  <th className="px-4 py-2 text-left">{tl("sourcing", "Stage")}</th>
-                  <th className="px-4 py-2" />
+                  <th className="w-32 px-4 py-2 text-left">{tl("sourcing", "Source")}</th>
+                  <th className="w-16 px-4 py-2 text-right">{tl("sourcing", "Unit")}</th>
+                  <th className="w-16 px-4 py-2 text-right">MOQ</th>
+                  <th className="w-28 px-4 py-2 text-right">{tl("sourcing", "Freight/unit")}</th>
+                  <th className="w-20 px-4 py-2 text-right">{tl("sourcing", "Landed")}</th>
+                  <th className="w-14 px-4 py-2 text-right">{tl("sourcing", "Lead")}</th>
+                  <th className="w-24 px-4 py-2 text-left">{tl("sourcing", "Stage")}</th>
+                  <th className="w-24 px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -504,7 +518,7 @@ export function SourcingView({ embedded }: {
                     <Fragment key={r.id}>
                     <tr onClick={() => setSelected(isSel ? null : r.id)}
  className={`cursor-pointer border-b border-border/60 transition-colors hover:bg-accent/50 ${isSel ? "bg-accent" : ""}`}>
-                      <td className="py-2 pl-4 pr-0">
+                      <td className="py-3 pl-4 pr-0">
                         {r.image
                           // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={fullImg(r.image)} alt="" className="size-9 rounded border border-border object-cover" />
@@ -514,34 +528,34 @@ export function SourcingView({ embedded }: {
  nothing said so. The profit calculator, the rival comparison and
  the agreed terms all live in that panel, and the only way to find
  out was to click a row that gave no sign it would do anything. */}
-                      <td className="px-4 py-2 font-medium">
+                      <td className="px-4 py-3 font-medium">
                         <span className="flex items-center gap-1.5">
                           <CaretRight size={12} weight="bold"
  className={"shrink-0 text-muted-foreground transition-transform " + (isSel ? "rotate-90" : "")} />
                           {r.title}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-muted-foreground">
+                      <td className="px-4 py-3 text-muted-foreground">
                         {r.supplierRef ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">{r.supplierRef}</span> : (r.shop || "—")}
                       </td>
-                      <td className="px-4 py-2 text-right tabular-nums">{money(r.cost)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{moq.toLocaleString()}</td>
-                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{freightUnit ? money(freightUnit) : "—"}</td>
-                      <td className="px-4 py-2 text-right font-semibold tabular-nums">{money(landed)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{money(r.cost)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{moq.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{freightUnit ? money(freightUnit) : "—"}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{money(landed)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
                       {/* DERIVED, so it is read. It was a dropdown, and every row sat at the
  first stage — because changing it changed nothing, and a label with
  no consequence is one nobody maintains. It now comes from what
  actually happened: a sample placed reads Sampling, a sample
  received reads Approved. The title says which fact put it here,
  because a stage you cannot argue with should still explain itself. */}
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-3">
                         <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
  title={STAGE_WHY[r.stage || "prospect"]}>
                           {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? tl("sourcing", "Saved")}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           {r.url && (
                             <a href={r.url} target="_blank" rel="noopener noreferrer"
