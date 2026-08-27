@@ -28,6 +28,8 @@ const nav = [
  * It stays opaque, so it can never float unreadably over content — the bug that made the
  * transparent version wrong in the first place — and the buttons keep one look throughout.
  */
+import { Wordmark } from "@/components/marketing/wordmark"
+
 export function SiteHeader() {
   /**
    * ONE appearance, on every marketing route: PAPER, opaque, with ink lettering.
@@ -55,8 +57,12 @@ export function SiteHeader() {
           set once. Read off a screenshot; it is invisible at the widths a container query
           collapses to. */}
       <div className="mx-auto flex h-16 max-w-[88rem] items-center gap-8 px-6 sm:px-10">
-        <Link href="/" className={"font-display text-2xl font-semibold tracking-tight " + ink}>
-          egful
+        {/* The mark inherits `ink`, which is what makes one file work on every header state.
+            Height-sized so it cannot distort, and it keeps the container's left edge — the
+            note above about the wordmark and the headline sharing one left margin still
+            applies, and artwork obeys it the same way the type did. */}
+        <Link href="/" aria-label="EGFUL home" className={"flex items-center " + ink}>
+          <Wordmark />
         </Link>
         <nav className="hidden items-center gap-6 md:flex">
           {nav.map((n) => (
