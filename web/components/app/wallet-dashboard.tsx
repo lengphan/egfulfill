@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SectionCard } from "@/components/app/section-card"
+import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
 import { getCashAccounts, attributeLedgerEntry, type CashAccount, markLedgerTest, getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
 import { BillingView } from "@/components/app/billing-view"
@@ -31,6 +33,9 @@ const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date
 // Admin review of pending seller top-ups (moved here from the old Console).
 function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   const tl = useLabelT()
+  /* Is a ConsoleShell above us? Then the page already names itself and already has an
+     action band, and this dashboard should not print a second of either. */
+  const inShell = useActionNode() !== null
   // Warehouse shares the factory wallet and sees the same ledger. APPROVING a top-up
   // stays admin-only though: that's confirming money arrived by bank transfer, which is
   // a higher-trust act than reading the balance.
@@ -344,6 +349,7 @@ function mapLedger(balance: number, ledger: LedgerRow[], fmtDate: (s?: string | 
 export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: boolean } = {}) {
   const fmtDate = useDateFormat()
   const tl = useLabelT()
+  const inShell = useActionNode() !== null
  const [view, setView] = useState<View | null>(null)
   // Distinguishes "couldn't read the wallet" from "this wallet is empty". Without it the
   // catch below fell back to ZERO, which renders "Available balance $0.00" under a green
@@ -557,6 +563,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
     <div className="space-y-4">
       <AdminTopups onReviewed={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
       <AdminPayouts onPaid={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
+      <ActionsPortal>
       <div className="flex flex-wrap items-center justify-end gap-2">
         {/* Factory ledger (admin/warehouse) has nothing to withdraw. Sellers get Withdraw,
  which opens the payout flow — enter details + an amount for admin to pay out.
@@ -570,6 +577,7 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
           <Plus size={16} weight="bold" /> {tl("wallet", "Add Funds")}
         </Button>
       </div>
+      </ActionsPortal>
 
       <TopUpDialog
  open={topUpOpen}
@@ -619,24 +627,17 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* StatGrid, not a hand-rolled 4-up grid. These four were the ONE set of figures on
+          any board the console header could not reach, because the portal lives in StatGrid
+          and this bypassed it — so Finance kept a 122px band of cards while every other page
+          had moved its numbers into the header. The tone line goes: StatCard stopped drawing
+          captions under the figure app-wide, and four sentences restating four headings is
+          exactly why. */}
+      <StatGrid>
         {kpis.map((k) => (
-          <Card key={k.label} className="gap-0 p-5">
-            <div className="eg-label text-muted-foreground">
-              {tl("wallet", k.label)}
-            </div>
-            <div className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{k.value}</div>
-            <div
- className={
-                "mt-1.5 text-xs font-medium " +
-                (k.tone === "pos" ? "text-success" : k.tone === "neg" ? "text-alert" : "text-muted-foreground")
-              }
-            >
-              {k.sub}
-            </div>
-          </Card>
+          <StatCard key={k.label} label={tl("wallet", k.label)} value={k.value} tone={k.tone} />
         ))}
-      </div>
+      </StatGrid>
 
       {/* Second copy of the pending-top-up notice — right above the ledger, where the credit
  lands, so a reviewer working the transactions doesn't miss it. Stays in sync with the
@@ -647,8 +648,12 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  const txCard = (
       <Card className="gap-0 overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="text-base font-bold">{tl("wallet", "Transaction history")}</div>
-          <Button variant="outline" size="sm">
+          {/* The tab directly above already reads "Transaction history". Naming it again on
+              the card is the duplicate-title defect one level down. */}
+          {!inShell && <div className="text-base font-bold">{tl("wallet", "Transaction history")}</div>}
+          {/* With the title gone, justify-between had nothing to push against and left the
+              one button stranded on the left of its own band. */}
+          <Button variant="outline" size="sm" className={inShell ? "ml-auto" : undefined}>
             <DownloadSimple size={14} /> {tl("wallet", "Export CSV")}
           </Button>
         </div>
