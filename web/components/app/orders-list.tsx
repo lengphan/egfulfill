@@ -335,7 +335,15 @@ export function OrdersList() {
  title={tl("ordersList", "Orders")}
  actions={
           <div className="flex items-center gap-2">
-            <ColumnsMenu order={colOrder} hidden={hidden} onOrder={setOrderCols} onHidden={setHiddenCols} />
+            <ColumnsMenu
+                cols={ORDER_COLS}
+                order={colOrder}
+                hidden={hidden}
+                isLocked={(id) => !!ORDER_COLS[id].locked}
+                defaults={{ order: [...DEFAULT_ORDER_COLS], hidden: [] }}
+                onOrder={setOrderCols}
+                onHidden={setHiddenCols}
+              />
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <UploadSimple size={14} weight="bold" /> {tl("ordersList", "Import")}
             </Button>

@@ -24,7 +24,7 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct, orderNeedsSetup } from "@/lib/variant-resolve"
 import { isApprovable } from "@/components/app/approve-order-button"
 import { VariantStrip } from "@/components/app/variant-field"
-import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
+import { FACTORY_COLS, factoryGridTemplate, FACTORY_DATA_COLS, DEFAULT_HIDDEN_FACTORY_COLS, isFactoryColLocked, loadFactoryColOrder, saveFactoryColOrder, loadFactoryHiddenCols, saveFactoryHiddenCols, reorderFactoryCols, type FactoryColId } from "@/lib/order-columns"
 
 /**
  * The width a row of these columns actually WANTS, in px.
@@ -65,7 +65,7 @@ function minPxFor(cols: FactoryColId[]): number {
  return Math.round((fixed + cols.length * 0.75 + 2.5) * 16)
 }
 import { useIsNarrow } from "@/lib/use-narrow"
-import { FactoryColumnsMenu } from "@/components/app/factory-columns-menu"
+import { ColumnsMenu } from "@/components/app/columns-menu"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, isMoneyStage, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta, isFactoryOrder, lineProgress, resolvedOrderStage } from "@/lib/factory-status"
 import { InternalNote } from "@/components/app/internal-note"
 import { printPackingSlips } from "@/lib/packing-slip"
@@ -1808,11 +1808,14 @@ export function OrdersHub() {
  count={filtered.length}
  total={orders.length}
               />
-              <FactoryColumnsMenu
- order={dataColOrder}
- hidden={hiddenCols}
- onOrder={(ids) => { setDataColOrder(ids); saveFactoryColOrder(ids) }}
- onHidden={(ids) => { setHiddenCols(ids); saveFactoryHiddenCols(ids) }}
+              <ColumnsMenu
+                cols={FACTORY_COLS}
+                order={dataColOrder}
+                hidden={hiddenCols}
+                isLocked={isFactoryColLocked}
+                defaults={{ order: [...FACTORY_DATA_COLS], hidden: [...DEFAULT_HIDDEN_FACTORY_COLS] }}
+                onOrder={(ids) => { setDataColOrder(ids); saveFactoryColOrder(ids) }}
+                onHidden={(ids) => { setHiddenCols(ids); saveFactoryHiddenCols(ids) }}
               />
             </div>
           )}
