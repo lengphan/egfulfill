@@ -1,4 +1,8 @@
+"use client"
+
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Stickers } from "@/components/auth/stickers"
 import type { CSSProperties, ReactNode } from "react"
 import {
   INK,
@@ -40,87 +44,117 @@ import {
  * tracking now, and the wordmark went from 3xl to lg: a sign-in page is not a hero, and the
  * two of them stacked were competing for the same job.
  */
+/**
+ * THE IMAGE PANEL — one frame per auth page, from `public/frames`.
+ *
+ * THE PANEL CARRIES NO TYPE, AND THAT IS A MEASURED DECISION, NOT A TASTE ONE.
+ *
+ * The obvious version put the wordmark and a line of display copy on the picture in ink.
+ * §4's imagery direction allows ink type on a frame but forbids a SCRIM, so the type is
+ * only legible where the frame happens to be light. Measuring the actual region the type
+ * occupies (36,28 → 336,198 over the real 684×950 panel) against ink #0A0A0A:
+ *
+ *     floor-conveyor        mean 16.86   worst  5.13   pass
+ *     hero-conveyor-egful   mean 17.09   worst  4.27   weak
+ *     c-volume              mean 13.98   worst  2.03   fail
+ *     rail-colourways       mean 13.15   worst  1.06   fail
+ *     b-exploded            mean 12.10   worst  1.07   fail
+ *     close-face            mean  5.57   worst  1.05   fail
+ *     mid-applique          mean  3.40   worst  1.04   fail
+ *
+ * Two of seven pass, and mean contrast is worthless here — b-exploded reads 12.1 and still
+ * puts letterforms on a shadow. On signup the line landed across the model's hair and was
+ * simply unreadable. Restricting every page to the two conveyor shots would make four
+ * screens look like one, so the words moved to the white column instead, where they are
+ * legible against a known ground on every frame.
+ *
+ * If a line is ever wanted back ON a frame, measure the worst pixel first — not the mean,
+ * and not by eye.
+ *
+ * §4's imagery direction is locked: one periwinkle #C0C4FF seamless, ink type, and NO
+ * SCRIM. So the type sits at the TOP-LEFT of every frame, which is where all four of these
+ * are lightest — a scrim would be the easy way to make any placement work, and it is
+ * exactly what the direction rules out.
+ *
+ * None of these frames identifies a supplier (§2.9): the mailers and the floor carry OUR
+ * mark, and the garments are unbranded. That has to stay true of the filename and the URL
+ * as well as the picture.
+ */
+const FRAMES: Record<string, { src: string; pos?: string }> = {
+  "/login": { src: "/frames/auth-login.jpg", pos: "50% 50%" },
+  "/signup": { src: "/frames/auth-signup.jpg", pos: "48% 50%" },
+  "/forgot-password": { src: "/frames/auth-forgot.jpg", pos: "50% 50%" },
+  "/reset-password": { src: "/frames/auth-reset.jpg", pos: "52% 50%" },
+}
+
 export function AuthShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
+  const pathname = usePathname()
+  const frame = FRAMES[pathname ?? ""] ?? FRAMES["/login"]
+
   return (
-    <div
-      className="flex min-h-svh flex-col items-center justify-center px-5 py-12"
-      style={{ background: AUTH_GROUND }}
-    >
-      {/* 400px, not max-w-sm (384). A card has padding the bare form did not, and at 384 the
-          measure inside it drops below where an email address stops wrapping. */}
-      <div className="w-full max-w-[400px]">
-        {/* CENTRED, and small. Left-aligned it sat above a centred card with nothing under
-            its left edge, which reads as an alignment mistake rather than a decision. */}
-        <Link
-          href="/"
-          className="mx-auto mb-7 block w-fit text-lg font-semibold tracking-tight"
-          style={{ color: INK }}
-        >
-          egful
-        </Link>
+    <div className="flex min-h-svh" style={{ background: AUTH_GROUND }}>
+        {/* Below lg the panel goes entirely rather than becoming a short band: a 120px strip
+            of a photograph is a texture, not a picture, and it would push the form off a
+            phone's first screen for nothing. */}
+        <aside className="relative hidden lg:block lg:w-[46%] xl:w-[48%]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a full-bleed background
+              frame, not content; next/image would add a layout wrapper for no benefit here. */}
+          <img
+            src={frame.src}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: frame.pos ?? "50% 50%" }}
+          />
+          <Stickers />
+        </aside>
 
-        <div
-          className="rounded-2xl px-7 py-7"
-          style={{ background: AUTH_FIELD, border: `1px solid ${HAIRLINE}` }}
-        >
-          {/* The page's own heading. Each auth page passes its own copy, so this one component
-              covers sign-in, sign-up, forgot and reset without any of them knowing what the
-              shell looks like. */}
-          <h1
-            className="text-xl font-semibold tracking-tight"
-            style={{ color: INK }}
-          >
-            {subtitle}
-          </h1>
+        <main className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+          <div className="w-full max-w-[400px]">
+            {/* The panel carries the wordmark on desktop, so a second one over the form
+                would be the same word twice on one screen. */}
+            <Link
+              href="/"
+              className="mb-8 block w-fit text-lg font-semibold tracking-tight"
+              style={{ color: INK }}
+            >
+              egful
+            </Link>
 
-          {/* THE FORM RE-THEMES ITSELF, so none of the four auth pages had to change.
-           *
-           * The shadcn primitives read their colours from CSS variables, and a variable set on an
-           * ancestor cascades — so overriding them here is what re-themes the form, rather than
-           * editing markup on login, signup, forgot and reset and hoping the four stay in step.
-           *
-           * --input is the load-bearing one. Input ships `border-transparent` with `bg-input/50`,
-           * and a white field on a white card has no edge of its own, so without a real border
-           * the controls are decoration rather than findable. AUTH_EDGE is the first step up the
-           * ramp that clears the 3:1 boundary floor.
-           *
-           * --border is the CARD's rule, not the field's — it was set to AUTH_EDGE, which is why
-           * the "or" divider and every separator inside the form drew at control weight. A
-           * divider is not a control.
-           */}
-          <div
-            className="mt-6 [&_[data-slot=input]]:border-(--auth-edge) [&_[data-slot=input]]:bg-(--auth-field)"
-            style={
-              {
-                color: INK,
-                "--auth-edge": AUTH_EDGE,
-                "--auth-field": AUTH_FIELD,
-                "--border": HAIRLINE,
-                "--muted-foreground": AUTH_MUTED,
-                // `text-foreground` sets colour EXPLICITLY, so inheriting from the wrapper above
-                // does not reach it — "Create account" rendered at the app's foreground until
-                // this was here.
-                "--foreground": INK,
-                // The "or" divider punches through its rule with `bg-card`. That has to be the
-                // CARD's ground now, not the page's — they were the same colour when the page
-                // was warm and the card did not exist.
-                "--card": AUTH_FIELD,
-                "--background": AUTH_FIELD,
-              } as CSSProperties
-            }
-          >
-            {children}
+            {/* NO CARD HERE. The card exists because a form alone on white has no shape; the
+                panel gives the page its shape instead, so the rule around the form becomes a
+                box drawn around something that is already held. */}
+            <h1 className="text-xl font-semibold tracking-tight" style={{ color: INK }}>
+              {subtitle}
+            </h1>
+            <div
+              className="mt-6 [&_[data-slot=input]]:border-(--auth-edge) [&_[data-slot=input]]:bg-(--auth-field)"
+              style={
+                {
+                  color: INK,
+                  "--auth-edge": AUTH_EDGE,
+                  "--auth-field": AUTH_FIELD,
+                  "--border": HAIRLINE,
+                  "--muted-foreground": AUTH_MUTED,
+                  "--foreground": INK,
+                  "--card": AUTH_GROUND,
+                  "--background": AUTH_GROUND,
+                } as CSSProperties
+              }
+            >
+              {children}
+            </div>
+
+            <Link
+              href="/"
+              className="mt-8 block w-fit text-xs transition-opacity hover:opacity-70"
+              style={{ color: AUTH_MUTED }}
+            >
+              ← Back to egful
+            </Link>
           </div>
-        </div>
-
-        <Link
-          href="/"
-          className="mx-auto mt-6 block w-fit text-xs transition-opacity hover:opacity-70"
-          style={{ color: AUTH_MUTED }}
-        >
-          ← Back to egful
-        </Link>
+        </main>
       </div>
-    </div>
-  )
+    )
+
 }
