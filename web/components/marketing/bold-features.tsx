@@ -4,7 +4,7 @@
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, PlateHero, Rise, MediaBand } from "@/components/marketing/bold-kit"
 import { CalloutList } from "@/components/marketing/bold-figure"
-import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * Features, in the house style. The same six capabilities and the same copy — restated as a
@@ -84,6 +84,10 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
   const { on: editing } = useEditMode()
   /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
   const figureSrc = useEditableSrc("featuresPage.figure.image", p.figure.image)
+  /* Same reason as the src above — the crop has to move while it is dragged, not on Save. */
+  const figFx = useEditableNum("featuresPage.figure.imageFocusX", p.figure.imageFocusX)
+  const figFy = useEditableNum("featuresPage.figure.imageFocusY", p.figure.imageFocusY)
+  const figZoom = useEditableNum("featuresPage.figure.imageScale", p.figure.imageScale)
 
   /* Computed once for the whole wall rather than per tile: a span depends on how many items
      there are in total, which an individual tile cannot know. */
@@ -130,8 +134,8 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
           annotated-figure device the reference boards use, which the cut-out was carrying
           before. `ink` tone is the LIGHT lettering, which is what a scrim needs. */}
       {(figureSrc || editing) && (
-        <EditableImage path="featuresPage.figure.image" transform={false}>
-          <MediaBand media={figureSrc} alt={p.figure.imageAlt}>
+        <EditableImage path="featuresPage.figure.image" transform="bleed">
+          <MediaBand media={figureSrc} alt={p.figure.imageAlt} focusX={figFx} focusY={figFy} scale={figZoom}>
             {p.figure.callouts.length > 0 && (
               <CalloutList
                 items={p.figure.callouts}

@@ -219,11 +219,11 @@ export const CARD = "var(--mk-card)"
  * from it, and it is narrow on purpose — a colour that is merely PAINTED never belongs here.
  */
 export const HEX = {
-  accent: "#0A0A0A",
-  ink: "#0A0A0A",
-  acid: "#D4F897",
-  surface: "#FFFFFF",
-  paper: "#FFFFFF",
+  accent: "#33373C",
+  ink: "#121212",
+  acid: "#C0C4FF",
+  surface: "#F3F4F5",
+  paper: "#F3F4F5",
 } as const
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
@@ -821,16 +821,43 @@ export function WindowSkeleton({ rows = 5 }: { rows?: number }) {
  *
  * See lib/media.ts for why the image/video decision is made on the extension.
  */
-function BleedMedia({ media, alt }: { media: string; alt?: string }) {
+/**
+ * The picture inside a full-bleed block, and WHICH PART of it survives the crop.
+ *
+ * `object-cover` alone takes the middle. Our photography is shot 16:9 and these blocks are
+ * half again as wide, so the middle is a torso: the head and the feet — the half that reads
+ * as a photograph rather than a texture — are exactly what a centred crop discards. `focusX`
+ * / `focusY` move the crop; `scale` pushes in past cover for a frame that wants to be tighter
+ * than the one that was shot.
+ *
+ * TRANSFORM-ORIGIN TRACKS THE FOCAL POINT, and it has to. Scaling about the centre while the
+ * crop is taken from the top slides the subject out of frame as you zoom, so the control
+ * would fight itself — you would drag to find the head and then lose it again on the next
+ * press of +. Anchoring both to the same point makes zoom mean "closer on THIS", which is the
+ * only thing it can usefully mean here.
+ *
+ * The defaults are the identity: 50/50/1 renders exactly what a bare object-cover did.
+ */
+function BleedMedia({ media, alt, focusX = 50, focusY = 50, scale = 1 }: {
+  media: string
+  alt?: string
+  focusX?: number
+  focusY?: number
+  scale?: number
+}) {
   const reduce = useReducedMotion()
   const cls = "absolute inset-0 -z-10 h-full w-full object-cover"
+  const fit: React.CSSProperties = {
+    objectPosition: `${focusX}% ${focusY}%`,
+    ...(scale !== 1 ? { transform: `scale(${scale})`, transformOrigin: `${focusX}% ${focusY}%` } : null),
+  }
   if (isVideoSrc(media)) {
-    return <video src={media} className={cls} autoPlay={!reduce} muted loop playsInline preload="metadata" aria-hidden />
+    return <video src={media} className={cls} style={fit} autoPlay={!reduce} muted loop playsInline preload="metadata" aria-hidden />
   }
   // An admin-supplied absolute URL from Settings › Site content; next/image would need every
   // host allow-listed.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={media} alt={alt || ""} className={cls} />
+  return <img src={media} alt={alt || ""} className={cls} style={fit} />
 }
 
 /**
@@ -856,16 +883,20 @@ function BleedMedia({ media, alt }: { media: string; alt?: string }) {
  * SHORTER THAN THE HERO by design. This sits mid-page with copy above and below; at the
  * hero's height it stops being a section and becomes a second first screen.
  */
-export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34rem)" }: {
+export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34rem)", focusX, focusY, scale }: {
   media?: string
   alt?: string
   children?: React.ReactNode
   minH?: string
+  /** Which part of the picture survives the crop — see BleedMedia. */
+  focusX?: number
+  focusY?: number
+  scale?: number
 }) {
   if (!media) return null
   return (
     <section className="relative isolate w-full overflow-hidden" style={{ minHeight: minH, background: ACCENT }}>
-      <BleedMedia media={media} alt={alt} />
+      <BleedMedia media={media} alt={alt} focusX={focusX} focusY={focusY} scale={scale} />
       {children && (
         <>
           <div
@@ -902,12 +933,35 @@ export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34r
  * on purpose and a fake app panel must never come back in its place. A scrim only appears when
  * there is something to scrim.
  */
-export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)" }: {
+export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)", focusX, focusY, scale, tone = "light" }: {
   /** A public image OR video URL. Empty is a legitimate answer — see above. */
   media?: string
   alt?: string
   children: React.ReactNode
   minH?: string
+  /** Which part of the picture survives the crop — see BleedMedia. This block is the widest
+   *  on the site relative to what is shot for it, so it is the one that needs them most. */
+  focusX?: number
+  focusY?: number
+  scale?: number
+  /**
+   * WHICH WAY THE TYPE RUNS, and therefore which veil the picture gets.
+   *
+   * `light` is the general case and the safe default: light lettering over a black-weighted
+   * scrim, which is legible over ANY upload including a bright one. It stays the default
+   * precisely because an admin can put anything here.
+   *
+   * `ink` is for a ground the art direction PINS. Our photography is shot on a pale periwinkle
+   * seamless, and a black scrim over a pale saturated ground does not darken it, it DULLS it —
+   * the ground arrives as mud and the picture stops being the reason the block exists. So the
+   * veil inverts: a soft lift in the page's own colour, and the lettering goes to ink. Ink on
+   * #C0C4FF is 11.22:1, which is why this direction can afford almost no veil at all.
+   *
+   * NOT AUTOMATIC FROM THE IMAGE. Sampling an upload to pick a tone would make the headline's
+   * colour depend on a photograph nobody has looked at yet, and get it wrong silently on the
+   * first dark one. The page that pins its ground says so.
+   */
+  tone?: "light" | "ink"
 }) {
   const hasMedia = !!media
   return (
@@ -917,14 +971,24 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
     >
       {hasMedia && (
         <>
-          <BleedMedia media={media!} alt={alt} />
-          {/* THE SCRIM EXISTS SO THE TYPE IS LEGIBLE ON ANY UPLOAD, not for mood. Weighted to
-              the bottom-left because that is where the headline stands; the top stays open so
-              the picture is still a picture. */}
+          <BleedMedia media={media!} alt={alt} focusX={focusX} focusY={focusY} scale={scale} />
+          {/* THE VEIL EXISTS SO THE TYPE IS LEGIBLE ON ANY UPLOAD, not for mood. Weighted to
+              the bottom because that is where the headline stands; the top stays open so the
+              picture is still a picture.
+
+              The ink veil is a fraction of the weight of the light one, and that is the whole
+              point: light type has to fight whatever is underneath it, while ink on the pinned
+              periwinkle ground already measures 11.22:1 and needs almost nothing. It is not
+              zero only because a figure can move through a frame and a shadow is darker than
+              the seamless it falls on. */}
           <div
             aria-hidden
             className="absolute inset-0 -z-10"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 38%, rgba(0,0,0,.12) 72%, rgba(0,0,0,0) 100%)" }}
+            style={{
+              background: tone === "ink"
+                ? `linear-gradient(to top, color-mix(in srgb, ${SURFACE} 55%, transparent) 0%, color-mix(in srgb, ${SURFACE} 26%, transparent) 34%, transparent 68%)`
+                : "linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.45) 38%, rgba(0,0,0,.12) 72%, rgba(0,0,0,0) 100%)",
+            }}
           />
         </>
       )}

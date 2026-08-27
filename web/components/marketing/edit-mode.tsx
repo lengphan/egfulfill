@@ -2,11 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowClockwise, ArrowCounterClockwise, ArrowUUpLeft, CheckCircle, CircleNotch, MagnifyingGlassMinus, MagnifyingGlassPlus, PencilSimple, Sparkle, X } from "@phosphor-icons/react"
+import { ArrowClockwise, ArrowCounterClockwise, ArrowsOutCardinal, ArrowUUpLeft, CheckCircle, CircleNotch, MagnifyingGlassMinus, MagnifyingGlassPlus, PencilSimple, Sparkle, X } from "@phosphor-icons/react"
 import { getUser } from "@/lib/auth"
 import { setSiteContent, uploadHeroImage } from "@/lib/api"
 import { downscaleImage } from "@/lib/image-downscale"
-import { FIGURE_SCALE_MAX, FIGURE_SCALE_MIN, type SiteContent } from "@/lib/site-content"
+import { FIGURE_SCALE_MAX, FIGURE_SCALE_MIN, FOCUS_DEFAULT, FOCUS_MAX, FOCUS_MIN, type SiteContent } from "@/lib/site-content"
 import { CopyBubble, GenerateBubble, kindForPath } from "@/components/marketing/generate-bubble"
 
 /**
@@ -337,12 +337,19 @@ export function useEditableNum(path: ContentPath, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback
 }
 
-/** The two siblings that say how a figure sits. `hero.image` → `hero.imageScale`. Derived
- *  rather than passed, so a new EditableImage cannot forget to wire them; a path that is not
- *  a figure's simply gets no transform controls. */
+/** The siblings that say how a figure sits. `hero.image` → `hero.imageScale`. Derived rather
+ *  than passed, so a new EditableImage cannot forget to wire them; a path that is not a
+ *  figure's simply gets no transform controls. */
 function transformPaths(path: ContentPath): { scale: ContentPath; rotate: ContentPath } | null {
   if (!path.endsWith(".image")) return null
   return { scale: `${path}Scale`, rotate: `${path}Rotate` }
+}
+
+/** The same derivation for a FULL-BLEED picture, where the adjustable thing is the crop
+ *  rather than the figure. Same reason it is derived, same failure it prevents. */
+function bleedPaths(path: ContentPath): { scale: ContentPath; fx: ContentPath; fy: ContentPath } | null {
+  if (!path.endsWith(".image")) return null
+  return { scale: `${path}Scale`, fx: `${path}FocusX`, fy: `${path}FocusY` }
 }
 
 /** Degrees, kept in -180..180 so pressing one way repeatedly never runs off to 7200. */
@@ -372,8 +379,15 @@ export function EditableImage({ path, children, transform = true }: {
    * `…imageScale` and `…imageRotate` and be read by nothing. The comment on useEditableNum
    * already names that failure by name: a control that reports a change it did not make is
    * worse than no control. So the derivation stays and the call site can decline it.
+   *
+   * `"bleed"` IS THE THIRD ANSWER, and it is the one this comment was missing. A full-bleed
+   * picture cannot be scaled or spun, but it very much can be CROPPED WRONG — object-cover
+   * takes the middle, and our frames are shot 16:9 into a block half again as wide, so the
+   * middle is a torso and the head is gone. So the band gets its own pair of controls that
+   * write `…FocusX`/`…FocusY` and are read by BleedMedia. Not `false`, because there was
+   * something to adjust all along; not `true`, because it is not the same something.
    */
-  transform?: boolean
+  transform?: boolean | "bleed"
 }) {
   const { on, read, write } = useEditMode()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -383,22 +397,85 @@ export function EditableImage({ path, children, transform = true }: {
   /** The prompt composer, open in place. See generate-bubble.tsx for why it lives here and
    *  not behind a link to the Studio. */
   const [asking, setAsking] = useState(false)
+  /* REPOSITIONING IS A MODE, not an always-on surface. A drag layer over the picture would sit
+     on top of the headline and the callouts — which are themselves editable and live INSIDE
+     the band — so leaving it armed would trade one control for two others. Off by default; the
+     picture only becomes draggable once you say so. */
+  const [placing, setPlacing] = useState(false)
   const current = read(path)
   /* How this figure sits. Derived from the path so no call site has to wire it — see
-     transformPaths. A path that is not a figure's yields null and the group is not drawn. */
-  const tp = transform ? transformPaths(path) : null
-  const rawScale = tp ? read(tp.scale) : undefined
-  const rawRotate = tp ? read(tp.rotate) : undefined
-  const scaleV = typeof rawScale === "number" && Number.isFinite(rawScale) ? rawScale : 1
-  const rotateV = typeof rawRotate === "number" && Number.isFinite(rawRotate) ? rawRotate : 0
+     transformPaths. A path that is not a figure's yields null and the group is not drawn.
+     Exactly one of these is ever non-null, so the two control groups can never both draw. */
+  const tp = transform === true ? transformPaths(path) : null
+  const bp = transform === "bleed" ? bleedPaths(path) : null
+  const numAt = (at: ContentPath | undefined, dflt: number) => {
+    const v = at ? read(at) : undefined
+    return typeof v === "number" && Number.isFinite(v) ? v : dflt
+  }
+  /* Scale is shared: it means "bigger figure" for a cut-out and "push in past cover" for a
+     bleed, but it is one stored number either way and one range either way. */
+  const scalePath = tp?.scale ?? bp?.scale
+  const scaleV = numAt(scalePath, 1)
+  const rotateV = numAt(tp?.rotate, 0)
+  const focusX = numAt(bp?.fx, FOCUS_DEFAULT)
+  const focusY = numAt(bp?.fy, FOCUS_DEFAULT)
   const hasImage = typeof current === "string" && current !== ""
-  const moved = scaleV !== 1 || rotateV !== 0
+  const moved = scaleV !== 1 || rotateV !== 0 || focusX !== FOCUS_DEFAULT || focusY !== FOCUS_DEFAULT
   /* Clamped HERE as well as in the normalizer: a disabled button is how the control tells
      you it is at the end of its range, and 0.1 steps on a float need the rounding or the
      readout reads 119.99999%. */
-  const zoom = (d: number) => tp && write(tp.scale,
+  const zoom = (d: number) => scalePath && write(scalePath,
     Math.round(Math.min(FIGURE_SCALE_MAX, Math.max(FIGURE_SCALE_MIN, scaleV + d)) * 10) / 10)
   const spin = (d: number) => tp && write(tp.rotate, wrapDeg(rotateV + d))
+  const reset = () => {
+    if (scalePath) write(scalePath, 1)
+    if (tp) write(tp.rotate, 0)
+    if (bp) { write(bp.fx, FOCUS_DEFAULT); write(bp.fy, FOCUS_DEFAULT) }
+  }
+
+  /**
+   * DRAGGING THE CROP.
+   *
+   * It writes through a frame rather than on every pointer event. `write` puts the value into
+   * the draft the whole page renders from, so writing on each move re-renders every editable
+   * node at the pointer's event rate — which is exactly where a drag stops tracking the
+   * finger. The move accumulates in a ref and one rAF flushes it; the picture keeps up and
+   * the stored number is still the exact one the pointer landed on.
+   */
+  const dragRef = useRef<{ x: number; y: number; fx: number; fy: number; w: number; h: number } | null>(null)
+  const frameRef = useRef(0)
+  const pendRef = useRef<{ fx: number; fy: number } | null>(null)
+  const flush = () => {
+    frameRef.current = 0
+    const q = pendRef.current
+    pendRef.current = null
+    if (q && bp) { write(bp.fx, q.fx); write(bp.fy, q.fy) }
+  }
+  const grab = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!bp) return
+    const r = e.currentTarget.getBoundingClientRect()
+    dragRef.current = { x: e.clientX, y: e.clientY, fx: focusX, fy: focusY, w: r.width || 1, h: r.height || 1 }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const moveTo = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current
+    if (!d || !bp) return
+    /* NEGATED, because you are dragging the PICTURE and not the window onto it: pulling right
+       should bring the picture's left edge into view, and that is a SMALLER object-position.
+       Without the minus the photograph runs away from the hand, which reads as broken rather
+       than as inverted. */
+    const clamp = (n: number) => Math.round(Math.min(FOCUS_MAX, Math.max(FOCUS_MIN, n)))
+    pendRef.current = {
+      fx: clamp(d.fx - ((e.clientX - d.x) / d.w) * 100),
+      fy: clamp(d.fy - ((e.clientY - d.y) / d.h) * 100),
+    }
+    if (!frameRef.current) frameRef.current = requestAnimationFrame(flush)
+  }
+  const letGo = (e: React.PointerEvent<HTMLDivElement>) => {
+    dragRef.current = null
+    if (frameRef.current) { cancelAnimationFrame(frameRef.current); flush() }
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
 
   const take = async (file: File | undefined) => {
     if (!file) return
@@ -427,6 +504,33 @@ export function EditableImage({ path, children, transform = true }: {
       className={"relative rounded-2xl ring-1 ring-inset transition-colors " + (over ? "ring-2 ring-foreground/50 bg-foreground/[0.04]" : "ring-foreground/15")}
     >
       {children}
+      {/* THE DRAG SURFACE. Over the picture, because the thing being adjusted IS the picture:
+          you move the photograph and watch the crop while you do it. Four arrow buttons would
+          be the same adjustment with the feedback taken away.
+
+          `touch-none` is load-bearing — without it a touch drag scrolls the page instead of
+          moving the crop, so the control would silently do nothing on the device most likely
+          to be used to check a layout. */}
+      {bp && hasImage && placing && !busy && (
+        <div
+          onPointerDown={grab}
+          onPointerMove={moveTo}
+          onPointerUp={letGo}
+          onPointerCancel={letGo}
+          role="presentation"
+          className="absolute inset-0 z-[5] cursor-grab touch-none active:cursor-grabbing"
+        >
+          {/* The thirds, so the subject can be put on one. Drawn only while repositioning — a
+              permanent grid over a photograph is just a grid over a photograph. */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-70"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, transparent calc(33.333% - 1px), rgba(255,255,255,.55) calc(33.333% - 1px) 33.333%, transparent 33.333%, transparent calc(66.667% - 1px), rgba(255,255,255,.55) calc(66.667% - 1px) 66.667%, transparent 66.667%)," +
+                "linear-gradient(to bottom, transparent calc(33.333% - 1px), rgba(255,255,255,.55) calc(33.333% - 1px) 33.333%, transparent 33.333%, transparent calc(66.667% - 1px), rgba(255,255,255,.55) calc(66.667% - 1px) 66.667%, transparent 66.667%)",
+            }}
+          />
+        </div>
+      )}
       {/* TOP-RIGHT, not bottom-centre: the page-level toolbar is fixed to the bottom middle,
           and the two landed on top of each other — the figure's own controls were underneath
           the Save button, which is the one place they must not be. */}
@@ -491,10 +595,45 @@ export function EditableImage({ path, children, transform = true }: {
               {/* A rotation has no layout answer, so it can push the figure past its box. The
                   way back is a button, not a guess at what the original angle was. */}
               {moved && (
-                <button type="button" onClick={() => { write(tp.scale, 1); write(tp.rotate, 0) }}
+                <button type="button" onClick={reset}
                   title="Back to as generated"
                   className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                   <ArrowUUpLeft size={13} weight="bold" /><span className="sr-only">Reset size and rotation</span>
+                </button>
+              )}
+            </>
+          )}
+          {/* WHERE THE CROP IS TAKEN FROM — the full-bleed pair. No rotate: a bleed has no
+              angle to turn, and drawing the button anyway is the dead control the note on
+              useEditableNum is about. Icons carry `title`; §4 puts a control's explanation in
+              its label, never in a sentence underneath it. */}
+          {hasImage && bp && !busy && (
+            <>
+              <span aria-hidden className="h-4 w-px bg-border" />
+              <button
+                type="button"
+                onClick={() => setPlacing((v) => !v)}
+                title={placing ? "Done repositioning" : "Drag the picture to reposition it"}
+                aria-pressed={placing}
+                className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors " + (placing ? "bg-foreground text-background" : "hover:bg-accent")}
+              >
+                <ArrowsOutCardinal size={13} weight="bold" /> {placing ? "Done" : "Reposition"}
+              </button>
+              <button type="button" onClick={() => zoom(-0.1)} disabled={scaleV <= FIGURE_SCALE_MIN}
+                title="Pull back" className="rounded-full p-1.5 transition-colors hover:bg-accent disabled:opacity-40">
+                <MagnifyingGlassMinus size={13} weight="bold" /><span className="sr-only">Pull back</span>
+              </button>
+              <span className="min-w-[2.75rem] text-center text-xs tabular-nums text-muted-foreground">
+                {Math.round(scaleV * 100)}%
+              </span>
+              <button type="button" onClick={() => zoom(0.1)} disabled={scaleV >= FIGURE_SCALE_MAX}
+                title="Push in" className="rounded-full p-1.5 transition-colors hover:bg-accent disabled:opacity-40">
+                <MagnifyingGlassPlus size={13} weight="bold" /><span className="sr-only">Push in</span>
+              </button>
+              {moved && (
+                <button type="button" onClick={reset} title="Back to the centre, as shot"
+                  className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                  <ArrowUUpLeft size={13} weight="bold" /><span className="sr-only">Reset the crop</span>
                 </button>
               )}
             </>

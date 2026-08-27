@@ -43,6 +43,23 @@ export type NumberedItem = { title: string; body?: string; points?: string[] }
 export const FIGURE_SCALE_MIN = 0.5
 export const FIGURE_SCALE_MAX = 2
 
+/**
+ * THE FOCAL POINT OF A FULL-BLEED PICTURE, in per-cent of the picture's own width and height.
+ *
+ * WHY THIS EXISTS. `imageScale`/`imageRotate` above are a CUT-OUT's adjustment — they move a
+ * figure that floats in a column. A full-bleed band has the opposite problem: the frame is the
+ * section's, the picture is painted `object-cover`, and the only question is WHICH PART of it
+ * survives the crop. Photography here is shot 16:9 and lands in a block half again as wide, so
+ * a centred crop keeps the middle and throws away the head and the feet — which is the half
+ * that reads as a photograph rather than a texture.
+ *
+ * 50/50 is the identity and is exactly what `object-position` already defaults to, so every
+ * piece of content written before these existed renders unchanged.
+ */
+export const FOCUS_MIN = 0
+export const FOCUS_MAX = 100
+export const FOCUS_DEFAULT = 50
+
 export type PageFigure = {
   /** Public URL. Wants a PNG with real alpha — see the note on hero.image. Empty renders
    *  NOTHING, which is a real answer: no placeholder where a product should be. */
@@ -62,6 +79,10 @@ export type PageFigure = {
   imageScale: number
   /** Degrees, positive clockwise. */
   imageRotate: number
+  /** Where the crop is taken from when this picture is painted full-bleed — see FOCUS_MIN.
+   *  Ignored by CutoutFigure, which has no crop to take. */
+  imageFocusX: number
+  imageFocusY: number
   ghostWord: string
   callouts: Callout[]
 }
@@ -130,6 +151,10 @@ export type SiteContent = {
     /** How the picture sits — see the note on PageFigure. 1 and 0 are "as generated". */
     imageScale: number
     imageRotate: number
+    /** Where the full-bleed crop is taken from — see FOCUS_MIN. The hero IS full-bleed, so
+     *  unlike imageScale/imageRotate these two are the pair that actually does anything here. */
+    imageFocusX: number
+    imageFocusY: number
     /** The word set huge and pale behind the figure. Empty = no ghost. */
     ghostWord: string
     /** The rule across the top of the hero: a word at each end. */
@@ -177,6 +202,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     imageAlt: "A printed garment made through EGFULFILL",
     imageScale: 1,
     imageRotate: 0,
+    imageFocusX: 50,
+    imageFocusY: 50,
     ghostWord: "EGFUL",
     ruleLeft: "EGFULFILL",
     ruleRight: "PRINT ON DEMAND, FULFILLED",
@@ -274,6 +301,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       imageAlt: "A printed garment made through EGFULFILL",
       imageScale: 1,
       imageRotate: 0,
+      imageFocusX: 50,
+      imageFocusY: 50,
       ghostWord: "EGFUL",
       callouts: [
         { label: "Printed on demand", note: "Nothing is made until it sells" },
@@ -344,6 +373,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       imageAlt: "A printed garment made through EGFULFILL",
       imageScale: 1,
       imageRotate: 0,
+      imageFocusX: 50,
+      imageFocusY: 50,
       ghostWord: "EGFUL",
       /* What HAPPENS to the object, in order — which is what makes this figure a diagram of
          the process rather than a photograph with adjectives stuck to it. */
@@ -437,6 +468,8 @@ export function mergeSiteContent(stored: unknown): SiteContent {
     imageAlt: str(stored.imageAlt, dflt.imageAlt),
     imageScale: num(stored.imageScale, dflt.imageScale, FIGURE_SCALE_MIN, FIGURE_SCALE_MAX),
     imageRotate: num(stored.imageRotate, dflt.imageRotate, -180, 180),
+    imageFocusX: num(stored.imageFocusX, dflt.imageFocusX, FOCUS_MIN, FOCUS_MAX),
+    imageFocusY: num(stored.imageFocusY, dflt.imageFocusY, FOCUS_MIN, FOCUS_MAX),
     ghostWord: typeof stored.ghostWord === "string" ? stored.ghostWord : dflt.ghostWord,
     callouts: Array.isArray(stored.callouts) ? (stored.callouts as Callout[]) : dflt.callouts,
   })
@@ -460,6 +493,8 @@ export function mergeSiteContent(stored: unknown): SiteContent {
       imageAlt: str(hero.imageAlt, d.hero.imageAlt),
       imageScale: num(hero.imageScale, d.hero.imageScale, FIGURE_SCALE_MIN, FIGURE_SCALE_MAX),
       imageRotate: num(hero.imageRotate, d.hero.imageRotate, -180, 180),
+      imageFocusX: num(hero.imageFocusX, d.hero.imageFocusX, FOCUS_MIN, FOCUS_MAX),
+      imageFocusY: num(hero.imageFocusY, d.hero.imageFocusY, FOCUS_MIN, FOCUS_MAX),
       // Blank is a real choice for all three of these — no ghost word, no rule label — so
       // they are kept as typed rather than run through `str`, which would resurrect a
       // default the admin had deliberately cleared.

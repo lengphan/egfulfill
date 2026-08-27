@@ -3,7 +3,7 @@
 import type { SiteContent } from "@/lib/site-content"
 import { ACCENT, ACCENT_INK, HAIRLINE, HEADING, INK, SURFACE, Pill, PlateHero, Band, Rise, MediaBand } from "@/components/marketing/bold-kit"
 import { CalloutList, NumberedCards } from "@/components/marketing/bold-figure"
-import { EditableText, EditableImage, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
+import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * How it works. Three steps, then the seller-facing status flow.
@@ -56,6 +56,10 @@ export function BoldHow({ content }: { content: SiteContent }) {
   const { on: editing } = useEditMode()
   /** The DRAFT's figure, so a generated or uploaded picture appears before Save. */
   const figureSrc = useEditableSrc("howPage.figure.image", p.figure.image)
+  /* Same reason as the src above — the crop has to move while it is dragged, not on Save. */
+  const figFx = useEditableNum("howPage.figure.imageFocusX", p.figure.imageFocusX)
+  const figFy = useEditableNum("howPage.figure.imageFocusY", p.figure.imageFocusY)
+  const figZoom = useEditableNum("howPage.figure.imageScale", p.figure.imageScale)
 
   return (
     <div className="text-[var(--mk-ink)]" style={{ background: SURFACE }}>
@@ -95,8 +99,8 @@ export function BoldHow({ content }: { content: SiteContent }) {
           annotated-figure device the reference boards use, which the cut-out was carrying
           before. `ink` tone is the LIGHT lettering, which is what a scrim needs. */}
       {(figureSrc || editing) && (
-        <EditableImage path="howPage.figure.image" transform={false}>
-          <MediaBand media={figureSrc} alt={p.figure.imageAlt}>
+        <EditableImage path="howPage.figure.image" transform="bleed">
+          <MediaBand media={figureSrc} alt={p.figure.imageAlt} focusX={figFx} focusY={figFy} scale={figZoom}>
             {p.figure.callouts.length > 0 && (
               <CalloutList
                 items={p.figure.callouts}

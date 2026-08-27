@@ -8,7 +8,7 @@ import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/market
 /** One object per feature section, in factory order: make → print → pack → label. */
 const FEATURE_OBJECTS = [ThreadCone, Printhead, ShippingBox, HangTag] as const
 import { CalloutList } from "@/components/marketing/bold-figure"
-import { EditableText, useEditMode } from "@/components/marketing/edit-mode"
+import { EditableImage, EditableText, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
 /**
  * "Exaggerated Minimalism" — black and white carrying the page, ONE vibrant accent, type
@@ -31,6 +31,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
   // visitor sees.
   const { on: editing } = useEditMode()
   const { hero, features, steps, testimonials, faq, cta } = content
+  /* Read through the draft so the crop moves WHILE it is being dragged. The page was handed
+     the server's copy; without these the picture would only jump once on Save, which is the
+     dead-control failure useEditableNum exists to prevent. */
+  const heroSrc = useEditableSrc("hero.image", hero.image)
+  const heroFx = useEditableNum("hero.imageFocusX", hero.imageFocusX)
+  const heroFy = useEditableNum("hero.imageFocusY", hero.imageFocusY)
+  const heroZoom = useEditableNum("hero.imageScale", hero.imageScale)
+  /* WHICH WAY THE HERO'S LETTERING RUNS. With a photograph it is INK, because the art
+     direction pins that photograph to a pale periwinkle seamless and ink measures 11.22:1 on
+     it. With no photograph MediaHero draws the slate plate instead, and the plate takes light
+     type. One derived value rather than a colour written at each of the four places below —
+     four copies is how a headline and its own subhead come to disagree. */
+  const heroInk = heroSrc ? INK : ACCENT_INK
   const reduce = useReducedMotion()
   // The scroll-linked parallax went with the app panel it moved. Nothing on this page
   // tracks scroll any more.
@@ -61,25 +74,27 @@ export function BoldHome({ content }: { content: SiteContent }) {
           NO MEDIA IS A REAL ANSWER — MediaHero draws the ink plate and the headline alone.
           A fake app panel was deleted from this page once, deliberately, and must not return
           as a stand-in for an image nobody has uploaded yet. */}
-      <MediaHero media={hero.image} alt={hero.imageAlt}>
+      <EditableImage path="hero.image" transform="bleed">
+      <MediaHero media={heroSrc} alt={hero.imageAlt} focusX={heroFx} focusY={heroFy} scale={heroZoom}
+        tone={heroSrc ? "ink" : "light"}>
         {/* Capped in rem, not ch. A ch cap on display type measures the "0" glyph of whatever
             face has actually loaded, so it collapsed to about a third of its intended width and
             broke a five-word headline onto five lines — which then pushed the buttons off the
             first screen. A rem cap cannot drift with the font. */}
-        <h1 className="font-display max-w-[54rem] font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: ACCENT_INK }}>
+        <h1 className="font-display max-w-[54rem] font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: heroInk }}>
           <span style={{ fontSize: "clamp(2.6rem, 6.4vw, 5.2rem)" }}>
             {editing
               ? <EditableText path="hero.headline">{hero.headline}</EditableText>
               : <MaskedWords text={hero.headline} />}{" "}
             {editing
               ? <EditableText path="hero.accent">{hero.accent}</EditableText>
-              : <TypedPhrase text={hero.accent} color={ACCENT_INK} lastWordColor={ACID} />}
+              : <TypedPhrase text={hero.accent} color={heroInk} lastWordColor={heroSrc ? ACCENT : ACID} />}
           </span>
         </h1>
 
         <motion.p
           className="mt-7 max-w-xl text-[18px] leading-relaxed"
-          style={{ color: ACCENT_INK, opacity: 0.78 }}
+          style={{ color: heroInk, opacity: 0.78 }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
           animate={{ opacity: 0.78, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
@@ -94,9 +109,10 @@ export function BoldHome({ content }: { content: SiteContent }) {
           transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
         >
           <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
-          <Pill href="/how-it-works" tone="ghostLight" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
+          <Pill href="/how-it-works" tone={heroSrc ? "ghost" : "ghostLight"} ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
         </motion.div>
       </MediaHero>
+      </EditableImage>
 
       {/* THE THREE FACTS move out of the hero and onto the page beneath it. On the plate they
           were light type over a photograph at 13px, which is the first thing that stops being
