@@ -174,7 +174,7 @@ export function BoldHow({ content }: { content: SiteContent }) {
                   index={i}
                   className="grid gap-2 py-5 sm:grid-cols-[7rem_1fr] sm:items-baseline sm:gap-6"
                 >
-                  <span className={"inline-flex w-fit rounded-full px-3 py-1 text-[13px] font-semibold " + toneFor(j.label)}>
+                  <span className={"inline-flex w-fit rounded-lg px-3 py-1 text-[13px] font-semibold " + toneFor(j.label)}>
                     <EditableText path={`howPage.journey.${i}.label`}>{j.label}</EditableText>
                   </span>
                   <span className="text-[15px] leading-relaxed" style={{ color: INK, opacity: 0.68 }}><EditableText path={`howPage.journey.${i}.body`}>{j.body}</EditableText></span>

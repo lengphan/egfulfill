@@ -223,17 +223,17 @@ export default function NewOrderPage() {
               />
               <div className="pointer-events-none absolute bottom-2 right-2.5">
                 {valid.kind === "checking" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-background/90 px-1.5 py-0.5 text-xs text-muted-foreground">
                     <CircleNotch size={12} className="animate-spin" /> {tl("newOrder", "Checking…")}
                   </span>
                 )}
                 {valid.kind === "ok" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs font-medium text-success">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-background/90 px-1.5 py-0.5 text-xs font-medium text-success">
                     <CheckCircle size={12} weight="fill" /> {tl("newOrder", "Validated")}
                   </span>
                 )}
                 {valid.kind === "bad" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={valid.msg}>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-background/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={valid.msg}>
                     <WarningCircle size={12} weight="fill" /> {tl("newOrder", "Not validated")}
                   </span>
                 )}

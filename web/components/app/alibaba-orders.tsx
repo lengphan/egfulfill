@@ -139,7 +139,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
               <button
  key={f.id}
  onClick={() => setFilter(f.id)}
- className={"eg-tap rounded-full px-3 py-1 text-xs font-medium transition-colors "
+ className={"eg-tap rounded-lg px-3 py-1 text-xs font-medium transition-colors "
                   + (filter === f.id ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground")}
               >
                 {tl("alibaba", f.label)} <span className="opacity-70">{counts[f.id]}</span>
@@ -171,7 +171,7 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
                           {loaded?.total != null ? ` · ${usd(loaded.total)}` : ""}
                         </span>
                       </button>
-                      <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + PILL[bucket]}>
+                      <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + PILL[bucket]}>
                         {o.statusLabel || o.status || tl("alibaba", "Unknown")}
                       </span>
                       <div className="flex items-center gap-1.5">

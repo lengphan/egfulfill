@@ -370,7 +370,7 @@ export function SupplierOrderingDialog({
                     S&amp;S Activewear
                     {opts.keys?.ss?.set
                       ? <span className="whitespace-nowrap text-2xs font-medium text-shipped">connected</span>
- : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("supplierOrder", "no key")}</span>}
+ : <span className="rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("supplierOrder", "no key")}</span>}
                   </h3>
                   <KeyRow label={tl("supplierOrder", "Account number")} name="SS_ACCOUNT_NUMBER" shown={opts.keys?.ss?.account ?? null}
  isAdmin={isAdmin} editing={editKey === "SS_ACCOUNT_NUMBER"} value={keyVal} busy={keyBusy}
@@ -387,7 +387,7 @@ export function SupplierOrderingDialog({
                     Otto Cap
                     {opts.keys?.otto?.set
                       ? <span className="whitespace-nowrap text-2xs font-medium text-shipped">connected</span>
- : <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("supplierOrder", "no key")}</span>}
+ : <span className="rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("supplierOrder", "no key")}</span>}
                   </h3>
                   {/* Username/password aren't in the editable set server-side — only the
                       OAuth client pair is — so the username is shown, not offered. */}

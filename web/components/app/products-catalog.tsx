@@ -284,7 +284,7 @@ export function ProductsCatalog() {
  pill, so a row of eight met the eye as eight buttons and the selected one
  had to shout over them. The unselected ones sit on the canvas now — the
  selection is the only thing drawn. */
-                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors " +
+                "rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors " +
                 (cat === c
                   ? "bg-primary text-primary-foreground"
  : "text-muted-foreground hover:bg-accent hover:text-foreground")
@@ -429,7 +429,7 @@ export function ProductsCatalog() {
  return (
                       <span
  title={st.why ?? tl("products", "On the public site.")}
- className="pointer-events-none absolute right-2 top-2 z-[5] inline-flex items-center gap-1.5 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium ring-1 ring-border backdrop-blur-sm transition-opacity group-hover:opacity-0"
+ className="pointer-events-none absolute right-2 top-2 z-[5] inline-flex items-center gap-1.5 rounded-lg bg-background/90 px-2 py-0.5 text-xs font-medium ring-1 ring-border backdrop-blur-sm transition-opacity group-hover:opacity-0"
                       >
                         {/* A DOT, not a filled chip. Over a photo the fill is what turns a
  grid into bunting; the dot carries the colour and the word carries

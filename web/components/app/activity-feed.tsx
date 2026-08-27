@@ -135,7 +135,7 @@ export function ActivityFeed({
                 {" · "}{when}
               </div>
             </div>
-            {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
+            {(() => { const amt = moneyOf(r); return amt != null ? <span className="shrink-0 rounded-lg bg-muted px-1.5 py-0.5 text-xs font-semibold tabular-nums">{fmtMoney(amt)}</span> : null })()}
           </div>
         )
       })}

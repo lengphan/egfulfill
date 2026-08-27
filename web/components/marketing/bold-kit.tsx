@@ -381,7 +381,7 @@ export function Pill({ href, children, tone = "primary", ring = false, className
   ring?: boolean
   className?: string
 }) {
-  const base = "group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+  const base = "group inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3.5 text-[15px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
   const tones = {
     /* THE PRIMARY CTA — lime ground, ink label, ink border. Inverted 2026-08-26.
      *

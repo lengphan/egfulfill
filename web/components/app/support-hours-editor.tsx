@@ -105,7 +105,7 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
               <div className="flex flex-wrap gap-1.5">
                 {DAYS.map(([label, d]) => (
                   <button key={d} type="button" disabled={!isAdmin} onClick={() => toggleDay(d)}
- className={"rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " +
+ className={"rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " +
                       (cfg.days.includes(d) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground") +
                       (isAdmin ? "" : " opacity-70")}>
                     {label}

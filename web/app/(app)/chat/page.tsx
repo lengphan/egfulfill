@@ -797,7 +797,7 @@ export default function ChatPage() {
  status, click to view/edit. Matches the inbox carve-out above. */}
           {isStaffUser && !isDesigner && (
             <button onClick={() => setHoursOpen(true)} title={tl("chat", "Support hours")}
- className={"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent " +
+ className={"inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent " +
                 (office ? (office.open ? "border-shipped/30 text-shipped" : "border-hold/30 text-hold") : "border-border text-muted-foreground")}>
               {/* NO DOT. The pill is already the colour the dot was — the border and the
  word both carry it — so a 6px disc of the same hue is the state said a
@@ -999,7 +999,7 @@ export default function ChatPage() {
                   {SUGGESTIONS.map((s) => (
                     /* Sent in the language it is READ in: the chip is the seller's own
                        words, and the assistant already mirrors the language it is asked in. */
-                    <button key={s} onClick={() => submit(tl("chat", s))} disabled={!activeId || sending} className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                    <button key={s} onClick={() => submit(tl("chat", s))} disabled={!activeId || sending} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50">
                       {tl("chat", s)}
                     </button>
                   ))}
@@ -1041,7 +1041,7 @@ export default function ChatPage() {
                     {joined && (
                       <div className="my-1.5 flex items-center gap-2 px-1 text-2xs font-medium text-muted-foreground">
                         <span className="h-px flex-1 bg-border" />
-                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2.5 py-1">
                           <Headset size={12} weight="fill" /> {t("chat.joinedConversation", { name: joined })}
                         </span>
                         <span className="h-px flex-1 bg-border" />
@@ -1425,7 +1425,7 @@ export default function ChatPage() {
                   "post a message" when pressing it spends money. */}
               <Button
  size={gen ? "sm" : "icon"}
- className={gen ? "h-9 shrink-0 gap-1.5 rounded-full px-3" : "size-9 rounded-full"}
+ className={gen ? "h-9 shrink-0 gap-1.5 rounded-lg px-3" : "size-9 rounded-full"}
  onClick={send}
  disabled={signedOut || !activeId || readOnly || (!input.trim() && !(pendingAtt && !gen)) || sending}
               >

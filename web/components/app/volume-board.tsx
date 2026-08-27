@@ -67,7 +67,7 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
   return (
     <>
       {!data.applied && (
-        <div className="mb-4 inline-flex rounded-full bg-muted px-2.5 py-1 eg-label text-muted-foreground">
+        <div className="mb-4 inline-flex rounded-lg bg-muted px-2.5 py-1 eg-label text-muted-foreground">
           {tl("volumeBoard", "Preview")}
         </div>
       )}

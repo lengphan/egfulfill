@@ -151,7 +151,7 @@ export function ItemDesignActions({
             an invoice and an email. */}
         {(onBoard || withVendor) && (
           <span
- className={"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium " + (lane?.tone ?? "bg-muted text-muted-foreground")}
+ className={"inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-medium " + (lane?.tone ?? "bg-muted text-muted-foreground")}
  title={withVendor
               ? `${vendorLabel(state?.vendor)}${state?.vendorRef ? ` · task ${state.vendorRef}` : ""}`
  : tl("itemDesignActions", "On our design board")}

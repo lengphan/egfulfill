@@ -1437,7 +1437,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                           {tl("purchase", "Sandbox")}
                         </span>
  : po.status === "placed" ? <span className="whitespace-nowrap text-xs font-medium text-packed">{tl("purchase", "Placed")}</span>
- : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("purchase", "Cancelled")}</span>
+ : po.status === "cancelled" ? <span className="rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("purchase", "Cancelled")}</span>
  : <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-shipped"><CheckCircle size={11} weight="fill" /> {tl("purchase", "Received")}</span>}
                     {/**
               * RECEIVE THE WHOLE DELIVERY, at the top where a box gets opened.
@@ -1545,7 +1545,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  exactly when you need to know there's more than one. */}
                               {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">box {t.box}</span>}
                               {t.deliveredAt
-                                ? <span className="inline-flex items-center gap-1 rounded-full bg-shipped/12 px-2 py-0.5 font-medium text-shipped">
+                                ? <span className="inline-flex items-center gap-1 rounded-lg bg-shipped/12 px-2 py-0.5 font-medium text-shipped">
                                     <CheckCircle size={10} weight="fill" /> delivered
                                   </span>
  : t.lastUpdate?.status
@@ -1571,12 +1571,12 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
                                 {r.note ? ` · ${r.note}` : ""}
                               </span>
                               {r.status === "credited" ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-shipped/12 px-2 py-0.5 font-medium text-shipped">
+                                <span className="inline-flex items-center gap-1 rounded-lg bg-shipped/12 px-2 py-0.5 font-medium text-shipped">
                                   <CheckCircle size={10} weight="fill" /> {usd(r.credit)} credited
                                 </span>
                               ) : (
                                 <>
-                                  <span className="rounded-full bg-hold/15 px-2 py-0.5 font-medium text-hold">
+                                  <span className="rounded-lg bg-hold/15 px-2 py-0.5 font-medium text-hold">
                                     {usd(r.credit)} expected
                                   </span>
                                   {/* Confirmed separately, because a credit lands when the
@@ -1853,7 +1853,7 @@ export function PurchaseView({ embedded = false, refreshKey = 0 }: { embedded?: 
  majority of rows saying nothing actionable; "order by hand" is the
  one that changes what you do next. */}
                     {!placeable(g.api) && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("purchase", "order by hand")}</span>
+                      <span className="rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{tl("purchase", "order by hand")}</span>
                     )}
                     {/* THEIR MINIMUM, said before it is keyed in rather than after they refuse
  it. Amber, not an error: this cart is legal, it just cannot be sent yet,

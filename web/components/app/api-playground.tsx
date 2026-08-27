@@ -186,7 +186,7 @@ export function ApiPlayground() {
       {/* Key bar */}
       <SectionCard
  title={<span className="flex items-center gap-2">{tl("apiPlayground", "Your API key")}
-          <span className={"rounded-full px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-alert/12 text-alert" : "bg-shipped/12 text-shipped")}>{env === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</span>
+          <span className={"rounded-lg px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-alert/12 text-alert" : "bg-shipped/12 text-shipped")}>{env === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</span>
         </span>}
  actions={
           <div className="flex rounded-lg border border-border p-0.5">
@@ -309,7 +309,7 @@ export function ApiPlayground() {
             <SectionCard
  title={tl("apiPlayground", "Response")}
  actions={
-                <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + (res.ok ? "bg-shipped/12 text-shipped" : "bg-alert/12 text-alert")}>
+                <span className={"rounded-lg px-2.5 py-0.5 text-xs font-semibold " + (res.ok ? "bg-shipped/12 text-shipped" : "bg-alert/12 text-alert")}>
                   {res.status || "ERR"}
                 </span>
               }

@@ -181,7 +181,7 @@ export function SourcingSuggestDialog({ listing, onClose, onSaved }: {
                 <div className="mb-1.5 text-xs text-muted-foreground">{tl("sourcingSuggest", "Specs a supplier will list")}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {data.attributes.map((a) => (
-                    <span key={a} className="rounded-full bg-muted px-2 py-0.5 text-xs">{a}</span>
+                    <span key={a} className="rounded-lg bg-muted px-2 py-0.5 text-xs">{a}</span>
                   ))}
                 </div>
               </div>

@@ -251,7 +251,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
                     {best && <span className="absolute right-0 top-0 rounded-bl-lg bg-primary px-2 py-0.5 eg-label text-primary-foreground">{tl("topup", "Best rate")}</span>}
                     <span className="text-lg font-semibold tabular-nums">{usd0(t.usd)}</span>
                     <span className="w-fit rounded-lg bg-muted px-2.5 py-1.5 text-xs tabular-nums text-muted-foreground">$1 = <span className="font-semibold text-foreground">{vnd(t.rate)}</span></span>
-                    {saveVnd > 0 && <span className="w-fit rounded-full bg-shipped/12 px-2 py-0.5 text-xs font-semibold text-shipped">save {vnd(saveVnd)}</span>}
+                    {saveVnd > 0 && <span className="w-fit rounded-lg bg-shipped/12 px-2 py-0.5 text-xs font-semibold text-shipped">save {vnd(saveVnd)}</span>}
                   </button>
                 )
               })}

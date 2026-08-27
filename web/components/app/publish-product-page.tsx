@@ -1746,7 +1746,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 />
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {tags.map((t) => <button key={t} onClick={() => removeTag(t)} className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">{t}<X size={10} weight="bold" /></button>)}
+                    {tags.map((t) => <button key={t} onClick={() => removeTag(t)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">{t}<X size={10} weight="bold" /></button>)}
                   </div>
                 )}
                 {/* NO TRENDING-KEYWORD CHIPS. A dozen shop-wide SpyDeck keywords sat under

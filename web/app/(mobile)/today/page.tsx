@@ -112,7 +112,7 @@ export default function TodayPage() {
             <p className="text-[3.25rem] font-black leading-none tabular-nums">
               {orders === null ? "—" : needsYou}
             </p>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/15 px-3 py-1.5 text-sm font-medium">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-primary-foreground/15 px-3 py-1.5 text-sm font-medium">
               Open queue <CaretRight size={14} weight="bold" />
             </span>
           </div>
@@ -162,7 +162,7 @@ export default function TodayPage() {
         <button
  onClick={load}
  disabled={busy}
- className="inline-flex h-10 items-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-colors active:bg-accent disabled:opacity-60"
+ className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-muted-foreground transition-colors active:bg-accent disabled:opacity-60"
         >
           {busy ? <CircleNotch size={15} className="animate-spin" /> : <ArrowClockwise size={15} />}
           {busy ? "Refreshing" : "Refresh"}

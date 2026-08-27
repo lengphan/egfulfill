@@ -177,12 +177,12 @@ export function EditModeProvider({ initial, children }: { initial: SiteContent; 
           {/* One bar, and it says what state the page is in. A control that toggles between
               "editing" and "not editing" has to show WHICH, or the only way to find out is to
               click something and see whether it turns into a text box. */}
-          <div className="flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-2 backdrop-blur">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-background/95 px-2 py-2 backdrop-blur">
             {!on ? (
               <button
                 type="button"
                 onClick={() => setOn(true)}
-                className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                className="flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
               >
                 <PencilSimple size={15} weight="bold" /> Edit this page
               </button>
@@ -195,7 +195,7 @@ export function EditModeProvider({ initial, children }: { initial: SiteContent; 
                   type="button"
                   onClick={() => void save()}
                   disabled={!dirty || saving}
-                  className="flex items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   {saving ? <CircleNotch size={14} className="animate-spin" /> : saved ? <CheckCircle size={14} weight="bold" /> : null}
                   {saving ? "Saving…" : saved ? "Saved" : "Save"}
@@ -203,7 +203,7 @@ export function EditModeProvider({ initial, children }: { initial: SiteContent; 
                 <button
                   type="button"
                   onClick={discard}
-                  className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   <X size={14} weight="bold" /> {dirty ? "Discard" : "Done"}
                 </button>
@@ -535,14 +535,14 @@ export function EditableImage({ path, children, transform = true }: {
           and the two landed on top of each other — the figure's own controls were underneath
           the Save button, which is the one place they must not be. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end p-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/95 px-2 py-1.5 backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-background/95 px-2 py-1.5 backdrop-blur">
           {/* GENERATE COMES FIRST, because it is the one that does not need you to already
               have a file. Upload is the fallback for a picture that exists. */}
           <button
             type="button"
             onClick={() => { setErr(null); setAsking((v) => !v) }}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
           >
             <Sparkle size={13} weight="fill" /> Generate
           </button>
@@ -551,7 +551,7 @@ export function EditableImage({ path, children, transform = true }: {
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
           >
             {busy ? <CircleNotch size={13} className="animate-spin" /> : <PencilSimple size={13} weight="bold" />}
             {busy ? "Uploading…" : typeof current === "string" && current ? "Replace" : "Upload"}
@@ -560,7 +560,7 @@ export function EditableImage({ path, children, transform = true }: {
             <button
               type="button"
               onClick={() => write(path, "")}
-              className="rounded-full px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="rounded-lg px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               Remove
             </button>
@@ -615,7 +615,7 @@ export function EditableImage({ path, children, transform = true }: {
                 onClick={() => setPlacing((v) => !v)}
                 title={placing ? "Done repositioning" : "Drag the picture to reposition it"}
                 aria-pressed={placing}
-                className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors " + (placing ? "bg-foreground text-background" : "hover:bg-accent")}
+                className={"flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium transition-colors " + (placing ? "bg-foreground text-background" : "hover:bg-accent")}
               >
                 <ArrowsOutCardinal size={13} weight="bold" /> {placing ? "Done" : "Reposition"}
               </button>

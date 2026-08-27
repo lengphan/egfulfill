@@ -459,9 +459,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  className="w-full rounded-lg border border-border bg-card px-3 pb-8 pt-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
                 <div className="pointer-events-none absolute bottom-2 right-2.5">
-                  {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("label", "Checking…")}</span>}
-                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("label", "Validated")}</span>}
-                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-full bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? tl("label", "Couldn't verify") : tl("label", "Not found")}</span>}
+                  {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("label", "Checking…")}</span>}
+                  {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("label", "Validated")}</span>}
+                  {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? tl("label", "Couldn't verify") : tl("label", "Not found")}</span>}
                 </div>
               </div>
               <p className="text-2xs text-muted-foreground">{tl("label", "Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).")}</p>

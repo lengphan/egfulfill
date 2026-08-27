@@ -494,7 +494,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
                             ) : (
                               <span className="min-w-0 flex-1 text-muted-foreground">{tl("digitizer", "No close match in your library")}</span>
                             )}
-                            {m && poor && <span className="shrink-0 rounded-full bg-hold/15 px-2 py-0.5 eg-label text-hold">poor</span>}
+                            {m && poor && <span className="shrink-0 rounded-lg bg-hold/15 px-2 py-0.5 eg-label text-hold">poor</span>}
                           </div>
                         )
                       })}

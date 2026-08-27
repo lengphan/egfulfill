@@ -149,7 +149,7 @@ export function ShopAnalyzer() {
             <SectionCard title={tl("shopAnalyzer", "Your most-used tags")}>
               <div className="flex flex-wrap gap-1.5 p-4">
                 {s.topTags.map((t) => (
-                  <span key={t.tag} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{t.tag} <span className="opacity-60">×{t.n}</span></span>
+                  <span key={t.tag} className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{t.tag} <span className="opacity-60">×{t.n}</span></span>
                 ))}
               </div>
             </SectionCard>

@@ -718,7 +718,7 @@ function AiAssistantCard({ onChanged }: { onChanged?: () => void }) {
             <div className="text-xs text-muted-foreground">{tl("integrations", "Powers the account-aware auto-reply in seller Support chat.")}</div>
           </div>
         </div>
-        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
+        <span className={"shrink-0 rounded-lg px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
           {cfg?.keySet ? tl("integrations", "Active") : tl("integrations", "Inactive")}
         </span>
       </div>
@@ -862,7 +862,7 @@ function ImageAiCard({ onChanged }: { onChanged?: () => void }) {
             <div className="text-xs text-muted-foreground">{tl("integrations", "Product images from a prompt, in staff’s own My EG chat. Not offered to sellers.")}</div>
           </div>
         </div>
-        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (active ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
+        <span className={"shrink-0 rounded-lg px-2.5 py-0.5 text-xs font-medium " + (active ? "bg-shipped/12 text-shipped" : "bg-muted text-muted-foreground")}>
           {active ? tl("integrations", "Active") : tl("integrations", "Inactive")}
         </span>
       </div>

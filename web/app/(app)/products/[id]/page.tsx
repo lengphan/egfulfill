@@ -202,7 +202,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-2">
               <span
  className={
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium " +
+                  "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium " +
                   (status === "Active" ? "bg-shipped/15 text-shipped" : "bg-muted text-muted-foreground")
                 }
               >
@@ -270,7 +270,7 @@ export default function ProductDetailPage() {
                       // Neither a photo nor a colour we can name in hex: say the word. It
                       // is wider than a dot, and it is the only honest thing to draw.
  if (!img && !hex) return (
-                        <span key={c} className="rounded-full border border-border px-2 py-1 text-xs">{c}</span>
+                        <span key={c} className="rounded-lg border border-border px-2 py-1 text-xs">{c}</span>
                       )
  return (
                         <span
@@ -348,7 +348,7 @@ export default function ProductDetailPage() {
               {techs.map((t) => {
  const fee = product.methodPrices?.[t.key.toUpperCase()] ?? product.methodPrices?.[t.label.split(" ")[0]]
  return (
-                  <span key={t.key} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-sm font-medium">
+                  <span key={t.key} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1 text-sm font-medium">
                     {t.label}
                     {typeof fee === "number" && fee > 0 && <span className="text-xs text-muted-foreground">+{usd(fee)}</span>}
                   </span>

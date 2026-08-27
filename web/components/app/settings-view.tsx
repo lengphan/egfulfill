@@ -777,7 +777,7 @@ function TeamPanel() {
  aria-pressed={on}
  onClick={() => onPerms(m.id, on ? perms.filter((x) => x !== s.id) : [...perms, s.id])}
  title={on ? `${s.label} — shared, click to stop sharing` : `${s.label} — not shared, click to share`}
- className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " +
+ className={"eg-tap rounded-lg px-2.5 py-1 text-xs font-medium transition-colors " +
                           (on
                             ? "bg-primary text-primary-foreground hover:bg-primary/90"
  : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground")}
@@ -1778,7 +1778,7 @@ function PlatformPanel() {
  onClick={() => toggleSide(sd)}
  disabled={on && sd === "front"}
  title={sd === "front" ? tl("settings", "Every product has a front") : undefined}
- className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors " +
+ className={"eg-tap rounded-lg px-2.5 py-1 text-xs font-medium capitalize transition-colors " +
                           (on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
                       >
                         {sd}
@@ -2391,7 +2391,7 @@ function UsersPanel() {
           {inactiveCount > 0 && (
             <button
  onClick={() => setShowInactive((v) => !v)}
- className={"eg-tap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " + (showInactive ? "border-border bg-accent" : "border-border text-muted-foreground hover:bg-accent")}
+ className={"eg-tap rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " + (showInactive ? "border-border bg-accent" : "border-border text-muted-foreground hover:bg-accent")}
             >
               {showInactive ? tl("settings", "Hide") : tl("settings", "Show")} {inactiveCount} deactivated
             </button>
@@ -2721,7 +2721,7 @@ function ActivityPanel() {
  aria-pressed={on}
  onClick={() => setCats(on ? [] : [c.key])}
  className={
-                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " +
+                  "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " +
                   (on
                     ? "border-primary bg-primary text-primary-foreground"
  : "border-input bg-card text-muted-foreground hover:text-foreground")

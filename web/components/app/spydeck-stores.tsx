@@ -245,7 +245,7 @@ export function StoresTab(h: Handlers) {
  return (
       <div>
         <div className="flex flex-wrap items-center gap-3 px-5 pt-4">
-          <button type="button" onClick={() => { setOpen(null); setCatalog(null) }} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent">
+          <button type="button" onClick={() => { setOpen(null); setCatalog(null) }} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent">
             {tl("spydeckStores", "Back")}
           </button>
           <div className="flex items-center gap-2">
@@ -256,7 +256,7 @@ export function StoresTab(h: Handlers) {
           <div className="ml-auto flex items-center gap-1 rounded-full bg-muted p-1">
             {(["gallery", "cards"] as const).map((v) => (
               <button key={v} type="button" onClick={() => setCatView(v)}
- className={"rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (catView === v ? "bg-card text-foreground " : "text-muted-foreground hover:text-foreground")}>
+ className={"rounded-lg px-2.5 py-1 text-xs font-medium transition-colors " + (catView === v ? "bg-card text-foreground " : "text-muted-foreground hover:text-foreground")}>
                 {v === "gallery" ? tl("spydeckStores", "Gallery") : tl("spydeckStores", "Details")}
               </button>
             ))}
@@ -307,7 +307,7 @@ export function StoresTab(h: Handlers) {
  return (
     <div>
       <div className="flex flex-col gap-3 px-5 pt-4 sm:flex-row sm:items-center">
-        <div className="flex flex-1 items-center gap-2 rounded-full border border-border bg-background px-4 py-2">
+        <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-background px-4 py-2">
           <MagnifyingGlass size={16} className="text-muted-foreground" />
           <input
  value={query} onChange={(e) => setQuery(e.target.value)}
@@ -315,7 +315,7 @@ export function StoresTab(h: Handlers) {
  placeholder={tl("spydeckStores", "Search competitor stores by name…")}
  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-          <button type="button" onClick={run} disabled={loading || !query.trim()} className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+          <button type="button" onClick={run} disabled={loading || !query.trim()} className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50">
             {loading ? <CircleNotch size={14} className="animate-spin" /> : tl("spydeckStores", "Search")}
           </button>
         </div>
@@ -324,7 +324,7 @@ export function StoresTab(h: Handlers) {
  value={catId}
  onChange={(e) => byCategory(e.target.value)}
  title={tl("spydeckStores", "Discover shops selling in a category")}
- className="rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+ className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <option value="">{tl("spydeckStores", "Browse by category…")}</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -333,7 +333,7 @@ export function StoresTab(h: Handlers) {
         <div className="flex items-center gap-1 rounded-full bg-muted p-1">
           {(["search", "saved"] as const).map((t) => (
             <button key={t} type="button" onClick={() => { setTab(t); setPage(0) }}
- className={"rounded-full px-3 py-1 text-xs font-medium transition-colors " + (tab === t ? "bg-card text-foreground " : "text-muted-foreground hover:text-foreground")}>
+ className={"rounded-lg px-3 py-1 text-xs font-medium transition-colors " + (tab === t ? "bg-card text-foreground " : "text-muted-foreground hover:text-foreground")}>
               {t === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : tl("spydeckStores", "Results")}
             </button>
           ))}
@@ -370,9 +370,9 @@ export function StoresTab(h: Handlers) {
                 ))}
                 {pages > 1 && (
                   <div className="flex items-center justify-center gap-2 pt-2">
-                    <button type="button" onClick={() => setPage(Math.max(0, cur - 1))} disabled={cur === 0} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">{tl("spydeckStores", "Prev")}</button>
+                    <button type="button" onClick={() => setPage(Math.max(0, cur - 1))} disabled={cur === 0} className="rounded-lg border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">{tl("spydeckStores", "Prev")}</button>
                     <span className="px-1 text-xs text-muted-foreground">Page {cur + 1} of {pages} · {all.length} stores</span>
-                    <button type="button" onClick={() => setPage(Math.min(pages - 1, cur + 1))} disabled={cur >= pages - 1} className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">{tl("spydeckStores", "Next")}</button>
+                    <button type="button" onClick={() => setPage(Math.min(pages - 1, cur + 1))} disabled={cur >= pages - 1} className="rounded-lg border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40">{tl("spydeckStores", "Next")}</button>
                   </div>
                 )}
               </>

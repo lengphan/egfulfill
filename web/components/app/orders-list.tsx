@@ -357,7 +357,7 @@ export function OrdersList() {
  key={f}
  onClick={() => setFilter(f)}
  className={
-                  "rounded-full px-3 py-1 text-sm font-medium transition-colors " +
+                  "rounded-lg px-3 py-1 text-sm font-medium transition-colors " +
                   (filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >

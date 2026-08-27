@@ -1034,7 +1034,7 @@ export function ProductEditorDialog({
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             {title ?? (product ? tl("product", "Edit product") : tl("product", "New product"))}
-            {importSupplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {importSupplier}</span>}
+            {importSupplier && <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {importSupplier}</span>}
           </DialogTitle>
         </DialogHeader>
 
@@ -2082,7 +2082,7 @@ export function ProductEditorDialog({
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? tl("product", "From supplier") : tl("product", "Suggested")}:</span>
                 {colorSuggestions.map((c) => (
-                  <button key={c} title={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {prettyColorName(c)}</button>
+                  <button key={c} title={c} onClick={() => addColor(c)} className="rounded-lg border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {prettyColorName(c)}</button>
                 ))}
               </div>
             )}

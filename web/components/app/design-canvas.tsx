@@ -2562,7 +2562,7 @@ export function DesignCanvasDialog({
  return (
                 <button key={f.side} onClick={() => goToSide(i)}
  title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
- className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors "
+ className={"flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium capitalize transition-colors "
                     + (i === side ? "bg-primary text-primary-foreground"
  : has ? "bg-primary/10 text-primary hover:bg-primary/15"
  : "bg-muted text-muted-foreground hover:bg-accent")}>

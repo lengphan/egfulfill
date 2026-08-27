@@ -1465,14 +1465,14 @@ export function SpyDeckView() {
               <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
                 <button
  type="button" onClick={moreIdeas} disabled={refreshing || freshScanning}
- className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
+ className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
  title={tl("spydeck", "Reshuffle the feed for a fresh set of ideas — free and instant")}
                 >
                   {refreshing ? <CircleNotch size={14} className="animate-spin" /> : null} More ideas
                 </button>
                 <button
  type="button" onClick={freshScan} disabled={refreshing || freshScanning}
- className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+ className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
  title={tl("spydeck", "Pull a brand-new batch of niches from Etsy (rate-limited)")}
                 >
                   {freshScanning ? <CircleNotch size={14} className="animate-spin" /> : null} Fresh scan

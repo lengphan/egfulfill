@@ -153,7 +153,7 @@ export default function SheetPage() {
         )}
 
         {done ? (
-          <span className="rounded-full bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Sent")}</span>
+          <span className="rounded-lg bg-shipped/10 px-2 py-0.5 text-2xs font-medium text-shipped">{tl("sheet_[id]", "Sent")}</span>
         ) : (
           /* State, not decoration: without it autosave is invisible and the only way to
              believe it is to close the tab and find out. */

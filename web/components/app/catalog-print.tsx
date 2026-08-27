@@ -539,7 +539,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           >
             <div className="flex items-start justify-between">
               <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
-              <span className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
+              <span className="rounded-lg px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
  style={{ background: HOUSE.lime, color: HOUSE.ink }}>
                 {fmtDate(new Date(), { month: "long", year: "numeric" })}
               </span>
@@ -781,7 +781,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     {editing && st.edited && (
                       <button
  type="button" onClick={() => revert(st)} disabled={savingRef === st.ref}
- className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200 print:hidden"
+ className="inline-flex items-center gap-1 rounded-lg bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200 print:hidden"
  title={tl("catalogPrint", "Put the name, copy and photo back to what the catalogue says")}
                       >
                         {tl("catalogPrint", "Edited · undo")}
@@ -929,7 +929,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                       {editing && (
                         <button
  type="button" onClick={() => pickFile(st)} disabled={savingRef === st.ref}
- className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 hover:bg-white print:hidden"
+ className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-neutral-700 hover:bg-white print:hidden"
                         >
                           {tl("catalogPrint", "Replace photo")}
                         </button>
@@ -967,7 +967,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                           {editing && st.sizes.length > 0 && (
                             <button
  type="button" onClick={() => setPicking({ st, kind: "sizes" })}
- className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 hover:bg-neutral-200 print:hidden"
+ className="rounded-lg bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 hover:bg-neutral-200 print:hidden"
                             >
                               {st.pickSizes?.length ? `${pickedSizes.length} of ${st.sizes.length}` : `All ${st.sizes.length}`}
                             </button>
@@ -1058,7 +1058,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     {editing && st.colors.length > 0 && (
                       <button
  type="button" onClick={() => setPicking({ st, kind: "colors" })}
- className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 hover:bg-neutral-200 print:hidden"
+ className="rounded-lg bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 hover:bg-neutral-200 print:hidden"
                       >
                         {st.pickColors?.length ? `${pickedColors.length} of ${st.colors.length}` : `All ${st.colors.length}`}
                       </button>
@@ -1137,7 +1137,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  title={`Fix the ${c.name} picture`}
  className="absolute inset-0 z-10 flex items-end justify-center bg-black/0 pb-1 opacity-0 transition hover:bg-black/25 hover:opacity-100 print:hidden"
                               >
-                                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-neutral-700">{tl("catalogPrint", "Fix")}</span>
+                                <span className="rounded-lg bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-neutral-700">{tl("catalogPrint", "Fix")}</span>
                               </button>
                             )}
                           </div>

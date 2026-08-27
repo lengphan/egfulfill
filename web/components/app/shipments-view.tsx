@@ -321,7 +321,7 @@ export function ShipmentsView() {
  onClick={() => setStatus(f.key)}
  disabled={!on && n === 0 && f.key !== "all"}
  className={
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
+                  "rounded-lg border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40 " +
                   (on
                     ? "border-primary bg-primary text-primary-foreground"
  : "border-border bg-card text-muted-foreground hover:text-foreground")

@@ -130,7 +130,7 @@ export function MotionEditor({ value, onChange }: {
           <button
  key={p} type="button" onClick={() => setName(p)}
  className={
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors " +
+              "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors " +
               (p === name
                 ? "bg-primary text-primary-foreground"
  : "border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")

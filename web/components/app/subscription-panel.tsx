@@ -181,7 +181,7 @@ export function SubscriptionPanel() {
               </div>
               <div className="mt-2 text-sm text-muted-foreground">{current.tagline}</div>
             </div>
-            <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <span className="shrink-0 rounded-lg bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
               {current.shortName}
             </span>
           </div>
@@ -254,7 +254,7 @@ export function SubscriptionPanel() {
               <div className="flex items-center justify-between">
                 <div className="font-semibold">{t.name}</div>
                 {t.id === "pro" && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 eg-label text-primary">
+                  <span className="rounded-lg bg-primary/10 px-2 py-0.5 eg-label text-primary">
                     {tl("subscription", "Popular")}
                   </span>
                 )}
@@ -323,7 +323,7 @@ export function SubscriptionPanel() {
             <div className="flex items-center gap-2">
               <MagnifyingGlass size={18} weight="bold" className="shrink-0 text-primary" />
               <div className="font-semibold">{tl("subscription", "SpyDeck research")}</div>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 eg-label text-primary">
+              <span className="rounded-lg bg-primary/10 px-2 py-0.5 eg-label text-primary">
                 {tl("subscription", "Research")}
               </span>
             </div>
@@ -333,7 +333,7 @@ export function SubscriptionPanel() {
           </div>
           <div className="shrink-0 text-right">
             {includedFree ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-shipped/12 px-3 py-1 text-sm font-medium text-shipped">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-shipped/12 px-3 py-1 text-sm font-medium text-shipped">
                 <Sparkle size={14} weight="fill" /> Included with {current.shortName}
               </span>
             ) : spydeckAddon ? (

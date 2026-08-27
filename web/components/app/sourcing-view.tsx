@@ -528,7 +528,7 @@ export function SourcingView() {
  received reads Approved. The title says which fact put it here,
  because a stage you cannot argue with should still explain itself. */}
                       <td className="px-4 py-2">
-                        <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
+                        <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
  title={STAGE_WHY[r.stage || "prospect"]}>
                           {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? tl("sourcing", "Saved")}
                         </span>

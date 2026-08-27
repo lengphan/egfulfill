@@ -104,7 +104,7 @@ export function TabBar<T extends string>({
             <TabLabel>{t.label}</TabLabel>
             {t.count != null && (
               <span className={cn(
-                "ml-0.5 rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
+                "ml-0.5 rounded-lg px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
                 on ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
               )}>
                 {t.count}

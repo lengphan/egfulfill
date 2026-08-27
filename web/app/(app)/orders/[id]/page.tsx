@@ -977,13 +977,13 @@ export default function OrderDetailPage() {
                             {designLabel(it.design_no) && (
                               <span
                                 title="This artwork's number — the same on the design board, and searchable"
-                                className="mt-1 inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
+                                className="mt-1 inline-flex items-center rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
                               >
                                 {designLabel(it.design_no)}
                               </span>
                             )}
                             {card && (
-                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
                                 {/* NO DOT — see the note in chat/page.tsx. The lane in ink
  beside it is what changes as the job moves; a violet disc
  was decoration on a pill that already reads. */}

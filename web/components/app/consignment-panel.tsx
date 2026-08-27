@@ -184,7 +184,7 @@ export function ConsignmentPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="tabular-nums text-sm font-semibold">{s.id}</span>
-                    <span className={"rounded-full px-2 py-0.5 eg-label " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
+                    <span className={"rounded-lg px-2 py-0.5 eg-label " + (STATUS_TONE[s.status] ?? "bg-muted text-muted-foreground")}>
                       {s.status.replace(/_/g, " ")}
                     </span>
                     {s.seller_name && <span className="text-sm text-muted-foreground">{s.seller_name}</span>}

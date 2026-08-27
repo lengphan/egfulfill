@@ -24,7 +24,7 @@ export function MobileNav({ sections, onLogout, role }: { sections: MobileNavSec
           <List size={20} weight="bold" />
         </button>
         <span className="font-display text-xl font-semibold tracking-tight">egful</span>
-        {role && <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium capitalize tracking-normal text-primary">{role}</span>}
+        {role && <span className="ml-auto rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-medium capitalize tracking-normal text-primary">{role}</span>}
       </div>
 
       {open && (

@@ -287,7 +287,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
                   <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{s.qty ?? "—"}</td>
                   <td className="px-4 py-2 text-muted-foreground">{when(s.placedAt)}</td>
                   <td className="px-4 py-2">
-                    <span className={"whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium " + STATUS[s.status].pill}>
+                    <span className={"whitespace-nowrap rounded-lg px-2 py-0.5 text-xs font-medium " + STATUS[s.status].pill}>
                       {tl("samples", STATUS[s.status].label)}
                     </span>
                   </td>

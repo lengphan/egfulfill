@@ -77,7 +77,7 @@ export function SiteHeader() {
             free is for people who don't, and it opens the form that makes one. */}
         <div className="ml-auto flex items-center gap-2">
                       <>
-              <Link href="/login" className={"rounded-full px-4 py-2 text-sm font-semibold transition-colors " + muted}>
+              <Link href="/login" className={"rounded-lg px-4 py-2 text-sm font-semibold transition-colors " + muted}>
                 Log in
               </Link>
               <Link

@@ -113,7 +113,7 @@ function EmbPreview({ designId, orderId, sku, cached, children }: { designId?: s
  e.preventDefault(); e.stopPropagation()   // Space would scroll the lane
  if (!busy) fetchPng()
           }}
- className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-full border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
+ className={"absolute inset-x-2 bottom-2 cursor-pointer rounded-lg border border-border bg-background/90 px-2 py-1 text-center text-xs font-medium text-muted-foreground backdrop-blur hover:text-foreground " + (busy ? "opacity-60" : "")}
         >
           {busy ? tl("designer", "Rendering…") : why ? tl("designer", "Couldn't render") : tl("designer", "Show stitches")}
         </span>
@@ -598,7 +598,7 @@ export function DesignerBoard() {
  className="ml-auto h-9 w-36 sm:w-56"
  aria-label={tl("designer", "Search designs")}
         />
-        <label className="eg-tap inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+        <label className="eg-tap inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
           <Plus size={14} weight="bold" /> {tl("designer", "Add design")}
           <input
  type="file"
@@ -717,7 +717,7 @@ export function DesignerBoard() {
                   ) : (
                     <span className="truncate text-sm font-semibold">{col.label}</span>
                   )}
-                  <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
+                  <span className="ml-auto shrink-0 rounded-lg bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
                   {/* Delete — non-system lanes only. Its cards move to the fallback, so this
  never strands work; system lanes (fallback + payout) carry no button. */}
                   {canManageLanes && !col.system && (
@@ -970,7 +970,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   // name, tinted like the board badge), a claimed card is with that designer, and anything
   // else is genuinely unclaimed — said plainly rather than a bare dash.
   { id: "claimed", label: "Assigned to", cell: (c) => c.vendor
-    ? <span className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">{vendorLabel(c.vendor)}</span>
+    ? <span className="inline-flex items-center gap-1 rounded-lg bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">{vendorLabel(c.vendor)}</span>
  : c.claimed_by
       ? <span className="text-foreground">{String(c.claimed_by)}</span>
  : <span className="text-muted-foreground">Unclaimed</span> },
@@ -1261,7 +1261,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
                 </button>
               )}
             </DialogTitle>
-            <span className={"mt-0.5 inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium " + lanePill(laneMeta(col, lanes).accent)}>
+            <span className={"mt-0.5 inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-xs font-medium " + lanePill(laneMeta(col, lanes).accent)}>
               {tl("designer", laneMeta(col, lanes).label)}
             </span>
           </div>
@@ -1631,7 +1631,7 @@ function BoardHistory() {
         {/* The tab exists mainly to answer "what got deleted?" — so a one-click filter to
  exactly that, without hunting through moves and credits. */}
         <button onClick={() => setOnlyDeletes((v) => !v)}
- className={"eg-tap ml-auto rounded-full border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-alert/30 bg-alert/12 text-alert" : "border-border text-muted-foreground hover:bg-accent")}>
+ className={"eg-tap ml-auto rounded-lg border px-3 py-1 text-xs font-medium transition-colors " + (onlyDeletes ? "border-alert/30 bg-alert/12 text-alert" : "border-border text-muted-foreground hover:bg-accent")}>
           {onlyDeletes ? tl("designer", "Showing deletions only") : tl("designer", "Deletions only")}
         </button>
       </div>
