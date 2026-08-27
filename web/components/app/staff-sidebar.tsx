@@ -10,6 +10,7 @@ import { loadNavVisibility, isSurfaceHidden } from "@/lib/nav-visibility"
 import { useLabelT } from "@/lib/i18n"
 import { getUser, clearSession } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
+import { Wordmark, WordmarkE } from "@/components/marketing/wordmark"
 
 export function StaffSidebar({ collapsed = false, onToggle }: {
   /** Set by the shell, which owns the fact — see lib/rail.ts. */
@@ -63,7 +64,7 @@ export function StaffSidebar({ collapsed = false, onToggle }: {
     )}>
       <div className={cn("flex h-16 shrink-0 items-center gap-2", collapsed ? "justify-center px-0" : "px-5")}>
         {/* Brand, so it keeps the marketing face — see sidebar.tsx. */}
-        <span className="font-display text-2xl font-semibold tracking-tight" title="egful">{collapsed ? "e" : "egful"}</span>
+        <span className="flex items-center" title="egful">{collapsed ? <WordmarkE className="h-6 w-6" /> : <Wordmark className="h-[22px] w-auto" />}</span>
         {/* WHICH ROLE YOU ARE IN, not a badge for it. This was a filled pill beside the
             wordmark on every single screen — the loudest thing in the sidebar header, saying
             something nobody needs shouted. Small caps carry it just as clearly and stop it

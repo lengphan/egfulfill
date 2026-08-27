@@ -12,6 +12,7 @@ import { useEntitlements } from "@/lib/entitlements"
 import { getMyAccess } from "@/lib/api"
 import { clearSession, getToken } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
+import { Wordmark, WordmarkE } from "@/components/marketing/wordmark"
 
 export function Sidebar({ collapsed = false, onToggle }: {
   /** Set by the shell, which owns the fact — see lib/rail.ts. */
@@ -76,7 +77,9 @@ export function Sidebar({ collapsed = false, onToggle }: {
           className="font-display text-2xl font-semibold tracking-tight text-sidebar-foreground"
           title="egful"
         >
-          {collapsed ? "e" : "egful"}
+          {/* currentColor, so the mark takes the sidebar's own lettering colour rather
+              than needing a light copy for the dark panel. */}
+          {collapsed ? <WordmarkE className="h-6 w-6" /> : <Wordmark className="h-[22px] w-auto" />}
         </Link>
       </div>
 

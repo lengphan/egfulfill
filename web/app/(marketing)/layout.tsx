@@ -5,6 +5,7 @@ import { SupportBubble } from "@/components/marketing/support-bubble"
 import { getSiteContent } from "@/lib/site-content"
 import { getPublicTheme } from "@/lib/public-theme"
 import { EditModeProvider } from "@/components/marketing/edit-mode"
+import { Wordmark } from "@/components/marketing/wordmark"
 
 /**
  * Async so the motion presets can be read HERE rather than per page.
@@ -78,7 +79,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
               KEEP A ROUTE TO A HUMAN HERE. A support widget is not a published contact
               method, so if this link goes, /contact must still publish the address. */}
           <div>
-            <div className="font-display text-xl font-semibold tracking-tight">egful</div>
+            <Wordmark className="h-[26px] w-auto" />
             <div className="mt-1 text-sm text-[var(--mk-auth-muted)]">
               EGFUL — hands-off print-on-demand fulfillment.
             </div>
