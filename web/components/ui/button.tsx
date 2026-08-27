@@ -44,8 +44,26 @@ const buttonVariants = cva(
           "border-input bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+        // A CONTROL AT REST, NOT A CAPTION. Ghost carried no colour and no chrome at all —
+        // it inherited whatever it sat in and only became visible on hover. At 89 uses that
+        // is a lot of buttons that do not look like buttons until you touch them, and
+        // "Cancel" beside a filled primary was the case that showed it.
+        //
+        // ON THE HOVER, AND AN EARLIER CLAIM CORRECTED. --muted measures 1.19:1 against a
+        // white card, which sounds fatal and is not: between two light surfaces that is a
+        // ~16% luminance drop, which is a perfectly legible fill change. The rest state was
+        // the real defect, not the hover.
+        //
+        // --secondary is used here rather than --muted for naming only. They hold the SAME
+        // value (oklch(0.9417 0.0052 247.88)), along with --accent — three tokens, one
+        // colour — so this changes nothing visually. Worth knowing before anyone edits one
+        // expecting the others to follow.
+        //
+        // Rest is now explicit ink at medium weight: findable by contrast and weight rather
+        // than by chrome, which is what keeps it BELOW outline in the hierarchy while still
+        // reading as something you can press.
         ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+          "text-foreground hover:bg-secondary hover:text-foreground aria-expanded:bg-secondary aria-expanded:text-foreground",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
