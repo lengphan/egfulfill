@@ -597,7 +597,7 @@ export function BroadcastsView({ embedded }: {
  const st = STATUS[b.status] ?? STATUS.draft
  return (
                     <tr key={String(b.id)} className="align-top">
-                      <td className="max-w-72 py-2.5 pr-3">
+                      <td className="max-w-72 py-3 pr-3">
                         {/* READ IT BACK. A sent broadcast is a record, and the record was a
  truncated first line — you could see that you mailed everyone and
  not what you said. Click the subject to reopen the whole thing.
@@ -611,9 +611,12 @@ export function BroadcastsView({ embedded }: {
                         >
                           {b.subject}
                         </button>
-                        <div className="truncate text-xs text-muted-foreground">{b.body}</div>
+                        {/* NOT the body. A truncated first line of email copy under every subject is a
+                            second line per row that nobody reads in a list — the subject is the
+                            identity, and the body is one click away in the editor. */}
+                        {!embedded && <div className="truncate text-xs text-muted-foreground">{b.body}</div>}
                       </td>
-                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                      <td className="py-3 pr-3 text-xs text-muted-foreground">
                         {audienceLabel(b.audience)}
                         {/* WHERE it went, not just to whom. Rows predating the channel column
  were email, and say nothing rather than claiming a channel they
@@ -622,10 +625,10 @@ export function BroadcastsView({ embedded }: {
                           <div className="text-2xs opacity-80">{channelLabel(b.channels)}</div>
                         ) : null}
                       </td>
-                      <td className="py-2.5 pr-3">
+                      <td className="py-3 pr-3">
                         <Badge className={st.cls}>{tl("broadcasts", st.label)}</Badge>
                       </td>
-                      <td className="py-2.5 pr-3 text-right tabular-nums">
+                      <td className="py-3 pr-3 text-right tabular-nums">
                         {/* A draft has no count and says so, rather than showing 0 — which
  would read as "sent to nobody". */}
                         {b.status === "draft" ? (
@@ -649,8 +652,8 @@ export function BroadcastsView({ embedded }: {
                           </>
                         )}
                       </td>
-                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">{b.created_by_name || b.created_by || "—"}</td>
-                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">{dt(b.sent_at ?? b.created_at)}</td>
+                      <td className="py-3 pr-3 text-xs text-muted-foreground">{b.created_by_name || b.created_by || "—"}</td>
+                      <td className="py-3 pr-3 text-xs text-muted-foreground">{dt(b.sent_at ?? b.created_at)}</td>
                       <td className="py-2.5">
                         {b.status === "draft" && (
                           <div className="flex justify-end gap-1">

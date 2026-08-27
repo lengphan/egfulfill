@@ -19,6 +19,7 @@ import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm, usePrompt } from "@/components/app/confirm-dialog"
 import { PageTitle } from "@/components/app/page-title"
 import { TabBar } from "@/components/app/tab-bar"
+import { useActionNode } from "@/components/app/console-shell"
 
 /**
  * Renders a Wilcom TrueView PNG for an EMB card's raw .emb, falling back to `children` (the
@@ -230,6 +231,7 @@ const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).to
 
 export function DesignerBoard() {
   const tl = useLabelT()
+  const inShell = useActionNode() !== null
  const confirm = useConfirm()
  const [cards, setCards] = useState<DesignCard[] | null>(null)
   /** Why the list is empty, when it is empty because the read failed rather than because
@@ -765,7 +767,13 @@ export function DesignerBoard() {
  onClick={() => setOpenId(c.id)}
  title={tl("designer", "Open card details")}
  aria-label={`Open ${c.title || "card"} details`}
- className="relative block h-48 w-full cursor-pointer overflow-hidden bg-muted"
+ /* 192px of art, or 192px of EMPTY GREY when the card has no thumbnail yet — which
+                             is most of them on a fresh board, because a design card is created
+                             before anyone has drawn anything. That made a card ~300px and fitted two
+                             per screen on a board whose whole point is seeing the queue at a glance.
+                             With art it stays big enough to judge; without, it collapses to a strip.
+                             The card is not the artwork when there is no artwork. */
+ className={"relative block w-full cursor-pointer overflow-hidden bg-muted " + (inShell && !c.thumb ? "h-14" : "h-48")}
                         >
                           <CardArt key={String(c.thumb ?? c.id)} card={c} imgClass="size-full object-cover" iconSize={26} />
                           {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-pending/90 px-1.5 py-0.5 text-2xs font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
