@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { Sidebar } from "@/components/app/sidebar"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { TopBar } from "@/components/app/topbar"
+import { CommandPalette } from "@/components/app/command-palette"
 import { PageTransition } from "@/components/motion/page-transition"
 import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
@@ -94,6 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <StaffSidebar collapsed={collapsed} onToggle={toggleRail} />
         <div className={railPad}>
           <TopBar />
+          <CommandPalette staff />
           {/* eg-content is THE page container — one width and one gutter for every page,
               no per-page opt-out. See app/globals.css. */}
           <main className="eg-content mx-auto px-4 py-5 md:px-10 md:py-8">
@@ -111,6 +113,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar collapsed={collapsed} onToggle={toggleRail} />
       <div className={railPad}>
         <TopBar />
+        <CommandPalette />
         <main className="eg-content mx-auto space-y-4 px-4 py-5 md:px-10 md:py-8">
           {/* Seller-only, and above the page rather than on one screen: a short wallet
               stops an order being submitted from ANYWHERE, so a warning that only appears
