@@ -442,7 +442,7 @@ export function EditableImage({ path, children, transform = true }: {
    * finger. The move accumulates in a ref and one rAF flushes it; the picture keeps up and
    * the stored number is still the exact one the pointer landed on.
    */
-  const dragRef = useRef<{ x: number; y: number; fx: number; fy: number; w: number; h: number } | null>(null)
+  const dragRef = useRef<{ x: number; y: number; fx: number; fy: number; ox: number; oy: number } | null>(null)
   const frameRef = useRef(0)
   const pendRef = useRef<{ fx: number; fy: number } | null>(null)
   const flush = () => {
@@ -454,7 +454,34 @@ export function EditableImage({ path, children, transform = true }: {
   const grab = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!bp) return
     const r = e.currentTarget.getBoundingClientRect()
-    dragRef.current = { x: e.clientX, y: e.clientY, fx: focusX, fy: focusY, w: r.width || 1, h: r.height || 1 }
+    /**
+     * THE DRAG MAPS TO THE OVERFLOW, NOT TO THE BOX — and getting that wrong is why the
+     * control felt broken rather than merely wrong.
+     *
+     * `object-position` does not slide the picture across the container. It distributes the
+     * part that DOESN'T FIT: at 0% the overflow all hangs off the far edge, at 100% off the
+     * near one. So the distance 0→100 covers is `displayed − container`, which is a different
+     * number on each axis and often nothing at all.
+     *
+     * Measured on the live hero: a 2400×1371 frame in a 1425×567 block covers to 1425×814.
+     * Vertical overflow is 247px; horizontal is ZERO. Mapping the drag to the box meant every
+     * vertical drag moved the picture 567/247 ≈ 2.3× less than the hand, and every horizontal
+     * one moved it not at all — there was no overflow for it to move across.
+     *
+     * Against the overflow, one pixel of pointer is one pixel of picture, which is the only
+     * mapping a direct-manipulation control can afford to have.
+     */
+    const media = e.currentTarget.parentElement?.querySelector("img, video") as
+      (HTMLImageElement | HTMLVideoElement | null)
+    const nw = media instanceof HTMLVideoElement ? media.videoWidth : (media?.naturalWidth ?? 0)
+    const nh = media instanceof HTMLVideoElement ? media.videoHeight : (media?.naturalHeight ?? 0)
+    const box = media?.getBoundingClientRect() ?? r
+    /* Fall back to the box on a picture that has not decoded yet — a slower drag is a poorer
+       control, and a division by zero is no control at all. */
+    const cover = nw > 0 && nh > 0 ? Math.max(box.width / nw, box.height / nh) : 0
+    const ox = cover ? nw * cover * scaleV - box.width : box.width
+    const oy = cover ? nh * cover * scaleV - box.height : box.height
+    dragRef.current = { x: e.clientX, y: e.clientY, fx: focusX, fy: focusY, ox, oy }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const moveTo = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -465,9 +492,13 @@ export function EditableImage({ path, children, transform = true }: {
        Without the minus the photograph runs away from the hand, which reads as broken rather
        than as inverted. */
     const clamp = (n: number) => Math.round(Math.min(FOCUS_MAX, Math.max(FOCUS_MIN, n)))
+    /* An axis with no overflow is HELD, not moved. There is nothing off-frame for it to
+       reveal, so writing a new value there would store a number that changes no pixel — and
+       the next picture, which may well overflow that axis, would inherit a crop nobody
+       chose. */
     pendRef.current = {
-      fx: clamp(d.fx - ((e.clientX - d.x) / d.w) * 100),
-      fy: clamp(d.fy - ((e.clientY - d.y) / d.h) * 100),
+      fx: d.ox > 1 ? clamp(d.fx - ((e.clientX - d.x) / d.ox) * 100) : d.fx,
+      fy: d.oy > 1 ? clamp(d.fy - ((e.clientY - d.y) / d.oy) * 100) : d.fy,
     }
     if (!frameRef.current) frameRef.current = requestAnimationFrame(flush)
   }
