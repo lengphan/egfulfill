@@ -244,10 +244,13 @@ function ProfilePanel() {
  onChange={(e) => { setUname(e.target.value); setSaved(false) }}
  onKeyDown={(e) => { if (e.key === "Enter") save() }}
  placeholder="yourstorename2026"
+ title={tl("settings", "12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.")}
  disabled={!user}
  className="max-w-sm"
           />
-          <span className="text-xs text-muted-foreground">{tl("settings", "12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.")}</span>
+          {/* §4: prose under a control is a defect. The rule is a constraint on THIS field,
+              so it rides the field as its title — available when asked for, not served to
+              everyone every time they open Settings. */}
         </label>
 
         {/* Avatar — an emoji + a colour. Deliberately not an image upload: no file
@@ -299,7 +302,9 @@ function ProfilePanel() {
             </span>
             <span>
               <span className="block text-sm font-medium">{tl("settings", "Notification sound")}</span>
-              <span className="block text-xs text-muted-foreground">{tl("settings", "Play a chime when something needs you")}</span>
+              {/* "Play a chime when something needs you" under a switch marked Notification
+                  sound is the shape §4 names: explaining a control that is already on screen
+                  and already says what it does. */}
             </span>
           </span>
           <Switch checked={sound} onCheckedChange={(v) => { setSound(v); setSaved(false) }} disabled={!user} />

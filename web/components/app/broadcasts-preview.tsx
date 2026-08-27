@@ -12,7 +12,7 @@ import { ConsoleShell } from "@/components/app/console-shell"
  */
 export function BroadcastsPreview() {
   return (
-    <ConsoleShell title="Broadcasts" icon={EnvelopeSimple}>
+    <ConsoleShell bare title="Broadcasts" icon={EnvelopeSimple}>
       <BroadcastsView embedded />
     </ConsoleShell>
   )
