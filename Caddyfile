@@ -1,3 +1,39 @@
+# ── GLOBAL ─────────────────────────────────────────────────────────────────────
+# egful.store and www sit BEHIND Cloudflare's proxy (moved 2026-08-27); api.egful.store
+# is deliberately grey-clouded so the 60MB base64 print-file uploads never meet a proxy
+# body limit. So the real visitor arrives two different ways, and the origin has to be
+# told which peers are allowed to speak for someone else.
+#
+# WHY THIS MATTERS: every rate limit in the API keys on
+# `x-forwarded-for.split(',')[0]` (password-reset.js, public_support.js, index.js). That
+# header is written by whoever is calling — so before this block, a caller could invent
+# an IP per request and the ceiling never applied to them. It reads the true client
+# through Cloudflare and is forgeable direct; either way the value was not trustworthy.
+#
+# trusted_proxies + client_ip_headers make `{http.request.client_ip}` authoritative:
+# Cf-Connecting-IP is honoured ONLY when the peer is genuinely a Cloudflare address,
+# and otherwise it is the socket address, which cannot be faked. Each reverse_proxy
+# then OVERWRITES X-Forwarded-For with it, so the API keeps reading the same header and
+# no Node change is needed.
+#
+# The list is Cloudflare's published ranges, read from https://www.cloudflare.com/ips-v4
+# and /ips-v6 on 2026-08-27. Cloudflare adds ranges occasionally — if real IPs ever start
+# reading as Cloudflare addresses, re-fetch those two URLs before suspecting anything else.
+{
+	servers {
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers Cf-Connecting-IP X-Forwarded-For
+	}
+}
+
+# The API upstream, in one place because it is wired in four: /api and /vqr on both the
+# apex and api.egful.store. The header_up is the point — see the note above.
+(api_upstream) {
+	reverse_proxy api:3000 {
+		header_up X-Forwarded-For {http.request.client_ip}
+	}
+}
+
 # Replace `your-domain.com` with your real domain (point its DNS A-record at the
 # VPS IP) and Caddy fetches a free HTTPS cert automatically.
 # No domain yet? Use `:80` instead of the domain line to test over plain HTTP.
@@ -38,12 +74,11 @@ api.egful.store {
 		-Server
 	}
 
-
 	handle /api/* {
-		reverse_proxy api:3000
+		import api_upstream
 	}
 	handle /vqr/* {
-		reverse_proxy api:3000
+		import api_upstream
 	}
 	handle {
 		respond 404
@@ -73,15 +108,14 @@ egful.store {
 		-Server
 	}
 
-
 	# API → the Node app
 	handle /api/* {
-		reverse_proxy api:3000
+		import api_upstream
 	}
 
 	# VietQR balance-change callbacks (server-to-server: token_generate + transaction-sync)
 	handle /vqr/* {
-		reverse_proxy api:3000
+		import api_upstream
 	}
 
 	# SECURITY: the static root is the whole repo dir, so secrets/source must be blocked
