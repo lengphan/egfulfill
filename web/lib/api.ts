@@ -2594,7 +2594,7 @@ export function postItemSetup(id: string, body: { line_id?: string; sku?: string
  */
 export function deleteOrderItem(id: string, lineId: string) {
   return api<{ ok?: boolean; error?: string }>(
-    `/api/orders/${encodeURIComponent(id)}/items/${encodeURIComponent(lineId)}`,
+    `/api/orders/${encodeURIComponent(id)}/items?line=${encodeURIComponent(lineId)}`,
     { method: "DELETE" },
   )
 }

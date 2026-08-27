@@ -2828,7 +2828,18 @@ export function ordersRoutes(app, requireAuth) {
    * a line that existed and now does not is exactly the case where the record has to say
    * what was there.
    */
-  app.delete('/api/orders/:id/items/:lineId', { preHandler: requireAuth }, async (req, reply) => {
+  /**
+   * TWO SHAPES, ONE HANDLER — and the second exists because of a real failure.
+   *
+   * With the identifier as a PATH segment, anything that makes it empty or oddly encoded
+   * produces a URL that matches no route at all, and Fastify answers with its own 404 whose
+   * body is {error:"Not Found"} — which the client then shows verbatim. That looks like the
+   * line is missing when the truth is the request never reached this handler.
+   *
+   * `?line=` cannot do that: the route matches on the path alone, so a bad identifier
+   * reaches the handler and gets an answer that says what is actually wrong.
+   */
+  const removeLine = async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
     const stageNow = await q('select factory_status from orders where id=$1', [req.params.id])
@@ -2838,18 +2849,42 @@ export function ordersRoutes(app, requireAuth) {
       reply.code(409);
       return { error: 'This order has been approved — remove a line before approval, or cancel and raise a new order.' };
     }
-    // line_id is line IDENTITY (§5). Deleting by sku would take every sibling of the same
-    // sku with it, which on a two-colour order is the wrong line half the time.
-    const found = await q(
-      'select * from order_items where order_id=$1 and line_id=$2',
-      [req.params.id, String(req.params.lineId)]
+    /**
+     * line_id is line IDENTITY (§5), and it is what this deletes by. But a caller can only
+     * send what the row HAS: the client addresses a line as `line_id ?? sku`, because the
+     * backfill has not always run and older rows carry only a sku. Matching line_id alone
+     * meant those rows returned "line not found" for a line plainly on the screen.
+     *
+     * So: line_id first. Falling back to sku ONLY when exactly one row carries it — two
+     * lines of one sku are two jobs, and deleting "the sku" would take the sibling with it,
+     * which on a two-colour order is the wrong line half the time. Ambiguous means refuse
+     * and say why, never guess.
+     */
+    const key = String(req.params.lineId ?? (req.query && req.query.line) ?? '').trim();
+    if (!key) { reply.code(400); return { error: 'No line was named to remove. Reload the page and try again.' }; }
+    let found = await q('select * from order_items where order_id=$1 and line_id=$2', [req.params.id, key]);
+    let byLineId = found.rowCount > 0;
+    if (!byLineId) {
+      const bySku = await q('select * from order_items where order_id=$1 and sku=$2', [req.params.id, key]);
+      if (bySku.rowCount > 1) {
+        reply.code(409);
+        return { error: 'This order has more than one line with that SKU and they are different jobs. Reload the page so each line carries its own id, then remove the one you mean.' };
+      }
+      found = bySku;
+    }
+    if (!found.rowCount) { reply.code(404); return { error: 'That line is no longer on this order — it may already have been removed.' }; }
+    await q(
+      byLineId
+        ? 'delete from order_items where order_id=$1 and line_id=$2'
+        : 'delete from order_items where order_id=$1 and sku=$2',
+      [req.params.id, key]
     );
-    if (!found.rowCount) { reply.code(404); return { error: 'line not found' }; }
-    await q('delete from order_items where order_id=$1 and line_id=$2', [req.params.id, String(req.params.lineId)]);
     audit(req, 'item.remove', { entityType: 'order', entityId: req.params.id, before: found.rows[0] });
     egBroadcast({ type: 'orders' });
     return { ok: true };
-  });
+  };
+  app.delete('/api/orders/:id/items/:lineId', { preHandler: requireAuth }, removeLine);
+  app.delete('/api/orders/:id/items', { preHandler: requireAuth }, removeLine);
 
   /**
    * DUPLICATE AN ORDER INTO A FRESH DRAFT.
