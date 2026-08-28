@@ -94,7 +94,7 @@ export default function Index() {
       .then(([t, res]) => {
         if (!t) return go("/login")
         const href = res?.notification?.request?.content?.data?.href
-        return go(typeof href === "string" ? routeForHref(href) : "/today")
+        return go(typeof href === "string" ? routeForHref(href) : "/dashboard")
       })
       /* SAY WHICH STATE THIS IS. A keychain that cannot be read is not the same as being
          signed out, and sending someone to /login would hide a real device fault behind a

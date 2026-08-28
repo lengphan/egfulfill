@@ -60,7 +60,7 @@ export default function Login() {
          someone has just proved they work here, the question answers itself.
          NOT awaited: a slow APNs registration must not hold the door shut. */
       enablePush().catch(() => {})
-      router.replace("/today")
+      router.replace("/dashboard")
     } catch (e) {
       // The server's own sentence, not a generic one — it distinguishes a wrong password
       // from an account that cannot sign in at all.

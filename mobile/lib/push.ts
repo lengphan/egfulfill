@@ -130,7 +130,7 @@ export async function disablePush() {
  */
 export function routeForHref(href?: string | null): string {
   const h = String(href || "").trim()
-  if (!h) return "/today"
+  if (!h) return "/dashboard"
 
   const order = h.match(/^\/orders\/([^/?#]+)/)
   if (order) return `/order/${order[1]}`
@@ -149,7 +149,7 @@ export function routeForHref(href?: string | null): string {
     case "/chat":           return "/chat"
     /* /notifications and /products have no phone equivalent. Today is where the counts are,
        which is the nearest honest answer to "something changed". */
-    default:                return "/today"
+    default:                return "/dashboard"
   }
 }
 

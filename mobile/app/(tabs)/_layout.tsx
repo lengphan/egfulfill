@@ -18,13 +18,25 @@ import { ChatBubble } from "@/components/chat-bubble"
 const INACTIVE = "rgba(221,224,227,0.7)"
 
 /** Keyed by the FILLED glyph name, which is what the focused branch passes. One word each:
- *  a second word does not fit 58pt and a bar is not where you explain anything. */
-const LABEL = { today: "Today", cube: "Orders", scan: "Scan", wallet: "Wallet", settings: "Settings" } as const
+ *  a second word does not fit the slot and a bar is not where you explain anything. */
+const LABEL = { grid: "Dashboard", cube: "Orders", scan: "Scan", wallet: "Wallet" } as const
 
 /**
  * The three things worth opening a phone for: what needs doing, a specific order, and the
  * money. Deliberately not a mirror of the web nav — a tab bar with nine entries is a menu,
  * and the point of the phone app is that it is quick.
+ *
+ * FOUR SLOTS, NOT FIVE — and Settings is the one that left.
+ *
+ * Five items on a 358pt bar is ~71pt each, and 71pt has to hold a glyph, a word and the
+ * space around both. That is why the glyph was 21pt when Apple's tab icons are ~25 and
+ * Material's are 24: it was sized to fit the crowd, not to be read across a workshop. Four
+ * slots are ~89pt, which pays for a 24pt glyph and an 11pt word with room left.
+ *
+ * Settings did not vanish — it is a control on the Dashboard header, which is the screen it
+ * belongs to: it answers "is this phone working properly", and that is a thing you check,
+ * not a place you go. The ROUTE is untouched, so `/(tabs)/settings` still resolves and the
+ * push notification map still lands on it; `href: null` only takes it out of the bar.
  */
 
 /**
@@ -68,21 +80,28 @@ function TabGlyph({ name, label, focused }: {
   const ink = focused ? C.onLit : INACTIVE
   return (
     <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
+      {/* THE LIVE PILL IS ROUND, and this reverses a note that used to sit here.
+          It was R.control — 10pt on a ~49pt-tall pill — chosen so the shapes would "nest
+          rather than repeat" inside a bar whose own radius is 30. In the hand it does not
+          read as nesting, it reads as a square sitting in a lozenge, because the two shapes
+          are close enough to compare and different enough to look like a mistake. Every
+          reference bar draws its indicator as a capsule for the same reason. R.pill is the
+          token for a thing that is genuinely round, and at this size it is one. */}
       <View
         style={{
-          minWidth: 58, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 5,
-          borderRadius: R.control, gap: 2,
+          minWidth: 72, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 5,
+          borderRadius: R.pill, gap: 1,
           alignItems: "center", justifyContent: "center",
           backgroundColor: focused ? C.lit : "transparent",
         }}
       >
-        <Ionicons name={name} size={21} color={ink} />
-        {/* 10.5 rather than 11: five words have to clear their pills at 58pt each without
-            the longest of them ("Settings") wrapping or ellipsing. */}
+        {/* 24, which is Material's tab icon and one under Apple's. It was 21 because five
+            slots left no room; four do. */}
+        <Ionicons name={name} size={24} color={ink} />
         <Text
           numberOfLines={1}
           style={{
-            fontSize: 10.5,
+            fontSize: 11,
             lineHeight: 13,
             fontFamily: focused ? F.semi : F.medium,
             color: ink,
@@ -165,11 +184,11 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="today"
+        name="dashboard"
         options={{
-          title: "Today",
+          title: "Dashboard",
           tabBarIcon: ({ focused }) => (
-            <TabGlyph name={focused ? "today" : "today-outline"} label={LABEL.today} focused={focused} />
+            <TabGlyph name={focused ? "grid" : "grid-outline"} label={LABEL.grid} focused={focused} />
           ),
         }}
       />
@@ -200,15 +219,9 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          tabBarIcon: ({ focused }) => (
-            <TabGlyph name={focused ? "settings" : "settings-outline"} label={LABEL.settings} focused={focused} />
-          ),
-        }}
-      />
+      {/* Still a screen, no longer a slot. Reached from the Dashboard header and from the
+          notification map, both of which push this exact route. */}
+      <Tabs.Screen name="settings" options={{ title: "Settings", href: null }} />
     </Tabs>
     <ChatBubble />
     </>
