@@ -888,6 +888,11 @@ export function DispatchBoard({ segmented }: {
      `actions` is truthy and a portal element still is. Inside a shell the card gets nothing
      and the row is portaled into the page band; outside one it is the card's header exactly
      as before. */
+  const searchEl = (
+    <Input value={q} onChange={(e) => setQ(e.target.value)}
+      placeholder={tl("dispatch", "Search order, customer or tracking…")}
+      className="h-8 w-56 lg:w-72" />
+  )
   const headActions = view === "history" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
             {/* PRINT / documents — grouped: manifest, labels, and (when scanning out) the
@@ -1001,7 +1006,13 @@ export function DispatchBoard({ segmented }: {
 
  return (
     <div className="space-y-4">
-      {inShell && headActions && <ActionsPortal>{headActions}</ActionsPortal>}
+      {inShell && (
+        <ActionsPortal>
+          {/* Search first, then the actions — the reading order of /orders' header line. */}
+          {view === "queue" && searchEl}
+          {headActions}
+        </ActionsPortal>
+      )}
       <StatGrid>
         <StatCard label={tl("dispatch", "To scan")} value={String(queue.length)} sub={tl("dispatch", "labelled, not scanned yet")} tone="pos" />
         <StatCard label={tl("dispatch", "With byeastside")} value={String(withPartner.length)} sub={tl("dispatch", "in their queue, not picked yet")} tone={withPartner.length ? "neg" : "mut"} />
@@ -1087,19 +1098,22 @@ export function DispatchBoard({ segmented }: {
             value={view}
             onChange={setView}
           />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={segmented
-              /* The row is full — tabs, search, five counted filters and Select-all. Taking
-                 width for the long placeholder pushes a filter out; keeping it clipped it to
-                 "…customer or trac". The label is what gives way, because it is the only
-                 thing here that is a hint rather than a control. */
-              ? tl("dispatch", "Search orders…")
-              : tl("dispatch", "Search order, customer or tracking…")} className={(segmented ? "h-8 min-w-[180px] flex-1 max-w-sm order-4" : "h-9 max-w-xs")} />
+          {/* SEARCH SITS WITH THE ACTIONS, NOT UNDER THE FILTERS.
+              Splitting the strip in two put the filters on row one and pushed search onto row
+              two, so the thing you reach for most moved DOWN every time a filter row grew.
+              /orders does not do that: its search is in the header line beside Import and New
+              order, and only the filters take a row of their own. Inside a shell this goes to
+              the page's action band; outside one it stays exactly where it was. */}
+          {!inShell && (
+            <Input value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder={tl("dispatch", "Search order, customer or tracking…")}
+              className="h-9 max-w-xs" />
+          )}
           {/* TWO ROWS, THE WAY /orders DOES IT — filters on their own line, then search and
               the selection utilities. One line held the view tabs, the search, five counted
               filters and Select-all: thirteen controls in ~150px, which is the "messy" of it.
               Done with flex `order` and a full-basis break rather than by restructuring the
               JSX, so nothing here changes owner and every control keeps its handler. */}
-          {inShell && <div className="order-3 basis-full" aria-hidden="true" />}
           {view === "history" && (
             <div className={"flex flex-wrap items-center gap-1 " + (inShell ? "order-2" : "")}>
               {HIST_FILTERS.map((f) => (

@@ -120,7 +120,7 @@ export function ConsoleShell({
               /* The left rule and its padding exist to separate the rail from the MOBILE
                  title beside it. On desktop there is no title here, so the rail starts at
                  the page's own left edge like everything else on the page. */
-              className="-mx-1 flex min-w-0 flex-1 items-end gap-6 overflow-x-auto px-1 pb-0.5 empty:hidden sm:gap-9 max-md:[&:not(:empty)]:border-l max-md:[&:not(:empty)]:border-border/70 max-md:[&:not(:empty)]:pl-6"
+              className="-mx-1 flex shrink-0 items-end gap-6 overflow-x-auto px-1 pb-0.5 empty:hidden sm:gap-9 max-md:[&:not(:empty)]:border-l max-md:[&:not(:empty)]:border-border/70 max-md:[&:not(:empty)]:pl-6"
             />
 
             {/* One row, whatever fills it: `actions` passed by the page, plus anything a
