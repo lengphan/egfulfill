@@ -419,10 +419,24 @@
    * worst pair available here. The order is identical in dark mode, because colour has to
    * follow the SERIES, not its rank — a filter that drops one series must never repaint
    * the survivors. */
-    --chart-1: oklch(0.30 0 0); /* cobalt — series 1 IS the signal colour */
-    --chart-2: oklch(0.6498 0.1306 73.7); /* amber   #BE811A */
-    --chart-3: oklch(0.6449 0.1198 224.9); /* teal    #0E9CC4 */
-    --chart-4: oklch(0.5839 0.1981 358.4); /* magenta #D0357A */
+  /* ONE FAMILY, SLATE TO PERIWINKLE (2026-08-28), replacing cobalt/amber/teal/magenta.
+   *
+   * Four categorical hues were four hues this app does not own, and two of them landed on
+   * top of the reserved status set: the amber sat beside `hold` and the magenta beside
+   * `alert`. The stage bracket put a channel mix bar directly under a Hold block, and the
+   * mix read as a status — a channel is not a state, and the floor's vocabulary must not be
+   * borrowed to say so.
+   *
+   * So series colour is now a RAMP of the house pair, darkest first. Series 1 stays the
+   * signal (revenue-chart draws "this period" with it and "previous" with series 2), the
+   * steps stay in the same order in dark mode so a filter that drops one never repaints the
+   * survivors, and where the ramp encodes something unordered — channels — the component
+   * carries a letter mark beside it, because a ramp alone implies a rank that channels do
+   * not have. */
+    --chart-1: oklch(0.3954 0.0157 255.6); /* slate      #41474F — series 1 IS the signal */
+    --chart-2: oklch(0.5832 0.1041 278.8); /* deep peri  #6E74B8 */
+    --chart-3: oklch(0.7434 0.1049 276.3); /* mid peri   #9AA6EE */
+    --chart-4: oklch(0.8376 0.0825 281.4); /* periwinkle #C0C4FF */
     --chart-5: oklch(0.4707 0.1254 139.7); /* green   #2F6B1F */
   /* ── ONE RADIUS (Workshop, 2026-08-26) ──────────────────────────────────────
    * 26px on everything bounded — cards, buttons, inputs, image frames, dialogs. It was
@@ -565,10 +579,12 @@
     --selected-foreground: oklch(0.955 0 0);
   /* Dark mode is SELECTED, not flipped: its own steps measured against the dark surface,
    * in the SAME hue order as light so series 3 is teal on both. */
-    --chart-1: oklch(0.86 0 0); /* cobalt, lifted for the dark ground */
-    --chart-2: oklch(0.6584 0.1243 74.5); /* amber   #BE8529 */
-    --chart-3: oklch(0.6476 0.1074 220.6); /* teal    #2A9DBC */
-    --chart-4: oklch(0.6439 0.1904 357.4); /* magenta #E24F8E */
+  /* The same ramp, lifted: on a near-black ground the slate end disappears, so the order is
+   * reversed in LIGHTNESS while series 1 stays the signal. */
+    --chart-1: oklch(0.8376 0.0825 281.4); /* periwinkle #C0C4FF — the signal, lifted */
+    --chart-2: oklch(0.7434 0.1049 276.3); /* mid peri   #9AA6EE */
+    --chart-3: oklch(0.6200 0.0900 279.0); /* deep peri, lifted off the ground */
+    --chart-4: oklch(0.5200 0.0450 265.0); /* slate-blue, the darkest step still legible */
     --chart-5: oklch(0.6249 0.1652 139.0); /* green   #4C9E31 */
   /* Same rule inverted: the panel IS the page, and the selected item is the acid block with
    * ink on it. On a near-black page the loud colour has to be the fill rather than the label

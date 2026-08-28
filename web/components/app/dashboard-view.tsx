@@ -7,6 +7,7 @@ import { GetStarted } from "@/components/app/get-started"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { GmvPanel } from "@/components/app/gmv-panel"
+import { StageBracket } from "@/components/app/stage-bracket"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,11 +20,12 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
-import { numOf } from "@/lib/order-format"
+import { numOf, platformOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
+import { resolvedOrderStage } from "@/lib/factory-status"
 import { dailyRevenue, barsOf, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
@@ -127,6 +129,25 @@ export function DashboardView() {
   /* A chart of zeros is a claim about revenue, so when the read failed there is nothing to
    * scale and `barsOf` returns an empty array — the panel then draws no chart at all rather
    * than a flat row at the axis. Same contract the old block had, one level down. */
+ /* WHERE the open work is, not just how much of it there is.
+  *
+  * `resolvedOrderStage` is the one answer to "what stage is this order at" — an order-level
+  * exception wins, everything else comes from the least-advanced line. Reading `status` here
+  * instead would disagree with the queue on exactly the orders that matter: a cancelled one,
+  * or one whose lines moved on the board. */
+ const ladder = useMemo(() => {
+   const counts: Record<string, number> = {}
+   const mix: Record<string, Record<string, number>> = {}
+   for (const o of orders ?? []) {
+     const st = resolvedOrderStage(o)
+     counts[st] = (counts[st] ?? 0) + 1
+     const ch = platformOf(o)
+     mix[st] = mix[st] ?? {}
+     mix[st][ch] = (mix[st][ch] ?? 0) + 1
+   }
+   return { counts, mix }
+ }, [orders])
+
  // The range control changes the WINDOW, not the bar count: four weekly buckets render as
  // slabs rather than as the shape of a run. 7d/4w/3m are 7/28/90 daily bars.
  const points = useMemo(
@@ -191,6 +212,20 @@ export function DashboardView() {
           </div>
         }
       />
+
+      {/* One number called "Open orders" was four different situations. The panel still
+          carries the total; this says which of them it is. */}
+      {orders !== null && orders.length > 0 && (
+        <div>
+          <p className="eg-label mb-2 text-muted-foreground">{cl("kpi", "Where the work is")}</p>
+          <StageBracket
+            role="seller"
+            counts={ladder.counts}
+            mix={ladder.mix}
+            onPick={(stage) => router.push(`/orders?stage=${encodeURIComponent(stage)}`)}
+          />
+        </div>
+      )}
 
       {isDemo && (
         <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
