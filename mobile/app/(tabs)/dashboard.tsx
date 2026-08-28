@@ -95,22 +95,17 @@ function Counter({ value, reduced, style }: { value: number; reduced: boolean; s
  *      you have to compare in your head.
  *   3. Seven days of intake, so the screen can say how it is going and not only how bad it is.
  *
- * COLOUR. The status palette means an order state and nothing else, so none of it is spent
- * on quantity: the funnel is one neutral ramp light→dark, the intake columns are one value
- * with today picked out in ink, and the hero block's bar is two greys. The only coloured
- * things on the screen are the four job rows, where the colour IS the state.
+ * THREE BLOCKS, NOT FIVE. It was read back as dense, and the diagnosis was repetition rather
+ * than volume: overdue and rush appeared three times (the figure, the strip, and two rows in
+ * "What needs doing") and Working appeared twice (a funnel segment and "In production"). The
+ * strip and the week's trend now live INSIDE the hero — they are readings of the same object
+ * — the jobs card is gone, and the one row on it that said something new, Awaiting scan,
+ * moved under the funnel. Two of the three section headings went with it.
+ *
+ * COLOUR. The status palette means an order state and nothing else, so none of it is spent on
+ * quantity: the funnel is one neutral ramp light→dark, the columns are one value with today
+ * picked out, and the block's bar is two greys off the block itself.
  */
-type Job = {
-  key: string; label: string; count: number; tone: keyof typeof TONE; urgent?: boolean
-  /** WHERE THE TILE GOES. Every one of these names a slice the Orders queue can already
-   *  show, so a tile is a question asked of that screen rather than a screen of its own —
-   *  which is also why they were pressable with no handler for so long: the destination
-   *  did not exist until the queue grew a stage filter. */
-  to: { lens?: string; stage?: string }
-}
-
-const TONE = { alert: C.alert, warn: C.warn, work: C.primary, quiet: C.muted } as const
-
 /**
  * THE OPEN LADDER, IN ORDER, ON AN ORDINAL RAMP.
  *
@@ -197,11 +192,13 @@ function FilterRow({ value, options, onPick }: {
  * already has a way to be loud: the bar. A calm morning is a short bar, which is exactly
  * how a zero morning should look.
  */
-function HeroFigure({ needsYou, openTotal, loading, reduced }: {
+function HeroFigure({ needsYou, openTotal, loading, reduced, urgent, days }: {
   needsYou: number
   openTotal: number
   loading: boolean
   reduced: boolean
+  urgent: Order[]
+  days: { key: string; letter: string; n: number }[]
 }) {
   const share = openTotal > 0 ? Math.min(1, needsYou / openTotal) : 0
   const grown = useGrow(loading ? 0 : share, reduced)
@@ -249,6 +246,16 @@ function HeroFigure({ needsYou, openTotal, loading, reduced }: {
       <Text style={{ color: C.onInk, opacity: 0.7, fontSize: 13, fontFamily: F.body, marginTop: S.sm }}>
         {loading ? "Loading…" : needsYou === 0 ? "Nothing overdue or rushed" : "overdue and rush"}
       </Text>
+
+      {/* THE STRIP IS PART OF THE FIGURE, not a second thing under it. These ARE the orders
+          the number counts, so they belong on the same object — as two blocks they said the
+          same fact twice and cost a whole band of the screen to do it. */}
+      <NeedsYouStrip orders={urgent} reduced={reduced} />
+
+      {/* AND THE WEEK, as a line rather than a card. It answers "how is it going" under the
+          bar that answers "how bad is it" — one object, two readings, no second legend and
+          no third section heading. */}
+      <Trend days={days} loading={loading} reduced={reduced} />
     </View>
   )
 }
@@ -277,8 +284,8 @@ function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: S.xl, gap: S.sm }}
-        style={{ marginTop: S.sm, flexGrow: 0 }}
+        contentContainerStyle={{ gap: S.sm }}
+        style={{ marginTop: S.lg, flexGrow: 0 }}
       >
         {orders.map((o) => {
           const src = assetUrl(lineListing(o.items?.[0] ?? {}))
@@ -290,16 +297,15 @@ function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean 
             >
               <View style={{
                 width: 68, height: 68, borderRadius: R.badge, overflow: "hidden",
-                backgroundColor: C.accent, alignItems: "center", justifyContent: "center",
-                borderWidth: 1, borderColor: C.border,
+                backgroundColor: C.inkAccent, alignItems: "center", justifyContent: "center",
               }}>
                 {src ? (
                   <Image source={{ uri: src }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                 ) : (
-                  <Ionicons name="shirt-outline" size={22} color={C.muted} />
+                  <Ionicons name="shirt-outline" size={22} color={C.onInk} />
                 )}
               </View>
-              <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: F.medium, color: C.muted }}>
+              <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: F.medium, color: C.onInk, opacity: 0.7 }}>
                 {numOf(o)}
               </Text>
             </Pressable>
@@ -321,7 +327,9 @@ function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean 
  * A stage with anything in it keeps a visible sliver (minWidth), because "a few" and "none"
  * are different answers and a 0.4% segment would round to neither.
  */
-function Funnel({ counts, loading }: { counts: Record<string, number>; loading: boolean }) {
+function Funnel({ counts, loading, awaitingScan }: {
+  counts: Record<string, number>; loading: boolean; awaitingScan: number
+}) {
   const total = LADDER.reduce((n, s) => n + (counts[s.stage] ?? 0), 0)
   return (
     <View style={{ ...CARD, marginHorizontal: S.xl, padding: S.lg }}>
@@ -368,6 +376,31 @@ function Funnel({ counts, loading }: { counts: Record<string, number>; loading: 
             </Text>
           </Pressable>
         ))}
+
+        {/* AWAITING SCAN IS NOT A STAGE, and it is the one row that survived "What needs
+            doing" — everything else on that card said something the figure or this funnel
+            already said. It is a label printed and not yet scanned out, so it sits under
+            the ladder behind a heavier rule, with no ramp swatch: the swatch means "a
+            position in the pipeline" and this is not one. */}
+        <Pressable
+          onPress={() => router.push({ pathname: "/(tabs)/orders", params: { lens: "Open" } })}
+          disabled={awaitingScan === 0}
+          style={({ pressed }) => ({
+            flexDirection: "row", alignItems: "center", gap: S.md,
+            paddingVertical: 9, marginTop: 2,
+            borderTopWidth: 1, borderTopColor: C.edge,
+            backgroundColor: pressed ? C.accent : "transparent",
+          })}
+        >
+          <Ionicons name="scan-outline" size={14} color={C.muted} style={{ width: 10 }} />
+          <Text style={{ flex: 1, fontSize: 14.5, fontFamily: F.medium, color: C.fg }}>Awaiting scan</Text>
+          <Text style={{
+            fontSize: 15, fontFamily: F.semi, fontVariant: ["tabular-nums"],
+            color: awaitingScan === 0 ? C.muted : C.fg,
+          }}>
+            {loading ? "—" : awaitingScan}
+          </Text>
+        </Pressable>
       </View>
     </View>
   )
@@ -384,8 +417,9 @@ function Funnel({ counts, loading }: { counts: Record<string, number>; loading: 
  * `label_scanned_at` is a pre-scan mark and not a dispatch — and a throughput chart built on
  * the nearest-looking column would be a confident wrong answer rather than a missing one.
  */
-function Column({ height, today, letter, loading, reduced, delay }: {
+function Column({ height, today, letter, loading, reduced, delay, dark }: {
   height: number; today: boolean; letter: string; loading: boolean; reduced: boolean; delay: number
+  dark?: boolean
 }) {
   /* The columns RISE, oldest first. Left-to-right is the direction the axis is read in, so
      the stagger is the reading order rather than a flourish — and at 30ms apart the whole
@@ -395,12 +429,14 @@ function Column({ height, today, letter, loading, reduced, delay }: {
     <View style={{ flex: 1, alignItems: "center", gap: 6 }}>
       <Animated.View style={{
         width: "100%", height: h, borderRadius: R.badge,
-        backgroundColor: loading ? C.accent : today ? C.fg : C.edge,
+        backgroundColor: dark
+          ? (loading ? C.inkAccent : today ? C.onInk : "rgba(221,224,227,0.42)")
+          : (loading ? C.accent : today ? C.fg : C.edge),
       }} />
       <Text style={{
-        fontSize: 10.5,
+        fontSize: 10,
         fontFamily: today ? F.semi : F.body,
-        color: today ? C.fg : C.muted,
+        color: dark ? (today ? C.onInk : "rgba(221,224,227,0.6)") : (today ? C.fg : C.muted),
       }}>
         {letter}
       </Text>
@@ -408,20 +444,21 @@ function Column({ height, today, letter, loading, reduced, delay }: {
   )
 }
 
-function Intake({ days, loading, reduced }: {
+function Trend({ days, loading, reduced }: {
   days: { key: string; letter: string; n: number }[]; loading: boolean; reduced: boolean
 }) {
   const peak = Math.max(1, ...days.map((d) => d.n))
   const total = days.reduce((n, d) => n + d.n, 0)
   return (
-    <View style={{ ...CARD, marginHorizontal: S.xl, padding: S.lg }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: S.sm, height: 72 }}>
+    <View style={{ marginTop: S.lg }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6, height: 36 }}>
         {days.map((d, i) => (
           <Column
             key={d.key}
-            /* A day with nothing gets a 3pt baseline rather than no bar: an absent column
+            dark
+            /* A day with nothing gets a 2pt baseline rather than no bar: an absent column
                and a zero column must not look like the same day. */
-            height={loading ? 3 : Math.max(3, Math.round((d.n / peak) * 52))}
+            height={loading ? 2 : Math.max(2, Math.round((d.n / peak) * 26))}
             today={i === days.length - 1}
             letter={d.letter}
             loading={loading}
@@ -430,7 +467,7 @@ function Intake({ days, loading, reduced }: {
           />
         ))}
       </View>
-      <Text style={{ marginTop: S.md, fontSize: 13, fontFamily: F.body, color: C.muted }}>
+      <Text style={{ marginTop: S.sm, fontSize: 12.5, fontFamily: F.body, color: C.onInk, opacity: 0.7 }}>
         {loading ? "Loading…" : `${total} in seven days`}
       </Text>
     </View>
@@ -522,21 +559,19 @@ export default function Dashboard() {
     return out
   }, [rows])
 
-  const jobs: Job[] = [
-    { key: "overdue", label: "Overdue", tone: "alert", urgent: true,
-      count: open.filter(isOverdue).length, to: { lens: "Late" } },
-    /* Rush has no filter of its own on the queue yet, so this opens the open orders and is
-       honest about being one step short rather than pretending to a slice that isn't there. */
-    { key: "rush", label: "Rush", tone: "warn", urgent: true,
-      count: open.filter((o) => o.rush).length, to: { lens: "Open" } },
-    { key: "working", label: "In production", tone: "work",
-      count: open.filter((o) => normalizeStage(o.factory_status) === "working").length,
-      to: { lens: "Open", stage: "working" } },
-    { key: "scan", label: "Awaiting scan", tone: "quiet",
-      count: open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length,
-      to: { lens: "Open" } },
-  ]
-  const needsYou = jobs.filter((j) => j.urgent).reduce((n, j) => n + j.count, 0)
+  /**
+   * WHAT THE SCREEN COUNTS, after the cleanup.
+   *
+   * There were four rows here — Overdue, Rush, In production, Awaiting scan — and three of
+   * them were already on the screen somewhere else: overdue and rush ARE the figure and the
+   * strip, and "in production" is the funnel's Working segment with its own count beside it.
+   * Saying a thing twice does not make it twice as visible; it makes the screen feel full.
+   *
+   * So two numbers survive: the figure's (overdue + rush, which is what "needs you" means)
+   * and awaiting scan, which appears nowhere else on the page.
+   */
+  const needsYou = open.filter((o) => isOverdue(o) || o.rush).length
+  const awaitingScan = open.filter((o) => !!o.label_printed_at && !o.label_scanned_at).length
 
   /* The strip's subjects: overdue first, then rush, deduped, capped at twelve — past that it
      is a queue and the queue is one tab away. */
@@ -607,50 +642,17 @@ export default function Dashboard() {
         <FilterRow value={channel} options={channels} onPick={setChannel} />
       ) : null}
 
-      <HeroFigure needsYou={needsYou} openTotal={open.length} loading={loading} reduced={reduced} />
-
-      <NeedsYouStrip orders={urgent} reduced={reduced} />
+      <HeroFigure
+        needsYou={needsYou}
+        openTotal={open.length}
+        loading={loading}
+        reduced={reduced}
+        urgent={urgent}
+        days={days}
+      />
 
       <Text style={SECTION_LABEL}>WHERE THE WORK IS</Text>
-      <Funnel counts={stageCounts} loading={loading} />
-
-      <Text style={SECTION_LABEL}>ORDERS IN</Text>
-      <Intake days={days} loading={loading} reduced={reduced} />
-
-      <Text style={SECTION_LABEL}>WHAT NEEDS DOING</Text>
-      {/* A GROUP IS A CARD. These rows sat straight on the page under a hairline, which was
-          right when the page was white and nothing could be a surface. On the tinted page a
-          white card is what says "these four belong together", and it costs no shadow to do
-          it. The last row loses its rule so the card's own edge finishes the stack. */}
-      <View style={{ ...CARD, marginHorizontal: S.xl, overflow: "hidden" }}>
-        {jobs.map((j, i) => (
-          <Pressable
-            key={j.key}
-            onPress={() => router.push({ pathname: "/(tabs)/orders", params: j.to })}
-            /* Nothing to press when the count is zero — a tile that opens an empty list is
-               a worse answer than the zero already on it. */
-            disabled={j.count === 0}
-            /* Press feedback on touch-DOWN, which is the tell people read as "native". */
-            style={({ pressed }) => ({
-              flexDirection: "row", alignItems: "center", gap: S.md,
-              paddingVertical: 15, paddingHorizontal: S.lg,
-              borderBottomWidth: i === jobs.length - 1 ? 0 : 1, borderBottomColor: C.border,
-              backgroundColor: pressed ? C.accent : "transparent",
-            })}
-          >
-            <View style={{ width: 6, height: 6, borderRadius: R.pill, backgroundColor: TONE[j.tone] }} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>{j.label}</Text>
-            </View>
-            <Text style={{
-              fontSize: 17, fontFamily: F.semi, fontVariant: ["tabular-nums"],
-              color: j.count === 0 ? C.muted : TONE[j.tone],
-            }}>
-              {loading ? "—" : j.count}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Funnel counts={stageCounts} loading={loading} awaitingScan={awaitingScan} />
 
       {/* Say WHICH state this is: a failed fetch and an empty queue must never look alike. */}
       {err ? (
