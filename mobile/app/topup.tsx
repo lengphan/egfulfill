@@ -257,11 +257,11 @@ export default function TopUp() {
               onPress={() => router.back()}
               style={({ pressed }) => ({
                 marginTop: 28, height: 52, borderRadius: R.control, paddingHorizontal: 32,
-                alignItems: "center", justifyContent: "center", backgroundColor: C.brand,
+                alignItems: "center", justifyContent: "center", backgroundColor: C.ink,
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
+              <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
             </Pressable>
           </View>
         ) : phase === "qr" && payment ? (
@@ -364,13 +364,13 @@ export default function TopUp() {
                     onPress={() => { setAmount(String(p)); setErr(null) }}
                     style={({ pressed }) => ({
                       paddingHorizontal: 16, height: 40, borderRadius: R.control, justifyContent: "center",
-                      backgroundColor: String(p) === amount ? C.brand : C.accent,
+                      backgroundColor: String(p) === amount ? C.ink : C.accent,
                       opacity: pressed ? 0.7 : 1,
                     })}
                   >
                     <Text style={{
                       fontSize: 15, fontFamily: F.semi,
-                      color: String(p) === amount ? C.onBrand : C.fg,
+                      color: String(p) === amount ? C.onInk : C.fg,
                     }}>{usd0(p)}</Text>
                   </Pressable>
                 ))}
@@ -394,12 +394,12 @@ export default function TopUp() {
               disabled={busy || !cfg}
               style={({ pressed }) => ({
                 marginTop: 28, height: 54, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-                backgroundColor: C.brand, opacity: pressed || busy || !cfg ? 0.7 : 1,
+                backgroundColor: C.ink, opacity: pressed || busy || !cfg ? 0.7 : 1,
               })}
             >
               {busy
-                ? <ActivityIndicator color={C.onBrand} />
-                : <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
+                ? <ActivityIndicator color={C.onInk} />
+                : <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
             </Pressable>
 
             {!cfg && !err && (

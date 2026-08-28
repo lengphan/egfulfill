@@ -131,12 +131,12 @@ export default function Wallet() {
           onPress={() => router.push("/topup")}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 12, height: 52, borderRadius: R.control, backgroundColor: C.brand,
+            marginTop: 12, height: 52, borderRadius: R.control, backgroundColor: C.ink,
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Ionicons name="add-circle" size={20} color={C.onBrand} />
-          <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
+          <Ionicons name="add-circle" size={20} color={C.onInk} />
+          <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
         </Pressable>
         )}
 

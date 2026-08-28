@@ -167,10 +167,10 @@ export default function Scan() {
           onPress={requestPerm}
           style={({ pressed }) => ({
             marginTop: 24, height: 54, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-            backgroundColor: C.brand, opacity: pressed ? 0.85 : 1,
+            backgroundColor: C.ink, opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
+          <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
         </Pressable>
         {/* The camera is not the only way in, and a refused permission is exactly when that
             matters. */}

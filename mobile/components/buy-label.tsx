@@ -207,12 +207,12 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
           disabled={busy === "rates"}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            height: 52, borderRadius: R.control, backgroundColor: C.brand,
+            height: 52, borderRadius: R.control, backgroundColor: C.ink,
             opacity: pressed || busy === "rates" ? 0.8 : 1,
           })}
         >
-          {busy === "rates" && <ActivityIndicator color={C.onBrand} />}
-          <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onBrand }}>
+          {busy === "rates" && <ActivityIndicator color={C.onInk} />}
+          <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onInk }}>
             {busy === "rates" ? "Getting rates…" : "Buy shipping label"}
           </Text>
         </Pressable>

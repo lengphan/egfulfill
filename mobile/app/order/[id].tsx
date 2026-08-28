@@ -313,7 +313,7 @@ export default function OrderDetail() {
                 disabled={moving}
                 style={({ pressed }) => ({
                   ...HERO_BUTTON,
-                  marginTop: 12, backgroundColor: C.brand,
+                  marginTop: 12, backgroundColor: C.ink,
                   opacity: pressed || moving ? 0.8 : 1,
                 })}
               >
@@ -321,11 +321,11 @@ export default function OrderDetail() {
                     picture of the word next to it — starting has a universal mark and
                     "Approve" does not, which is why the arrow came off that one. */}
                 {moving
-                  ? <ActivityIndicator color={C.onBrand} />
+                  ? <ActivityIndicator color={C.onInk} />
                   : to === "working"
-                    ? <Ionicons name="play" size={HERO_GLYPH} color={C.onBrand} />
+                    ? <Ionicons name="play" size={HERO_GLYPH} color={C.onInk} />
                     : null}
-                <Text style={{ ...HERO_LABEL, color: C.onBrand }}>
+                <Text style={{ ...HERO_LABEL, color: C.onInk }}>
                   {stageAction(to)}
                 </Text>
               </Pressable>
@@ -409,10 +409,10 @@ export default function OrderDetail() {
                       style={({ pressed }) => ({
                         flex: 1, height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
                         alignItems: "center", justifyContent: "center",
-                        backgroundColor: C.brand, opacity: pressed ? 0.85 : 1,
+                        backgroundColor: C.ink, opacity: pressed ? 0.85 : 1,
                       })}
                     >
-                      <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 15 }}>Track</Text>
+                      <Text style={{ color: C.onInk, fontFamily: F.bold, fontSize: 15 }}>Track</Text>
                     </Pressable>
                   )}
                   {/* Staff only, and only when there is a PDF: the server nulls the label

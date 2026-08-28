@@ -154,12 +154,12 @@ export default function Login() {
                 disabled={busy || !ready}
                 style={({ pressed }) => ({
                   height: 52, borderRadius: R.control, alignItems: "center", justifyContent: "center",
-                  backgroundColor: C.brand,
+                  backgroundColor: C.ink,
                   opacity: busy || !ready ? 0.4 : pressed ? 0.85 : 1,
                 })}
               >
-                {busy ? <ActivityIndicator color={C.onBrand} />
-                      : <Text style={{ color: C.onBrand, fontSize: 16, fontFamily: F.semi }}>Sign in</Text>}
+                {busy ? <ActivityIndicator color={C.onInk} />
+                      : <Text style={{ color: C.onInk, fontSize: 16, fontFamily: F.semi }}>Sign in</Text>}
               </Pressable>
             </View>
           </View>
