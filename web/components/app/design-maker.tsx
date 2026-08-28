@@ -17,6 +17,7 @@ import { canvasReadableSrc } from "@/lib/thread-match"
 // code that happened to live in this one screen's file.
 import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { FaceTile } from "@/components/app/face-tile"
+import { RegionMark } from "@/components/app/region"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
@@ -186,6 +187,22 @@ export function DesignMaker() {
   // The full catalog, so a product picked from the dialog (which hands back a flattened
   // shape) can be resolved to its catalog row for the print zone.
  const catalogRef = useRef<CatalogProduct[]>([])
+  /** The same rows in state. The ref exists so a picked product can be resolved to its
+   *  catalogue row without re-rendering; the first-run screen has to DRAW them, and a ref
+   *  cannot cause that. Both are written from one fetch so they cannot disagree. */
+ const [catalogRows, setCatalogRows] = useState<CatalogProduct[]>([])
+  /**
+   * THE FOUR OFFERED WITHOUT ASKING.
+   *
+   * Not "the four newest" and not a hand-typed list: the first four PUBLISHED blanks that
+   * actually have a picture, because a starter tile with no mockup is a grey square that
+   * teaches nothing. Everything else is one press behind Browse — the panel is a shortcut to
+   * the common case, not a catalogue.
+   */
+ const starters = useMemo(
+    () => catalogRows.filter((p) => !!mockupOf(p)).slice(0, 4),
+    [catalogRows],
+  )
   // Minted on FIRST save, not during render (an impure call there is unstable across
   // re-renders). Held so re-saving UPDATES the same template rather than piling up
   // duplicates, and set to the source id when a template is reopened.
@@ -421,6 +438,7 @@ export function DesignMaker() {
  getCatalogProducts()
         .then((rows) => {
  catalogRef.current = rows ?? []
+ setCatalogRows(rows ?? [])
  if (!productParam) return
  const p = catalogRef.current.find((x) => String(x.id) === productParam || String(x.sku) === productParam)
  if (p) { setMockup(mockupOf(p)); setProduct(p); setSide("front") }
@@ -755,6 +773,59 @@ export function DesignMaker() {
         </div>
       </header>
 
+      {/**
+        * NOTHING IS DRAWN UNTIL THERE IS SOMETHING TO DRAW IT FOR.
+        *
+        * Four columns opened before a blank existed, and three of them could not act: Artwork
+        * and Text have nowhere to go, and Print area showed "12 x 16, standard size" for a
+        * garment nobody had chosen — the screen inventing a fact it had no source for.
+        *
+        * Checked against Printful, Printify, Fourthwall and Gelato: NONE of them has an empty
+        * editor. The blank is chosen upstream and the editor opens around it, because the
+        * print areas, the faces and the price are all properties of the PRODUCT. This is that
+        * rule enforced inside our route rather than moved onto four other screens.
+        *
+        * ONE DECISION, NOT STEP ONE OF THREE. No numbering, no progress bar: picking a blank
+        * is what has to be true before anything else means anything, and the dashboard's
+        * numbered stepper came out this week for asserting a sequence that was not real.
+        */}
+      {!product ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+          <div className="w-full max-w-2xl text-center">
+            <div className="flex justify-center"><RegionMark icon={TShirt} /></div>
+            <h1 className="mt-4 text-xl font-semibold tracking-tight">{tl("designMaker", "What are you making?")}</h1>
+            {/* An empty region may carry ONE sentence, because there is nothing else to read. */}
+            <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+              {tl("designMaker", "Pick a blank to start. The editor opens around it.")}
+            </p>
+            {starters.length > 0 && (
+              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {starters.map((p) => (
+                  <button
+                    key={String(p.id)}
+                    type="button"
+                    onClick={() => { setProduct(p); setMockup(mockupOf(p)); setSide("front") }}
+                    className="group rounded-xl border border-border bg-card p-2 text-left transition-colors hover:border-primary/50"
+                  >
+                    <span className="block aspect-square overflow-hidden rounded-lg bg-muted/40">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={mockupOf(p)} alt="" className="size-full object-contain p-[6%]" />
+                    </span>
+                    <span className="mt-1.5 block truncate text-xs font-medium">{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="mt-6 flex flex-col items-center gap-2">
+              {/* Browse opens the SAME picker the Blank tool does — one route to the full
+                  catalogue rather than two that drift apart. */}
+              <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+                {starters.length > 0 ? tl("designMaker", "Browse all blanks") : tl("designMaker", "Pick a blank")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="flex min-h-0 flex-1 gap-3">
         {/* Left: the rail, then the panel for whatever it has selected. */}
         <nav aria-label={tl("designMaker", "Tools")} className="hidden w-16 shrink-0 flex-col gap-1 rounded-xl border border-border bg-card p-1.5 lg:flex">
@@ -1106,6 +1177,7 @@ export function DesignMaker() {
           )}
         </aside>
       </div>
+      )}
 
       <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => {
           // Resolve through mockupOf, not p.img — the picker's img is empty for a product
