@@ -32,10 +32,24 @@ function maskKey(k: string): string {
  return prefix + body.slice(0, 4) + "••••••••" + body.slice(-4)
 }
 
+/**
+ * THE VERB, AND IT HAS TO READ AS ONE.
+ *
+ * These were `shipped/12` and `packed/12` — emerald and sky, two RESERVED floor statuses,
+ * spent on a developer page. Worse, at a 12% tint they are the same pale mint: the pill
+ * exists to say which verb this is and it said the same thing either way, which is the one
+ * thing a pill must not do.
+ *
+ * Read is quiet, write is loud. GET is the safe, common one and takes the neutral; POST is
+ * the one that CHANGES something and takes the brand fill — `bg-brand`, never `text-brand`,
+ * because that token is a ground we control the foreground of and is not legible as ink.
+ */
 const methodTone: Record<string, string> = {
-  GET: "bg-shipped/12 text-shipped",
-  POST: "bg-packed/12 text-packed",
+  GET: "bg-muted text-muted-foreground",
+  POST: "bg-brand text-brand-foreground",
 }
+/** Anything the catalogue grows later still gets a pill rather than a bare word. */
+const toneFor = (m: string) => methodTone[m] ?? "bg-muted text-muted-foreground"
 
 type DevTab = "api" | "webhooks"
 
@@ -186,12 +200,18 @@ export function ApiPlayground() {
       {/* Key bar */}
       <SectionCard
  title={<span className="flex items-center gap-2">{tl("apiPlayground", "Your API key")}
-          <span className={"rounded-lg px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-alert/12 text-alert" : "bg-shipped/12 text-shipped")}>{env === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</span>
+          {/* SANDBOX IS NOT A SUCCESS AND LIVE IS NOT AN ERROR.
+              These were `shipped` and `alert` — emerald and red, both reserved floor
+              statuses, on a badge that names an ENVIRONMENT. Sandbox is the safe default and
+              unremarkable, so it takes the neutral; live is a genuine warning — real orders,
+              real charges — and amber is the token that already means exactly that, so this
+              is the warning colour used for a warning rather than borrowed for a mode. */}
+          <span className={"rounded-lg px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-hold/12 text-hold" : "bg-muted text-muted-foreground")}>{env === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</span>
         </span>}
  actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(["test", "live"] as const).map((m) => (
-              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-alert text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</button>
+              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-hold text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</button>
             ))}
           </div>
         }
@@ -262,7 +282,7 @@ export function ApiPlayground() {
                 (selected.id === e.id ? "bg-primary/10 text-primary" : "hover:bg-accent")
               }
             >
-              <span className={"rounded px-1.5 py-0.5 font-mono text-2xs font-bold " + methodTone[e.method]}>{e.method}</span>
+              <span className={"rounded px-1.5 py-0.5 font-mono text-2xs font-bold " + toneFor(e.method)}>{e.method}</span>
               <span className="truncate font-medium">{e.title}</span>
             </button>
           ))}
@@ -273,7 +293,7 @@ export function ApiPlayground() {
           <SectionCard title={selected.title}>
             <div className="space-y-4 p-5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={"rounded px-2 py-1 font-mono text-xs font-bold " + methodTone[selected.method]}>{selected.method}</span>
+                <span className={"rounded px-2 py-1 font-mono text-xs font-bold " + toneFor(selected.method)}>{selected.method}</span>
                 <code className="rounded bg-muted px-2 py-1 font-mono text-xs">{resolvedPath}</code>
               </div>
               <p className="text-sm text-muted-foreground">{selected.description}</p>

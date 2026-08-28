@@ -19,13 +19,25 @@ const FALLBACK_METHODS = PRODUCT_METHODS.map((m) => m.label)
 // listing published from our catalog arrives already resolved by SKU, so it shows the
 // blank pre-filled with nothing to do. The chosen Blank drives the Colour/Size/Method
 // options. Persisted per line (postItemSetup); the parent reloads so the quote updates.
+/** The fields this control can write — the body of `postItemSetup` minus the line key. */
+export type ItemSetupPatch = Omit<Parameters<typeof postItemSetup>[1], "line_id" | "sku">
+
 export function VariantPicker({
   orderId, item, catalog, onSaved, dense,
 }: {
   orderId: string
   item: OrderItem
   catalog: CatalogProduct[]
-  onSaved: () => void
+  /**
+   * Told WHAT changed, not just that something did.
+   *
+   * Every caller so far re-fetches the order and re-renders from that, so the argument was
+   * unnecessary. The designer cannot: it is opened with a snapshot of the line (`editing`
+   * in the order list holds the item captured at click time), so a reload behind it leaves
+   * the window showing the garment you just changed away from. It merges the patch locally
+   * instead. Optional, so the three existing callers are untouched.
+   */
+  onSaved: (patch?: ItemSetupPatch) => void
   /**
    * Two per row at EVERY width.
    *
@@ -113,7 +125,7 @@ export function VariantPicker({
 
   const save = async (patch: Parameters<typeof postItemSetup>[1], field: string) => {
     setBusy(field); setErr(null)
-    try { await postItemSetup(orderId, { ...key, ...patch }); onSaved() }
+    try { await postItemSetup(orderId, { ...key, ...patch }); onSaved(patch) }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save") }
     finally { setBusy(null) }
   }

@@ -2161,24 +2161,20 @@ export function DesignCanvasDialog({
  visible below the button — which reads as a bar that has come loose. Nothing is short
  of padding: the bar carries its own. */
           /**
-           * FULL SCREEN, over the app rather than inside it.
+           * A DIALOG, not the window — reverting a fullscreen experiment.
            *
-           * This was a 1040px popup, and it was the wrong container the whole time. The
-           * window does placement, resolution, four printed faces, a thread list, the files
-           * on the line and the seller's whole artwork library — that is an editor, and an
-           * editor is a room, not a card floating in the middle of one. The Design Maker has
-           * been `fixed inset-0` since it was built; the only reason these two differed was
-           * which file each was written in.
+           * The reasoning that took it fullscreen was sound for the MAKER and wrong for here.
+           * The Maker is a room you go to and stay in until you publish. This opens off one
+           * line of one order while you are working a queue, and taking the whole screen for
+           * it makes a small act — check the placement, drop a file, save — feel like leaving
+           * the page you were on. Bounded keeps the order behind it visible, which is the
+           * context you are actually working in.
            *
-           * Still a Dialog, deliberately. Escape, the focus trap, the portal and the aria
-           * wiring are the parts nobody notices until they are gone, and a hand-rolled
-           * `fixed inset-0` div has none of them. What changes is the SHAPE of the popup, so
-           * the nested pickers and confirms still sit above it on z-50 exactly as before.
-           *
-           * The list underneath stays mounted and stays scrolled: this is an overlay, not a
-           * route, so closing it puts you back on the same row of a 700-row queue.
+           * What the fullscreen pass got right is kept: a flex COLUMN with a fixed header and
+           * a fixed footer, so the action bar holds the bottom edge without `sticky` and the
+           * controls column is the only thing that scrolls.
            */
- className="inset-0 top-0 left-0 flex h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"
+ className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg lg:max-w-[min(94vw,1040px)]"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -2434,7 +2430,16 @@ export function DesignCanvasDialog({
               })}
             </div>
           )}
-        <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-15rem))] flex-col gap-2">
+        {/* AND A CEILING IN PIXELS, not just a share of the viewport.
+            Height alone is not a size: on a tall window `100dvh-15rem` drew a 742px square,
+            and because a seller's OWN photo is object-COVER while our flat is
+            object-contain, replacing the mockup filled all 742px edge to edge where the
+            garment had been letterboxing inside it with white to spare. Same box, and the
+            picture appeared to double. 36rem is past the point where more pixels help you
+            judge a placement, and it caps both mockups the same so switching between them
+            no longer resizes the canvas. The height term is the DIALOG's box (92vh) less its
+            own chrome, not the viewport — the two are no longer the same thing. */}
+        <div className="mx-auto flex w-full max-w-[min(100%,calc(92vh-14rem),30rem)] flex-col gap-2">
           {/* rounded-LG. `rounded-xl` and up all resolve to --radius (26px), which on a
               64px-wide box is a capsule — the shape reserved for count badges and avatars. */}
           <div className="flex shrink-0 items-stretch gap-1 self-start rounded-lg border border-border bg-card p-1">

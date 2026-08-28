@@ -257,18 +257,25 @@
    * 5.08:1, the weakest pair in the app, on the most-pressed control. White on cobalt is
    * 6.02:1: more contrast and one less colour. */
     --primary-foreground: oklch(0.9667 0.0017 247.84);
-  /* THE ACTION PAIR — violet fill, lime label. Inverted per mode, like the sidebar.
+  /* THE VIOLET, AND WHY IT WAS INVISIBLE IN THE APP.
    *
-   * A borderless button is only findable if its FILL clears 3:1 against what's behind it,
-   * and lime is 1.19:1 on the white page — it can never be the fill on a light surface. So
-   * on light the violet fills and the lime becomes the label (6.03:1 shape, 5.07:1 text).
+   * This value is the one measured for the shipping skin: white on it 16.3:1, 15.6:1 against
+   * a white card, and 0.086 clear of the nearest reserved status in both themes. It was
+   * declared ONLY inside `[data-skin="workshop"]` — and `data-skin` is written in exactly one
+   * place, app/(marketing)/layout.tsx. The app and the boards never set it, so every
+   * `bg-brand` in the product fell through to this block and painted near-black instead.
    *
-   * Dark INVERTS, because no single violet satisfies both jobs there: by the time it's light
-   * enough to have a shape against the dark card (>=0.59) the lime label has fallen under
-   * 4.5:1. The lime fill has no such problem on a dark ground — 16.56:1 both ways — so dark
-   * runs lime fill + ink label. Same two colours, opposite jobs, exactly the rule the
-   * selected nav item already follows in each mode. */
-    --brand: oklch(0.175 0 0);
+   * Dark mode did not have the bug: its rule is `.dark [data-skin="workshop"], .dark:root`,
+   * and that `:root` is what light was missing. So the accent appeared in one theme and not
+   * the other, and it went unnoticed because there are only six `bg-brand` uses to notice it
+   * in. The value lives here now; the skin block keeps its copy for the marketing subtree.
+   *
+   * Still FILLS only, never text — that rule is unchanged and is the reason --brand and
+   * --primary are two tokens. `node tools/check-skins.mjs` gates this one.
+   *
+   * The lime-and-violet action pair the note here used to describe is a direction that was
+   * dropped; the declaration is the truth and the comment above it was history. */
+    --brand: oklch(0.250 0.070 285);
     --brand-foreground: oklch(1 0 0);
   /* THE NEUTRALS ARE BEIGE, not grey. This is what lets the beige actually spread.
    *

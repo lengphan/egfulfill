@@ -118,25 +118,27 @@ export function GetStarted({ orders, balance, clip }: {
     <section className="overflow-hidden rounded-2xl border border-brand/40 bg-brand/10">
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="text-sm font-semibold">{tl("getStarted", "Get started")}</span>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {steps.map((s, n) => (
+        {/**
+          * WORDS, NOT PILLS — and no numerals.
+          *
+          * These are non-interactive spans wearing a button's chrome: a rounded lozenge, a
+          * border, a filled counter. §4 reserves the pill for things that carry meaning —
+          * an order stage, an HTTP verb, RUSH/LATE — and explicitly not for a role, a count
+          * or a tag, which is all these were.
+          *
+          * The numbers were worse than decoration, they were wrong: 1·2·3 asserts a sequence,
+          * and these three are independent — you can fund the wallet before connecting a
+          * store, and plenty do. What a person needs here is which one is still open, and
+          * that is a weight, not a number in a circle.
+          */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {steps.map((s) => (
             <span
               key={s.id}
-              className={
-                "inline-flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs " +
-                (s === next ? "border border-border bg-card font-semibold text-foreground" : "text-muted-foreground")
-              }
+              className={"inline-flex items-center gap-1.5 " +
+                (s === next ? "font-semibold text-foreground" : "text-muted-foreground")}
             >
-              <span
-                className={
-                  "inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums " +
-                  (s.ok ? "bg-success/15 text-success"
-                    : s === next ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground")
-                }
-              >
-                {s.ok ? <Check size={9} weight="bold" /> : n + 1}
-              </span>
+              {s.ok && <Check size={11} weight="bold" className="shrink-0 opacity-70" />}
               {s.label}
             </span>
           ))}
