@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { TAB_BAR,SECTION,F,C, R } from "@/lib/theme"
+import { TAB_BAR,CARD,F,C, R } from "@/lib/theme"
 import { TopupApprovals } from "@/components/topup-approvals"
 
 /**
@@ -98,8 +98,14 @@ export default function Wallet() {
             this tab is the queue of sellers waiting to be told their money landed, which is
             the one job where standing at a desk is the only thing between a seller and
             being able to trade. Staff see approvals here; sellers see their own wallet. */}
+        {/* THE BALANCE IS A CARD. It was a section under a hairline rule, which was right
+            when the page was white and nothing could be a surface — on the tinted page a
+            bounded white card is what makes the one number on the screen read as an object
+            rather than as a heading with a figure after it.
+            The LEDGER below stays full-bleed rows, deliberately: a card is for a bounded
+            group and a scrolling history is not one. Same split the queue makes. */}
         {noWallet ? null : (
-        <View style={{ ...SECTION }}>
+        <View style={{ ...CARD, marginTop: 20, padding: 18 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>BALANCE</Text>
             {w?.low && (

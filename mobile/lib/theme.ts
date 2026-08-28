@@ -71,12 +71,25 @@ export const C = {
   primary: "#121212",
   onPrimary: "#F3F4F5",
   /**
-   * INK AS A FILL — `--brand`, a near-black that leans violet. The web's `default` button is
-   * `bg-brand`, not `bg-primary`, and the two are different values on purpose: one is read
-   * as letterforms, the other is pressed. White on it is 16.26:1 and its own shape against
-   * the page is 14.77:1.
+   * THE ACTION — `--brand`, the violet. The web's `default` button is `bg-brand`, not
+   * `bg-primary`, and the two are different values on purpose: one is read as letterforms,
+   * the other is pressed. White on it is 7.68:1 and its own shape against the page is 6.98:1.
+   *
+   * IT WAS #1F1B41, a dark eggplant, and mirroring that was correct-at-the-time and wrong:
+   * the web had shipped the eggplant by accident (it was whatever happened to be sitting in
+   * the skin block) and then corrected it to the value its "Which Violet" study actually
+   * picked. tools/check-theme.mjs is what caught the drift, on the first run after the web
+   * moved — which is the entire reason that gate exists.
+   *
+   * It is LOUD, and that is a consequence rather than a preference. The muted violet this
+   * family started from failed BECAUSE it was muted: low chroma at hue 282 sits it beside
+   * `pending`, a desaturated blue at hue 255, and two quiet colours 27 degrees apart are two
+   * quiet colours. A brand has to be a colour no order state is.
+   *
+   * NEVER ON THE BLOCK. It is 1.56:1 against slate — it has no shape there at all. `lit` is
+   * the block's action colour and this is the page's; they are not interchangeable.
    */
-  brand: "#1F1B41",
+  brand: "#4E01FC",
   onBrand: "#FFFFFF",
 
   /**
