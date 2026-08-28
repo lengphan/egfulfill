@@ -19,7 +19,7 @@ import { canvasReadableSrc } from "@/lib/thread-match"
 import { proxiedImageSrc } from "@/lib/order-image"
 // The tile is shared with the order dialog — it takes props only, so it was always shared
 // code that happened to live in this one screen's file.
-import { ImageThumb } from "@/components/app/artwork-panel"
+import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
@@ -853,14 +853,14 @@ export function DesignMaker() {
 
       <div className="flex min-h-0 flex-1 gap-3">
         {/* Left: the rail, then the panel for whatever it has selected. */}
-        <nav aria-label={tl("designMaker", "Tools")} className="hidden w-16 shrink-0 flex-col gap-1 rounded-2xl border border-border bg-card p-1.5 lg:flex">
+        <nav aria-label={tl("designMaker", "Tools")} className="hidden w-16 shrink-0 flex-col gap-1 rounded-xl border border-border bg-card p-1.5 lg:flex">
           {TOOLS.map(({ key, label, Icon }) => (
             <button
  key={key}
  type="button"
  onClick={() => setTool(key)}
  aria-current={tool === key ? "true" : undefined}
- className={"flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-2xs font-medium transition-colors " +
+ className={"flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-2xs font-medium transition-colors " +
                 (tool === key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
             >
               <Icon size={19} weight={tool === key ? "fill" : "regular"} />
@@ -888,79 +888,28 @@ export function DesignMaker() {
             </div>
           )}
           {/* Artwork — your reusable uploads + buyer art from your orders. */}
+          {/**
+            * THE SHARED PANEL — this screen no longer keeps its own.
+            *
+            * "Where does a picture come from" was implemented twice: once here, and not at
+            * all on an order line until that surface borrowed this one. Two implementations
+            * of one idea is how they drift; ImageThumb had already moved to the shared file
+            * and this is the rest of it following.
+            *
+            * `templates` is offered HERE and deliberately not on an order line: a template
+            * carries a blank, a layer stack AND a print area, and this is the editor that can
+            * accept all three. A line's garment is already decided.
+            *
+            * Two tracks, because this column is 288px — three would give each thumbnail about
+            * 68px, too small to tell two of a seller's logos apart, which is the panel's job.
+            */}
           {tool === "images" && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">{tl("designMaker", "Artwork")}</div>
-              <label className="flex cursor-pointer items-center gap-1 text-2xs font-medium text-primary hover:underline">
-                <UploadSimple size={12} weight="bold" /> {tl("designMaker", "Upload")}
-                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onUploadImages(e.target.files); e.target.value = "" }} />
-              </label>
-            </div>
-            {/**
-              * THE SOURCES ARE A BAR, NOT FOUR DIFFERENT CONTROLS.
-              *
-              * This panel had two stacked groups, each with its own inline "all N" link, and
-              * then a full-width outline button under both — so reaching artwork meant
-              * choosing between four controls of three different shapes, named "Your
-              * uploads", "From your orders", "All 12", "Browse All Orders" and "Saved
-              * designs & templates". Two of those words are the same word (designs, uploads,
-              * artwork) and one of them, "Browse All Orders", does not browse orders at all.
-              *
-              * One question — WHERE IS THIS PICTURE FROM — is one bar, which is the house
-              * treatment for exactly that (CLAUDE.md §4: a rule under the live word), and
-              * then ONE grid and ONE "Browse all" that always mean the live source. The
-              * count lives on the tab, so nothing has to say it twice.
-              */}
-            <TabBar
- size="sm" spacing="none" className="border-b-0" ariaLabel="Artwork source"
- value={source} onChange={setSource}
-              // NO COUNTS. This bar lives in a 288px column and three labels plus three
-              // badges do not fit in it — and the number is already under the grid, on the
-              // "Browse all N" that acts on it. Saying it twice cost the labels their line.
- items={[
-                { id: "yours" as const, label: tl("designMaker", "Yours") },
-                { id: "orders" as const, label: tl("designMaker", "From orders") },
-                { id: "templates" as const, label: tl("designMaker", "Templates") },
-              ]}
+            <ArtworkPanel
+              sources={["yours", "orders", "templates"]}
+              columns={2}
+              onPlace={placeImage}
+              onApplyTemplate={applyTemplate}
             />
-            {imagesLoading ? (
-              <div className="flex justify-center py-2"><CircleNotch size={16} className="animate-spin text-muted-foreground" /></div>
-            ) : railList.length === 0 ? (
-              /* An empty region may carry one sentence, because there is nothing else to
- read — §4. One per source, saying what puts something here. */
-              <p className="px-1 text-2xs text-muted-foreground">
-                {source === "yours"
-                  ? tl("designMaker", "Upload an image and it stays here to reuse.")
-                  : source === "orders"
-                    ? tl("designMaker", "Artwork buyers send with an order lands here on its own.")
-                    : tl("designMaker", "Save a design as a template to reopen it on any blank.")}
-              </p>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  {railList.slice(0, RAIL_LIMIT).map((it) => (
-                    <ImageThumb
- key={it.key} url={it.url} src={it.src} name={it.name} badge={it.badge} title={it.title}
- measure={it.measure} onPlace={it.onPlace} onDelete={it.onDelete}
-                      // The DISPLAY src, not the raw url: a buyer's hotlink only loads through
-                      // the proxy, and the lightbox is an <img> like any other.
- onZoom={() => lightbox.open(it.src ?? it.url, it.title || it.name)}
-                    />
-                  ))}
-                </div>
-                {railList.length > RAIL_LIMIT && (
-                  <button
- type="button"
- onClick={() => (source === "templates" ? setLibOpen(true) : setBrowse(source === "yours" ? "uploads" : "orders"))}
- className="w-full text-left text-2xs font-medium text-primary hover:underline"
-                  >
-                    Browse all {railList.length}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
           )}
 
           {tool === "text" && (
