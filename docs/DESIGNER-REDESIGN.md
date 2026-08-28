@@ -1,105 +1,76 @@
-# Designer redesign — research and plan
+# The two editors — what was built, and what is still open
 
-Design Maker (`web/components/app/design-maker.tsx`) and the mini designer
-(`DesignCanvasDialog` in `web/components/app/design-canvas.tsx`). Written 2026-08-27
-against commit `dc98265b`. Nothing here is built — this is the plan and the function
-table the redesign mandate requires *before* drawing.
+Design Maker (`web/components/app/design-maker.tsx`) and the order designer
+(`DesignCanvasDialog` in `web/components/app/design-canvas.tsx`). Written 2026-08-27,
+**rewritten 2026-08-28 after the work landed** — the first version of this file described a
+plan, and two of its conclusions turned out to be wrong. Superseded parts are marked.
 
-Full write-up, with the reference research and both function tables:
+Research and the original function tables:
 https://claude.ai/code/artifact/a89fcb0d-b687-4d60-b9b9-032b948e9a28
 
-## 1. The headline
+## 1. What was wrong
 
-They are described as a full editor and its shortened version. They are not.
+They were described as a full editor and its shortened version. They were not:
+`DesignCanvasDialog` was 2,460 lines in one function against the Maker's 1,060, and they
+carried **disjoint** feature sets. Only the Maker had print zone, DPI, layers, text, zoom.
+Only the dialog had thread matching, files, buyer's file, board card, fee tier.
 
-| | lines | shape |
-|---|---|---|
-| `DesignMaker` — the "full" one | 1,060 | full-screen route, three columns |
-| `DesignCanvasDialog` — the "mini" one | 2,460, one function | dialog, two columns |
+The consequence was a real defect, not an inconsistency: **the surface that places artwork on
+lines the factory prints showed neither the printable area nor the resolution**, while the
+one for speculative product templates showed both. `DesignStage` had accepted a `printZone`
+since it was written and one of its two callers passed it; `layerDpi` was exported from
+design-maker.tsx and imported by nothing.
 
-The short one is 2.3× the long one. They are not full-and-short; they are two disjoint
-halves. They share exactly four imports: `DesignStage`, `readImageFile`,
-`useBackgroundRemoval`, `Pos`/`DEFAULT_POS`.
+## 2. What is shared now
 
-Only the Maker has: print zone, DPI meter, multi-layer, text layers, zoom, layer list, publish.
-Only the dialog has: thread match, files-on-line, buyer's file, board card, send-to-designer,
-partner push, fee tier, apply-to-all, seller's own mockup.
+| Module | What it owns |
+|---|---|
+| `components/app/artwork-panel.tsx` | sources, grid, browse-all, `ImageThumb`, `reloadToken` |
+| `components/app/face-tile.tsx` | the garment tiles — a LIST of layers, not one artwork |
+| `lib/stage-zoom.ts` | wheel zoom. A callback ref, because the dialog is portalled |
+| `lib/print-zone.ts` | the printable rectangle, `outsideZone`, `fitToZone` |
+| `lib/print-quality.ts` | `layerDpi`, `printedInches`, `dpiVerdict`, `useNaturalSizes` |
 
-## 2. Three defects, verified in source
+What still differs is the context panel, and that is correct: an order line and a product
+template are different things.
 
-1. **The order dialog draws no print zone.** `DesignStage` accepts `printZone`;
-   `design-maker.tsx:1182` passes it, `design-canvas.tsx` never does. The surface that
-   places artwork on lines the factory prints cannot show the printable area.
-2. **The order dialog computes no resolution.** `layerDpi` and `dpiVerdict` are exported
-   from `design-maker.tsx` and imported by **nothing**. A 600px buyer upload can be placed
-   across a 14" front print and saved silently.
-3. **The dialog's right rail is twelve stacked panels**, ~900 lines of JSX in one 380px
-   column, all on screen at once.
+## 3. Two conclusions from the first draft that were WRONG
 
-Also live: the Maker's tool-rail buttons use `rounded-xl` → `--radius` (26px) on a ~48px
-box, so they render as circles, which the primitive rules forbid.
+**"Keep the order designer a dialog"** → then fullscreen → then a dialog again. The
+reasoning that took it fullscreen was sound for the Maker and wrong for a window that opens
+off one line while you work a queue. It is a bounded dialog, and the header/footer structure
+the fullscreen pass introduced was kept.
 
-## 3. The earlier prototype
+**"Level the features — layers and text into the order editor"** is not a wiring job.
+`postOrderDesign` takes a single `data` and `pos` PER SIDE. One artwork per face is the
+SERVER's model, and design-canvas documents it as deliberate:
 
-Recovered from the `Mapper.dc.html` artboard of the *EGFUL Product Screens* artifact.
-It draws a **mapper** — one artwork, eight blanks, per-blank live toggles, "5 of 8 products
-live / Publish changes" — not an editor. That is the publish flow (Printful/Fourthwall's
-model) and we don't have it; worth building **separately**. Its skin (DM Sans, `#ff5a00`,
-cool zinc) predates `workshop` and is superseded.
+> an order line holds one artwork per face, and giving it a list to hold one item would be a
+> worse model, not a more general one
 
-Take three ideas from it, discard the skin: DPI and physical size stated as fact; the
-method constraint explained at the point of decision ("embroidery caps at 12 thread
-colours, this uses 19"); cost visible while editing.
+Levelling that is a data-model change and needs its own piece of work.
 
-## 4. Reference — Fourthwall
+## 4. Traps that cost time here
 
-- Faces are **silhouettes each carrying their own artwork**, all visible at once.
-- Properties come to the **selection as a floating bar**; there is no right properties rail.
-- Physical size and DPI are printed **inside the print zone**, on the garment.
-- Cost is live under the stage.
+- **The print area is product-configured** (`printAreas[side]`, product editor › Print sides,
+  stored in `catalog_products.data`). A product with none falls back to a hardcoded
+  per-garment-type table calibrated against one bundled tee flat — so a wrong-looking box
+  usually means *not set*, not broken.
+- **`pos` is a percentage of a SQUARE stage.** The frame's aspect is not ours to change, and
+  zoom must scale a WRAPPER — anything reaching `pos` silently resizes the print.
+- **The dialog is portalled.** An effect reading `ref.current` on mount finds null and never
+  runs again. That is why zoom uses a callback ref, and it is invisible on the Maker.
+- **The dialog holds a SNAPSHOT of the line** (`editing` in the order list). A save plus a
+  parent reload does not refresh it; the variant patch is merged locally.
+- **`@theme` accepts custom properties only.** A comment inside it is a build error, and
+  neither tsc nor eslint sees it — only loading the page does.
 
-## 5. The proposal — one room, two contexts
+## 5. Still open
 
-One editor shell, opened from two places; only the context panel differs.
-
-```
-[ faces ]  [        stage        ]  [ context drawer ]
- silhouette  print zone always drawn   one tab at a time
- per side,   size + DPI inside it      order: Design·Threads·Files·Board
- own art     layers, text, zoom        product: Blank·Artwork·Text
-             selection property bar
-```
-
-The dialog **stays a dialog** — it opens from a row inside a 700-row queue and a
-full-screen route loses your place.
-
-## 6. Sequence
-
-- **A** Close the two defects — pass `printZone`, lift the DPI helpers into `lib/` and call
-  them from the dialog. Small, and the part with real production consequence.
-- **B** The selection property bar, adopted by both. Load-bearing: without it the rail
-  cannot empty.
-- **C** The faces column — replaces two different side-switchers with one.
-- **D** The context drawer — twelve panels become four tabs; the Maker's rail and
-  properties panel merge into three.
-- **E** Level the feature sets — threads into the Maker; layers/text/zoom onto an order line.
-- **F** The Mapper, scoped separately.
-
-## 7. Constraints on this path
-
-- `rounded-xl`+ all resolve to 26px. Controls take `--radius-control` (10px), badges 8px,
-  `rounded-full` is count badges and avatars only.
-- No prose under a control. The drawer and property bar are where subtitles breed.
-- Import `tab-bar` / `dropzone` / `empty-state` / `region`; never hand-roll a bar.
-- Never name the supplier — the Blank tab prints product name and SKU, nothing else.
-- Incremental loading in the Artwork grid is a CLICK, never an effect watching list length
-  (CLAUDE.md §2.8).
-- Draw on the real pages at localhost. A drawing has six controls and these screens have
-  forty — which is how the earlier prototype came to be drawn and never applied. The
-  function tables are the floor.
-
-## 8. Function tables
-
-In the artifact linked above. Every control on both surfaces, each assigned one of three
-fates — stays visible / moves elsewhere / collapses into a named menu — plus the four
-capabilities the redraw adds. Nothing is deleted.
+- **Layers / text on an order line** — the model change above.
+- **The rail shape** on the marketing catalogue — raised, never specified.
+- **Button variants**: measured at outline 211 · ghost 69 · secondary 12 · destructive 4, so
+  only ~33% of buttons declare themselves the main action. Now that the fill is settled this
+  is the next real sweep.
+- **`bg-primary/10 text-primary`** survives in 8 places that are NOT selection (badges,
+  speaker labels, step markers, a channel colour). Left deliberately — see the commit.
