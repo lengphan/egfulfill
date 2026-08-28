@@ -6,7 +6,7 @@ import Link from "next/link"
 import { TShirt, MagnifyingGlass } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, CARD, HEADING, INK, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
 import { PageBanner } from "@/components/marketing/page-banner"
-import { Scatter } from "@/components/marketing/scatter"
+import { ProductField } from "@/components/marketing/product-field"
 import type { PageHead } from "@/lib/site-content"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
@@ -361,34 +361,26 @@ export function BoldCatalog({ products, head }: { products: PublicProduct[] | nu
       <PageBanner head={head} pathPrefix="catalogPage" />
 
       {/* ── WHAT WE MAKE, AS OBJECTS ───────────────────────────────────────────────
-          Four blanks on the page's own colour before the grid begins. This page opened
+          Twelve blanks on the page's own colour before the grid begins. This page opened
           straight onto a filter row and a table of cards — a catalogue with no photography in
           it at all — so the first thing a visitor met was a control rather than a product.
 
-          FOUR SILHOUETTES, NOT FOUR COLOURS. A tee, a crew, a hoodie and a cap read as four
-          objects; four tees in four colours read as a repeat, however good the colours are.
-          The rail elsewhere on the site does the opposite job — same garment, many colours —
-          and mixing the two logics gives a jumble.
+          THIS REPLACED A SCATTER OF FOUR, and the reason is worth keeping. The note here used
+          to argue for "four silhouettes, not four colours" — a tee, a crew, a hoodie and a cap
+          because four tees in four colours read as a repeat. That was half right and it made
+          the page look unfinished: four garments in four UNRELATED colours are four one-offs,
+          which is a repeat of a different kind. What reads as a collection is one colour across
+          many forms, so both axes are used at once — down the page is colour, across it is
+          form, and neither alone would carry it.
 
-          Colour is the range: bone, sand, charcoal, clay. Two light neutrals, one dark anchor
-          so the group does not float, one hue. Every one is a real product, re-shot to the
-          house standard rather than a supplier catalogue photograph.
+          The colours are real orderable ones, not a mood board: Natural, Charcoal and Iris are
+          all in the live Gildan colourway list, and Iris is the house periwinkle at 5 degrees
+          of hue from the brand value rather than a shade invented for this page.
 
-          The interaction is a product truth rather than a flourish: hover brings a blank
-          forward, a click opens it. Nothing reveals, nothing parallaxes. */}
-      <Scatter
-        minH="clamp(26rem, 62vh, 40rem)"
-        items={[
-          /* TIGHTER, AND ONE CROPS THE EDGE. Four objects spread evenly across 1440px read as
-             unfinished rather than curated — the reference gets away with air because objects
-             run off the frame and imply more beyond it. Overlapping the right edge is what
-             turns empty space into a crop. */
-          { src: "/frames/obj-tee.png",    alt: "Heavyweight cotton t-shirt, bone",        href: "/catalog#apparel",  x: 25, y: 43, w: 26 },
-          { src: "/frames/obj-crew.png",   alt: "Ring-spun crewneck sweatshirt, sand",     href: "/catalog#apparel",  x: 50, y: 71, w: 21 },
-          { src: "/frames/obj-hoodie.png", alt: "Heavy blend hooded sweatshirt, charcoal", href: "/catalog#apparel",  x: 68, y: 35, w: 28 },
-          { src: "/frames/obj-cap.png",    alt: "Six-panel cap, clay",                     href: "/catalog#headwear", x: 92, y: 68, w: 18 },
-        ]}
-      />
+          The interaction is a product truth rather than a flourish: clicking a blank ports the
+          whole field to that colour, which is the question a buyer actually has. Nothing
+          reveals, nothing parallaxes. */}
+      <ProductField />
 
       {/* WIDER THAN THE PROSE PAGES, on purpose. A catalogue is scanned, not read: nothing
           in the grid runs left-to-right, so width buys products per row rather than costing
