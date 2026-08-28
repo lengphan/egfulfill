@@ -354,10 +354,13 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
       // line can arrive ready to make instead of anonymous.
       const built = await q('select * from published_listings where listing_id=$1', [String(tr.listing_id || '')])
         .then((r) => r.rows[0]).catch(() => null);
-      const lineId = genLineId();
+      // From ETSY's transaction id, not invented — see the note on order_items_platform_line_uq
+      // in orders.js. An invented id let two overlapping syncs each write the whole line set.
+      const lineId = tr.transaction_id ? 'et-' + tr.transaction_id : genLineId();
       await q(
         `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization, print_type, line_id, blank)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         on conflict do nothing`,
         [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization,
          method || (built && built.print_type) || null, lineId, (built && built.blank_sku) || null]
       );

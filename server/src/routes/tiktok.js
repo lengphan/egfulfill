@@ -483,8 +483,12 @@ async function importTiktokOrder(conn, order, isFactory) {
       const variant = (li.sku_name && li.sku_name !== name) ? li.sku_name : null;
       const method = /embroider|embroidered|embroidery|monogram/i.test(`${name || ''} ${variant || ''}`) ? 'EMB' : null;
       await q(
+        // 'tt-' + li.id was already derived from TikTok's own id, which is why TikTok is the
+        // one importer that never duplicated. on conflict makes that guarantee enforced
+        // rather than incidental.
         `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, print_type, line_id)
-         values ($1,$2,$3,1,$4,$5,$6,$7,$8)`,
+         values ($1,$2,$3,1,$4,$5,$6,$7,$8)
+         on conflict do nothing`,
         [id, li.seller_sku || li.sku_id || null, name, variant, num(li.sale_price), li.sku_image || null, method, 'tt-' + li.id]
       );
     }

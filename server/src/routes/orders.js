@@ -1114,6 +1114,26 @@ export function ordersRoutes(app, requireAuth) {
     .then(() => q('create index if not exists orders_created_idx on orders (created_at desc)').catch(() => {}))
     .then(() => q('create index if not exists orders_seller_created_idx on orders (seller_id, created_at desc)').catch(() => {}))
     /**
+     * IMPORT IDEMPOTENCY. Every importer guarded its line inserts with
+     * `select 1 from order_items where order_id=$1` and then inserted if that came back
+     * empty — a check and an act with an await between them. Two sync passes overlapping
+     * (a webhook landing while a poll runs) both read "no items yet" and both wrote the
+     * whole set, and because the line_id was invented per insert nothing collided. A
+     * Shopify order for ONE snowboard arrived as two, one second apart, on 2026-08-28.
+     *
+     * The importers now derive line_id from the PLATFORM's own line id (`sh-`/`et-`/`tt-`),
+     * so a second pass produces the same value and this index refuses it. The guard is no
+     * longer what makes it safe; the database is.
+     *
+     * PARTIAL, on purpose. Eleven Etsy orders from June–July hold repeated legacy `L…` ids
+     * from an older path, and a full index could not be created without deleting settled
+     * production rows. Restricting it to the platform-derived prefixes enforces the rule on
+     * everything new while leaving recorded history exactly as it is.
+     */
+    .then(() => q(`create unique index if not exists order_items_platform_line_uq
+                   on order_items (order_id, line_id)
+                   where line_id ~ '^(sh|et|tt)-'`).catch(() => {}))
+    /**
      * LINE IDENTITY. The primary key was (order_id, sku, kind), so two lines of the SAME
      * sku on one order shared ONE design row — attaching artwork to the second silently
      * overwrote the first, and both lines then rendered the same image. A customer buying

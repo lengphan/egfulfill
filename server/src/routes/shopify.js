@@ -236,10 +236,17 @@ async function importShopifyOrder(conn, order, isFactory, imgCache = new Map()) 
       const variant = [line.variant_title, extra].filter((s) => s && s !== 'Default Title').join(', ') || null;
       const method = /embroider|embroidered|embroidery|monogram/i.test(`${line.title || ''} ${variant || ''}`) ? 'EMB' : null;
       const img = await shopifyProductImage(conn, line.product_id, line.variant_id, imgCache);
+      // line_id from SHOPIFY's own line id, not invented here. The hasItems guard above is
+      // a check and an act with an image fetch between them, so two overlapping syncs both
+      // pass it — and an invented id made the second insert look like a different line.
+      // A one-item order arrived as two on 2026-08-28. A derived id collides on the second
+      // pass and the unique index (orders.js) refuses it.
       await q(
         `insert into order_items (order_id, sku, name, qty, variant, unit_price, design_src, personalization, print_type, line_id, img)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [id, line.sku || null, line.title || null, line.quantity || 1, variant, num(line.price), uploadUrl, personalization, method, genLineId(), img]
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         on conflict do nothing`,
+        [id, line.sku || null, line.title || null, line.quantity || 1, variant, num(line.price), uploadUrl, personalization, method,
+         line.id ? 'sh-' + line.id : genLineId(), img]
       );
     }
   }
