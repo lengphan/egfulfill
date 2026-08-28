@@ -81,14 +81,14 @@ export type ItemAvatarProps = {
  * `missing` is that fact, kept separate so the caller can say it out loud instead — CLAUDE.md
  * §4: an empty state must never be indistinguishable from a broken one.
  */
-function blankOf(item: OrderItem, catalog?: CatalogProduct[]): { url: string; missing: boolean; chosen: boolean } {
+function blankOf(item: OrderItem, catalog?: CatalogProduct[], px?: number): { url: string; missing: boolean; chosen: boolean } {
   const p = catalog?.length ? resolveProduct(item, catalog) : null
   // No fallback — this is the blank's OWN imagery or nothing.
   const own = bestMockup(p, item.color, "")
   // `chosen` — a blank RESOLVES for this line, so there is a second thing to look at. Kept
   // separate from `url`, which falls back to the listing photo and therefore cannot answer
   // "do we know what we are making yet".
-  return { url: thumbSrc(own || item.img), missing: !!p && !own, chosen: !!p }
+  return { url: thumbSrc(own || item.img, px), missing: !!p && !own, chosen: !!p }
 }
 
 export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, bare, className }: ItemAvatarProps) {
@@ -121,9 +121,9 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   // earlier never appeared on the thumbnail and looked like it hadn't saved.
   const design = designForLine(designs ?? undefined, item) ?? null
   const art = designSrc(design?.data) || designSrc(item.design_src)
-  const { url: blank, missing: blankMissing, chosen: blankChosen } = blankOf(item, catalog)
+  const { url: blank, missing: blankMissing, chosen: blankChosen } = blankOf(item, catalog, size)
   // 300x300 rather than the stored full-resolution photo — see thumbSrc.
-  const listing = thumbSrc(item.img)
+  const listing = thumbSrc(item.img, size)
   /**
    * NO BLANK PICKED IS NOT AN ERROR STATE — it is where every marketplace line starts.
    *

@@ -61,9 +61,28 @@ export function proxiedImageSrc(url?: string | null): string {
  * designer and the print path keep the full-resolution one, which is exactly why this is not
  * done at sync: the big image is still the right image, just not for a 96px square.
  */
-export function thumbSrc(url?: string | null, size = "300x300"): string {
+export function thumbSrc(url?: string | null, px = 96): string {
   if (!url || !/^https?:\/\/i\.etsystatic\.com\//i.test(url)) return url || ""
-  return url.replace(/\/il_[a-zA-Z0-9]+\./, `/il_${size}.`)
+  /**
+   * ONLY THE `xN` WIDTHS, BECAUSE THE FIXED ONES CROP.
+   *
+   * `il_300x300` is not a smaller photo, it is a SQUARE one: checked against real stored
+   * rows, a 1140x1000 listing comes back 300x300 — re-framed — where `il_570xN` comes back
+   * 570x500 with the composition intact. Etsy's fixed-size variants (75x75, 170x135,
+   * 300x300, 340x270) all crop; the `xN` ones scale. A thumbnail may be small. It may not
+   * be a different picture.
+   *
+   * 570 is therefore the smallest step, and it is also the sharp one: ItemAvatar is drawn at
+   * 44, 56, 72, 76 and larger again on the order detail page, and a retina screen paints
+   * three device pixels per CSS pixel, so 300 was visibly soft on the bigger ones. 570
+   * covers every tile in the app at 3x and still weighs 39kB against the stored 232kB.
+   *
+   * Past the last step the full-resolution photo is kept, which is correct — at that size it
+   * IS the right image.
+   */
+  const v = px <= 190 ? "570xN" : px <= 264 ? "794xN" : null
+  if (!v) return url
+  return url.replace(/\/il_[a-zA-Z0-9]+\./, `/il_${v}.`)
 }
 
 export function designSrc(d?: string | null): string {
