@@ -164,10 +164,40 @@ export function DashboardView() {
   * carried a thumbnail falls back to Thumb's marked tile rather than a broken image. */
  const blanks = useMemo(() => topProducts(orders ?? [], 4), [orders])
 
- const recent = useMemo(
+ /* WHAT IS WAITING ON THE SELLER, and only then what is recent.
+  *
+  * The table under all this was "Recent orders", and by the time it renders the page has
+  * already said the same thing twice: the bracket counts every stage, and the six newest
+  * orders are the six newest marks the rest of the page is built from. What none of it says
+  * is which ones are stuck on THEM.
+  *
+  * Two situations qualify, and both are the seller's move:
+  *  - on_hold — the factory has stopped and is asking a question
+  *  - Draft   — never submitted, so nothing was charged and nothing is being made
+  *
+  * When neither exists the card falls back to the recent list rather than showing an empty
+  * state, because "nothing needs you" is good news and an empty table does not read that
+  * way. The title says which of the two it is. */
+ const needsYou = useMemo(
+    () =>
+      [...(orders ?? [])]
+        .filter((o) => {
+ const st = resolvedOrderStage(o)
+ return st === "on_hold" || st === ""
+        })
+        .sort((a, b) => (tsOf(a) || 0) - (tsOf(b) || 0)),
+ [orders]
+  )
+
+ const recentList = useMemo(
     () => [...(orders ?? [])].sort((a, b) => (tsOf(b) || 0) - (tsOf(a) || 0)).slice(0, 6),
  [orders]
   )
+
+  // Oldest first when it is a to-do list — the one that has been waiting longest is the one
+  // that needs answering. Newest first when it is just the recent list.
+ const showingNeeds = needsYou.length > 0
+ const recent = showingNeeds ? needsYou.slice(0, 6) : recentList
 
  return (
     <div className="space-y-4">
@@ -275,7 +305,7 @@ export function DashboardView() {
 
 
       <SectionCard
- title={t("dash.recentOrders")}
+ title={showingNeeds ? t("dash.needsYou") : t("dash.recentOrders")}
  actions={
           <Button variant="outline" size="sm" onClick={() => router.push("/orders")}>
             {t("dash.viewAll")}
