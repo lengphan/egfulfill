@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { View, Text, TextInput, FlatList, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native"
+import { View, Text, TextInput, SectionList, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
@@ -11,9 +11,10 @@ import { OrderRow } from "@/components/order-row"
 /**
  * ORDERS — a searchable list, and the way into one order.
  *
- * FlatList rather than a ScrollView of rows: this list is the length of the floor (237 open
- * on the day it was built), and mounting every row is how a phone list starts dropping
- * frames. It virtualises.
+ * A SectionList rather than a ScrollView of rows: this list is the length of the floor (237
+ * open on the day it was built), and mounting every row is how a phone list starts dropping
+ * frames. It virtualises — and it is sectioned because the queue now groups itself by when
+ * work is due rather than by order number. See `sections` below.
  *
  * Numbers and stage words come from lib/orders, the same rules Today counts with, so a row
  * here cannot describe an order differently from the tile that led you to it.
@@ -134,6 +135,53 @@ export default function Orders() {
       || (o.items ?? []).some((it) => lineTitle(it).toLowerCase().includes(q)
         || has(it.sku) || has(it.blank)))
   }, [all, filter, stage, search])
+
+  /**
+   * THE QUEUE ORDERS ITSELF BY WHEN THINGS ARE DUE.
+   *
+   * It was ordered by order number, which is the one attribute of an order that says
+   * nothing about what to do with it. Every list app in the references groups by something
+   * meaningful and leaves sort as the secondary control; this is that move applied to work.
+   *
+   * Three groups, and the top one is the only one that should ever make anyone hurry:
+   *
+   *   OVERDUE     — late against the promise where there is one, and only then against age.
+   *                 Worst first, because that is the order you would pick them up in.
+   *   DUE TODAY   — a ship-by that falls inside today. Not overdue yet, and it is the group
+   *                 that decides whether the afternoon is calm.
+   *   LATER       — everything else, including orders with no ship-by at all. An undated
+   *                 order has no claim on today; putting it anywhere else would invent one.
+   *
+   * `isOverdue` is the shared rule, not a local copy — it reads Etsy's promised date first
+   * and only falls back to age, and it was a hand-kept duplicate here twice before.
+   */
+  const sections = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const today = start.getTime()
+    const tomorrow = today + 864e5
+    const due = (o: Order) => (o.ship_by ? new Date(o.ship_by).getTime() : NaN)
+
+    const late: Order[] = [], now: Order[] = [], later: Order[] = []
+    for (const o of rows) {
+      if (isOverdue(o)) { late.push(o); continue }
+      const p = due(o)
+      if (Number.isFinite(p) && p >= today && p < tomorrow) now.push(o)
+      else later.push(o)
+    }
+    /* Soonest first inside every group; an undated order sorts to the end of its own group
+       rather than to the top, where a missing value would otherwise put it. */
+    const soonest = (a: Order, b: Order) => {
+      const x = due(a), y = due(b)
+      return (Number.isFinite(x) ? x : Infinity) - (Number.isFinite(y) ? y : Infinity)
+    }
+    late.sort(soonest); now.sort(soonest); later.sort(soonest)
+
+    return [
+      { key: "late", title: "Overdue", urgent: true, data: late },
+      { key: "today", title: "Due today", urgent: false, data: now },
+      { key: "later", title: "Later", urgent: false, data: later },
+    ].filter((s) => s.data.length > 0)
+  }, [rows])
 
   const role = me?.role ?? ""
   const staff = !!role && role !== "seller"
@@ -341,9 +389,47 @@ export default function Orders() {
           <ActivityIndicator color={C.primary} />
         </View>
       ) : (
-        <FlatList
-          data={rows}
+        <SectionList
+          sections={sections}
           keyExtractor={(o) => o.id}
+          /* The group you are inside stays named at the top of the screen. On a queue this
+             long the header is the only thing telling you whether what you are reading is
+             late or merely next. */
+          stickySectionHeadersEnabled
+          renderSectionHeader={({ section }) => (
+            <View style={{
+              paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8,
+              /* OPAQUE, because it is sticky — rows sliding under a transparent header is
+                 the classic version of this control looking broken. */
+              backgroundColor: C.bg,
+            }}>
+              <View style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                alignSelf: "flex-start",
+                /* THE LATE GROUP IS THE ONLY ONE WEARING ANYTHING. It is the block, so it
+                   reads as an object rather than a coloured word — and alert stays on the
+                   count, where it is reporting a number of orders rather than tinting a
+                   whole band of the screen. */
+                backgroundColor: section.urgent ? C.ink : "transparent",
+                borderRadius: R.control,
+                paddingHorizontal: section.urgent ? 10 : 0,
+                paddingVertical: section.urgent ? 6 : 0,
+              }}>
+                <Text style={{
+                  fontSize: 12.5, fontFamily: F.semi, letterSpacing: 1.2,
+                  color: section.urgent ? C.onInk : C.muted,
+                }}>
+                  {section.title.toUpperCase()}
+                </Text>
+                <Text style={{
+                  fontSize: 12.5, fontFamily: F.semi,
+                  color: section.urgent ? C.lit : C.muted,
+                }}>
+                  {section.data.length}
+                </Text>
+              </View>
+            </View>
+          )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
           /* NO horizontal padding here. The row owns it (18, the same 18 the title, the
              search field and the filters use), so content lines up down the whole screen and
