@@ -536,6 +536,46 @@ export function mergeSiteContent(stored: unknown): SiteContent {
   const num = (v: unknown, fallback: number, min: number, max: number) =>
     typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback
 
+  /**
+   * A STORED ITEM INHERITS FIELDS IT HAS NEVER HEARD OF.
+   *
+   * `arr` replaces a stored array wholesale, which is right: it is what makes deleting the
+   * sixth feature actually delete it. But it also means a field ADDED to the defaults later is
+   * invisible on any site that has ever saved this section — the stored card has no `shot`
+   * key, so the default's `shot` never arrives and the frame draws a wireframe forever. Every
+   * new field would need a manual re-save on every deployment before it could be seen.
+   *
+   * So a stored item takes any key it is MISSING from the default of the same name. Matching
+   * on `title`, not on index: an admin reordering the cards would otherwise hand card three's
+   * screenshot to card one, and reordering is a thing people do casually.
+   *
+   * It only ever FILLS A GAP. A key the admin has set — including one deliberately set to
+   * empty — is left exactly as stored, so this can never resurrect something that was cleared.
+   */
+  const inherit = <T extends { title?: string }>(stored: T[], defaults: T[]): T[] =>
+    stored.map((item, i) => {
+      /* Title first, because an admin reordering the cards would otherwise hand card three's
+         screenshot to card one, and reordering is something people do casually.
+
+         POSITION IS THE FALLBACK, and only when the two arrays are the same length. Card two
+         is stored as "Vetted print network" against a default of "Our factory, not a broker" —
+         renamed, not replaced — and on title alone it inherits nothing, so the slot built for
+         it stays empty forever with no way to tell that from a card genuinely about something
+         else. Equal length is the signal that these are the same four cards with one renamed.
+
+         The residual risk is a card both RENAMED and MOVED, which then takes the wrong
+         screenshot. That is worth it against the alternative, and the failure is visible: a
+         wrong picture on a card is obvious, an eternally blank frame is not. */
+      const base = defaults.find((d0) => d0.title && d0.title === item.title)
+        ?? (stored.length === defaults.length ? defaults[i] : undefined)
+      if (!base) return item
+      const out = { ...item }
+      for (const k of Object.keys(base) as (keyof T)[]) {
+        if (!(k in out)) out[k] = base[k]
+      }
+      return out
+    })
+
   const hero = obj("hero")
   const features = obj("features")
   const steps = obj("steps")
@@ -623,7 +663,7 @@ export function mergeSiteContent(stored: unknown): SiteContent {
     features: {
       heading: str(features.heading, d.features.heading),
       subhead: str(features.subhead, d.features.subhead),
-      cards: arr<FeatureCard>(features.cards, d.features.cards),
+      cards: inherit(arr<FeatureCard>(features.cards, d.features.cards), d.features.cards),
     },
     steps: {
       heading: str(steps.heading, d.steps.heading),
