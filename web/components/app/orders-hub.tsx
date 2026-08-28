@@ -14,7 +14,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { Button } from "@/components/ui/button"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { pushToDispatch, getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
+import { pushToDispatch, getDispatchStatus, getOrders, cachedOrders, streamOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getOrderDesignsBatch, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, addInventoryItem, getPurchaseOrders, savePurchaseOrder, resolveSuppliers, setOrderRush, duplicateOrder, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch, type PurchaseOrder } from "@/lib/api"
 import { orderReadiness } from "@/lib/order-readiness"
 import { orderStock, stockSkuOf } from "@/lib/stock-status"
 import { getToken, getUser } from "@/lib/auth"
@@ -565,13 +565,41 @@ export function OrdersHub() {
   // EXIST, say which. Someone then goes looking for their missing orders instead of for the
   // outage.
  const [loadErr, setLoadErr] = useState<string | null>(null)
- const load = useCallback(() => {
- if (!getToken()) { setOrders([]); setLoadErr(null); return }
- getOrders()
+  /** A refresh: the whole list in one request. Handed to buttons and to the live pings
+   *  below, so it must stay a plain fetch — see the first-paint effect under it. */
+  const load = useCallback(() => {
+    if (!getToken()) { setOrders([]); setLoadErr(null); return }
+    getOrders()
       .then((rows) => { setOrders(rows ?? []); setLoadErr(null) })
       .catch((e) => { setOrders([]); setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.") })
   }, [])
- useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  /**
+   * THE FIRST PAINT STREAMS; A REFRESH DOES NOT.
+   *
+   * The list is 971 orders / 1.37MB and the first 100 are 0.16MB, so the first screen is
+   * worth walking a page at a time. A live ping is a different event: the board is already
+   * drawn, nothing waits on a blank, and streaming it would turn every scan on the floor
+   * into ten requests instead of one.
+   *
+   * The walk lives HERE, in a mount effect, rather than inside `load` — `load` is passed
+   * into the rows as `onSaved` / `onRefreshed`, and a callback that reads a ref and is
+   * handed out during render is exactly what react-hooks/refs refuses. The effect closure
+   * owns its own controller, so unmounting mid-walk stops it with nothing to remember.
+   */
+  useEffect(() => {
+    const ctl = new AbortController()
+    // Deferred, because every branch below writes state — the house pattern for
+    // react-hooks/set-state-in-effect (§5).
+    const id = setTimeout(() => {
+      if (!getToken()) { setOrders([]); setLoadErr(null); return }
+      // Another board may already hold the whole list — take it rather than walk it again.
+      const held = cachedOrders()
+      if (held) { setOrders(held); setLoadErr(null); return }
+      streamOrders((rows) => { setOrders(rows); setLoadErr(null) }, { pageSize: 100, signal: ctl.signal })
+        .catch((e) => { setOrders([]); setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.") })
+    }, 0)
+    return () => { clearTimeout(id); ctl.abort() }
+  }, [])
   // Live refresh. Without this the readiness tags read whatever the page loaded with, so
   // an order scanned on the floor kept an amber "not scanned yet" tag next to a history
   // panel — fetched fresh on open — that already said "Scanned here". Two answers to the

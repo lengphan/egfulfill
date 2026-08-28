@@ -15,7 +15,7 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { fetchShipmentLabel } from "@/lib/api"
 import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
-import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
+import { getOrders, cachedOrders, streamOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { StagedLabelRow, UploadLabelRow, useLabelPullBack, AddLabelButton, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
 import {
@@ -299,11 +299,25 @@ export function DispatchBoard({ segmented }: {
     }
   }
 
- const load = useCallback(() => {
- if (!getUser()) { setOrders([]); return }
- getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
+  /** A refresh after an action: the whole list in one request. */
+  const load = useCallback(() => {
+    if (!getUser()) { setOrders([]); return }
+    getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
   }, [])
- useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+  /** First paint walks it a page at a time — 1.37MB whole against 0.16MB for the first 100.
+   *  A reload after an action does not: the board is already on screen and nothing waits on
+   *  a blank. In its own effect, not inside `load`, for the reason spelled out in orders-hub. */
+  useEffect(() => {
+    const ctl = new AbortController()
+    const t = setTimeout(() => {
+      if (!getUser()) { setOrders([]); return }
+      const held = cachedOrders()
+      if (held) { setOrders(held); return }
+      streamOrders((rows) => setOrders(rows), { pageSize: 100, signal: ctl.signal })
+        .catch(() => setOrders([]))
+    }, 0)
+    return () => { clearTimeout(t); ctl.abort() }
+  }, [])
   // Auto-dismiss the status/notice line (e.g. "Pulled 1 back") — it's transient, not a
   // sticky error you must act on, so it clears itself after a few seconds.
  useEffect(() => {
