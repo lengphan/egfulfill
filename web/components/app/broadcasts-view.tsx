@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { EnvelopeSimple, CircleNotch, Warning, Plus, PaperPlaneTilt, Trash, PencilSimple, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -299,11 +300,16 @@ function BrandedEmailPreview({ branding, body }: { branding: EmailBranding | nul
  * least reversible thing in the product.
  */
 export function BroadcastsView({ embedded }: {
-  /** The page around it already says "Broadcasts". Drop the card's own title; its actions
-   *  stay in place. */
+  /** The page around it already says "Broadcasts", so the card drops its own title. */
   embedded?: boolean
 } = {}) {
   const tl = useLabelT()
+  /* The actions used to "stay in place" when embedded — which meant a SectionCard header
+     with no title and one right-aligned button, a 60px empty rule across the top of the
+     card. Inside a ConsoleShell they hoist into the page band instead, beside the figures,
+     which is where a page-level action belongs. Outside one there is no node and the card
+     keeps them, so the standalone view is unchanged. */
+  const inShell = useActionNode() !== null
  const [rows, setRows] = useState<Broadcast[]>([])
  const [mailOk, setMailOk] = useState(true)
  const [branding, setBranding] = useState<EmailBranding | null>(null) // saved branding, for the editor preview
@@ -558,17 +564,20 @@ export function BroadcastsView({ embedded }: {
     )
   }
 
+ const actionRow = (
+    <div className="flex items-center gap-2">
+      {/* Branding is a one-time setup behind this button (admin-only), not a panel. */}
+      {isAdmin && <EmailBrandingCard />}
+      <Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />{tl("broadcasts", "New broadcast")}</Button>
+    </div>
+  )
+
  return (
     <div className="space-y-4">
+      {inShell && <ActionsPortal>{actionRow}</ActionsPortal>}
       <SectionCard
  title={embedded ? undefined : tl("broadcasts", "Broadcasts")}
- actions={
-          <div className="flex items-center gap-2">
-            {/* Branding is a one-time setup behind this button (admin-only), not a panel. */}
-            {isAdmin && <EmailBrandingCard />}
-            <Button size="sm" onClick={() => openEditor(null)}><Plus size={14} weight="bold" />{tl("broadcasts", "New broadcast")}</Button>
-          </div>
-        }
+ actions={inShell ? undefined : actionRow}
  bodyClassName="p-5"
       >
         {!mailOk && (

@@ -4,8 +4,10 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { PenNib, X, CircleNotch, Warning, Storefront, Needle, CurrencyDollar, CheckCircle, CheckSquare, Square, LinkSimple, Plus, PencilSimple, Paperclip, MagnifyingGlassPlus, UploadSimple, Trash, DotsSixVertical } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
+import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
@@ -592,15 +594,24 @@ export function DesignerBoard() {
         {/* Add design — the explicit way in, in EITHER view. Drag-drop onto a lane only
  works in Board view, which left List view with no way to bring artwork in.
             Files land in Incoming regardless (see dropFiles), so no lane choice is needed. */}
-        {/* One search box for BOTH views — id, title, product, order #, partner ids. */}
-        <Input
- value={query}
- onChange={(e) => setQuery(e.target.value)}
- placeholder={tl("designer", "Search designs…")}
- className="ml-auto h-9 w-36 sm:w-56"
- aria-label={tl("designer", "Search designs")}
+        {/* One search box for BOTH views — id, title, product, order #, partner ids.
+            SearchField, not a bare Input: this was h-9 w-36 sm:w-56 with no magnifier, one
+            of the fixed widths the primitive exists to retire. */}
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder={tl("designer", "Search designs…")}
+          ariaLabel={tl("designer", "Search designs")}
+          onClear={() => setQuery("")}
+          width="sm"
+          className="ml-auto"
         />
-        <label className="eg-tap inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+        {/* buttonVariants, not hand-painted button chrome. CLAUDE.md §4 names this exact
+            shape — "a file <label> in field chrome" — and it was nine Tailwind classes
+            re-deriving `Button`'s default variant, which is how a house style drifts one
+            new file at a time. A <label> is still required: it is what opens the file
+            picker, so this borrows the LOOK without pretending to be a button. */}
+        <label className={cn(buttonVariants({ size: "sm" }), "eg-tap shrink-0 cursor-pointer")}>
           <Plus size={14} weight="bold" /> {tl("designer", "Add design")}
           <input
  type="file"
@@ -620,7 +631,11 @@ export function DesignerBoard() {
           value={view}
           onChange={setView}
           spacing="none"
-          className="border-b-0"
+          /* shrink-0 or the nav loses. TabBar's <nav> is overflow-x-auto, which makes it
+             infinitely shrinkable in a flex row — beside the search field and Add design it
+             collapsed to 84px and scrolled "List" out of sight entirely. A tab bar that
+             hides one of its two tabs is worse than one that wraps. */
+          className="shrink-0 border-b-0"
         />
       </div>
 
