@@ -92,3 +92,63 @@ export function printZoneOf(p: CatalogProduct | null, side = "front", inches?: {
   }
   return { x, y, w, h }
 }
+
+/**
+ * IS THE ARTWORK OUTSIDE WHAT WE CAN PRINT?
+ *
+ * Everything beyond the printable rectangle is trimmed in production, and until the zone was
+ * drawn on the order dialog nothing on either surface said so — the default placement is 45%
+ * of the stage wide against a tee zone of 31%, so artwork dropped and left alone has always
+ * hung outside the print area by half its own width. That was invisible rather than absent.
+ *
+ * Measured on the ROTATED bounding box, because a square turned 45° is 1.41× as wide as its
+ * own width and a check that ignores that passes designs the press will clip.
+ *
+ * `nat` is the artwork's natural pixel size, for its aspect ratio only. Null → not measured
+ * yet, and the honest answer is "don't know", never "fine".
+ */
+export function outsideZone(
+  pos: { x: number; y: number; w: number; r: number },
+  zone: PrintZone,
+  nat: { w: number; h: number } | null,
+): boolean | null {
+  if (!nat || !(nat.w > 0) || !(nat.h > 0)) return null
+  // The stage is square, so a width given as a % of it and a height given as a % of it share
+  // one scale — which is the whole reason that frame is held square.
+  const hw = pos.w / 2
+  const hh = (pos.w * (nat.h / nat.w)) / 2
+  const t = (pos.r * Math.PI) / 180
+  const c = Math.abs(Math.cos(t)), s = Math.abs(Math.sin(t))
+  const bw = hw * c + hh * s
+  const bh = hw * s + hh * c
+  // A hair of tolerance: a design sized to exactly fill the area should not accuse itself.
+  const e = 0.35
+  return pos.x - bw < zone.x - e || pos.x + bw > zone.x + zone.w + e
+    || pos.y - bh < zone.y - e || pos.y + bh > zone.y + zone.h + e
+}
+
+/**
+ * THE LARGEST THIS ARTWORK GOES INSIDE THE PRINT AREA, centred in it.
+ *
+ * Offered as an action rather than applied on drop. Changing where artwork lands by default
+ * would move nothing already saved, but it would quietly change what every future drop does,
+ * and "it used to land bigger" is a worse surprise than a button that says what it will do.
+ */
+export function fitToZone(
+  zone: PrintZone,
+  nat: { w: number; h: number } | null,
+  r = 0,
+): { x: number; y: number; w: number; r: number } {
+  const cx = zone.x + zone.w / 2
+  const cy = zone.y + zone.h / 2
+  // Unmeasured: assume square. A very tall image may want a second press once it has
+  // loaded, which is honest — guessing its shape would not be.
+  const ratio = nat && nat.w > 0 && nat.h > 0 ? nat.h / nat.w : 1
+  // ROTATION IS KEPT. Somebody turned that artwork on purpose, and squaring it up to make
+  // the arithmetic easier throws away a decision — the same loss as re-centring a template's
+  // placement. So the fit solves for the rotated bounding box instead.
+  const t = (r * Math.PI) / 180
+  const c = Math.abs(Math.cos(t)), s = Math.abs(Math.sin(t))
+  const w = Math.min(zone.w / (c + ratio * s), zone.h / (s + ratio * c))
+  return { x: cx, y: cy, w, r }
+}

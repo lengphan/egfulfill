@@ -3,14 +3,13 @@
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, CursorClick, Trash, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, LinkSimpleBreak, CaretDown, MagnifyingGlassPlus, type Icon } from "@phosphor-icons/react"
+import { UploadSimple, TextT, CursorClick, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, CaretDown, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
-import { Thumb } from "@/components/app/thumb"
 import { TabBar } from "@/components/app/tab-bar"
 import { EmptyState } from "@/components/app/empty-state"
 import { useLightbox } from "@/components/app/image-lightbox"
@@ -18,9 +17,13 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, getDesignLibrary, getDesignLibraryItem, deleteDesignLibrary, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate, type LibraryDesign } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
 import { proxiedImageSrc } from "@/lib/order-image"
+// The tile is shared with the order dialog — it takes props only, so it was always shared
+// code that happened to live in this one screen's file.
+import { ImageThumb } from "@/components/app/artwork-panel"
 import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
+import { layerDpi, dpiVerdict, useNaturalSizes } from "@/lib/print-quality"
 import { designFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
@@ -72,65 +75,6 @@ export type SideStack = { images: ImageLayer[]; texts: TextLayer[] }
 /** Shared, frozen, module-scope: a fresh `{ images: [], texts: [] }` per render would be a
  * new object every time and defeat every equality check that reads it. */
 const EMPTY_STACK: SideStack = Object.freeze({ images: [], texts: [] }) as SideStack
-
-/**
- * WHAT A PLACED LAYER WOULD PRINT AT, in DPI.
- *
- * The one number a print-on-demand editor owes the person using it, and we published a
- * 300 DPI guideline on the marketing site while checking nothing at all.
- *
- * `pos.w` is a percentage of the STAGE, and the print area is a percentage of the same
- * stage — so the layer's share of the printable rectangle is pos.w / zone.w, and its
- * printed width in inches is that share of the area's real width. Pixels over inches is
- * the DPI. Nothing here is about the file's own DPI tag: a 500px image labelled 300 DPI
- * still only has 500 pixels to spend, which is the thing that actually goes soft.
- */
-export function layerDpi(naturalW: number, posW: number, zoneW: number, areaInW: number): number | null {
- if (!(naturalW > 0) || !(posW > 0) || !(zoneW > 0) || !(areaInW > 0)) return null
- const printedInches = (posW / zoneW) * areaInW
- if (!(printedInches > 0)) return null
- return naturalW / printedInches
-}
-
-/** Green / amber / red, and what to say about it. 300 is the guideline we publish; 150 is
- * the floor most DTG and DTF work is still acceptable at. */
-export function dpiVerdict(dpi: number | null): { tone: "ok" | "warn" | "bad" | "unknown"; label: string } {
- if (dpi == null) return { tone: "unknown", label: "Measuring…" }
- if (dpi >= 300) return { tone: "ok", label: "Print quality: good" }
- if (dpi >= 150) return { tone: "warn", label: "Print quality: usable" }
- return { tone: "bad", label: "Print quality: too low" }
-}
-
-/**
- * THE PIXELS A PLACED IMAGE ACTUALLY HAS.
- *
- * Module-scope and content-keyed by src, so the same artwork on three layers is measured
- * once and a re-render never re-measures anything. Decoding is the whole cost here.
- */
-const naturalCache = new Map<string, { w: number; h: number }>()
-
-function useNaturalSizes(srcs: string[]): Map<string, { w: number; h: number }> {
- const key = srcs.join("\u0000")
- const [, setTick] = useState(0)
- useEffect(() => {
- const missing = key.split("\u0000").filter((u) => u && !naturalCache.has(u))
- if (!missing.length) return
- let live = true
-    Promise.all(missing.map((u) => new Promise<void>((res) => {
- const im = new window.Image()
- im.crossOrigin = "anonymous"
-      // A 0×0 entry is still an ANSWER — it stops this retrying a broken URL every render,
-      // and layerDpi reads it as "can't tell" rather than as a quality verdict.
- im.onload = () => { naturalCache.set(u, { w: im.naturalWidth, h: im.naturalHeight }); res() }
- im.onerror = () => { naturalCache.set(u, { w: 0, h: 0 }); res() }
- im.src = u
-    // Re-render once the whole batch is in, not once per image: a ten-layer design would
-    // otherwise re-render ten times on open.
-    }))).then(() => { if (live) setTick((n) => n + 1) })
- return () => { live = false }
-  }, [key])
- return naturalCache
-}
 
 async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 900): Promise<string> {
  const c = document.createElement("canvas"); c.width = size; c.height = size
@@ -205,96 +149,6 @@ export type RailArt = {
   measure?: boolean
   onPlace: () => void
   onDelete?: () => void
-}
-
-function ImageThumb({ url, src, name, badge, title, measure = true, onPlace, onDelete, onZoom }: {
- url: string; src?: string; name?: string; badge?: string; title?: string; measure?: boolean; onPlace: () => void; onDelete?: () => void; onZoom?: () => void
-}) {
-  const tl = useLabelT()
-  /**
-   * THE SIZE, MEASURED FROM THE PICTURE ITSELF.
-   *
-   * There was no way to tell a 4500px file from a 400px one before placing it — you found
-   * out from the quality meter after it was on the garment, which is the wrong end of the
-   * job. The image is being decoded to draw the thumbnail anyway, so onLoad already knows.
-   * No fetch, no extra request.
-   */
- const [dim, setDim] = useState<{ w: number; h: number } | null>(null)
-  /** Under 1200px on its long edge is soft on anything bigger than a pocket print, which is
-   * worth saying HERE — the cheapest moment to pick a different file is before placing it. */
- const small = dim != null && Math.max(dim.w, dim.h) > 0 && Math.max(dim.w, dim.h) < 1200
-  /**
-   * THE FILE IS NOT THERE.
-   *
-   * Buyer art is held as a URL and never copied, and Etsy hands us whatever the buyer typed
-   * into a listing variation — so a share page, an expired link or a PDF arrives here looking
-   * exactly like an image. It cannot be placed: a layer whose picture never loads is an
-   * invisible object on the garment, which is worse than not adding it. So the tile stops
-   * being a button and becomes the link to the original, which is the only thing left that
-   * can answer "what did they actually send".
-   */
- const [broken, setBroken] = useState(false)
- if (broken) {
-    return (
-      <a
- href={url} target="_blank" rel="noreferrer"
- title={[title || [badge, name].filter(Boolean).join(" · "), tl("designMaker", "Not an image we can load — opens the original")].filter(Boolean).join(" · ")}
- className="block w-full overflow-hidden rounded-md border border-border transition-colors hover:border-primary/50"
-      >
-        <Thumb className="aspect-square w-full" icon={<LinkSimpleBreak size={18} weight="duotone" />} note="" />
-        <span className="block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium text-hold">
-          {tl("designMaker", "Can’t load")}
-        </span>
-      </a>
-    )
-  }
- return (
-    <div className="group/thumb relative">
-      <button
- type="button" onClick={onPlace} title={[title || [badge, name].filter(Boolean).join(" · "), dim ? `${dim.w} × ${dim.h} px` : null].filter(Boolean).join(" · ") || tl("designMaker", "Place on the design")}
- className="block w-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-primary/50"
-      >
-        {/* A picture that fails must not paint its ALT — and the alt here is the marketplace
- listing title, so a refused buyer upload rendered a paragraph of "Custom Embroidered
- Apron with Name, Personalized Kitchen Apron, …" down a 130px column. Thumb is the
- rule; `broken` above is what this surface adds to it. */}
-        <Thumb
- src={src ?? url} alt={name || ""}
- onLoad={measure ? (e) => setDim({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }) : undefined}
- onBroken={() => setBroken(true)}
- className="aspect-square w-full"
-        />
-        {/* THE PIXELS, not a truncated id. This caption used to read "4148231…" — the order
- reference cut off mid-number, which identifies nothing and is on the tooltip
- anyway. What you actually need before dropping a file on a garment is how big it
- is. Amber when it is too small to print large. */}
-        <span className={"block truncate border-t border-border bg-card px-1 py-0.5 text-2xs font-medium tabular-nums " +
-          (small ? "text-hold" : "text-muted-foreground")}>
-          {dim ? `${dim.w}×${dim.h}` : badge || (measure ? "…" : name || "")}
-        </span>
-      </button>
-      {/* LOOKING IS NOT PLACING. The tile's click puts the artwork on the garment, which is
-          the right primary action and the wrong way to answer "what IS this" — at 130px two
-          of a seller's logos are a smudge apart. So the magnifier is its own control, on
-          hover, the same split ItemAvatar already makes between verifying and authoring. */}
-      {onZoom && (
-        <button
- type="button" onClick={onZoom} title={tl("designMaker", "View full size")}
- className="absolute left-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 group-hover/thumb:flex"
-        >
-          <MagnifyingGlassPlus size={11} weight="bold" />
-        </button>
-      )}
-      {onDelete && (
-        <button
- type="button" onClick={onDelete} title={tl("designMaker", "Remove from your library")}
- className="absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-alert group-hover/thumb:flex"
-        >
-          <Trash size={11} weight="bold" />
-        </button>
-      )}
-    </div>
-  )
 }
 
 /**

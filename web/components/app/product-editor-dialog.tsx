@@ -116,8 +116,13 @@ function PrintAreaEditor({ src, zone, onChange, onReset }: {
     <div className="flex flex-wrap items-start gap-4">
       <div ref={box} className="relative size-80 shrink-0 select-none overflow-hidden rounded-lg border border-border bg-muted">
         {src ? (
+          // p-[1%] MATCHES THE STAGE. DesignStage draws a catalogue blank with a 1% inset and
+          // this drew it edge to edge, so the same percentages framed two slightly different
+          // garments: a box placed exactly on a chest here sat about 1% of the stage high once
+          // it reached the designer. The rectangle is stored against the square frame, so both
+          // frames have to inset the picture identically.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="" className="pointer-events-none size-full object-contain" />
+          <img src={src} alt="" className="pointer-events-none size-full object-contain p-[1%]" />
         ) : (
           <span className="grid size-full place-items-center text-xs text-muted-foreground">{tl("product", "No photo for this side")}</span>
         )}

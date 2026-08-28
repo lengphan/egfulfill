@@ -12,11 +12,14 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app/dropzone"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
+import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
+import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
+import { layerDpi, dpiVerdict, printedInches, useNaturalSizes } from "@/lib/print-quality"
 import { TIER_LABEL, TIER_WHY, feeFor } from "@/lib/design-fee"
 import { fileToUploadUrl } from "@/lib/chat-upload"
 import { perceptualHash } from "@/lib/phash"
@@ -798,6 +801,64 @@ const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
  * rather than pretending to be a broken image, because those need different actions from
  * whoever is looking.
  */
+/**
+ * ONE FACE, DRAWN AS ITSELF.
+ *
+ * The sides were two words in pills under the garment — "Front" and "Back" — so the only way
+ * to learn whether the back carried anything was to press it and look. On a four-face blank
+ * that is three round trips to answer "is this line finished", which is the question the
+ * window is open to answer.
+ *
+ * The tile is the garment with its own artwork on it, at the placement it is actually saved
+ * at. Nothing here is interactive except the tile itself: it is a picture of a state, and a
+ * handle on it. Same %-frame as the stage (square, `pos` in percentages), so what you see in
+ * a 64px tile is what the 500px stage shows.
+ */
+function FaceTile({ url, art, label, active, extra, onSelect }: {
+ url: string
+ art?: { data: string; pos: Pos } | null
+ label: string
+ active: boolean
+  /** What this face ADDS per unit, when it is not the first printed one. Null → free, and
+   *  nothing is said: a price of nothing is noise on every single-sided line. */
+ extra?: string | null
+ onSelect: () => void
+}) {
+ return (
+    <button
+ type="button"
+ onClick={onSelect}
+ aria-current={active ? "true" : undefined}
+ title={art ? `${label} — has artwork` : `${label} — empty`}
+ className={"group flex w-full flex-col items-center gap-1 rounded-lg border p-1 transition-colors "
+        + (active ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-accent/50")}
+    >
+      <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-muted/40">
+        {url && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={url} alt="" className="absolute inset-0 size-full object-contain p-[4%]" />
+        )}
+        {art?.data && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+ src={canvasReadableSrc(art.data)} alt=""
+ className="absolute block"
+ style={{
+ left: `${art.pos.x}%`, top: `${art.pos.y}%`, width: `${art.pos.w}%`,
+ transform: `translate(-50%,-50%) rotate(${art.pos.r}deg)`,
+            }}
+          />
+        )}
+      </span>
+      <span className={"w-full truncate text-center text-[10px] font-medium capitalize leading-none "
+        + (active ? "text-primary" : "text-muted-foreground")}>{label}</span>
+      {extra && (
+        <span className="text-[9px] leading-none tabular-nums text-muted-foreground">{extra}</span>
+      )}
+    </button>
+  )
+}
+
 function CustomerFileThumb({ src }: { src: string }) {
   const tl = useLabelT()
  const art = useArtworkSrc(src)
@@ -916,11 +977,14 @@ export function DesignCanvasDialog({
    */
  const defaultTplName = [item.blank || item.sku || "Placement", item.color].filter(Boolean).join(" · ")
 
+ /** The catalogue row this line resolves to. Lifted OUT of the faces memo because the
+  *  print area and the printable rectangle are the product's, not the mockup's — and the
+  *  order dialog had no way to ask for either. */
+ const product = useMemo(() => resolveProduct(item, catalog ?? []), [item, catalog])
  const faces = useMemo(() => {
- const product = resolveProduct(item, catalog ?? [])
  const f = mockupFaces(product, item.color)
  return f.length ? f : (item.img ? [{ side: "front", url: item.img }] : [])
-  }, [item, catalog])
+  }, [product, item.color, item.img])
  const [side, setSide] = useState(0)
   /**
    * WHOSE PHOTO THE STAGE DRAWS.
@@ -941,6 +1005,8 @@ export function DesignCanvasDialog({
  const [mockBusy, setMockBusy] = useState(false)
 
  const sideName = (faces[side]?.side || "front").toLowerCase()
+
+
 
   /**
    * ONE ARTWORK PER FACE, held here while the window is open.
@@ -1001,6 +1067,46 @@ export function DesignCanvasDialog({
     }
  return out
   }, [faces, facesWithArt])
+
+  /* Placed AFTER the memos above, not beside `sideName` where it reads more naturally.
+     The React Compiler treats a value passed into a function it cannot see through as
+     possibly mutated, so computing the zone between `sideName` and the two hooks that take
+     it as a dependency made both of them unverifiable — `preserve-manual-memoization`,
+     three errors, and the whole component silently dropped from compilation. */
+  /**
+   * THE PRINTABLE RECTANGLE, AND WHAT THE ARTWORK WOULD PRINT AT.
+   *
+   * Neither of these reached this window. `DesignStage` has drawn a `printZone` since it
+   * was written and the Design Maker passes one; this caller never did — so the surface
+   * that places artwork on a line the factory will actually print was the one that could
+   * not show where the print goes. `layerDpi` was worse: exported from design-maker.tsx
+   * and imported by nothing, so a 640px file stretched across a 12-inch front saved in
+   * silence.
+   *
+   * Both are read from the PRODUCT, per side. Nothing here is typed by hand — a print area
+   * a seller could retype is a print area that disagrees with the one the floor set up.
+   */
+ const zone = printZoneOf(product, sideName)
+ const areaIn = printSizeOf(product, sideName)
+  // One src, measured once and cached by content. Unconditional — hooks may not be skipped
+  // just because a face happens to be empty.
+ const natural = useNaturalSizes(designUrl ? [designUrl] : [])
+ const artDpi = layerDpi(natural.get(designUrl)?.w ?? 0, pos.w, zone.w, areaIn.w)
+ const artIn = printedInches(pos.w, zone.w, areaIn.w)
+ const quality = dpiVerdict(designUrl ? artDpi : null)
+  /**
+   * IS IT OUTSIDE WHAT WE CAN PRINT — and the one press that fixes it.
+   *
+   * Drawing the zone made a defect visible that had always been true: DEFAULT_POS is 45% of
+   * the stage wide and a tee's printable area is 31%, so artwork dropped and left alone hangs
+   * outside it by half its own width and is trimmed at the press.
+   *
+   * REPORTED, not corrected. Changing where artwork lands by default moves nothing already
+   * saved, but it silently changes every future drop — so the fit is a button that says what
+   * it will do, and the seller keeps the placement they chose.
+   */
+ const artNat = natural.get(designUrl) ?? null
+ const artOutside = designUrl && !ownMockups[sideKey] ? outsideZone(pos, zone, artNat) : null
 
   // Thread match (EMB only): sample the artwork's dominant colours → nearest in-stock
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
@@ -2054,7 +2160,25 @@ export function DesignCanvasDialog({
  way the bar pinned ABOVE the padding and the thread list scrolled on underneath it,
  visible below the button — which reads as a bar that has come loose. Nothing is short
  of padding: the bar carries its own. */
- className="max-h-[92vh] overflow-y-auto pb-0 sm:max-w-md lg:max-w-[min(94vw,600px)]"
+          /**
+           * FULL SCREEN, over the app rather than inside it.
+           *
+           * This was a 1040px popup, and it was the wrong container the whole time. The
+           * window does placement, resolution, four printed faces, a thread list, the files
+           * on the line and the seller's whole artwork library — that is an editor, and an
+           * editor is a room, not a card floating in the middle of one. The Design Maker has
+           * been `fixed inset-0` since it was built; the only reason these two differed was
+           * which file each was written in.
+           *
+           * Still a Dialog, deliberately. Escape, the focus trap, the portal and the aria
+           * wiring are the parts nobody notices until they are gone, and a hand-rolled
+           * `fixed inset-0` div has none of them. What changes is the SHAPE of the popup, so
+           * the nested pickers and confirms still sit above it on z-50 exactly as before.
+           *
+           * The list underneath stays mounted and stays scrolled: this is an overlay, not a
+           * route, so closing it puts you back on the same row of a 700-row queue.
+           */
+ className="inset-0 top-0 left-0 flex h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"
         // Drop ANYWHERE in the designer, not just onto a button. This dialog already had
         // Upload and From library but no drop target at all, so a dragged file had nowhere
         // to land and the only route was a file picker. The point of putting it here is
@@ -2097,7 +2221,7 @@ export function DesignCanvasDialog({
  becoming a three-line headline. Etsy names run 130+ characters, so unclamped
  this pushed the stage most of the way down the window and ran the last word
  underneath the ✕. */}
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-3">
           <DialogTitle className="line-clamp-2 pr-10 leading-snug">{item.name || item.sku}</DialogTitle>
           {/* THE VARIANT, READ-ONLY. What is being printed on is a thing this window has to
  state and does not need to own: the picker is on the order's item row, and two
@@ -2128,7 +2252,23 @@ export function DesignCanvasDialog({
           * uses, so it was 380px of column earning almost nothing and costing the one thing
           * this window is for.
           */}
-        <div className="flex flex-col gap-5">
+        {/**
+          * TWO COLUMNS AGAIN, and this time the pieces for it already existed.
+          *
+          * The window had been cut to one column and 600px, which put the garment in a
+          * narrow strip with the buyer's file, the threads, the files and the charge stacked
+          * below the fold — so judging placement and acting on it were never on screen at
+          * once, in a window whose whole job is both. The two children of this stack are
+          * already exactly the two columns; they were only ever stacked.
+          *
+          * `items-start`, so the controls begin level with the top of the garment rather
+          * than floating down its middle.
+          */}
+        {/* THE WORK AREA — one row that owns whatever height is left.
+            `min-h-0` on a flex child is what actually lets it shrink; without it the column
+            refuses to go below its content and the action bar gets pushed off the bottom,
+            which is the same "Save below the fold" defect in a different container. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 lg:flex-row lg:gap-6 lg:overflow-hidden">
         {/* The left column is sized to the stage itself rather than to half the dialog. An
  even 50/50 split gave the controls far more width than their cards use and stranded
  the remainder as dead space beside them; letting the garment take what it needs and
@@ -2158,7 +2298,11 @@ export function DesignCanvasDialog({
             the sides, the embroidery card and the action bar travel under it. That is the
             "the image floats over everything when I scroll" report, and it had survived the
             layout change that removed its only reason to exist. */}
-        <div className="min-w-0 lg:w-full">
+        {/* `flex-1` and `min-h-0` are LG-ONLY. Below it the work area scrolls as a single
+            stack, and a flex-1 child in a scrolling column collapses toward zero while the
+            stage inside it keeps its own max-width — which is why the artwork panel was
+            drawn straight over the garment at 900px wide. */}
+        <div className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:flex-1">
         {/* Side tabs — only when the blank has more than one face to place art on. */}
         {/**
           * A SIDE LIST, not just a mockup switcher.
@@ -2239,62 +2383,61 @@ export function DesignCanvasDialog({
             itself. Two sticky boxes for one picture, from two different sessions, and below
             `lg` only this one applied: on a tablet the garment pinned and the whole rest of
             the window scrolled beneath it. */}
-        <div className="relative mx-auto w-full max-w-[min(100%,62vh)]">
-          <DesignStage
- className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
- designUrl={designUrl}
- pos={pos} setPos={setPos}
- onRemove={() => void removeArtwork()}
-            /* ON THE LAYER, WITH THE REST. This was a labelled button parked in the corner of
- the stage while rotate, lock and delete sat in one strip above the selection —
- so the one tool that changes the ARTWORK was the only one not with the artwork
- tools. The strip has always been able to carry it; nothing passed it. */
- onEraseBg={bg.run}
- eraseBusy={bg.busy}
- onUndoErase={bg.canUndo ? bg.undo : undefined}
-            // Only when there IS another face to copy to — a one-sided blank gets no button.
- onCopy={faces.length > 1 && designUrl ? copyToOtherFaces : undefined}
- copyLabel={`Copy to the other ${faces.length - 1 === 1 ? "side" : "sides"}`}
- picking={picking} onPickColor={onPickColor}
-            // Suppress the stage's OWN "Pick a blank to start designing" placeholder: the
-            // overlay below is already the empty state, and rendering both stacked two
-            // different sentences on top of each other in the same 40px. An empty fragment
-            // rather than null — the stage falls back on nullish, so null would restore it.
- emptyHint={<></>}
-          />
-          {/* THE BACKGROUND TOOLS, ON THE ARTWORK.
-              Buyer artwork arrives on a white or grey plate more often than not, and this
- is where someone is looking when they notice. What it produces is a data: url,
- so `save` persists the CUT-OUT and the removal travels with the design
- afterwards; leave it alone and the artwork saves exactly as it arrived.
-
-              Bottom-left, over the stage: the top corners hold the stage's own remove and
- the artwork usually sits centred, so this is the one corner it doesn't cover. */}
-          {/**
-            * THE TOOL RAIL — on the artboard, the way a design tool puts it.
-            *
-            * These lived in the right-hand column as a NUMBERED STEP ("1 · Your design →
-            * Upload image · Library"), which framed placing artwork as a form to complete
-            * rather than something you do to a picture. The step told you where you were in
-            * a process; the rail tells you what you can do to the thing under your cursor,
-            * and it does it without your eye leaving the garment.
-            *
-            * Left edge, vertical, one column of marks: it is the edge with nothing on it —
-            * the selection strip floats above the artwork, the sides sit under the stage,
-            * and artwork lands centred — so the rail costs no view of what is being made.
-            */}
-          {/* MIDDLE-LEFT, not top-left. Pinned to the top it sat level with the garment's
- collar and the eye had to travel up to reach it; centred, it is where the
- cursor already is when it is on the artwork. */}
-          {/* z-20 — ABOVE THE EMPTY-STAGE TARGET.
-              With no artwork on a face, a button covering `absolute inset-0` sits over the
-              whole stage so that clicking the garment anywhere opens the picker. The rail is
-              drawn earlier in the DOM and carried no z-index, so that overlay painted ON TOP
-              of it: pressing Files never reached Files — it hit the overlay and opened the OS
-              file browser instead of the panel. It went unnoticed while the rail's first
-              entry was Upload, because hitting the overlay did the same thing as hitting the
-              button. The moment that entry became a panel, the two stopped agreeing. */}
-          <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-1 rounded-xl border border-border bg-card/95 p-1 backdrop-blur">
+        {/**
+          * THE RAIL SITS BESIDE THE GARMENT, NOT ON TOP OF IT.
+          *
+          * It was `absolute left-2 top-1/2` — parked in the middle of the stage, over the
+          * left sleeve. On a landscape flat it covered the garment; on a portrait one it sat
+          * in the dead margin; either way its position was decided by the picture rather than
+          * by the layout, so it read as something dropped on the artboard rather than as a
+          * toolbar. It also stole the one gesture the stage owns: everything under it was
+          * unclickable, which is the bug the z-20 note below records being chased.
+          *
+          * Its own track in a flex row instead. The stage keeps its square frame — the
+          * design's %-coords and the print zone are both measured against it, so its aspect
+          * is not ours to change — and simply gets the room the rail is no longer taking.
+          */}
+        {/* 54vh, DOWN from 62. The stage is square, so its cap is a HEIGHT budget however it
+            is written — and the toolbar above it plus the measurement and the side pills below
+            it now share that budget. At 62vh the pills sat underneath the pinned action bar on
+            a 900px screen, which is the "Save is below the fold" defect this window has already
+            been cut down twice to avoid. Width is no longer the scarce thing: the controls
+            moved into their own column. */}
+        {/**
+          * THE FACES STAND BESIDE THE GARMENT, AS GARMENTS.
+          *
+          * They were two words in pills under the stage, so "does the back have anything on
+          * it" could only be answered by pressing Back and looking — three round trips on a
+          * four-face blank, to answer the question this window is open for. The tiles carry
+          * the same three facts the pills did (which face, which have artwork, what a second
+          * one costs) and add the one they could not: what is actually on each.
+          */}
+        <div className="flex w-full items-start gap-3">
+          {faces.length > 1 && (
+            <div className="flex w-[68px] shrink-0 flex-col gap-1.5" role="tablist" aria-label="Printed faces">
+              {faces.map((f, i) => {
+ const k = (f.side || "front").toLowerCase()
+ const art = k === sideName
+                  ? (designUrl ? { data: designUrl, pos } : null)
+                  : ((faceArt ?? {})[k] ?? null)
+                /* The surcharge is per ADDITIONAL face: shown on one that already costs, and
+                   on an empty one that WOULD — which is only true once something else is
+                   printed. Nothing at all when the rate is 0. */
+ const charges = !!sideFee && sideFee > 0 && (art ? costingFaces[k] : anyFaceHasArt)
+ return (
+                  <FaceTile
+ key={f.side} url={f.url} art={art} label={f.side || "front"}
+ active={i === side} onSelect={() => goToSide(i)}
+ extra={charges ? `+${sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
+                  />
+                )
+              })}
+            </div>
+          )}
+        <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-15rem))] flex-col gap-2">
+          {/* rounded-LG. `rounded-xl` and up all resolve to --radius (26px), which on a
+              64px-wide box is a capsule — the shape reserved for count badges and avatars. */}
+          <div className="flex shrink-0 items-stretch gap-1 self-start rounded-lg border border-border bg-card p-1">
             {/**
               * ONE DOOR FOR FILES, not three beside each other.
               *
@@ -2435,6 +2578,65 @@ export function DesignCanvasDialog({
               </button>
             )}
           </div>
+          <div className="relative w-full">
+          <DesignStage
+ className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
+ designUrl={designUrl}
+            /* The printable rectangle. Drawn on OUR blank only: a seller's own photo is a
+               backdrop we did not calibrate, so a zone measured against the catalogue flat
+               would land somewhere arbitrary on it and read as fact. */
+ printZone={ownMockups[sideKey] ? undefined : zone}
+ pos={pos} setPos={setPos}
+ onRemove={() => void removeArtwork()}
+            /* ON THE LAYER, WITH THE REST. This was a labelled button parked in the corner of
+ the stage while rotate, lock and delete sat in one strip above the selection —
+ so the one tool that changes the ARTWORK was the only one not with the artwork
+ tools. The strip has always been able to carry it; nothing passed it. */
+ onEraseBg={bg.run}
+ eraseBusy={bg.busy}
+ onUndoErase={bg.canUndo ? bg.undo : undefined}
+            // Only when there IS another face to copy to — a one-sided blank gets no button.
+ onCopy={faces.length > 1 && designUrl ? copyToOtherFaces : undefined}
+ copyLabel={`Copy to the other ${faces.length - 1 === 1 ? "side" : "sides"}`}
+ picking={picking} onPickColor={onPickColor}
+            // Suppress the stage's OWN "Pick a blank to start designing" placeholder: the
+            // overlay below is already the empty state, and rendering both stacked two
+            // different sentences on top of each other in the same 40px. An empty fragment
+            // rather than null — the stage falls back on nullish, so null would restore it.
+ emptyHint={<></>}
+          />
+          {/* THE BACKGROUND TOOLS, ON THE ARTWORK.
+              Buyer artwork arrives on a white or grey plate more often than not, and this
+ is where someone is looking when they notice. What it produces is a data: url,
+ so `save` persists the CUT-OUT and the removal travels with the design
+ afterwards; leave it alone and the artwork saves exactly as it arrived.
+
+              Bottom-left, over the stage: the top corners hold the stage's own remove and
+ the artwork usually sits centred, so this is the one corner it doesn't cover. */}
+          {/**
+            * THE TOOL RAIL — on the artboard, the way a design tool puts it.
+            *
+            * These lived in the right-hand column as a NUMBERED STEP ("1 · Your design →
+            * Upload image · Library"), which framed placing artwork as a form to complete
+            * rather than something you do to a picture. The step told you where you were in
+            * a process; the rail tells you what you can do to the thing under your cursor,
+            * and it does it without your eye leaving the garment.
+            *
+            * Left edge, vertical, one column of marks: it is the edge with nothing on it —
+            * the selection strip floats above the artwork, the sides sit under the stage,
+            * and artwork lands centred — so the rail costs no view of what is being made.
+            */}
+          {/* MIDDLE-LEFT, not top-left. Pinned to the top it sat level with the garment's
+ collar and the eye had to travel up to reach it; centred, it is where the
+ cursor already is when it is on the artwork. */}
+          {/* z-20 — ABOVE THE EMPTY-STAGE TARGET.
+              With no artwork on a face, a button covering `absolute inset-0` sits over the
+              whole stage so that clicking the garment anywhere opens the picker. The rail is
+              drawn earlier in the DOM and carried no z-index, so that overlay painted ON TOP
+              of it: pressing Files never reached Files — it hit the overlay and opened the OS
+              file browser instead of the panel. It went unnoticed while the rail's first
+              entry was Upload, because hitting the overlay did the same thing as hitting the
+              button. The moment that entry became a panel, the two stopped agreeing. */}
 
           {/**
             * OUR OWN BOX, not the browser's.
@@ -2530,65 +2732,64 @@ export function DesignCanvasDialog({
               </span>
             </button>
           )}
-        </div>
-        {/* THE SIDES, UNDER THE GARMENT.
-            They sat above it, which is where a page puts NAVIGATION — and these are not
- navigation, they are the placement: which face of the shirt this artwork goes on,
- what each face already carries, and what a second face costs. Under the stage
- they read as controls for the thing above them, in the same place every design
- tool puts its artboard row. */}
-        {faces.length > 1 && (
-          /* CENTRED ON THE STAGE, ALWAYS. Left-aligned they hung off one edge of a garment
- that is itself centred, so the row moved every time the canvas resized while the
- thing it belongs to did not. Centring ties them to the artboard above rather
- than to the panel's left margin. */
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {faces.map((f, i) => {
- const has = facesWithArt[(f.side || "front").toLowerCase()]
-              /**
-               * THE PILL ITSELF CARRIES THE STATE — no dot.
-               *
-               * A dot is a second mark inside a control that could just BE the mark, and next
-               * to a filled pill it read as a third state rather than as "this one has
-               * something on it". Three appearances, one property:
-               *
-               * solid    — the face you are on
-               * tinted   — has artwork, not selected
-               * plain    — empty
-               *
-               * Primary, not a status colour: emerald/amber/red are spoken for on the floor
-               * (shipped, hold, alert) and a designer tab is not a floor status.
-               */
- return (
-                <button key={f.side} onClick={() => goToSide(i)}
- title={has ? `${f.side} — has artwork` : `${f.side} — empty`}
- className={"flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium capitalize transition-colors "
-                    + (i === side ? "bg-primary text-primary-foreground"
- : has ? "bg-primary/10 text-primary hover:bg-primary/15"
- : "bg-muted text-muted-foreground hover:bg-accent")}>
-                  {f.side}
-                  {/**
-                    * WHAT THIS FACE COSTS, before it is chosen.
-                    *
-                    * The surcharge is per ADDITIONAL face, so the first one printed is
-                    * included and every one after adds this per unit. A seller found that
-                    * out on the Summary AFTER placing the artwork; the pill is where the
-                    * decision is actually made.
-                    *
-                    * Shown on a face that already costs, and on an empty one that WOULD —
-                    * which is only true once something else is printed. Nothing at all when
-                    * the rate is 0: an empty "+$0.00" is noise.
-                    */}
-                  {!!sideFee && sideFee > 0 && (has ? costingFaces[(f.side || "front").toLowerCase()] : anyFaceHasArt) && (
-                    <span className={"tabular-nums " + (i === side ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
-                      +{sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
           </div>
-        )}
+          {/**
+            * WHAT IT PRINTS AT — the one number this window owed and never said.
+            *
+            * Placed size first, because that is the fact; the verdict second, because that is
+            * our opinion of it. Both are read off the LIVE placement, so dragging the corner
+            * moves them — which is what makes it a measurement rather than a badge.
+            *
+            * No sentence under it. The tone carries "too low" on its own and the title says
+            * what to do about it, per §4 — a paragraph explaining DPI under a control is the
+            * exact shape this codebase keeps having to delete.
+            */}
+          {designUrl && !ownMockups[sideKey] && (
+            <div className="flex items-center justify-center gap-2 text-xs">
+              {artIn != null && (
+                <span className="tabular-nums text-muted-foreground">
+                  {artIn.toFixed(1)}&Prime; wide
+                </span>
+              )}
+              <span
+                title={quality.tone === "bad"
+                  ? "Scale it down, or replace it with a larger file — this will look soft in print."
+                  : quality.tone === "warn"
+                  ? "Fine for DTG and DTF. Embroidery wants 300."
+                  : undefined}
+                className={"inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 font-medium "
+                  /* The SAME tokens the Design Maker's meter uses — `hold` is the amber one
+                     and there is no `--warning`, so `text-warning` would have rendered as
+                     nothing at all. Two surfaces judging one file must not disagree. */
+                  + (quality.tone === "ok" ? "bg-success/10 text-success"
+                  : quality.tone === "warn" ? "bg-hold/10 text-hold"
+                  : quality.tone === "bad" ? "bg-destructive/10 text-destructive"
+                  : "text-muted-foreground")}
+              >
+                {artDpi != null && <span className="tabular-nums">{Math.round(artDpi)} DPI</span>}
+                <span>{quality.label.replace("Print quality: ", "")}</span>
+              </span>
+              {/* The warning carries its own fix. Not a sentence underneath it — the button
+                  IS the explanation of what is wrong, per §4. */}
+              {artOutside && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="rounded-lg bg-hold/10 px-2 py-0.5 font-medium text-hold">
+                    {tl("canvas", "Outside the print area")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPos((p) => fitToZone(zone, artNat, p.r))}
+                    title={tl("canvas", "Make it as large as it goes inside the printable area, centred, keeping any rotation")}
+                    className="rounded-lg px-2 py-0.5 font-medium text-primary transition-colors hover:bg-accent"
+                  >
+                    {tl("canvas", "Fit")}
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        </div>
         {/**
           * WHAT IS ACTUALLY ON THIS FACE — the receipt for the drop.
           *
@@ -2624,7 +2825,37 @@ export function DesignCanvasDialog({
             COLUMN now, so self-start became a CROSS-axis rule — it shrank every one of these
  blocks to its own content width and pinned them to the left edge, beside the
  garment instead of under it. */}
-        <div className="mx-auto flex w-full max-w-[min(100%,560px)] flex-col gap-4">
+        {/* The ONLY thing that scrolls. Threads, files and the library are a list of
+            unknown length; the garment is not, and it must never leave the screen to let
+            them through. */}
+        <div className="mx-auto flex w-full max-w-[min(100%,560px)] flex-col gap-4 lg:mx-0 lg:w-[380px] lg:max-w-none lg:shrink-0 lg:overflow-y-auto">
+          {/**
+            * YOUR ARTWORK, ON SCREEN — the thing this window has never shown.
+            *
+            * Every route to a picture was behind the "Files" popover, so an empty face was a
+            * dashed box and two icons and no sign that the seller already owns the file they
+            * are about to go looking for. The Design Maker has had this panel since it was
+            * built; the difference between the two surfaces was never a design decision, only
+            * which file the code happened to be written in.
+            *
+            * `templates` is NOT offered here. A template carries a blank, a stack and a print
+            * area, and this canvas belongs to an order line whose garment is already decided —
+            * the template route that DOES make sense on a line (take the placement, leave the
+            * blank) is the one on the Files popover, and it is deliberately not duplicated.
+            */}
+          {!filesLocked && (
+            <ArtworkPanel
+              columns={3}
+              onPlace={(url, name) => {
+                setErr(null)
+                setDesignUrl(url.startsWith("data:") ? url : canvasReadableSrc(url))
+                setPos(DEFAULT_POS)
+                setDesignName(name ?? null)
+                setDesignSize(null)
+                noteArtSource(sideName, "")
+              }}
+            />
+          )}
         {/* THE VARIANT IS NOT PICKED HERE ANY MORE.
             It is on the order's item row, four fields wide, and this window repeated the
  same picker on the same line — two places to change one fact, and the second one
@@ -3141,7 +3372,13 @@ export function DesignCanvasDialog({
             past it at the edges, the popup drops its own pb-6 so the bar can reach the bottom,
             the bottom corners keep the popup's radius, and what passes behind it stays legible
             under the blur. Same shape the site-content panel uses. */}
-        <div className="order-last sticky bottom-0 z-10 -mx-6 space-y-2 rounded-b-[min(var(--radius-4xl),24px)] border-t border-border bg-popover/95 px-6 py-4 backdrop-blur">
+        </div>
+        </div>
+        {/* OUT of the scrolling area entirely. It was `sticky bottom-0` inside a scroll box,
+            which is what you reach for when the window itself is the scroller. It isn't any
+            more: the shell is a fixed-height column, only the controls column scrolls, and a
+            shrink-0 row at the bottom of that column holds the edge without sticky at all. */}
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-popover px-6 py-3">
           {/* Say WHY Save is refused — and ONLY when it is. This printed "add an image so we
               can show where your file sits on the product" whenever no image was placed,
               including on a line carrying a machine file, which is now saveable. A sentence
@@ -3182,8 +3419,6 @@ export function DesignCanvasDialog({
  a reason to grey out Save. */}
             <Button onClick={() => void save()} disabled={saving || !canSave}>{saving ? <CircleNotch size={15} className="animate-spin" /> : tl("canvas", "Save")}</Button>
           </div>
-        </div>
-        </div>
         </div>
         <LibraryPickerDialog
  open={libOpen} onOpenChange={setLibOpen}
