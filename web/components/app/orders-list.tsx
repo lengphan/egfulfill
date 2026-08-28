@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
+import { cachedOrders, streamOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken, getUser } from "@/lib/auth"
@@ -262,28 +262,40 @@ export function OrdersList() {
  const setHiddenCols = (ids: OrderColId[]) => { setHidden(ids); saveHiddenCols(ids) }
  const visibleCols = useMemo(() => colOrder.filter((id) => !hidden.includes(id)), [colOrder, hidden])
 
- const load = useCallback(() => {
+  /**
+   * THE FIRST SCREEN DOES NOT WAIT FOR THE LAST ORDER.
+   *
+   * Measured on the live box: this list is 2.59MB on a staff account, and all of it had to
+   * arrive before anything drew. The query was never the cost (the whole thing is ~110ms);
+   * the megabytes crossing from Jakarta were. So the first 100 orders paint and the rest
+   * streams in behind them — same total bytes, a screen that is usable long before them.
+   *
+   * `complete` is not cosmetic. Until the walk finishes, "nothing matches that filter" is a
+   * claim this component cannot honestly make (§4, Honesty in UI).
+   */
+  const [complete, setComplete] = useState(false)
+  const load = useCallback(() => {
     // Signed in → show real data (empty state if none). Only fall back to samples
     // when there's no session at all (standalone/marketing preview).
- const signedIn = !!getToken()
- getOrders()
-      .then((rows) => {
- if (rows && rows.length) {
- setOrders(rows)
- setIsDemo(false)
-        } else {
- setOrders(signedIn ? [] : DEMO)
- setIsDemo(!signedIn)
-        }
-      })
-      .catch(() => {
- setOrders(signedIn ? [] : DEMO)
- setIsDemo(!signedIn)
-      })
+    const signedIn = !!getToken()
+    const settle = (rows: OrderRow[], done: boolean) => {
+      if (rows.length) { setOrders(rows); setIsDemo(false) }
+      else if (done) { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) }
+      if (done) setComplete(true)
+    }
+    // Another board may already hold the whole list — reuse it rather than walk it again.
+    const held = cachedOrders()
+    if (held) { settle(held, true); return undefined }
+    setComplete(false)
+    const ctl = new AbortController()
+    streamOrders(settle, { pageSize: 100, signal: ctl.signal })
+      .catch(() => { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn); setComplete(true) })
+    return () => ctl.abort()
   }, [])
- useEffect(() => {
- const id = setTimeout(load, 0)
- return () => clearTimeout(id)
+  useEffect(() => {
+    let stop: (() => void) | undefined
+    const id = setTimeout(() => { stop = load() }, 0)
+    return () => { clearTimeout(id); stop?.() }
   }, [load])
 
   // Whose orders am I looking at? A team member works IN their leader's shop — these are
@@ -409,6 +421,9 @@ export function OrdersList() {
                 </div>
               }
             />
+          ) : !complete ? (
+            /* Still walking the list — "nothing matches" is not yet a true statement. */
+            <EmptyState icon={Package} title={tl("ordersList", "No match yet — still loading orders")} />
           ) : (
             <EmptyState icon={Package} title={tl("ordersList", "No orders here")} note={tl("ordersList", "Nothing matches that filter or search.")} />
           )

@@ -3354,6 +3354,7 @@ const vi: Dict = {
   "ordersList.Open order": "Mở đơn hàng",
   "ordersList.Connect a store": "Kết nối cửa hàng",
   "ordersList.Search orders…": "Tìm đơn hàng…",
+  "ordersList.No match yet — still loading orders": "Chưa khớp — vẫn đang tải đơn hàng",
   "ordersList.No orders here": "Không có đơn hàng nào ở đây",
   "ordersList.No orders yet": "Chưa có đơn hàng nào",
   "ordersList.No tracking yet": "Chưa có mã vận đơn",

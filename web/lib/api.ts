@@ -2207,17 +2207,91 @@ export async function getOrders(opts?: { force?: boolean }): Promise<OrderRow[]>
   return (await cachedList("orders", 30_000, loadOrders)).slice()
 }
 
-async function loadOrders() {
-  const rows = await api<OrderRow[]>(`/api/orders`)
-  // The list no longer inlines base64 thumbnails — it sends `img_ref`, a cacheable URL for
-  // the same bytes (see the aggregate in orders.js; it was 74% of a 6MB response). Resolve
-  // it back onto `img` HERE, at the API boundary, so every consumer — the avatars, the row
-  // photo strip, the design canvas — keeps reading the one field it always has, and none of
-  // them had to learn that the transport changed.
+// The list no longer inlines base64 thumbnails — it sends `img_ref`, a cacheable URL for
+// the same bytes (see the aggregate in orders.js; it was 74% of a 6MB response). Resolve
+// it back onto `img` HERE, at the API boundary, so every consumer — the avatars, the row
+// photo strip, the design canvas — keeps reading the one field it always has, and none of
+// them had to learn that the transport changed.
+function resolveImgRefs(rows: OrderRow[] | null | undefined): OrderRow[] {
   for (const o of rows ?? []) {
     for (const it of o.items ?? []) if (!it.img && it.img_ref) it.img = `${API_BASE}${it.img_ref}`
   }
-  return rows
+  return rows ?? []
+}
+
+async function loadOrders() {
+  return resolveImgRefs(await api<OrderRow[]>(`/api/orders`))
+}
+
+/** The shared order list IF it is already loaded and still fresh — so a caller that can
+ *  stream doesn't start streaming over a list another board just fetched in full. */
+export function cachedOrders(): OrderRow[] | null {
+  const hit = _lists.get("orders")
+  return hit && Date.now() - hit.at < 30_000 ? (hit.data as OrderRow[]).slice() : null
+}
+
+/**
+ * THE ORDER LIST, A PAGE AT A TIME — so the first screen doesn't wait for the last order.
+ *
+ * Measured on the live box: the staff list is 2.59MB and the first 100 orders are 0.26MB.
+ * The server time is not the problem (the whole query is ~110ms); the 2.59MB crossing from
+ * Jakarta is. So the first page paints, and the rest arrives behind it.
+ *
+ * WHY THIS IS NOT THE RUNAWAY SHAPE (§2.8). It is not an effect watching state its own
+ * fetch writes. It is one sequence, started once, whose cursor moves STRICTLY past every
+ * row it has already received — so a page it has read can never be requested again, and
+ * the walk ends on a short page. `MAX_PAGES` is a backstop, not the mechanism: if it ever
+ * trips, something is wrong upstream and stopping is the right answer either way.
+ *
+ * On completion the assembled list is written into the SAME cache entry `getOrders()` uses,
+ * so the eighteen other callers — search, reports, the import's duplicate check — get a
+ * complete list from memory rather than re-fetching what was just streamed.
+ */
+export async function streamOrders(
+  onPage: (rowsSoFar: OrderRow[], done: boolean) => void,
+  opts: { pageSize?: number; signal?: AbortSignal } = {},
+): Promise<OrderRow[]> {
+  const size = Math.max(1, Math.min(500, opts.pageSize ?? 100))
+  const MAX_PAGES = 200
+  const all: OrderRow[] = []
+  let cursor = ""
+  for (let n = 0; n < MAX_PAGES; n++) {
+    if (opts.signal?.aborted) return all
+    const qs = `limit=${size}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+    const rows = resolveImgRefs(await api<OrderRow[]>(`/api/orders?${qs}`, { signal: opts.signal }))
+    /**
+     * AN OLD SERVER IGNORES `limit` — and it would ignore `cursor` with it.
+     *
+     * Vercel and the VPS deploy separately, so for a few minutes this client can be talking
+     * to an API that predates paging. It would hand back the whole list every time, never
+     * satisfy `rows.length < size`, and walk the same 2.59MB up to MAX_PAGES: half a
+     * gigabyte, on a loop, which is the §2.8 failure this repo has already paid for once.
+     *
+     * More rows than were asked for is proof the parameter did nothing. Take the full list
+     * — it IS the complete answer — and stop.
+     */
+    if (rows.length > size) {
+      onPage(rows, true)
+      _lists.set("orders", { at: Date.now(), data: rows })
+      return rows
+    }
+    all.push(...rows)
+    const done = rows.length < size
+    onPage(all.slice(), done)
+    if (done) {
+      // Only a COMPLETE walk may fill the shared entry. Seeding it from a partial list
+      // would hand every other board a truncated one that looks whole.
+      _lists.set("orders", { at: Date.now(), data: all })
+      return all
+    }
+    const last = rows[rows.length - 1]
+    // Can't keyset on a row with no key — stop with what we have rather than loop on the
+    // same cursor forever.
+    if (!last?.created_at || !last.id) return all
+    // The cursor the server keysets on: "<created_at>|<id>".
+    cursor = `${last.created_at}|${last.id}`
+  }
+  return all
 }
 /** Orders to suggest when "@"-tagging in a support thread — the THREAD's seller's orders,
  *  so it works for staff on a seller's inbox thread too (getOrders is caller-only). */

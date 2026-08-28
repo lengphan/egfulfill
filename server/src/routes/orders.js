@@ -1438,7 +1438,8 @@ export function ordersRoutes(app, requireAuth) {
     if (!rows.length || !canSeeMoney(user)) return rows;
     const ids = rows.map((r) => String(r.id));
     const [idx, fees, chargedRows] = await Promise.all([
-      catalogIndex().catch(() => ({ exact: new Map(), rows: [] })),
+      // No images: this index only prices lines, and the image keys are ~7MB of base64.
+      catalogIndex({ withImages: false }).catch(() => ({ exact: new Map(), rows: [] })),
       feeSettings().catch(() => ({})),
       q(`select ref, coalesce(sum(delta),0) as amt from wallet_ledger
           where type=$1 and ref = any($2::text[]) group by ref`, [CHARGE_TYPE + '-in', ids])
@@ -1679,6 +1680,48 @@ export function ordersRoutes(app, requireAuth) {
     // until approval, then goes violet — a file existing isn't the same as it being approved.
     const designBoard = `exists(select 1 from design_cards dc where dc.order_id = o.id) as design_on_board,
       exists(select 1 from design_cards dc where dc.order_id = o.id and dc.col = 'approved') as design_approved`;
+    /**
+     * OPT-IN PAGING. No `limit` means the whole list, byte for byte what this route has
+     * always returned — because NINETEEN callers across web/ and mobile/ read it expecting
+     * completeness: search, reports, the dashboard totals, and the import dialog's
+     * duplicate check, which decides whether an order already exists. A default page size
+     * would not have made those slower, it would have made them WRONG, and silently.
+     * So paging is something a caller asks for.
+     *
+     * KEYSET, NOT OFFSET. Orders sync in constantly; with OFFSET, one arriving between two
+     * page requests shifts every later row up by one and a row is skipped with nothing to
+     * show it happened. `(created_at, id)` is unique and never moves, so a page can't.
+     *
+     * The tie-breaker on `id` is also why `order by` gains it in the unpaged case: two
+     * orders sharing a created_at had no defined order between them, so the boundary
+     * between page N and N+1 was not stable even within one request.
+     *
+     * What this does NOT do is make the SQL cheaper — the aggregate still runs over every
+     * row the filter admits, then limits. Measured at 1,030 orders the whole query is
+     * ~110ms, so a page costs at most that and less as the cursor advances. The win is the
+     * WIRE: the full staff response is 2.59MB, the first 100 orders are 0.26MB.
+     */
+    const qy = req.query || {};
+    const pageSize = Math.min(500, Math.max(0, Number(qy.limit) || 0));
+    // "<iso timestamp>|<order id>" — the last row of the previous page.
+    const rawCursor = String(qy.cursor || '').trim();
+    const cut = rawCursor.indexOf('|');
+    const cursor = pageSize && cut > 0 && !isNaN(Date.parse(rawCursor.slice(0, cut)))
+      ? { ts: rawCursor.slice(0, cut), id: rawCursor.slice(cut + 1) }
+      : null;
+    /** The keyset predicate + ORDER BY + LIMIT, numbered from however many params the
+     *  branch already has. Returns SQL and the params to append. */
+    const page = (base) => {
+      const p = [];
+      let where = '';
+      if (cursor) {
+        p.push(cursor.ts, cursor.id);
+        where = ` and (o.created_at, o.id) < ($${base + 1}::timestamptz, $${base + 2}::text)`;
+      }
+      const tail = ` order by o.created_at desc, o.id desc${pageSize ? ` limit ${pageSize}` : ''}`;
+      return { where, tail, params: p };
+    };
+
     if (isStaff(req.user)) {
       // Staff (factory) see factory-OWNED orders (the admin marketplace shops, which
       // need factory setup) PLUS any SELLER order that's been PUSHED to production.
@@ -1691,6 +1734,7 @@ export function ordersRoutes(app, requireAuth) {
       // sellers both call a shop "Home". Staff branch only: a seller reading their own list
       // would only ever see themselves.
       const sellerName = `(select coalesce(nullif(su.name,''), su.email) from users su where su.id = o.seller_id) as seller_name`;
+      const pg = page(0);
       const r = await q(
         `select o.*, ${machineFile}, ${designBoard}, ${sellerName}, ${agg} from orders o ${join}
          -- A LABEL IS NOT AN ORDER. Buying a standalone label (re-ship, sample, someone
@@ -1709,7 +1753,8 @@ export function ordersRoutes(app, requireAuth) {
             -- so a manual FF-* order can never set it, and a brand-new order is still at
             -- '' / 'new', which the push filter excludes.
             or exists (select 1 from users u where u.id = o.seller_id and u.role <> 'seller'))
-         group by o.id order by o.created_at desc`);
+           ${pg.where}
+         group by o.id${pg.tail}`, pg.params);
       await Promise.all(r.rows.map(healOrphanLines));
       await attachCost(r.rows, req.user);
       return r.rows.map(compact);
@@ -1718,6 +1763,7 @@ export function ordersRoutes(app, requireAuth) {
     // their OWNER's orders (if their permissions include 'orders'); a plain seller sees their own.
     const sel = await resolveSeller(req.user);
     if (!_canSurface(sel, 'orders')) return [];
+    const pg = page(1);   // $1 is the seller
     const r = await q(
       // created_by_name: WHO uploaded it, resolved to a name ONLY when the creator is the
       // shop owner ($1) or one of the owner's own active team members. A factory account or
@@ -1729,8 +1775,9 @@ export function ordersRoutes(app, requireAuth) {
                 or exists (select 1 from team_members tm
                              where tm.owner_id = $1::text and lower(tm.email) = lower(cu.email) and tm.status = 'active'))
          ) as created_by_name
-       from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
-      [sel.id]
+       from orders o ${join} where o.seller_id=$1 and o.factory_order=false${pg.where}
+       group by o.id${pg.tail}`,
+      [sel.id, ...pg.params]
     );
     await Promise.all(r.rows.map(healOrphanLines));
     await attachCost(r.rows, req.user);

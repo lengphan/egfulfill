@@ -82,7 +82,32 @@ import { storageEnabled, putObject, deleteObject, presignGet, publicUrl, designU
 // 60MB body limit: full-resolution print files (e.g. 4000×5000 PNG ~10-25MB) are
 // ~33% larger as base64, so 25MB could silently reject a legit design upload.
 const app = Fastify({ logger: true, bodyLimit: 60 * 1024 * 1024 });
-await app.register(cors, { origin: process.env.CORS_ORIGIN || '*' });
+/**
+ * ONE ORIGIN PER RESPONSE.
+ *
+ * CORS_ORIGIN holds a comma-separated list and was handed to @fastify/cors as a single
+ * STRING, so the header went out as
+ *   access-control-allow-origin: https://app.egful.store,https://egful.store
+ * which NO browser accepts — the spec allows exactly one origin, or `*`. Nothing had
+ * noticed because nothing cross-origin exists yet: the app reaches /api/* through Vercel's
+ * rewrite, so every call is same-origin and the header is never enforced. It would have
+ * failed the moment the browser was pointed at the API host directly, and the failure
+ * would have looked like the API being down.
+ *
+ * An ARRAY makes @fastify/cors match the request's Origin and echo back the one that hit.
+ *
+ * maxAge: without it a preflight repeats on every authorized request, and against Jakarta
+ * that is a whole extra round trip per call — the thing that would eat any latency gained
+ * by dropping the proxy hop in the first place.
+ */
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || '*').split(',').map((x) => x.trim()).filter(Boolean);
+const CORS_ANY = CORS_ORIGINS.includes('*') || !CORS_ORIGINS.length;
+/** The single value this request may be told, echoing the caller's own origin when allowed. */
+export function allowedOrigin(origin) {
+  if (CORS_ANY) return '*';
+  return CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0];
+}
+await app.register(cors, { origin: CORS_ANY ? '*' : CORS_ORIGINS, maxAge: 86400 });
 
 // Shopify webhooks HMAC-sign the EXACT request bytes, so those routes need the raw
 // body — but Fastify's JSON parser discards it. Override the parser to stash the raw
@@ -513,7 +538,8 @@ app.get('/api/events', (req, reply) => {
     'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no',
-    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*'
+    // Hijacked reply — @fastify/cors never runs, so the one-origin rule is applied by hand.
+    'Access-Control-Allow-Origin': allowedOrigin(req.headers.origin)
   });
   res.write('retry: 3000\n\n:ok\n\n');
   const remove = addClient(res, user);   // bind the socket to WHO it belongs to
