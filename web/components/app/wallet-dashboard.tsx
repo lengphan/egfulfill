@@ -645,18 +645,30 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       <AdminTopups onReviewed={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
 
       {(() => {
- const txCard = (
+      /* Tabbed = the factory lens, where Transaction and Partner sit under one pair of tabs.
+         It decides where the export action lives, so it is named once here rather than
+         re-derived at both sites. */
+      const tabbed = partnerHistory && isFactoryWallet
+      const exportBtn = (
+        <Button variant="outline" size="sm">
+          <DownloadSimple size={14} /> {tl("wallet", "Export CSV")}
+        </Button>
+      )
+      const txCard = (
       <Card className="gap-0 overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          {/* The tab directly above already reads "Transaction history". Naming it again on
-              the card is the duplicate-title defect one level down. */}
-          {!inShell && <div className="text-base font-bold">{tl("wallet", "Transaction history")}</div>}
-          {/* With the title gone, justify-between had nothing to push against and left the
-              one button stranded on the left of its own band. */}
-          <Button variant="outline" size="sm" className={inShell ? "ml-auto" : undefined}>
-            <DownloadSimple size={14} /> {tl("wallet", "Export CSV")}
-          </Button>
-        </div>
+        {/* NO BAND AT ALL when the view is tabbed. Hiding the duplicate title was half a
+            fix: it left a 55px strip whose entire content was one right-aligned button, and
+            an empty rule across the top of a card reads as a header that failed to load.
+            Under tabs the action belongs ON the tab row — that row is already this card's
+            header, which is where every other board puts it. */}
+        {!tabbed && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+            {/* The tab directly above already reads "Transaction history". Naming it again on
+                the card is the duplicate-title defect one level down. */}
+            {!inShell && <div className="text-base font-bold">{tl("wallet", "Transaction history")}</div>}
+            <div className={inShell ? "ml-auto" : undefined}>{exportBtn}</div>
+          </div>
+        )}
         {pending.length > 0 && (
           <div className="border-b border-border px-4 py-3">
             {/* Not "Awaiting confirmation": a VietQR request confirms ITSELF when the money
@@ -770,7 +782,14 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
  void attribute(t, v)
                           }}
  title={tl("wallet", "Which real account this moved through, or mark it a test")}
- className={"w-[9.5rem] rounded border border-border bg-transparent px-1 py-0.5 text-2xs "
+                          /* THE HOUSE FIELD, not a raw select. This was `rounded border
+                             bg-transparent px-1 py-0.5 text-2xs` — a 4px corner where the rest
+                             of the app is rounded-lg, no ground at all, and 11px type, repeated
+                             once per ledger row. Eight of those down a table is the cheapest
+                             thing on the page. `.eg-select .eg-control` is what every other
+                             select in the app already wears; h-7 keeps the row compact without
+                             going back under the legible floor. */
+                          className={"eg-select eg-control h-7 w-[9.5rem] pr-7 text-xs "
                             + (t.cashAccount ? "text-muted-foreground" : "text-hold")}
                         >
                           <option value="">{markingId === t.id ? "…" : tl("wallet", "— unassigned")}</option>
@@ -815,12 +834,16 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
       )
       // Partner history (vendor costs) is FACTORY-ONLY — a seller never sees it. When shown,
       // the transaction table and the partner view sit under one pair of tabs, cards on top.
- return partnerHistory && isFactoryWallet ? (
+      return tabbed ? (
         <Tabs defaultValue="transactions" className="space-y-3">
-          <TabsList>
-            <TabsTrigger value="transactions">{tl("wallet", "Transaction history")}</TabsTrigger>
-            <TabsTrigger value="partners">{tl("wallet", "Partner history")}</TabsTrigger>
-          </TabsList>
+          {/* The action sits ON the tab rule, not in a band of its own below it. */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <TabsList>
+              <TabsTrigger value="transactions">{tl("wallet", "Transaction history")}</TabsTrigger>
+              <TabsTrigger value="partners">{tl("wallet", "Partner history")}</TabsTrigger>
+            </TabsList>
+            {exportBtn}
+          </div>
           <TabsContent value="transactions">{txCard}</TabsContent>
           <TabsContent value="partners"><BillingView /></TabsContent>
         </Tabs>

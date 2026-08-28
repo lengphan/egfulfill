@@ -2,8 +2,10 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
-import { Bank, CreditCard, ArrowsClockwise, CircleNotch, Warning } from "@phosphor-icons/react"
+import { Bank, CreditCard, ArrowsClockwise, CircleNotch, Warning, DotsThree, Plus, Minus } from "@phosphor-icons/react"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { usePrompt } from "@/components/app/confirm-dialog"
 import {
  getCashAccounts, saveCashAccount, reconcileCashAccount, recordCashPayment, backfillPostage,
@@ -120,14 +122,14 @@ export function CashAccountsPanel() {
   // down to report on itself.
  if (err && !view) {
  return (
-      <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Warning size={12} weight="fill" className="shrink-0 text-hold" /> {err}
       </p>
     )
   }
  if (!view) {
  return (
-      <p className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <CircleNotch size={12} className="animate-spin" /> {tl("cashAccounts", "Accounts…")}
       </p>
     )
@@ -167,12 +169,22 @@ export function CashAccountsPanel() {
     <div className="space-y-2 p-0.5">
       <div className="flex items-baseline justify-between gap-2 px-0.5">
         <span className="eg-label text-muted-foreground">{tl("cashAccounts", "Accounts")}</span>
-        <button onClick={() => add()} className="eg-tap text-2xs font-medium text-primary hover:underline">{tl("cashAccounts", "+ Add")}</button>
+        {/* A BUTTON, NOT AN UNDERLINED LINK. This was `text-2xs text-primary hover:underline`
+            — 11px of coloured text doing the job of the only "make a thing" control on the
+            strip. §4: a button is an action and carries a control's shape; an underline is
+            what a link inside a sentence wears. */}
+        <Button size="sm" variant="outline" onClick={() => add()} className="h-7 gap-1 px-2 text-xs">
+          <Plus size={12} weight="bold" /> {tl("cashAccounts", "Add")}
+        </Button>
       </div>
 
       {/* Across, not down — six to a row on a wide screen, so five accounts and an
           Unassigned line are ONE strip rather than a column with dead space beneath it. */}
-      <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {/* items-start: one card carries an extra button (Unassigned's "Place past postage"),
+          and a grid stretches every sibling to match its tallest — so four accounts each grew
+          ~50px of empty space under their balance to keep pace with a card they have nothing
+          to do with. A row of half-empty boxes is most of what "undone" looks like. */}
+      <div className="grid items-start gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {view.accounts.map((a) => (
         // group/acct so the controls stay out of sight until this card is pointed at — three
         // buttons on every card is a wall of chrome on a figure you mostly just read.
@@ -186,26 +198,56 @@ export function CashAccountsPanel() {
             <span className={"text-base font-bold tracking-tight tabular-nums " + (a.balance < 0 ? "text-alert" : "")}>
               {usd(a.balance)}
             </span>
-            <span className="flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/acct:opacity-100">
-              <button onClick={() => pay(a.id, a.name, "in")} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title={tl("cashAccounts", "Money in")}>+</button>
-              <button onClick={() => pay(a.id, a.name, "out")} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title={tl("cashAccounts", "Money out")}>−</button>
-              <button onClick={() => reconcile(a.id, a.name, a.balance)} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent" title={tl("cashAccounts", "Set the real balance")}>
-                {busy === a.id ? <CircleNotch size={9} className="animate-spin" /> : <ArrowsClockwise size={9} />}
-              </button>
-              {/* WHICH CARD SHIPPO CHARGES. Named once here, and every label cost places
- itself against it from then on — the alternative is choosing an account on
- every label, which nobody would do and which would leave postage in
-                  Unassigned forever. Only offered on a card, because postage is charged to
- one; marking a bank would attribute spend to a place it never left. */}
-              {a.kind === "card" && !a.is_postage && (
-                <button onClick={() => setPostage(a)} disabled={busy === a.id}
- className="eg-tap rounded border border-border px-1 text-2xs leading-4 hover:bg-accent"
- title={tl("cashAccounts", "Charge postage to this card")}>$</button>
-              )}
-            </span>
+            {/* ── ONE MENU, NOT FOUR MICRO-BUTTONS ────────────────────────────────
+                This was four buttons at `px-1 text-2xs leading-4` — roughly 14x16px targets,
+                unlabelled (+ − ⟳ $), and `opacity-0` until the card was hovered. Two things
+                were wrong with that, and the second is the one that matters.
+
+                They are too small to hit. The size-picker in the blank dialog already fixed
+                this exact thing and wrote down why: "Sized to be HIT as well as read. These
+                were 10px text in a 2px pad — a target you aim at, on the control you are here
+                to use." Same sentence applies here.
+
+                And hiding them was the wrong answer to the right observation. The old note
+                says three buttons on every card is "a wall of chrome on a figure you mostly
+                just read" — true, but the fix for too much chrome is FEWER CONTROLS, not
+                invisible ones. Hover-hidden means unreachable on touch and undiscoverable
+                everywhere: nothing on the card said these actions existed.
+
+                Four actions on one account is a menu. It is always visible, it is one proper
+                target, and it can afford to say what each action does in words. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={busy === a.id}
+                aria-label={tl("cashAccounts", "Actions for this account")}
+                className="eg-tap -mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+              >
+                {busy === a.id
+                  ? <CircleNotch size={13} className="animate-spin" />
+                  : <DotsThree size={15} weight="bold" />}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuItem onClick={() => pay(a.id, a.name, "in")} className="gap-2 text-xs">
+                  <Plus size={13} weight="bold" /> {tl("cashAccounts", "Money in")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => pay(a.id, a.name, "out")} className="gap-2 text-xs">
+                  <Minus size={13} weight="bold" /> {tl("cashAccounts", "Money out")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => reconcile(a.id, a.name, a.balance)} className="gap-2 text-xs">
+                  <ArrowsClockwise size={13} /> {tl("cashAccounts", "Set the real balance")}
+                </DropdownMenuItem>
+                {/* WHICH CARD SHIPPO CHARGES. Named once here, and every label cost places
+                    itself against it from then on — the alternative is choosing an account on
+                    every label, which nobody would do and which would leave postage in
+                    Unassigned forever. Only offered on a card, because postage is charged to
+                    one; marking a bank would attribute spend to a place it never left. */}
+                {a.kind === "card" && !a.is_postage && (
+                  <DropdownMenuItem onClick={() => setPostage(a)} className="gap-2 text-xs">
+                    <CreditCard size={13} /> {tl("cashAccounts", "Charge postage here")}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </Card>
       ))}
@@ -215,17 +257,17 @@ export function CashAccountsPanel() {
           <div className="eg-label text-muted-foreground">{tl("cashAccounts", "Unassigned")}</div>
           <div className="mt-0.5 flex items-baseline justify-between gap-2">
             <span className="text-base font-bold tabular-nums">{usd(view.unassigned.amount)}</span>
-            <span className="text-2xs text-muted-foreground">{view.unassigned.entries} entries</span>
+            <span className="text-xs text-muted-foreground">{view.unassigned.entries} entries</span>
           </div>
           {/* Postage places itself from the moment a card is marked — but everything bought
               BEFORE that is still sitting here, and seventy-odd rows through a per-row picker
  is a chore nobody finishes. Only offered once a postage card exists, because
  without one there is nowhere to put them. */}
           {view.accounts.some((a) => a.is_postage) && (
-            <button onClick={runBackfill} disabled={busy === "backfill"}
- className="eg-tap mt-1 self-start rounded border border-border px-1.5 text-2xs leading-4 hover:bg-accent">
-              {busy === "backfill" ? "…" : tl("cashAccounts", "Place past postage")}
-            </button>
+            <Button size="sm" variant="outline" onClick={runBackfill} disabled={busy === "backfill"}
+              className="mt-1.5 h-7 self-start px-2 text-xs">
+              {busy === "backfill" ? <CircleNotch size={12} className="animate-spin" /> : tl("cashAccounts", "Place past postage")}
+            </Button>
           )}
         </Card>
       )}
@@ -236,18 +278,18 @@ export function CashAccountsPanel() {
  footing with real balances. The one-click id still matters: a hand-typed
           "Ping Pong" becomes `ping-pong` and then silently receives nothing. */}
       {missing.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 pt-0.5 text-2xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
           <span>{tl("cashAccounts", "Add:")}</span>
           {missing.map((sg) => (
             <button key={sg.id} onClick={() => add(sg)} disabled={busy === sg.id}
- className="eg-tap rounded border border-dashed border-border px-1.5 py-0.5 font-medium transition-colors hover:border-primary hover:text-foreground">
+ className="eg-tap rounded-md border border-dashed border-border px-2 py-1 font-medium transition-colors hover:border-primary hover:text-foreground">
               {sg.name}
             </button>
           ))}
         </div>
       )}
 
-      {err && <p className="text-2xs text-hold">{err}</p>}
+      {err && <p className="text-xs text-hold">{err}</p>}
     </div>
   )
 }
