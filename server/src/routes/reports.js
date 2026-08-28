@@ -158,6 +158,27 @@ export function reportsRoutes(app, requireStaff) {
         onTime: { pct: onTimeN ? Math.round((onTimeHit / onTimeN) * 100) : null, n: onTimeN },
       },
       line: [...line.values()],
+      /*
+       * WHAT NEEDS A PERSON — the exceptions, oldest first.
+       *
+       * `recent` is the eight NEWEST of everything, which is the wrong eight for this: an
+       * account can hold twelve orders and have none of them in the newest eight, so a
+       * dashboard filtering `recent` for holds would report nothing while twelve sat there.
+       *
+       * Oldest first because this is a to-do list, not a feed — the one that has waited
+       * longest is the one to answer. Same projection as `recent`, and capped the same way:
+       * a queue is for working through on its own page, not for reading whole here.
+       */
+      attention: rows
+        .filter((r) => EXCEPTIONS.has(stageOf(r.factory_status || r.status, r.item_statuses)))
+        .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+        .slice(0, 8)
+        .map((r) => ({
+          id: r.id, seq: r.seq, store: r.store || null, source: r.source || null,
+          customer: r.customer_name || null,
+          total: num(r.total), stage: stageOf(r.factory_status || r.status, r.item_statuses),
+          created_at: r.created_at,
+        })),
       // Eight rows, and only what the list prints — not the orders themselves.
       recent: rows.slice(0, 8).map((r) => ({
         id: r.id, seq: r.seq, store: r.store || null, source: r.source || null,

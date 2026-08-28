@@ -191,7 +191,16 @@ export function StaffDashboard() {
   // Bucketed by the server, scaled 0..1 — the shape of the run, which is all this draws.
  const gmvBars = ov?.gmvBars ?? []
 
- const recent = ov?.recent ?? []
+ /* WHAT NEEDS A PERSON, and only then what is recent.
+  *
+  * The exceptions come from the server oldest-first, because filtering `recent` for them
+  * would report nothing on an account holding twelve orders none of which are among the
+  * eight newest. When nothing is stuck the card falls back to the recent list rather than
+  * an empty state — "nothing needs you" is good news and an empty table does not read that
+  * way. The title says which of the two it is showing. */
+ const attention = ov?.attention ?? []
+ const showingAttention = attention.length > 0
+ const recent = showingAttention ? attention : (ov?.recent ?? [])
 
   // The production line honours the same window the money cards use — but only where the
   // control is actually shown (admin). For roles without the toggle it stays a full,
@@ -426,7 +435,7 @@ export function StaffDashboard() {
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SectionCard title={t("dash.recentOrders")} actions={<Link href="/production" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}>
+          <SectionCard title={showingAttention ? t("dash.needsPerson") : t("dash.recentOrders")} actions={<Link href="/production" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}>
             {ov === null ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
             ) : recent.length === 0 ? (

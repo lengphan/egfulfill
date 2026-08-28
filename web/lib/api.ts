@@ -2370,8 +2370,12 @@ export type Overview = {
     onTime: { pct: number | null; n: number }
   }
   line: OverviewLineRow[]
-  recent: { id: string; seq?: number | null; store?: string | null; source?: string | null; customer: string | null; total: number; stage: string; created_at?: string | null }[]
+  /** The exceptions, oldest first — what needs a person. NOT a slice of `recent`: an account
+   *  can hold twelve orders and have none of them among the eight newest. */
+  attention?: OverviewOrderRow[]
+  recent: OverviewOrderRow[]
 }
+export type OverviewOrderRow = { id: string; seq?: number | null; store?: string | null; source?: string | null; customer: string | null; total: number; stage: string; created_at?: string | null }
 
 /** The onEdit helper that makes the sheet's variant dropdowns depend on the chosen product.
  *  Served rather than bundled so it can never drift from the column names the template
