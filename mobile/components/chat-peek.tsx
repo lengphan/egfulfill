@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Pressable, View, Text, Animated, Easing, AccessibilityInfo, ActivityIndicator } from "react-native"
+import { Pressable, View, Text, Animated, Easing, AccessibilityInfo, ActivityIndicator, ScrollView } from "react-native"
 import { useRouter, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, getSupportThreads, getOrderMessages, type SupportThread, type ChatEntry } from "@/lib/api"
@@ -32,7 +32,7 @@ import { C, F, R, S, TAB_BAR } from "@/lib/theme"
  * is not optional: it is the only one they have.
  */
 const PEEK_H = 58
-const OPEN_H = 320
+const OPEN_H = 380
 
 export function ChatPeek() {
   const router = useRouter()
@@ -75,6 +75,7 @@ export function ChatPeek() {
   /* THE PANEL GROWS FROM THE PEEK, it does not appear over it. The peek is anchored to the
      bottom, so growing the height upward reads as the same object opening — which is what
      makes the close feel like putting it back rather than dismissing a dialog. */
+  const scroller = useRef<ScrollView | null>(null)
   const h = useRef(new Animated.Value(PEEK_H)).current
   useEffect(() => {
     const to = open ? OPEN_H : PEEK_H
@@ -93,7 +94,9 @@ export function ChatPeek() {
     let alive = true
     setMsgs(null)
     getOrderMessages(top.order_id)
-      .then((rows) => { if (alive) setMsgs(rows.slice(-6)) })
+      /* Thirty, not six. Six was chosen when the panel could not scroll, so it was a cap
+         standing in for a scrollbar; with one, the only reason to cut is the payload. */
+      .then((rows) => { if (alive) setMsgs(rows.slice(-30)) })
       .catch(() => { if (alive) setMsgs([]) })
     return () => { alive = false }
   }, [open, top?.order_id])
@@ -161,7 +164,18 @@ export function ChatPeek() {
           makes you decide whether to stop what you are doing. */}
       {open ? (
         <View style={{ flex: 1, paddingHorizontal: S.lg, paddingBottom: S.lg, gap: S.sm }}>
-          <View style={{ flex: 1, gap: 6, justifyContent: "flex-end" }}>
+          {/* IT HAS TO SCROLL, and this shipped without doing so. The messages sat in a
+              fixed box pinned to the bottom, so a long message was CLIPPED by the panel's
+              edge with no way to reach the rest of it — a conversation you cannot read is
+              worse than the disc that at least sent you to a screen where you could.
+              Anchored to the end on open, because the newest line is the one you came for. */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ gap: 6, flexGrow: 1, justifyContent: "flex-end" }}
+            showsVerticalScrollIndicator
+            ref={(r) => { scroller.current = r }}
+            onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}
+          >
             {msgs === null ? (
               <ActivityIndicator color={C.onInk} />
             ) : msgs.length === 0 ? (
@@ -183,7 +197,7 @@ export function ChatPeek() {
                 </View>
               ))
             )}
-          </View>
+          </ScrollView>
 
           <Pressable
             onPress={() => {
