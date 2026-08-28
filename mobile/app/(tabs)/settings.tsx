@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, Alert, Linking } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import Constants from "expo-constants"
+import * as Updates from "expo-updates"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, type User } from "@/lib/api"
 import { enablePush, disablePush, pushState, type PushState } from "@/lib/push"
@@ -81,6 +82,17 @@ export default function Settings() {
   }
 
   const version = Constants.expoConfig?.version ?? "—"
+  /**
+   * WHICH JS IS ACTUALLY RUNNING.
+   *
+   * The app version alone cannot answer that. Everything shipped over the air shares a
+   * runtime version with the build it lands on, so 1.0.1 is 1.0.1 whether the phone is
+   * running the bundle baked into the build or an update published an hour ago — and
+   * "seems like no changes" is unanswerable without this line. `updateId` is null when the
+   * embedded bundle is what is running, which is itself the answer.
+   */
+  const build = String(Updates.updateId ?? "").slice(0, 8)
+  const jsVersion = Updates.isEmbeddedLaunch || !build ? "built in" : build
 
   return (
     <ScrollView
@@ -167,7 +179,8 @@ export default function Settings() {
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>APP</Text>
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
-        <Line label="Version" value={version} last />
+        <Line label="Version" value={version} />
+        <Line label="Update" value={jsVersion} last />
       </View>
 
       <Pressable
