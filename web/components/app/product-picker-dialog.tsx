@@ -132,13 +132,28 @@ export function ProductPickerDialog({
           <DialogTitle>{tl("productPicker", "Add from catalog")}</DialogTitle>
         </DialogHeader>
 
-        {/* PICK THE SHAPE, NOT THE WORD. Finding a hoodie meant typing "hoodie"; a row of
-            outlines is recognised without reading, and it is the same gesture whatever
-            language the seller has the app in. A type with no drawing shows its name — it
-            still filters, it just does not get a picture it has not been given. */}
-        {types.length > 1 && (
+        {/* ── THE SHAPE ROW, AND WHY IT IS GATED ────────────────────────────────────────
+            The idea was: pick the shape, not the word. Finding a hoodie meant typing "hoodie",
+            and a row of outlines is recognised without reading — the same gesture whatever
+            language the app is in.
+
+            It never once drew a picture. The outlines in blank-outline.tsx are keyed by GARMENT
+            TYPE — tshirt, hoodie, sweatshirt, cap, tote, mug — and what arrives here is the
+            product's CATEGORY: Headwear, Apparel, Bags, Other. Those can never match, so every
+            button took the fallback branch and rendered `t.id.slice(0, 3)` above the full name:
+            "Hea" over "Headwear", "App" over "Apparel". An abbreviation of a word, stacked on
+            the word, in a card whose whole purpose was to avoid reading the word.
+
+            So the row renders only when the outlines can actually resolve. With category data
+            it draws nothing at all, which is correct — and if a caller ever passes real types
+            it comes back on its own, working as intended, with no change here.
+
+            A category FILTER is a different control and not this one. If one is wanted it is a
+            rule under the live word (components/app/tab-bar.tsx), per §4 — not a grid of
+            square cards, which is a shape that promises a picture. */}
+        {types.filter((t) => hasBlankOutline(t.id)).length > 1 && (
           <div className="flex flex-wrap gap-1.5">
-            {types.map((t) => (
+            {types.filter((t) => hasBlankOutline(t.id)).map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -151,14 +166,13 @@ export function ProductPickerDialog({
                     : "border-border text-muted-foreground hover:border-foreground/25 hover:text-foreground")
                 }
               >
-                {hasBlankOutline(t.id)
-                  ? <BlankOutline type={t.id} className="h-8 w-full" />
-                  : <span className="flex h-8 items-center text-xs">{t.id.slice(0, 3)}</span>}
+                <BlankOutline type={t.id} className="h-8 w-full" />
                 <span className="truncate">{t.id}</span>
               </button>
             ))}
           </div>
         )}
+
         <SearchField
           value={query}
           onChange={setQuery}
