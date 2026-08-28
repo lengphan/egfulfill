@@ -10,6 +10,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { GmvPanel } from "@/components/app/gmv-panel"
 import { StageBracket } from "@/components/app/stage-bracket"
+import { ChannelFan } from "@/components/app/channel-fan"
 import { getOverview, getFactoryPnl, type Overview, type FactoryPnl } from "@/lib/api"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
@@ -266,8 +267,23 @@ export function StaffDashboard() {
       // that would then have to be busted on every tick to stay true.
  if (row.oldest) oldest[id] = row.oldest
     }
- return { counts, mix, oldest }
+    // Channel totals for the fan, summed off the same per-stage splits. One read, and the
+    // fan can never disagree with the mix bars it sits beside.
+ const byChannel: Record<string, number> = {}
+ for (const row of ov?.line ?? []) {
+ for (const [k, v] of Object.entries(row.byPlatform ?? {})) byChannel[k] = (byChannel[k] ?? 0) + v
+    }
+ return { counts, mix, oldest, byChannel }
   }, [ov])
+
+ /* Biggest first, so the ramp runs dark-to-light across the arc and a channel keeps its
+  * colour when a smaller one drops out of the window entirely. The server counts by
+  * platform id; SLOT_OF-style capitalisation is the one place the two spellings meet. */
+ const SLOT: Record<string, string> = { etsy: "Etsy", tiktok: "TikTok", shopify: "Shopify", manual: "Manual" }
+ const fanSlices = Object.entries(ladder.byChannel)
+   .map(([k, n]) => ({ name: SLOT[k] ?? k.charAt(0).toUpperCase() + k.slice(1), n }))
+   .filter((s) => s.n > 0)
+   .sort((a, b) => b.n - a.n)
 
  /* Stage ages, in days, off the stamps the memo carried. Read at render with the same clock
   * as the greeting — `now` is already the browser's own, and an age is only ever drawn where
@@ -321,15 +337,29 @@ export function StaffDashboard() {
     >
       <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
           <SquaresFour size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
             <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
             <p className="text-sm text-muted-foreground">
-              {todayLabel}
-              {stats.createdToday > 0 && <> · <span className="font-medium text-foreground">{stats.createdToday}</span> {t("dash.newToday")}</>}
+              {/* The full weekday and date went. Anyone reading this knows what day it is,
+                  and it was the widest thing under their own name. What arrived today is the
+                  half that is actually news, so it stands alone — and when nothing has, the
+                  line is dropped rather than padded back out with a date. */}
+              {stats.createdToday > 0
+                ? <><span className="font-medium text-foreground">{stats.createdToday}</span> {t("dash.newToday")}</>
+                : todayLabel}
             </p>
           </div>
+
+          {/* WHERE THEY CAME FROM, in the same group as the name so it reads as part of the
+              greeting rather than floating between it and the range control. Drawn only when
+              there is more than one channel to tell apart — a fan of one is a semicircle. */}
+          {fanSlices.length > 1 && (
+            <div className="w-[212px] shrink-0">
+              <ChannelFan slices={fanSlices} caption={tl("kpi", "orders")} />
+            </div>
+          )}
         </div>
         {/* Money window — admin only, since the money cards are. */}
         {isAdmin && (
@@ -362,7 +392,8 @@ export function StaffDashboard() {
           A block is a link into the queue at that stage; the ones past this role's reach are
           drawn dashed and say why on hover. */}
       <div>
-        <p className="eg-label mb-2 text-muted-foreground">{tl("kpi", "Where the work is")}</p>
+        {/* No label. Every block on the bracket is titled — DRAFT, PENDING, APPROVED — so a
+            caption above them names a thing that already names itself. */}
         <StageBracket
  role={role}
           /* NOT isFactory. That flag is about one ORDER's path — a job the floor raised for
