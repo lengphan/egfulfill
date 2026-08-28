@@ -23,6 +23,7 @@ import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
+import { useStageZoom } from "@/lib/stage-zoom"
 import { layerDpi, dpiVerdict, useNaturalSizes } from "@/lib/print-quality"
 import { designFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
@@ -288,23 +289,9 @@ export function DesignMaker() {
  const measured = images.map(dpiOf).filter((d): d is number => d != null)
  const worstDpi = measured.length ? Math.min(...measured) : null
  const quality = dpiVerdict(images.length === 0 ? null : worstDpi)
-  /** Stage zoom. The wheel had no meaning on the canvas at all — the one gesture every
-   * editor answers with zoom did nothing here. Clamped, and reset from the chip. */
- const [zoom, setZoom] = useState(1)
- const stageWrap = useRef<HTMLDivElement | null>(null)
- useEffect(() => {
- const el = stageWrap.current
- if (!el) return
-    // Attached by hand, NOT via onWheel: React registers wheel at the root as passive, so
-    // preventDefault there is ignored and the page scrolls behind the zoom.
- const onWheel = (e: WheelEvent) => {
- e.preventDefault()
-      // Exponential, so a notch feels the same at 40% as it does at 300%.
- setZoom((z) => Math.min(3, Math.max(0.4, z * Math.pow(0.9985, e.deltaY))))
-    }
- el.addEventListener("wheel", onWheel, { passive: false })
- return () => el.removeEventListener("wheel", onWheel)
-  }, [])
+  /** Stage zoom — shared with the order designer, which had none. See lib/stage-zoom.ts for
+   *  why this scales a WRAPPER and never the artwork's own percentages. */
+ const { zoom, reset: resetZoom, ref: stageWrap, style: zoomStyle } = useStageZoom()
  const nextLayerId = useRef(1)
   /**
    * EVERYTHING DECIDED BEFORE ANY STATE IS SET.
@@ -948,7 +935,7 @@ export function DesignMaker() {
               // Scaled, not resized. The stage's own drag maths reads getBoundingClientRect,
               // which reports the SCALED box, so a layer dragged at 200% still lands where
               // the pointer is — percentages stay percentages.
- style={{ transform: zoom === 1 ? undefined : `scale(${zoom})` }}
+ style={zoomStyle}
             >
               <DesignStage
                 className="w-full"
@@ -997,7 +984,7 @@ export function DesignMaker() {
             {zoom !== 1 && (
               <button
  type="button"
- onClick={() => setZoom(1)}
+ onClick={resetZoom}
  title={tl("designMaker", "Back to 100%")}
  className="absolute right-6 top-6 z-10 rounded-lg border border-border bg-card/90 px-2.5 py-1 text-xs font-medium tabular-nums backdrop-blur hover:text-primary"
               >

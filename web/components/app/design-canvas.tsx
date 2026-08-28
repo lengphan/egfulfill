@@ -20,6 +20,8 @@ import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeD
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
+import { useStageZoom } from "@/lib/stage-zoom"
+import { useIsNarrow } from "@/lib/use-narrow"
 import { layerDpi, dpiVerdict, printedInches, useNaturalSizes } from "@/lib/print-quality"
 import { TIER_LABEL, TIER_WHY, feeFor } from "@/lib/design-fee"
 import { fileToUploadUrl } from "@/lib/chat-upload"
@@ -992,6 +994,20 @@ export function DesignCanvasDialog({
    *
    * Merged, not replaced: change the colour and then the size and both must survive.
    */
+  /**
+   * ZOOM, and it is OFF on a narrow screen.
+   *
+   * The wheel handler calls preventDefault so the page does not scroll behind the gesture —
+   * which is right at `lg`, where the work area is a fixed-height row and nothing under the
+   * pointer wants to scroll. Below it the whole column IS the scroller, and capturing the
+   * wheel over the garment would trap someone half way down a panel with no way past it.
+   * A gesture that steals scrolling on a phone is worse than no gesture.
+   */
+ const narrow = useIsNarrow()
+  /* `stageZoom`, not `zoom` — this window already has a `zoom` and it is the LIGHTBOX,
+     which is looking at a picture full size. A different job that had the better name. */
+ const { zoom: stageZoom, reset: resetZoom, ref: stageWrap, style: zoomStyle } = useStageZoom(!narrow)
+
  const [variantPatch, setVariantPatch] = useState<ItemSetupPatch | null>(null)
 
   /**
@@ -2586,7 +2602,10 @@ export function DesignCanvasDialog({
               </button>
             )}
           </div>
-          <div className="relative w-full">
+          {/* The zoom wrapper. It scales this box, NOT the artwork's percentages — see
+              lib/stage-zoom.ts. `origin-top` so zooming grows the garment downward from
+              where the eye already is rather than pushing its collar off the top. */}
+          <div ref={stageWrap} className="relative w-full origin-top" style={zoomStyle}>
           <DesignStage
  className="w-full" mockup={activeMockup} mockupFill={!!ownMockups[sideKey]}
  designUrl={designUrl}
@@ -2779,7 +2798,19 @@ export function DesignCanvasDialog({
               </span>
               {/* The warning carries its own fix. Not a sentence underneath it — the button
                   IS the explanation of what is wrong, per §4. */}
-              {artOutside && (
+              {/* THE WAY BACK. A zoom with no reset is a state you can enter and not leave —
+                and at 40% the garment is small enough that finding the gesture again is its
+                own puzzle. Only drawn when it would do something. */}
+            {stageZoom !== 1 && (
+              <button
+                type="button"
+                onClick={resetZoom}
+                className="rounded-lg px-2 py-0.5 font-medium tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {Math.round(stageZoom * 100)}% · {tl("canvas", "reset")}
+              </button>
+            )}
+            {artOutside && (
                 <span className="inline-flex items-center gap-1.5">
                   <span className="rounded-lg bg-hold/10 px-2 py-0.5 font-medium text-hold">
                     {tl("canvas", "Outside the print area")}
