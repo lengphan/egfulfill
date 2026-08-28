@@ -60,7 +60,7 @@ export function ShippingView() {
         onChange={pick}
       />
 
-      {tab === "dispatch" ? <DispatchBoard /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
+      {tab === "dispatch" ? <DispatchBoard segmented /> : tab === "shipments" ? <ShipmentsView /> : <RateCalculatorView />}
     </div>
   )
 }

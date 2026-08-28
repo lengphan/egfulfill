@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { onLive } from "@/lib/live"
 import { ManifestDialog } from "@/components/app/manifest-dialog"
+import { SearchField } from "@/components/app/search-field"
 import { manifestReadiness, manifestTooltip } from "@/lib/manifest-eligible"
 import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, UploadSimple, X, XCircle, Clock, FilePdf, Barcode, CaretDown, CaretRight, Package, type Icon } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -925,9 +926,12 @@ export function DispatchBoard({ segmented }: {
      and the row is portaled into the page band; outside one it is the card's header exactly
      as before. */
   const searchEl = (
-    <Input value={q} onChange={(e) => setQ(e.target.value)}
+    <SearchField
+      value={q}
+      onChange={setQ}
+      width="sm"
       placeholder={tl("dispatch", "Search order, customer or tracking…")}
-      className="h-8 w-56 lg:w-72" />
+    />
   )
   const headActions = view === "history" ? undefined : (
           <div className="flex flex-wrap items-center gap-2">
@@ -1141,9 +1145,12 @@ export function DispatchBoard({ segmented }: {
               order, and only the filters take a row of their own. Inside a shell this goes to
               the page's action band; outside one it stays exactly where it was. */}
           {!inShell && (
-            <Input value={q} onChange={(e) => setQ(e.target.value)}
+            <SearchField
+              value={q}
+              onChange={setQ}
+              width="sm"
               placeholder={tl("dispatch", "Search order, customer or tracking…")}
-              className="h-9 max-w-xs" />
+            />
           )}
           {/* TWO ROWS, THE WAY /orders DOES IT — filters on their own line, then search and
               the selection utilities. One line held the view tabs, the search, five counted
