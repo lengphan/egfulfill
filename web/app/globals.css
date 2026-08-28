@@ -835,6 +835,41 @@ td[align="right"] {
   .eg-drift-1, .eg-drift-2, .eg-drift-3 { animation: none; }
 }
 
+/* ── THE RAIL — garments running past, until you reach for one ─────────────────
+   A continuous horizontal track that pauses when the pointer is on it, which is
+   the whole interaction: it moves so the field reads as stock passing rather
+   than as a layout, and it stops so a garment can actually be aimed at. A rail
+   you cannot stop is a rail you cannot use.
+
+   ONE TRACK, DUPLICATED ONCE, TRANSLATED -50%. The clone is what makes the loop
+   seamless — at -50% the second copy sits exactly where the first began, so the
+   reset is invisible. The clone is aria-hidden at the call site: it is the same
+   garments a second time, and announcing every product twice is noise.
+
+   TRANSFORM ONLY, and no JavaScript in the loop. This animates a composited
+   property, so it never touches layout or paint and never re-renders React.
+   CLAUDE.md §2.8 is about a fetch that re-triggers itself; the danger there was
+   an effect watching state its own work rewrote. There is no state here at all —
+   which is exactly why it is CSS and not a rAF ticking a React value.
+
+   REDUCED MOTION STOPS IT COMPLETELY. A wide block of continuous horizontal
+   movement is close to the definition of what that setting is asking us not to
+   do, and unlike an entrance animation there is no moment at which it finishes.
+   The rail is then simply a static row — everything stays reachable. */
+@keyframes eg-rail {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+.eg-rail { animation: eg-rail var(--rail-dur, 64s) linear infinite; will-change: transform; }
+.eg-rail-rev { animation-direction: reverse; }
+/* Pause on the RAIL, not on the object: catching one garment should hold the
+   whole row still, or the neighbour you were about to reach for slides away. */
+.eg-rail-hold:hover .eg-rail,
+.eg-rail-hold:focus-within .eg-rail { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .eg-rail { animation: none; }
+}
+
 /* ── Dithered hero plate ──────────────────────────────────────────────────────
    A 1-bit Atkinson-dithered image on a near-black canvas. The source is
  black-on-white, so `invert` flips it and `screen` keeps true black transparent

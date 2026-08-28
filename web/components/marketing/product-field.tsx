@@ -7,54 +7,38 @@ import { TabBar } from "@/components/app/tab-bar"
 import { CARD, INK, SURFACE } from "@/components/marketing/bold-kit"
 
 /**
- * ── THE FIELD — racks of blanks on the page's own colour ─────────────────────────────────
+ * ── THE RAIL — stock running past, until you reach for one ───────────────────────────────
  *
- * Twelve objects, full bleed, three racks. Each rack is one COLOUR STORY across every form we
- * make, and clicking any object ports the whole field to that story.
+ * Three rails, one per colour story, each a continuous horizontal track of blanks. The track
+ * moves; putting the pointer on a rail stops it; clicking a garment opens that garment.
  *
- * WHY RACKS AND NOT A SCATTER OF FOUR. The first version put four objects on one field with
- * air between them and it read as unfinished — correctly, because four unrelated garments in
- * four unrelated colours are four one-offs, not a collection. The reference this is drawn
- * from is dense for a reason that is not spacing: it shows ONE glaze across MANY forms, so
- * every silhouette rhymes and the eye reads a set. Three racks is that idea with the axis
- * made explicit — down the page is colour, across it is form.
+ * WHY IT MOVES. A static field has to be composed, and a composed field of four objects reads
+ * as a layout with gaps in it. A moving one reads as STOCK — there is more of this, it is
+ * going past, you are seeing a window onto it. That is also honest about what a catalogue is,
+ * and it means the field no longer has to pretend the range is exactly wide enough to fill a
+ * screen.
  *
- * THERE IS NO CARD. The tile is transparent — no border, no fill, no radius, no shadow — so
- * an object sits ON the canvas rather than inside a box on it. A card makes a grid of
- * thumbnails; the absence of one makes a table of objects.
+ * WHY IT STOPS. A rail you cannot stop is a rail you cannot use. Hovering pauses the whole
+ * ROW rather than the object under the cursor: pausing one garment while its neighbours keep
+ * sliding would move the thing you were about to reach for, which is the opposite of aiming.
  *
- * THE SHADOW IS IN THE PNG. §4 bans shadows on interface chrome; a shadow inside a photograph
- * is part of the photograph. Every object's shadow is synthesised from its own silhouette with
- * identical parameters, which is why they now share one light — and why the charcoal hoodie's
- * shadow can no longer be too short to clear a dark garment while the bone tee's is fine.
+ * THE THREE RAILS RUN IN ALTERNATING DIRECTIONS. Three tracks moving the same way at the same
+ * speed read as one big thing sliding — the parallax of a train window. Alternating makes each
+ * row its own object and stops the eye locking onto a single vector.
  *
- * SIZE IS DEPTH, NOT RANK. The scale differences read as near and far. A bigger object is not
- * a better seller, and using it that way would be an invented signal. It only means anything
- * because the source PNGs are normalised to one garment-to-canvas ratio per form — before
- * that, identical `w` values rendered at wildly different sizes and the field could not be
- * composed at all.
+ * NO JAVASCRIPT IN THE LOOP. This is a CSS transform animation, so it never touches layout,
+ * never repaints, and never re-renders React. CLAUDE.md §2.8's runaway loader was an EFFECT
+ * fetching on a condition its own fetch satisfied — the danger is state feeding itself. There
+ * is no state here at all, which is exactly why this is CSS and not a rAF ticking a value.
  *
- * POSITIONS ARE PLACED, NEVER RANDOM. Random overlaps the type, collides, and changes on every
- * render, so a layout could never be judged. Objects deliberately cross the left and right
- * edges: a crop implies more beyond the frame, which is what turns empty space into a margin.
+ * THERE IS NO CARD. No border, no fill, no radius, no CSS shadow — an object sits ON the
+ * canvas rather than in a box on it. The shadow is inside the PNG, synthesised from each
+ * silhouette with identical parameters, so all of them share one light.
  *
- * ── CLICKING A BLANK OPENS THAT BLANK ────────────────────────────────────────────────────
+ * CLICKING A BLANK OPENS THAT BLANK. It used to port the field to that colour, which was a
+ * dead end wearing an interaction's clothes. Colour lives on the bar; an object is a product.
  *
- * It used to port the field to the object's colour, and that was a dead end wearing an
- * interaction's clothes: you clicked a hoodie and got a filter. A photograph of a product is
- * the most direct promise a page can make, and the only honest way to keep it is to go to the
- * product. /catalog/[slug] already existed the whole time.
- *
- * So the two jobs are split by CONTROL rather than shared by one: the bar above changes the
- * colour, an object opens the product. Nothing on this page now does something other than
- * what it looks like it does.
- *
- * A FORM WITH NO PUBLISHED PRODUCT IS NOT DRAWN. We have a photograph of a ring-spun crewneck
- * and there is no crewneck in the published catalogue, so there is nowhere for it to go —
- * and a picture of a garment you cannot buy is the catalogue lying about its range. It is
- * dropped from every rack rather than pointed at the nearest similar thing, which would be
- * worse: sending someone who clicked a crewneck to a hooded sweatshirt is not an
- * approximation, it is the wrong product. Publish one and it returns on its own.
+ * A FORM WITH NO PUBLISHED PRODUCT IS NOT DRAWN — see FORM_SLUG.
  */
 
 export type FormId = "tee" | "crew" | "hoodie" | "cap"
@@ -71,9 +55,11 @@ const FORM_LABEL: Record<FormId, string> = {
 /**
  * THE PRODUCT EACH PHOTOGRAPH IS OF — checked against the live catalogue, not assumed.
  *
- * A slug that stops being published resolves to nothing and its object disappears, which is
- * the correct failure: the field can go stale in only one direction, toward showing less than
- * we sell, never toward showing something we do not.
+ * A slug that is not published resolves to nothing and its object is not drawn, which is the
+ * correct failure: the rail can go stale in only one direction, toward showing less than we
+ * sell, never toward showing something we do not. The crewneck is in this table and not in
+ * the catalogue, so it currently draws nothing — deliberately, because sending someone who
+ * clicked a crewneck to a hooded sweatshirt is not an approximation, it is the wrong product.
  */
 const FORM_SLUG: Record<FormId, string> = {
   tee: "gildan-unisex-heavy-cotton-t-shirt",
@@ -88,138 +74,131 @@ const STORIES: { id: StoryId; name: string }[] = [
   { id: "iris", name: "Iris" },
 ]
 
-type Placed = { form: FormId; x: number; y: number; w: number }
-
 /**
- * ── TEMPORARY: FORMS REPEAT ──────────────────────────────────────────────────────────────
+ * ── TEMPORARY: THE SEQUENCE REPEATS ──────────────────────────────────────────────────────
  *
- * Each rack currently lists EIGHT objects drawn from four forms, so every garment appears
- * twice at a different size. This is a PROBE, not the design. The open question is whether a
- * dense field actually reads better than a sparse one before committing ~250 credits to
- * shooting six more forms (cotton shirt, polo, quarter-zip, trucker, beanie, duffel — all of
- * which we genuinely publish). Repeating what we have answers that for nothing.
- *
- * It has to come out either way. A repeat is honest as a texture and dishonest as a
- * catalogue: the field implies a range, and eight objects that are really four overstate it.
- * When the new forms land, every duplicate entry below is replaced by a real one and this
- * note goes with them. If they do NOT land, the racks go back to four.
- *
- * The duplicate is hidden from assistive tech (see `dup` at the call site) — it is the same
- * product with the same action, and announcing it twice is noise, not access.
+ * Each rail lists more slots than we have forms, so garments recur along the track. On a
+ * moving rail that is far less of a claim than it was on a static field — stock passing a
+ * window genuinely does repeat — but it is still a range being padded, and it comes out when
+ * the real forms land (cotton shirt, polo, quarter-zip, trucker, beanie, duffel, all of which
+ * we publish). The order and sizes vary between rails so no two rows scan alike.
  */
+type Slot = { form: FormId; w: number; dy: number }
 
-/**
- * ONE RACK PER STORY, AND NO TWO RACKS ALIKE.
- *
- * The forms appear in a different order and at different heights in each rack. Three rows of
- * the same four positions is a table with its headers removed — the irregularity is what makes
- * it read as objects laid out rather than data rendered.
- */
-const RACKS: Record<StoryId, Placed[]> = {
+const RAILS: Record<StoryId, Slot[]> = {
   natural: [
-    { form: "cap", x: 1, y: 42, w: 14 },
-    { form: "tee", x: 13, y: 64, w: 17 },
-    { form: "crew", x: 26, y: 36, w: 20 },
-    { form: "hoodie", x: 41, y: 64, w: 22 },
-    { form: "tee", x: 56, y: 34, w: 15 },
-    { form: "cap", x: 68, y: 60, w: 13 },
-    { form: "crew", x: 82, y: 38, w: 20 },
-    { form: "hoodie", x: 98, y: 62, w: 22 },
+    { form: "tee", w: 1.0, dy: 6 },
+    { form: "hoodie", w: 1.25, dy: -4 },
+    { form: "cap", w: 0.72, dy: 10 },
+    { form: "crew", w: 1.12, dy: 0 },
+    { form: "tee", w: 0.86, dy: -8 },
+    { form: "hoodie", w: 1.05, dy: 8 },
+    { form: "cap", w: 0.8, dy: -6 },
   ],
   charcoal: [
-    { form: "hoodie", x: 2, y: 60, w: 21 },
-    { form: "crew", x: 17, y: 35, w: 19 },
-    { form: "cap", x: 30, y: 62, w: 13 },
-    { form: "tee", x: 42, y: 36, w: 17 },
-    { form: "hoodie", x: 57, y: 63, w: 22 },
-    { form: "tee", x: 72, y: 34, w: 15 },
-    { form: "crew", x: 85, y: 60, w: 20 },
-    { form: "cap", x: 99, y: 38, w: 14 },
+    { form: "hoodie", w: 1.18, dy: 4 },
+    { form: "cap", w: 0.76, dy: -8 },
+    { form: "tee", w: 1.02, dy: 8 },
+    { form: "crew", w: 1.22, dy: -3 },
+    { form: "cap", w: 0.7, dy: 10 },
+    { form: "tee", w: 0.9, dy: -6 },
+    { form: "hoodie", w: 1.08, dy: 2 },
   ],
   iris: [
-    { form: "crew", x: 0, y: 38, w: 20 },
-    { form: "hoodie", x: 15, y: 62, w: 22 },
-    { form: "tee", x: 31, y: 35, w: 16 },
-    { form: "cap", x: 43, y: 60, w: 13 },
-    { form: "crew", x: 56, y: 37, w: 19 },
-    { form: "hoodie", x: 72, y: 63, w: 22 },
-    { form: "cap", x: 87, y: 36, w: 14 },
-    { form: "tee", x: 98, y: 60, w: 17 },
+    { form: "crew", w: 1.15, dy: -5 },
+    { form: "tee", w: 0.95, dy: 8 },
+    { form: "hoodie", w: 1.28, dy: -2 },
+    { form: "cap", w: 0.74, dy: 9 },
+    { form: "tee", w: 1.05, dy: -7 },
+    { form: "crew", w: 1.0, dy: 5 },
+    { form: "cap", w: 0.78, dy: -4 },
   ],
 }
 
-/** The single-story view: the same four objects with the room three racks were sharing. */
-const SOLO: Placed[] = [
-  { form: "cap", x: 2, y: 44, w: 16 },
-  { form: "tee", x: 15, y: 66, w: 20 },
-  { form: "crew", x: 32, y: 38, w: 23 },
-  { form: "hoodie", x: 50, y: 66, w: 25 },
-  { form: "tee", x: 67, y: 36, w: 18 },
-  { form: "cap", x: 79, y: 62, w: 15 },
-  { form: "crew", x: 93, y: 40, w: 23 },
-]
-
 const srcOf = (form: FormId, story: StoryId) => `/frames/obj-${form}-${story}.png`
 
-function Rack({ items, story, solo, priceOf }: {
-  items: Placed[]
+/** How long one full pass takes. Slower than it feels it should be: this is ambient. */
+const DURATION: Record<StoryId, string> = { natural: "72s", charcoal: "88s", iris: "80s" }
+
+function Garment({ slot, story, price, hidden }: {
+  slot: Slot
   story: StoryId
-  solo: boolean
-  /** null when this form is not a published product — the object is then not drawn at all. */
-  priceOf: (f: FormId) => number | null
+  price: number
+  /** A clone in the loop's second copy, or a repeat of a form already on this rail. */
+  hidden: boolean
 }) {
   const name = STORIES.find((s) => s.id === story)!.name
-  const shown = items.filter((it) => priceOf(it.form) !== null)
+  return (
+    <Link
+      href={`/catalog/${FORM_SLUG[slot.form]}`}
+      aria-hidden={hidden || undefined}
+      tabIndex={hidden ? -1 : undefined}
+      aria-label={`${FORM_LABEL[slot.form]} in ${name}`}
+      className="group relative block shrink-0 focus-visible:outline-none"
+      style={{
+        width: `calc(var(--rail-unit) * ${slot.w})`,
+        transform: `translateY(${slot.dy}%)`,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={srcOf(slot.form, story)}
+        alt=""
+        className="block w-full origin-center transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.09] motion-safe:group-focus-visible:scale-[1.09]"
+      />
+      {/*
+        * THE LABEL NAMES THE GARMENT AND ITS REAL PRICE — the two things that decide whether
+        * the click is worth making. §4 reserves the pill for stage meaning and forbids it for
+        * tags; this is neither, it is a hover readout of where the click leads, which is why
+        * it is `rounded-lg` like every other control rather than `rounded-full`.
+        *
+        * CENTRED UNDER THE GARMENT rather than beside it, because on a rail the neighbour is
+        * only a few percent away and a label hanging to the right would sit on top of it.
+        */}
+      <span
+        className="pointer-events-none absolute left-1/2 top-full z-10 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+        style={{ background: INK, color: CARD }}
+      >
+        {FORM_LABEL[slot.form]} · from ${price.toFixed(2)}
+      </span>
+    </Link>
+  )
+}
+
+function Rail({ story, reverse, priceOf }: {
+  story: StoryId
+  reverse: boolean
+  priceOf: (f: FormId) => number | null
+}) {
+  const slots = RAILS[story].filter((s) => priceOf(s.form) !== null)
+  if (!slots.length) return null
+
+  /* THE TRACK IS THE SEQUENCE TWICE, and the animation translates it -50%. At that point the
+     second copy sits exactly where the first began, so the reset is invisible — which is the
+     entire trick, and why the clone cannot be a different length or a different order. */
+  const track = [...slots, ...slots]
+
   return (
     <div
-      className="relative w-full"
-      style={{ minHeight: solo ? "clamp(24rem, 56vh, 37rem)" : "clamp(18rem, 38vh, 25rem)" }}
+      className="eg-rail-hold relative w-full overflow-hidden py-4"
+      /* --rail-unit is the base object width; every slot scales off it, so one value tunes
+         the whole rail's density and the depth differences survive. */
+      style={{ ["--rail-unit" as string]: "clamp(9rem, 17vw, 19rem)", ["--rail-dur" as string]: DURATION[story] }}
     >
-      {shown.map((it, i) => {
-        /* The FIRST appearance of a form is the real one; later ones are the temporary
-           repeats noted above. Same destination — so they stay clickable with a mouse and
-           stay out of the tab order and the accessibility tree. */
-        const dup = shown.findIndex((o) => o.form === it.form) !== i
-        const price = priceOf(it.form)
-        return (
-        <Link
-          key={`${it.form}-${i}`}
-          href={`/catalog/${FORM_SLUG[it.form]}`}
-          aria-hidden={dup || undefined}
-          tabIndex={dup ? -1 : undefined}
-          /* The name says the garment AND the colour, because the visible label only appears
-             on hover and a pointer is not the only way here. */
-          aria-label={`${FORM_LABEL[it.form]} in ${name}`}
-          className="group absolute block focus-visible:outline-none"
-          style={{ left: `${it.x}%`, top: `${it.y}%`, width: `${it.w}%`, transform: "translate(-50%, -50%)" }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={srcOf(it.form, story)}
-            alt=""
-            className="block w-full origin-center transition-transform duration-500 ease-out will-change-transform motion-safe:group-hover:scale-[1.06] motion-safe:group-focus-visible:scale-[1.06]"
+      <div className={"eg-rail flex w-max items-center gap-[2.5vw]" + (reverse ? " eg-rail-rev" : "")}>
+        {track.map((slot, i) => (
+          <Garment
+            key={`${slot.form}-${i}`}
+            slot={slot}
+            story={story}
+            price={priceOf(slot.form)!}
+            /* The second copy is the loop's clone, and within the first copy a form that has
+               already appeared is one of the temporary repeats. Both are the same product with
+               the same destination, so they stay clickable and stay out of the a11y tree. */
+            hidden={i >= slots.length || slots.findIndex((o) => o.form === slot.form) !== i}
           />
-          {/*
-            * THE LABEL NAMES THE PRODUCT AND ITS PRICE — the two things that decide whether
-            * the click is worth making. It used to read "+ Charcoal", which described the
-            * filter the click used to apply; the click goes to the product now, so the label
-            * had to move with it or it would be advertising the old behaviour.
-            *
-            * §4 reserves the pill for stage meaning and forbids it for tags. This is neither:
-            * it is a hover readout of where the click leads, which is why it is `rounded-lg`
-            * like every other control rather than `rounded-full`.
-            *
-            * The price is the REAL published one, "from" because it moves by size.
-            */}
-          <span
-            className="pointer-events-none absolute left-full top-1/2 z-10 ml-1 hidden -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 lg:block"
-            style={{ background: INK, color: CARD }}
-          >
-            {FORM_LABEL[it.form]} · from ${price!.toFixed(2)}
-          </span>
-        </Link>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }
@@ -230,8 +209,7 @@ export function ProductField({ products, className = "" }: {
 }) {
   const [story, setStory] = useState<StoryId | "all">("all")
 
-  /* Resolved against what is ACTUALLY published, every render. A form whose slug is missing
-     — the ring-spun crewneck today — returns null and is not drawn. */
+  /* Resolved against what is ACTUALLY published, every render. */
   const priceOf = (f: FormId): number | null => {
     const p = (products ?? []).find((x) => x.slug === FORM_SLUG[f])
     if (!p) return null
@@ -239,39 +217,33 @@ export function ProductField({ products, className = "" }: {
     return Number.isFinite(n) && n > 0 ? n : null
   }
 
+  const shown = story === "all" ? STORIES : STORIES.filter((s) => s.id === story)
+
   const tabs = [
     { id: "all" as const, label: "All" },
     ...STORIES.map((s) => ({ id: s.id, label: s.name })),
   ]
 
   return (
-    /* overflow-hidden is what lets an object cross the frame without giving the PAGE a
-       horizontal scrollbar — so it stays, and the padding is what stops it also slicing the
-       bottom off the last rack. Measured: objects ran 29px past the section and the iris
-       hoodie met the CTA band with a flat cut edge. A rack places objects by PERCENT of its
-       own height, so the lowest always hangs past it; the section carries that overhang. */
-    <section className={"relative w-full overflow-hidden pb-16 " + className} style={{ background: SURFACE }}>
+    <section className={"relative w-full overflow-hidden pb-10 " + className} style={{ background: SURFACE }}>
       {/* THE RULE UNDER THE LIVE WORD — components/app/tab-bar.tsx, not a fresh row of
-          capsules. §4's own worked example: this bar was hand-rolled fourteen times before the
-          primitive existed, and every new one was written because there was nothing to import.
-          There is now. Colour lives HERE, and only here — an object opens its product. */}
+          capsules. Colour lives HERE, and only here: an object opens its product. */}
       <div className="mx-auto max-w-[88rem] px-6 sm:px-10">
         <TabBar items={tabs} value={story} onChange={setStory} ariaLabel="Colour" />
       </div>
 
-      <div className="hidden lg:block">
-        {story === "all"
-          ? STORIES.map((s) => (
-              <Rack key={s.id} items={RACKS[s.id]} story={s.id} solo={false} priceOf={priceOf} />
-            ))
-          : <Rack items={SOLO} story={story} solo priceOf={priceOf} />}
+      <div className="mt-4 hidden lg:block">
+        {shown.map((s, i) => (
+          <Rail key={s.id} story={s.id} reverse={i % 2 === 1} priceOf={priceOf} />
+        ))}
       </div>
 
-      {/* Below lg the racks become a grid. A field needs room a phone does not have; the same
-          objects and the same destination, arranged rather than placed. */}
+      {/* Below lg the rails become a grid. A moving rail on a touch screen cannot be paused by
+          hovering, so there is nothing to hover and the motion would be decoration you cannot
+          stop — the same objects and the same destination, arranged rather than running. */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 px-6 py-10 sm:grid-cols-3 lg:hidden">
-        {(story === "all" ? STORIES : STORIES.filter((s) => s.id === story)).flatMap((s) =>
-          RACKS[s.id]
+        {shown.flatMap((s) =>
+          RAILS[s.id]
             .filter((it, i, a) => a.findIndex((o) => o.form === it.form) === i && priceOf(it.form) !== null)
             .map((it) => (
               <Link
