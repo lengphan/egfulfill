@@ -24,8 +24,10 @@ import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
+import { matchThreadColors, type Thread } from "@/lib/thread-match"
+import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { layerDpi, dpiVerdict, useNaturalSizes } from "@/lib/print-quality"
-import { designFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
+import { designFaces, setTypeMockups, typeMockupOf, methodsOf, isEmbroidery } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
 
@@ -292,6 +294,49 @@ export function DesignMaker() {
   /** Stage zoom — shared with the order designer, which had none. See lib/stage-zoom.ts for
    *  why this scales a WRAPPER and never the artwork's own percentages. */
  const { zoom, reset: resetZoom, ref: stageWrap, style: zoomStyle } = useStageZoom()
+
+  /**
+   * WHAT THIS WOULD COST IN CONES, on a blank that can be embroidered.
+   *
+   * The order designer has matched artwork to threads since it was written and this screen
+   * never has — so a seller could design an embroidered product, publish it, and first learn
+   * how many colours it resolves to when the factory opened the line. Same matcher, same
+   * palette, so the two cannot disagree about one file.
+   *
+   * Every image layer, unioned by thread code: a design is the stack, not its bottom layer,
+   * and two layers sharing a red must not count it twice.
+   *
+   * No invented ceiling. It reports the count and the cones; how many needles a machine has
+   * is a fact about a machine, and this window does not know which one.
+   */
+ const embBlank = useMemo(() => methodsOf(product).some(isEmbroidery), [product])
+ const [threads, setThreads] = useState<Thread[]>([])
+ const [threadBusy, setThreadBusy] = useState(false)
+ const layerKey = images.map((im) => im.src).join("\u0000")
+ useEffect(() => {
+    // The condition is the blank's methods and the layer list; what this writes is `threads`,
+    // which is in neither — so it cannot re-satisfy itself (CLAUDE.md 2.8).
+    // The two SYNCHRONOUS sets are deferred a tick — `react-hooks/set-state-in-effect`, the
+    // rule that bites in this codebase, and the same setTimeout(fn, 0) the app pages use.
+    // Everything below lands in a promise callback and is already off the render path.
+ let live = true
+ if (!embBlank || !layerKey) {
+ const clear = setTimeout(() => setThreads([]), 0)
+ return () => { live = false; clearTimeout(clear) }
+    }
+ const busy = setTimeout(() => setThreadBusy(true), 0)
+ const srcs = layerKey.split("\u0000").filter(Boolean)
+ loadThreadPalette()
+      .then(() => Promise.all(srcs.map((src) => matchThreadColors(src).catch(() => [] as Thread[]))))
+      .then((lists) => {
+ if (!live) return
+ const seen = new Map<string, Thread>()
+ for (const l of lists) for (const t of l) seen.set(t.code, t)
+ setThreads([...seen.values()])
+      })
+      .finally(() => { if (live) setThreadBusy(false) })
+ return () => { live = false; clearTimeout(busy) }
+  }, [embBlank, layerKey])
  const nextLayerId = useRef(1)
   /**
    * EVERYTHING DECIDED BEFORE ANY STATE IS SET.
@@ -1025,6 +1070,43 @@ export function DesignMaker() {
             * target at 300 DPI is the number a designer actually needs, and it is the one
             * thing Printify puts in front of you and we did not.
             */}
+          {/**
+            * THE CONES THIS WOULD TAKE. Only on a blank that can be embroidered, and only
+            * with something placed — on a DTG product the question does not arise.
+            *
+            * The count is the fact; the swatches are what makes it checkable. No ceiling is
+            * asserted: how many needles a machine carries is a fact about a machine, and
+            * this window does not know which one it is destined for.
+            */}
+          {embBlank && images.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-sm font-semibold">{tl("designMaker", "Thread colours")}</div>
+              {threadBusy ? (
+                <div className="flex justify-center py-1.5"><CircleNotch size={15} className="animate-spin text-muted-foreground" /></div>
+              ) : threads.length === 0 ? (
+                <p className="text-2xs text-muted-foreground">
+                  {tl("designMaker", "We couldn’t read solid colours out of this artwork.")}
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {threads.map((t) => (
+                      <span
+                        key={t.code}
+                        title={`${t.name} · ${t.code}`}
+                        className="size-5 rounded-full border border-black/15"
+                        style={{ background: t.hex }}
+                      />
+                    ))}
+                  </div>
+                  <div className="text-2xs tabular-nums text-muted-foreground">
+                    {threads.length} {threads.length === 1 ? tl("designMaker", "colour") : tl("designMaker", "colours")}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="text-sm font-semibold">{tl("designMaker", "Print area")}</div>
             <div className="flex items-baseline gap-1.5 text-sm tabular-nums">
