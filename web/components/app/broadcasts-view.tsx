@@ -61,6 +61,13 @@ function channelLabel(ch: BroadcastChannel[]): string {
  return "Email only"
 }
 
+/** True when nothing narrows the audience — i.e. audienceLabel() would say "All sellers". */
+function isEveryone(a: BroadcastAudience | null | undefined): boolean {
+  const aud = a ?? {}
+  if (Array.isArray(aud.sellerIds) && aud.sellerIds.length) return false
+  return aud.hasOrders === undefined && !aud.includeInactive
+}
+
 function audienceLabel(a: BroadcastAudience | null | undefined): string {
  const aud = a ?? {}
  if (Array.isArray(aud.sellerIds) && aud.sellerIds.length) return `${aud.sellerIds.length} hand-picked`
@@ -617,7 +624,17 @@ export function BroadcastsView({ embedded }: {
                         {!embedded && <div className="truncate text-xs text-muted-foreground">{b.body}</div>}
                       </td>
                       <td className="py-3 pr-3 text-xs text-muted-foreground">
-                        {audienceLabel(b.audience)}
+                        {/* SHOW THE EXCEPTION, NOT THE RULE. audienceLabel() only returns
+                            anything other than "All sellers" when the audience was actually
+                            narrowed — so on an account that mails everyone, this column said
+                            the same eight words eight times down the page and spent a full
+                            column of width doing it. On a table already wide enough to push
+                            its last column off the right edge, a constant is the first thing
+                            that should go.
+                            Narrowed audiences still show, and now they stand out instead of
+                            hiding among identical neighbours — which is the point of a column
+                            you scan. */}
+                        {!isEveryone(b.audience) && <div>{audienceLabel(b.audience)}</div>}
                         {/* WHERE it went, not just to whom. Rows predating the channel column
  were email, and say nothing rather than claiming a channel they
  never had. */}
