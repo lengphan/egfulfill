@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getWallet, getMe, type User, type WalletResponse, type LedgerRow } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { TAB_BAR,SECTION,F,C } from "@/lib/theme"
+import { TAB_BAR,SECTION,F,C, R } from "@/lib/theme"
 import { TopupApprovals } from "@/components/topup-approvals"
 
 /**
@@ -103,7 +103,7 @@ export default function Wallet() {
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>BALANCE</Text>
             {w?.low && (
-              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: "center", backgroundColor: C.warnTint }}>
+              <View style={{ paddingHorizontal: 10, height: 24, borderRadius: R.badge, justifyContent: "center", backgroundColor: C.warnTint }}>
                 <Text style={{ fontSize: 11, fontFamily: F.bold, color: C.warn }}>
                   LOW{w.lowBelow != null ? ` · UNDER ${money(w.lowBelow)}` : ""}
                 </Text>
@@ -122,12 +122,12 @@ export default function Wallet() {
           onPress={() => router.push("/topup")}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 12, height: 52, borderRadius: 14, backgroundColor: C.primary,
+            marginTop: 12, height: 52, borderRadius: R.control, backgroundColor: C.brand,
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Ionicons name="add-circle" size={20} color={C.onPrimary} />
-          <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
+          <Ionicons name="add-circle" size={20} color={C.onBrand} />
+          <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Add funds</Text>
         </Pressable>
         )}
 

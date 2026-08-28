@@ -89,7 +89,7 @@ export function Barcode({ value, height = 64, module = 2, showValue = true, dark
       {/* The quiet zone is part of the symbol, not padding — a scanner needs the clear
           margin to find the start. White under the bars for the same reason: the warm page
           colour costs contrast a cheap scanner does not have to spare. */}
-      <View style={{ backgroundColor: "#ffffff", borderRadius: R.sm, paddingHorizontal: 14, paddingVertical: 10 }}>
+      <View style={{ backgroundColor: "#ffffff", borderRadius: R.control, paddingHorizontal: 14, paddingVertical: 10 }}>
         <Svg width={total} height={height}>{bars}</Svg>
       </View>
       {showValue && (

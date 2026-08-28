@@ -64,12 +64,12 @@ export function ItemPhotos({ open, onClose, title, art, listing }: {
                    cannot check the edges of. */
                 <Image
                   source={{ uri: assetUrl(s.url) || undefined }}
-                  style={{ width: "100%", aspectRatio: 1, borderRadius: R.lg, backgroundColor: C.card }}
+                  style={{ width: "100%", aspectRatio: 1, borderRadius: R.card, backgroundColor: C.card }}
                   resizeMode="contain"
                 />
               ) : (
                 <View style={{
-                  width: "100%", aspectRatio: 1, borderRadius: R.lg, backgroundColor: C.card,
+                  width: "100%", aspectRatio: 1, borderRadius: R.card, backgroundColor: C.card,
                   borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", gap: 10,
                 }}>
                   <Ionicons name="image-outline" size={30} color={C.muted} />

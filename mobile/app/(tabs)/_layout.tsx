@@ -1,19 +1,21 @@
 import { Tabs } from "expo-router"
-import { Platform, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { F, C, R, TAB_BAR } from "@/lib/theme"
 import { ChatBubble } from "@/components/chat-bubble"
 
 /**
- * The unlit tabs. Ink at 60% = 5.25:1 on the bar's white — a real reading, not a hint.
+ * THE UNLIT TABS, on the block.
  *
- * It was 55% over a ground that was itself 94% translucent, so its true contrast depended on
- * whatever happened to be scrolling underneath. MEASURED: 4.36:1 even in the best case, with
- * plain white content behind the bar. That is under the 4.5:1 body floor before an order
- * thumbnail is anywhere near it, and in the screenshot that prompted this, one was.
+ * The bar was WHITE, and the unlit glyph was ink at 60% on it — 5.25:1, a real reading. That
+ * construction is gone with the bar itself (see tabBarStyle), so this is re-measured against
+ * slate rather than carried over: #DDE0E3 at 70% composites to #AAADB1, which is 5.32:1 on
+ * the block. The live tab is ink on periwinkle at 11.22:1 — a 2.1x jump, plus a fill, plus a
+ * weight change. Three channels, none of them hue, so it survives greyscale and a colourblind
+ * operator both.
  */
-const INACTIVE = "rgba(10,10,10,0.6)"
+const INACTIVE = "rgba(221,224,227,0.7)"
 
 /** Keyed by the FILLED glyph name, which is what the focused branch passes. One word each:
  *  a second word does not fit 58pt and a bar is not where you explain anything. */
@@ -26,49 +28,52 @@ const LABEL = { today: "Today", cube: "Orders", scan: "Scan", wallet: "Wallet", 
  */
 
 /**
- * THE ACTIVE TAB IS A NEUTRAL PILL, and there is no colour in this bar at all.
+ * THE BAR IS THE DARK BLOCK, AND THE LIVE TAB IS THE ONE LIT THING ON IT.
  *
- * It was a rose disc — C.pop, 42px, behind the live glyph. Two things were wrong with it,
- * and the second is the one that matters.
+ * Two earlier versions of this control are worth recording, because this is the third and
+ * each of the first two was fixing something real.
  *
- * lib/theme.ts states the rule for that token itself: it is a fill carrying dark text, and
- * it "earns its keep on the dark blocks and as a small badge". A tab indicator is neither.
- * It is the most PERMANENT element in the app — every screen, same place, always lit — so
- * putting the one bright thing there meant the accent stopped marking anything and simply
- * became what the tab bar looks like. An accent that is always on screen is a background.
+ * It was a ROSE DISC behind the live glyph. Wrong because a tab indicator is the most
+ * PERMANENT element in the app — every screen, same place, always lit — so putting the one
+ * bright thing there meant the accent stopped marking anything and simply became what the
+ * tab bar looks like. An accent that is always on screen is a background.
  *
- * And the web never does this. `--pop` renders in exactly three places over there: the
- * unread notification dot, the unread row tint, and one badge in studio. Never in chrome —
- * no sidebar, no tab row, no nav. So the disc was a mobile-only rule, which is the thing
- * `web is canonical, mobile extends` exists to stop.
+ * It then became a WHITE BAR with a light-grey pill. That fixed the accent and introduced a
+ * different defect: a light grey on white can only ever reach ~1.2:1, so the pill could not
+ * be what tells you which tab is live, and the bar's own edge (C.border, 1.33:1) meant the
+ * floating control had no shape against a light screen either. Ink and weight were carrying
+ * the whole state on their own.
  *
- * What replaces it is a flat neutral ground (C.tabActive) carrying an ink glyph and an ink
- * label. Ink and WEIGHT do the work colour was doing — see that token's note for why the
- * ground itself cannot be the signal and what the two real channels measure.
+ * The block solves both at once, and it is not a new idea — it is the web's sidebar. A dark
+ * bounded panel carrying the nav, with exactly ONE item lit on it, is what answers "where am
+ * I" over there, and the periwinkle exists in the palette for precisely this job. It is
+ * 7.18:1 on slate and 1.67:1 on white, so this is the only surface in the app it can sit on
+ * at all; the white bar could never have had it.
  *
- * THE LABELS COME BACK. They went on the argument that five recognisable glyphs say it
- * already — but `scan` and `today` are not recognisable, they are guesses, and the bar is
- * the one control a new operator meets first. A word under a glyph is not a caption; it is
- * what makes the second tab findable without opening it.
+ * It is also what lets the bar lose its shadow, which Workshop forbids at every level. Slate
+ * is 10.88:1 against the page — the control has a shape because of what it IS, not because
+ * of a blur underneath it.
  *
- * Rendered whole in `tabBarIcon` rather than through `tabBarShowLabel`, because the ground
- * has to enclose the glyph AND its word — the navigator draws those in two separate slots
- * and nothing can span them.
+ * THE LABELS STAY. Five recognisable glyphs was the argument for dropping them, but `scan`
+ * and `today` are not recognisable, they are guesses, and the bar is the one control a new
+ * operator meets first. Rendered whole in `tabBarIcon` rather than through
+ * `tabBarShowLabel`, because the ground has to enclose the glyph AND its word — the
+ * navigator draws those in two separate slots and nothing can span them.
  */
 function TabGlyph({ name, label, focused }: {
   name: keyof typeof Ionicons.glyphMap
   label: string
   focused: boolean
 }) {
-  const ink = focused ? C.fg : INACTIVE
+  const ink = focused ? C.onLit : INACTIVE
   return (
     <View style={{ height: TAB_BAR.height, alignItems: "center", justifyContent: "center" }}>
       <View
         style={{
           minWidth: 58, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 5,
-          borderRadius: R.md, gap: 2,
+          borderRadius: R.control, gap: 2,
           alignItems: "center", justifyContent: "center",
-          backgroundColor: focused ? C.tabActive : "transparent",
+          backgroundColor: focused ? C.lit : "transparent",
         }}
       >
         <Ionicons name={name} size={21} color={ink} />
@@ -107,25 +112,18 @@ export default function TabsLayout() {
         /* TabGlyph inks its own glyph and label, because the ground has to enclose both
            and the navigator's two tint options cannot reach inside one View. These stay
            declared so anything the navigator draws itself agrees with it. */
-        tabBarActiveTintColor: C.fg,
+        tabBarActiveTintColor: C.onLit,
         tabBarInactiveTintColor: INACTIVE,
         tabBarShowLabel: false,
         /*
-         * AN OPAQUE BAR. It floats, but it is a SURFACE.
+         * AN OPAQUE BAR, AND NOW A DARK ONE. See the note above TabGlyph for why the white
+         * version could not carry a live state, and why nothing lighter would have.
          *
-         * It was rgba(251,251,251,0.94) — the page's own #FBFBFB at 94% — inside a border of
-         * rgba(10,10,10,0.06). So the fill was the page and the edge measured about 1.1:1
-         * against it: on a white screen the capsule had no shape whatsoever, and the user's
-         * report was that the control panel is impossible to see. It was, literally.
-         *
-         * The translucency was there so the list stayed "faintly visible" underneath. On warm
-         * paper with a tinted bar that reads as depth; on white paper with a white bar it just
-         * means order thumbnails scroll THROUGH the glyphs, which is the second half of the
-         * same complaint. A floating control needs to be opaque or it is not a control.
-         *
-         * White on the near-white page, held by a measured hairline and a soft shadow — the
-         * same construction the login panel uses, and C.card exists for exactly this: a
-         * surface that genuinely IS a surface (never a content card — see lib/theme.ts).
+         * NO SHADOW. Workshop's depth model is a change of background value, and the block is
+         * 10.88:1 against the page — there is nothing left for a blur to add. The `elevation`
+         * and `shadow*` keys that used to sit here are the exact thing lib/theme.ts removed
+         * with LIFT, and a floating bar was the case most likely to argue for an exception.
+         * It does not need one.
          */
         tabBarStyle: {
           position: "absolute",
@@ -142,32 +140,12 @@ export default function TabsLayout() {
           left: 16, right: 16, bottom,
           height: TAB_BAR.height,
           // Half the height: still a true lozenge, just a wider one. The pills inside it are
-          // R.md, so the shapes nest rather than repeat.
+          // R.control, so the shapes nest rather than repeat.
           borderRadius: TAB_BAR.height / 2,
-          backgroundColor: C.card,
+          backgroundColor: C.ink,
           borderTopWidth: 0,
-          borderWidth: 1,
-          borderColor: C.border,
+          borderWidth: 0,
           paddingBottom: 0,
-          ...Platform.select({
-            /*
-             * shadow* is iOS-only; Android draws depth from `elevation` and ignores the rest.
-             * With the fill now OPAQUE, Android's elevation no longer renders muddy behind a
-             * translucent ground — the artefact that forced the two platforms apart is gone,
-             * so both can carry a real shadow.
-             *
-             * The home indicator (iOS) and the gesture pill (Android) both live where this bar
-             * sits, which is why `bottom` clears the safe-area inset rather than a fixed 16.
-             */
-            ios: {
-              shadowColor: "#0A0A0A",
-              shadowOpacity: 0.10,
-              shadowRadius: 18,
-              shadowOffset: { width: 0, height: 6 },
-            },
-            android: { elevation: 6 },
-            default: {},
-          }),
         },
         /* CENTRED, AND MEANT IT. With the labels hidden the item keeps the padding the
            navigator reserves for a label, so every glyph sat high in the capsule rather than

@@ -130,7 +130,7 @@ export default function ChatThread() {
                   </Text>
                 )}
                 <View style={{
-                  maxWidth: "84%", borderRadius: R.md, paddingHorizontal: 13, paddingVertical: 9,
+                  maxWidth: "84%", borderRadius: R.control, paddingHorizontal: 13, paddingVertical: 9,
                   // Ink for yours, the warm well for theirs — the same two surfaces the rest of
                   // the app uses, rather than a third palette invented for chat.
                   backgroundColor: mine ? C.ink : C.accent,
@@ -159,8 +159,9 @@ export default function ChatThread() {
             placeholderTextColor={C.muted}
             multiline
             style={{
-              flex: 1, maxHeight: 120, minHeight: 42, borderRadius: R.md,
-              backgroundColor: C.accent, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 11,
+              flex: 1, maxHeight: 120, minHeight: 42, borderRadius: R.control,
+              borderWidth: 1, borderColor: C.edge,
+              backgroundColor: C.card, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 11,
               fontSize: 15, fontFamily: F.body, color: C.fg,
             }}
           />
@@ -168,7 +169,7 @@ export default function ChatThread() {
             onPress={send}
             disabled={!text.trim() || sending}
             style={({ pressed }) => ({
-              width: 42, height: 42, borderRadius: 21, backgroundColor: C.ink,
+              width: 42, height: 42, borderRadius: R.pill, backgroundColor: C.ink,
               alignItems: "center", justifyContent: "center",
               opacity: !text.trim() || sending ? 0.4 : pressed ? 0.75 : 1,
             })}

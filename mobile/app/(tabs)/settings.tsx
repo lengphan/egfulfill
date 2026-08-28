@@ -6,7 +6,7 @@ import Constants from "expo-constants"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, type User } from "@/lib/api"
 import { useFocusEffect } from "expo-router"
-import { TAB_BAR,F,C } from "@/lib/theme"
+import { TAB_BAR,F,C, R, CARD } from "@/lib/theme"
 
 /**
  * SETTINGS — deliberately short.
@@ -23,11 +23,12 @@ import { TAB_BAR,F,C } from "@/lib/theme"
  *    where they are audited — not duplicated onto a phone where they can be changed by
  *    accident in a pocket.
  */
-function Line({ label, value }: { label: string; value: string }) {
+function Line({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
     <View style={{
       flexDirection: "row", justifyContent: "space-between", gap: 16,
-      paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border,
+      paddingVertical: 15, paddingHorizontal: 16,
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border,
     }}>
       <Text style={{ fontSize: 15, color: C.muted }}>{label}</Text>
       <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg, flexShrink: 1, textAlign: "right" }}>{value}</Text>
@@ -74,9 +75,9 @@ export default function Settings() {
       <Text style={{ fontSize: 30, fontFamily: F.display, color: C.fg, letterSpacing: -0.5 }}>Settings</Text>
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>ACCOUNT</Text>
-      <View style={{ marginTop: 8 }}>
+      <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
         {err
-          ? <Text style={{ color: C.alert, fontSize: 15, paddingVertical: 14 }}>{err}</Text>
+          ? <Text style={{ color: C.alert, fontSize: 15, padding: 16 }}>{err}</Text>
           : (
             <>
               {/* Name and Username only appear when there IS one. A row of dashes is not
@@ -85,12 +86,12 @@ export default function Settings() {
               {me?.name ? <Line label="Name" value={me.name} /> : null}
               {me?.username ? <Line label="Username" value={me.username} /> : null}
               <Line label="Email" value={me?.email || "—"} />
-              <Line label="Role" value={me?.role || "—"} />
+              <Line label="Role" value={me?.role || "—"} last />
               {/* An account whose stored email is really a username predates signup
                   validation, and it is worth saying so rather than labelling it Email —
                   that person cannot reset a password, because nothing can be sent. */}
               {me?.email && !/.+@.+\..+/.test(String(me.email)) ? (
-                <Text style={{ fontSize: 13, color: C.warn, paddingTop: 12 }}>
+                <Text style={{ fontSize: 13, color: C.warn, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14 }}>
                   That is a username in the email field, so password reset can&apos;t reach you.
                   Add a real email on the web to fix it.
                 </Text>
@@ -100,15 +101,15 @@ export default function Settings() {
       </View>
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>APP</Text>
-      <View style={{ marginTop: 8 }}>
-        <Line label="Version" value={version} />
+      <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
+        <Line label="Version" value={version} last />
       </View>
 
       <Pressable
         onPress={() => Linking.openURL("https://app.egful.store")}
         style={({ pressed }) => ({
           flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-          marginTop: 28, height: 50, borderRadius: 14, borderWidth: 1, borderColor: C.border,
+          marginTop: 28, height: 50, borderRadius: R.control, borderWidth: 1, borderColor: C.edge,
           opacity: pressed ? 0.6 : 1,
         })}
       >
@@ -119,8 +120,8 @@ export default function Settings() {
       <Pressable
         onPress={signOut}
         style={({ pressed }) => ({
-          marginTop: 12, height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center",
-          borderWidth: 1, borderColor: C.border, opacity: pressed ? 0.6 : 1,
+          marginTop: 12, height: 50, borderRadius: R.control, alignItems: "center", justifyContent: "center",
+          borderWidth: 1, borderColor: C.edge, opacity: pressed ? 0.6 : 1,
         })}
       >
         <Text style={{ fontSize: 16, fontFamily: F.semi, color: C.alert }}>Sign out</Text>

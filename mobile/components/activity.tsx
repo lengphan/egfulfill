@@ -17,7 +17,7 @@ export function ActivityRow({ e }: {
       {/* The rail: a log reads as a sequence, and the dot-and-line is what says so without
           a heading per entry. */}
       <View style={{ alignItems: "center", width: 10, paddingTop: 5 }}>
-        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.primary }} />
+        <View style={{ width: 7, height: 7, borderRadius: R.pill, backgroundColor: C.primary }} />
         <View style={{ flex: 1, width: 1, backgroundColor: C.border, marginTop: 4 }} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -30,7 +30,7 @@ export function ActivityRow({ e }: {
         {e.attachment?.url && String(e.attachment.mime || "").startsWith("image/") && (
           <Image
             source={{ uri: e.attachment.url }}
-            style={{ width: "100%", height: 190, marginTop: 10, borderRadius: R.md, backgroundColor: C.accent }}
+            style={{ width: "100%", height: 190, marginTop: 10, borderRadius: R.card, backgroundColor: C.accent }}
             resizeMode="cover"
           />
         )}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, Alert, RefreshControl, ScrollView, TextInput } from "react-native"
 import { getTopups, confirmTopup, rejectTopup, type Topup } from "@/lib/api"
-import { F, C, SECTION, TAB_BAR, methodLabel } from "@/lib/theme"
+import { F, C, R, SECTION, TAB_BAR, methodLabel } from "@/lib/theme"
 
 /**
  * TOP-UPS, APPROVED FROM THE FLOOR.
@@ -121,8 +121,9 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
                 placeholder="0.00"
                 placeholderTextColor={C.muted}
                 style={{
-                  flex: 1, height: 38, borderRadius: 9, paddingHorizontal: 10,
-                  backgroundColor: C.accentPaper, color: C.fg, fontFamily: F.medium, fontSize: 15,
+                  flex: 1, height: 38, borderRadius: R.control, paddingHorizontal: 10,
+                  borderWidth: 1, borderColor: C.edge,
+                  backgroundColor: C.card, color: C.fg, fontFamily: F.medium, fontSize: 15,
                 }}
               />
             </View>
@@ -137,7 +138,7 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
               onPress={() => act("no")}
               disabled={!!busy}
               style={({ pressed }) => ({
-                flex: 1, height: 44, borderRadius: 12, flexDirection: "row", gap: 8,
+                flex: 1, height: 44, borderRadius: R.control, flexDirection: "row", gap: 8,
                 alignItems: "center", justifyContent: "center",
                 borderWidth: 1, borderColor: C.border,
                 opacity: pressed || busy ? 0.6 : 1,
@@ -150,7 +151,7 @@ function Row({ t, onDone }: { t: Topup; onDone: () => void }) {
               onPress={() => act("ok")}
               disabled={!!busy}
               style={({ pressed }) => ({
-                flex: 1, height: 44, borderRadius: 12, flexDirection: "row", gap: 8,
+                flex: 1, height: 44, borderRadius: R.control, flexDirection: "row", gap: 8,
                 alignItems: "center", justifyContent: "center",
                 backgroundColor: C.ink,
                 opacity: pressed || busy ? 0.7 : 1,

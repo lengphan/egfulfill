@@ -11,7 +11,7 @@ import {
   normalizeStage, units, isOverdue, numOf, platformOf, orderRefLabel, nextStage, addressLines,
   STAGE_LABEL, stageAction, stageDenialReason, isFactoryOrder, recordedRevenue,
 } from "@/lib/orders"
-import { F,C, R, LIFT, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
+import { F,C, R, CARD_INK, SECTION, toneOnInk, HERO_BUTTON, HERO_LABEL, HERO_GLYPH } from "@/lib/theme"
 import { ActivityRow } from "@/components/activity"
 import { ConfirmShipment } from "@/components/confirm-shipment"
 import { OrderLine } from "@/components/order-line"
@@ -239,7 +239,7 @@ export default function OrderDetail() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.primary} />}
         >
           {/* ── THE JOB, in one block ──────────────────────────────────────────── */}
-          <View style={{ backgroundColor: C.ink, borderRadius: R.xl, padding: 22, ...LIFT }}>
+          <View style={{ ...CARD_INK, padding: 22 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={{ fontSize: 12, fontFamily: F.bold, color: C.onInk, opacity: 0.55, letterSpacing: 1.4 }}>
                 {platformOf(o).toUpperCase()}
@@ -261,11 +261,15 @@ export default function OrderDetail() {
             </Text>
 
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 }}>
-              <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.pill, backgroundColor: tone.bg }}>
-                <Text style={{ fontSize: 11, fontFamily: F.bold, color: tone.fg, letterSpacing: 0.6 }}>
-                  {(STAGE_LABEL[stage] ?? stage).toUpperCase()}
-                </Text>
-              </View>
+              {/* THE STAGE IS A WORD, in one of three registers — see STATUS_REGISTER_INK.
+                  It was a tinted capsule drawn from a table of eight hues, and the web
+                  measured that vocabulary and retired it: 16 of its 36 pairs sat under the
+                  0.150 OKLab separation floor. On this block in particular the tint drained
+                  to a near-white blob and violet-on-lavender read as a mistake rather than a
+                  status. Weight and a rule carry it now, and both survive a bad screen. */}
+              <Text style={{ fontSize: 13, letterSpacing: 0.2, ...tone }}>
+                {STAGE_LABEL[stage] ?? stage}
+              </Text>
               <Text style={{ fontSize: 13, color: C.onInk, opacity: 0.65 }}>
                 {sizeText}
                 {o.total != null ? ` · $${(Number(o.total) || 0).toFixed(2)}` : ""}
@@ -309,7 +313,7 @@ export default function OrderDetail() {
                 disabled={moving}
                 style={({ pressed }) => ({
                   ...HERO_BUTTON,
-                  marginTop: 12, backgroundColor: C.primary,
+                  marginTop: 12, backgroundColor: C.brand,
                   opacity: pressed || moving ? 0.8 : 1,
                 })}
               >
@@ -317,11 +321,11 @@ export default function OrderDetail() {
                     picture of the word next to it — starting has a universal mark and
                     "Approve" does not, which is why the arrow came off that one. */}
                 {moving
-                  ? <ActivityIndicator color={C.onPrimary} />
+                  ? <ActivityIndicator color={C.onBrand} />
                   : to === "working"
-                    ? <Ionicons name="play" size={HERO_GLYPH} color={C.onPrimary} />
+                    ? <Ionicons name="play" size={HERO_GLYPH} color={C.onBrand} />
                     : null}
-                <Text style={{ ...HERO_LABEL, color: C.onPrimary }}>
+                <Text style={{ ...HERO_LABEL, color: C.onBrand }}>
                   {stageAction(to)}
                 </Text>
               </Pressable>
@@ -403,12 +407,12 @@ export default function OrderDetail() {
                     <Pressable
                       onPress={() => Linking.openURL(link)}
                       style={({ pressed }) => ({
-                        flex: 1, height: 46, borderRadius: R.md, flexDirection: "row", gap: 8,
+                        flex: 1, height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
                         alignItems: "center", justifyContent: "center",
-                        backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
+                        backgroundColor: C.brand, opacity: pressed ? 0.85 : 1,
                       })}
                     >
-                      <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 15 }}>Track</Text>
+                      <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 15 }}>Track</Text>
                     </Pressable>
                   )}
                   {/* Staff only, and only when there is a PDF: the server nulls the label
@@ -418,7 +422,7 @@ export default function OrderDetail() {
                       onPress={printLabel}
                       disabled={printing}
                       style={({ pressed }) => ({
-                        flex: 1, height: 46, borderRadius: R.md, flexDirection: "row", gap: 8,
+                        flex: 1, height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
                         alignItems: "center", justifyContent: "center",
                         borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
                       })}
@@ -452,7 +456,7 @@ export default function OrderDetail() {
                     onPress={printLabel}
                     disabled={printing}
                     style={({ pressed }) => ({
-                      height: 46, borderRadius: R.md, flexDirection: "row", gap: 8,
+                      height: 46, borderRadius: R.control, flexDirection: "row", gap: 8,
                       alignItems: "center", justifyContent: "center",
                       borderWidth: 1.5, borderColor: C.ink, opacity: pressed || printing ? 0.6 : 1,
                     })}

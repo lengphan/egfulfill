@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { getOrders, type Order } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
 import { isOpen, isOverdue, normalizeStage } from "@/lib/orders"
-import { TAB_BAR,F,C, S } from "@/lib/theme"
+import { TAB_BAR,F,C, R, S, CARD } from "@/lib/theme"
 
 /**
  * TODAY — the same screen as the web shell, rebuilt with native primitives.
@@ -113,8 +113,12 @@ export default function Today() {
       <Text style={{ paddingHorizontal: S.xl, marginTop: S.xl, marginBottom: S.sm, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4, color: C.muted }}>
         WHAT NEEDS DOING
       </Text>
-      <View style={{ marginHorizontal: S.xl, borderTopWidth: 1, borderTopColor: C.border }}>
-        {jobs.map((j) => (
+      {/* A GROUP IS A CARD. These rows sat straight on the page under a hairline, which was
+          right when the page was white and nothing could be a surface. On the tinted page a
+          white card is what says "these four belong together", and it costs no shadow to do
+          it. The last row loses its rule so the card's own edge finishes the stack. */}
+      <View style={{ ...CARD, marginHorizontal: S.xl, overflow: "hidden" }}>
+        {jobs.map((j, i) => (
           <Pressable
             key={j.key}
             onPress={() => router.push({ pathname: "/(tabs)/orders", params: j.to })}
@@ -124,12 +128,12 @@ export default function Today() {
             /* Press feedback on touch-DOWN, which is the tell people read as "native". */
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: S.md,
-              paddingVertical: 15,
-              borderBottomWidth: 1, borderBottomColor: C.border,
+              paddingVertical: 15, paddingHorizontal: S.lg,
+              borderBottomWidth: i === jobs.length - 1 ? 0 : 1, borderBottomColor: C.border,
               backgroundColor: pressed ? C.accent : "transparent",
             })}
           >
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: TONE[j.tone] }} />
+            <View style={{ width: 6, height: 6, borderRadius: R.pill, backgroundColor: TONE[j.tone] }} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 15, fontFamily: F.medium, color: C.fg }}>{j.label}</Text>
             </View>

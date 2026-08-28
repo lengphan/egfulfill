@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useFocusEffect, useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, getSupportThreads, type SupportThread } from "@/lib/api"
-import { F, C, SECTION, TAB_BAR } from "@/lib/theme"
+import { F, C, R, SECTION, TAB_BAR } from "@/lib/theme"
 
 /**
  * CHAT — the two rooms, and nothing else.
@@ -91,7 +91,7 @@ export default function ChatIndex() {
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                 <View style={{
-                  width: 40, height: 40, borderRadius: 20, backgroundColor: C.ink,
+                  width: 40, height: 40, borderRadius: R.pill, backgroundColor: C.ink,
                   alignItems: "center", justifyContent: "center",
                 }}>
                   <Ionicons name="people" size={19} color={C.onInk} />
@@ -132,10 +132,10 @@ export default function ChatIndex() {
                         only version of this number worth putting a colour on. */}
                     {!!t.unanswered && t.unanswered > 0 && (
                       <View style={{
-                        minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6,
-                        backgroundColor: C.alert, alignItems: "center", justifyContent: "center",
+                        minWidth: 20, height: 20, borderRadius: R.pill, paddingHorizontal: 6,
+                        backgroundColor: C.pop, alignItems: "center", justifyContent: "center",
                       }}>
-                        <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: "#fff" }}>{t.unanswered}</Text>
+                        <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.onPop }}>{t.unanswered}</Text>
                       </View>
                     )}
                     <Text style={{ fontSize: 12.5, fontFamily: F.body, color: C.muted }}>{when(t.last_at)}</Text>

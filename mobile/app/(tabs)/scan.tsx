@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import { Ionicons } from "@expo/vector-icons"
 import { scanInventory, getMe, type ScanResult, type User } from "@/lib/api"
-import { TAB_BAR,F,C } from "@/lib/theme"
+import { TAB_BAR,F,C, R } from "@/lib/theme"
 
 /**
  * SCAN — stock in and out, from the aisle instead of a station.
@@ -116,11 +116,11 @@ export default function Scan() {
         <Pressable
           onPress={requestPerm}
           style={({ pressed }) => ({
-            marginTop: 24, height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center",
-            backgroundColor: C.primary, opacity: pressed ? 0.85 : 1,
+            marginTop: 24, height: 54, borderRadius: R.control, alignItems: "center", justifyContent: "center",
+            backgroundColor: C.brand, opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
+          <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Allow camera</Text>
         </Pressable>
       </View>
     )
@@ -181,7 +181,7 @@ export default function Scan() {
         * whole game — a decoder needs roughly two camera pixels per module.
         */}
       <View style={{
-        marginHorizontal: 20, borderRadius: 20, overflow: "hidden",
+        marginHorizontal: 20, borderRadius: R.card, overflow: "hidden",
         height: camSize, backgroundColor: "#000",
       }}>
         <CameraView
@@ -202,7 +202,7 @@ export default function Scan() {
         >
           {/* Square, because the code is. 68% leaves the quiet zone inside the frame —
               a QR held edge-to-edge with the reticle loses the margin decoders need. */}
-          <View style={{ width: camSize * 0.68, height: camSize * 0.68, borderWidth: 3, borderColor: tone, borderRadius: 18 }} />
+          <View style={{ width: camSize * 0.68, height: camSize * 0.68, borderWidth: 3, borderColor: tone, borderRadius: R.card }} />
         </View>
       </View>
 

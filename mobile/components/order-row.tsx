@@ -3,7 +3,7 @@ import { View, Text, Image, Pressable, Modal, ScrollView, useWindowDimensions, A
 import { Ionicons } from "@expo/vector-icons"
 import { assetUrl, type Order } from "@/lib/api"
 import { isOverdue, normalizeStage, units, numOf, platformOf, lineTitle, lineFacts, STAGE_LABEL } from "@/lib/orders"
-import { F,C, R, LIFT, toneOf } from "@/lib/theme"
+import { F,C, R, toneOf } from "@/lib/theme"
 /* ImagePeek moved to its own file once it grew pinch-zoom and a dismiss gesture — it
    is a photo viewer, and two screens use it. Re-exported so importers are unchanged. */
 import { ImagePeek } from "@/components/image-peek"
@@ -71,7 +71,7 @@ function RowMenu({ open, onClose, title, actions }: {
   const change = live.filter((a) => a.strong)
 
   const Block = ({ items }: { items: Exclude<Action, null>[] }) => (
-    <View style={{ backgroundColor: C.card, borderRadius: 16, overflow: "hidden", marginTop: 10 }}>
+    <View style={{ backgroundColor: C.card, borderRadius: R.card, overflow: "hidden", marginTop: 10 }}>
       {items.map((a, i) => (
         <Pressable
           key={a.label}
@@ -109,17 +109,18 @@ function RowMenu({ open, onClose, title, actions }: {
           <Pressable
             onPress={() => {}}
             style={{
-              backgroundColor: C.bg,
-              borderTopLeftRadius: 22, borderTopRightRadius: 22,
+              // A SHEET IS A CARD. It was the page colour held apart from the page by a
+              // hairline and a shadow — two near-identical surfaces, which is exactly the
+              // construction the white card replaces. White on the tinted page separates on
+              // its own, and the border finishes it. The shadow that used to be here is the
+              // one Workshop forbids at every level.
+              backgroundColor: C.card,
+              borderTopLeftRadius: R.card, borderTopRightRadius: R.card,
               paddingTop: 10, paddingBottom: 40, paddingHorizontal: 14,
-              // With no scrim behind it the sheet carries its own separation, or its top
-              // edge dissolves into paper of exactly the same colour.
               borderTopWidth: 1, borderColor: C.border,
-              shadowColor: "#0A0A0A", shadowOpacity: 0.13, shadowRadius: 22,
-              shadowOffset: { width: 0, height: -6 }, elevation: 16,
             }}
           >
-            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, marginBottom: 14 }} />
+            <View style={{ alignSelf: "center", width: 38, height: 4, borderRadius: R.pill, backgroundColor: C.border, marginBottom: 14 }} />
             <Text style={{ fontSize: 12, fontFamily: F.semi, color: C.muted, letterSpacing: 1.2, paddingHorizontal: 4 }}>
               {title.toUpperCase()}
             </Text>
@@ -166,14 +167,14 @@ function Chip({ label, fg, bg, solid }: { label: string; fg: string; bg?: string
    */
   if (solid) {
     return (
-      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, backgroundColor: bg }}>
+      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: R.badge, backgroundColor: bg }}>
         <Text style={{ fontSize: 10.5, fontFamily: F.bold, color: fg, letterSpacing: 0.6 }}>{label}</Text>
       </View>
     )
   }
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-      {bg ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: fg }} /> : null}
+      {bg ? <View style={{ width: 6, height: 6, borderRadius: R.pill, backgroundColor: fg }} /> : null}
       <Text style={{ fontSize: 12.5, fontFamily: F.medium, color: bg ? C.fg : C.muted }}>{label}</Text>
     </View>
   )
@@ -258,7 +259,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
       <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
         {selecting && (
           <View style={{
-            width: 19, height: 19, borderRadius: 9.5, marginRight: 1,
+            width: 19, height: 19, borderRadius: R.pill, marginRight: 1,
             alignItems: "center", justifyContent: "center",
             backgroundColor: selected ? C.primary : "transparent",
             borderWidth: 1.5, borderColor: selected ? C.primary : C.border,
@@ -316,7 +317,7 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
                 style={{
                   width: shots.length === 1 ? 200 : 168,
                   height: shots.length === 1 ? 200 : 168,
-                  borderRadius: 10, backgroundColor: C.accent,
+                  borderRadius: R.control, backgroundColor: C.accent,
                 }}
                 resizeMode="cover"
               />
@@ -327,7 +328,11 @@ export function OrderRow({ order, selecting, selected, onPress, onLongPress, onA
 
       {/* THE STATE. */}
       <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
-        <Chip label={STAGE_LABEL[stage] ?? stage} fg={tone.fg} bg={tone.bg} />
+        {/* THE STAGE IS A WORD, not a dot beside one — see STATUS_REGISTER. The dot was
+            the reserved stage colour, and that colour vocabulary was measured and retired
+            on the web (lib/status-tone.ts): only hue separated its nine members, which is
+            the one channel a factory screen and a colourblind reader both lose. */}
+        <Text style={{ fontSize: 12.5, ...tone }}>{STAGE_LABEL[stage] ?? stage}</Text>
         <Chip label={`${units(order)} ${units(order) === 1 ? "item" : "items"}`} fg={C.muted} />
         {noArt && <Chip label="No artwork" fg={C.muted} />}
       </View>

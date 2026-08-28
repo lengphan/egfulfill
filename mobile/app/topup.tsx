@@ -10,7 +10,7 @@ import {
   getTopupConfig, createVietqrPayment, vietqrStatus, getWallet, abandonVietqr, getMyTopups,
   type TopupConfig, type VietqrPayment, type LedgerRow, type TopupRequest,
 } from "@/lib/api"
-import { F,C } from "@/lib/theme"
+import { F,C, R } from "@/lib/theme"
 
 /**
  * ADD FUNDS — VietQR, mirroring the web dialog rather than reinventing it.
@@ -256,17 +256,17 @@ export default function TopUp() {
             <Pressable
               onPress={() => router.back()}
               style={({ pressed }) => ({
-                marginTop: 28, height: 52, borderRadius: 14, paddingHorizontal: 32,
-                alignItems: "center", justifyContent: "center", backgroundColor: C.primary,
+                marginTop: 28, height: 52, borderRadius: R.control, paddingHorizontal: 32,
+                alignItems: "center", justifyContent: "center", backgroundColor: C.brand,
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
+              <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Back to wallet</Text>
             </Pressable>
           </View>
         ) : phase === "qr" && payment ? (
           <View style={{ alignItems: "center", marginTop: 20 }}>
-            <View style={{ padding: 16, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border }}>
+            <View style={{ padding: 16, borderRadius: R.card, backgroundColor: C.card, borderWidth: 1, borderColor: C.border }}>
               {payment.qrCode
                 ? <QRCode value={payment.qrCode} size={qrSize} getRef={(c) => { qrRef.current = c }} />
                 : <Text style={{ color: C.muted }}>No scannable code</Text>}
@@ -279,7 +279,7 @@ export default function TopUp() {
               {usd0(payment.amountUsd ?? usdAmt)}
             </Text>
 
-            <View style={{ alignSelf: "stretch", marginTop: 24, borderRadius: 16, backgroundColor: C.accent, padding: 16 }}>
+            <View style={{ alignSelf: "stretch", marginTop: 24, borderRadius: R.card, backgroundColor: C.accent, padding: 16 }}>
               <Field label="Receiver" value={payment.name} />
               <Field label="Bank" value={payment.bankCode} />
               <Field label="Account" value={payment.vaAccount || payment.account} />
@@ -301,8 +301,8 @@ export default function TopUp() {
               disabled={saving || !payment.qrCode}
               style={({ pressed }) => ({
                 flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                marginTop: 20, height: 50, borderRadius: 14, paddingHorizontal: 24,
-                borderWidth: 1, borderColor: C.border, opacity: pressed || saving ? 0.6 : 1,
+                marginTop: 20, height: 50, borderRadius: R.control, paddingHorizontal: 24,
+                borderWidth: 1, borderColor: C.edge, opacity: pressed || saving ? 0.6 : 1,
               })}
             >
               {saving
@@ -334,8 +334,9 @@ export default function TopUp() {
               * than being part of it.
               */}
             <View style={{
-              marginTop: 10, borderRadius: 16, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
-              backgroundColor: C.accent,
+              marginTop: 10, borderRadius: R.control, paddingHorizontal: 18, paddingTop: 6, paddingBottom: 8,
+              borderWidth: 1, borderColor: C.edge,
+              backgroundColor: C.card,
             }}>
               <TextInput
                 value={amount}
@@ -362,14 +363,14 @@ export default function TopUp() {
                     key={p}
                     onPress={() => { setAmount(String(p)); setErr(null) }}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 16, height: 40, borderRadius: 20, justifyContent: "center",
-                      backgroundColor: String(p) === amount ? C.primary : C.accent,
+                      paddingHorizontal: 16, height: 40, borderRadius: R.control, justifyContent: "center",
+                      backgroundColor: String(p) === amount ? C.brand : C.accent,
                       opacity: pressed ? 0.7 : 1,
                     })}
                   >
                     <Text style={{
                       fontSize: 15, fontFamily: F.semi,
-                      color: String(p) === amount ? C.onPrimary : C.fg,
+                      color: String(p) === amount ? C.onBrand : C.fg,
                     }}>{usd0(p)}</Text>
                   </Pressable>
                 ))}
@@ -392,13 +393,13 @@ export default function TopUp() {
               onPress={start}
               disabled={busy || !cfg}
               style={({ pressed }) => ({
-                marginTop: 28, height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center",
-                backgroundColor: C.primary, opacity: pressed || busy || !cfg ? 0.7 : 1,
+                marginTop: 28, height: 54, borderRadius: R.control, alignItems: "center", justifyContent: "center",
+                backgroundColor: C.brand, opacity: pressed || busy || !cfg ? 0.7 : 1,
               })}
             >
               {busy
-                ? <ActivityIndicator color={C.onPrimary} />
-                : <Text style={{ color: C.onPrimary, fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
+                ? <ActivityIndicator color={C.onBrand} />
+                : <Text style={{ color: C.onBrand, fontFamily: F.bold, fontSize: 16 }}>Show payment QR</Text>}
             </Pressable>
 
             {!cfg && !err && (
@@ -451,7 +452,7 @@ export default function TopUp() {
                           </Text>
                         </View>
                         <View style={{
-                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.badge,
                           backgroundColor: e.paid ? C.successTint : C.warnTint,
                         }}>
                           <Text style={{ fontSize: 12, fontFamily: F.bold, color: e.paid ? C.success : C.warn }}>

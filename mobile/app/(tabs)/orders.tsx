@@ -5,7 +5,7 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getOrders, setOrderStage, getMe, type Order, type User } from "@/lib/api"
 import { isOpen, isOverdue, numOf, plainNum, nextStage, lineTitle, normalizeStage, STAGE_LABEL, STAGE_VERB, canSetStage, isFactoryOrder } from "@/lib/orders"
-import { TAB_BAR,F,C, R, LIFT } from "@/lib/theme"
+import { TAB_BAR,F,C, R, CARD_INK } from "@/lib/theme"
 import { OrderRow } from "@/components/order-row"
 
 /**
@@ -244,8 +244,8 @@ export default function Orders() {
 
         <View style={{
           flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12,
-          height: 44, borderRadius: 10, paddingHorizontal: 12,
-          backgroundColor: C.accentPaper, borderWidth: 0,
+          height: 44, borderRadius: R.control, paddingHorizontal: 12,
+          backgroundColor: C.card, borderWidth: 1, borderColor: C.edge,
         }}>
           <Ionicons name="search" size={17} color={C.muted} />
           <TextInput
@@ -384,7 +384,7 @@ export default function Orders() {
         <View style={{
           position: "absolute", left: 14, right: 14, bottom: insets.bottom + TAB_BAR.clearance - 4,
           flexDirection: "row", alignItems: "center", gap: 12,
-          backgroundColor: C.ink, borderRadius: R.lg, padding: 12, ...LIFT,
+          ...CARD_INK, padding: 12,
         }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onInk }}>
@@ -401,15 +401,20 @@ export default function Orders() {
             disabled={moving || !movable.length}
             style={({ pressed }) => ({
               flexDirection: "row", alignItems: "center", gap: 8,
-              paddingHorizontal: 16, height: 44, borderRadius: R.md,
-              backgroundColor: movable.length ? C.pop : "#2E2E2E",
+              paddingHorizontal: 16, height: 44, borderRadius: R.control,
+              /* THE LIT THING, and this bar is the reason the token is not chrome: it
+                 appears when a selection exists and leaves when it does not, so it marks
+                 something rather than decorating the app. `pop` used to fill it, which the
+                 palette now forbids on the block — see lib/theme.ts. Disabled is the
+                 block’s own state step, not a hand-typed grey. */
+              backgroundColor: movable.length ? C.lit : C.inkAccent,
               opacity: pressed || moving ? 0.7 : 1,
             })}
           >
             {moving
-              ? <ActivityIndicator color={C.ink} />
-              : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.onPop : C.muted} />}
-            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? C.onPop : C.muted }}>
+              ? <ActivityIndicator color={C.onLit} />
+              : <Ionicons name="arrow-forward" size={16} color={movable.length ? C.onLit : C.onInk} />}
+            <Text style={{ fontSize: 15, fontFamily: F.bold, color: movable.length ? C.onLit : C.onInk }}>
               {batchLabel}
             </Text>
           </Pressable>

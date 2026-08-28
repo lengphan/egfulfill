@@ -145,8 +145,8 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
         onChangeText={(t) => setForm((f) => ({ ...f, [k]: t }))}
         autoCapitalize={k === "state" || k === "country" ? "characters" : "words"}
         style={{
-          height: 44, borderRadius: R.md, paddingHorizontal: 12,
-          borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
+          height: 44, borderRadius: R.control, paddingHorizontal: 12,
+          borderWidth: 1, borderColor: C.edge, backgroundColor: C.card,
           color: C.fg, fontSize: 15,
         }}
       />
@@ -157,7 +157,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
     <View style={{ gap: 12 }}>
       {/* DELIVER TO, above the price. Reviewed, then paid for — never the other way. */}
       <View style={{
-        borderRadius: R.md, borderWidth: 1, borderColor: C.border,
+        borderRadius: R.card, borderWidth: 1, borderColor: C.border,
         backgroundColor: C.card, padding: 14, gap: 10,
       }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -207,12 +207,12 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
           disabled={busy === "rates"}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            height: 52, borderRadius: R.md, backgroundColor: C.primary,
+            height: 52, borderRadius: R.control, backgroundColor: C.brand,
             opacity: pressed || busy === "rates" ? 0.8 : 1,
           })}
         >
-          {busy === "rates" && <ActivityIndicator color={C.onPrimary} />}
-          <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onPrimary }}>
+          {busy === "rates" && <ActivityIndicator color={C.onBrand} />}
+          <Text style={{ fontSize: 16, fontFamily: F.bold, color: C.onBrand }}>
             {busy === "rates" ? "Getting rates…" : "Buy shipping label"}
           </Text>
         </Pressable>
@@ -228,7 +228,7 @@ export function BuyLabel({ order, onDone }: { order: Order; onDone: () => void }
               style={({ pressed }) => ({
                 flexDirection: "row", alignItems: "center", gap: 12,
                 paddingVertical: 12, paddingHorizontal: 14,
-                borderRadius: R.md, borderWidth: 1, borderColor: C.border,
+                borderRadius: R.control, borderWidth: 1, borderColor: C.border,
                 backgroundColor: pressed ? C.accent : C.card,
                 opacity: busy && busy !== r.token ? 0.5 : 1,
               })}

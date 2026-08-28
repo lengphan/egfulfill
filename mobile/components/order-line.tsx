@@ -6,7 +6,7 @@ import {
   designsFor, lineArt, lineListing, lineTitle, lineFacts, nextLineStage, normalizeStage,
   STAGE_LABEL, stageActionLine, KIND_LABEL, isArtwork, stageDenialReason, isFactoryOrder,
 } from "@/lib/orders"
-import { F,C, R, LIFT } from "@/lib/theme"
+import { F,C, R } from "@/lib/theme"
 import { ImagePeek } from "@/components/order-row"
 
 /**
@@ -38,16 +38,16 @@ function FileChip({ d }: { d: OrderDesign }) {
       onPress={() => url && Linking.openURL(url)}
       style={({ pressed }) => ({
         flexDirection: "row", alignItems: "center", gap: 10,
-        paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md,
+        paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.control,
         backgroundColor: pressed ? C.accent : "transparent",
       })}
     >
       {art && url ? (
         <Image source={{ uri: assetUrl(url) || undefined }}
-          style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: C.accent }} />
+          style={{ width: 34, height: 34, borderRadius: R.badge, backgroundColor: C.accent }} />
       ) : (
         <View style={{
-          width: 34, height: 34, borderRadius: 8, backgroundColor: C.ink,
+          width: 34, height: 34, borderRadius: R.badge, backgroundColor: C.ink,
           alignItems: "center", justifyContent: "center",
         }}>
           <Ionicons name="document-text" size={16} color={C.onInk} />
@@ -300,7 +300,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
                 style={{
                   width: pics.length === 1 ? 200 : 168,
                   height: pics.length === 1 ? 200 : 168,
-                  borderRadius: 10, backgroundColor: C.accent,
+                  borderRadius: R.control, backgroundColor: C.accent,
                 }}
                 resizeMode="cover"
               />
@@ -317,7 +317,7 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
               disabled={stitchBusy || !!stitchWhy}
               onPress={renderStitch}
               style={({ pressed }) => ({
-                width: 168, height: 168, borderRadius: 10,
+                width: 168, height: 168, borderRadius: R.control,
                 // The image well the pictures beside it sit on, not white — a white tile among
                 // warm wells is the stuck-on look the theme note warns about.
                 borderWidth: 1, borderColor: C.border, backgroundColor: C.accent,
@@ -373,15 +373,15 @@ export function OrderLine({ orderId, order, item, index, designs, canWork, role,
           disabled={busy}
           style={({ pressed }) => ({
             flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-            marginTop: 12, height: 44, borderRadius: 12,
-            backgroundColor: to === "working" ? C.primary : C.ink,
+            marginTop: 12, height: 44, borderRadius: R.control,
+            backgroundColor: to === "working" ? C.brand : C.ink,
             opacity: pressed || busy ? 0.7 : 1,
           })}
         >
           {/* No glyph. "Start Item" needs no picture of starting, and arrow-forward was the
               second arrow on a card that already had one. */}
           {busy && <ActivityIndicator color={C.onInk} />}
-          <Text style={{ fontSize: 15, fontFamily: F.semi, color: to === "working" ? C.onPrimary : C.onInk, letterSpacing: -0.1 }}>
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: to === "working" ? C.onBrand : C.onInk, letterSpacing: -0.1 }}>
             {stageActionLine(to)}
           </Text>
         </Pressable>

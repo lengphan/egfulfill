@@ -3,7 +3,7 @@ import { Pressable, View, Text } from "react-native"
 import { useRouter, useFocusEffect } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, getSupportThreads } from "@/lib/api"
-import { C, F, TAB_BAR } from "@/lib/theme"
+import { C, F, R, TAB_BAR } from "@/lib/theme"
 
 /**
  * THE WAY INTO CHAT, from wherever you are.
@@ -56,24 +56,29 @@ export function ChatBubble() {
       accessibilityLabel={waiting > 0 ? `Chat, ${waiting} waiting on you` : "Chat"}
       style={({ pressed }) => ({
         position: "absolute", right: 18, bottom: TAB_BAR.clearance + 8,
-        width: 52, height: 52, borderRadius: 26,
+        width: 52, height: 52, borderRadius: R.pill,
+        // NO SHADOW, on either platform. Slate is 10.88:1 against the page, so the disc has
+        // a shape because of what it is — Workshop's whole depth model, and the reason
+        // lib/theme.ts no longer exports anything that draws a blur.
         backgroundColor: C.ink, alignItems: "center", justifyContent: "center",
-        // iOS draws the soft shadow; Android ignores it and uses elevation. Both, or it is
-        // a flat disc on one of the two platforms.
-        shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-        elevation: 6,
         opacity: pressed ? 0.8 : 1,
       })}
     >
       <Ionicons name="chatbubble-ellipses" size={22} color={C.onInk} />
       {waiting > 0 && (
         <View style={{
-          position: "absolute", top: -2, right: -2, minWidth: 20, height: 20, borderRadius: 10,
-          paddingHorizontal: 5, backgroundColor: C.alert,
+          position: "absolute", top: -2, right: -2, minWidth: 20, height: 20, borderRadius: R.pill,
+          paddingHorizontal: 5,
+          /* POP, NOT ALERT — and this is the token's whole job. `--pop` means "this is new,
+             and it is for you": on the web it renders on the unread badge, the unread dot
+             and the unread row, and nowhere else. A count of messages waiting on you IS that.
+             `alert` is a RESERVED status colour and red here said something had gone wrong
+             when nothing had. Ink on rose is 7.51:1. */
+          backgroundColor: C.pop,
           alignItems: "center", justifyContent: "center",
           borderWidth: 2, borderColor: C.bg,
         }}>
-          <Text style={{ fontSize: 11, fontFamily: F.semi, color: "#fff" }}>{waiting > 99 ? "99+" : waiting}</Text>
+          <Text style={{ fontSize: 11, fontFamily: F.semi, color: C.onPop }}>{waiting > 99 ? "99+" : waiting}</Text>
         </View>
       )}
     </Pressable>
