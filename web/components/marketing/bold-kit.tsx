@@ -533,7 +533,13 @@ export function PlateHero({ title, accent, sub, children, path }: {
    */
   return (
     <section className="relative -mt-16 pt-16" style={{ background: SURFACE }}>
-      <div className="mx-auto max-w-[88rem] px-6 pb-20 pt-14 sm:px-10 sm:pt-20">
+      {/* TALLER, AND BOUNDED BY THE VIEWPORT RATHER THAN BY ITS OWN PADDING.
+        Padding alone sizes an opening block to its text, so a two-line standfirst produced a
+        banner about 350px deep — the page started before it had introduced itself, and the
+        first thing under the fold was a control row. A min-height makes it an OPENING rather
+        than a heading with air around it, and `svh` rather than `vh` so a phone's collapsing
+        toolbar does not crop it. */}
+    <div className="mx-auto flex min-h-[clamp(26rem,58svh,38rem)] max-w-[88rem] flex-col justify-center px-6 pb-20 pt-14 sm:px-10 sm:pt-20">
         <h1 className="max-w-[20ch] font-display font-semibold leading-[0.92] tracking-[-0.032em]" style={{ ...DISPLAY, color: INK }}>
           {path && editing
             ? <EditableText path={`${path}.title`}>{title}</EditableText>
@@ -985,7 +991,7 @@ function PressReveal({ media, alt, focusX, focusY, scale, innerRef }: {
   )
 }
 
-export function MediaHero({ media, reveal, alt, children, minH = "clamp(30rem, 62vh, 44rem)", focusX, focusY, scale, tone = "light", bleed = false, atTop = true }: {
+export function MediaHero({ media, reveal, alt, children, minH = "clamp(36rem, 76svh, 52rem)", focusX, focusY, scale, tone = "light", bleed = false, atTop = true }: {
   /** A public image OR video URL. Empty is a legitimate answer — see above. */
   media?: string
   /** The DECORATED twin of `media`, revealed under the pointer — see PressReveal. Both must
