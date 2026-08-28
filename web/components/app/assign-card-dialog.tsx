@@ -2,9 +2,9 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, CircleNotch, Warning, CheckCircle, LinkSimple } from "@phosphor-icons/react"
+import { CircleNotch, Warning, CheckCircle, LinkSimple } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -102,12 +102,11 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
           <div className="space-y-3">
             <div>
               <label htmlFor="ac-q" className="mb-1 block text-xs font-medium">{tl("assignCard", "Find the order")}</label>
-              <div className="relative">
-                <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input id="ac-q" value={q}
- onChange={(e) => { setQ(e.target.value); setPicked(null); setLine(null) }}
- placeholder={tl("assignCard", "Order number, customer or store…")} className="h-9 pl-8" />
-              </div>
+              <SearchField
+                value={q}
+                onChange={(v) => { setQ(v); setPicked(null); setLine(null) }}
+                placeholder={tl("assignCard", "Order number, customer or store…")}
+              />
             </div>
 
             {orders === null ? (

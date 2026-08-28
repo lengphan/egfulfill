@@ -6,18 +6,18 @@ import { mayEditVariants } from "@/shared/order-rules"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { designSearchTerms } from "@/lib/design-id"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
+import { SearchField } from "@/components/app/search-field"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
 import { stockSkuOf } from "@/lib/stock-status"
 import { useRouter } from "next/navigation"
-import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
+import { Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { consumeImportOpen } from "@/lib/sheet-return"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { ColumnsMenu } from "@/components/app/columns-menu"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -373,15 +373,12 @@ export function OrdersList() {
               </button>
             ))}
           </div>
-          <div className="relative max-w-xs flex-1">
-            <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
- value={query}
- onChange={(e) => setQuery(e.target.value)}
- placeholder={tl("ordersList", "Search orders…")}
- className="h-9 pl-8"
-            />
-          </div>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            width="sm"
+            placeholder={tl("ordersList", "Search orders…")}
+          />
         </div>
 
         {isDemo && (

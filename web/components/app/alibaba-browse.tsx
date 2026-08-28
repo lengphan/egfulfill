@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { MagnifyingGlass, CircleNotch, Plus, Check } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import { SectionCard } from "@/components/app/section-card"
 import { getAlibabaConfig, searchAlibaba, saveSourcing, type AlibabaProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
@@ -153,14 +153,12 @@ export function AlibabaBrowse({ onConnectedChange, initialQuery, onSaved }: {
 
       <div className="space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[240px] flex-1">
-            <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
- value={q} onChange={(e) => setQ(e.target.value)}
- onKeyDown={(e) => { if (e.key === "Enter") run(q, 1) }}
- placeholder={tl("alibabaBrowse", "e.g. blank cotton tote bag")} className="h-9 pl-8"
-            />
-          </div>
+          <SearchField
+            value={q}
+            onChange={setQ}
+            onKeyDown={(e) => { if (e.key === "Enter") run(q, 1) }}
+            placeholder={tl("alibabaBrowse", "e.g. blank cotton tote bag")}
+          />
           <Button size="sm" onClick={() => run(q, 1)} disabled={busy || !q.trim()}>
             {busy ? <CircleNotch size={14} className="animate-spin" /> : <MagnifyingGlass size={14} weight="bold" />} Search
           </Button>

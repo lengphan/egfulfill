@@ -3,9 +3,9 @@
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { MagnifyingGlass, Package } from "@phosphor-icons/react"
+import { Package } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { BlankOutline, hasBlankOutline } from "@/components/app/blank-outline"
 import { sizesOf, methodsOf } from "@/lib/variant-resolve"
@@ -159,10 +159,12 @@ export function ProductPickerDialog({
             ))}
           </div>
         )}
-        <div className="relative">
-          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tl("productPicker", "Search products…")} className="pl-9" autoFocus />
-        </div>
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          autoFocus
+          placeholder={tl("productPicker", "Search products…")}
+        />
 
         <div className="max-h-[55vh] overflow-y-auto">
           {products === null ? (

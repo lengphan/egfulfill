@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState, useContext, createContext, isValidEle
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, MagnifyingGlass, DotsThree, X, DownloadSimple, Database, ArrowSquareOut, CaretRight } from "@phosphor-icons/react"
+import { SearchField } from "@/components/app/search-field"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, DotsThree, X, DownloadSimple, Database, ArrowSquareOut, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -1337,25 +1338,13 @@ function PlatformPanel() {
       {/* Sticky, because the point is to type a word and watch the page below it shrink —
  scrolling away from the box you're filtering with defeats that. */}
       <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-5 py-3 backdrop-blur">
-        <div className="relative">
-          <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
- value={settingsQ}
- onChange={(e) => setSettingsQ(e.target.value)}
- placeholder={tl("settings", "Search settings — try “tiktok”, “shipping”, “payout”…")}
- className="h-9 pl-8"
- aria-label={tl("settings", "Search settings")}
-          />
-          {!!settingsQ && (
-            <button
- onClick={() => setSettingsQ("")}
- aria-label={tl("settings", "Clear search")}
- className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
-            >
-              <X size={12} weight="bold" />
-            </button>
-          )}
-        </div>
+        <SearchField
+          value={settingsQ}
+          onChange={setSettingsQ}
+          placeholder={tl("settings", "Search settings — try “tiktok”, “shipping”, “payout”…")}
+          ariaLabel={tl("settings", "Search settings")}
+          onClear={() => setSettingsQ("")}
+        />
       </div>
       <FoldGroup>
       {!isOperator && (
@@ -2345,10 +2334,11 @@ function UsersPanel() {
       </SectionCard>
       <SectionCard title={tl("settings", "Users")}>
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-          <div className="relative min-w-[220px] flex-1">
-            <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={qStr} onChange={(e) => setQStr(e.target.value)} placeholder={tl("settings", "Search name, email or store…")} className="h-9 pl-8" />
-          </div>
+          <SearchField
+            value={qStr}
+            onChange={setQStr}
+            placeholder={tl("settings", "Search name, email or store…")}
+          />
           {/* A FIELD, not seven capsules. This was a run of seven pills with a filled black
               one — a primary button's shape and fill, seven times over, wrapping to a second
               line in a toolbar that already holds a search box and a sort. Tabs would be no
@@ -2743,10 +2733,12 @@ function ActivityPanel() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tl("settings", "Search actor, note, id…")} className="h-8 w-60 pl-8" />
-          </div>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            width="sm"
+            placeholder={tl("settings", "Search actor, note, id…")}
+          />
           <select
  value={range}
  onChange={(e) => setRange(e.target.value)}

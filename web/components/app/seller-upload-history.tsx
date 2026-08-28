@@ -2,10 +2,10 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, CircleNotch, MagnifyingGlass, ArrowSquareOut } from "@phosphor-icons/react"
+import { UploadSimple, CircleNotch, ArrowSquareOut } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { SearchField } from "@/components/app/search-field"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
-import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Pagination, usePaged } from "@/components/app/pagination"
 import { getOrders, type OrderRow } from "@/lib/api"
@@ -73,10 +73,12 @@ export function SellerUploadHistory() {
         />
         <div className="flex items-center gap-3">
           <span className="hidden text-xs text-muted-foreground sm:inline"><span className="font-semibold text-foreground tabular-nums">{today}</span> {tl("uploadHistory", "today ·")} <span className="font-semibold text-foreground tabular-nums">{orders?.length ?? 0}</span> total</span>
-          <div className="relative w-full sm:w-56">
-            <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("uploadHistory", "Search order, customer, tracking…")} className="h-9 pl-8" />
-          </div>
+          <SearchField
+            value={q}
+            onChange={setQ}
+            width="sm"
+            placeholder={tl("uploadHistory", "Search order, customer, tracking…")}
+          />
         </div>
       </div>
 

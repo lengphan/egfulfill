@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent } from "react"
 // NB: do NOT import phosphor's `Image` — it would shadow the DOM `new Image()` used in
 // toDataUrl below. Use ImageSquare for the mode toggle instead.
-import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, MagnifyingGlass, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown } from "@phosphor-icons/react"
+import { Needle, ImageSquare, PencilSimple, ClockCounterClockwise, CircleNotch, Eye, DownloadSimple, Warning, ArrowsClockwise, X, ArrowRight, PaperPlaneTilt, Check, ArrowsOutCardinal, CaretUp, CaretDown } from "@phosphor-icons/react"
 import { canvasReadableSrc, nearestThread, matchQuality } from "@/lib/thread-match"
 import { orderRefLabel } from "@/lib/order-format"
 import {
@@ -14,6 +14,7 @@ import {
  type OrderUpload, type LibraryDesign, type ThreadColor, type WilcomResult, type WilcomGeneration, type WilcomTransform,
 } from "@/lib/api"
 import { PageTitle } from "@/components/app/page-title"
+import { SearchField } from "@/components/app/search-field"
 import { TabLabel } from "@/components/app/tab-label"
 import { Thumb } from "@/components/app/thumb"
 
@@ -150,10 +151,12 @@ function BrowseTab() {
     <>
       {/* Search only, top-right — order artwork and the design library live in one grid below. */}
       <div className="flex justify-end">
-        <div className="relative w-full max-w-sm">
-          <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("digitizer", "Search artwork…")} className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
-        </div>
+        <SearchField
+          value={q}
+          onChange={setQ}
+          width="sm"
+          placeholder={tl("digitizer", "Search artwork…")}
+        />
       </div>
 
       <div className="mt-4">
@@ -1199,10 +1202,12 @@ function HistoryTab() {
  return (
     <>
       <div className="mb-4 flex items-center gap-3">
-        <div className="relative max-w-sm flex-1">
-          <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("digitizer", "Search by design, source or type…")} className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40" />
-        </div>
+        <SearchField
+          value={q}
+          onChange={setQ}
+          width="sm"
+          placeholder={tl("digitizer", "Search by design, source or type…")}
+        />
         <button onClick={() => { setRows(null); load() }} title={tl("digitizer", "Refresh")} className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"><ArrowsClockwise size={15} /></button>
       </div>
       {rows === null ? (

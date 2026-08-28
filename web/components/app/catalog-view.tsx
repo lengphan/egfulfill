@@ -2,10 +2,11 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent, Tag } from "@phosphor-icons/react"
+import { CircleNotch, Warning, DownloadSimple, Percent, Tag } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
+import { SearchField } from "@/components/app/search-field"
 import {
  getCatalogProducts, setCatalogSelection, setCatalogPrice, applyCatalogMarkup,
  catalogExportUrl, type CatalogProduct,
@@ -204,10 +205,12 @@ export function CatalogView() {
           {tab === "mine" && (
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{published} published</span>
-              <div className="relative">
-                <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("catalog", "Search name or SKU…")} className="h-9 w-64 pl-8" />
-              </div>
+              <SearchField
+                value={q}
+                onChange={setQ}
+                width="sm"
+                placeholder={tl("catalog", "Search name or SKU…")}
+              />
             </div>
           )}
         </div>

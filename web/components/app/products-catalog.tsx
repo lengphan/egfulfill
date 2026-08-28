@@ -4,10 +4,10 @@ import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning, Tag } from "@phosphor-icons/react"
+import { Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning, Tag } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { BrandSplitDialog } from "@/components/app/brand-split-dialog"
@@ -295,15 +295,12 @@ export function ProductsCatalog() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
- value={query}
- onChange={(e) => setQuery(e.target.value)}
- placeholder={tl("products", "Search products…")}
- className="w-52 pl-9"
-            />
-          </div>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            width="sm"
+            placeholder={tl("products", "Search products…")}
+          />
           {/* SECONDARY, because adding a product is what this screen is for. Only offered
  when there is something to split — a button that always opens onto "nothing to
  do" teaches you to stop pressing it. */}

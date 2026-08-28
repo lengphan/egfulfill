@@ -1,8 +1,9 @@
 "use client"
 
-import { MagnifyingGlass, CaretDown, X, Check, FunnelSimple } from "@phosphor-icons/react"
+import { CaretDown, X, Check, FunnelSimple } from "@phosphor-icons/react"
 
 import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import { FilterMenu } from "@/components/app/filter-menu"
 import { useLabelT } from "@/lib/i18n"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
@@ -42,20 +43,16 @@ export function OrderSearchInput({ query, onChange, className = "" }: {
 }) {
   const tl = useLabelT()
   return (
-    <div className={"relative " + className}>
-      <MagnifyingGlass size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        value={query.text}
-        onChange={(e) => onChange({ ...query, text: e.target.value })}
-        // Short: the full "order, customer, tracking or SKU" list truncated to "Search
-        // order, customer, t", which reads as a broken field. What it searches is in the
-        // title and the label, where it isn't clipped.
-        placeholder={tl("ui", "Search orders…")}
-        title={tl("ui", "Search order number, customer, tracking, store, SKU or item name")}
-        className="h-9 rounded-md pl-8 text-sm"
-        aria-label={tl("ui", "Search order number, customer, tracking, store, SKU or item name")}
-      />
-    </div>
+    <SearchField
+      value={query.text}
+      onChange={(text) => onChange({ ...query, text })}
+      // Short: the full "order, customer, tracking or SKU" list truncated to "Search
+      // order, customer, t", which reads as a broken field. What it searches is in the
+      // aria-label, where it isn't clipped.
+      placeholder={tl("ui", "Search orders…")}
+      ariaLabel={tl("ui", "Search order number, customer, tracking, store, SKU or item name")}
+      className={className}
+    />
   )
 }
 

@@ -2,10 +2,10 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, MagnifyingGlass, Plus, Check } from "@phosphor-icons/react"
+import { CircleNotch, Plus, Check } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { SearchField } from "@/components/app/search-field"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { driveImg } from "@/lib/supplier-catalog"
 import { clickableProps } from "@/lib/a11y"
 import {
@@ -578,15 +578,11 @@ export function POAddItems({
           ))}
         </div>
 
-        <div className="relative">
-          <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
- value={term}
- onChange={(e) => setTerm(e.target.value)}
- placeholder={tab === "inventory" ? tl("poItems", "Search your stocked blanks…") : tl("poItems", "Search the supplier catalog…")}
- className="pl-9"
-          />
-        </div>
+        <SearchField
+          value={term}
+          onChange={setTerm}
+          placeholder={tab === "inventory" ? tl("poItems", "Search your stocked blanks…") : tl("poItems", "Search the supplier catalog…")}
+        />
 
         <div className="max-h-[60vh] min-h-[24rem] divide-y divide-border overflow-y-auto rounded-lg border border-border">
           {tab === "inventory" && (

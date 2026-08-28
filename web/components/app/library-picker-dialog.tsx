@@ -2,9 +2,9 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
-import { PenNib, CircleNotch, MagnifyingGlass, Stack } from "@phosphor-icons/react"
+import { PenNib, CircleNotch, Stack } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import { getDesignLibrary, getDesignLibraryItem, getTemplates, type LibraryDesign, type ProductTemplate } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
 import { Thumb } from "@/components/app/thumb"
@@ -136,10 +136,12 @@ export function LibraryPickerDialog({
             value={source}
             onChange={setSource}
           />
-          <div className="relative min-w-[10rem] flex-1">
-            <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("libraryPicker", "Search by name…")} className="h-9 pl-8" aria-label={tl("libraryPicker", "Search your library")} />
-          </div>
+          <SearchField
+            value={q}
+            onChange={setQ}
+            placeholder={tl("libraryPicker", "Search by name…")}
+            ariaLabel={tl("libraryPicker", "Search your library")}
+          />
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto">

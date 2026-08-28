@@ -2,8 +2,9 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { MagnifyingGlass, UploadSimple, CircleNotch, Package } from "@phosphor-icons/react"
+import { UploadSimple, CircleNotch, Package } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { SearchField } from "@/components/app/search-field"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SupplierDetailDialog } from "@/components/app/supplier-detail-dialog"
@@ -536,10 +537,12 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
     // No title — the "All suppliers" tab already names it. The toolbar is the top of the card.
     <SectionCard>
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-        <div className="relative max-w-md flex-1">
-          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tl("allSuppliers", "Search all blanks by name, brand, style, SKU…")} className="h-9 pl-9" />
-        </div>
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          width="md"
+          placeholder={tl("allSuppliers", "Search all blanks by name, brand, style, SKU…")}
+        />
         {total > 0 && <span className="text-xs text-muted-foreground">{total.toLocaleString()} blanks</span>}
         {isAdmin && (
           <>

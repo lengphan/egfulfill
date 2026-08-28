@@ -2,9 +2,9 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useMemo, useState } from "react"
-import { ImageSquare, MagnifyingGlass, MagnifyingGlassPlus } from "@phosphor-icons/react"
+import { ImageSquare, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { SearchField } from "@/components/app/search-field"
 import { Thumb } from "@/components/app/thumb"
 import { useLightbox } from "@/components/app/image-lightbox"
 
@@ -64,19 +64,15 @@ export function ArtPickerDialog({
         {zoom.node}
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
 
-        <div className="relative">
-          <MagnifyingGlass size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          {/* Remounted with the dialog (key on `open`) rather than cleared by an effect, so a
-              second visit never renders the previous search for a frame. */}
-          <Input
-            key={String(open)}
-            value={qy}
-            onChange={(e) => setQy(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="pl-9"
-            aria-label={searchPlaceholder}
-          />
-        </div>
+        {/* Remounted with the dialog (key on `open`) rather than cleared by an effect, so a
+            second visit never renders the previous search for a frame. */}
+        <SearchField
+          key={String(open)}
+          value={qy}
+          onChange={setQy}
+          placeholder={searchPlaceholder}
+          ariaLabel={searchPlaceholder}
+        />
 
         <div className="max-h-[58vh] overflow-y-auto">
           {items.length === 0 ? (

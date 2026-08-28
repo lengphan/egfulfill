@@ -2,8 +2,9 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, Warning, MagnifyingGlass, CaretLeft, CaretRight } from "@phosphor-icons/react"
+import { CircleNotch, Warning, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
+import { SearchField } from "@/components/app/search-field"
 import { Input } from "@/components/ui/input"
 import { ProductThumb } from "@/components/app/product-thumb"
 import { getSupplierStyles, setCatalogPicks, priceCatalogPicks, type SupplierStyle } from "@/lib/api"
@@ -100,10 +101,12 @@ export function SupplierStylesPicker({ onChanged }: { onChanged?: () => void }) 
  return (
     <div className="space-y-3 px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("supplierStylesPicker", "Search style, brand or number…")} className="h-9 w-72 pl-8" />
-        </div>
+        <SearchField
+          value={q}
+          onChange={setQ}
+          width="md"
+          placeholder={tl("supplierStylesPicker", "Search style, brand or number…")}
+        />
         <span className="text-xs text-muted-foreground">
           {total.toLocaleString()} styles synced
         </span>

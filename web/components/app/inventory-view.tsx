@@ -3,8 +3,9 @@
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { Package, MagnifyingGlass, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree, Warning, CaretDown } from "@phosphor-icons/react"
+import { Package, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, QrCode as QrCodeIcon, DotsThree, Warning, CaretDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { SearchField } from "@/components/app/search-field"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { InboundPanel } from "@/components/app/inbound-panel"
 import { Button } from "@/components/ui/button"
@@ -407,10 +408,13 @@ export function InventoryView({ embedded = false, pool }: { embedded?: boolean; 
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-4">
-          <div className="relative max-w-md flex-1">
-            <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tl("inventory", "Search SKU, name, variant…")} className="h-9 pl-9" />
-          </div>
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            onClear={() => setSearch("")}
+            width="md"
+            placeholder={tl("inventory", "Search SKU, name, variant…")}
+          />
           {cats.length > 0 && (
             <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select eg-control pr-8">
               <option value="">{tl("inventory", "All categories")}</option>
@@ -1505,10 +1509,12 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
             <>
               {!picked ? (
                 <>
-                  <div className="relative">
-                    <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl("inventory", "Search the catalogue…")} className="h-9 pl-9" autoFocus />
-                  </div>
+                  <SearchField
+                    value={q}
+                    onChange={setQ}
+                    autoFocus
+                    placeholder={tl("inventory", "Search the catalogue…")}
+                  />
                   <div className="max-h-72 divide-y divide-border overflow-auto rounded-lg border border-border">
                     {matches.length === 0 ? (
                       <div className="px-3 py-8 text-center text-sm text-muted-foreground">

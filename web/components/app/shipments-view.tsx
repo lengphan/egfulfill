@@ -2,8 +2,9 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, CircleNotch, Package, DownloadSimple, Plus } from "@phosphor-icons/react"
+import { CircleNotch, Package, DownloadSimple, Plus } from "@phosphor-icons/react"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
+import { SearchField } from "@/components/app/search-field"
 import { ShipmentDetailDialog } from "@/components/app/shipment-detail-dialog"
 import { RateCheckerDialog } from "@/components/app/rate-checker-dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -11,7 +12,6 @@ import { deliveryWord, DELIVERY_TEXT_TONE } from "@/lib/delivery-status"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { getShipments, voidLabel, type ShipmentRow } from "@/lib/api"
 import { plainNum, platformFromId } from "@/lib/order-format"
 import { onLive } from "@/lib/live"
@@ -298,15 +298,13 @@ export function ShipmentsView() {
       }
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
-        <div className="relative">
-          <MagnifyingGlass size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
- value={q}
- onChange={(e) => setQ(e.target.value)}
- placeholder={tl("shipments", "Tracking, order, customer or carrier…")}
- className="h-9 w-80 pl-8"
-          />
-        </div>
+        <SearchField
+          value={q}
+          onChange={setQ}
+          onClear={() => setQ("")}
+          width="md"
+          placeholder={tl("shipments", "Tracking, order, customer or carrier…")}
+        />
         {/* Each pill carries its own count, so the answer to "is anything stuck?" is on
  screen before you click anything. A pill with nothing behind it is disabled
  rather than hidden — a filter that appears and disappears as data changes is a

@@ -5,8 +5,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
-import { MagnifyingGlass, MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
+import { MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
 import { ThumbFill } from "@/components/app/thumb"
+import { SearchField } from "@/components/app/search-field"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -1360,16 +1361,13 @@ export function SpyDeckView() {
         {(view === "search" || view === "trending") && (
           <div className="border-b border-border p-4">
             <div className="flex items-center gap-2">
-              <div className="relative max-w-md flex-1">
-                <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
- value={query}
- onChange={(e) => setQuery(e.target.value)}
- onKeyDown={(e) => e.key === "Enter" && run()}
- placeholder={tl("spydeck", "e.g. vintage sunset tee")}
- className="pl-9"
-                />
-              </div>
+              <SearchField
+                value={query}
+                onChange={setQuery}
+                onKeyDown={(e) => { if (e.key === "Enter") run() }}
+                width="md"
+                placeholder={tl("spydeck", "e.g. vintage sunset tee")}
+              />
               {canFilter && (
                 <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
                   {tl("spydeck", "Filters")}
