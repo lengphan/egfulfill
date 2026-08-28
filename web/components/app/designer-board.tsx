@@ -631,10 +631,12 @@ export function DesignerBoard() {
           value={view}
           onChange={setView}
           spacing="none"
-          /* shrink-0 or the nav loses. TabBar's <nav> is overflow-x-auto, which makes it
-             infinitely shrinkable in a flex row — beside the search field and Add design it
-             collapsed to 84px and scrolled "List" out of sight entirely. A tab bar that
-             hides one of its two tabs is worse than one that wraps. */
+          /* A WIDTH GUARD, and it is not fixing anything visible today — measured after
+             adding it: scrollWidth == width, "List" ends exactly at the content edge, so
+             nothing was ever clipped here. It is kept because TabBar's <nav> is
+             overflow-x-auto and therefore shrinkable past its content, and this is the one
+             call site that puts it in a flex ROW beside two other controls. The block-axis
+             half of the same hazard is handled in the primitive (min-h-fit there). */
           className="shrink-0 border-b-0"
         />
       </div>

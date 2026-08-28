@@ -88,10 +88,28 @@ export function TabBar<T extends string>({
     // and the active tab's ::after sits at -bottom-px — one pixel of vertical overflow, which
     // is all macOS needs to park a full-height scrollbar between the last tab and whatever is
     // beside it. That bar appeared in the library picker, next to Templates.
+    //
+    // min-h-fit, AND IT IS THE SAME `overflow-x: auto` THAT MAKES IT NECESSARY.
+    //
+    // A flex item is normally protected from being squeezed below its own content by the
+    // automatic minimum size — `min-height: auto`. That rule is switched OFF for an item
+    // whose overflow is not `visible`, and the line above is the reason this one's is not.
+    // So in a flex COLUMN, where flex-shrink acts on HEIGHT, this bar is infinitely
+    // shrinkable: put it above anything tall enough to overflow and it collapses.
+    //
+    // Measured in the mini designer, where the panel is `flex flex-col ... overflow-y-auto`:
+    // the nav went to 4px — exactly its own padding-top, content height zero — while the
+    // tab labels went on painting outside it. The dropzone below then appeared to sit ON
+    // TOP of the tabs and slice them in half, which is what gets reported. It reads as a
+    // z-index fight and it is not one; the bar simply has no height left.
+    //
+    // min-h-fit restores that floor on the block axis only. NOT shrink-0: that would also
+    // stop the bar shrinking on the INLINE axis in a flex row, and its ability to narrow
+    // and scroll is exactly what the overflow-x above is for.
     <nav
       aria-label={ariaLabel}
       className={cn(
-        "eg-scroll-none flex overflow-x-auto",
+        "eg-scroll-none flex min-h-fit overflow-x-auto",
         look === "segmented"
           ? cn("w-fit gap-0.5 rounded-lg bg-muted p-0.5", spacing === "none" ? "" : "mb-6")
           : cn("border-b border-border", spacing === "none" ? "-mb-px" : "mb-6", gap),
