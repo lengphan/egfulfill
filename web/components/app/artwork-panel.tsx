@@ -148,6 +148,7 @@ export function ArtworkPanel({
   onApplyTemplate,
   columns = 3,
   className,
+  reloadToken,
 }: {
   /** Which tabs this host can honour. `templates` REPLACES the canvas, so a surface that
    *  cannot do that leaves it out rather than showing a control that half works. */
@@ -158,6 +159,17 @@ export function ArtworkPanel({
   onApplyTemplate?: (t: ProductTemplate) => void
   columns?: 2 | 3
   className?: string
+  /**
+   * BUMP THIS AND THE LISTS RELOAD.
+   *
+   * The panel fetches its own data, which is right — the host should not have to thread four
+   * requests through it. But a file can arrive without the panel knowing: the Maker takes a
+   * drop straight onto the canvas and uploads it to the same library this is showing, and
+   * before this the grid simply did not know a new file existed until the screen was
+   * reopened. A number the host changes is the smallest thing that can say "look again", and
+   * it cannot re-satisfy itself the way a list length would.
+   */
+  reloadToken?: number
 }) {
   const tl = useLabelT()
   const lightbox = useLightbox()
@@ -195,7 +207,7 @@ export function ArtworkPanel({
       })
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [reloadToken])
 
   /** The two "mine" stores merged and newest-first. `seller_images` (uploaded from a rail)
    *  and `design_library` (dropped on Design Lab › Artwork) are both "a flat picture of mine,

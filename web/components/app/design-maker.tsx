@@ -3,25 +3,20 @@
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { UploadSimple, TextT, CursorClick, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, CaretDown, type Icon } from "@phosphor-icons/react"
+import { TextT, CursorClick, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, CaretDown, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
-import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { ArtPickerDialog, type ArtItem } from "@/components/app/art-picker-dialog"
-import { TabBar } from "@/components/app/tab-bar"
 import { EmptyState } from "@/components/app/empty-state"
 import { useLightbox } from "@/components/app/image-lightbox"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, getSellerImages, uploadSellerImage, deleteSellerImage, getOrderUploads, getDesignLibrary, getDesignLibraryItem, deleteDesignLibrary, type CatalogProduct, type SellerImage, type OrderUpload, type ProductTemplate, type LibraryDesign } from "@/lib/api"
+import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, uploadSellerImage, type CatalogProduct, type ProductTemplate } from "@/lib/api"
 import { canvasReadableSrc } from "@/lib/thread-match"
-import { proxiedImageSrc } from "@/lib/order-image"
 // The tile is shared with the order dialog — it takes props only, so it was always shared
 // code that happened to live in this one screen's file.
 import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { FaceTile } from "@/components/app/face-tile"
-import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
@@ -130,30 +125,6 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
  * them into one shape here is what lets the panel be ONE grid under ONE bar instead of a
  * stack of groups that each grew their own header and their own browse link.
  */
-export type RailArt = {
-  key: string
-  /** The value handed to onPlace's closure and to the "can't load" link. */
-  url: string
-  /** What to DISPLAY when that differs — buyer art and marketplace thumbs go via the proxy. */
-  src?: string
-  name?: string
-  badge?: string
-  title?: string
-  /** Newest first, across sources. 0 where the source has no date of its own. */
-  at: number
-  /**
-   * Whether the tile may report the picture's pixel size.
-   *
-   * ONLY WHERE THE TILE IS DRAWING THE ARTWORK ITSELF. A design_library row renders its
-   * 320px THUMBNAIL and fetches the real file on press, and a template renders a 640px
-   * composite of a garment — so measuring what loaded would print "320×320" under a 4500px
-   * design and flag it amber as too small to print. A wrong measurement is worse than none:
-   * it is the quality warning people act on.
-   */
-  measure?: boolean
-  onPlace: () => void
-  onDelete?: () => void
-}
 
 /**
  * How many images each source shows in the rail before it defers to Browse.
@@ -181,8 +152,6 @@ const TOOLS: { key: ToolKey; label: string; Icon: Icon }[] = [
   { key: "images", label: "Artwork", Icon: ImageSquare },
   { key: "text", label: "Text", Icon: TextT },
 ]
-
-const RAIL_LIMIT = 6
 
 export function DesignMaker() {
   const tl = useLabelT()
@@ -380,9 +349,6 @@ export function DesignMaker() {
    * design made before this is the only layer.
    */
  const designUrl = images[0]?.src ?? ""
- const setDesignUrl = (v: string) =>
- setImages((prev) => (v ? (prev.length ? prev.map((im, i) => (i === 0 ? { ...im, src: v } : im))
- : [{ id: `img-${nextLayerId.current++}`, src: v, name: null, pos: { ...DEFAULT_POS } }]) : prev.slice(1)))
  const [pos, setPos] = useState<Pos>(DEFAULT_POS)
  const [selected, setSelected] = useState<string | null>(null)
   /** The selected image layer, when the selection is one.
@@ -396,10 +362,8 @@ export function DesignMaker() {
  const selImage = images.find((im) => im.id === selected) ?? null
  const [name, setName] = useState("")
  const [pickerOpen, setPickerOpen] = useState(false)
- const [libOpen, setLibOpen] = useState(false)
   // Which image source the browse dialog is showing, or null when it's closed. One piece of
   // state rather than two booleans: they are the same dialog and can never both be open.
- const [browse, setBrowse] = useState<null | "uploads" | "orders">(null)
   /** Which tool's panel is open beside the rail. One at a time, like every editor.
    *  Opens on BLANK: nothing else in here does anything until a garment is chosen, and
    * landing on Artwork put the one required first step behind a tab nobody had a reason
@@ -424,8 +388,6 @@ export function DesignMaker() {
  const [saving, setSaving] = useState(false)
  const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null)
   // Images library: the seller's own reusable uploads + buyer art from their orders.
- const [sellerImages, setSellerImages] = useState<SellerImage[]>([])
- const [orderUploads, setOrderUploads] = useState<OrderUpload[]>([])
   /**
    * TWO STORES HOLD THE SAME THING, and the rail is where that stops being visible.
    *
@@ -439,11 +401,8 @@ export function DesignMaker() {
    * behind it, and this makes the seller's answer to "where is my picture" correct today.
    * The two are told apart by `kind`, which is what routes a place and a delete.
    */
- const [savedDesigns, setSavedDesigns] = useState<LibraryDesign[]>([])
- const [railTemplates, setRailTemplates] = useState<ProductTemplate[]>([])
- const [imagesLoading, setImagesLoading] = useState(true)
+ const [libToken, setLibToken] = useState(0)
   /** Which SOURCE the Artwork panel is showing. See the panel for why it is a bar. */
- const [source, setSource] = useState<"yours" | "orders" | "templates">("yours")
   /** Looking at a picture full size — a different job from placing it. NOT `zoom`, which is
    *  already taken by the stage's own scale a hundred lines up. */
  const lightbox = useLightbox()
@@ -557,17 +516,16 @@ export function DesignMaker() {
 
   // Load the Images library (own uploads + order art). Kept as a plain fn so an upload
   // or delete can refresh it without re-running the mount effect.
- const refreshImages = () => {
- getSellerImages().then((r) => setSellerImages(r.images ?? [])).catch(() => {})
- getDesignLibrary().then((r) => setSavedDesigns(r ?? [])).catch(() => {})
- getTemplates().then((r) => setRailTemplates(r ?? [])).catch(() => {})
- getOrderUploads().then((r) => setOrderUploads(r.images ?? [])).catch(() => {}).finally(() => setImagesLoading(false))
-  }
- useEffect(() => {
- const t = setTimeout(refreshImages, 0)
- return () => clearTimeout(t)
-     
-  }, [])
+  /**
+   * "LOOK AGAIN" — a number, not a refetch this screen performs itself.
+   *
+   * ArtworkPanel owns its lists now, so the four fetches that used to live here have nobody
+   * reading them. But a file can still arrive without the panel knowing: the canvas takes a
+   * drop directly, and that upload lands in the same library the panel is showing. Bumping a
+   * token is the smallest thing that can say so, and unlike a list length it cannot be
+   * re-satisfied by the fetch it triggers.
+   */
+ const bumpLibrary = () => setLibToken((n) => n + 1)
 
   // Place a library image on the canvas. Remote URLs (R2, marketplace) go through the img
   // proxy so the composed canvas stays SAME-ORIGIN and can export (a tainted canvas throws
@@ -593,28 +551,10 @@ export function DesignMaker() {
  readImageFile(f, (dataUrl) => {
         // Kept in "Your uploads" too, so it is reusable next time — best-effort, exactly as
         // before: failing to stash a copy must never cost the layer that was just placed.
- uploadSellerImage(dataUrl, f.name).then((r) => { if (r.image) refreshImages() }).catch(() => {})
+ uploadSellerImage(dataUrl, f.name).then((r) => { if (r.image) bumpLibrary() }).catch(() => {})
  res({ src: dataUrl, name: f.name })
       }, (m) => { setMsg({ tone: "err", text: m }); res(null) })
     }))).then((out) => addImages(out.filter((x): x is { src: string; name?: string | null } => !!x)))
-  }
- const removeImage = (id: string) => {
- setSellerImages((prev) => prev.filter((im) => im.id !== id))
- deleteSellerImage(id).catch(() => refreshImages())
-  }
-  /** The design_library half of "Yours" — the bytes are behind a second call, and the tile
-   *  only ever held the thumbnail. Placing the THUMB would put a 320px picture on a 4800px
-   *  print, which is the quality bug that never announces itself. */
- const placeLibraryDesign = async (d: LibraryDesign) => {
-    try {
- const r = await getDesignLibraryItem(d.id)
- if (r.data) { placeImage(r.data, d.name); return }
-    } catch { /* fall through to the message below */ }
- setMsg({ tone: "err", text: "Couldn't open that artwork." })
-  }
- const removeLibraryDesign = (id: number | string) => {
- setSavedDesigns((prev) => prev.filter((d) => d.id !== id))
- deleteDesignLibrary(id).catch(() => refreshImages())
   }
 
  const updateText = (id: string, patch: Partial<TextLayer>) =>
@@ -625,75 +565,6 @@ export function DesignMaker() {
   }
  const removeText = (id: string) => { setTexts((prev) => prev.filter((t) => t.id !== id)); setSelected(null) }
  const selText = texts.find((t) => t.id === selected)
-
-
-  /**
-   * "YOURS" IS BOTH STORES, told apart by where a press has to go.
-   *
-   * A seller_images row carries a loadable url, so placing it is one call. A design_library
-   * row carries only a THUMB — its bytes come from getDesignLibraryItem — so placing it is
-   * a fetch first. That difference is the whole reason they were never merged, and it is
-   * two lines of closure, not a reason to show someone two libraries.
-   *
-   * Newest first across both. Interleaving by date rather than concatenating is the point:
-   * a picture added a minute ago is at the front whichever door you came in through.
-   *
-   * The MEMO holds data only, never the handlers. Every callback in this component is
-   * redefined each render, so a memo that closed over them would either go stale or be
-   * listed as a dependency and re-run on every keystroke — which is the same defect either
-   * way. Sorting is the expensive half and it is the half that is pure.
-   */
- const yoursRows = useMemo(
-    () => [
-      ...sellerImages.map((im) => ({ kind: "seller" as const, im, at: im.ts ?? 0 })),
-      ...savedDesigns.map((d) => ({ kind: "library" as const, d, at: d.created_at ? Date.parse(d.created_at) || 0 : 0 })),
-    ].sort((x, y) => y.at - x.at),
-    [sellerImages, savedDesigns]
-  )
-
-  /** The live source, in the ONE shape the grid draws. */
- const railList: RailArt[] =
- source === "yours"
-      ? yoursRows.map((r) =>
- r.kind === "seller"
-            ? { key: "s" + r.im.id, url: r.im.url, name: r.im.name, at: r.at,
- onPlace: () => placeImage(r.im.url, r.im.name), onDelete: () => removeImage(r.im.id) }
-            // The THUMB is what the tile draws; the full artwork is fetched on press.
-            : { key: "l" + r.d.id, url: r.d.thumb ?? "", src: r.d.thumb ? proxiedImageSrc(r.d.thumb) : undefined,
- name: r.d.name ?? "", at: r.at, measure: false, badge: r.d.name ? undefined : `IMG-${r.d.id}`,
- onPlace: () => placeLibraryDesign(r.d), onDelete: () => removeLibraryDesign(r.d.id) }
-        )
- : source === "orders"
-        ? orderUploads.map((im, i) => ({
- key: im.url + i, url: im.url, src: canvasReadableSrc(im.url), name: im.name,
- badge: orderRefLabel(im.orderRef), title: [im.orderRef, im.name].filter(Boolean).join(" · "),
- at: 0, onPlace: () => placeImage(im.url, im.name),
-          }))
-        : railTemplates.map((t) => ({
- key: String(t.id), url: String(t.composite ?? ""), name: t.name ?? "Untitled template",
- badge: t.seq != null ? `TPL-${t.seq}` : undefined,
- title: [t.name, (t.data as { blank?: string } | null)?.blank].filter(Boolean).join(" · "),
- at: 0, measure: false,
-            // A template REPLACES the canvas rather than adding a layer — it is a blank, a
-            // stack and a print area, not a picture. That is the one press in this panel
-            // that is not "place", which is why templates are their own source and not
-            // another group of thumbnails in the same list.
- onPlace: () => applyTemplate(t),
-          }))
-
-  // What the browse dialog shows. Buyer art needs the proxy to DISPLAY (Etsy blocks
-  // hotlinking) but the raw url to PLACE — same split the rail thumbnails make.
-  //
-  // "uploads" is the SAME merged list the rail's Yours tab shows, not sellerImages alone.
-  // Browsing all of something has to show all of it, and a Browse that dropped the
-  // design_library half would contradict the count on the tab that opened it.
- const browseItems: ArtItem[] =
- browse === "uploads"
-      ? railList.map((it) => ({ url: it.url, src: it.src, name: it.name, badge: it.badge }))
- : browse === "orders"
-        ? orderUploads.map((im) => ({ url: im.url, src: canvasReadableSrc(im.url), name: im.name, badge: im.orderRef }))
- : []
-
 
  const saveAsTemplate = async () => {
  if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
@@ -720,7 +591,7 @@ export function DesignMaker() {
       })
  if (r.error) throw new Error(r.error)
  setMsg({ tone: "ok", text: "Saved as a template." })
- refreshImages()
+ bumpLibrary()
     } catch (e) {
  setMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't save the template." })
     } finally { setSaving(false) }
@@ -782,7 +653,7 @@ export function DesignMaker() {
       // The rail is a list of what you have saved, so it has to include what you JUST saved.
       // Without this the panel kept showing the state from page load and the save read as
       // having done nothing.
- refreshImages()
+ bumpLibrary()
     } catch (e) {
  setMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't save." })
     } finally { setSaving(false) }
@@ -939,6 +810,7 @@ export function DesignMaker() {
           {tool === "images" && (
             <ArtworkPanel
               sources={["yours", "orders", "templates"]}
+              reloadToken={libToken}
               columns={2}
               onPlace={placeImage}
               onApplyTemplate={applyTemplate}
@@ -1240,23 +1112,9 @@ export function DesignMaker() {
         }} />
       {/* Reached from the Templates source's "Browse all", so it lands on Templates —
           dropping someone on the other tab is the same click they were avoiding. */}
-      <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} initialSource="templates"
- onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }}
- onPickTemplate={applyTemplate} />
-      {/* One dialog for both sources — the rail decides which list it is showing. */}
-      <ArtPickerDialog
- open={browse !== null}
- onOpenChange={(v) => { if (!v) setBrowse(null) }}
- title={browse === "uploads" ? tl("designMaker", "Your uploads") : tl("designMaker", "Artwork from your orders")}
- items={browseItems}
- onPick={placeImage}
- emptyText={browse === "uploads" ? tl("designMaker", "You haven't uploaded anything yet.") : tl("designMaker", "No buyer artwork has come in from your orders yet.")}
- searchPlaceholder={browse === "uploads" ? "Search your uploads…" : "Search by order number or item…"}
-      />
     </div>
   )
 }
-
 
 /**
  * The Suspense fallback for the maker route.
