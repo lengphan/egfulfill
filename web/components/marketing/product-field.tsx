@@ -1,208 +1,150 @@
 "use client"
 
 import { useState } from "react"
-import { swatchHex, readableOn } from "@/lib/color-swatch"
 import Link from "next/link"
+import { swatchHex, readableOn } from "@/lib/color-swatch"
 import type { PublicProduct } from "@/lib/api"
 import { TabBar } from "@/components/app/tab-bar"
 import { INK, SURFACE } from "@/components/marketing/bold-kit"
 
 /**
- * ── THE RAIL — stock running past, until you reach for one ───────────────────────────────
+ * ── THE RAIL — one style per rail, hung in its colour run ────────────────────────────────
  *
- * Three rails, one per colour story, each a continuous horizontal track of blanks. The track
- * moves; putting the pointer on a rail stops it; clicking a garment opens that garment.
+ * Three rails: a hoodie, a crewneck, a tee. Each one runs the colourways that style is
+ * actually sold in. The track moves; putting the pointer on a rail stops that row; clicking a
+ * garment opens it.
  *
- * WHY IT MOVES. A static field has to be composed, and a composed field of four objects reads
- * as a layout with gaps in it. A moving one reads as STOCK — there is more of this, it is
- * going past, you are seeing a window onto it. That is also honest about what a catalogue is,
- * and it means the field no longer has to pretend the range is exactly wide enough to fill a
- * screen.
+ * THE AXIS WAS THE OTHER WAY ROUND AND IT WAS WRONG. Colour used to run down the page and
+ * form across it, which needs MANY FORMS to fill a row — and there are three. Every version
+ * of that field was padded with the same garment repeated, and it read as wallpaper because
+ * that is what it was. Turned ninety degrees the problem disappears: a Gildan 18500 is sold
+ * in 47 colours and an 18000 in 41, so a rail of one style in its colour run never runs out
+ * and never repeats. It is also what a shop rail literally is — one style, hung in a size and
+ * colour run, which is why the arrangement reads as a rack without having to be told.
  *
- * WHY IT STOPS. A rail you cannot stop is a rail you cannot use. Hovering pauses the whole
- * ROW rather than the object under the cursor: pausing one garment while its neighbours keep
- * sliding would move the thing you were about to reach for, which is the opposite of aiming.
+ * WHY IT MOVES. A static field has to be composed, and a composed field reads as a layout
+ * with gaps in it. A moving one reads as STOCK: there is more of this, it is going past, you
+ * are seeing a window onto it.
  *
- * THE THREE RAILS RUN IN ALTERNATING DIRECTIONS. Three tracks moving the same way at the same
- * speed read as one big thing sliding — the parallax of a train window. Alternating makes each
- * row its own object and stops the eye locking onto a single vector.
+ * WHY IT STOPS. A rail you cannot stop is a rail you cannot use. Hover pauses the whole ROW,
+ * not the garment under the cursor — pausing one while its neighbours slid on would move the
+ * thing you were reaching for, which is the opposite of aiming.
  *
- * NO JAVASCRIPT IN THE LOOP. This is a CSS transform animation, so it never touches layout,
- * never repaints, and never re-renders React. CLAUDE.md §2.8's runaway loader was an EFFECT
- * fetching on a condition its own fetch satisfied — the danger is state feeding itself. There
- * is no state here at all, which is exactly why this is CSS and not a rAF ticking a value.
+ * NO JAVASCRIPT IN THE LOOP. A CSS transform animation: it never touches layout, never
+ * repaints, never re-renders React. §2.8's runaway loader was an EFFECT fetching on a
+ * condition its own fetch satisfied — state feeding itself. There is no state here, which is
+ * exactly why this is CSS and not a rAF ticking a React value.
  *
- * THERE IS NO CARD. No border, no fill, no radius, no CSS shadow — an object sits ON the
- * canvas rather than in a box on it. The shadow is inside the PNG, synthesised from each
- * silhouette with identical parameters, so all of them share one light.
+ * THERE IS NO CARD. No border, no fill, no radius, no CSS shadow — a garment hangs on the
+ * canvas rather than sitting in a box on it.
  *
- * CLICKING A BLANK OPENS THAT BLANK. It used to port the field to that colour, which was a
- * dead end wearing an interaction's clothes. Colour lives on the bar; an object is a product.
- *
- * A FORM WITH NO PUBLISHED PRODUCT IS NOT DRAWN — see FORM_SLUG.
+ * A STYLE WITH NO PUBLISHED PRODUCT GETS NO RAIL — see FORM_SLUG.
  */
 
-export type FormId = "tee" | "crew" | "hoodie" | "cap"
-export type StoryId = "natural" | "charcoal" | "iris"
+export type FormId = "hoodie" | "crew" | "tee"
 
 /** The garment names as a visitor would say them — never the supplier's catalogue title. */
 const FORM_LABEL: Record<FormId, string> = {
-  tee: "Heavyweight cotton tee",
-  crew: "Ring-spun crewneck",
   hoodie: "Heavy blend hoodie",
-  cap: "Six-panel cap",
+  crew: "Heavy blend crewneck",
+  tee: "Heavyweight cotton tee",
 }
 
 /**
- * THE PRODUCT EACH PHOTOGRAPH IS OF — checked against the live catalogue, not assumed.
+ * THE PRODUCT EACH RAIL IS OF — checked against the live catalogue, not assumed.
  *
- * A slug that is not published resolves to nothing and its object is not drawn, which is the
- * correct failure: the rail can go stale in only one direction, toward showing less than we
- * sell, never toward showing something we do not. The crewneck is in this table and not in
- * the catalogue, so it currently draws nothing — deliberately, because sending someone who
- * clicked a crewneck to a hooded sweatshirt is not an approximation, it is the wrong product.
+ * A slug that is not published resolves to nothing and its ENTIRE RAIL is dropped, which is
+ * the correct failure: the page can go stale in only one direction, toward showing less than
+ * we sell, never toward showing something we do not. The crewneck sits here and is not in the
+ * catalogue, so its rail does not draw — deliberately, because sending someone who clicked a
+ * crewneck to a hooded sweatshirt is the wrong product, not an approximation.
  */
 const FORM_SLUG: Record<FormId, string> = {
-  tee: "gildan-unisex-heavy-cotton-t-shirt",
-  crew: "ring-spun-crewneck-sweatshirt",
   hoodie: "comfort-colors-ring-spun-hooded-sweatshirt-1567",
-  cap: "adams-headwear-icon-sandwich-cap",
+  crew: "gildan-heavy-blend-crewneck-sweatshirt-18000",
+  tee: "gildan-unisex-heavy-cotton-t-shirt",
 }
 
-const STORIES: { id: StoryId; name: string }[] = [
-  { id: "natural", name: "Natural" },
-  { id: "charcoal", name: "Charcoal" },
-  { id: "iris", name: "Iris" },
-]
-
 /**
- * ── TEMPORARY: THE SEQUENCE REPEATS ──────────────────────────────────────────────────────
- *
- * Each rail lists more slots than we have forms, so garments recur along the track. On a
- * moving rail that is far less of a claim than it was on a static field — stock passing a
- * window genuinely does repeat — but it is still a range being padded, and it comes out when
- * the real forms land (cotton shirt, polo, quarter-zip, trucker, beanie, duffel, all of which
- * we publish). The order and sizes vary between rails so no two rows scan alike.
+ * THE COLOUR RUN. Real Gildan colourway names off the 18000 and 18500, dyed from one
+ * photograph per style rather than generated per colour — see tools/dye-rail.py. Order is a
+ * merchandiser's, not a data one: it ALTERNATES LIGHT AND DARK rather than running the
+ * neutrals together. Sorted by value it put natural, sand, ash and sport grey side by side —
+ * four near-whites that read as one washed-out stretch of rail before jumping to pink.
+ * Alternating gives the row a rhythm, which is both how a rack is actually hung and what
+ * stops a colour run reading as a paint chart.
  */
-type Slot = { form: FormId; w: number; dy: number }
+const COLOURWAYS = [
+  { slug: "natural", name: "Natural" },
+  { slug: "navy", name: "Navy" },
+  { slug: "sand", name: "Sand" },
+  { slug: "black", name: "Black" },
+  { slug: "ash", name: "Ash" },
+  { slug: "maroon", name: "Maroon" },
+  { slug: "sport-grey", name: "Sport Grey" },
+  { slug: "forest", name: "Forest" },
+  { slug: "light-pink", name: "Light Pink" },
+  { slug: "charcoal", name: "Charcoal" },
+  { slug: "gold", name: "Gold" },
+  { slug: "royal", name: "Royal" },
+] as const
 
-const RAILS: Record<StoryId, Slot[]> = {
-  natural: [
-    { form: "tee", w: 1.0, dy: 6 },
-    { form: "hoodie", w: 1.25, dy: -4 },
-    { form: "cap", w: 0.72, dy: 10 },
-    { form: "crew", w: 1.12, dy: 0 },
-    { form: "tee", w: 0.86, dy: -8 },
-    { form: "hoodie", w: 1.05, dy: 8 },
-    { form: "cap", w: 0.8, dy: -6 },
-  ],
-  charcoal: [
-    { form: "hoodie", w: 1.18, dy: 4 },
-    { form: "cap", w: 0.76, dy: -8 },
-    { form: "tee", w: 1.02, dy: 8 },
-    { form: "crew", w: 1.22, dy: -3 },
-    { form: "cap", w: 0.7, dy: 10 },
-    { form: "tee", w: 0.9, dy: -6 },
-    { form: "hoodie", w: 1.08, dy: 2 },
-  ],
-  iris: [
-    { form: "crew", w: 1.15, dy: -5 },
-    { form: "tee", w: 0.95, dy: 8 },
-    { form: "hoodie", w: 1.28, dy: -2 },
-    { form: "cap", w: 0.74, dy: 9 },
-    { form: "tee", w: 1.05, dy: -7 },
-    { form: "crew", w: 1.0, dy: 5 },
-    { form: "cap", w: 0.78, dy: -4 },
-  ],
-}
+const RAILS: FormId[] = ["hoodie", "crew", "tee"]
 
-const srcOf = (form: FormId, story: StoryId) => `/frames/obj-${form}-${story}.png`
+/** One full pass. Slower than it feels it should be: this is ambient, not a carousel. */
+const DURATION: Record<FormId, string> = { hoodie: "82s", crew: "94s", tee: "88s" }
 
-/**
- * ── PREVIEW: ONE RAIL HANGS ──────────────────────────────────────────────────────────────
- *
- * The Natural rail uses a HANGING photograph; the other two keep the folded flat-lays. Two
- * shot types on one page is not the design — it is there so the difference can be judged
- * side by side, which is the whole question. One of them comes out.
- *
- * WHY HANGING IS THE ONE THAT SAYS "RAIL". A folded garment rests ON something, so it is
- * padded to a fixed HEM and reads as stock on a shelf — which is why the folded version has
- * always looked like a conveyor. A hanging garment is suspended FROM something, so it is
- * padded to a fixed SHOULDER LINE, and that shared top edge is what the eye reads as a rail.
- *
- * THE HOOK AND THE BAR ARE DRAWN, NOT PHOTOGRAPHED. Background removal ate the real hook —
- * a thin bright wire against a pale ground is exactly what matting loses — and that turned
- * out to be the better answer. One hook, one height, identical on every garment, so the
- * rail's line is guaranteed by construction rather than by what the camera did that frame.
- * A photographed hook would be a different length and angle in every shot.
- */
-/**
- * A hanging photograph per form, per story. A rail is a REAL rail only for the forms that
- * have one — the others are simply not on it, rather than a folded garment floating between
- * two hung ones, which reads as a mistake rather than as variety.
- *
- * The cap is deliberately absent and will stay absent: a cap does not go on a hanger. It
- * belongs on a peg or a clip, which is a different object and a different shot.
- */
-const HANG_SRC: Partial<Record<StoryId, Partial<Record<FormId, string>>>> = {
-  natural: {
-    tee: "/frames/hang-tee-side.png",
-    hoodie: "/frames/hang-hoodie-side.png",
-  },
-}
+/* WebP, not PNG: these are photographs WITH an alpha channel, which is the case PNG handles
+   worst. Resized to 820px — twice the tallest height the rail ever renders — because a
+   1050x1500 canvas is four times the pixels anyone can see, and 24 of them was 14MB a page. */
+const srcOf = (form: FormId, colour: string) => `/frames/rail-${form}-${colour}.webp`
 
-/** How long one full pass takes. Slower than it feels it should be: this is ambient. */
-const DURATION: Record<StoryId, string> = { natural: "72s", charcoal: "88s", iris: "80s" }
-
-function Garment({ slot, story, price, hidden, hang, i }: {
-  slot: Slot
-  story: StoryId
+function Garment({ form, colour, name, price, i, cloned }: {
+  form: FormId
+  colour: string
+  name: string
   price: number
-  /** A clone in the loop's second copy, or a repeat of a form already on this rail. */
-  hidden: boolean
-  /** The hanging photograph, when this rail is a real rail. */
-  hang?: string
   /** Position along the track — drives the variation below. */
   i: number
+  /** In the loop's second copy: the same garment again, so it stays out of the a11y tree. */
+  cloned: boolean
 }) {
   /*
-   * ONE PHOTOGRAPH, MADE TO STOP LOOKING LIKE ONE.
+   * A RACK IS NEVER UNIFORM, and the absence of that is what made an early version read as
+   * wallpaper. Two free moves fix it without touching the photograph:
    *
-   * The first hanging rail put the same shirt at the same angle eleven times and it read as
-   * wallpaper — a texture, not stock. A real rail is never uniform: garments face both ways
-   * because people put them back however they came off, and they hang at slightly different
-   * lengths because hangers sit at different depths on the bar.
+   * MIRRORING. A flipped garment is a different silhouette to the eye — the sleeve is on the
+   * other side, the light falls the other way — while remaining the same honest picture of the
+   * same product. It is not a claim about range; it is the same shirt turned round, which is
+   * exactly what it would be on a rail where people put things back however they came off.
    *
-   * Mirroring is the move that does the most for nothing. A flipped garment is a DIFFERENT
-   * silhouette to the eye — the sleeve is on the other side, the light falls the other way —
-   * while remaining the same honest photograph of the same product. It is not a claim about
-   * range; it is the same shirt, turned round, which is exactly what it would be on a rail.
+   * LENGTH. Hangers sit at different depths on a bar, so garments hang a little unevenly. A
+   * few percent is enough; more reads as a mistake rather than as a rack.
    */
-  const flip = hang ? i % 2 === 1 : false
-  const lengthJitter = hang ? 1 - ((i * 37) % 11) / 90 : 1
-  const name = STORIES.find((s) => s.id === story)!.name
+  const flip = i % 2 === 1
+  const lengthJitter = 1 - ((i * 37) % 11) / 90
   const tagBg = swatchHex(name) ?? INK
   return (
     <Link
-      href={`/catalog/${FORM_SLUG[slot.form]}`}
-      aria-hidden={hidden || undefined}
-      tabIndex={hidden ? -1 : undefined}
-      aria-label={`${FORM_LABEL[slot.form]} in ${name}`}
+      href={`/catalog/${FORM_SLUG[form]}`}
+      aria-hidden={cloned || undefined}
+      tabIndex={cloned ? -1 : undefined}
+      aria-label={`${FORM_LABEL[form]} in ${name}`}
       className="group relative block shrink-0 focus-visible:outline-none"
-      style={hang
-        /* SIZED BY HEIGHT, NOT WIDTH. Garments on a rail hang to a common length, and the
-           turned shot is a 0.34 aspect — set by width it would be nearly three rail-heights
-           tall. Width follows from the photograph, which is also what varies along a real
-           rail as garments turn at different angles. */
-        ? { height: `calc(var(--rail-h) * ${(0.94 + (slot.w - 1) * 0.06) * lengthJitter})`, width: "auto" }
-        : { width: `calc(var(--rail-unit) * ${slot.w})`, transform: `translateY(${slot.dy}%)` }}
+      /* SIZED BY HEIGHT. Garments on a rail hang to a common length and differ in BULK — the
+         hoodie comes out visibly broader than the tee because its photograph is, which is the
+         difference a shopper actually sees. Width follows from the picture. */
+      style={{ height: `calc(var(--rail-h) * ${lengthJitter})`, width: "auto" }}
     >
-      <span className={hang ? "eg-sway flex h-full flex-col items-center" : "contents"} style={hang ? { ["--sway-dur" as string]: `${5.2 + (slot.w * 2.3) % 2.6}s`, animationDelay: `-${(slot.w * 3.7) % 4}s` } : undefined}>
-      {hang && (
-        /* THE HOOK. A stroke, not an image — see HANGING above. `origin-top` on the garment
-           below means the hover lift grows DOWN from the hook rather than around the
-           garment's middle, so the hanging point stays welded to the bar while it scales.
-           Scaling from the centre would lift the garment off its own hook. */
+      <span
+        className="eg-sway flex h-full flex-col items-center"
+        style={{ ["--sway-dur" as string]: `${5.4 + ((i * 13) % 7) * 0.42}s`, animationDelay: `-${(i * 17) % 9}s` }}
+      >
+        {/* THE HOOK is a stroke, not an image. Matting eats a thin bright wire against a pale
+            ground, and drawing it is better anyway: one hook at one height on every garment,
+            so the rail's line is guaranteed by construction rather than by what the camera did
+            that frame. `origin-top` on the garment means the hover lift grows DOWN from the
+            hook — scaling from the centre would lift a shirt off its own hanger. */}
         <svg viewBox="0 0 24 26" className="mx-auto block h-[22px] w-[24px]" aria-hidden="true" fill="none">
           <path
             d="M12 26V9M12 9c0-3.2 2-5 4.2-5 1.9 0 3.3 1.4 3.3 3.1"
@@ -212,112 +154,68 @@ function Garment({ slot, story, price, hidden, hang, i }: {
             strokeLinecap="round"
           />
         </svg>
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={hang ?? srcOf(slot.form, story)}
-        alt=""
-        className={"block w-full transition-transform duration-500 ease-out " + (hang
-          ? "origin-top motion-safe:group-hover:scale-[1.05] motion-safe:group-focus-visible:scale-[1.05]"
-          : "origin-center motion-safe:group-hover:scale-[1.09] motion-safe:group-focus-visible:scale-[1.09]")}
-        style={hang ? { height: "calc(100% - 22px)", width: "auto", transform: flip ? "scaleX(-1)" : undefined } : undefined}
-      />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={srcOf(form, colour)}
+          alt=""
+          className="block origin-top transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.05] motion-safe:group-focus-visible:scale-[1.05]"
+          style={{ height: "calc(100% - 22px)", width: "auto", transform: flip ? "scaleX(-1)" : undefined }}
+        />
       </span>
       {/*
-        * THE LABEL NAMES THE GARMENT AND ITS REAL PRICE — the two things that decide whether
-        * the click is worth making. §4 reserves the pill for stage meaning and forbids it for
-        * tags; this is neither, it is a hover readout of where the click leads, which is why
-        * it is `rounded-lg` like every other control rather than `rounded-full`.
+        * THE TAG NAMES THE COLOUR AND THE PRICE — on this rail every garment is the same style,
+        * so the colour is the only thing that differs and therefore the only thing worth
+        * saying. It wears that colour: the hex is the real orderable value out of
+        * lib/color-swatch, the same table the catalogue's chips read, so a tag and a chip can
+        * never disagree. Text colour is computed from the background rather than fixed,
+        * because Natural needs ink and Navy needs white.
         *
-        * CENTRED UNDER THE GARMENT rather than beside it, because on a rail the neighbour is
-        * only a few percent away and a label hanging to the right would sit on top of it.
+        * §4 reserves the pill for stage meaning and forbids it for tags; this is neither — it
+        * is a hover readout of where the click leads, which is why it is `rounded-lg` like
+        * every other control rather than `rounded-full`. Centred UNDER the garment, because on
+        * a rail the neighbour is a few percent away and a label to the side lands on it.
         */}
       <span
         className="pointer-events-none absolute left-1/2 top-full z-10 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-        /* THE TAG IS THE GARMENT'S OWN COLOUR. It was INK on every rail, so three colour
-           stories shared one black label and the swatch a person is actually choosing
-           between was the one thing the label did not show. The hex is the real orderable
-           colourway out of lib/color-swatch — the same table the catalogue's chips read, so
-           a tag and a chip for one colour cannot disagree — and the text colour is decided
-           from it rather than fixed, because Natural needs ink and Iris needs white. */
         style={{ background: tagBg, color: readableOn(tagBg) }}
       >
-        {FORM_LABEL[slot.form]} · from ${price.toFixed(2)}
+        {name} · from ${price.toFixed(2)}
       </span>
     </Link>
   )
 }
 
-function Rail({ story, reverse, priceOf, solo = false }: {
-  story: StoryId
-  reverse: boolean
-  priceOf: (f: FormId) => number | null
-  /** One story selected: this rail is the whole field, so it gets the height three shared. */
-  solo?: boolean
-}) {
-  /* Declared BEFORE the filter that reads them. They were below it, and because the use sits
-     inside a callback TypeScript cannot prove when it runs — so this compiled clean and threw
-     a temporal-dead-zone error only at prerender, taking the whole build down. */
-  const hangMap = HANG_SRC[story]
-  const isHanging = !!hangMap && Object.keys(hangMap).length > 0
-  const slots = RAILS[story].filter(
-    (sl) => priceOf(sl.form) !== null && (!isHanging || !!hangMap?.[sl.form]),
-  )
-  if (!slots.length) return null
-
-  /* THE TRACK IS THE SEQUENCE TWICE, and the animation translates it -50%. At that point the
+function Rail({ form, reverse, price }: { form: FormId; reverse: boolean; price: number }) {
+  /* THE TRACK IS THE COLOUR RUN TWICE, and the animation translates it -50%. At that point the
      second copy sits exactly where the first began, so the reset is invisible — which is the
-     entire trick, and why the clone cannot be a different length or a different order. */
-  const track = [...slots, ...slots]
-
+     whole trick, and why the clone cannot be a different length or a different order. */
+  const track = [...COLOURWAYS, ...COLOURWAYS]
   return (
     <div
       className="eg-rail-hold relative w-full overflow-hidden py-4"
-      /* --rail-unit is the base object width; every slot scales off it, so one value tunes
-         the whole rail's density and the depth differences survive. */
       style={{
-        ["--rail-unit" as string]: "clamp(9rem, 17vw, 19rem)",
-        /* THREE RAILS SHARE THE PAGE; ONE RAIL OWNS IT. The two views answer different
-           questions — three is "what is the range", one is "show me this colour" — so the
-           single rail gets the height the other two were using. It is also the view that
-           survives a small range best: four large garments fill a screen where twelve small
-           ones put every repeat on show. */
-        /* 48vh, not 66. The page head is ~460px, so a 66vh rail totalled 1054px against a
-           900px viewport and the garments were sliced by the FOLD — which reads as a bug,
-           because a fold is not a frame edge the way the left and right margins are. */
-        ["--rail-h" as string]: solo ? "clamp(22rem, 48vh, 34rem)" : "clamp(19rem, 42vh, 30rem)",
-        ["--rail-dur" as string]: DURATION[story],
+        ["--rail-h" as string]: "clamp(17rem, 34vh, 25rem)",
+        ["--rail-dur" as string]: DURATION[form],
       }}
     >
-      {isHanging && (
-        /* THE BAR, behind everything and edge to edge. It runs past both margins because a
-           rail does not end where the viewport does — that is the same reason objects cross
-           the frame. One hairline: §4's weight for a rule, not a drawn pole. */
-        <div
-          className="pointer-events-none absolute left-0 right-0 z-0"
-          /* The hook svg is 22px and sits at the very top of each item, which begins at the
-             rail's own 1rem of padding. The bar crosses it 4px down so the hook reads as
-             hanging OVER the bar rather than balanced on it. */
-          /* NOT `HAIRLINE`. That token is a card's edge against white and measures barely
-             1.02:1 on this ground — the bar was there and nobody could see it. A rail has to
-             read as a physical thing the hooks hang over, so it takes a real value: still one
-             pixel, still quiet, but actually present. */
-          style={{ top: "calc(1rem + 4px)", height: 1, background: "color-mix(in oklch, var(--mk-ink) 22%, transparent)" }}
-        />
-      )}
-      <div className={"eg-rail relative z-[1] flex w-max gap-[4vw] " + (isHanging ? "items-start" : "items-center") + (reverse ? " eg-rail-rev" : "")}>
-        {track.map((slot, i) => (
+      {/* THE BAR, behind everything and edge to edge — a rail does not end where the viewport
+          does, which is the same reason garments cross the frame. NOT the HAIRLINE token:
+          that is a card's edge against white and measures barely 1.02:1 on this ground, so
+          the bar was drawn and invisible. Still one pixel, still quiet, actually present. */}
+      <div
+        className="pointer-events-none absolute left-0 right-0 z-0"
+        style={{ top: "calc(1rem + 4px)", height: 1, background: "color-mix(in oklch, var(--mk-ink) 22%, transparent)" }}
+      />
+      <div className={"eg-rail relative z-[1] flex w-max items-start gap-[3.5vw]" + (reverse ? " eg-rail-rev" : "")}>
+        {track.map((c, i) => (
           <Garment
-            key={`${slot.form}-${i}`}
-            slot={slot}
-            story={story}
-            price={priceOf(slot.form)!}
-            /* The second copy is the loop's clone, and within the first copy a form that has
-               already appeared is one of the temporary repeats. Both are the same product with
-               the same destination, so they stay clickable and stay out of the a11y tree. */
-            hidden={i >= slots.length || slots.findIndex((o) => o.form === slot.form) !== i}
-            hang={hangMap?.[slot.form]}
+            key={`${c.slug}-${i}`}
+            form={form}
+            colour={c.slug}
+            name={c.name}
+            price={price}
             i={i}
+            cloned={i >= COLOURWAYS.length}
           />
         ))}
       </div>
@@ -329,10 +227,6 @@ export function ProductField({ products, className = "" }: {
   products: PublicProduct[] | null
   className?: string
 }) {
-  /* `story` is fixed at "all" now that the colour filter is gone — the rails are the three
-     colourways and there is nothing to narrow to. Kept as a constant rather than threaded
-     out of `shown` and `Rail`, both of which still take it and still mean it. */
-  const story = "all" as const
   type ViewId = "rail" | "grid"
   const [view, setView] = useState<ViewId>("rail")
 
@@ -344,13 +238,15 @@ export function ProductField({ products, className = "" }: {
     return Number.isFinite(n) && n > 0 ? n : null
   }
 
-  const shown = story === "all" ? STORIES : STORIES.filter((s) => s.id === story)
+  const rails = RAILS.map((f) => ({ form: f, price: priceOf(f) })).filter(
+    (r): r is { form: FormId; price: number } => r.price !== null,
+  )
 
-  /* THE COLOUR FILTER IS GONE. It asked a question this section does not answer: the rails
-     ARE the three colourways, all of them, all the time — so filtering to one left two thirds
-     of the field empty to show a subset of a set you could already see. Colour is chosen on
-     the product page, where there are 82 of them and a filter earns its place. What replaces
-     it is the one control people did ask for: whether this is a field or a grid. */
+  /* THE COLOUR FILTER IS GONE. It asked a question this section does not answer: a rail IS
+     the colour run, all of it, all the time — so filtering to one colour emptied the field to
+     show a subset of a set already on screen. Colour is chosen on the product page, where
+     there are 41 or 47 of them and a filter earns its place. What replaces it is the one
+     control people did ask for: whether this is a field or a grid. */
   const views = [
     { id: "rail" as const, label: "Rail" },
     { id: "grid" as const, label: "Grid" },
@@ -358,41 +254,34 @@ export function ProductField({ products, className = "" }: {
 
   return (
     <section className={"relative w-full overflow-hidden pb-10 " + className} style={{ background: SURFACE }}>
-      {/* THE RULE UNDER THE LIVE WORD — components/app/tab-bar.tsx, not a fresh row of
-          capsules. Colour lives HERE, and only here: an object opens its product. */}
       <div className="mx-auto max-w-[88rem] px-6 sm:px-10">
         <TabBar items={views} value={view} onChange={(v) => setView(v as ViewId)} ariaLabel="View" />
       </div>
 
       <div className={"mt-4 " + (view === "rail" ? "hidden lg:block" : "hidden")}>
-        {shown.map((s, i) => (
-          <Rail key={s.id} story={s.id} reverse={i % 2 === 1} priceOf={priceOf} solo={story !== "all"} />
+        {rails.map((r, i) => (
+          <Rail key={r.form} form={r.form} reverse={i % 2 === 1} price={r.price} />
         ))}
       </div>
 
-      {/* Below lg the rails become a grid. A moving rail on a touch screen cannot be paused by
-          hovering, so there is nothing to hover and the motion would be decoration you cannot
-          stop — the same objects and the same destination, arranged rather than running. */}
-      {/* Below lg the rails become a grid whatever the toggle says: a moving rail on a touch
-          screen cannot be paused by hovering, so the motion would be decoration you cannot
-          stop. Above lg it is now a CHOICE — the same objects and the same destination,
+      {/* Below lg this is the ONLY view, whatever the toggle says: a moving rail on a touch
+          screen cannot be paused by hovering, so the motion would be decoration nobody can
+          stop. Above lg it is a choice — the same garments and the same destinations,
           arranged rather than running, for anyone who would rather scan than watch. */}
-      <div className={"grid grid-cols-2 gap-x-4 gap-y-6 px-6 py-10 sm:grid-cols-3 "
-        + (view === "grid" ? "lg:grid lg:grid-cols-4" : "lg:hidden")}>
-        {shown.flatMap((s) =>
-          RAILS[s.id]
-            .filter((it, i, a) => a.findIndex((o) => o.form === it.form) === i && priceOf(it.form) !== null)
-            .map((it) => (
-              <Link
-                key={`${s.id}-${it.form}`}
-                href={`/catalog/${FORM_SLUG[it.form]}`}
-                aria-label={`${FORM_LABEL[it.form]} in ${s.name}`}
-                className="block"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={srcOf(it.form, s.id)} alt="" className="block w-full" />
-              </Link>
-            )),
+      <div className={"grid grid-cols-2 gap-x-4 gap-y-8 px-6 py-10 sm:grid-cols-4 "
+        + (view === "grid" ? "lg:grid lg:grid-cols-6" : "lg:hidden")}>
+        {rails.flatMap((r) =>
+          COLOURWAYS.map((c) => (
+            <Link
+              key={`${r.form}-${c.slug}`}
+              href={`/catalog/${FORM_SLUG[r.form]}`}
+              aria-label={`${FORM_LABEL[r.form]} in ${c.name}`}
+              className="block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={srcOf(r.form, c.slug)} alt="" className="block w-full" />
+            </Link>
+          )),
         )}
       </div>
     </section>
