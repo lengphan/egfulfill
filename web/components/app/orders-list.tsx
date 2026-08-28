@@ -265,10 +265,11 @@ export function OrdersList() {
   /**
    * THE FIRST SCREEN DOES NOT WAIT FOR THE LAST ORDER.
    *
-   * Measured on the live box: this list is 2.59MB on a staff account, and all of it had to
-   * arrive before anything drew. The query was never the cost (the whole thing is ~110ms);
-   * the megabytes crossing from Jakarta were. So the first 100 orders paint and the rest
-   * streams in behind them — same total bytes, a screen that is usable long before them.
+   * Measured through the live route as an admin: 971 orders, 1.37MB, 267ms — and all of it
+   * had to arrive before anything drew. The query was never the cost (the SQL is ~110ms of
+   * that); the megabytes crossing from Jakarta were. So the first 100 orders paint at
+   * 0.16MB and the rest streams in behind them — same total bytes, a screen that is usable
+   * long before them.
    *
    * `complete` is not cosmetic. Until the walk finishes, "nothing matches that filter" is a
    * claim this component cannot honestly make (§4, Honesty in UI).

@@ -2233,9 +2233,10 @@ export function cachedOrders(): OrderRow[] | null {
 /**
  * THE ORDER LIST, A PAGE AT A TIME — so the first screen doesn't wait for the last order.
  *
- * Measured on the live box: the staff list is 2.59MB and the first 100 orders are 0.26MB.
- * The server time is not the problem (the whole query is ~110ms); the 2.59MB crossing from
- * Jakarta is. So the first page paints, and the rest arrives behind it.
+ * Measured through the live route as an admin: the whole list is 971 orders / 1.37MB /
+ * 267ms, and the first 100 are 0.16MB / 100ms. The server time is not the problem (the SQL
+ * is ~110ms of that); the megabytes crossing from Jakarta are. So the first page paints,
+ * and the rest arrives behind it.
  *
  * WHY THIS IS NOT THE RUNAWAY SHAPE (§2.8). It is not an effect watching state its own
  * fetch writes. It is one sequence, started once, whose cursor moves STRICTLY past every
@@ -2264,8 +2265,8 @@ export async function streamOrders(
      *
      * Vercel and the VPS deploy separately, so for a few minutes this client can be talking
      * to an API that predates paging. It would hand back the whole list every time, never
-     * satisfy `rows.length < size`, and walk the same 2.59MB up to MAX_PAGES: half a
-     * gigabyte, on a loop, which is the §2.8 failure this repo has already paid for once.
+     * satisfy `rows.length < size`, and walk the same 1.37MB up to MAX_PAGES: 274MB, on a
+     * loop, which is the §2.8 failure this repo has already paid for once.
      *
      * More rows than were asked for is proof the parameter did nothing. Take the full list
      * — it IS the complete answer — and stop.

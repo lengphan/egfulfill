@@ -1699,7 +1699,8 @@ export function ordersRoutes(app, requireAuth) {
      * What this does NOT do is make the SQL cheaper — the aggregate still runs over every
      * row the filter admits, then limits. Measured at 1,030 orders the whole query is
      * ~110ms, so a page costs at most that and less as the cursor advances. The win is the
-     * WIRE: the full staff response is 2.59MB, the first 100 orders are 0.26MB.
+     * WIRE. Measured through this route on the live box, as an admin: the full response is
+     * 971 orders / 1.37MB / 267ms, and `?limit=100` is 0.16MB / 100ms — 11.5% of it.
      */
     const qy = req.query || {};
     const pageSize = Math.min(500, Math.max(0, Number(qy.limit) || 0));
