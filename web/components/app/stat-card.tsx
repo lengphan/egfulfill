@@ -1,6 +1,6 @@
 "use client"
 
-import type { ElementType } from "react"
+import { Children, type ElementType, type ReactNode } from "react"
 import { Card } from "@/components/ui/card"
 import { RailPortal, useInRail, useRailNode } from "@/components/app/console-shell"
 
@@ -136,9 +136,41 @@ export function StatGrid({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** The original 4-up grid. Hidden when a rail has taken the figures. */
-function StatGridInPlace({ children }: { children: React.ReactNode }) {
+/**
+ * THE GRID FOLLOWS THE COUNT. It used to be `xl:grid-cols-4` whatever it was given, so a
+ * board with fewer than four figures left the rest of the row empty — and it is not a rare
+ * case. Measured across the app: wallet has ONE card in a four-column row (a 75% hole),
+ * dispatch has two, billing and designer earnings have three, purchasing has five and wraps
+ * to 4+1. Six boards, and on each of them the row reads as unfinished rather than as short.
+ *
+ * "The layout seems undone" is a COUNT problem, not a spacing one — count the cells before
+ * reaching for padding.
+ *
+ * The map is literal on purpose: Tailwind's scanner only sees complete class strings, so a
+ * computed `xl:grid-cols-${n}` would compile to nothing and silently leave the default.
+ */
+const XL_COLS: Record<number, string> = {
+  1: "xl:grid-cols-1", 2: "xl:grid-cols-2", 3: "xl:grid-cols-3",
+  4: "xl:grid-cols-4", 5: "xl:grid-cols-5",
+}
+/** Six or more wraps to whichever row length divides evenly, so no row is a short one. */
+function xlCols(n: number): string {
+  if (n <= 5) return XL_COLS[Math.max(1, n)] ?? "xl:grid-cols-4"
+  if (n % 4 === 0) return "xl:grid-cols-4"
+  if (n % 3 === 0) return "xl:grid-cols-3"
+  return "xl:grid-cols-4"
+}
+
+/** Hidden when a rail has taken the figures. */
+function StatGridInPlace({ children }: { children: ReactNode }) {
   const rail = useRailNode()
+  /* toArray drops the nulls a conditional card leaves behind, so a board rendering
+     `{isAdmin && <StatCard/>}` is counted by what actually shows, not by what was written. */
+  const n = Children.toArray(children).length
   if (rail) return null
-  return <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">{children}</div>
+  return (
+    <div className={`grid gap-3 sm:gap-4 ${n === 1 ? "grid-cols-1" : "grid-cols-2"} ${xlCols(n)}`}>
+      {children}
+    </div>
+  )
 }
