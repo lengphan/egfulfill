@@ -98,8 +98,13 @@ export default function Today() {
           <Text style={{ color: C.muted, fontSize: 11.5, fontFamily: F.semi, letterSpacing: 1.4 }}>
             NEEDS YOU NOW
           </Text>
+          {/* THE PLACEHOLDER IS MUTED, and that is not a nicety. An em-dash set at 60pt in
+              near-black is a solid black bar three characters wide — it reads as a redaction,
+              not as "not known yet", and it is the largest thing on the screen while it is
+              there. Colour is the only thing separating a figure from a waiting state here,
+              so the waiting state has to be the quiet one. */}
           <Text style={{
-            color: needsYou > 0 ? C.alert : C.fg,
+            color: orders === null ? C.muted : needsYou > 0 ? C.alert : C.fg,
             fontSize: 60, fontFamily: F.display, marginTop: 2, letterSpacing: -1.5,
           }}>
             {orders === null ? "—" : needsYou}

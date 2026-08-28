@@ -110,7 +110,10 @@ export default function Wallet() {
               </View>
             )}
           </View>
-          <Text style={{ color: C.fg, fontSize: 46, fontFamily: F.bold, marginTop: 8 }}>
+          {/* THE PLACEHOLDER IS MUTED. An em-dash at 46pt in near-black is a solid black
+              bar, which reads as a redaction rather than as "not known" — and on a BALANCE
+              that is the worst possible misreading. Same fix as the figure on Today. */}
+          <Text style={{ color: err ? C.muted : C.fg, fontSize: 46, fontFamily: F.bold, marginTop: 8 }}>
             {err ? "—" : money(w?.balance ?? 0)}
           </Text>
         </View>

@@ -38,7 +38,6 @@ export default function RootLayout() {
   // Hold the splash until the face is in. A frame of system font followed by a reflow into
   // Inter is worse than waiting — it is the flash this app was just fixed for elsewhere.
   useEffect(() => { if (ready) SplashScreen.hideAsync().catch(() => {}) }, [ready])
-  if (!ready) return null
 
   /**
    * A TAP ON A NOTIFICATION OPENS THE THING IT IS ABOUT.
@@ -58,6 +57,14 @@ export default function RootLayout() {
     })
     return () => sub.remove()
   }, [])
+
+  /* EVERY HOOK IS ABOVE THIS LINE, and it has to be.
+     The notification listener was written below it and crashed the app on launch with
+     "Rendered more hooks than during the previous render": this component renders once with
+     `ready` false and returns here, so a hook after the return exists on the second render
+     and not the first. An early return in a component that owns hooks is a trap, and the
+     only safe place for one is under all of them. */
+  if (!ready) return null
 
   return (
     /* GESTURE ROOT, OUTERMOST. react-native-gesture-handler's detectors only receive touches

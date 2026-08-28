@@ -353,7 +353,10 @@ export default function Orders() {
           ListEmptyComponent={
             /* Says WHICH it is. An empty list that reads the same as a failed one is how a
                broken fetch gets mistaken for a quiet day. */
-            <Text style={{ color: err ? C.alert : C.muted, fontSize: 14, marginTop: 24 }}>
+            /* ...and it needs the 18 itself. The list deliberately carries no horizontal
+               padding because every ROW owns it — but this is not a row, so it was the one
+               thing on the screen sitting flush against the left edge. */
+            <Text style={{ color: err ? C.alert : C.muted, fontSize: 14, marginTop: 24, paddingHorizontal: 18 }}>
               {err ?? (search ? `Nothing matches “${search}”.` : `No ${filter.toLowerCase()} orders.`)}
             </Text>
           }
