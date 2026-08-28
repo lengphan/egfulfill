@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { GmvPanel } from "@/components/app/gmv-panel"
 import { StageBracket } from "@/components/app/stage-bracket"
+import { Thumb } from "@/components/app/thumb"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,7 +27,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
 import { resolvedOrderStage } from "@/lib/factory-status"
-import { dailyRevenue, barsOf, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
+import { dailyRevenue, barsOf, topProducts, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
 // What each range means as a number of DAILY bars.
@@ -157,6 +158,12 @@ export function DashboardView() {
  const bars = useMemo(() => (orders === null ? [] : barsOf(points)), [orders, points])
  const barsPrev = useMemo(() => (orders === null ? [] : barsOf(points, "prev")), [orders, points])
 
+ /* WHAT IS ACTUALLY SELLING, with the picture off the line it was picked from.
+  * `topProducts` carries `img` now — the field the row avatars and the design canvas
+  * already read, resolved from `img_ref` at the API boundary. A product that has never
+  * carried a thumbnail falls back to Thumb's marked tile rather than a broken image. */
+ const blanks = useMemo(() => topProducts(orders ?? [], 4), [orders])
+
  const recent = useMemo(
     () => [...(orders ?? [])].sort((a, b) => (tsOf(b) || 0) - (tsOf(a) || 0)).slice(0, 6),
  [orders]
@@ -224,6 +231,30 @@ export function DashboardView() {
             mix={ladder.mix}
             onPick={(stage) => router.push(`/orders?stage=${encodeURIComponent(stage)}`)}
           />
+        </div>
+      )}
+
+      {blanks.length > 0 && (
+        <div>
+          <p className="eg-label mb-2 text-muted-foreground">{cl("kpi", "What is selling")}</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {blanks.map((b) => (
+              <button
+ key={b.name}
+ type="button"
+ onClick={() => router.push(`/products?q=${encodeURIComponent(b.name)}`)}
+                className="eg-tap overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-primary/40"
+              >
+                <Thumb src={b.img} alt={b.name} fit="contain" className="aspect-[4/3] w-full bg-muted/40" />
+                <div className="border-t border-border px-3 py-2.5">
+                  <div className="truncate text-sm font-medium leading-tight">{b.name}</div>
+                  <div className="mt-1 text-2xs tabular-nums text-muted-foreground">
+                    {b.units === 1 ? t("dash.oneUnit") : t("dash.nUnits", { n: b.units })} · {usd(b.revenue)}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
