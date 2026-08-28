@@ -246,8 +246,12 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   <EditableText path={`features.cards.${i}.body`}>{c.body}</EditableText>
                 </p>
               </div>
-              {/* No `src` yet — the frame draws a wireframe rather than a fake screenshot.
-                  Swap in a real capture per card once the boards are reskinned.
+              {/* THE FRAME TAKES A REAL CAPTURE, and draws a wireframe when it has none.
+                  That fallback is the point: an empty slot must read as "no screenshot yet",
+                  never as a plausible screen. A mocked-up queue with invented order numbers on
+                  a public page is what §4 forbids, so the honest empty beats the convincing
+                  fake. Replaceable in place like every other picture on the site, so a capture
+                  goes in through the editor rather than a deploy.
 
                   THE CAPTION IS NOW A TAG STUCK TO THE PANEL, and it is the SAME STRING — the
                   card's own title, straight from stored content. A sticker that states a fact
@@ -258,7 +262,9 @@ export function BoldHome({ content }: { content: SiteContent }) {
                   one breaking the edge is something applied to the object afterwards, which is
                   the whole device — and it is why the wrapper is `relative` with no clipping. */}
               <div className={"relative " + (flip ? "lg:order-1" : "")}>
-                <Window tilt={flip ? -2 : 2} />
+                <EditableImage path={`features.cards.${i}.shot`}>
+                  <Window src={c.shot} alt={c.shotAlt} tilt={flip ? -2 : 2} />
+                </EditableImage>
                 <SwingTag
                   label={c.title}
                   rotate={flip ? 4 : -4}

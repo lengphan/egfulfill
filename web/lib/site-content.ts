@@ -13,7 +13,14 @@ import { DEFAULT_MOTION, mergeMotion, type MotionSettings } from "./motion"
  *  the one sentence a figure is allowed, because it is annotating a number rather than
  *  sitting under a control. */
 export type Stat = { value: string; label: string; note?: string }
-export type FeatureCard = { title: string; body: string }
+/**
+ * `shot` is a capture of the REAL app for this feature — the frame draws a wireframe without
+ * one, which is deliberate: an empty slot must read as "no screenshot yet", never as a
+ * plausible screen. §4 forbids a fake queue with invented order numbers on a public page, and
+ * a mocked-up capture is exactly that with extra steps. So the field is optional and the
+ * fallback is honestly blank rather than convincingly wrong.
+ */
+export type FeatureCard = { title: string; body: string; shot?: string; shotAlt?: string }
 export type Step = { n: string; title: string; body: string }
 export type Testimonial = { quote: string; name: string; role: string }
 export type Faq = { q: string; a: string }
