@@ -13,6 +13,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app/dropzone"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { ArtworkPanel } from "@/components/app/artwork-panel"
+import { TabBar } from "@/components/app/tab-bar"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
 import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
@@ -992,6 +993,25 @@ export function DesignCanvasDialog({
    * Merged, not replaced: change the colour and then the size and both must survive.
    */
  const [variantPatch, setVariantPatch] = useState<ItemSetupPatch | null>(null)
+
+  /**
+   * ONE PANEL AT A TIME, in a column that had twelve stacked in it.
+   *
+   * Threads, files, the buyer's file, the board card, the fee and the artwork library were
+   * all on screen at once, which is the same as none of them being prominent — you scrolled
+   * a 380px column looking for the one you wanted.
+   *
+   * The risk of tabbing an operational surface is that something a person relies on seeing
+   * appears to have been REMOVED, so every tab that can carry a number carries one: Files
+   * says how many, Threads says how many cones. Nothing goes quiet.
+   *
+   * Opens on what there is to READ when a buyer sent something, and on what there is to DO
+   * otherwise. A line that arrives with a customer's file and a note wants to be read before
+   * it is worked on; a bare line wants the artwork library.
+   */
+ type CtxTab = "design" | "artwork" | "files" | "threads" | "board"
+ const [ctxTab, setCtxTab] = useState<CtxTab>(
+    item.design_src || item.personalization ? "design" : "artwork")
  const liveItem = useMemo(() => {
  if (!variantPatch) return item
  const p = variantPatch
@@ -2880,6 +2900,29 @@ export function DesignCanvasDialog({
             * The seller's listing image is untouched by this. That photo belongs to the
             * line and stays where it is; this changes the blank underneath it.
             */}
+          {/* Imported, never hand-rolled: the underline is the only active tab treatment in
+              this app and hand-rolling is how that rule got broken in fourteen places. */}
+          <TabBar
+            size="sm" spacing="none" className="sticky top-0 z-10 -mt-1 border-b-0 bg-popover pt-1"
+            ariaLabel="Line panels"
+            value={ctxTab} onChange={(v: string) => setCtxTab(v as CtxTab)}
+            items={[
+              { id: "design", label: tl("canvas", "Design") },
+              { id: "artwork", label: tl("canvas", "Artwork") },
+              { id: "files", label: tl("canvas", "Files"), count: fileCount || undefined },
+              /* BOTH EMBROIDERY-ONLY, and for the same reason the code gives itself: every
+                 part of the digitising step is stitch apparatus — the formats it accepts,
+                 the EMB- id it files under, the designer board it posts to — and on a DTG
+                 line the image IS the print file. A tab that is always empty on half the
+                 orders is worse than no tab. Non-embroidery lines reach a designer from the
+                 rail, which is where that route already lives. */
+              ...(isEmb ? [
+                { id: "threads", label: tl("canvas", "Threads"), count: Object.keys(picks).length || undefined },
+                { id: "board", label: tl("canvas", "Board") },
+              ] : []),
+            ]}
+          />
+          {ctxTab === "design" && (<>
           {!filesLocked && catalog && catalog.length > 0 && (
             <VariantPicker
               orderId={orderId}
@@ -2906,6 +2949,8 @@ export function DesignCanvasDialog({
             * the template route that DOES make sense on a line (take the placement, leave the
             * blank) is the one on the Files popover, and it is deliberately not duplicated.
             */}
+          </>)}
+          {ctxTab === "artwork" && (<>
           {!filesLocked && (
             <ArtworkPanel
               columns={3}
@@ -2973,6 +3018,8 @@ export function DesignCanvasDialog({
             what is attached to this line, not a form. Hidden entirely when the line has
             nothing, which is honest: an empty frame here would read as a list that failed
             to load rather than as a line nobody has sent a file for. */}
+          </>)}
+          {ctxTab === "files" && (<>
         {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 text-xs font-medium text-foreground">{tl("canvas", "Files")}</div>
@@ -3030,6 +3077,8 @@ export function DesignCanvasDialog({
             {dlErr && <div className="mt-1.5 text-2xs text-destructive">{dlErr}</div>}
           </div>
         )}
+          </>)}
+          {ctxTab === "threads" && (<>
         {isEmb && designUrl && (
           /* NO CEILING, AND NO SECOND SCROLLBAR.
              This was `max-h-[17vh] overflow-y-auto` — a fraction of the VIEWPORT, not of the
@@ -3159,6 +3208,8 @@ export function DesignCanvasDialog({
         {/* The BUYER's uploaded file (marketplace orders). Was invisible in React — the
  floor couldn't see what the customer actually sent. Shows the file + their
  personalization note, with one click to adopt it as the design to place. */}
+          </>)}
+          {ctxTab === "design" && (<>
         {(item.design_src || item.personalization) && (
           /**
            * THE NOTE FIRST, THEN THE FILE.
@@ -3209,6 +3260,7 @@ export function DesignCanvasDialog({
             )}
           </div>
         )}
+          </>)}
         <div className="space-y-3">
           {/* The artwork input the STAGE opens. An explicit Upload image / Replace button is
  always shown too: the empty stage alone wasn't discoverable, which left people
@@ -3238,6 +3290,7 @@ export function DesignCanvasDialog({
  the number implied. Two cards that each say what they are, and tick when they
  are done, carry the same information without instructing anybody. The marker is
  a dot until then: the card is a state, not a task list. */}
+          {ctxTab === "board" && (<>
           <div className="flex flex-col gap-2">
             {/* 1 — Design image */}
             {/* ONE GREEN. This step hand-picked emerald-300/50 while step 2 below used the
@@ -3358,6 +3411,7 @@ export function DesignCanvasDialog({
             </div>
             )}
           </div>
+          </>)}
           {/* LAST, because it is a shortcut rather than a decision: "do this line" is the
  question, "and the other nine" is the follow-up.
 
