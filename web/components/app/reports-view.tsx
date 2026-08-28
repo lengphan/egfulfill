@@ -4,6 +4,7 @@ import { useLabelT, useLocaleTag } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Sparkle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { RevenueChart } from "@/components/app/revenue-chart"
 import {
@@ -117,7 +118,13 @@ export function ReportsView() {
         <RevenueChart data={series} />
       )}
 
+      {/* SPEED CAME HERE FROM THE DASHBOARD.
+          Four lead times and an on-time rate are figures you review, not ones you act on
+          standing at a machine — and this page already holds the orders they are computed
+          from, so it costs no extra read. It was two thirds of a row on the dashboard that
+          nobody could do anything about. */}
       <div className="grid gap-4 lg:grid-cols-2">
+        <FulfillmentSpeed orders={orders ?? undefined} loading={orders === null} />
         <SectionCard title={tl("reports", "Revenue by channel")} bodyClassName="space-y-4 p-5">
           {orders === null && loadErr ? (
             // "No revenue yet" is a statement about the business. Only make it when the

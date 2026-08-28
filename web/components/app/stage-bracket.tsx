@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { useLabelT } from "@/lib/i18n"
 import { ALL_STATUSES } from "@/lib/factory-status"
 import { canSetStage, stageDenialReason, lineFor } from "@/shared/order-rules"
 
@@ -32,6 +33,10 @@ export type StageCounts = Record<string, number>
 /** Optional per-stage channel split, keyed stage → channel → n. Drawn as a hairline under
  *  the figure. Absent is fine and draws nothing; it is never invented. */
 export type StageMix = Record<string, Record<string, number>>
+/** Optional age of the OLDEST thing at each stage, in days. A stage holding old work is a
+ *  different problem from a busy one, and the count alone cannot say which — which is the
+ *  whole reason the production-line card used to exist beneath this one. */
+export type StageAges = Record<string, number>
 
 const MIX_CLASS = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4"]
 
@@ -40,6 +45,7 @@ export function StageBracket({
   isFactory,
   counts,
   mix,
+  ages,
   onPick,
   className,
 }: {
@@ -49,11 +55,13 @@ export function StageBracket({
   isFactory?: boolean
   counts: StageCounts
   mix?: StageMix
+  ages?: StageAges
   /** A block is a link into the queue at that stage. Out-of-zone blocks still navigate —
    *  looking is not setting. */
   onPick?: (stage: string) => void
   className?: string
 }) {
+  const tl = useLabelT()
   const line = lineFor(isFactory)
   const labelOf = (id: string) => ALL_STATUSES.find((s) => s.id === id)?.label ?? id
 
@@ -79,6 +87,8 @@ export function StageBracket({
     const why = allowed ? null : stageDenialReason(role, from, id, isFactory)
     const n = counts[id] ?? 0
     const split = Object.entries(mix?.[id] ?? {}).filter(([, v]) => v > 0)
+    // Only where there is something to be old. "0 orders, oldest 6 days" is not a fact.
+    const age = n > 0 ? ages?.[id] : undefined
 
     return (
       <button
@@ -99,7 +109,14 @@ export function StageBracket({
         {/* The refusal reaches a screen reader too. `title` alone is a hover affordance, and
             the whole point of these strings is that the rule should be learnable. */}
         {why && <span className="sr-only">{why}</span>}
-        <div className="mt-0.5 text-xl font-semibold tabular-nums leading-tight">{n}</div>
+        <div className="mt-0.5 flex items-baseline gap-1.5">
+          <span className="text-xl font-semibold tabular-nums leading-tight">{n}</span>
+          {Number.isFinite(age) && (
+            <span className="text-2xs tabular-nums opacity-60">
+              {(age as number) < 1 ? tl("stage", "today") : `${Math.floor(age as number)}d`}
+            </span>
+          )}
+        </div>
         {split.length > 0 && (
           <div className="mt-1.5 flex h-1 gap-0.5 overflow-hidden rounded-full" aria-hidden>
             {split.map(([name, v], j) => (

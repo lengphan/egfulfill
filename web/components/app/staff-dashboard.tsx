@@ -7,8 +7,6 @@ import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, CurrencyDollar,
 import { SectionCard } from "@/components/app/section-card"
 import { TabBar } from "@/components/app/tab-bar"
 import { StageBadge } from "@/components/app/stage-badge"
-import { ProductionLine } from "@/components/app/production-line"
-import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { GmvPanel } from "@/components/app/gmv-panel"
 import { StageBracket } from "@/components/app/stage-bracket"
@@ -262,7 +260,6 @@ export function StaffDashboard() {
   // The window is applied by the SERVER when the toggle is visible — see load(). A role
   // without the toggle gets the live floor, because hiding orders behind a filter someone
   // cannot see is worse than showing all of them.
- const lineRows = ov?.line ?? []
 
   // Role-tuned KPI cards. `today` is shown only where it's a real, live delta.
   // Admin gets the money view — revenue, profit, volume, average — read over the chosen
@@ -310,12 +307,27 @@ export function StaffDashboard() {
  on_hold: c?.onHold ?? 0,
     }
  const mix: Record<string, Record<string, number>> = {}
+ const oldest: Record<string, string> = {}
  for (const row of ov?.line ?? []) {
  const id = row.id === "pending" ? "in_review" : row.id === "draft" ? "" : row.id === "onHold" ? "on_hold" : row.id
  if (row.byPlatform) mix[id] = row.byPlatform
+      // The STAMP, not the age. Turning it into days needs the clock, and the clock is not
+      // a pure value — it is read once at render like the greeting above, not inside a memo
+      // that would then have to be busted on every tick to stay true.
+ if (row.oldest) oldest[id] = row.oldest
     }
- return { counts, mix }
+ return { counts, mix, oldest }
   }, [ov])
+
+ /* Stage ages, in days, off the stamps the memo carried. Read at render with the same clock
+  * as the greeting — `now` is already the browser's own, and an age is only ever drawn where
+  * a stage actually holds something. */
+ const stageAges = Object.fromEntries(
+   Object.entries(ladder.oldest).flatMap(([id, iso]) => {
+ const t0 = Date.parse(iso)
+ return isNaN(t0) ? [] : [[id, (now.getTime() - t0) / 86400000] as const]
+   })
+ )
 
   // Shortcut catalog = every page this role can actually reach (nav boards + tools), so the
   // launcher never offers a link that would just bounce. /overview is this page, so it's
@@ -422,6 +434,7 @@ export function StaffDashboard() {
            * orders from the operator whose whole job on this line is approving them. */
  counts={ladder.counts}
  mix={ladder.mix}
+ ages={stageAges}
  onPick={(stage) => router.push(`/production?stage=${encodeURIComponent(stage)}`)}
         />
       </div>
@@ -459,38 +472,20 @@ export function StaffDashboard() {
         </div>
       )}
 
-      {/* Production line narrowed to two thirds so the fulfilment-speed card fills the
- space it was wasting — the chart is only a handful of bars wide. */}
-      <div className="grid items-stretch gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-1">
-          <FulfillmentSpeed speed={ov?.speed} loading={ov === null} />
-        </div>
-        <div className="lg:col-span-2">
-          <SectionCard
- className="h-full"
- title={t("dash.productionLine")}
- actions={<Link href="/production" className="eg-tap inline-flex items-center gap-1 text-sm text-primary hover:underline">{t("dash.openQueue")} <ArrowRight size={13} weight="bold" /></Link>}
-            /* flex-1 so the body actually receives the card's stretched height — without it
- the chart sized to its content and left a third of the card empty. */
- bodyClassName="flex flex-1 flex-col divide-y divide-border"
-          >
-            {ov === null ? (
-              <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-            ) : (
-              <>
-                <ProductionLine line={lineRows} />
-                {stats.attention > 0 && (
-                  <Link href="/production" className="flex items-center gap-2 bg-hold/10 px-5 py-2.5 text-xs font-medium text-hold transition-colors hover:bg-hold/15 dark:hover:bg-hold/50">
-                    <Warning size={14} weight="fill" className="shrink-0" />
-                    <span>{stats.attention === 1 ? t("dash.onHoldOne") : t("dash.onHold", { n: stats.attention })}</span>
-                    <ArrowRight size={13} weight="bold" className="ml-auto shrink-0" />
-                  </Link>
-                )}
-              </>
-            )}
-          </SectionCard>
-        </div>
-      </div>
+      {/* Speed and Production line BOTH came off this page.
+       *
+       * The bracket above says the count and the channel mix for every stage, and now the
+       * age of the oldest thing at each one too — which was the only thing the production
+       * line knew that the bracket did not. What was left was the same five counts drawn a
+       * second time, on a linear scale where one big stage turns every other bar into a
+       * 3px stub, so it could not show the one thing it existed for.
+       *
+       * Speed moved to Reports rather than being deleted. Four lead times and an on-time
+       * rate are figures you review, not ones you act on standing at a machine, and Reports
+       * already holds the orders they are computed from.
+       *
+       * The on-hold link that lived under the line is the bracket's Hold block, which
+       * carries the same count and opens the same queue. */}
 
       <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
