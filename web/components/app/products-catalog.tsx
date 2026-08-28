@@ -7,6 +7,7 @@ import Image from "next/image"
 import { Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Warning, Tag } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
+import { TabBar } from "@/components/app/tab-bar"
 import { SearchField } from "@/components/app/search-field"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
@@ -274,26 +275,14 @@ export function ProductsCatalog() {
 
       {/* toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map((c) => (
-            <button
- key={c}
- onClick={() => setCat(c)}
- className={
-                /* ONE CHIP CARRIES COLOUR, the rest are text. Every category was a bordered
- pill, so a row of eight met the eye as eight buttons and the selected one
- had to shout over them. The unselected ones sit on the canvas now — the
- selection is the only thing drawn. */
-                "rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors " +
-                (cat === c
-                  ? "bg-primary text-primary-foreground"
- : "text-muted-foreground hover:bg-accent hover:text-foreground")
-              }
-            >
-              {c}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          look="segmented"
+          spacing="none"
+          ariaLabel={tl("products", "Category")}
+          items={categories.map((c) => ({ id: c, label: c }))}
+          value={cat}
+          onChange={setCat}
+        />
         <div className="flex items-center gap-2">
           <SearchField
             value={query}

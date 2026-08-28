@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
+import { TabBar } from "@/components/app/tab-bar"
 import {
   DEFAULT_MOTION, LIMITS, PRESET_NAMES, clampField, entrance,
  type MotionPreset, type MotionSettings, type PresetName,
@@ -125,21 +126,15 @@ export function MotionEditor({ value, onChange }: {
 
  return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1.5">
-        {PRESET_NAMES.map((p) => (
-          <button
- key={p} type="button" onClick={() => setName(p)}
- className={
-              "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors " +
-              (p === name
-                ? "bg-primary text-primary-foreground"
- : "border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
-            }
-          >
-            {tl("motionEditor", ABOUT[p].title)}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        look="segmented"
+        size="sm"
+        spacing="none"
+        ariaLabel={tl("motionEditor", "Preset")}
+        items={PRESET_NAMES.map((p) => ({ id: p, label: tl("motionEditor", ABOUT[p].title) }))}
+        value={name}
+        onChange={setName}
+      />
 
       <p className="text-xs leading-relaxed text-muted-foreground">
         <span className="font-medium text-foreground">{tl("motionEditor", ABOUT[name].title)}</span> — {ABOUT[name].use}{" "}

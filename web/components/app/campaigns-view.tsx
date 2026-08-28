@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Megaphone, CircleNotch, Warning, Plus, Play, Pause, ArrowSquareOut } from "@phosphor-icons/react"
 import Link from "next/link"
 import { SectionCard } from "@/components/app/section-card"
+import { TabBar } from "@/components/app/tab-bar"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -77,11 +78,15 @@ export function CampaignsView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-border p-0.5">
-            {DAYS.map((d) => (
-              <button key={d} onClick={() => setDays(d)} className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + (days === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{d}d</button>
-            ))}
-          </div>
+          <TabBar
+            look="segmented"
+            size="sm"
+            spacing="none"
+            ariaLabel={tl("campaigns", "Date range")}
+            items={DAYS.map((d) => ({ id: String(d), label: `${d}d` }))}
+            value={String(days)}
+            onChange={(v) => setDays(Number(v))}
+          />
           {connected && <Button size="sm" onClick={() => setNewOpen(true)}><Plus size={14} weight="bold" /> {tl("campaigns", "New campaign")}</Button>}
         </div>
       </div>

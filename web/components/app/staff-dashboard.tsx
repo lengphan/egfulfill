@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ElementType } from "rea
 import Link from "next/link"
 import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { TabBar } from "@/components/app/tab-bar"
 import { StageBadge } from "@/components/app/stage-badge"
 import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
@@ -347,18 +348,15 @@ export function StaffDashboard() {
         </div>
         {/* Money window — admin only, since the money cards are. */}
         {isAdmin && (
-          <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
-            {RANGES.map((r) => (
-              <button
- key={r.id}
- onClick={() => setRange(r.id)}
- aria-pressed={range === r.id}
- className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (range === r.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-              >
-                {tl("range", r.label)}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            look="segmented"
+            size="sm"
+            spacing="none"
+            ariaLabel={tl("range", "Date range")}
+            items={RANGES.map((r) => ({ id: r.id, label: tl("range", r.label) }))}
+            value={range}
+            onChange={setRange}
+          />
         )}
       </div>
 

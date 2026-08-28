@@ -7,6 +7,7 @@ import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
 import { MagnifyingGlassPlus, Binoculars, CaretLeft, CaretRight, LockSimple, Check, TrendUp, Heart, Warning, CheckCircle, Storefront, CircleNotch, Package, Trash, User as UserIcon } from "@phosphor-icons/react"
 import { ThumbFill } from "@/components/app/thumb"
+import { TabBar } from "@/components/app/tab-bar"
 import { SearchField } from "@/components/app/search-field"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -1337,25 +1338,23 @@ export function SpyDeckView() {
       <SectionCard
  title={tl("spydeck", "Product research")}
  actions={
-          <div className="flex rounded-lg border border-border p-0.5">
-            {(([
+          <TabBar
+            look="segmented"
+            spacing="none"
+            ariaLabel={tl("spydeck", "View")}
+            items={(([
               ...(showTrending ? (["trending"] as const) : []),
               "search", "saved", "uploaded",
               ...(showStores ? (["stores"] as const) : []),
               ...(showAccount ? (["account"] as const) : []),
-            ]) as Array<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">).map((v) => (
-              <button
- key={v}
- onClick={() => setView(v)}
- className={
-                  "eg-tap rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors " +
-                  (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
-                }
-              >
-                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? tl("spydeck", "Trending") : v === "account" ? tl("spydeck", "My shop") : v === "stores" ? tl("spydeck", "Stores") : tl("spydeck", "Search")}
-              </button>
-            ))}
-          </div>
+            ]) as Array<"trending" | "search" | "saved" | "uploaded" | "account" | "stores">).map((v) => ({
+              id: v,
+              label: v.charAt(0).toUpperCase() + v.slice(1),
+              count: v === "saved" ? (saved.length || undefined) : v === "uploaded" ? (uploaded.length || undefined) : undefined,
+            }))}
+            value={view}
+            onChange={setView}
+          />
         }
       >
         {(view === "search" || view === "trending") && (

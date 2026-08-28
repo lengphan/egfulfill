@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { CircleNotch, CaretRight, Package, ArrowSquareOut, Warning, CheckCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { TabBar } from "@/components/app/tab-bar"
 import { Button } from "@/components/ui/button"
 import { SampleOrderDialog, chatUrl, orderUrl, usd, when } from "@/components/app/sample-orders"
 import { AlibabaReceiveDialog } from "@/components/app/alibaba-receive-dialog"
@@ -134,17 +135,16 @@ export function AlibabaOrders({ refreshKey = 0 }: { refreshKey?: number }) {
         <>
           {/* pt-3 matches pb-3: the row had no top padding, so it sat flush against the
  header's rule and the pills read as touching it. */}
-          <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-3">
-            {FILTERS.map((f) => (
-              <button
- key={f.id}
- onClick={() => setFilter(f.id)}
- className={"eg-tap rounded-lg px-3 py-1 text-xs font-medium transition-colors "
-                  + (filter === f.id ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground")}
-              >
-                {tl("alibaba", f.label)} <span className="opacity-70">{counts[f.id]}</span>
-              </button>
-            ))}
+          <div className="px-4 pt-3 pb-3">
+            <TabBar
+              look="segmented"
+              size="sm"
+              spacing="none"
+              ariaLabel={tl("alibaba", "Filter orders")}
+              items={FILTERS.map((f) => ({ id: f.id, label: tl("alibaba", f.label), count: counts[f.id] }))}
+              value={filter}
+              onChange={setFilter}
+            />
           </div>
 
           {rows.length === 0 ? (

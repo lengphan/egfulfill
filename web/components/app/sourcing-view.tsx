@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, Trash, ArrowSquareOut, CircleNotch, Calculator, DownloadSimple, X, Package, CaretRight } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { TabBar } from "@/components/app/tab-bar"
 import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
 import { AlibabaBrowse } from "@/components/app/alibaba-browse"
@@ -350,21 +351,17 @@ export function SourcingView({ embedded }: {
           The toggle only appears when there is a second view to reach: without Alibaba
  connected, or for a non-admin, this is just the prospect table as it always was. */}
       {canBrowse && (
-        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
-          {([["prospects", tl("sourcing", "Suppliers")], ["find", tl("sourcing", "Search")]] as const).map(([id, label]) => (
-            <button
- key={id}
- onClick={() => setTab(id)}
- aria-pressed={tab === id}
- className={"rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors " + (tab === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              {label}
-              {id === "prospects" && rows.length > 0 && (
-                <span className={"ml-1.5 tabular-nums " + (tab === id ? "text-primary-foreground/70" : "text-muted-foreground/70")}>{rows.length}</span>
-              )}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          look="segmented"
+          spacing="none"
+          ariaLabel={tl("sourcing", "Sourcing view")}
+          items={[
+            { id: "prospects" as const, label: tl("sourcing", "Suppliers"), count: rows.length || undefined },
+            { id: "find" as const, label: tl("sourcing", "Search") },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
       )}
 
       {/* MOUNTED ALWAYS, hidden when it isn't the current view — not conditionally rendered.

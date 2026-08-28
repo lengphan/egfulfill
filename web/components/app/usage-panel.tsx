@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning, ArrowsClockwise, ChartBar, Check } from "@phosphor-icons/react"
 import { getUsageSummary, setUsageConfig, type UsageSummary, type UsagePlatform } from "@/lib/api"
 import { EmptyState } from "@/components/app/empty-state"
+import { TabBar } from "@/components/app/tab-bar"
 
 const WINDOWS = [{ d: 7, label: "7 days" }, { d: 30, label: "30 days" }, { d: 90, label: "90 days" }]
 const money = (n: number) => "$" + (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -104,14 +105,15 @@ export function UsagePanel({ isAdmin }: { isAdmin: boolean }) {
           <p className="text-sm text-muted-foreground">{tl("usage", "API call volume + estimated cost per platform. Thresholds alert only — nothing is throttled.")}</p>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex rounded-lg border border-border p-0.5">
-            {WINDOWS.map((w) => (
-              <button key={w.d} onClick={() => setDays(w.d)}
- className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (days === w.d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>
-                {tl("usage", w.label)}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            look="segmented"
+            size="sm"
+            spacing="none"
+            ariaLabel={tl("usage", "Time window")}
+            items={WINDOWS.map((w) => ({ id: String(w.d), label: tl("usage", w.label) }))}
+            value={String(days)}
+            onChange={(v) => setDays(Number(v))}
+          />
           <button onClick={() => void load()} title={tl("usage", "Refresh")} className="rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent">
             <ArrowsClockwise size={15} className={loading ? "animate-spin" : ""} />
           </button>

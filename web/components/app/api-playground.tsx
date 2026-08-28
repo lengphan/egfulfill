@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { Key, Copy, Check, CircleNotch, Warning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
+import { TabBar } from "@/components/app/tab-bar"
 import { cn } from "@/lib/utils"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
@@ -209,11 +210,15 @@ export function ApiPlayground() {
           <span className={"rounded-lg px-2 py-0.5 text-xs font-semibold uppercase " + (env === "live" ? "bg-hold/12 text-hold" : "bg-muted text-muted-foreground")}>{env === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</span>
         </span>}
  actions={
-          <div className="flex rounded-lg border border-border p-0.5">
-            {(["test", "live"] as const).map((m) => (
-              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-hold text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m === "live" ? tl("apiPlayground", "Live") : tl("apiPlayground", "Sandbox")}</button>
-            ))}
-          </div>
+          <TabBar
+            look="segmented"
+            size="sm"
+            spacing="none"
+            ariaLabel={tl("apiPlayground", "Environment")}
+            items={[{ id: "test" as const, label: "TEST" }, { id: "live" as const, label: "LIVE" }]}
+            value={env}
+            onChange={setEnv}
+          />
         }
       >
         <div className="space-y-3 p-5">

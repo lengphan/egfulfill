@@ -6,6 +6,7 @@ import { mayEditVariants } from "@/shared/order-rules"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { designSearchTerms } from "@/lib/design-id"
 import { SubmitOrderButton } from "@/components/app/submit-order-button"
+import { TabBar } from "@/components/app/tab-bar"
 import { SearchField } from "@/components/app/search-field"
 import { ApproveOrderButton } from "@/components/app/approve-order-button"
 import { orderNeedsSetup } from "@/lib/variant-resolve"
@@ -359,20 +360,14 @@ export function OrdersList() {
         )}
         {/* toolbar */}
         <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-1.5">
-            {SELLER_FILTERS.map((f) => (
-              <button
- key={f}
- onClick={() => setFilter(f)}
- className={
-                  "rounded-lg px-3 py-1 text-sm font-medium transition-colors " +
-                  (filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
-                }
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            look="segmented"
+            spacing="none"
+            ariaLabel={tl("ordersList", "Filter orders")}
+            items={SELLER_FILTERS.map((f) => ({ id: f, label: f }))}
+            value={filter}
+            onChange={setFilter}
+          />
           <SearchField
             value={query}
             onChange={setQuery}
