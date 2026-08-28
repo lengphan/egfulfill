@@ -9,6 +9,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
+import { GmvPanel } from "@/components/app/gmv-panel"
 import { getOverview, getFactoryPnl, type Overview, type FactoryPnl } from "@/lib/api"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
@@ -388,59 +389,13 @@ export function StaffDashboard() {
       {isAdmin && (
         <div className="grid items-stretch gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <SectionCard
- className="h-full"
- title={tl("kpi", "GMV")}
- bodyClassName="flex flex-1 flex-col gap-5 p-5"
-            >
-              <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-                <div>
-                  <div className="font-title text-4xl font-black leading-none tracking-tight tabular-nums sm:text-5xl">
-                    {ov === null ? "—" : usd(money.revenue)}
-                  </div>
-                  <div className="mt-1.5 eg-label text-muted-foreground">{tl("rangesub", rangeMeta.sub)}</div>
-                </div>
-                {/* The figures that QUALIFY the headline, at a third its weight — the
- hierarchy the old panel was built for, kept. */}
-                {/* NO CAPTION, the same rule the tiles above already follow. "we earned",
-                    "after $275 costs", "per order" explained figures their own labels
- already name — three sentences under three headings, in a panel whose
- whole job is to be glanced at. `sub` is still computed and still
- reachable in the tooltip-free case; it is simply not drawn. */}
-                {moneySide.map((c) => (
-                  <div key={c.label} title={c.sub}>
-                    <div className="text-xl font-bold tabular-nums">{c.value}</div>
-                    <div className="mt-1 eg-label text-muted-foreground">{tl("kpi", c.label)}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* The SHAPE, not the axis. Bars are the one form that reads at this size with
- no labels at all, and it is the only chart the panel needs. */}
-              {gmvBars.length > 0 && (
-                <div className="mt-auto flex h-28 items-end gap-1" aria-hidden>
-                  {gmvBars.map((h, i) => (
-                    <span
- key={i}
-                      /* LIME, at a strength you can actually see it at.
-                       *
-                       * --brand swaps by mode (violet on paper, lime on the dark surface —
-                       * globals.css), and 30% of the lime over a near-black card lands on a
-                       * dull olive: the one large piece of colour on the page read as a
-                       * washed-out grey-green rather than as the house accent. The gauge
-                       * beside it already draws at full strength, so the two halves of the
-                       * same row disagreed about what colour this app is.
-                       *
-                       * Only the dark step moves. On paper 30% violet is a bar you read the
-                       * shape of, and taking it up would make the chart shout over the
-                       * figures it exists to support. */
- className="flex-1 rounded-t-md bg-brand/30 dark:bg-brand/70"
- style={{ height: `${Math.max(3, h * 100)}%` }}
-                    />
-                  ))}
-                </div>
-              )}
-            </SectionCard>
+            <GmvPanel
+              title={tl("kpi", "GMV")}
+              headline={ov === null ? "—" : usd(money.revenue)}
+              headlineSub={tl("rangesub", rangeMeta.sub)}
+              side={moneySide.map((c) => ({ label: tl("kpi", c.label), value: c.value, sub: c.sub }))}
+              bars={gmvBars}
+            />
           </div>
 
           <SectionCard
