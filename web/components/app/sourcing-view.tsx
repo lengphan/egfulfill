@@ -142,6 +142,10 @@ export function SourcingView({ embedded }: {
  const [sellPrice, setSellPrice] = useState("")
  const [shipCharged, setShipCharged] = useState("")
  const [outbound, setOutbound] = useState("4.50")
+ /* Terms and the conversation start CLOSED. Nine controls and two notes, and opening
+    them by default is most of what made an expanded row read as a form rather than an
+    answer. One flag for the view, not one per row — only the selected row renders. */
+ const [showTerms, setShowTerms] = useState(false)
 
  const load = useCallback(() => {
  getSourcing()
@@ -702,6 +706,55 @@ export function SourcingView({ embedded }: {
                   )}
                 </div>
 
+                {/* ── THE ANSWER, FIRST ────────────────────────────────────────────────
+                    This panel used to open with four INPUT fields, then a line of prose, then
+                    the four numbers at `opacity-40`. So the thing you expanded the row to find
+                    out — what does this land at, and does it beat the other supplier — was the
+                    faintest thing in it, sitting below the form that produces it.
+
+                    A row you expand should ANSWER. The figures come first at full strength; the
+                    fields that change them sit underneath, because they are how you adjust the
+                    answer rather than the answer itself.
+
+                    HONESTY RULE KEPT, AND STRENGTHENED. Faded numbers still read as numbers.
+                    When something is missing there is now no figure at all — only what to add —
+                    which is what the old `opacity-40` was reaching for. */}
+                {missing.length > 0 ? (
+                  <div className="border-b border-border px-4 py-8 text-center">
+                    <p className="text-sm font-medium">
+                      Add {missing.join(" and ")} to see what this lands at.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Nothing is calculated until then.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                <div className="grid gap-px border-b border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+                  <Stat label={tl("sourcing", "Landed cost / unit")} value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
+ sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : tl("sourcing", "no freight")} />
+                  <Stat label={tl("sourcing", "Fees")} value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
+                  <Stat label={tl("sourcing", "Profit / unit")} value={missing.length ? "—" : money(result.profit)}
+ sub={missing.length ? tl("sourcing", "not enough entered") : pct(result.marginPct) + " margin"}
+ tone={missing.length ? undefined : result.profit >= 0 ? "good" : "bad"} />
+                  <Stat label={`Profit at MOQ ${(active.moq ?? 1).toLocaleString()}`}
+ value={missing.length ? "—" : money(result.profitAtMoq)}
+ sub={active.leadDays != null ? `${active.leadDays} day lead time` : undefined}
+ tone={missing.length ? undefined : result.profitAtMoq >= 0 ? "good" : "bad"} />
+                </div>
+                <div className={`p-4 text-xs text-muted-foreground ${missing.includes("a unit price") ? "hidden" : ""}`}>
+                  Break-even sell price is <strong className="text-foreground">{money(result.breakEvenPrice)}</strong>
+                  {result.unitsToCoverFreight != null && <> · {result.unitsToCoverFreight} units cover the freight</>}
+                  {(active.moq ?? 1) > 1 && (
+                    <> {tl("sourcing", "· you commit")} <strong className="text-foreground">
+                      {money((active.cost ?? 0) * (active.moq ?? 1) + (active.shipTotal ?? 0))}
+                    </strong> {tl("sourcing", "up front")}</>
+                  )}
+                </div>
+                  </>
+                )}
+
+                {/* ── HOW YOU CHANGE IT ─────────────────────────────────────────────── */}
                 <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
                   <label className="text-xs">
                     <span className="text-muted-foreground">{tl("sourcing", "Sell price")}</span>
@@ -724,44 +777,25 @@ export function SourcingView({ embedded }: {
                   </label>
                 </div>
 
-                {missing.length > 0 && (
-                  // Honesty rule: an empty state must not look like a working feature. Without a
-                  // unit price the "profit" is just fees on nothing, so say what's missing rather
-                  // than render a confident number.
-                  <div className="border-b border-border px-4 py-3 text-xs text-muted-foreground">
-                    Add {missing.join(" and ")} to see profit. Everything below is incomplete until then.
-                  </div>
-                )}
-
-                <div className={`grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4 ${missing.length ? "opacity-40" : ""}`}>
-                  <Stat label={tl("sourcing", "Landed cost / unit")} value={missing.includes("a unit price") ? "—" : money(result.landedUnitCost)}
- sub={result.freightPerUnit ? `incl. ${money(result.freightPerUnit)} freight` : tl("sourcing", "no freight")} />
-                  <Stat label={tl("sourcing", "Fees")} value={money(result.fees)} sub={`${fee.label} ${fee.pct}% + card ${PAYMENT_DEFAULT.pct}%`} />
-                  <Stat label={tl("sourcing", "Profit / unit")} value={missing.length ? "—" : money(result.profit)}
- sub={missing.length ? tl("sourcing", "not enough entered") : pct(result.marginPct) + " margin"}
- tone={missing.length ? undefined : result.profit >= 0 ? "good" : "bad"} />
-                  <Stat label={`Profit at MOQ ${(active.moq ?? 1).toLocaleString()}`}
- value={missing.length ? "—" : money(result.profitAtMoq)}
- sub={active.leadDays != null ? `${active.leadDays} day lead time` : undefined}
- tone={missing.length ? undefined : result.profitAtMoq >= 0 ? "good" : "bad"} />
+                {/* ── THE CONVERSATION, behind one control ───────────────────────────
+                    Agreed terms and What they said are nine controls and two notes, and they
+                    are a RECORD OF A CONVERSATION rather than part of the maths. Open by
+                    default they doubled the height of the panel and put a textarea directly
+                    under a profit figure, which is most of what made an expanded row read as a
+                    form. Still in the same panel — someone choosing between two suppliers needs
+                    both — just not both at once. */}
+                <div className="border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowTerms((s) => !s)}
+                    aria-expanded={showTerms}
+                    className="eg-tap flex w-full items-center gap-1.5 px-4 py-2.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <CaretRight size={12} weight="bold" className={"transition-transform " + (showTerms ? "rotate-90" : "")} />
+                    {tl("sourcing", "Terms and what they said")}
+                  </button>
+                  {showTerms && <SupplierTerms key={active.id} row={active} onSaved={load} />}
                 </div>
-
-                <div className={`p-4 text-xs text-muted-foreground ${missing.includes("a unit price") ? "hidden" : ""}`}>
-                  Break-even sell price is <strong className="text-foreground">{money(result.breakEvenPrice)}</strong>
-                  {result.unitsToCoverFreight != null && <> · {result.unitsToCoverFreight} units cover the freight</>}
-                  {(active.moq ?? 1) > 1 && (
-                    <> {tl("sourcing", "· you commit")} <strong className="text-foreground">
-                      {money((active.cost ?? 0) * (active.moq ?? 1) + (active.shipTotal ?? 0))}
-                    </strong> {tl("sourcing", "up front")}</>
-                  )}
-                </div>
-
-                {/* Terms and the conversation sit UNDER the maths, in the same panel. The
- numbers above are what the deal earns; these are what the deal actually
- is, and someone deciding between two suppliers needs both in one place.
-                    Remounted per row so a half-typed note can't follow you to another
- supplier. */}
-                <SupplierTerms key={active.id} row={active} onSaved={load} />
               </SectionCard>
                         </td>
                       </tr>
