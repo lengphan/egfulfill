@@ -2486,9 +2486,11 @@ export function DesignCanvasDialog({
             no longer resizes the canvas. The height term is the DIALOG's box (92vh) less its
             own chrome, not the viewport — the two are no longer the same thing. */}
         <div className="mx-auto flex w-full max-w-[min(100%,calc(92vh-14rem),30rem)] flex-col gap-2">
-          {/* rounded-LG. `rounded-xl` and up all resolve to --radius (26px), which on a
-              64px-wide box is a capsule — the shape reserved for count badges and avatars. */}
-          <div className="flex shrink-0 items-stretch gap-1 self-start rounded-lg border border-border bg-card p-1">
+          {/* NO CARD AROUND IT. This was a bordered, filled box holding four tools; with the
+              Files popover gone it holds one or two, and a card around a single button reads
+              as a control that was left behind rather than a toolbar. The buttons carry their
+              own hover, which is all a toolbar of this size needs. */}
+          <div className="flex shrink-0 items-stretch gap-1 self-start">
             {/**
               * ONE DOOR FOR FILES, not three beside each other.
               *
@@ -2506,77 +2508,6 @@ export function DesignCanvasDialog({
               * dropzone.tsx); every row here can be downloaded, which is the reason to print
               * a file name in the first place.
               */}
-            <Popover>
-              <PopoverTrigger
-                title={tl("canvas", "Files on this line — add one, or take a copy")}
-                aria-label={tl("canvas", "Files on this line")}
-                className={railBtn + " relative"}
-              >
-                <UploadSimple size={18} weight="bold" />
-                <span className={railWord}>{tl("canvas", "Files")}</span>
-                {/* GENUINELY ROUND, which is what a count badge is allowed to be (CLAUDE.md
-                    §4). It is the only thing on this rail that reports state rather than
-                    offering an action. */}
-                {fileCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-semibold tabular-nums text-primary-foreground">
-                    {fileCount}
-                  </span>
-                )}
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-80 p-3">
-                {/*
-                 * ONE ZONE THAT TAKES EVERYTHING.
-                 *
-                 * This had tabs — Image · Templates · Machine files — which put the print file
-                 * in one place and the stitch file in another, so adding two files to one line
-                 * meant knowing which drawer each belonged in before you could drop it. That is
-                 * our filing system, not the seller's job. It also did not fit: three labels in
-                 * a 320px popover clipped the first tab off the front of the bar.
-                 *
-                 * The intake never needed splitting. `uploadRef` already accepts an image OR a
-                 * machine file, and takeFile already routes by type — including the refusal
-                 * that a stitch file only fits an embroidered line. So one target, one gesture,
-                 * and the file says what it is.
-                 *
-                 * onPick, NOT the zone's own input: opening the OS file dialog takes focus off
-                 * the page, the popover reads that as an outside interaction and closes, taking
-                 * its input with it — so the picker never appeared and pressing the zone looked
-                 * like it did nothing. uploadRef lives at dialog level and survives that.
-                 */}
-                <Dropzone
-                  icon={UploadSimple}
-                  accept={"image/*," + MACHINE_EXT_LIST}
-                  label={tl("canvas", "Drop your files, or click to browse")}
-                  hint={isEmb ? tl("canvas", "PNG or JPG, and a stitch file — .EMB .PES .DST .EXP .JEF — together") : tl("canvas", "PNG or JPG")}
-                  multiple
-                  onFiles={(f) => void takeFiles(f)}
-                  onPick={() => uploadRef.current?.click()}
-                  action={
-                    <Button size="sm" variant="outline" onClick={() => { setLibSource("designs"); setLibOpen(true) }}>
-                      {tl("canvas", "Pick from your library")}
-                    </Button>
-                  }
-                />
-                {/* SAVING a template is not ADDING a file, so it sits under the zone rather
-                    than inside it — and only with artwork on the line, because there is
-                    otherwise nothing to save. The library above opens on its Designs tab and
-                    carries a Templates tab of its own, so starting FROM one needs no second
-                    control here. */}
-                {designUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
-                    disabled={tplBusy}
-                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
-                  >
-                    {tplBusy
-                      ? <CircleNotch size={13} className="animate-spin" />
-                      : <BookmarkSimple size={13} weight="bold" />}
-                    Save this placement as a template
-                  </button>
-                )}
-              </PopoverContent>
-            </Popover>
             {/**
               * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the title says
               * in as many words because it is the one thing about this control that can be
@@ -3020,6 +2951,45 @@ export function DesignCanvasDialog({
             to load rather than as a line nobody has sent a file for. */}
           </>)}
           {ctxTab === "files" && (<>
+            {/**
+              * THE DROP TARGET LIVES WITH THE FILE LIST, not behind a second button.
+              *
+              * There were two controls saying "Files": this list, and a popover on the rail
+              * that added one. Same word, two places, and only one of them ever told you
+              * what was already attached. A tab called Files should be where a file is added
+              * AND where the ones on the line are named — so the popover is gone and its
+              * zone is here, which also means this tab is never empty on a line with nothing
+              * on it yet.
+              *
+              * "Pick from your library" is not carried over: that is the Artwork tab, one
+              * click away, and it was the same library.
+              *
+              * onPick, NOT the zone's own input — opening the OS file dialog takes focus off
+              * the page, and `uploadRef` lives at dialog level so it survives that.
+              */}
+            <Dropzone
+              icon={UploadSimple}
+              accept={"image/*," + MACHINE_EXT_LIST}
+              label={tl("canvas", "Drop your files, or click to browse")}
+              hint={isEmb ? tl("canvas", "PNG or JPG, and a stitch file — .EMB .PES .DST .EXP .JEF — together") : tl("canvas", "PNG or JPG")}
+              multiple
+              onFiles={(f) => void takeFiles(f)}
+              onPick={() => uploadRef.current?.click()}
+            />
+            {/* Saving a template is not ADDING a file, so it sits under the zone rather than
+                inside it — and only with artwork on the line, because there is otherwise
+                nothing to save. */}
+            {designUrl && (
+              <button
+                type="button"
+                onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
+                disabled={tplBusy}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+              >
+                {tplBusy ? <CircleNotch size={13} className="animate-spin" /> : <BookmarkSimple size={13} weight="bold" />}
+                {tl("canvas", "Save as template")}
+              </button>
+            )}
         {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 text-xs font-medium text-foreground">{tl("canvas", "Files")}</div>
