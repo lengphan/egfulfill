@@ -467,9 +467,13 @@ function Trend({ days, loading, reduced }: {
           />
         ))}
       </View>
-      <Text style={{ marginTop: S.sm, fontSize: 12.5, fontFamily: F.body, color: C.onInk, opacity: 0.7 }}>
-        {loading ? "Loading…" : `${total} in seven days`}
-      </Text>
+      {/* Silent while loading: the block already says "Loading…" once above, and the same
+          word twice in one object reads as two things failing rather than one waiting. */}
+      {loading ? null : (
+        <Text style={{ marginTop: S.sm, fontSize: 12.5, fontFamily: F.body, color: C.onInk, opacity: 0.7 }}>
+          {`${total} in seven days`}
+        </Text>
+      )}
     </View>
   )
 }
