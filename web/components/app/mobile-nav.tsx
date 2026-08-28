@@ -46,7 +46,7 @@ export function MobileNav({ sections, onLogout, role }: { sections: MobileNavSec
                     const active = pathname === item.href || pathname.startsWith(item.href + "/")
                     const Icon = item.icon
                     return (
-                      <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors", active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-accent hover:text-foreground")}>
+                      <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors", active ? "eg-selected" : "text-foreground/70 hover:bg-accent hover:text-foreground")}>
                         <Icon size={20} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")} />
                         <span className="flex-1">{nl("nav", item.label)}</span>
                         {item.locked && <LockSimple size={13} weight="fill" className="shrink-0 text-muted-foreground/60" />}

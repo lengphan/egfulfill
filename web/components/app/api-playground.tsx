@@ -284,7 +284,7 @@ export function ApiPlayground() {
  onClick={() => pick(e)}
  className={
                 "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors " +
-                (selected.id === e.id ? "bg-primary/10 text-primary" : "hover:bg-accent")
+                (selected.id === e.id ? "eg-selected" : "hover:bg-accent")
               }
             >
               <span className={"rounded px-1.5 py-0.5 font-mono text-2xs font-bold " + toneFor(e.method)}>{e.method}</span>

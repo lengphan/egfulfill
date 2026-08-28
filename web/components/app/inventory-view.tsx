@@ -1591,7 +1591,7 @@ export function AddItemDialog({ open, onOpenChange, onAdd, existing, catalog, se
  title={r.exists ? `${r.sku} — already stocked` : r.sku}
  className={"inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs "
                                     + (r.exists ? "border-border opacity-40"
- : chosen.has(r.sku) ? "cursor-pointer border-primary bg-primary/10 text-primary"
+ : chosen.has(r.sku) ? "cursor-pointer border-selected eg-selected"
  : "cursor-pointer border-border")}
                                 >
                                   <input

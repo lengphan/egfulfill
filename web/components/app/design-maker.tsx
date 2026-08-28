@@ -1181,7 +1181,7 @@ export function DesignMaker() {
  const v = dpiVerdict(d)
  return (
                     <button key={im.id} onClick={() => setSelected(im.id)}
- className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
+ className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "eg-selected" : "hover:bg-accent")}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={im.src} alt="" className="eg-checker size-7 shrink-0 rounded border border-border object-contain" />
                       <span className="truncate">{im.name || tl("designMaker", "Image")}</span>
@@ -1194,7 +1194,7 @@ export function DesignMaker() {
                 })}
                 {texts.map((t) => (
                   <button key={t.id} onClick={() => setSelected(t.id)}
- className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === t.id ? "bg-primary/10 text-primary" : "hover:bg-accent")}>
+ className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === t.id ? "eg-selected" : "hover:bg-accent")}>
                     <TextT size={14} className="shrink-0" /> <span className="truncate">{t.text || tl("designMaker", "Text")}</span>
                   </button>
                 ))}

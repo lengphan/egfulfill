@@ -264,7 +264,7 @@ function ProfilePanel() {
  onClick={() => { setEmoji(""); setSaved(false) }}
  disabled={!user}
  title={tl("settings", "Use your initial")}
- className={"flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition-colors " + (emoji === "" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent")}
+ className={"flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition-colors " + (emoji === "" ? "border-selected eg-selected" : "border-border hover:bg-accent")}
             >
               {(name || user?.name || "?").charAt(0).toUpperCase()}
             </button>

@@ -361,7 +361,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
  setSize({ w: inOf(w), h: inOf(w / aspect) })
                       }}
  className={"eg-tap rounded-md border px-2 py-1 text-2xs font-medium transition-colors " +
-                        (on ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
+                        (on ? "border-selected/50 eg-selected" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground")}
                     >
                       {tl("digitizer", pl.label)}
                     </button>

@@ -1327,7 +1327,7 @@ export function ProductEditorDialog({
  setMethod(keys.map((k) => methodByKey(k)?.label).filter(Boolean).join(" / "))
                         }}
  className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors " +
-                          (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
+                          (on ? "border-selected eg-selected" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
                       >
                         {/* No tick. The pill lights up when it is on, which is the same
  information in the same place — a mark inside a control that has

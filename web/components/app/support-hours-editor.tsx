@@ -106,7 +106,7 @@ export function SupportHoursEditor({ open, onOpenChange, isAdmin, onSaved }: {
                 {DAYS.map(([label, d]) => (
                   <button key={d} type="button" disabled={!isAdmin} onClick={() => toggleDay(d)}
  className={"rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " +
-                      (cfg.days.includes(d) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground") +
+                      (cfg.days.includes(d) ? "border-selected eg-selected" : "border-border text-muted-foreground hover:text-foreground") +
                       (isAdmin ? "" : " opacity-70")}>
                     {label}
                   </button>
