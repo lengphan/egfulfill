@@ -18,7 +18,12 @@ import { packetHtml, printHtmlViaIframe } from "@/lib/label-packet"
 import { getOrders, getOrderHistory, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, getDispatchUploads, deleteDispatchUpload, type OrderRow, type AuditRow, type ShipAddress, type DispatchUpload } from "@/lib/api"
 import { NewLabelDialog } from "@/components/app/new-label-dialog"
 import { StagedLabelRow, UploadLabelRow, useLabelPullBack, AddLabelButton, PageDropZone, readStagedLabel, sendStagedLabel, stagedKeyOf, uploadKeyOf, type StagedLabel } from "@/components/app/external-labels"
-import { DISPATCH_GRID, DISPATCH_HEAD } from "@/components/app/dispatch-grid"
+import {
+  DISPATCH_GRID, DISPATCH_HEAD, DISPATCH_COLS, DISPATCH_COL_ORDER, DISPATCH_HIDDEN_DEFAULT,
+  dispatchTemplate, type DispatchColId,
+} from "@/components/app/dispatch-grid"
+import { ColumnsMenu } from "@/components/app/columns-menu"
+import { loadColumnOrder, loadHiddenColumns, saveColumnIds } from "@/lib/table-columns"
 import { getUser } from "@/lib/auth"
 import { ActivityFeed } from "@/components/app/activity-feed"
 import { numOf, platformOf, customerOf, unitsOf, addrLine, shipAddressOf } from "@/lib/order-format"
@@ -232,6 +237,23 @@ export function DispatchBoard({ segmented }: {
      this card should not print a second of each. Outside one every branch below falls back
      to exactly what shipped. */
  const inShell = useActionNode() !== null
+  /* Column layout, persisted per browser. Read in an effect: localStorage does not exist on
+     the server, and a first paint that disagrees with the second is a flicker on every load. */
+ const [colOrder, setColOrder] = useState<DispatchColId[]>(DISPATCH_COL_ORDER)
+ const [hiddenCols, setHiddenCols] = useState<DispatchColId[]>(DISPATCH_HIDDEN_DEFAULT)
+ useEffect(() => {
+    const t = setTimeout(() => {
+      const isId = (v: unknown): v is DispatchColId => typeof v === "string" && v in DISPATCH_COLS
+      setColOrder(loadColumnOrder("eg_dispatch_cols", DISPATCH_COL_ORDER, isId))
+      setHiddenCols(loadHiddenColumns("eg_dispatch_hidden", DISPATCH_HIDDEN_DEFAULT, isId))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+  /* Outside a ConsoleShell the board keeps all seven, so the template it draws is character
+     for character the string this file used to hold — the mechanism changed, the layout did
+     not. */
+ const visibleCols = inShell ? colOrder.filter((id) => !hiddenCols.includes(id)) : DISPATCH_COL_ORDER
+ const gridStyle = { gridTemplateColumns: dispatchTemplate(visibleCols) }
   /* CELL TYPE, MEASURED AGAINST THE ORDERS PAGE.
      /orders — the surface people point at as the readable one — sets its cell content at
      14px/500 (32 of its elements). This board set Channel, Units, Ship-to and Tracking at
@@ -1174,9 +1196,24 @@ export function DispatchBoard({ segmented }: {
           {/* ONE select-all for one table. It used to be two — this one for orders, another
  in the external card's header — which meant "select all" never selected all of
  what was on screen, and the count in each button was a count of half the list. */}
+          {/* Columns sits on the utility line beside the count and Select-all — the band whose
+              job is reshaping the table, not acting on it. Same place /orders puts it. */}
+          {inShell && view === "queue" && (
+            <ColumnsMenu
+              className="order-6"
+              cols={DISPATCH_COLS}
+              order={colOrder}
+              hidden={hiddenCols}
+              isLocked={(id) => !!DISPATCH_COLS[id].locked}
+              defaults={{ order: [...DISPATCH_COL_ORDER], hidden: [...DISPATCH_HIDDEN_DEFAULT] }}
+              labelNs="dispatch"
+              onOrder={(ids) => { setColOrder(ids); saveColumnIds("eg_dispatch_cols", ids) }}
+              onHidden={(ids) => { setHiddenCols(ids); saveColumnIds("eg_dispatch_hidden", ids) }}
+            />
+          )}
           {view === "queue" && (
             <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}
-              className={inShell ? "order-6" : undefined}>
+              className={inShell ? "order-7" : undefined}>
               {allSelected ? tl("dispatch", "Clear selection") : `Select all ${selectableAll}`}
             </Button>
           )}
@@ -1363,15 +1400,11 @@ export function DispatchBoard({ segmented }: {
  status used to share a single wrapping line under the order number, which made
  the address the thing that moved every row's status somewhere different. */
           <div className="overflow-x-auto">
-            <div className={DISPATCH_GRID + " " + DISPATCH_HEAD}>
+            <div className={DISPATCH_GRID + " " + DISPATCH_HEAD} style={gridStyle}>
               <span />
-              <span>{tl("dispatch", "Order")}</span>
-              <span>{tl("dispatch", "Customer")}</span>
-              <span>{tl("dispatch", "Channel")}</span>
-              <span>{tl("dispatch", "Units")}</span>
-              <span>{tl("dispatch", "Ship to")}</span>
-              <span>{tl("dispatch", "Status")}</span>
-              <span>{tl("dispatch", "Tracking")}</span>
+              {/* FROM THE REGISTRY, so the header, the tracks and the Columns control can
+                  never disagree — and a column turned off leaves all three together. */}
+              {visibleCols.map((id) => <span key={id}>{tl("dispatch", DISPATCH_COLS[id].label)}</span>)}
               <span />
             </div>
             <div className="divide-y divide-border">
@@ -1388,6 +1421,7 @@ export function DispatchBoard({ segmented }: {
                   <StagedLabelRow
  key={r.key} s={r.s}
  picked={extPicked.has(r.key)} onToggle={toggleExt} onDiscard={discardStaged}
+                    template={gridStyle.gridTemplateColumns}
                   />
                 )
               }
@@ -1397,6 +1431,7 @@ export function DispatchBoard({ segmented }: {
  key={r.key} u={r.u}
  picked={extPicked.has(r.key)} onToggle={toggleExt}
  busy={busy} pulling={pulling} onPullBack={(u) => void pullBackOne(u)}
+                    template={gridStyle.gridTemplateColumns}
                   />
                 )
               }
@@ -1408,7 +1443,7 @@ export function DispatchBoard({ segmented }: {
  return (
                 <label
  key={r.key}
- className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}
+ className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={gridStyle}
                 >
                   {/* Selectable whether or not it has a label. Only the label-dependent
                       ACTIONS need one; tying the checkbox itself to a label left an
@@ -1418,34 +1453,45 @@ export function DispatchBoard({ segmented }: {
  type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)}
  className="size-4 shrink-0 accent-primary" aria-label={`Select ${numOf(o)}`}
                   />
-                  <span className="truncate tabular-nums text-sm font-semibold">
-                    <OrderNumber order={o} editable onSaved={() => load()} />
-                  </span>
-                  <span className="truncate text-sm">{customerOf(o)}</span>
-                  <span className={"truncate text-muted-foreground " + cell} title={o.store || undefined}>
-                    {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
-                  </span>
-                  <span className={"text-muted-foreground " + cell}>{unitsOf(o)}</span>
-                  <span className={"truncate text-muted-foreground " + cell} title={addrLine(o) || undefined}>{addrLine(o) || "—"}</span>
-                  {/* The label's OWN status — not the production readiness pills, which belong
- on the make boards. "Sent to partner" is the byeastside hand-off (pushed
- but not scanned back yet), so it's visible whether a parcel is out for
- external scan or still waiting here. */}
-                  <span className="min-w-0">
-                    {sentOut ? <DispStatus k="removed" label={tl("dispatch", "Sent to partner")} /> : <DispStatus k={d.key} label={d.label} />}
-                  </span>
-                  {o.tracking ? (
-                    <span className={"truncate tabular-nums text-muted-foreground " + cell} title={o.tracking}>{o.tracking}</span>
-                  ) : (
-                    // No label yet → give the action right here rather than a dead gap. Buys
-                    // the label for this order (stopPropagation: the row is a <label>).
-                    <button
- onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLabelFor(o) }}
- className="eg-tap inline-flex w-fit items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-                    >
-                      {tl("dispatch", "Create label")}
-                    </button>
-                  )}
+                  {/* ONE MAP, from the same visible list the header uses — seven hand-written
+                      spans could not stay aligned with a header that can hide a column. */}
+                  {visibleCols.map((id) => {
+                    if (id === "order") return (
+                      <span key={id} className="truncate tabular-nums text-sm font-semibold">
+                        <OrderNumber order={o} editable onSaved={() => load()} />
+                      </span>
+                    )
+                    if (id === "customer") return <span key={id} className="truncate text-sm">{customerOf(o)}</span>
+                    if (id === "channel") return (
+                      <span key={id} className={"truncate text-muted-foreground " + cell} title={o.store || undefined}>
+                        {platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}
+                      </span>
+                    )
+                    if (id === "units") return <span key={id} className={"text-muted-foreground " + cell}>{unitsOf(o)}</span>
+                    if (id === "shipto") return <span key={id} className={"truncate text-muted-foreground " + cell} title={addrLine(o) || undefined}>{addrLine(o) || "—"}</span>
+                    /* The label's OWN status — not the production readiness pills, which belong
+                       on the make boards. "Sent to partner" is the byeastside hand-off (pushed
+                       but not scanned back yet), so it is visible whether a parcel is out for
+                       external scan or still waiting here. */
+                    if (id === "status") return (
+                      <span key={id} className="min-w-0">
+                        {sentOut ? <DispStatus k="removed" label={tl("dispatch", "Sent to partner")} /> : <DispStatus k={d.key} label={d.label} />}
+                      </span>
+                    )
+                    return o.tracking ? (
+                      <span key={id} className={"truncate tabular-nums text-muted-foreground " + cell} title={o.tracking}>{o.tracking}</span>
+                    ) : (
+                      // No label yet → give the action right here rather than a dead gap. Buys
+                      // the label for this order (stopPropagation: the row is a <label>).
+                      <button
+                        key={id}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLabelFor(o) }}
+                        className="eg-tap inline-flex w-fit items-center gap-1 rounded-lg border border-primary/40 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                      >
+                        {tl("dispatch", "Create label")}
+                      </button>
+                    )
+                  })}
                   <span className="flex justify-end gap-1">
                     {o.tracking_label_url && (
                       <a

@@ -329,7 +329,11 @@ export function useLabelPullBack(onChanged: () => void) {
 }
 
 /** A file on this machine that has not been sent. */
-export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
+export function StagedLabelRow({ s, picked, onToggle, onDiscard, template }: {
+  /** THE QUEUE'S OWN TEMPLATE. These rows sit inside the dispatch list, so they cannot own a
+   *  copy of the column widths — that is exactly the drift dispatch-grid.ts was written to
+   *  stop. Handed down rather than imported. */
+  template: string
  s: StagedLabel
  picked: boolean
  onToggle: (key: string) => void
@@ -339,7 +343,7 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
  const k = stagedKeyOf(s)
  const p = s.parse
  return (
-          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
+          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={{ gridTemplateColumns: template }}>
             <input
  type="checkbox" checked={picked} onChange={() => onToggle(k)}
  className="size-4 shrink-0 accent-primary" aria-label={`Select ${s.name}`}
@@ -381,7 +385,9 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard }: {
 }
 
 /** A label that IS with byeastside. */
-export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack }: {
+export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack, template }: {
+  /** See StagedLabelRow — the same template the queue above is drawn with. */
+  template: string
  u: DispatchUpload
  picked: boolean
  onToggle: (key: string) => void
@@ -398,7 +404,7 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack 
  const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
  const trackText = tracked[0] || u.tracking || null
  return (
-          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
+          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={{ gridTemplateColumns: template }}>
             <input
  type="checkbox" checked={picked} onChange={() => onToggle(k)}
  className="size-4 shrink-0 accent-primary" aria-label={`Select ${u.file_name || "label"}`}
