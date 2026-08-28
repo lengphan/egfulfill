@@ -948,7 +948,7 @@ export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34r
  * on purpose and a fake app panel must never come back in its place. A scrim only appears when
  * there is something to scrim.
  */
-export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)", focusX, focusY, scale, tone = "light" }: {
+export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)", focusX, focusY, scale, tone = "light", bleed = false, atTop = true }: {
   /** A public image OR video URL. Empty is a legitimate answer — see above. */
   media?: string
   alt?: string
@@ -977,12 +977,49 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
    * first dark one. The page that pins its ground says so.
    */
   tone?: "light" | "ink"
+  /**
+   * DISSOLVE THE BOTTOM EDGE INTO THE PAGE instead of ending on a rule.
+   *
+   * It works here for a reason that is not general: the photography is shot on a ground that
+   * IS the page colour — a pale periwinkle seamless, or a polished floor at ~#F3F4F5 — so the
+   * two surfaces genuinely meet. Fading a picture whose base is a different colour just makes
+   * a grey smear where the edge used to be, which is worse than an honest edge.
+   *
+   * A MASK, NOT AN OVERLAY. A gradient of the page colour laid on top would work on the page
+   * and break the moment the section sits on any other ground; masking to transparent lets
+   * whatever is behind show through, so it is correct on all of them.
+   */
+  bleed?: boolean
+  /**
+   * WHETHER THIS BLOCK IS THE FIRST THING ON THE PAGE.
+   *
+   * The header is transparent and 64px tall, so a hero that opens a page pulls up by exactly
+   * that and pads it back — which is how the picture reaches the top of the viewport with the
+   * nav standing on it. PlateHero has always done the same.
+   *
+   * A PROP rather than a constant because the home page stopped being that case: its headline
+   * moved into a band of its own above the picture, so the picture is no longer first, and an
+   * unconditional -mt-16 pulled it up over the CTA buttons instead of over the header. A
+   * negative margin is only ever correct against the thing it was measured from.
+   */
+  atTop?: boolean
 }) {
   const hasMedia = !!media
   return (
+    /* -mt-16 pt-16 — the same trick PlateHero uses to sit UNDER the header. The bar is 64px
+       and transparent, so pulling up by it and padding back puts the picture behind the nav
+       without moving the content that stands on it. This is what "full bleed" actually needs:
+       edge to edge horizontally was never the missing half. */
     <section
-      className="relative isolate w-full overflow-hidden"
-      style={{ minHeight: minH, background: ACCENT }}
+      className={"relative isolate w-full overflow-hidden" + (atTop ? " -mt-16 pt-16" : "")}
+      style={{
+        minHeight: minH,
+        background: ACCENT,
+        ...(bleed && hasMedia ? {
+          maskImage: "linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%)",
+        } : null),
+      }}
     >
       {hasMedia && (
         <>

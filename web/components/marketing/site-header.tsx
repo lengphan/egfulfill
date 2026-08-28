@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 
-import { SURFACE, ACID, INK } from "@/components/marketing/bold-kit"
+import { ACID, INK } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -45,11 +45,23 @@ export function SiteHeader() {
    */
   const ink = "text-[var(--mk-ink)]"
   const muted = "text-[var(--mk-ink)]/65 hover:bg-[var(--mk-ink)]/[0.05] hover:text-[var(--mk-ink)]"
+  /* TRANSPARENT AND IN FLOW, so a full-bleed hero can run to the top of the viewport with
+        the nav standing on it. The bar was `sticky` with a SURFACE fill, which is why every
+        photographic hero began 64px down the page behind a grey strip — the thing that stopped
+        it being full bleed at all.
+
+        NO ROUTE FORK, and the note above still holds: this works everywhere because every hero
+        ground is light. PlateHero is paper and already pulls itself up under the bar with
+        -mt-16 pt-16; MediaHero now does the same, and its `tone="ink"` pages are pinned to a
+        pale periwinkle ground. Ink nav reads on all of them, so there is nothing to fork on.
+
+        IT SCROLLS AWAY RATHER THAN STICKING. A transparent bar that stays put sits over
+        whatever scrolls under it, and over the slate bands that is ink on near-black. The
+        alternative — growing a background at 24px of scroll — is the two-appearance header §4
+        removed once already. Scrolling away is the only option that keeps one appearance.
+   */
   return (
-    <header
-      className="sticky top-0 z-30"
-      style={{ background: SURFACE }}
-    >
+    <header className="relative z-30">
       {/* THE HEADER SHARES THE PAGE'S CONTAINER — 88rem with a 40px gutter, the same one every
           band uses. It was max-w-6xl (72rem), so on a 1440 screen the wordmark sat 136px in
           while the headline under it started at 48px: the first two things the eye meets on
@@ -62,7 +74,7 @@ export function SiteHeader() {
             note above about the wordmark and the headline sharing one left margin still
             applies, and artwork obeys it the same way the type did. */}
         <Link href="/" aria-label="EGFUL home" className={"flex items-center " + ink}>
-          <Wordmark />
+          <Wordmark className="h-[30px] w-auto" />
         </Link>
         <nav className="hidden items-center gap-6 md:flex">
           {nav.map((n) => (

@@ -44,7 +44,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
      it. With no photograph MediaHero draws the slate plate instead, and the plate takes light
      type. One derived value rather than a colour written at each of the four places below —
      four copies is how a headline and its own subhead come to disagree. */
-  const heroInk = heroSrc ? INK : ACCENT_INK
+  const heroInk = INK
   const reduce = useReducedMotion()
   // The scroll-linked parallax went with the app panel it moved. Nothing on this page
   // tracks scroll any more.
@@ -75,9 +75,24 @@ export function BoldHome({ content }: { content: SiteContent }) {
           NO MEDIA IS A REAL ANSWER — MediaHero draws the ink plate and the headline alone.
           A fake app panel was deleted from this page once, deliberately, and must not return
           as a stand-in for an image nobody has uploaded yet. */}
-      <EditableImage path="hero.image" transform="bleed">
-      <MediaHero media={heroSrc} alt={hero.imageAlt} focusX={heroFx} focusY={heroFy} scale={heroZoom}
-        tone={heroSrc ? "ink" : "light"}>
+      {/* ── THE TYPE HAS ITS OWN FIELD ───────────────────────────────────────────────
+          The headline used to stand ON the picture, and the clear space it needs was measured
+          rather than assumed: 54% of the width at 1440, 76% at 1185, and 90% at 1024 — because
+          a narrower viewport wraps the same words into more lines and each line runs a larger
+          FRACTION of the width. The worst case is the NARROW end, not the wide one.
+
+          Nine-tenths clear is not a composition, it is an empty photograph. So every prompt
+          asking a shot to "leave the left third free" was being judged against a constraint no
+          picture with a subject in it can meet, and each one failed for the same reason.
+
+          The reference set does not attempt it either: Danielle Levitt, The Pop Manifesto and
+          Julia Johnson all give the type its own field and let the photograph be a photograph.
+          So the headline sits in a band above, and the picture below is uncomposed and
+          full-bleed — free to be busy edge to edge, because nothing stands on it.
+
+          It also removes an aspect problem the same measurement exposed: the hero block runs
+          1.81:1 at 1024 and 2.51:1 at 1440, so one crop was never going to serve both ends. */}
+      <section className="mx-auto max-w-[88rem] px-6 pb-[clamp(2.5rem,5vw,4rem)] pt-[clamp(3rem,7vw,5.5rem)] sm:px-10">
         {/* Capped in rem, not ch. A ch cap on display type measures the "0" glyph of whatever
             face has actually loaded, so it collapsed to about a third of its intended width and
             broke a five-word headline onto five lines — which then pushed the buttons off the
@@ -89,7 +104,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
               : <MaskedWords text={hero.headline} />}{" "}
             {editing
               ? <EditableText path="hero.accent">{hero.accent}</EditableText>
-              : <TypedPhrase text={hero.accent} color={heroInk} lastWordColor={heroSrc ? ACCENT : ACID} />}
+              : <TypedPhrase text={hero.accent} color={heroInk} lastWordColor={ACCENT} />}
           </span>
         </h1>
 
@@ -110,9 +125,25 @@ export function BoldHome({ content }: { content: SiteContent }) {
           transition={{ duration: 0.6, delay: 0.45, ease: EASE }}
         >
           <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
-          <Pill href="/how-it-works" tone={heroSrc ? "ghost" : "ghostLight"} ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
+          <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
         </motion.div>
-      </MediaHero>
+      </section>
+
+      {/* THE PICTURE, uncomposed. No children, so MediaHero draws no veil at all — the scrim
+          exists to make type legible and there is no type here. */}
+      <EditableImage path="hero.image" transform="bleed">
+        <MediaHero
+          media={heroSrc}
+          alt={hero.imageAlt}
+          focusX={heroFx}
+          focusY={heroFy}
+          scale={heroZoom}
+          tone="ink"
+          atTop={false}
+          minH="clamp(24rem, 54vh, 40rem)"
+        >
+          <></>
+        </MediaHero>
       </EditableImage>
 
       {/* THE THREE FACTS move out of the hero and onto the page beneath it. On the plate they
