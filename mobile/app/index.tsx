@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { View, Text, Animated, Easing, AccessibilityInfo } from "react-native"
 import { router } from "expo-router"
+import * as Notifications from "expo-notifications"
 import { getToken } from "@/lib/api"
+import { routeForHref } from "@/lib/push"
 import { MarkE } from "@/components/wordmark"
 import { C, F } from "@/lib/theme"
 
@@ -48,7 +50,7 @@ export default function Index() {
        which happens exactly once — CLAUDE.md §2.8's rule about an effect whose own result can
        re-satisfy its condition does not apply, and this must never become a poll. */
     const started = Date.now()
-    const go = (to: "/today" | "/login") => {
+    const go = (to: string) => {
       if (!alive) return
       const wait = Math.max(0, HOLD_MS - (Date.now() - started))
       setTimeout(() => {
@@ -76,8 +78,24 @@ export default function Index() {
          the mark and skipping the motion is the safe branch. */
       .catch(() => { if (alive) { fade.setValue(1); rise.setValue(0) } })
 
-    getToken()
-      .then((t) => go(t ? "/today" : "/login"))
+    /**
+     * A COLD START FROM A NOTIFICATION GOES TO THE THING IT IS ABOUT.
+     *
+     * The live tap listener lives in _layout.tsx, and it cannot cover this case: when the app
+     * was not running, the tap IS the launch, and by the time a navigator exists this screen
+     * has already decided where to go. So the destination is decided once, here, and the
+     * notification wins over Today — otherwise tapping "Order #4099 is overdue" opens the
+     * dashboard and leaves you to find it.
+     *
+     * Only when signed in. A tap that arrives with no session still has to go to /login, or
+     * the app would push an order screen that immediately bounces.
+     */
+    Promise.all([getToken(), Notifications.getLastNotificationResponseAsync().catch(() => null)])
+      .then(([t, res]) => {
+        if (!t) return go("/login")
+        const href = res?.notification?.request?.content?.data?.href
+        return go(typeof href === "string" ? routeForHref(href) : "/today")
+      })
       /* SAY WHICH STATE THIS IS. A keychain that cannot be read is not the same as being
          signed out, and sending someone to /login would hide a real device fault behind a
          password prompt they do not need to type. */

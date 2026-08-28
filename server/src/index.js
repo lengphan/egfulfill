@@ -58,6 +58,7 @@ import { roleGrantsRoutes } from './routes/role_grants.js';
 import { purchaseRoutes } from './routes/purchase.js';
 import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { pushRoutes } from './routes/push.js';
 import { adsRoutes } from './routes/ads.js';
 import { broadcastsRoutes } from './routes/broadcasts.js';
 import { siteContentRoutes } from './routes/site_content.js';
@@ -594,6 +595,7 @@ roleGrantsRoutes(app, requireAuth);                    // the GRANT half of Perm
 purchaseRoutes(app, requireAuth, requireAdmin, requireAdmin, requireStaff);            // ADMIN: purchase orders — commits company money + exposes unit cost across every blank. Receiving stock stays warehouse (inventory.js)
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
+pushRoutes(app, requireAuth);                           // device registry for the phone; notify() fans out to it
 adsRoutes(app, requireAdmin);                          // ADMIN: Meta + Google Ads — these CREATE and PAUSE campaigns, i.e. they move money
 broadcastsRoutes(app, requireBroadcaster, requireBroadcaster);  // ADMIN or OPERATOR: seller email broadcasts. Drafting reaches the whole seller list, so it is gated the same as sending; PUBLIC unsubscribe at /api/broadcasts/unsubscribe
 siteContentRoutes(app, requireAdmin);                  // editable marketing-home copy — PUBLIC GET (homepage reads it), ADMIN PUT (Settings › Site content)

@@ -5,6 +5,7 @@ import { router } from "expo-router"
 import Constants from "expo-constants"
 import { Ionicons } from "@expo/vector-icons"
 import { getMe, clearToken, type User } from "@/lib/api"
+import { enablePush, disablePush, pushState, type PushState } from "@/lib/push"
 import { useFocusEffect } from "expo-router"
 import { TAB_BAR,F,C, R, CARD } from "@/lib/theme"
 
@@ -15,8 +16,11 @@ import { TAB_BAR,F,C, R, CARD } from "@/lib/theme"
  * anyone asks when a phone behaves differently from a desk).
  *
  * What is NOT here, and why:
- *  - Notifications. There is no push service wired, and a toggle that saves nothing is worse
- *    than no toggle — someone turns it on and then trusts alerts that never come.
+ *  - A notifications TOGGLE. There is a push service now (lib/push.ts), so the old reason for
+ *    having nothing here is gone — but a switch would still be a lie: once iOS has been told
+ *    no, only iOS Settings can undo it, and a toggle that flips back the moment it is touched
+ *    is worse than no toggle. So this states the state and offers the control that can
+ *    actually change it, which is a different one in each case.
  *  - Theme. The palette is one house style shared with the web; a per-device override is how
  *    two surfaces start disagreeing about what "overdue" looks like.
  *  - Anything an admin sets. Prices, hours and permissions belong on one screen, on the web,
@@ -40,6 +44,8 @@ export default function Settings() {
   const insets = useSafeAreaInsets()
   const [me, setMe] = useState<User | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [push, setPush] = useState<PushState | null>(null)
+  const [pushWhy, setPushWhy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try { setMe(await getMe()); setErr(null) }
@@ -51,7 +57,9 @@ export default function Settings() {
    * life of the app, so a name or a role changed anywhere else (the web, an admin promoting
    * you) never appeared here. It read as "settings don't update", and it was: nothing was
    * ever asked for again. The wallet already reloads on focus for the same reason. */
-  useFocusEffect(useCallback(() => { load() }, [load]))
+  /* ON FOCUS, because this can change OUTSIDE the app: someone switches notifications off in
+     iOS Settings and comes back, and a value read once at mount would still say "On". */
+  useFocusEffect(useCallback(() => { load(); pushState().then(setPush).catch(() => {}) }, [load]))
 
   const signOut = () => {
     // Confirmed, because on a phone this is one mis-tap away from the tab bar and signing
@@ -60,7 +68,14 @@ export default function Settings() {
       { text: "Cancel", style: "cancel" },
       {
         text: "Sign out", style: "destructive",
-        onPress: async () => { await clearToken(); router.replace("/login") },
+        onPress: async () => {
+          /* BEFORE clearing the token, because forgetting the device is an authenticated
+             call — after, it has no credential to make it with and the handset would keep
+             receiving this account's notifications until someone else signed in on it. */
+          await disablePush()
+          await clearToken()
+          router.replace("/login")
+        },
       },
     ])
   }
@@ -99,6 +114,56 @@ export default function Settings() {
             </>
           )}
       </View>
+
+      <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>ALERTS</Text>
+      <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
+        <Line
+          label="Notifications"
+          value={
+            push === "on" ? "On"
+            : push === "blocked" ? "Off"
+            : push === "unsupported" ? "Not on a simulator"
+            : push === "ask" ? "Not set up"
+            : "—"
+          }
+          last={push === "on" || push === "unsupported" || push === null}
+        />
+        {/* THE CONTROL THAT CAN ACTUALLY CHANGE IT, which is a different one in each state.
+            Offering "Turn on" to somebody who has already declined would do nothing at all —
+            iOS will not show the prompt a second time — so that case gets the way OUT of the
+            app instead, which is the only thing that works. */}
+        {push === "ask" ? (
+          <Pressable
+            onPress={async () => {
+              const r = await enablePush()
+              setPushWhy(r.token ? null : r.why ?? null)
+              setPush(await pushState())
+            }}
+            style={({ pressed }) => ({
+              height: 48, alignItems: "center", justifyContent: "center",
+              borderTopWidth: 1, borderTopColor: C.border,
+              backgroundColor: pressed ? C.accent : "transparent",
+            })}
+          >
+            <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Turn on notifications</Text>
+          </Pressable>
+        ) : push === "blocked" ? (
+          <Pressable
+            onPress={() => Linking.openSettings()}
+            style={({ pressed }) => ({
+              height: 48, alignItems: "center", justifyContent: "center",
+              borderTopWidth: 1, borderTopColor: C.border,
+              backgroundColor: pressed ? C.accent : "transparent",
+            })}
+          >
+            <Text style={{ fontSize: 15, fontFamily: F.semi, color: C.fg }}>Open iOS Settings</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {/* A REFUSAL CARRIES ITS REASON (§4). This is the answer to a press, not a subtitle. */}
+      {pushWhy ? (
+        <Text style={{ fontSize: 13, color: C.warn, marginTop: 8, paddingHorizontal: 4 }}>{pushWhy}</Text>
+      ) : null}
 
       <Text style={{ fontSize: 11.5, fontFamily: F.semi, color: C.muted, letterSpacing: 1.4, marginTop: 28 }}>APP</Text>
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>

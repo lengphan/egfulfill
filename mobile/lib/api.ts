@@ -583,3 +583,23 @@ export type SupportThread = {
 /** Staff only — every seller conversation, newest first. A seller gets a 403 and should
  *  simply open their own `support-<id>` instead. */
 export const getSupportThreads = () => request<SupportThread[]>(`/api/support/threads`)
+
+/**
+ * PUSH DEVICES — the phone's token, handed to the server so notify() can reach it.
+ *
+ * See lib/push.ts for the flow and server/src/routes/push.js for why the registry is keyed
+ * by token rather than by (user, token).
+ */
+export async function registerPushDevice(token: string, platform: string) {
+  return request<{ ok: true }>("/api/push/devices", {
+    method: "POST",
+    body: JSON.stringify({ token, platform }),
+  })
+}
+
+export async function forgetPushDevice(token: string) {
+  return request<{ ok: true }>("/api/push/devices", {
+    method: "DELETE",
+    body: JSON.stringify({ token }),
+  })
+}

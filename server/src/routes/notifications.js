@@ -11,6 +11,7 @@
 //    business action that triggered it (shipping an order, sending a message).
 import { q } from '../db.js';
 import { egSendTo } from '../events.js';
+import { pushToUsers } from './push.js';
 
 let _ready = null;
 export function ensureNotifications() {
@@ -69,6 +70,28 @@ export async function notify({ userIds, roles, type, title, body, href, entityId
     // what wasn't theirs — which meant anyone with devtools could read notifications
     // meant for other people.
     egSendTo(ids, { type: 'notification', kind: type });
+
+    /**
+     * ...AND THE PHONE. Deliberately here rather than at the 33 call sites.
+     *
+     * SSE only reaches a browser that is open, which is exactly the case a factory phone is
+     * not: the whole point of the app is that somebody is on the floor with the screen off.
+     * Hanging push off this one function means the bell and the handset can never know about
+     * different sets of events, and anything added to notify() later gets push without
+     * anyone remembering to ask for it.
+     *
+     * NOT awaited. notify() is fire-and-forget by contract, and awaiting an HTTP round-trip
+     * to Expo inside it would put a third party in the path of shipping an order. It swallows
+     * internally too; the .catch is belt and braces.
+     */
+    pushToUsers(ids, {
+      title,
+      body,
+      // The href is the WEB's route. The phone maps it to its own — that mapping is
+      // presentation and belongs on the client, so the server keeps sending one canonical
+      // address and every front-end resolves it the way its own router works.
+      data: { kind: type, href: href || null, entityId: entityId ? String(entityId) : null },
+    }).catch(() => {});
   } catch (e) {
     // Swallow: a missed bell must never break the action that caused it.
   }

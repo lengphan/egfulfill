@@ -5,6 +5,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { useFonts } from "expo-font"
 import * as SplashScreen from "expo-splash-screen"
 import { useEffect } from "react"
+import * as Notifications from "expo-notifications"
+import { router } from "expo-router"
+import { routeForHref } from "@/lib/push"
 import {
   Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
 } from "@expo-google-fonts/inter"
@@ -36,6 +39,25 @@ export default function RootLayout() {
   // Inter is worse than waiting — it is the flash this app was just fixed for elsewhere.
   useEffect(() => { if (ready) SplashScreen.hideAsync().catch(() => {}) }, [ready])
   if (!ready) return null
+
+  /**
+   * A TAP ON A NOTIFICATION OPENS THE THING IT IS ABOUT.
+   *
+   * Here, not on a screen: this listener has to be mounted for the life of the app, and a
+   * screen that unmounts takes its listener with it — which is how a notification tapped
+   * from a tab you were not on ends up doing nothing.
+   *
+   * This covers the app being open or backgrounded. The COLD start is handled in
+   * app/index.tsx, because at that moment there is no navigator to push onto yet and the
+   * launch screen is already deciding where to go.
+   */
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+      const href = res?.notification?.request?.content?.data?.href
+      router.push(routeForHref(typeof href === "string" ? href : null) as never)
+    })
+    return () => sub.remove()
+  }, [])
 
   return (
     /* GESTURE ROOT, OUTERMOST. react-native-gesture-handler's detectors only receive touches

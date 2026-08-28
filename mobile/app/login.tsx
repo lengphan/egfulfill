@@ -5,6 +5,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router"
 import { login } from "@/lib/api"
+import { enablePush } from "@/lib/push"
 import { Wordmark } from "@/components/wordmark"
 import { F, C, R, S, CARD } from "@/lib/theme"
 
@@ -52,6 +53,13 @@ export default function Login() {
     setBusy(true); setErr(null)
     try {
       await login(email.trim(), password)
+      /* THE PERMISSION PROMPT BELONGS HERE, and not one screen earlier.
+         iOS shows the system dialog once per install, so asking before anyone has signed in
+         spends the single chance on a person who does not yet know what the app is — and a
+         declined prompt cannot be re-shown from inside the app at all. Asked at the moment
+         someone has just proved they work here, the question answers itself.
+         NOT awaited: a slow APNs registration must not hold the door shut. */
+      enablePush().catch(() => {})
       router.replace("/today")
     } catch (e) {
       // The server's own sentence, not a generic one — it distinguishes a wrong password
