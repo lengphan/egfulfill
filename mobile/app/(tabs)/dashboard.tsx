@@ -1,11 +1,82 @@
-import { useCallback, useMemo, useState } from "react"
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator } from "react-native"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator,
+  Animated, Easing, AccessibilityInfo, Image,
+} from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
-import { getOrders, type Order } from "@/lib/api"
+import { getOrders, assetUrl, type Order } from "@/lib/api"
 import { router, useFocusEffect } from "expo-router"
-import { isOpen, isOverdue, normalizeStage, platformOf } from "@/lib/orders"
+import { isOpen, isOverdue, normalizeStage, platformOf, numOf, lineListing } from "@/lib/orders"
 import { TAB_BAR, F, C, R, S, CARD } from "@/lib/theme"
+
+/**
+ * MOTION, AND THE ONE RULE IT OBEYS.
+ *
+ * Every animation here serves FEEDBACK, CONTINUITY or HIERARCHY, nothing is over 500ms, and
+ * all of it is skipped under Reduce Motion — the screen still shows, it simply does not move.
+ * That is the same contract the launch screen already keeps.
+ *
+ * What moves is what ARRIVED: the figure counts to its value, the bars grow to theirs. A
+ * dashboard that animates on every re-render is a dashboard nobody can read, so each of
+ * these runs when the numbers change and not otherwise.
+ */
+const D = { fast: 200, base: 320, count: 420 } as const
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AccessibilityInfo.isReduceMotionEnabled().then((v) => { if (alive) setReduced(!!v) })
+    const sub = AccessibilityInfo.addEventListener("reduceMotionChanged", (v) => setReduced(!!v))
+    return () => { alive = false; sub?.remove?.() }
+  }, [])
+  return reduced
+}
+
+/** A value that eases to its target. Under Reduce Motion it simply IS its target. */
+function useGrow(target: number, reduced: boolean, duration: number = D.base, delay = 0) {
+  const v = useRef(new Animated.Value(reduced ? target : 0)).current
+  useEffect(() => {
+    if (reduced) { v.setValue(target); return }
+    const a = Animated.timing(v, {
+      toValue: target, duration, delay,
+      easing: Easing.out(Easing.cubic), useNativeDriver: false,
+    })
+    a.start()
+    return () => a.stop()
+  }, [target, reduced, duration, delay, v])
+  return v
+}
+
+/**
+ * THE FIGURE COUNTS ONCE.
+ *
+ * Not decoration: the count is what makes a number that CHANGED look different from a number
+ * that was always there, which on a screen you glance at forty times a shift is the whole
+ * job. It runs on arrival and on a real change, never on a re-render, and Reduce Motion gets
+ * the final value with no steps at all.
+ */
+function Counter({ value, reduced, style }: { value: number; reduced: boolean; style?: object }) {
+  const [shown, setShown] = useState(value)
+  const from = useRef(value)
+  useEffect(() => {
+    if (reduced || value === from.current) { setShown(value); from.current = value; return }
+    const start = Date.now()
+    const a = from.current
+    let raf = 0
+    const step = () => {
+      const t = Math.min(1, (Date.now() - start) / D.count)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setShown(Math.round(a + (value - a) * eased))
+      if (t < 1) raf = requestAnimationFrame(step)
+      else from.current = value
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [value, reduced])
+  return <Text style={style}>{shown}</Text>
+}
 
 /**
  * DASHBOARD — the same numbers as the web overview, rebuilt with native primitives.
@@ -126,12 +197,14 @@ function FilterRow({ value, options, onPick }: {
  * already has a way to be loud: the bar. A calm morning is a short bar, which is exactly
  * how a zero morning should look.
  */
-function HeroFigure({ needsYou, openTotal, loading }: {
+function HeroFigure({ needsYou, openTotal, loading, reduced }: {
   needsYou: number
   openTotal: number
   loading: boolean
+  reduced: boolean
 }) {
   const share = openTotal > 0 ? Math.min(1, needsYou / openTotal) : 0
+  const grown = useGrow(loading ? 0 : share, reduced)
   return (
     <View style={{
       marginHorizontal: S.xl, marginTop: S.lg,
@@ -144,12 +217,15 @@ function HeroFigure({ needsYou, openTotal, loading }: {
         {/* The placeholder stays QUIET. An em-dash at 60pt in the brightest ink on the block
             is a bar three characters wide, and it reads as a redaction rather than as "not
             known yet" — while being the largest thing on the screen. */}
-        <Text style={{
-          color: loading ? C.inkAccent : C.onInk,
-          fontSize: 60, fontFamily: F.display, letterSpacing: -1.5,
-        }}>
-          {loading ? "—" : needsYou}
-        </Text>
+        {loading ? (
+          <Text style={{ color: C.inkAccent, fontSize: 60, fontFamily: F.display, letterSpacing: -1.5 }}>—</Text>
+        ) : (
+          <Counter
+            value={needsYou}
+            reduced={reduced}
+            style={{ color: C.onInk, fontSize: 60, fontFamily: F.display, letterSpacing: -1.5 }}
+          />
+        )}
         {!loading && openTotal > 0 ? (
           <Text style={{ color: C.onInk, opacity: 0.7, fontSize: 15, fontFamily: F.medium }}>
             of {openTotal} open
@@ -164,8 +240,8 @@ function HeroFigure({ needsYou, openTotal, loading }: {
         height: 6, borderRadius: R.pill, backgroundColor: C.inkAccent,
         marginTop: S.lg, overflow: "hidden",
       }}>
-        <View style={{
-          width: `${Math.round(share * 100)}%`,
+        <Animated.View style={{
+          width: grown.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
           height: "100%", borderRadius: R.pill, backgroundColor: C.onInk,
         }} />
       </View>
@@ -174,6 +250,63 @@ function HeroFigure({ needsYou, openTotal, loading }: {
         {loading ? "Loading…" : needsYou === 0 ? "Nothing overdue or rushed" : "overdue and rush"}
       </Text>
     </View>
+  )
+}
+
+/**
+ * THE ONLY PICTURES ON THE SCREEN, AND THEY ARE REAL.
+ *
+ * A dashboard is where decorative imagery goes to be meaningless — a stock photograph of a
+ * factory costs a download and tells an operator nothing. So the imagery here is the WORK:
+ * the orders that are overdue or rushed, as the things they are, in the order you would pick
+ * them up. Tapping one opens it.
+ *
+ * These are the marketplace's listing photos, not artwork — the list payload does not carry
+ * design files, and lineArt is explicit that a product photo must never stand in for one. So
+ * the strip is never labelled as artwork, and a line with no photo shows its order number on
+ * a plain ground rather than borrowing a picture from somewhere else.
+ *
+ * It only exists when something is wrong. On a calm morning there is nothing here at all,
+ * which is the same argument as the peek: a signal, not chrome.
+ */
+function NeedsYouStrip({ orders, reduced }: { orders: Order[]; reduced: boolean }) {
+  const fade = useGrow(1, reduced, D.fast)
+  if (!orders.length) return null
+  return (
+    <Animated.View style={{ opacity: fade }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: S.xl, gap: S.sm }}
+        style={{ marginTop: S.sm, flexGrow: 0 }}
+      >
+        {orders.map((o) => {
+          const src = assetUrl(lineListing(o.items?.[0] ?? {}))
+          return (
+            <Pressable
+              key={o.id}
+              onPress={() => router.push(`/order/${encodeURIComponent(o.id)}`)}
+              style={({ pressed }) => ({ width: 68, opacity: pressed ? 0.7 : 1, gap: 5 })}
+            >
+              <View style={{
+                width: 68, height: 68, borderRadius: R.badge, overflow: "hidden",
+                backgroundColor: C.accent, alignItems: "center", justifyContent: "center",
+                borderWidth: 1, borderColor: C.border,
+              }}>
+                {src ? (
+                  <Image source={{ uri: src }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                ) : (
+                  <Ionicons name="shirt-outline" size={22} color={C.muted} />
+                )}
+              </View>
+              <Text numberOfLines={1} style={{ fontSize: 11, fontFamily: F.medium, color: C.muted }}>
+                {numOf(o)}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+    </Animated.View>
   )
 }
 
@@ -251,34 +384,51 @@ function Funnel({ counts, loading }: { counts: Record<string, number>; loading: 
  * `label_scanned_at` is a pre-scan mark and not a dispatch — and a throughput chart built on
  * the nearest-looking column would be a confident wrong answer rather than a missing one.
  */
-function Intake({ days, loading }: { days: { key: string; letter: string; n: number }[]; loading: boolean }) {
+function Column({ height, today, letter, loading, reduced, delay }: {
+  height: number; today: boolean; letter: string; loading: boolean; reduced: boolean; delay: number
+}) {
+  /* The columns RISE, oldest first. Left-to-right is the direction the axis is read in, so
+     the stagger is the reading order rather than a flourish — and at 30ms apart the whole
+     week is up in a fifth of a second. */
+  const h = useGrow(height, reduced, D.fast, delay)
+  return (
+    <View style={{ flex: 1, alignItems: "center", gap: 6 }}>
+      <Animated.View style={{
+        width: "100%", height: h, borderRadius: R.badge,
+        backgroundColor: loading ? C.accent : today ? C.fg : C.edge,
+      }} />
+      <Text style={{
+        fontSize: 10.5,
+        fontFamily: today ? F.semi : F.body,
+        color: today ? C.fg : C.muted,
+      }}>
+        {letter}
+      </Text>
+    </View>
+  )
+}
+
+function Intake({ days, loading, reduced }: {
+  days: { key: string; letter: string; n: number }[]; loading: boolean; reduced: boolean
+}) {
   const peak = Math.max(1, ...days.map((d) => d.n))
   const total = days.reduce((n, d) => n + d.n, 0)
   return (
     <View style={{ ...CARD, marginHorizontal: S.xl, padding: S.lg }}>
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: S.sm, height: 72 }}>
-        {days.map((d, i) => {
-          const today = i === days.length - 1
-          return (
-            <View key={d.key} style={{ flex: 1, alignItems: "center", gap: 6 }}>
-              <View style={{
-                width: "100%",
-                /* A day with nothing gets a 3pt baseline rather than no bar: an absent
-                   column and a zero column must not look like the same day. */
-                height: loading ? 3 : Math.max(3, Math.round((d.n / peak) * 52)),
-                borderRadius: R.badge,
-                backgroundColor: loading ? C.accent : today ? C.fg : C.edge,
-              }} />
-              <Text style={{
-                fontSize: 10.5,
-                fontFamily: today ? F.semi : F.body,
-                color: today ? C.fg : C.muted,
-              }}>
-                {d.letter}
-              </Text>
-            </View>
-          )
-        })}
+        {days.map((d, i) => (
+          <Column
+            key={d.key}
+            /* A day with nothing gets a 3pt baseline rather than no bar: an absent column
+               and a zero column must not look like the same day. */
+            height={loading ? 3 : Math.max(3, Math.round((d.n / peak) * 52))}
+            today={i === days.length - 1}
+            letter={d.letter}
+            loading={loading}
+            reduced={reduced}
+            delay={i * 30}
+          />
+        ))}
       </View>
       <Text style={{ marginTop: S.md, fontSize: 13, fontFamily: F.body, color: C.muted }}>
         {loading ? "Loading…" : `${total} in seven days`}
@@ -293,6 +443,7 @@ export default function Dashboard() {
   const [err, setErr] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [channel, setChannel] = useState("All")
+  const reduced = useReducedMotion()
 
   const load = useCallback(async () => {
     try { setOrders(await getOrders()); setErr(null) }
@@ -387,6 +538,14 @@ export default function Dashboard() {
   ]
   const needsYou = jobs.filter((j) => j.urgent).reduce((n, j) => n + j.count, 0)
 
+  /* The strip's subjects: overdue first, then rush, deduped, capped at twelve — past that it
+     is a queue and the queue is one tab away. */
+  const urgent = useMemo(() => {
+    const late = open.filter(isOverdue)
+    const rush = open.filter((o) => o.rush && !late.includes(o))
+    return [...late, ...rush].slice(0, 12)
+  }, [open])
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
@@ -403,18 +562,25 @@ export default function Dashboard() {
           </Text>
           <Text style={{ marginTop: 2, fontSize: 30, fontFamily: F.display, letterSpacing: -0.5, color: C.fg }}>Dashboard</Text>
         </View>
+        {/* A BORDERED CONTROL, NOT A LOOSE GLYPH. It shipped as a bare 22pt outline in muted
+            ink against a big display heading, and the first person to look for Settings did
+            not find it — which, with the tab gone, is the same as having deleted it. Shape
+            says kind here as everywhere else: this is something you press, so it has the
+            edge a control has. */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Settings"
           onPress={() => router.push("/(tabs)/settings")}
-          hitSlop={8}
+          hitSlop={10}
           style={({ pressed }) => ({
-            width: 44, height: 44, marginTop: -4, marginRight: -10,
+            width: 40, height: 40, marginTop: 2,
             alignItems: "center", justifyContent: "center",
-            borderRadius: R.pill, backgroundColor: pressed ? C.accent : "transparent",
+            borderRadius: R.control,
+            borderWidth: 1, borderColor: C.border,
+            backgroundColor: pressed ? C.accent : C.card,
           })}
         >
-          <Ionicons name="settings-outline" size={22} color={C.muted} />
+          <Ionicons name="settings-outline" size={20} color={C.fg} />
         </Pressable>
       </View>
 
@@ -422,13 +588,15 @@ export default function Dashboard() {
         <FilterRow value={channel} options={channels} onPick={setChannel} />
       ) : null}
 
-      <HeroFigure needsYou={needsYou} openTotal={open.length} loading={loading} />
+      <HeroFigure needsYou={needsYou} openTotal={open.length} loading={loading} reduced={reduced} />
+
+      <NeedsYouStrip orders={urgent} reduced={reduced} />
 
       <Text style={SECTION_LABEL}>WHERE THE WORK IS</Text>
       <Funnel counts={stageCounts} loading={loading} />
 
       <Text style={SECTION_LABEL}>ORDERS IN</Text>
-      <Intake days={days} loading={loading} />
+      <Intake days={days} loading={loading} reduced={reduced} />
 
       <Text style={SECTION_LABEL}>WHAT NEEDS DOING</Text>
       {/* A GROUP IS A CARD. These rows sat straight on the page under a hairline, which was
