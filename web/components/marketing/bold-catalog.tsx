@@ -6,6 +6,7 @@ import Link from "next/link"
 import { TShirt, MagnifyingGlass } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, CARD, HEADING, INK, SURFACE, Pill, Rise } from "@/components/marketing/bold-kit"
 import { PageBanner } from "@/components/marketing/page-banner"
+import { Scatter } from "@/components/marketing/scatter"
 import type { PageHead } from "@/lib/site-content"
 import type { PublicProduct } from "@/lib/api"
 import { framingStyle } from "@/lib/product-framing"
@@ -358,6 +359,32 @@ export function BoldCatalog({ products, head }: { products: PublicProduct[] | nu
           A catalogue whose products could be edited as text would be a page that disagrees
           with what is actually stocked. */}
       <PageBanner head={head} pathPrefix="catalogPage" />
+
+      {/* ── WHAT WE MAKE, AS OBJECTS ───────────────────────────────────────────────
+          Four blanks on the page's own colour before the grid begins. This page opened
+          straight onto a filter row and a table of cards — a catalogue with no photography in
+          it at all — so the first thing a visitor met was a control rather than a product.
+
+          FOUR SILHOUETTES, NOT FOUR COLOURS. A tee, a crew, a hoodie and a cap read as four
+          objects; four tees in four colours read as a repeat, however good the colours are.
+          The rail elsewhere on the site does the opposite job — same garment, many colours —
+          and mixing the two logics gives a jumble.
+
+          Colour is the range: bone, sand, charcoal, clay. Two light neutrals, one dark anchor
+          so the group does not float, one hue. Every one is a real product, re-shot to the
+          house standard rather than a supplier catalogue photograph.
+
+          The interaction is a product truth rather than a flourish: hover brings a blank
+          forward, a click opens it. Nothing reveals, nothing parallaxes. */}
+      <Scatter
+        minH="clamp(26rem, 62vh, 40rem)"
+        items={[
+          { src: "/frames/obj-tee.png",    alt: "Heavyweight cotton t-shirt, bone",     href: "/catalog#apparel", x: 22, y: 38, w: 17 },
+          { src: "/frames/obj-crew.png",   alt: "Ring-spun crewneck sweatshirt, sand",  href: "/catalog#apparel", x: 47, y: 64, w: 14 },
+          { src: "/frames/obj-hoodie.png", alt: "Heavy blend hooded sweatshirt, charcoal", href: "/catalog#apparel", x: 72, y: 34, w: 19 },
+          { src: "/frames/obj-cap.png",    alt: "Six-panel cap, clay",                  href: "/catalog#headwear", x: 89, y: 72, w: 11 },
+        ]}
+      />
 
       {/* WIDER THAN THE PROSE PAGES, on purpose. A catalogue is scanned, not read: nothing
           in the grid runs left-to-right, so width buys products per row rather than costing

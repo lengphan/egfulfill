@@ -92,12 +92,26 @@ export function BoldHome({ content }: { content: SiteContent }) {
 
           It also removes an aspect problem the same measurement exposed: the hero block runs
           1.81:1 at 1024 and 2.51:1 at 1440, so one crop was never going to serve both ends. */}
-      <section className="mx-auto max-w-[88rem] px-6 pb-[clamp(2.5rem,5vw,4rem)] pt-[clamp(3rem,7vw,5.5rem)] sm:px-10">
+      <EditableImage path="hero.image" transform="bleed">
+      <MediaHero
+        media={heroSrc}
+        alt={hero.imageAlt}
+        focusX={heroFx}
+        focusY={heroFy}
+        scale={heroZoom}
+        tone="ink"
+      >
         {/* Capped in rem, not ch. A ch cap on display type measures the "0" glyph of whatever
             face has actually loaded, so it collapsed to about a third of its intended width and
             broke a five-word headline onto five lines — which then pushed the buttons off the
             first screen. A rem cap cannot drift with the font. */}
-        <h1 className="font-display max-w-[54rem] font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: heroInk }}>
+        {/* CAPPED AS A FRACTION OF THE BLOCK, not in rem — and that distinction is the bug.
+            A rem cap is a fixed width, so at 1024 the same words filled 90% of the frame and at
+            1440 only 54%. The picture was being asked for a different amount of clear space at
+            every viewport, which is why no shot could satisfy it.
+            A percentage cap makes the demand CONSTANT: the type never crosses this line, so a
+            photograph composed to leave that fraction free is correct at every width. */}
+        <h1 className="font-display w-full max-w-[min(54rem,58%)] font-semibold leading-[0.95] tracking-[-0.03em]" style={{ color: heroInk }}>
           <span style={{ fontSize: "clamp(2.6rem, 6.4vw, 5.2rem)" }}>
             {editing
               ? <EditableText path="hero.headline">{hero.headline}</EditableText>
@@ -109,7 +123,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </h1>
 
         <motion.p
-          className="mt-7 max-w-xl text-[18px] leading-relaxed"
+          className="mt-7 w-full max-w-[min(36rem,52%)] text-[18px] leading-relaxed"
           style={{ color: heroInk, opacity: 0.78 }}
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
           animate={{ opacity: 0.78, y: 0 }}
@@ -127,23 +141,7 @@ export function BoldHome({ content }: { content: SiteContent }) {
           <Pill href="/signup" tone="primary"><EditableText path="hero.ctaPrimary">{hero.ctaPrimary}</EditableText></Pill>
           <Pill href="/how-it-works" tone="ghost" ring><EditableText path="hero.ctaSecondary">{hero.ctaSecondary}</EditableText></Pill>
         </motion.div>
-      </section>
-
-      {/* THE PICTURE, uncomposed. No children, so MediaHero draws no veil at all — the scrim
-          exists to make type legible and there is no type here. */}
-      <EditableImage path="hero.image" transform="bleed">
-        <MediaHero
-          media={heroSrc}
-          alt={hero.imageAlt}
-          focusX={heroFx}
-          focusY={heroFy}
-          scale={heroZoom}
-          tone="ink"
-          atTop={false}
-          minH="clamp(24rem, 54vh, 40rem)"
-        >
-          <></>
-        </MediaHero>
+      </MediaHero>
       </EditableImage>
 
       {/* THE THREE FACTS move out of the hero and onto the page beneath it. On the plate they
