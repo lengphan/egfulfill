@@ -92,6 +92,32 @@ export function revenueSeries(orders: OrderRow[], now: number, tag: string = "en
   }
 }
 
+/**
+ * A DAILY run over `days`, current window and the one before it.
+ *
+ * revenueSeries buckets into 7 / 4 / 3 points because an area chart with axis labels wants
+ * few of them. A bar strip wants the opposite: at four buckets the bars render as slabs and
+ * stop reading as a shape at all. So the range control changes the WINDOW here, not the
+ * number of bars — 7d is seven bars, 4w is twenty-eight, 3m is ninety.
+ */
+export function dailyRevenue(orders: OrderRow[], days: number, now: number): RevPoint[] {
+  return bucketize(orders, days, 1, now, (i) => String(i))
+}
+
+/**
+ * Bucket revenue scaled 0..1 — the SHAPE of the run, which is all a bar strip draws.
+ *
+ * Mirrors what `Overview.gmvBars` hands the staff dashboard off the reports endpoint, so one
+ * panel can draw either: staff get it computed server-side over every seller, a seller gets
+ * it computed here over their own orders, and neither the panel nor this function has to know
+ * which. Scaled against the tallest bar in the window, so an empty window is all zeros rather
+ * than a divide by nothing.
+ */
+export function barsOf(points: RevPoint[], key: "revenue" | "prev" = "revenue"): number[] {
+  const max = points.reduce((m, p) => Math.max(m, p[key]), 0)
+  return max > 0 ? points.map((p) => p[key] / max) : points.map(() => 0)
+}
+
 export function channelBreakdown(orders: OrderRow[]): { name: string; revenue: number; pct: number }[] {
   const by: Record<string, number> = {}
   for (const o of orders) {
@@ -105,8 +131,8 @@ export function channelBreakdown(orders: OrderRow[]): { name: string; revenue: n
     .sort((a, b) => b.revenue - a.revenue)
 }
 
-export function topProducts(orders: OrderRow[], limit = 6): { name: string; units: number; revenue: number }[] {
-  const by: Record<string, { units: number; revenue: number }> = {}
+export function topProducts(orders: OrderRow[], limit = 6): { name: string; units: number; revenue: number; img?: string | null }[] {
+  const by: Record<string, { units: number; revenue: number; img?: string | null }> = {}
   for (const o of orders) {
     for (const it of o.items ?? []) {
       const name = it.name || it.sku || "Item"
@@ -115,6 +141,9 @@ export function topProducts(orders: OrderRow[], limit = 6): { name: string; unit
       if (!by[name]) by[name] = { units: 0, revenue: 0 }
       by[name].units += qty
       by[name].revenue += rev
+      // FIRST one wins, and it is never overwritten by a later blank: the same product can
+      // appear on a line that carried a thumbnail and on one that did not.
+      if (!by[name].img && it.img) by[name].img = it.img
     }
   }
   return Object.entries(by)

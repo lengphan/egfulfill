@@ -26,6 +26,8 @@ export function GmvPanel({
   headlineSub,
   side = [],
   bars = [],
+  barsPrev,
+  controls,
   className,
 }: {
   title: string
@@ -36,12 +38,19 @@ export function GmvPanel({
   side?: GmvSide[]
   /** Daily totals scaled 0..1. Empty renders no chart rather than a flat line at the axis. */
   bars?: number[]
+  /** The same window, one period back. Drawn BEHIND at a third the strength, and only when
+   *  the caller has a comparison to make — the panel never invents one. */
+  barsPrev?: number[]
+  /** The caller's own range / compare controls, on the title row. The panel owns no state:
+   *  which window it is looking at is the page's decision, not the chart's. */
+  controls?: React.ReactNode
   className?: string
 }) {
   return (
     <SectionCard
       className={className ?? "h-full"}
       title={title}
+      actions={controls}
       bodyClassName="flex flex-1 flex-col gap-5 p-5"
     >
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -63,17 +72,26 @@ export function GmvPanel({
       </div>
 
       {bars.length > 0 && (
-        <div className="mt-auto flex h-28 items-end gap-1" aria-hidden>
+        <div className="mt-auto flex h-28 items-stretch gap-1" aria-hidden>
           {bars.map((h, i) => (
-            <span
-              key={i}
-              /* --brand swaps by mode (violet on paper, lifted on the dark surface). 30% of
-                 the dark value over a near-black card lands on a dull olive, so only the dark
-                 step moves up — on paper 30% is a bar you read the shape of, and taking it up
-                 would make the chart shout over the figures it exists to support. */
-              className="flex-1 rounded-t-md bg-brand/30 dark:bg-brand/70"
-              style={{ height: `${Math.max(3, h * 100)}%` }}
-            />
+            <span key={i} className="relative flex-1">
+              {/* The comparison sits BEHIND, at a third the strength — a second full-strength
+                  series would make the panel a chart to study rather than one to glance at. */}
+              {barsPrev && barsPrev[i] !== undefined && (
+                <span
+                  className="absolute inset-x-0 bottom-0 rounded-t-md bg-brand/10 dark:bg-brand/25"
+                  style={{ height: `${Math.max(3, barsPrev[i] * 100)}%` }}
+                />
+              )}
+              <span
+                /* --brand swaps by mode (violet on paper, lifted on the dark surface). 30% of
+                   the dark value over a near-black card lands on a dull olive, so only the dark
+                   step moves up — on paper 30% is a bar you read the shape of, and taking it up
+                   would make the chart shout over the figures it exists to support. */
+                className="absolute inset-x-0 bottom-0 rounded-t-md bg-brand/30 dark:bg-brand/70"
+                style={{ height: `${Math.max(3, h * 100)}%` }}
+              />
+            </span>
           ))}
         </div>
       )}

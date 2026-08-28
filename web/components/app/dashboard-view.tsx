@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Sparkle, Warning, House, Receipt, CurrencyDollar, Package, Wallet } from "@phosphor-icons/react"
+import { Sparkle, Warning, House } from "@phosphor-icons/react"
 import { GetStarted } from "@/components/app/get-started"
-import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
-import { RevenueChart } from "@/components/app/revenue-chart"
+import { GmvPanel } from "@/components/app/gmv-panel"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -18,15 +18,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
-import { useT, useLabelT, useDateFormat, useLocaleTag } from "@/lib/i18n"
+import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
 import { getToken, getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
-import { revenueSeries, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
+import { dailyRevenue, barsOf, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
+// What each range means as a number of DAILY bars.
+const PERIOD_DAYS: Record<string, number> = { "7d": 7, "4w": 28, "3m": 90 }
 // USD, en-US, IN EVERY LOCALE — deliberately not localised. Sellers here list on
 // international marketplaces and price in dollars, so the figure is the same number in
 // the same currency whatever language the labels are in. The only place money is
@@ -55,11 +57,14 @@ export function DashboardView() {
  const router = useRouter()
  const t = useT()
   const fmtOn = useDateFormat()
-  const localeTag = useLocaleTag()
   // Short "MMM d" for a row of dates. Was a module-scope helper pinned to en-US.
   const fmtDate = (v?: string | null) => (v ? fmtOn(v, { month: "short", day: "numeric" }) : "—")
  const cl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  // The two controls the revenue chart used to own. They came ACROSS rather than being
+  // dropped: the block changed shape, the functions did not.
+ const [period, setPeriod] = useState<string>("4w")
+ const [compare, setCompare] = useState(false)
  const [balance, setBalance] = useState<number | null>(null)
  const [isDemo, setIsDemo] = useState(false)
   // "Couldn't read your orders" is not the same fact as "you have no orders", and every
@@ -118,7 +123,18 @@ export function DashboardView() {
  const todayLabel = fmtOn(greetDate, { weekday: "long", month: "short", day: "numeric" })
  const name = getUser()?.name || t("dash.there")
 
- const series = useMemo(() => revenueSeries(orders ?? [], now, localeTag), [orders, now, localeTag])
+
+  /* A chart of zeros is a claim about revenue, so when the read failed there is nothing to
+   * scale and `barsOf` returns an empty array — the panel then draws no chart at all rather
+   * than a flat row at the axis. Same contract the old block had, one level down. */
+ // The range control changes the WINDOW, not the bar count: four weekly buckets render as
+ // slabs rather than as the shape of a run. 7d/4w/3m are 7/28/90 daily bars.
+ const points = useMemo(
+   () => (orders === null ? [] : dailyRevenue(orders, PERIOD_DAYS[period] ?? 28, now)),
+   [orders, period, now]
+ )
+ const bars = useMemo(() => (orders === null ? [] : barsOf(points)), [orders, points])
+ const barsPrev = useMemo(() => (orders === null ? [] : barsOf(points, "prev")), [orders, points])
 
  const recent = useMemo(
     () => [...(orders ?? [])].sort((a, b) => (tsOf(b) || 0) - (tsOf(a) || 0)).slice(0, 6),
@@ -139,13 +155,42 @@ export function DashboardView() {
       </div>
 
       <GetStarted orders={orders === null ? null : orders.length} balance={balance} />
-      {/* Labels and captions translate; the VALUES stay USD in every locale (see `usd`). */}
-      <StatGrid>
-        <StatCard label={cl("kpi", "Orders (30d)")} value={orders === null ? "—" : String(stats.count30)} sub={cl("kpisub", "last 30 days")} icon={Receipt} />
-        <StatCard label={cl("kpi", "Revenue (30d)")} value={orders === null ? "—" : usd(stats.rev30)} sub={cl("kpisub", "gross, last 30 days")} tone="pos" icon={CurrencyDollar} />
-        <StatCard label={cl("kpi", "Open orders")} value={orders === null ? "—" : String(stats.open)} sub={cl("kpisub", "in the pipeline")} icon={Package} />
-        <StatCard label={cl("kpi", "Wallet balance")} value={balance === null ? "—" : usd(balance)} sub={cl("kpisub", "available to fulfill")} icon={Wallet} />
-      </StatGrid>
+
+      {/* ONE money block, where there were four tiles and a chart under them.
+       *
+       * The four figures are all still here — revenue is the headline, the other three
+       * qualify it — and the chart's own two controls came with it rather than being
+       * dropped: `period` still picks the window and `compare` still draws the one before.
+       * Labels and captions translate; the VALUES stay USD in every locale (see `usd`). */}
+      <GmvPanel
+        title={cl("kpi", "Revenue")}
+        headline={orders === null ? "—" : usd(stats.rev30)}
+        headlineSub={cl("kpisub", "last 30 days")}
+        side={[
+          { label: cl("kpi", "Orders (30d)"), value: orders === null ? "—" : String(stats.count30) },
+          { label: cl("kpi", "Open orders"), value: orders === null ? "—" : String(stats.open) },
+          { label: cl("kpi", "Wallet balance"), value: balance === null ? "—" : usd(balance) },
+        ]}
+        bars={bars}
+        barsPrev={compare ? barsPrev : undefined}
+        controls={
+          <div className="flex items-center gap-2">
+            <ToggleGroup value={[period]} onValueChange={(v) => v[0] && setPeriod(v[0])} variant="outline" size="sm">
+              <ToggleGroupItem value="7d">{t("dash.7d")}</ToggleGroupItem>
+              <ToggleGroupItem value="4w">{t("dash.4weeks")}</ToggleGroupItem>
+              <ToggleGroupItem value="3m">{t("dash.3months")}</ToggleGroupItem>
+            </ToggleGroup>
+            <Button
+              variant={compare ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setCompare((v) => !v)}
+              aria-pressed={compare}
+            >
+              {t("dash.previous")}
+            </Button>
+          </div>
+        }
+      />
 
       {isDemo && (
         <div className="flex items-center gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
@@ -161,17 +206,7 @@ export function DashboardView() {
         </div>
       )}
 
-      {/* A chart of zeros is a claim about revenue. When the read failed we have no
- series to draw, so say that instead of rendering a flat line at the axis. */}
-      {orders === null && loadErr ? (
-        <SectionCard title={t("dash.revenue")}>
-          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-            {t("dash.noChart")}
-          </div>
-        </SectionCard>
-      ) : (
-        <RevenueChart data={series} />
-      )}
+
 
       <SectionCard
  title={t("dash.recentOrders")}
