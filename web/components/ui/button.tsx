@@ -33,7 +33,18 @@ const buttonVariants = cva(
          * near-black surface is almost invisible, which left the old hover doing nothing at
          * all once the violet went.
          */
-        default: "bg-brand text-brand-foreground hover:bg-[color-mix(in_oklch,var(--brand),var(--background)_18%)]",
+        /* --primary, NOT --brand. The reasoning above is about INK, and this line pointed at
+           a token that merely happened to hold near-black. The moment --brand became the
+           violet it was always meant to be, every primary button in the product turned
+           violet with it — against the argument written directly above it.
+           They are different jobs. --primary is the ink: 17.4:1 on a white card, and it
+           INVERTS per theme (near-black on light, near-white on dark), which is exactly what
+           a fill needs when the surface behind it flips. --brand is a chromatic accent for
+           large fills we control the foreground of — a selected row, a POST pill — and it is
+           measured against the eight reserved order statuses precisely because it is
+           chromatic. A neutral has no such problem: it is not on the wheel, so it can never
+           be mistaken for a state an order is in. */
+        default: "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),var(--background)_18%)]",
         // A CONTROL EDGE, NOT A CARD RULE — and they are different tokens for a reason.
         // `--border` is a card's rule: it separates two surfaces and is allowed to be
         // faint. On the page ground it measures 1.23:1, and CLAUDE.md sets a 3:1 FLOOR for a
