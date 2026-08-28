@@ -99,6 +99,42 @@ const DURATION: Record<FormId, string> = { hoodie: "82s", crew: "94s", tee: "88s
    1050x1500 canvas is four times the pixels anyone can see, and 24 of them was 14MB a page. */
 const srcOf = (form: FormId, colour: string) => `/frames/rail-${form}-${colour}.webp`
 
+/**
+ * ── THE GRID IS FLAT-LAYS, NOT THE HANGING SHOTS SHRUNK ──────────────────────────────────
+ *
+ * The two views are two ways of SEEING stock, so they take the two shot types that mean those
+ * things. A hanging garment is suspended from a rail — that is a rack, and it is what the rail
+ * view is. A folded garment rests on a surface — that is a shelf, and a grid of tiles is a
+ * shelf. Putting the hanging shots in a grid gives twelve suspended garments floating in
+ * boxes, hanging from nothing, which is the arrangement contradicting the photograph.
+ *
+ * The grid also carries the CAP, which the rail cannot: a cap does not go on a hanger, it goes
+ * on a peg. Folded flat it sits on a shelf like everything else, so the view that is a shelf
+ * is the one where it belongs.
+ */
+type GridFormId = "tee" | "crew" | "hoodie" | "cap"
+const GRID_FORMS: GridFormId[] = ["tee", "crew", "hoodie", "cap"]
+const GRID_LABEL: Record<GridFormId, string> = {
+  tee: "Heavyweight cotton tee",
+  crew: "Heavy blend crewneck",
+  hoodie: "Heavy blend hoodie",
+  cap: "Six-panel cap",
+}
+const GRID_SLUG: Record<GridFormId, string> = {
+  tee: "gildan-unisex-heavy-cotton-t-shirt",
+  crew: "gildan-heavy-blend-crewneck-sweatshirt-18000",
+  hoodie: "comfort-colors-ring-spun-hooded-sweatshirt-1567",
+  cap: "adams-headwear-icon-sandwich-cap",
+}
+/* The flat-lays exist in the three colourways they were shot and graded in — not the rail's
+   twelve. A grid of four forms across twelve colours is 48 tiles, which is a spreadsheet. */
+const GRID_COLOURS = [
+  { slug: "natural", name: "Natural" },
+  { slug: "charcoal", name: "Charcoal" },
+  { slug: "iris", name: "Iris" },
+] as const
+const gridSrc = (form: GridFormId, colour: string) => `/frames/obj-${form}-${colour}.png`
+
 function Garment({ form, colour, name, price, i, cloned }: {
   form: FormId
   colour: string
@@ -238,6 +274,13 @@ export function ProductField({ products, className = "" }: {
     return Number.isFinite(n) && n > 0 ? n : null
   }
 
+  const gridPriceOf = (f: GridFormId): number | null => {
+    const p = (products ?? []).find((x) => x.slug === GRID_SLUG[f])
+    if (!p) return null
+    const n = p.priceFrom ?? p.price
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+
   const rails = RAILS.map((f) => ({ form: f, price: priceOf(f) })).filter(
     (r): r is { form: FormId; price: number } => r.price !== null,
   )
@@ -255,7 +298,12 @@ export function ProductField({ products, className = "" }: {
   return (
     <section className={"relative w-full overflow-hidden pb-10 " + className} style={{ background: SURFACE }}>
       <div className="mx-auto max-w-[88rem] px-6 sm:px-10">
-        <TabBar items={views} value={view} onChange={(v) => setView(v as ViewId)} ariaLabel="View" />
+        {/* `segmented`, not `line`. TabBar's own note says it: `line` is a PAGE's tabs — which
+            section am I on — and `segmented` is a level below that, a lens on the section you
+            are already in. Rail and Grid are two ways of looking at one set of garments, not
+            two destinations, and drawn as a rule under the live word they read as navigation
+            sitting on a line. §4: shape says KIND. */}
+        <TabBar items={views} value={view} onChange={(v) => setView(v as ViewId)} ariaLabel="View" look="segmented" spacing="none" />
       </div>
 
       <div className={"mt-4 " + (view === "rail" ? "hidden lg:block" : "hidden")}>
@@ -268,20 +316,26 @@ export function ProductField({ products, className = "" }: {
           screen cannot be paused by hovering, so the motion would be decoration nobody can
           stop. Above lg it is a choice — the same garments and the same destinations,
           arranged rather than running, for anyone who would rather scan than watch. */}
-      <div className={"grid grid-cols-2 gap-x-4 gap-y-8 px-6 py-10 sm:grid-cols-4 "
-        + (view === "grid" ? "lg:grid lg:grid-cols-6" : "lg:hidden")}>
-        {rails.flatMap((r) =>
-          COLOURWAYS.map((c) => (
-            <Link
-              key={`${r.form}-${c.slug}`}
-              href={`/catalog/${FORM_SLUG[r.form]}`}
-              aria-label={`${FORM_LABEL[r.form]} in ${c.name}`}
-              className="block"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={srcOf(r.form, c.slug)} alt="" className="block w-full" />
-            </Link>
-          )),
+      <div className={"grid grid-cols-2 gap-x-5 gap-y-8 px-6 py-10 sm:grid-cols-3 sm:px-10 "
+        + (view === "grid" ? "lg:grid lg:grid-cols-4" : "lg:hidden")}>
+        {GRID_FORMS.flatMap((f) =>
+          gridPriceOf(f) === null
+            ? []
+            : GRID_COLOURS.map((c) => (
+                <Link
+                  key={`${f}-${c.slug}`}
+                  href={`/catalog/${GRID_SLUG[f]}`}
+                  aria-label={`${GRID_LABEL[f]} in ${c.name}`}
+                  className="group block"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={gridSrc(f, c.slug)}
+                    alt=""
+                    className="block w-full origin-center transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.04]"
+                  />
+                </Link>
+              )),
         )}
       </div>
     </section>

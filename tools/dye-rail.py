@@ -66,6 +66,41 @@ def wood_mask(arr, lab):
     return band & (C > np.median(C[g]) * 1.9) & warm
 
 
+def cloth_target(hex_target):
+    """
+    DYE TO THE CLOTH, NOT TO THE CHIP.
+
+    lib/color-swatch holds UI SWATCH colours — vivid chips built to stay legible at 16px. Real
+    dyed cotton is never that saturated, and the gap widens the more vivid the chip gets.
+    Measured against the two colourways we actually photographed:
+
+        natural   swatch C* 9.4  ->  cloth C*  8.7   (0.93x — a near-neutral barely moves)
+        charcoal  swatch C* 11.0 ->  cloth C*  1.6   (0.14x)
+        iris      swatch C* 76.4 ->  cloth C* 17.8   (0.23x)
+
+    So it is not a flat percentage; it SATURATES. C = 19 * (1 - exp(-C_swatch / 15)) passes
+    through both measured points and asymptotes near C* 19, which is where washed pigment-dyed
+    cotton actually sits. Dyeing straight to the chip is what made royal and gold look like
+    plastic — they were carrying four times the chroma any of these garments has.
+
+    Lightness moves with it. A vivid chip is also darker than the cloth it names (iris: L* 42
+    against the garment's L* 60), because saturation and depth travel together in a swatch and
+    come apart in a wash. So L is pulled toward the washed band in proportion to how much
+    chroma the curve just removed — a colour that barely compressed barely moves.
+    """
+    t = np.array([[[int(hex_target[i:i + 2], 16) for i in (1, 3, 5)]]], dtype=np.float64)
+    L, A, B = to_lab(t)[0, 0]
+    C = np.hypot(A, B)
+    if C < 0.5:
+        return L, A, B
+    C2 = 19.0 * (1 - np.exp(-C / 15.0))
+    k = C2 / C
+    removed = 1 - k                      # 0 for a neutral, ->1 for a vivid chip
+    WASHED = 62.0
+    L2 = L + (WASHED - L) * removed * 0.55
+    return L2, A * k, B * k
+
+
 def dye(im, hex_target):
     arr = np.array(im).astype(np.float64)
     a = arr[..., 3]
@@ -76,8 +111,7 @@ def dye(im, hex_target):
     wood = wood_mask(arr, lab)
     cloth = (a > 8) & ~wood
 
-    t = np.array([[[int(hex_target[i:i + 2], 16) for i in (1, 3, 5)]]], dtype=np.float64)
-    tL, tA, tB = to_lab(t)[0, 0]
+    tL, tA, tB = cloth_target(hex_target)
 
     ref = g & ~wood
     mL = L[ref].mean()
