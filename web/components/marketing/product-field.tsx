@@ -57,6 +57,24 @@ const STORIES: { id: StoryId; name: string }[] = [
 type Placed = { form: FormId; x: number; y: number; w: number }
 
 /**
+ * ── TEMPORARY: FORMS REPEAT ──────────────────────────────────────────────────────────────
+ *
+ * Each rack currently lists EIGHT objects drawn from four forms, so every garment appears
+ * twice at a different size. This is a PROBE, not the design. The open question is whether a
+ * dense field actually reads better than a sparse one before committing ~250 credits to
+ * shooting six more forms (cotton shirt, polo, quarter-zip, trucker, beanie, duffel — all of
+ * which we genuinely publish). Repeating what we have answers that for nothing.
+ *
+ * It has to come out either way. A repeat is honest as a texture and dishonest as a
+ * catalogue: the field implies a range, and eight objects that are really four overstate it.
+ * When the new forms land, every duplicate entry below is replaced by a real one and this
+ * note goes with them. If they do NOT land, the racks go back to four.
+ *
+ * The duplicate is hidden from assistive tech (see `dup` at the call site) — it is the same
+ * product with the same action, and announcing it twice is noise, not access.
+ */
+
+/**
  * ONE RACK PER STORY, AND NO TWO RACKS ALIKE.
  *
  * The forms appear in a different order and at different heights in each rack. Three rows of
@@ -65,31 +83,46 @@ type Placed = { form: FormId; x: number; y: number; w: number }
  */
 const RACKS: Record<StoryId, Placed[]> = {
   natural: [
-    { form: "tee", x: 11, y: 52, w: 18 },
-    { form: "crew", x: 37, y: 35, w: 21 },
-    { form: "hoodie", x: 64, y: 60, w: 23 },
-    { form: "cap", x: 95, y: 38, w: 17 },
+    { form: "cap", x: 1, y: 42, w: 14 },
+    { form: "tee", x: 13, y: 64, w: 17 },
+    { form: "crew", x: 26, y: 36, w: 20 },
+    { form: "hoodie", x: 41, y: 64, w: 22 },
+    { form: "tee", x: 56, y: 34, w: 15 },
+    { form: "cap", x: 68, y: 60, w: 13 },
+    { form: "crew", x: 82, y: 38, w: 20 },
+    { form: "hoodie", x: 98, y: 62, w: 22 },
   ],
   charcoal: [
-    { form: "cap", x: 7, y: 44, w: 16 },
-    { form: "hoodie", x: 33, y: 62, w: 24 },
-    { form: "tee", x: 61, y: 36, w: 19 },
-    { form: "crew", x: 93, y: 58, w: 22 },
+    { form: "hoodie", x: 2, y: 60, w: 21 },
+    { form: "crew", x: 17, y: 35, w: 19 },
+    { form: "cap", x: 30, y: 62, w: 13 },
+    { form: "tee", x: 42, y: 36, w: 17 },
+    { form: "hoodie", x: 57, y: 63, w: 22 },
+    { form: "tee", x: 72, y: 34, w: 15 },
+    { form: "crew", x: 85, y: 60, w: 20 },
+    { form: "cap", x: 99, y: 38, w: 14 },
   ],
   iris: [
-    { form: "crew", x: 8, y: 60, w: 21 },
-    { form: "cap", x: 39, y: 36, w: 16 },
-    { form: "hoodie", x: 66, y: 58, w: 24 },
-    { form: "tee", x: 93, y: 38, w: 19 },
+    { form: "crew", x: 0, y: 38, w: 20 },
+    { form: "hoodie", x: 15, y: 62, w: 22 },
+    { form: "tee", x: 31, y: 35, w: 16 },
+    { form: "cap", x: 43, y: 60, w: 13 },
+    { form: "crew", x: 56, y: 37, w: 19 },
+    { form: "hoodie", x: 72, y: 63, w: 22 },
+    { form: "cap", x: 87, y: 36, w: 14 },
+    { form: "tee", x: 98, y: 60, w: 17 },
   ],
 }
 
 /** The single-story view: the same four objects with the room three racks were sharing. */
 const SOLO: Placed[] = [
-  { form: "tee", x: 15, y: 54, w: 26 },
-  { form: "crew", x: 43, y: 43, w: 29 },
-  { form: "hoodie", x: 71, y: 62, w: 32 },
-  { form: "cap", x: 95, y: 45, w: 22 },
+  { form: "cap", x: 2, y: 44, w: 16 },
+  { form: "tee", x: 15, y: 66, w: 20 },
+  { form: "crew", x: 32, y: 38, w: 23 },
+  { form: "hoodie", x: 50, y: 66, w: 25 },
+  { form: "tee", x: 67, y: 36, w: 18 },
+  { form: "cap", x: 79, y: 62, w: 15 },
+  { form: "crew", x: 93, y: 40, w: 23 },
 ]
 
 const srcOf = (form: FormId, story: StoryId) => `/frames/obj-${form}-${story}.png`
@@ -106,9 +139,16 @@ function Rack({ items, story, solo, onPort }: {
       className="relative w-full"
       style={{ minHeight: solo ? "clamp(24rem, 56vh, 37rem)" : "clamp(18rem, 38vh, 25rem)" }}
     >
-      {items.map((it) => (
+      {items.map((it, i) => {
+        /* The FIRST appearance of a form is the real one; later ones are the temporary
+           repeats above. Same click, same target — so they stay pressable with a mouse and
+           stay out of the tab order and the accessibility tree. */
+        const dup = items.findIndex((o) => o.form === it.form) !== i
+        return (
         <button
-          key={it.form}
+          key={`${it.form}-${i}`}
+          aria-hidden={dup || undefined}
+          tabIndex={dup ? -1 : undefined}
           type="button"
           onClick={() => onPort(story)}
           /* THE ACCESSIBLE NAME CARRIES BOTH FACTS, because the visible label only appears on
@@ -143,7 +183,8 @@ function Rack({ items, story, solo, onPort }: {
             + {name}
           </span>
         </button>
-      ))}
+        )
+      })}
     </div>
   )
 }
