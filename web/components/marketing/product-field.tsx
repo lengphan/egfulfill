@@ -212,7 +212,12 @@ function Garment({ form, colour, name, price, i, cloned }: {
         * a rail the neighbour is a few percent away and a label to the side lands on it.
         */}
       <span
-        className="pointer-events-none absolute left-1/2 top-full z-10 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+        /* INSIDE THE BOX, NOT BELOW IT. It sat at `top-full` — under the garment — and the
+           rail clips vertically because it must clip horizontally for garments to cross the
+           frame, so the tag was cut in half on every hover. `overflow-x: auto` is not an
+           option either: CSS forces the other axis to scroll with it. So the tag sits over the
+           garment's own hem, which is where a real swing ticket hangs anyway. */
+        className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
         style={{ background: tagBg, color: readableOn(tagBg) }}
       >
         {name} · from ${price.toFixed(2)}

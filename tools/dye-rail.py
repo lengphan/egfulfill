@@ -56,14 +56,51 @@ def prep(path, rel=1.0):
 
 
 def wood_mask(arr, lab):
+    """
+    THE HANGER IS COMPACT. CLOTH IS NOT.
+
+    The first version of this took warm, high-chroma pixels in the top fifth of the garment and
+    called them wood. It left cream patches undyed across the hood and a hard horizontal edge
+    where the position cutoff stopped — because a bone garment's shadowed FOLDS are warmer and
+    more chromatic than its own median, so they tripped the test. The docstring above this
+    function already said "by chroma alone a warm bone garment is nearly as orange as pale
+    wood", and then the code used chroma anyway and merely gated it by position.
+
+    What actually separates them is SHAPE. Measured on the hoodie: the hanger is one blob of
+    4722px filling 0.76 of its bounding box — a solid bar — at C* 29 and b* 28. The cloth
+    false-positives are 3671px at fill 0.19, thin sprawling folds, at C* 20. Two regions can
+    share a colour; they cannot share a colour AND a compactness.
+
+    So: label the candidates, and keep only blobs that are solid, small and genuinely yellow.
+    Cloth folds fail the fill test however warm they get, and a shadow fails the chroma test
+    however compact it is.
+    """
+    from scipy import ndimage
     a = arr[..., 3]
     C = np.hypot(lab[..., 1], lab[..., 2])
-    warm = lab[..., 2] > lab[..., 1] * 0.8
+    B = lab[..., 2]
     g = a > 200
     rows = np.where(g.any(1))[0]
+
+    # A generous band — the shape test does the real work, so this only has to exclude the hem.
     band = g.copy()
-    band[rows[0] + int((rows[-1] - rows[0]) * 0.22):] = False
-    return band & (C > np.median(C[g]) * 1.9) & warm
+    band[rows[0] + int((rows[-1] - rows[0]) * 0.35):] = False
+    cand = band & (C > 18) & (B > 15)
+
+    lbl, n = ndimage.label(cand)
+    keep = np.zeros_like(cand)
+    for i in range(1, n + 1):
+        blob = lbl == i
+        size = blob.sum()
+        if size < 200:
+            continue
+        ys, xs = np.where(blob)
+        bb = max((ys.max() - ys.min() + 1) * (xs.max() - xs.min() + 1), 1)
+        # solid, and no bigger than a hanger could plausibly be
+        if size / bb > 0.5 and size < g.sum() * 0.06:
+            keep |= blob
+    # Grow by a pixel so the wood's own antialiased rim is not dyed into a coloured halo.
+    return ndimage.binary_dilation(keep, iterations=2)
 
 
 def cloth_target(hex_target):
@@ -71,34 +108,34 @@ def cloth_target(hex_target):
     DYE TO THE CLOTH, NOT TO THE CHIP.
 
     lib/color-swatch holds UI SWATCH colours — vivid chips built to stay legible at 16px. Real
-    dyed cotton is never that saturated, and the gap widens the more vivid the chip gets.
-    Measured against the two colourways we actually photographed:
+    dyed cotton is never that saturated, and the gap widens the more vivid the chip. Measured
+    against the two colourways actually photographed:
 
-        natural   swatch C* 9.4  ->  cloth C*  8.7   (0.93x — a near-neutral barely moves)
-        charcoal  swatch C* 11.0 ->  cloth C*  1.6   (0.14x)
-        iris      swatch C* 76.4 ->  cloth C* 17.8   (0.23x)
+        natural   swatch C*  9.4  ->  cloth C*  8.7   (0.93x — a near-neutral barely moves)
+        charcoal  swatch C* 11.0  ->  cloth C*  1.6   (0.14x)
+        iris      swatch C* 76.4  ->  cloth C* 17.8   (0.23x)
 
-    So it is not a flat percentage; it SATURATES. C = 19 * (1 - exp(-C_swatch / 15)) passes
-    through both measured points and asymptotes near C* 19, which is where washed pigment-dyed
-    cotton actually sits. Dyeing straight to the chip is what made royal and gold look like
-    plastic — they were carrying four times the chroma any of these garments has.
+    So it is not a flat percentage; it SATURATES: a near-neutral barely moves and a vivid chip
+    collapses. C = 26 * (1 - exp(-C/20)) asymptotes near C* 26, which is where a real dyed
+    maroon or forest sits. Dyeing straight to the chip is what made royal and gold look like
+    plastic; capping at the pale iris's C* 18 was the opposite mistake and turned maroon into
+    dusty rose, because a deep red genuinely IS more chromatic than a washed periwinkle.
 
-    Lightness moves with it. A vivid chip is also darker than the cloth it names (iris: L* 42
-    against the garment's L* 60), because saturation and depth travel together in a swatch and
-    come apart in a wash. So L is pulled toward the washed band in proportion to how much
-    chroma the curve just removed — a colour that barely compressed barely moves.
+    Lightness travels with it, but only slightly. A vivid chip is a little darker than the cloth
+    it names, so L is pulled toward the washed band in proportion to the chroma removed — at
+    0.25, not 0.55. At 0.55 a maroon whose swatch sits at L* 29 landed near L* 50 and read as
+    light brown at the collar, which is the whole reason this number is written down.
     """
     t = np.array([[[int(hex_target[i:i + 2], 16) for i in (1, 3, 5)]]], dtype=np.float64)
     L, A, B = to_lab(t)[0, 0]
     C = np.hypot(A, B)
     if C < 0.5:
         return L, A, B
-    C2 = 19.0 * (1 - np.exp(-C / 15.0))
+    C2 = 26.0 * (1 - np.exp(-C / 20.0))
     k = C2 / C
-    removed = 1 - k                      # 0 for a neutral, ->1 for a vivid chip
+    removed = 1 - k
     WASHED = 62.0
-    L2 = L + (WASHED - L) * removed * 0.55
-    return L2, A * k, B * k
+    return L + (WASHED - L) * removed * 0.25, A * k, B * k
 
 
 def dye(im, hex_target):
