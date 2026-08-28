@@ -3,7 +3,7 @@ import { Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { F, C, R, TAB_BAR } from "@/lib/theme"
-import { ChatBubble } from "@/components/chat-bubble"
+import { ChatPeek } from "@/components/chat-peek"
 
 /**
  * THE UNLIT TABS, on the block.
@@ -119,10 +119,12 @@ export default function TabsLayout() {
   /* The home indicator (iOS) and the gesture pill (Android) both sit where this bar does,
      so it clears the safe-area inset rather than a hard-coded 16. */
   const bottom = Math.max(insets.bottom, 10)
-  /* THE BUBBLE IS A SIBLING OF THE TABS, not a sixth tab.
-     The bar holds places you GO; a conversation is something that interrupts you, which
-     wants a control that floats over the page and carries a count rather than a slot in a
-     row of five. A Fragment so it lands over whichever screen is showing. */
+  /* THE PEEK IS A SIBLING OF THE TABS, not a fifth tab.
+     The bar holds places you GO; a conversation is something that INTERRUPTS you, which is
+     a different kind of thing — so it is drawn only while someone is waiting, over whichever
+     screen is showing, and it says who and what rather than carrying a bare count. When
+     nobody is waiting there is nothing there at all; chat is then the control on the
+     Dashboard header, which is also a seller's only route since the count is staff-only. */
   return (
     <>
     <Tabs
@@ -223,7 +225,7 @@ export default function TabsLayout() {
           notification map, both of which push this exact route. */}
       <Tabs.Screen name="settings" options={{ title: "Settings", href: null }} />
     </Tabs>
-    <ChatBubble />
+    <ChatPeek />
     </>
   )
 }

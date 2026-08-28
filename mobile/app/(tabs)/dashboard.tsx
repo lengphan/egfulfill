@@ -567,6 +567,25 @@ export default function Dashboard() {
             not find it — which, with the tab gone, is the same as having deleted it. Shape
             says kind here as everywhere else: this is something you press, so it has the
             edge a control has. */}
+        {/* CHAT'S PERMANENT ROUTE. The peek only exists while someone is waiting, and a
+            seller never gets one at all — the count is staff-only. So this is not a
+            convenience, it is the door: without it the feature would be reachable only when
+            the app decided to offer it. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Chat"
+          onPress={() => router.push("/chat")}
+          hitSlop={10}
+          style={({ pressed }) => ({
+            width: 40, height: 40, marginTop: 2,
+            alignItems: "center", justifyContent: "center",
+            borderRadius: R.control,
+            borderWidth: 1, borderColor: C.border,
+            backgroundColor: pressed ? C.accent : C.card,
+          })}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={C.fg} />
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Settings"
