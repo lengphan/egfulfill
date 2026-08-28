@@ -259,8 +259,21 @@
     --primary-foreground: oklch(0.9667 0.0017 247.84);
   /* THE VIOLET, AND WHY IT WAS INVISIBLE IN THE APP.
    *
-   * This value is the one measured for the shipping skin: white on it 16.3:1, 15.6:1 against
-   * a white card, and 0.086 clear of the nearest reserved status in both themes. It was
+   * #4E00FC with white — the value the "Which Violet" study picked, at 7.69:1 and clear of
+   * every reserved order status by 0.216 light / 0.281 dark against a floor of 0.171/0.154.
+   *
+   * The floor is not a constant: the gate derives it from the distance between `hold` and
+   * `alert`, a pair already proven readable side by side. And the brand has to clear it in
+   * BOTH themes, because dark lifts every status and a value that separates in one can
+   * collide in the other — which is exactly how the marketing periwinkle fails.
+   *
+   * It is louder than what it replaces, and that is a consequence rather than a choice. The
+   * old #7974E8 failed BECAUSE it was muted: low chroma at hue 282 sits it beside `pending`,
+   * a desaturated blue at hue 255, and two quiet colours 27 degrees apart are two quiet
+   * colours. Escaping that means moving in chroma, and chroma is the direction that keeps it
+   * recognisably violet. The brand has to be a colour no order state is.
+   *
+   * Whatever the value, it was
    * declared ONLY inside `[data-skin="workshop"]` — and `data-skin` is written in exactly one
    * place, app/(marketing)/layout.tsx. The app and the boards never set it, so every
    * `bg-brand` in the product fell through to this block and painted near-black instead.
@@ -275,7 +288,7 @@
    *
    * The lime-and-violet action pair the note here used to describe is a direction that was
    * dropped; the declaration is the truth and the comment above it was history. */
-    --brand: oklch(0.250 0.070 285);
+    --brand: oklch(0.480 0.294 278.1);  /* #4E00FC */
     --brand-foreground: oklch(1 0 0);
   /* THE NEUTRALS ARE BEIGE, not grey. This is what lets the beige actually spread.
    *
@@ -1186,7 +1199,10 @@ td[align="right"] {
      Measured: white on it 16.3:1 · 15.6:1 against a white card, far past the 3:1 fill floor ·
      nearest status ΔE 0.086 clear of the floor in BOTH themes. `node tools/check-skins.mjs`
      covers --brand now, so the next move of this token is checked rather than argued. */
-  --brand: oklch(0.250 0.070 285);
+  /* SAME VALUE AS :root. Two blocks declare this token — the app reads :root, the marketing
+     subtree reads this one — and letting them drift is how the product ended up painting a
+     different accent from the site. #4E00FC per the "Which Violet" study. */
+  --brand: oklch(0.480 0.294 278.1);  /* #4E00FC */
   --brand-foreground: oklch(1 0 0);
 }
 
