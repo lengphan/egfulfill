@@ -840,7 +840,11 @@ export function DesignMaker() {
  full width alone, its height matched that width and the mockup ran off the
  top and bottom of the panel — the cap was cut off by the frame. Capping the
  width by viewport height keeps the whole square visible. */}
-          <div className="relative flex h-full max-h-full w-full flex-col items-center justify-center gap-3">
+          {/* A ROW, so the faces sit BESIDE the garment exactly as they do in the order
+              designer. They were a strip underneath here and a column to the left there —
+              the same tiles doing the same job in two arrangements, which is the kind of
+              difference nobody decides and everybody notices. */}
+          <div className="relative flex h-full max-h-full w-full items-center justify-center gap-3">
             <div
  onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
  onDragLeave={() => setDragOver(false)}
@@ -921,9 +925,11 @@ export function DesignMaker() {
               * layer is a quiet misreport of the thing this is here to report.
               */}
             {faces.length > 1 && (
-              <div className="flex items-center gap-1.5 rounded-xl border border-border bg-card/80 p-1.5 backdrop-blur">
+              /* No card around them, and `order-first` so they lead — the tiles carry their
+                 own selected state, and a panel behind them would be chrome on chrome. */
+              <div className="order-first flex w-[68px] shrink-0 flex-col gap-1.5" role="tablist" aria-label="Printed faces">
                 {faces.map((f) => (
-                  <div key={f.side} className="w-[62px]">
+                  <div key={f.side}>
                     <FaceTile
                       url={f.url}
                       layers={(stacks[f.side]?.images ?? []).map((im) => ({ src: im.src, pos: im.pos }))}
