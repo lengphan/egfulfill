@@ -282,10 +282,24 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     heading: "Everything after the sale, handled.",
     subhead: "From the moment an order lands to the tracking number your buyer sees.",
     cards: [
-      { title: "Every store, one queue", body: "Orders from Etsy, Shopify & TikTok Shop sync in automatically — no CSV exports, no copy-paste, no missed orders." },
-      { title: "Our factory, not a broker", body: "We own the machines. Checked at intake, after decoration and at pack, by the people who made it." },
+      /* THE CAPTURES ARE THE REAL APP WITH SUBSTITUTED CONTENT, and the distinction matters.
+         The interface, the columns, the states and the workflow are exactly what ships —
+         these are screenshots, not mockups. What was replaced is everything that belonged to
+         someone else: buyer names, and every piece of customer artwork in the Design Lab,
+         which was real third-party logos and a photograph of identifiable people. A customer's
+         mark on our homepage implies an endorsement they never gave.
+
+         Figures are sample data for ONE seller's own dashboard, which is what a product
+         screenshot is. They are not a claim about platform volume and must never be presented
+         as one — no caption, here or on the page, says these are real results. */
+      { title: "Every store, one queue", body: "Orders from Etsy, Shopify & TikTok Shop sync in automatically — no CSV exports, no copy-paste, no missed orders.", shot: "/frames/shot-orders.webp", shotAlt: "The order queue with Etsy, Shopify and TikTok Shop orders in one list" },
+      { title: "Our factory, not a broker", body: "We own the machines. Checked at intake, after decoration and at pack, by the people who made it.", shot: "/frames/shot-design.webp", shotAlt: "The Design Lab, showing artwork ready to place on a garment" },
+      /* No capture yet — this card wants an order detail showing tracking pushed back to the
+         marketplace, and the queue shot already carries the tracking column. Two cards showing
+         the same screen would read as one screen photographed twice. The frame draws its
+         wireframe until there is a real one. */
       { title: "Tracking, automatic", body: "Cheapest label bought and tracking pushed back to the marketplace for you." },
-      { title: "Transparent wallet", body: "A prepaid wallet with clear per-order charges and instant payouts. Always know exactly what you paid and why." },
+      { title: "Transparent wallet", body: "A prepaid wallet with clear per-order charges and instant payouts. Always know exactly what you paid and why.", shot: "/frames/shot-dashboard.webp", shotAlt: "The seller dashboard, showing revenue, open orders and wallet balance" },
     ],
   },
   steps: {
