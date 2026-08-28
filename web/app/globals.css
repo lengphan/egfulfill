@@ -928,9 +928,21 @@ td[align="right"] {
 
    It KEEPS RUNNING when the rail is paused: stopping a rail does not stop the cloth, and
    holding both still at once is what would look wrong. */
+/* WIND, NOT A METRONOME.
+   This was a two-frame sine between -1.1 and 1.1 degrees: symmetrical, evenly paced, and at
+   that amplitude closer to a wobble than to a hanging garment. Two things make it read as
+   air moving rather than as an animation — a WIDER arc, and UNEVEN timing, because a gust
+   pushes hard and lets go, and the swing back overshoots before it settles.
+   The peaks are deliberately unequal (2.9 one way, 2.6 the other) so a rail of garments
+   never lines up into one rhythm even where two share a duration. Origin is the hook. */
 @keyframes eg-sway {
-  0%, 100% { transform: rotate(-1.1deg); }
-  50%      { transform: rotate(1.1deg); }
+  0%   { transform: rotate(-3.8deg); }
+  18%  { transform: rotate(0.8deg); }
+  38%  { transform: rotate(4.2deg); }
+  55%  { transform: rotate(-0.6deg); }
+  72%  { transform: rotate(-3.2deg); }
+  88%  { transform: rotate(1.3deg); }
+  100% { transform: rotate(-3.8deg); }
 }
 .eg-sway { animation: eg-sway var(--sway-dur, 5.5s) ease-in-out infinite; transform-origin: 50% 3%; }
 @media (prefers-reduced-motion: reduce) {

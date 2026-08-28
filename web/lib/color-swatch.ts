@@ -149,3 +149,21 @@ export function colorFamily(raw: string): string | null {
   if (!hex) return null
   return FAMILY_OF[nearestColorName(hex)] ?? null
 }
+
+/**
+ * INK OR WHITE ON A SWATCH — decided, not guessed.
+ *
+ * A label that takes a garment's own colour cannot also fix its text colour: Natural is a
+ * pale oatmeal that needs ink and Iris is a saturated violet that needs white, and picking
+ * one for both leaves half the labels unreadable. WCAG relative luminance, with the usual
+ * 0.5 split — the two candidates are the extremes of the range, so the crossover is where
+ * their contrast ratios meet rather than anywhere subtler.
+ */
+export function readableOn(hex: string): "#111111" | "#FFFFFF" {
+  const h = hex.replace("#", "")
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
+  const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+  return L > 0.45 ? "#111111" : "#FFFFFF"
+}

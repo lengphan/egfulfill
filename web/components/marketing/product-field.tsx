@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
+import { swatchHex, readableOn } from "@/lib/color-swatch"
 import Link from "next/link"
 import type { PublicProduct } from "@/lib/api"
 import { TabBar } from "@/components/app/tab-bar"
-import { CARD, INK, SURFACE } from "@/components/marketing/bold-kit"
+import { INK, SURFACE } from "@/components/marketing/bold-kit"
 
 /**
  * ── THE RAIL — stock running past, until you reach for one ───────────────────────────────
@@ -180,6 +181,7 @@ function Garment({ slot, story, price, hidden, hang, i }: {
   const flip = hang ? i % 2 === 1 : false
   const lengthJitter = hang ? 1 - ((i * 37) % 11) / 90 : 1
   const name = STORIES.find((s) => s.id === story)!.name
+  const tagBg = swatchHex(name) ?? INK
   return (
     <Link
       href={`/catalog/${FORM_SLUG[slot.form]}`}
@@ -232,7 +234,13 @@ function Garment({ slot, story, price, hidden, hang, i }: {
         */}
       <span
         className="pointer-events-none absolute left-1/2 top-full z-10 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
-        style={{ background: INK, color: CARD }}
+        /* THE TAG IS THE GARMENT'S OWN COLOUR. It was INK on every rail, so three colour
+           stories shared one black label and the swatch a person is actually choosing
+           between was the one thing the label did not show. The hex is the real orderable
+           colourway out of lib/color-swatch — the same table the catalogue's chips read, so
+           a tag and a chip for one colour cannot disagree — and the text colour is decided
+           from it rather than fixed, because Natural needs ink and Iris needs white. */
+        style={{ background: tagBg, color: readableOn(tagBg) }}
       >
         {FORM_LABEL[slot.form]} · from ${price.toFixed(2)}
       </span>
@@ -321,7 +329,12 @@ export function ProductField({ products, className = "" }: {
   products: PublicProduct[] | null
   className?: string
 }) {
-  const [story, setStory] = useState<StoryId | "all">("all")
+  /* `story` is fixed at "all" now that the colour filter is gone — the rails are the three
+     colourways and there is nothing to narrow to. Kept as a constant rather than threaded
+     out of `shown` and `Rail`, both of which still take it and still mean it. */
+  const story = "all" as const
+  type ViewId = "rail" | "grid"
+  const [view, setView] = useState<ViewId>("rail")
 
   /* Resolved against what is ACTUALLY published, every render. */
   const priceOf = (f: FormId): number | null => {
@@ -333,9 +346,14 @@ export function ProductField({ products, className = "" }: {
 
   const shown = story === "all" ? STORIES : STORIES.filter((s) => s.id === story)
 
-  const tabs = [
-    { id: "all" as const, label: "All" },
-    ...STORIES.map((s) => ({ id: s.id, label: s.name })),
+  /* THE COLOUR FILTER IS GONE. It asked a question this section does not answer: the rails
+     ARE the three colourways, all of them, all the time — so filtering to one left two thirds
+     of the field empty to show a subset of a set you could already see. Colour is chosen on
+     the product page, where there are 82 of them and a filter earns its place. What replaces
+     it is the one control people did ask for: whether this is a field or a grid. */
+  const views = [
+    { id: "rail" as const, label: "Rail" },
+    { id: "grid" as const, label: "Grid" },
   ]
 
   return (
@@ -343,10 +361,10 @@ export function ProductField({ products, className = "" }: {
       {/* THE RULE UNDER THE LIVE WORD — components/app/tab-bar.tsx, not a fresh row of
           capsules. Colour lives HERE, and only here: an object opens its product. */}
       <div className="mx-auto max-w-[88rem] px-6 sm:px-10">
-        <TabBar items={tabs} value={story} onChange={setStory} ariaLabel="Colour" />
+        <TabBar items={views} value={view} onChange={(v) => setView(v as ViewId)} ariaLabel="View" />
       </div>
 
-      <div className="mt-4 hidden lg:block">
+      <div className={"mt-4 " + (view === "rail" ? "hidden lg:block" : "hidden")}>
         {shown.map((s, i) => (
           <Rail key={s.id} story={s.id} reverse={i % 2 === 1} priceOf={priceOf} solo={story !== "all"} />
         ))}
@@ -355,7 +373,12 @@ export function ProductField({ products, className = "" }: {
       {/* Below lg the rails become a grid. A moving rail on a touch screen cannot be paused by
           hovering, so there is nothing to hover and the motion would be decoration you cannot
           stop — the same objects and the same destination, arranged rather than running. */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-6 px-6 py-10 sm:grid-cols-3 lg:hidden">
+      {/* Below lg the rails become a grid whatever the toggle says: a moving rail on a touch
+          screen cannot be paused by hovering, so the motion would be decoration you cannot
+          stop. Above lg it is now a CHOICE — the same objects and the same destination,
+          arranged rather than running, for anyone who would rather scan than watch. */}
+      <div className={"grid grid-cols-2 gap-x-4 gap-y-6 px-6 py-10 sm:grid-cols-3 "
+        + (view === "grid" ? "lg:grid lg:grid-cols-4" : "lg:hidden")}>
         {shown.flatMap((s) =>
           RAILS[s.id]
             .filter((it, i, a) => a.findIndex((o) => o.form === it.form) === i && priceOf(it.form) !== null)
