@@ -389,11 +389,17 @@ export function StaffDashboard() {
         <div className="grid items-stretch gap-4">
           <div>
             <GmvPanel
-              /* THE OWNER'S BAND. Slate — the app's one dark surface — because this is the
-                 one set of figures nobody else on the floor is allowed to see, and the fan
-                 shares it rather than sitting in its own card: "how much" and "where from"
-                 are one question asked twice. */
-              tone="slate"
+              /* A WHITE CARD, not the slate band the plan drew.
+               *
+               * The plan's reasoning was that slate is "the app's one dark surface", which is
+               * exactly backwards: the app already HAS its one dark surface, and it is the
+               * rail. §4 is explicit that the sidebar carries the colour as "one bounded block
+               * that is never underneath the data" — a full-width slate card in the content
+               * area makes two dark blocks and puts one of them directly on the numbers.
+               *
+               * Everything else the band was for survives: the fan shares the card, and the
+               * second row of figures sits under the headline. It was the GROUND that was
+               * wrong, not the composition. */
               title={tl("kpi", "GMV")}
               headline={ov === null ? "—" : usd(money.revenue)}
               headlineSub={tl("rangesub", rangeMeta.sub)}
@@ -406,7 +412,7 @@ export function StaffDashboard() {
               ]}
               bars={gmvBars}
               aside={fanSlices.length > 1
-                ? <ChannelFan slices={fanSlices} caption={tl("kpi", "orders")} onDark />
+                ? <ChannelFan slices={fanSlices} caption={tl("kpi", "orders")} />
                 : undefined}
             />
           </div>
