@@ -6,6 +6,7 @@ import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, MediaBand } fro
 import { CalloutList } from "@/components/marketing/bold-figure"
 import { EditableText, EditableImage, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 import { PageBanner } from "@/components/marketing/page-banner"
+import { RotaryBadge } from "@/components/marketing/stickers"
 
 /**
  * Features, in the house style. The same six capabilities and the same copy — restated as a
@@ -137,14 +138,26 @@ export function BoldFeatures({ content }: { content: SiteContent }) {
       {(figureSrc || editing) && (
         <EditableImage path="featuresPage.figure.image" transform="bleed">
           <MediaBand media={figureSrc} alt={p.figure.imageAlt} focusX={figFx} focusY={figFy} scale={figZoom}>
-            {p.figure.callouts.length > 0 && (
-              <CalloutList
-                items={p.figure.callouts}
-                path="featuresPage.figure.callouts"
-                tone="ink"
-                className="flex-wrap gap-x-10 gap-y-5"
+            <div className="flex flex-wrap items-end justify-between gap-8">
+              {p.figure.callouts.length > 0 && (
+                <CalloutList
+                  items={p.figure.callouts}
+                  path="featuresPage.figure.callouts"
+                  tone="ink"
+                  className="flex-wrap gap-x-10 gap-y-5"
+                />
+              )}
+              {/* ONE STAMP, and it claims something this page actually proves — the six rows
+                  below are the capabilities, and every one runs whether anybody is watching.
+                  Slate rather than periwinkle: a band's picture is admin-replaceable, and
+                  periwinkle on a pale one measures 1.52:1 and disappears. */}
+              <RotaryBadge
+                className="hidden w-[92px] shrink-0 sm:block"
+                text="NO MINIMUMS"
+                fill={ACCENT}
+                ink={ACCENT_INK}
               />
-            )}
+            </div>
           </MediaBand>
         </EditableImage>
       )}
