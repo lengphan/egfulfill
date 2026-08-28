@@ -379,10 +379,14 @@ export function BoldCatalog({ products, head }: { products: PublicProduct[] | nu
       <Scatter
         minH="clamp(26rem, 62vh, 40rem)"
         items={[
-          { src: "/frames/obj-tee.png",    alt: "Heavyweight cotton t-shirt, bone",     href: "/catalog#apparel", x: 22, y: 38, w: 17 },
-          { src: "/frames/obj-crew.png",   alt: "Ring-spun crewneck sweatshirt, sand",  href: "/catalog#apparel", x: 47, y: 64, w: 14 },
-          { src: "/frames/obj-hoodie.png", alt: "Heavy blend hooded sweatshirt, charcoal", href: "/catalog#apparel", x: 72, y: 34, w: 19 },
-          { src: "/frames/obj-cap.png",    alt: "Six-panel cap, clay",                  href: "/catalog#headwear", x: 89, y: 72, w: 11 },
+          /* TIGHTER, AND ONE CROPS THE EDGE. Four objects spread evenly across 1440px read as
+             unfinished rather than curated — the reference gets away with air because objects
+             run off the frame and imply more beyond it. Overlapping the right edge is what
+             turns empty space into a crop. */
+          { src: "/frames/obj-tee.png",    alt: "Heavyweight cotton t-shirt, bone",        href: "/catalog#apparel",  x: 25, y: 43, w: 26 },
+          { src: "/frames/obj-crew.png",   alt: "Ring-spun crewneck sweatshirt, sand",     href: "/catalog#apparel",  x: 50, y: 71, w: 21 },
+          { src: "/frames/obj-hoodie.png", alt: "Heavy blend hooded sweatshirt, charcoal", href: "/catalog#apparel",  x: 68, y: 35, w: 28 },
+          { src: "/frames/obj-cap.png",    alt: "Six-panel cap, clay",                     href: "/catalog#headwear", x: 92, y: 68, w: 18 },
         ]}
       />
 
@@ -395,7 +399,9 @@ export function BoldCatalog({ products, head }: { products: PublicProduct[] | nu
           product ticked months ago and since set back to Draft is not on this page at all,
           so it cannot be in this row either. Empty until someone ticks something, and the
           row simply doesn't render then. */}
-      {!failed && picked.length > 0 && (
+      {/* TEMPORARILY HIDDEN — the scatter is the page while it is being judged. Flip both
+          flags back to bring the browse grid and the starter row back. */}
+      {false && !failed && picked.length > 0 && (
         <section className="mx-auto max-w-[88rem] px-6 pt-10 sm:px-10">
           <h2 className="text-[22px] font-bold tracking-tight">Starter essentials</h2>
           <p className="mt-1 text-[15px] text-[var(--mk-ink)]/60">
@@ -411,7 +417,7 @@ export function BoldCatalog({ products, head }: { products: PublicProduct[] | nu
 
       {/* pt-8: the browse row and the shelf above already separate this from the hero, and
           64px more put the first product below the fold on a laptop. */}
-      <section className="mx-auto max-w-[88rem] px-6 pb-16 pt-8 sm:px-10">
+      <section className="mx-auto hidden max-w-[88rem] px-6 pb-16 pt-8 sm:px-10">
         {failed ? (
           /* THE THREE EMPTY REGIONS ON THIS PAGE NOW SHARE ONE SHAPE — a white block, no
              border, text flush left. They were centred bordered boxes, which is a fourth
