@@ -1,6 +1,7 @@
 "use client"
 
 import { SectionCard } from "@/components/app/section-card"
+import { cn } from "@/lib/utils"
 
 /**
  * THE MONEY PANEL — one headline figure, the figures that qualify it, and the shape of the run.
@@ -25,9 +26,12 @@ export function GmvPanel({
   headline,
   headlineSub,
   side = [],
+  foot = [],
   bars = [],
   barsPrev,
   controls,
+  aside,
+  tone = "card",
   className,
 }: {
   title: string
@@ -41,24 +45,36 @@ export function GmvPanel({
   /** The same window, one period back. Drawn BEHIND at a third the strength, and only when
    *  the caller has a comparison to make — the panel never invents one. */
   barsPrev?: number[]
+  /** A second, quieter row under the headline — the figures that qualify the qualifiers.
+   *  Kept separate from `side` so the two tiers cannot silently merge into one long row. */
+  foot?: GmvSide[]
   /** The caller's own range / compare controls, on the title row. The panel owns no state:
    *  which window it is looking at is the page's decision, not the chart's. */
   controls?: React.ReactNode
+  /** A shape beside the figures — the channel fan on the owner's board. It shares the band
+   *  rather than sitting in its own card, because "how much" and "where from" are one
+   *  question asked twice. */
+  aside?: React.ReactNode
+  /** `slate` is the owner's band: the app's one dark surface, carrying the one set of
+   *  figures nobody else on the floor is allowed to see. */
+  tone?: "card" | "slate"
   className?: string
 }) {
+  const dark = tone === "slate"
   return (
     <SectionCard
-      className={className ?? "h-full"}
+      className={cn(className ?? "h-full", dark && "border-transparent bg-sidebar text-sidebar-foreground")}
       title={title}
       actions={controls}
-      bodyClassName="flex flex-1 flex-col gap-5 p-5"
+      bodyClassName={cn("flex flex-1 gap-5 p-5", aside ? "flex-col lg:flex-row lg:items-center" : "flex-col")}
     >
+      <div className="flex min-w-0 flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div>
           <div className="font-title text-4xl font-black leading-none tracking-tight tabular-nums sm:text-5xl">
             {headline}
           </div>
-          <div className="mt-1.5 eg-label text-muted-foreground">{headlineSub}</div>
+          <div className={cn("mt-1.5 eg-label", dark ? "text-sidebar-foreground/60" : "text-muted-foreground")}>{headlineSub}</div>
         </div>
         {/* NO CAPTION under these, the same rule the tiles follow: "we earned", "per order"
             explained figures their own labels already name. `sub` stays reachable as a title
@@ -66,10 +82,22 @@ export function GmvPanel({
         {side.map((c) => (
           <div key={c.label} title={c.sub}>
             <div className="text-xl font-bold tabular-nums">{c.value}</div>
-            <div className="mt-1 eg-label text-muted-foreground">{c.label}</div>
+            <div className={cn("mt-1 eg-label", dark ? "text-sidebar-foreground/60" : "text-muted-foreground")}>{c.label}</div>
           </div>
         ))}
       </div>
+
+      {foot.length > 0 && (
+        <div className={cn("flex flex-wrap gap-x-7 gap-y-3 border-t pt-3.5",
+          dark ? "border-sidebar-foreground/12" : "border-border")}>
+          {foot.map((c) => (
+            <div key={c.label} title={c.sub}>
+              <div className="text-base font-semibold tabular-nums">{c.value}</div>
+              <div className={cn("mt-0.5 eg-label", dark ? "text-sidebar-foreground/60" : "text-muted-foreground")}>{c.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {bars.length > 0 && (
         <div className="mt-auto flex h-28 items-stretch gap-1" aria-hidden>
@@ -79,7 +107,8 @@ export function GmvPanel({
                   series would make the panel a chart to study rather than one to glance at. */}
               {barsPrev && barsPrev[i] !== undefined && (
                 <span
-                  className="absolute inset-x-0 bottom-0 rounded-t-md bg-brand/10 dark:bg-brand/25"
+                  className={cn("absolute inset-x-0 bottom-0 rounded-t-md",
+                    dark ? "bg-brand/30" : "bg-brand/10 dark:bg-brand/25")}
                   style={{ height: `${Math.max(3, barsPrev[i] * 100)}%` }}
                 />
               )}
@@ -88,13 +117,17 @@ export function GmvPanel({
                    the dark value over a near-black card lands on a dull olive, so only the dark
                    step moves up — on paper 30% is a bar you read the shape of, and taking it up
                    would make the chart shout over the figures it exists to support. */
-                className="absolute inset-x-0 bottom-0 rounded-t-md bg-brand/30 dark:bg-brand/70"
+                className={cn("absolute inset-x-0 bottom-0 rounded-t-md",
+                  dark ? "bg-brand/80" : "bg-brand/30 dark:bg-brand/70")}
                 style={{ height: `${Math.max(3, h * 100)}%` }}
               />
             </span>
           ))}
         </div>
       )}
+      </div>
+
+      {aside && <div className="w-full shrink-0 lg:w-[240px]">{aside}</div>}
     </SectionCard>
   )
 }

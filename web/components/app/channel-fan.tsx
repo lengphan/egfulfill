@@ -38,6 +38,7 @@ export function ChannelFan({
   slices,
   total,
   caption,
+  onDark,
   className,
 }: {
   /** Biggest first is the caller's business — this draws them in the order given, so a
@@ -47,10 +48,18 @@ export function ChannelFan({
    *  off the server should pass its own rather than let this re-add it. */
   total?: number
   caption?: string
+  /** ON A DARK GROUND THE RAMP RUNS THE OTHER WAY.
+   *
+   *  --chart-1 is the darkest step in light mode, which is right on a white card and
+   *  invisible on the slate band — the biggest channel, the one the fan exists to show,
+   *  would be the one you cannot see. Reversing keeps the same four colours and hands the
+   *  lightest to the largest slice. */
+  onDark?: boolean
   className?: string
 }) {
   const tl = useLabelT()
   const [hot, setHot] = useState<string | null>(null)
+  const ramp = onDark ? [...RAMP].reverse() : RAMP
 
   const sum = slices.reduce((a, s) => a + s.n, 0)
   const shown = total ?? sum
@@ -72,7 +81,7 @@ export function ChannelFan({
   if (sum <= 0) return null
 
   const CX = 150, CY = 138, R0 = 62, R1 = 116
-  const colourOf = (name: string) => RAMP[slices.findIndex((s) => s.name === name) % RAMP.length]
+  const colourOf = (name: string) => ramp[slices.findIndex((s) => s.name === name) % ramp.length]
 
   return (
     <div className={cn("flex flex-col", className)}>
@@ -101,7 +110,7 @@ export function ChannelFan({
           <div className="text-3xl font-semibold tabular-nums leading-none tracking-tight">
             {hot ? (slices.find((s) => s.name === hot)?.n ?? shown) : shown}
           </div>
-          <div className="mt-1 text-2xs text-muted-foreground">
+          <div className={cn("mt-1 text-2xs", onDark ? "text-sidebar-foreground/60" : "text-muted-foreground")}>
             {hot ?? caption ?? tl("kpi", "orders")}
           </div>
         </div>
@@ -116,11 +125,12 @@ export function ChannelFan({
             onPointerLeave={() => setHot(null)}
             onFocus={() => setHot(s.name)}
             onBlur={() => setHot(null)}
-            className="eg-tap inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
+            className={cn("eg-tap inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-2xs transition-colors",
+              onDark ? "text-sidebar-foreground/60 hover:text-sidebar-foreground" : "text-muted-foreground hover:text-foreground")}
           >
-            <span className="size-2 shrink-0 rounded-[2px]" style={{ background: RAMP[i % RAMP.length] }} />
+            <span className="size-2 shrink-0 rounded-[2px]" style={{ background: ramp[i % ramp.length] }} />
             {/* The letter, because a ramp on its own implies a rank channels do not have. */}
-            <span className="font-medium tabular-nums text-foreground">{s.name.charAt(0).toUpperCase()}</span>
+            <span className={cn("font-medium tabular-nums", onDark ? "text-sidebar-foreground" : "text-foreground")}>{s.name.charAt(0).toUpperCase()}</span>
             {tl("ui", s.name)}
             <span className="tabular-nums">{s.n}</span>
           </button>
@@ -128,7 +138,7 @@ export function ChannelFan({
       </div>
 
       {capped && (
-        <p className="mt-1.5 text-2xs text-muted-foreground/70">
+        <p className={cn("mt-1.5 text-2xs", onDark ? "text-sidebar-foreground/45" : "text-muted-foreground/70")}>
           {tl("kpi", "Shares, not one stroke per order")}
         </p>
       )}

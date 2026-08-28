@@ -61,31 +61,7 @@ const SHORTCUT_DESC: Record<string, string> = {
 // MiniStat went with the tile rows it existed for. Every figure it used to draw is now
 // either a side figure on the money panel or a block on the stage bracket.
 
-/**
- * A ring gauge. `pct` null means NOT READ — the ring stays empty and the centre says "—",
- * because a 0% ring and a failed fetch must never look the same on a floor dashboard.
- */
-function Gauge({ pct, caption }: { pct: number | null; caption: string }) {
- const R = 54
- const C = 2 * Math.PI * R
- return (
-    <div className="relative grid place-items-center">
-      <svg viewBox="0 0 140 140" className="size-36 -rotate-90">
-        <circle cx="70" cy="70" r={R} fill="none" strokeWidth="13" className="stroke-brand/15" />
-        <circle
- cx="70" cy="70" r={R} fill="none" strokeWidth="13" strokeLinecap="round"
- className="stroke-brand transition-[stroke-dashoffset] duration-700"
- strokeDasharray={C}
- strokeDashoffset={C * (1 - (pct ?? 0) / 100)}
-        />
-      </svg>
-      <div className="absolute grid place-items-center text-center">
-        <div className="text-3xl font-black leading-none tracking-tight tabular-nums">{pct === null ? "—" : `${pct}%`}</div>
-        <div className="mt-1 text-2xs font-medium text-muted-foreground">{caption}</div>
-      </div>
-    </div>
-  )
-}
+// Gauge went with the card it was drawn for.
 
 // The staff home — role-meaningful KPIs off the shared order feed, a live production-line
 // snapshot, a recent-orders list, and quick links into the surfaces that role actually uses.
@@ -337,7 +313,7 @@ export function StaffDashboard() {
     >
       <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div className="flex items-center gap-3">
           <SquaresFour size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
             <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
@@ -352,14 +328,6 @@ export function StaffDashboard() {
             </p>
           </div>
 
-          {/* WHERE THEY CAME FROM, in the same group as the name so it reads as part of the
-              greeting rather than floating between it and the range control. Drawn only when
-              there is more than one channel to tell apart — a fan of one is a semicircle. */}
-          {fanSlices.length > 1 && (
-            <div className="w-[212px] shrink-0">
-              <ChannelFan slices={fanSlices} caption={tl("kpi", "orders")} />
-            </div>
-          )}
         </div>
         {/* Money window — admin only, since the money cards are. */}
         {isAdmin && (
@@ -409,34 +377,35 @@ export function StaffDashboard() {
 
       {/* Money chart + the one rate worth a gauge. Admin only, like the money itself. */}
       {isAdmin && (
-        <div className="grid items-stretch gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid items-stretch gap-4">
+          <div>
             <GmvPanel
+              /* THE OWNER'S BAND. Slate — the app's one dark surface — because this is the
+                 one set of figures nobody else on the floor is allowed to see, and the fan
+                 shares it rather than sitting in its own card: "how much" and "where from"
+                 are one question asked twice. */
+              tone="slate"
               title={tl("kpi", "GMV")}
               headline={ov === null ? "—" : usd(money.revenue)}
               headlineSub={tl("rangesub", rangeMeta.sub)}
               side={moneySide.map((c) => ({ label: tl("kpi", c.label), value: c.value, sub: c.sub }))}
+              foot={[
+                { label: tl("kpi", "On hold"), value: ov === null ? "—" : String(ov.counts.onHold ?? 0) },
+                { label: tl("kpi", "Avg to ship"), value: ov?.speed?.total?.days != null ? `${ov.speed.total.days}d` : "—" },
+                { label: tl("kpi", "On time"), value: ov?.speed?.onTime?.pct != null ? `${ov.speed.onTime.pct}%` : "—" },
+                { label: tl("kpi", "Shipped"), value: ov === null ? "—" : `${shippedPct}%` },
+              ]}
               bars={gmvBars}
+              aside={fanSlices.length > 1
+                ? <ChannelFan slices={fanSlices} caption={tl("kpi", "orders")} onDark />
+                : undefined}
             />
           </div>
 
-          <SectionCard
- className="h-full"
- title={tl("kpi", "Shipped")}
- bodyClassName="flex h-full flex-col items-center justify-center gap-5 p-5"
-          >
-            <Gauge pct={ov === null ? null : shippedPct} caption={t("dash.ofAllOrders")} />
-            <div className="grid w-full grid-cols-2 gap-3 text-center">
-              <div className="rounded-xl bg-muted/50 py-2.5">
-                <div className="text-lg font-bold tabular-nums">{ov === null ? "—" : stats.shipped}</div>
-                <div className="text-2xs font-medium text-muted-foreground">{t("dash.shippedLower")}</div>
-              </div>
-              <div className="rounded-xl bg-muted/50 py-2.5">
-                <div className="text-lg font-bold tabular-nums">{ov === null ? "—" : stats.total}</div>
-                <div className="text-2xs font-medium text-muted-foreground">{t("dash.allOrdersLower")}</div>
-              </div>
-            </div>
-          </SectionCard>
+          {/* The Shipped gauge went with the tile rows. Its percentage is a figure on the
+              band above and its two counts are the bracket's Shipped block and its own total
+              — a dial drawn to say a number that is already written twice on the same
+              screen. */}
         </div>
       )}
 

@@ -40,6 +40,22 @@ export type StageAges = Record<string, number>
 
 const MIX_CLASS = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4"]
 
+/**
+ * DAYS, THEN MONTHS, THEN YEARS — because this app has orders whose oldest Draft is from
+ * four years ago, and "1765d" is four digits nobody can read at a glance sitting beside a
+ * count. The old production-line card had the same maths and the same problem; it was just
+ * smaller and further down the page, so nobody looked at it.
+ *
+ * Deliberately coarse past two months. The point of this figure is "is something rotting
+ * here", and at that range the answer does not get better for being precise.
+ */
+function ageLabel(days: number, today: string): string {
+  if (days < 1) return today
+  if (days < 60) return `${Math.floor(days)}d`
+  if (days < 730) return `${Math.round(days / 30)}mo`
+  return `${(days / 365).toFixed(1)}y`
+}
+
 export function StageBracket({
   role,
   isFactory,
@@ -112,9 +128,7 @@ export function StageBracket({
         <div className="mt-0.5 flex items-baseline gap-1.5">
           <span className="text-xl font-semibold tabular-nums leading-tight">{n}</span>
           {Number.isFinite(age) && (
-            <span className="text-2xs tabular-nums opacity-60">
-              {(age as number) < 1 ? tl("stage", "today") : `${Math.floor(age as number)}d`}
-            </span>
+            <span className="text-2xs tabular-nums opacity-60">{ageLabel(age as number, tl("stage", "today"))}</span>
           )}
         </div>
         {split.length > 0 && (
