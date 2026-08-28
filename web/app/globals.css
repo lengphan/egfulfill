@@ -949,6 +949,33 @@ td[align="right"] {
   .eg-sway { animation: none; }
 }
 
+/* ── THE PRESS — the decorated garment shows through under the pointer ─────────
+   A radial mask whose centre and radius are written by pointer events straight
+   onto the element as custom properties. No React state is involved, so a
+   120Hz trackpad cannot drive a render loop.
+
+   The radius rests at 0, so with the pointer off the picture the garment is
+   blank and the layer costs nothing. `mask-image` is composited, so moving the
+   centre never triggers layout or paint.
+
+   WITHOUT A POINTER, THE GARMENT IS SIMPLY FINISHED. A touch screen has
+   nowhere to put a circle that follows a cursor it does not have, and reduced
+   motion asks for no chasing element — so both drop the mask entirely and show
+   the decorated version whole. That is the honest resting state: the product
+   as it ships, rather than a blank waiting for a gesture nobody can make. */
+.eg-press {
+  --px: 50%;
+  --py: 50%;
+  --pr: 0px;
+  -webkit-mask-image: radial-gradient(circle var(--pr) at var(--px) var(--py), #000 38%, rgba(0,0,0,.55) 62%, transparent 100%);
+  mask-image: radial-gradient(circle var(--pr) at var(--px) var(--py), #000 38%, rgba(0,0,0,.55) 62%, transparent 100%);
+  transition: --pr 240ms cubic-bezier(.16,1,.3,1);
+}
+@property --pr { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .eg-press { -webkit-mask-image: none; mask-image: none; }
+}
+
 /* ── Dithered hero plate ──────────────────────────────────────────────────────
    A 1-bit Atkinson-dithered image on a near-black canvas. The source is
  black-on-white, so `invert` flips it and `screen` keeps true black transparent

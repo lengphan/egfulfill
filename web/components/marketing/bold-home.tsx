@@ -25,6 +25,11 @@ import { EditableImage, EditableText, useEditableNum, useEditableSrc, useEditMod
  */
 
 
+/** Heroes that have a blank twin shot for them. Path only — the stored value may be absolute. */
+const PRESS_PAIRS: Record<string, string> = {
+  "/frames/hero-cap.jpg": "/frames/hero-cap-blank.jpg",
+}
+
 export function BoldHome({ content }: { content: SiteContent }) {
   // Edit mode swaps the ANIMATED text for an editable one. MaskedWords and TypedPhrase
   // own the DOM they animate, so a contentEditable inside either would be re-mounted mid-
@@ -36,6 +41,11 @@ export function BoldHome({ content }: { content: SiteContent }) {
      the server's copy; without these the picture would only jump once on Save, which is the
      dead-control failure useEditableNum exists to prevent. */
   const heroSrc = useEditableSrc("hero.image", hero.image)
+  /* Matched on the PATH, because the stored value may be a full URL and the pair is about
+     which photograph it is, not which host served it. */
+  const pressBlank = PRESS_PAIRS[(() => {
+    try { return new URL(heroSrc, "https://x.invalid").pathname } catch { return heroSrc }
+  })()]
   const heroFx = useEditableNum("hero.imageFocusX", hero.imageFocusX)
   const heroFy = useEditableNum("hero.imageFocusY", hero.imageFocusY)
   const heroZoom = useEditableNum("hero.imageScale", hero.imageScale)
@@ -93,8 +103,19 @@ export function BoldHome({ content }: { content: SiteContent }) {
           It also removes an aspect problem the same measurement exposed: the hero block runs
           1.81:1 at 1024 and 2.51:1 at 1440, so one crop was never going to serve both ends. */}
       <EditableImage path="hero.image" transform="bleed">
+      {/* ── THE PRESS ─────────────────────────────────────────────────────────────
+          The headline asks "What if every order printed itself?" — so the picture underneath
+          shows it happening. The garment is blank; the decorated version appears under the
+          pointer. See PressReveal in bold-kit.
+
+          IT ONLY ENGAGES FOR A HERO WE HAVE A BLANK TWIN OF. The hero image is admin-editable,
+          and the effect needs a matched PAIR of the same photograph — a blank guessed by
+          filename would silently pair two unrelated pictures the first time somebody uploads
+          one. No twin means no press, and the hero is the ordinary picture it has always been,
+          which is why this is a lookup and not a string transform. */}
       <MediaHero
-        media={heroSrc}
+        media={pressBlank ?? heroSrc}
+        reveal={pressBlank ? heroSrc : undefined}
         alt={hero.imageAlt}
         focusX={heroFx}
         focusY={heroFy}

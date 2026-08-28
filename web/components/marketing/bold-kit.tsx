@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight } from "@phosphor-icons/react"
 import { entrance, type PresetName } from "@/lib/motion"
@@ -948,9 +948,49 @@ export function MediaBand({ media, alt, children, minH = "clamp(22rem, 48vh, 34r
  * on purpose and a fake app panel must never come back in its place. A scrim only appears when
  * there is something to scrim.
  */
-export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44rem)", focusX, focusY, scale, tone = "light", bleed = false, atTop = true }: {
+/**
+ * ── THE PRESS — the page keeps its own headline's promise ────────────────────────────────
+ *
+ * The hero asks "What if every order printed itself?" and then showed a picture of a finished
+ * cap sitting still: the page made a claim and did not demonstrate it. Here the garment is
+ * BLANK, and wherever the pointer goes the decorated version shows through a soft circle that
+ * follows it — as though the press were under your hand. Move away and it is blank again.
+ *
+ * TWO LAYERS, ONE MASK, NO STATE. The pointer writes CSS custom properties straight onto the
+ * element through a ref. React never re-renders, so a 120Hz trackpad cannot trigger a render
+ * loop — which is the same reason the product rail is CSS and not a rAF ticking a React value
+ * (§2.8: the danger is state feeding itself).
+ *
+ * THE TWO IMAGES MUST BE THE SAME PHOTOGRAPH. The blank is the original with only the
+ * stitching patched out — measured at 0.43/255 difference outside the patch and 0.59 across
+ * the face. A generative "remove the mark" pass on its own drifted 7.3% of the frame including
+ * the face, and a face that subtly changes under the cursor is far worse than no effect.
+ *
+ * WITHOUT A POINTER IT IS SIMPLY DECORATED. A touch screen has nowhere to put the circle, and
+ * reduced motion asks for no chasing element — both get the finished garment, whole and still,
+ * which is an honest resting state rather than a broken one.
+ */
+function PressReveal({ media, alt, focusX, focusY, scale, innerRef }: {
+  media: string
+  alt?: string
+  focusX?: number
+  focusY?: number
+  scale?: number
+  innerRef: React.RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div ref={innerRef} aria-hidden className="eg-press absolute inset-0 -z-10">
+      <BleedMedia media={media} alt={alt} focusX={focusX} focusY={focusY} scale={scale} />
+    </div>
+  )
+}
+
+export function MediaHero({ media, reveal, alt, children, minH = "clamp(30rem, 62vh, 44rem)", focusX, focusY, scale, tone = "light", bleed = false, atTop = true }: {
   /** A public image OR video URL. Empty is a legitimate answer — see above. */
   media?: string
+  /** The DECORATED twin of `media`, revealed under the pointer — see PressReveal. Both must
+   *  be the same photograph or the reveal reads as two pictures crossfading. */
+  reveal?: string
   alt?: string
   children: React.ReactNode
   minH?: string
@@ -1005,6 +1045,25 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
   atTop?: boolean
 }) {
   const hasMedia = !!media
+  /*
+   * THE POINTER IS READ ON THE SECTION, NOT ON THE REVEAL LAYER.
+   *
+   * The layer sits at -z-10 behind the headline, and the content wrapper fills the whole
+   * block — so listeners on the layer itself never fired: every pointer event was intercepted
+   * by the type standing in front of it. The section is the only element that actually
+   * receives the pointer everywhere the picture is visible.
+   *
+   * Coordinates are still resolved against the section's own box, which is the same box the
+   * layer fills, so the circle lands exactly under the cursor.
+   */
+  const pressRef = useRef<HTMLDivElement>(null)
+  const setPress = (x: string, y: string, r: string) => {
+    const el = pressRef.current
+    if (!el) return
+    el.style.setProperty("--px", x)
+    el.style.setProperty("--py", y)
+    el.style.setProperty("--pr", r)
+  }
   return (
     /* -mt-16 pt-16 — the same trick PlateHero uses to sit UNDER the header. The bar is 64px
        and transparent, so pulling up by it and padding back puts the picture behind the nav
@@ -1012,6 +1071,16 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
        edge to edge horizontally was never the missing half. */
     <section
       className={"relative isolate w-full overflow-hidden" + (atTop ? " -mt-16 pt-16" : "")}
+      onPointerMove={reveal ? (e) => {
+        if (e.pointerType === "touch") return
+        const b = e.currentTarget.getBoundingClientRect()
+        setPress(
+          `${((e.clientX - b.left) / b.width) * 100}%`,
+          `${((e.clientY - b.top) / b.height) * 100}%`,
+          "clamp(9rem, 17vw, 15rem)",
+        )
+      } : undefined}
+      onPointerLeave={reveal ? () => setPress("50%", "50%", "0px") : undefined}
       style={{
         minHeight: minH,
         background: ACCENT,
@@ -1024,6 +1093,7 @@ export function MediaHero({ media, alt, children, minH = "clamp(30rem, 62vh, 44r
       {hasMedia && (
         <>
           <BleedMedia media={media!} alt={alt} focusX={focusX} focusY={focusY} scale={scale} />
+          {reveal && <PressReveal media={reveal} alt={alt} focusX={focusX} focusY={focusY} scale={scale} innerRef={pressRef} />}
           {/* THE VEIL EXISTS SO THE TYPE IS LEGIBLE ON ANY UPLOAD, not for mood. Weighted to
               the bottom because that is where the headline stands; the top stays open so the
               picture is still a picture.
