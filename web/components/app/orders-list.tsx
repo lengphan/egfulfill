@@ -289,7 +289,7 @@ export function OrdersList() {
     if (held) { settle(held, true); return undefined }
     setComplete(false)
     const ctl = new AbortController()
-    streamOrders(settle, { pageSize: 100, signal: ctl.signal })
+    streamOrders(settle, { signal: ctl.signal })
       .catch(() => { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn); setComplete(true) })
     return () => ctl.abort()
   }, [])

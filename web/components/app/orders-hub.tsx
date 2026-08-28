@@ -595,7 +595,7 @@ export function OrdersHub() {
       // Another board may already hold the whole list — take it rather than walk it again.
       const held = cachedOrders()
       if (held) { setOrders(held); setLoadErr(null); return }
-      streamOrders((rows) => { setOrders(rows); setLoadErr(null) }, { pageSize: 100, signal: ctl.signal })
+      streamOrders((rows) => { setOrders(rows); setLoadErr(null) }, { signal: ctl.signal })
         .catch((e) => { setOrders([]); setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.") })
     }, 0)
     return () => { clearTimeout(id); ctl.abort() }

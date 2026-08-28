@@ -314,7 +314,7 @@ export function DispatchBoard({ segmented }: {
       if (!getUser()) { setOrders([]); return }
       const held = cachedOrders()
       if (held) { setOrders(held); return }
-      streamOrders((rows) => setOrders(rows), { pageSize: 100, signal: ctl.signal })
+      streamOrders((rows) => setOrders(rows), { signal: ctl.signal })
         .catch(() => setOrders([]))
     }, 0)
     return () => { clearTimeout(t); ctl.abort() }

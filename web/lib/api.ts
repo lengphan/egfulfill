@@ -2250,14 +2250,23 @@ export function cachedOrders(): OrderRow[] | null {
  */
 export async function streamOrders(
   onPage: (rowsSoFar: OrderRow[], done: boolean) => void,
-  opts: { pageSize?: number; signal?: AbortSignal } = {},
+  opts: { firstPage?: number; pageSize?: number; signal?: AbortSignal } = {},
 ): Promise<OrderRow[]> {
-  const size = Math.max(1, Math.min(500, opts.pageSize ?? 100))
+  /**
+   * THE FIRST PAGE IS THE SIZE OF A SCREEN; THE REST ARE AS BIG AS THEY LIKE.
+   *
+   * A board shows 25 rows. Asking for 100 to fill 25 makes the first paint wait on four
+   * screens nobody is looking at, and asking for 100 four more times makes ten requests of
+   * what could be five. So the first ask is a screenful and the ones behind it are large.
+   */
+  const first = Math.max(1, Math.min(500, opts.firstPage ?? 25))
+  const rest = Math.max(1, Math.min(500, opts.pageSize ?? 200))
   const MAX_PAGES = 200
   const all: OrderRow[] = []
   let cursor = ""
   for (let n = 0; n < MAX_PAGES; n++) {
     if (opts.signal?.aborted) return all
+    const size = n === 0 ? first : rest
     const qs = `limit=${size}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
     const rows = resolveImgRefs(await api<OrderRow[]>(`/api/orders?${qs}`, { signal: opts.signal }))
     /**
@@ -2278,7 +2287,15 @@ export async function streamOrders(
     }
     all.push(...rows)
     const done = rows.length < size
-    onPage(all.slice(), done)
+    /**
+     * TWO RENDERS, NOT TEN.
+     *
+     * Handing every page to React made the list visibly tick: the row count, the pager and
+     * the "of N" all rewrote themselves once per request while you watched it load. Nothing
+     * after the first page changes what is ON SCREEN anyway — a board shows 25 rows — so
+     * the middle pages accumulate quietly and the total lands once, when it is true.
+     */
+    if (n === 0 || done) onPage(all.slice(), done)
     if (done) {
       // Only a COMPLETE walk may fill the shared entry. Seeding it from a partial list
       // would hand every other board a truncated one that looks whole.
