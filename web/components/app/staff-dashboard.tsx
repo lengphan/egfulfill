@@ -10,7 +10,7 @@ import { StageBadge } from "@/components/app/stage-badge"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { GmvPanel } from "@/components/app/gmv-panel"
 import { StageBracket } from "@/components/app/stage-bracket"
-import { ChannelFan } from "@/components/app/channel-fan"
+import { ChannelRing } from "@/components/app/channel-ring"
 import { getOverview, getFactoryPnl, type Overview, type FactoryPnl } from "@/lib/api"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
@@ -265,7 +265,7 @@ export function StaffDashboard() {
   * colour when a smaller one drops out of the window entirely. The server counts by
   * platform id; SLOT_OF-style capitalisation is the one place the two spellings meet. */
  const SLOT: Record<string, string> = { etsy: "Etsy", tiktok: "TikTok", shopify: "Shopify", manual: "Manual" }
- const fanSlices = Object.entries(ladder.byChannel)
+ const channelSlices = Object.entries(ladder.byChannel)
    .map(([k, n]) => ({ name: SLOT[k] ?? k.charAt(0).toUpperCase() + k.slice(1), n }))
    .filter((s) => s.n > 0)
    .sort((a, b) => b.n - a.n)
@@ -411,8 +411,8 @@ export function StaffDashboard() {
                 { label: tl("kpi", "Shipped"), value: ov === null ? "—" : `${shippedPct}%` },
               ]}
               bars={gmvBars}
-              aside={fanSlices.length > 1
-                ? <ChannelFan slices={fanSlices} caption={tl("kpi", "orders")} />
+              aside={channelSlices.length > 1
+                ? <ChannelRing slices={channelSlices} caption={tl("kpi", "orders")} />
                 : undefined}
             />
           </div>
