@@ -785,7 +785,7 @@ function TeamPanel() {
  title={on ? `${s.label} — shared, click to stop sharing` : `${s.label} — not shared, click to share`}
  className={"eg-tap rounded-lg px-2.5 py-1 text-xs font-medium transition-colors " +
                           (on
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            ? "eg-selected hover:bg-primary/90"
  : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground")}
                       >
                         {tl("settings", s.label)}
@@ -1773,7 +1773,7 @@ function PlatformPanel() {
  disabled={on && sd === "front"}
  title={sd === "front" ? tl("settings", "Every product has a front") : undefined}
  className={"eg-tap rounded-lg px-2.5 py-1 text-xs font-medium capitalize transition-colors " +
-                          (on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
+                          (on ? "eg-selected" : "bg-muted text-muted-foreground hover:text-foreground")}
                       >
                         {sd}
                       </button>
@@ -2718,7 +2718,7 @@ function ActivityPanel() {
  className={
                   "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " +
                   (on
-                    ? "border-primary bg-primary text-primary-foreground"
+                    ? "border-selected eg-selected"
  : "border-input bg-card text-muted-foreground hover:text-foreground")
                 }
               >

@@ -78,7 +78,7 @@ function ColourGroups({ variants, name, picked, onToggle, onQty }: {
  title={`SKU ${r.sku}`}
  onClick={() => onToggle({ sku: r.sku, name, variant: [r.color, r.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(r.price), image: r.image ?? undefined })}
  className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors "
-                        + (on ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
+                        + (on ? "border-selected eg-selected" : "border-border hover:bg-muted")}
                     >
                       {label}
                     </button>

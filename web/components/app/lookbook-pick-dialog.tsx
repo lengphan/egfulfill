@@ -97,7 +97,7 @@ export function LookbookPickDialog({
                   <button
                     key={o.value} type="button" onClick={() => toggle(o.value)} aria-pressed={on}
                     className={"min-w-10 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors "
-                      + (on ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted")}
+                      + (on ? "border-selected eg-selected" : "border-border text-muted-foreground hover:bg-muted")}
                   >
                     {o.value}
                   </button>

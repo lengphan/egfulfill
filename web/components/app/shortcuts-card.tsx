@@ -116,7 +116,7 @@ export function ShortcutsCard({
         <button
  onClick={() => { setEditing((e) => !e); setAddOpen(false) }}
  aria-pressed={editing}
- className={"eg-tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors " + (editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+ className={"eg-tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors " + (editing ? "eg-selected" : "text-muted-foreground hover:text-foreground")}
         >
           {editing ? <><Check size={13} weight="bold" /> {t("dash.done")}</> : <><PencilSimple size={13} weight="bold" /> {t("dash.edit")}</>}
         </button>

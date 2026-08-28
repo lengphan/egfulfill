@@ -316,7 +316,7 @@ export function SupplierDetailDialog({
                           // Sized to be HIT as well as read. These were 10px text in a 2px
                           // pad — a target you aim at, on the control you are here to use.
  className={"min-w-9 rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors "
-                            + (z === size ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
+                            + (z === size ? "border-selected eg-selected" : "border-border hover:bg-muted")}
                         >
                           {z}
                         </button>

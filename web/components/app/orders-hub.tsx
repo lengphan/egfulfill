@@ -1736,7 +1736,7 @@ export function OrdersHub() {
  onClick={() => setQuery({ ...query, status: on ? "" : p.value })}
  aria-pressed={on}
  title={on && p.value ? `Showing ${p.label} only — click to clear` : undefined}
- className={"eg-tap h-8 rounded-md px-2.5 text-sm font-medium transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+ className={"eg-tap h-8 rounded-md px-2.5 text-sm font-medium transition-colors " + (on ? "eg-selected" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
                 >
                   {tl("stage", p.label)}
                   {/* A COUNT, so you know whether it's worth going in. Only on the two pills

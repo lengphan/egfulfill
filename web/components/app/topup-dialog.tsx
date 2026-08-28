@@ -404,7 +404,7 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {PROVIDERS.map((p) => (
-          <button key={p.key} onClick={() => setProvider(p)} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (provider.key === p.key ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}>{p.key}</button>
+          <button key={p.key} onClick={() => setProvider(p)} className={"rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors " + (provider.key === p.key ? "border-selected eg-selected" : "border-border hover:bg-accent")}>{p.key}</button>
         ))}
       </div>
 
