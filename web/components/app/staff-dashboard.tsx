@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type ElementType } from "react"
 import Link from "next/link"
-import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, Tray, MagnifyingGlass, GearSix, Wrench, Truck, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
+import { useRouter } from "next/navigation"
+import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TabBar } from "@/components/app/tab-bar"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -10,6 +11,7 @@ import { ProductionLine } from "@/components/app/production-line"
 import { FulfillmentSpeed } from "@/components/app/fulfillment-speed"
 import { ShortcutsCard, type ShortcutItem } from "@/components/app/shortcuts-card"
 import { GmvPanel } from "@/components/app/gmv-panel"
+import { StageBracket } from "@/components/app/stage-bracket"
 import { getOverview, getFactoryPnl, type Overview, type FactoryPnl } from "@/lib/api"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf } from "@/lib/order-format"
@@ -134,10 +136,13 @@ export function StaffDashboard() {
   // strings in data structures, so they translate through useLabelT (keyed by the value)
   // rather than being restructured into keys.
  const tl = useLabelT()
+ const router = useRouter()
  const role = getUser()?.role || ""
  const name = getUser()?.name || t("dash.there")
  const isAdmin = role === "admin"
- const isWarehouse = role === "warehouse"
+ /* isWarehouse is gone: what it used to select was two hand-written lists of stage tiles,
+  * and that difference now lives in the bracket — where canSetStage decides it from the same
+  * rules the server enforces, rather than from two arrays that could drift from them. */
  const [ov, setOv] = useState<Overview | null>(null)
   // Leaving orders null on failure keeps every tile at "—" instead of asserting a factory
   // with nothing in it. A staff dashboard reading all-zeros during an outage is how a
@@ -281,19 +286,36 @@ export function StaffDashboard() {
       { label: tl("kpi", "Orders"), value: money.count, sub: tl("rangesub", rangeMeta.sub), icon: Package },
       { label: tl("kpi", "Avg order"), value: usd(money.aov), sub: tl("kpisub", "per order"), icon: Receipt },
     ]
- : isWarehouse
-      ? [
-        { label: tl("kpi", "To receive"), value: stats.newCount, sub: tl("kpisub", "new intake"), icon: Tray, neg: true },
-        { label: tl("kpi", "In production"), value: stats.production, sub: tl("kpisub", "scan → pack"), icon: GearSix },
-        { label: tl("kpi", "Working"), value: stats.ready, sub: tl("kpisub", "being made"), icon: Wrench, pos: true },
-        { label: tl("kpi", "Shipped"), value: stats.shipped, sub: t("kpi.pctOfAll", { pct: shippedPct }), icon: Truck, pos: true },
-      ]
- : [
-        { label: tl("kpi", "New"), value: stats.newCount, sub: tl("kpisub", "awaiting start"), icon: Tray, neg: true },
-        { label: tl("kpi", "In review"), value: stats.review, sub: tl("kpisub", "artwork check"), icon: MagnifyingGlass },
-        { label: tl("kpi", "In production"), value: stats.production, sub: tl("kpisub", "scan → pack"), icon: GearSix },
-        { label: tl("kpi", "Shipped"), value: stats.shipped, sub: t("kpi.pctOfAll", { pct: shippedPct }), icon: Truck, pos: true },
-      ]
+    /* The two floor roles have no tiles: their stage counts are the BRACKET below, which
+     * says the same things in the real vocabulary and adds the two these were missing.
+     * "In review" was never a stage label — the id is in_review and it reads Pending — and
+     * "In production · scan → pack" described a pick/pack ladder that normalizeStage folds
+     * onto `working`. Approved and Hold had nowhere to appear at all. */
+ : []
+
+  /* THE LADDER. `Overview.counts` is already the stage vocabulary — draft, pending,
+   * approved, working, shipped, onHold — under the server's own spelling, and `line`
+   * carries the per-stage channel split. Both come off one read; nothing new is fetched.
+   *
+   * The map is the only place the two spellings meet: the endpoint says `pending`, the
+   * canonical id is `in_review`, and `""` is Draft. */
+ const ladder = useMemo(() => {
+ const c = ov?.counts
+ const counts: Record<string, number> = {
+      "": c?.draft ?? 0,
+ in_review: c?.pending ?? 0,
+ approved: c?.approved ?? 0,
+ working: c?.working ?? 0,
+ shipped: c?.shipped ?? 0,
+ on_hold: c?.onHold ?? 0,
+    }
+ const mix: Record<string, Record<string, number>> = {}
+ for (const row of ov?.line ?? []) {
+ const id = row.id === "pending" ? "in_review" : row.id === "draft" ? "" : row.id === "onHold" ? "on_hold" : row.id
+ if (row.byPlatform) mix[id] = row.byPlatform
+    }
+ return { counts, mix }
+  }, [ov])
 
   // Shortcut catalog = every page this role can actually reach (nav boards + tools), so the
   // launcher never offers a link that would just bounce. /overview is this page, so it's
@@ -374,15 +396,34 @@ export function StaffDashboard() {
  role-tuned, so warehouse and operator get their production counts in the same
  shape admin gets money in.
  orders===null means NOT READ, so every tile shows — rather than 0. */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        {cards.map((c) => (
-          <MiniStat
+      {cards.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          {cards.map((c) => (
+            <MiniStat
  key={c.label}
  label={c.label}
  value={ov === null ? "—" : String(c.value)}
  icon={c.icon}
-          />
-        ))}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* WHERE THE WORK IS, and — for operator and warehouse — which part of it is theirs.
+          A block is a link into the queue at that stage; the ones past this role's reach are
+          drawn dashed and say why on hover. */}
+      <div>
+        <p className="eg-label mb-2 text-muted-foreground">{tl("kpi", "Where the work is")}</p>
+        <StageBracket
+ role={role}
+          /* NOT isFactory. That flag is about one ORDER's path — a job the floor raised for
+           * itself never sits at Pending — and this is a summary of every order, most of
+           * which are sellers' and all of which pass through it. Dropping it here hid 26
+           * orders from the operator whose whole job on this line is approving them. */
+ counts={ladder.counts}
+ mix={ladder.mix}
+ onPick={(stage) => router.push(`/production?stage=${encodeURIComponent(stage)}`)}
+        />
       </div>
 
       {/* Money chart + the one rate worth a gauge. Admin only, like the money itself. */}
