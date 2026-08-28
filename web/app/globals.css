@@ -252,7 +252,16 @@
    * Status colours are untouched: emerald still means shipped, amber still means warning.
    * Those carry meaning on the floor and must not be crowded by a brand hue.
    */
-    --primary: oklch(0.1822 0.0000 89.88);
+  /* THE SAME SLATE THE RAIL IS. `--sidebar` is oklch(0.335 0.010 250) — #33373C — and this
+     was a near-neutral black at 0.182, so the most-pressed control in the product and the
+     panel down the left were two different darks that never quite agreed.
+     One value now. It is still ink by any measure that matters: 11.98:1 as a fill on a white
+     card and as text on one, against a 4.5:1 floor, and it is nowhere near light — the rule
+     this token may not break is that it can never become a LIGHT value, because it letters
+     as well as fills. A softer dark is not a lighter one.
+     Dark mode is untouched: there the primary is near-white, because a fill has to invert
+     when the surface behind it does. */
+    --primary: oklch(0.335 0.010 250);
   /* WHITE, NOT LIME. Every filled button in the product read as lime on electric violet —
    * 5.08:1, the weakest pair in the app, on the most-pressed control. White on cobalt is
    * 6.02:1: more contrast and one less colour. */
