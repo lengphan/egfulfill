@@ -894,7 +894,7 @@ export function DesignMaker() {
  onClick={() => setTool(key)}
  aria-current={tool === key ? "true" : undefined}
  className={"flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-2xs font-medium transition-colors " +
-                (tool === key ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+                (tool === key ? "eg-selected" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
             >
               <Icon size={19} weight={tool === key ? "fill" : "regular"} />
               {tl("designMaker", label)}

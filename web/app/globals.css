@@ -43,7 +43,6 @@
     --color-sidebar-accent: var(--sidebar-accent);
     --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
-  /* THE THING THAT IS CHOSEN. See the token itself for why it is not --primary. */
     --color-selected: var(--selected);
     --color-selected-foreground: var(--selected-foreground);
     --color-sidebar-foreground: var(--sidebar-foreground);
@@ -149,21 +148,7 @@
    *
    * `rounded-badge` is the single exception the direction allows — the chip is the one
    * element SQUARER than a button, which is what now distinguishes it. */
-/**
- * THE SELECTED THING, as one class rather than as fresh Tailwind every time.
- *
- * This idea was written out by hand as `bg-primary/10 text-primary` in 29 files. That is the
- * shape a house rule dies in: nobody was careless, there was simply nothing to import, so
- * every new selected state was two more utility classes chosen from memory — and half of
- * them picked a different opacity.
- *
- * A ground carrying ink. Never a border, never a fill you have to hunt for: pair it with the
- * element's own shape, and let the colour say only "this one".
- */
-.eg-selected {
-  background-color: var(--selected);
-  color: var(--selected-foreground);
-}
+
 
     /* CONTROL STEPS. sm/md/lg are what Button, Input and .eg-control resolve through, and
      * pointing them at --radius its 26px made every 32px control a full capsule — a badge
@@ -769,6 +754,22 @@ td[align="right"] {
 
    Height matches the Button's default so a mixed row still sits on one line.
    ── */
+/**
+ * THE SELECTED THING, as one class rather than as fresh Tailwind every time.
+ *
+ * This idea was written out by hand as `bg-primary/10 text-primary` in 29 files. That is the
+ * shape a house rule dies in: nobody was careless, there was simply nothing to import, so
+ * every new selected state was two more utility classes chosen from memory — and half of
+ * them picked a different opacity.
+ *
+ * A ground carrying ink. Never a border, never a fill you have to hunt for: pair it with the
+ * element's own shape, and let the colour say only "this one".
+ */
+.eg-selected {
+  background-color: var(--selected);
+  color: var(--selected-foreground);
+}
+
 .eg-control {
  display: inline-flex;
  align-items: center;

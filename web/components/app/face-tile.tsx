@@ -42,7 +42,7 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
       aria-current={active ? "true" : undefined}
       title={has ? `${label} — has artwork` : `${label} — empty`}
       className={"group flex w-full flex-col items-center gap-1 rounded-lg border p-1 transition-colors "
-        + (active ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-accent/50")}
+        + (active ? "border-selected eg-selected" : "border-transparent hover:border-border hover:bg-accent/50")}
     >
       <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-muted/40">
         {url && (
@@ -63,7 +63,7 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
         ))}
       </span>
       <span className={"w-full truncate text-center text-[10px] font-medium capitalize leading-none "
-        + (active ? "text-primary" : "text-muted-foreground")}>{label}</span>
+        + (active ? "" : "text-muted-foreground")}>{label}</span>
       {extra && (
         <span className="text-[9px] leading-none tabular-nums text-muted-foreground">{extra}</span>
       )}

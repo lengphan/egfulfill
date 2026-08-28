@@ -39,7 +39,7 @@ export function ZoomControl() {
         title={`Content zoom — ${zoomLabel(zoom)}`}
         className={
           "eg-tap relative inline-flex size-9 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " +
-          (on ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")
+          (on ? "eg-selected" : "text-muted-foreground hover:bg-accent hover:text-foreground")
         }
       >
         {/* Aa, NOT a magnifying glass with a plus in it. This sat one button away from

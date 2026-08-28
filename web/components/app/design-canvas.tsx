@@ -507,7 +507,7 @@ export function DesignStage({
  title={locked ? tl("canvas", "Unlock — let it be moved again") : tl("canvas", "Lock in place")}
  aria-label={locked ? tl("canvas", "Unlock") : tl("canvas", "Lock in place")}
  aria-pressed={locked}
- className={stripBtn + (locked ? " bg-primary/10 text-primary" : "")}
+ className={stripBtn + (locked ? " eg-selected" : "")}
         >
           {locked ? <Lock size={stripIcon} weight="fill" /> : <LockOpen size={stripIcon} weight="bold" />}
         </button>
@@ -2514,7 +2514,7 @@ export function DesignCanvasDialog({
                 ? tl("canvas", "Put our product photo back")
  : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
  aria-label={ownMockups[sideKey] ? tl("canvas", "Use our product photo") : tl("canvas", "Use my own product photo")}
- className={railBtn + (ownMockups[sideKey] ? " bg-primary/10 text-primary" : "")}
+ className={railBtn + (ownMockups[sideKey] ? " eg-selected" : "")}
             >
               {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
               <span className={railWord}>{ownMockups[sideKey] ? tl("canvas", "Our photo") : tl("canvas", "Mockup")}</span>
