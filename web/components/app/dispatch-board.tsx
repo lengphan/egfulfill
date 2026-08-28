@@ -1071,10 +1071,15 @@ export function DispatchBoard({ segmented }: {
               segmented control whose active half went solid `bg-primary` — the same fill as
               the Finish All button four inches to its right, so the row had two black
               rectangles meaning completely different things. A rule under the live word. */}
+          {/* SAME FAMILY AS THE FILTERS BESIDE IT. An underline bar butted straight against
+              the filters' segmented track read as two different kinds of control jammed into
+              one row — which is what "messy" is here. Both are ways of narrowing the same
+              list, so both take the same shape and the row reads as one strip. */}
           <TabBar
             size="sm"
+            look={inShell ? "segmented" : "line"}
             ariaLabel="Dispatch view"
-            className={"shrink-0 border-b-0 " + (inShell ? "order-1" : "")}
+            className={"shrink-0 " + (inShell ? "order-1 mb-0" : "border-b-0")}
             items={[
               { id: "queue" as const, label: tl("dispatch", "To scan") },
               { id: "history" as const, label: tl("dispatch", "History"), count: history.length || undefined },
@@ -1141,15 +1146,23 @@ export function DispatchBoard({ segmented }: {
           {/* ml-auto: with the filter chips added, the batch count and Select all were being
  wrapped to a second line one at a time and reading as stray controls. Pinned
  right, they wrap together as the pair they are. */}
+          {/* HOW MANY THIS ROW IS ABOUT. Row B held a search box and Select-all separated by
+              a third of the width of dead space. /orders puts "962 orders" beside its
+              utilities for the same reason: the number is what the controls act on. */}
+          {inShell && view === "queue" && (
+            <span className="order-5 ml-auto whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+              {rows.length} {rows.length === 1 ? "row" : "rows"}
+            </span>
+          )}
           {view === "queue" && chosen.length + extPicked.size > 0 && (
-            <span className={"ml-auto text-muted-foreground " + (inShell ? "order-5 text-sm" : "text-xs")}>{chosen.length + extPicked.size} in this batch</span>
+            <span className={"text-muted-foreground " + (inShell ? "order-5 text-sm" : "ml-auto text-xs")}>{chosen.length + extPicked.size} in this batch</span>
           )}
           {/* ONE select-all for one table. It used to be two — this one for orders, another
  in the external card's header — which meant "select all" never selected all of
  what was on screen, and the count in each button was a count of half the list. */}
           {view === "queue" && (
             <Button size="sm" variant="outline" disabled={!selectableAll} onClick={toggleAllRows}
-              className={inShell ? "order-6 ml-auto" : undefined}>
+              className={inShell ? "order-6" : undefined}>
               {allSelected ? tl("dispatch", "Clear selection") : `Select all ${selectableAll}`}
             </Button>
           )}

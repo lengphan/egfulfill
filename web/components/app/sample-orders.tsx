@@ -239,7 +239,7 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
           icon={Package}
           size="sm"
           title={tl("samples", "No samples recorded yet")}
-          note={tl("samples", "Record one from a supplier’s row and its cost books straight to the factory wallet.")}
+          note={tl("samples", "Record one from a supplier’s row.")}
         />
       ) : (
         <div className="overflow-x-auto">
@@ -283,7 +283,12 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
                     <div className="max-w-[240px] truncate">{s.supplierTitle || s.sellerName || "—"}</div>
                     {s.note && <div className="max-w-[240px] truncate text-xs text-muted-foreground">{s.note}</div>}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{usd(s.amount)}</td>
+                  {/* Where this number lands, on the number itself — asked for, not served.
+                      It replaces a standing footnote under the whole table. */}
+                  <td className="px-4 py-2 text-right tabular-nums"
+                      title={tl("samples", "Booked to the factory wallet at place time — it shows as spent even if the sample never arrives. Appears in Finance under Sample.")}>
+                    {usd(s.amount)}
+                  </td>
                   <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{s.qty ?? "—"}</td>
                   <td className="px-4 py-2 text-muted-foreground">{when(s.placedAt)}</td>
                   <td className="px-4 py-2">
@@ -313,10 +318,10 @@ export function SampleOrdersPanel({ reloadKey = 0 }: { reloadKey?: number }) {
           </table>
         </div>
       )}
-      <div className="flex items-start gap-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-        <Warning size={14} weight="fill" className="mt-0.5 shrink-0 text-hold" />
-        {tl("samples", "Booked at place time, so a sample that never arrives still shows as spent — which it is. It appears in Finance under")} <span className="font-medium text-foreground">{tl("samples", "Sample")}</span>{tl("samples", ", and in the suppliers partner statement.")}
-      </div>
+      {/* THE FOOTNOTE IS GONE (§4). Two sentences under a populated table, standing there
+          every time anyone opened Sourcing, explaining an accounting rule nobody was asking
+          about at that moment. Where a sample's cost lands is a fact about the ROW, so it
+          rides the row's own cost cell as a title, and Finance is where you go to see it. */}
     </SectionCard>
   )
 }
