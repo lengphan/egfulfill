@@ -38,10 +38,20 @@ export function FulfillmentSpeed({ orders, loading, speed }: { orders?: OrderRow
   // eight lines of type and the figures — the only thing anyone reads here — had to
   // compete with a grey gloss on every one of them. The label carries the meaning;
   // On-time absorbs its yardstick into its name rather than losing it.
- const rows: { icon: typeof Timer; label: string; stat: SpeedStat; accent: string }[] = [
-    { icon: Timer, label: tl("speed", "Production"), stat: s.production, accent: "text-working" },
-    { icon: Truck, label: tl("speed", "Transit"), stat: s.transit, accent: "text-packed" },
-    { icon: Clock, label: tl("speed", "Total lead time"), stat: s.total, accent: "text-foreground" },
+  /* INK, NOT STATUS HUES.
+   *
+   * Production was painted `text-working` and Transit `text-packed` — violet and sky, two of
+   * the eight colours that carry MEANING on the floor. A lead time is not a stage, so a
+   * number wearing "working" is a false signal in the one vocabulary that has to stay
+   * trustworthy: the same violet three inches away, on a Working chip, means something.
+   *
+   * Four scalars are stat tiles, not a series, and colour on all of them says nothing anyway.
+   * On-time keeps its colour below because that one IS a status — it is measured against a
+   * threshold and crossing it is the point. */
+ const rows: { icon: typeof Timer; label: string; stat: SpeedStat }[] = [
+    { icon: Timer, label: tl("speed", "Production"), stat: s.production },
+    { icon: Truck, label: tl("speed", "Transit"), stat: s.transit },
+    { icon: Clock, label: tl("speed", "Total lead time"), stat: s.total },
   ]
 
  return (
@@ -65,7 +75,7 @@ export function FulfillmentSpeed({ orders, loading, speed }: { orders?: OrderRow
                 <Icon size={17} weight="regular" className="shrink-0 text-muted-foreground" />
                 <div className="min-w-0 truncate text-sm font-medium leading-tight">{r.label}</div>
                 <div className="ml-auto text-right">
-                  <div className={"text-xl font-bold tabular-nums leading-none " + (r.stat.days === null ? "text-muted-foreground" : r.accent)}>{fmtDays(r.stat.days)}</div>
+                  <div className={"text-xl font-bold tabular-nums leading-none " + (r.stat.days === null ? "text-muted-foreground" : "text-foreground")}>{fmtDays(r.stat.days)}</div>
                   <div className="mt-1 text-2xs text-muted-foreground">{r.stat.n ? (r.stat.n === 1 ? t("dash.oneOrder") : t("dash.nOrders", { n: r.stat.n })) : t("dash.noDataYet")}</div>
                 </div>
               </div>

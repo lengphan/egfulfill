@@ -170,17 +170,24 @@ export function ProductionLine({ orders, line }: { orders?: OrderRow[]; line?: O
               )}
             </div>
 
-            {/* Oldest-waiting, muted: context for the count rather than a competing number.
-                Fixed width so it never shoves the counts out of their column. */}
-            <div className="w-12 shrink-0 text-right text-2xs tabular-nums text-muted-foreground/70">
+            {/* AGE LEADS NOW, and the count is the context.
+             *
+             * The two were the other way round until the stage bracket went in above this
+             * card, which says the count and the channel mix for every stage in its own
+             * right. Repeating them here as the loudest thing on the row made one screen
+             * answer "how many" twice and "how long" never — and how long is the question
+             * only this card can answer. A stage holding old work is a different problem
+             * from a busy one, which is the reason `oldest` is computed at all.
+             *
+             * Value at the end of the ROW, not the end of the bar: a 2%-wide stack has
+             * nowhere to put a label, and a number that moves with the bar is one you have
+             * to hunt for. Right-aligned and tabular so the digits read as a column. */}
+            <div className={"w-14 shrink-0 text-right text-sm font-semibold tabular-nums " + (r.n ? "text-foreground" : "text-muted-foreground/60")}>
               {r.n ? ageLabel(r.oldest, t("dash.today")) : ""}
             </div>
 
-            {/* Value at the end of the ROW, not the end of the bar: a 2%-wide stack has
-                nowhere to put a label, and a number that moves with the bar is one you have
-                to hunt for. Right-aligned and tabular so the digits read as a column. */}
-            <div className={"w-10 shrink-0 text-right text-sm font-semibold tabular-nums " + (r.n ? "text-foreground" : "text-muted-foreground/60")}>
-              {r.n}
+            <div className="w-9 shrink-0 text-right text-2xs tabular-nums text-muted-foreground/70">
+              {r.n || ""}
             </div>
           </div>
 
