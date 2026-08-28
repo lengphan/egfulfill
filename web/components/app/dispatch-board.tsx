@@ -1236,16 +1236,16 @@ export function DispatchBoard({ segmented }: {
           {/* ml-auto: with the filter chips added, the batch count and Select all were being
  wrapped to a second line one at a time and reading as stray controls. Pinned
  right, they wrap together as the pair they are. */}
-          {/* HOW MANY THIS ROW IS ABOUT. Row B held a search box and Select-all separated by
-              a third of the width of dead space. /orders puts "962 orders" beside its
-              utilities for the same reason: the number is what the controls act on. */}
-          {inShell && view === "queue" && (
-            <span className="order-5 ml-auto whitespace-nowrap text-sm text-muted-foreground tabular-nums">
-              {rows.length} {rows.length === 1 ? "row" : "rows"}
-            </span>
-          )}
+          {/* THE COUNT IS ALREADY ON THE CHIP. This printed the same number twice, 400px
+              apart: the live filter always carries its own count ("All · 14", "External ·
+              2"), and `rows.length` IS that filter's result — so "14 rows" restated the
+              chip the eye had just read. It also cost the row exactly the width it did not
+              have: 977px of space against ~987px of controls, which pushed Select-all onto
+              a line of its own and made one utility row read as two. That wrap is most of
+              what "cluttered" was here.
+              /orders keeps its "962 orders" because /orders has no counted filter chips. */}
           {view === "queue" && chosen.length + extPicked.size > 0 && (
-            <span className={"text-muted-foreground " + (inShell ? "order-5 text-sm" : "ml-auto text-xs")}>{chosen.length + extPicked.size} in this batch</span>
+            <span className={"text-muted-foreground " + (inShell ? "order-5 ml-auto text-sm" : "ml-auto text-xs")}>{chosen.length + extPicked.size} in this batch</span>
           )}
           {/* ONE select-all for one table. It used to be two — this one for orders, another
  in the external card's header — which meant "select all" never selected all of
@@ -1254,7 +1254,10 @@ export function DispatchBoard({ segmented }: {
               job is reshaping the table, not acting on it. Same place /orders puts it. */}
           {inShell && view === "queue" && (
             <ColumnsMenu
-              className="order-6"
+              /* ml-auto lives on whichever right-hand element comes first: the batch count
+                 only exists while something is ticked, so without it here the pair would
+                 drift back to the middle the moment a selection is cleared. */
+              className="order-6 [&:first-of-type]:ml-auto"
               cols={DISPATCH_COLS}
               order={colOrder}
               hidden={hiddenCols}
