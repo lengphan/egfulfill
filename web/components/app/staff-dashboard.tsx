@@ -1,9 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ElementType } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { SquaresFour, Package, ArrowRight, CircleNotch, Warning, CurrencyDollar, TrendUp, Receipt } from "@phosphor-icons/react"
+import { SquaresFour, ArrowRight, CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TabBar } from "@/components/app/tab-bar"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -57,45 +57,8 @@ const SHORTCUT_DESC: Record<string, string> = {
   "/developers": "API keys",
 }
 
-/**
- * A compact KPI tile — icon chip, figure, label.
- *
- * Local to this page rather than a variant of the shared `StatCard`, which is deliberately
- * chipless: a row of tinted chips reads as stickers before it reads as data, and that rule
- * still holds on the pages that use it. This dashboard is the exception on purpose, so the
- * exception lives here and can't leak onto the queue boards.
- */
-function MiniStat({
- label, value, icon: Icon,
-}: {
- label: string
- value: string
- icon: ElementType
- tone?: "pos" | "neg"
-}) {
-  const tl = useLabelT()
- return (
-    <div className="rounded-2xl border border-border/70 bg-card/85 p-4 backdrop-blur-sm">
-      <div className="flex items-start gap-3">
-        {/* The glyph goes LIME on dark. "Large fills only, never text" is a rule about the
- light theme, where the accent measures 1.19:1 on white and disappears; on the
- dark card the same colour is 16.56:1 and is what globals.css already uses for the
- selected nav item. Five tiles across the top of the page is where the accent
- earns its keep — it was violet-on-violet-wash here, which is a tint, not a
- colour. */}
-        <Icon size={18} weight="bold" className="mt-0.5 shrink-0 text-primary dark:bg-brand/15 dark:text-brand" />
-        <div className="min-w-0">
-          <div className="text-2xl font-black leading-none tracking-tight tabular-nums">{value}</div>
-          <div className="mt-2 truncate eg-label text-muted-foreground">{tl("kpi", label)}</div>
-          {/* NO CAPTION. These read as explanations of the figure above them ("we earned",
-              "after $73 costs", "per order") and the owner's call is that the figure and its
- label carry it. Dropped here rather than at each call site so nothing can
- reintroduce one by passing `sub`. */}
-        </div>
-      </div>
-    </div>
-  )
-}
+// MiniStat went with the tile rows it existed for. Every figure it used to draw is now
+// either a side figure on the money panel or a block on the stage bracket.
 
 /**
  * A ring gauge. `pct` null means NOT READ — the ring stays empty and the centre says "—",
@@ -239,8 +202,9 @@ export function StaffDashboard() {
  const moneySide = useMemo(() => ([
     { label: tl("kpi", "Our revenue"), value: pnl ? usd(pnl.income) : "—", sub: tl("kpisub", pnl?.known ? "we earned" : "nothing booked") },
     { label: tl("kpi", "Profit"), value: pnl?.known ? usd(pnl.profit) : "—", sub: pnl?.known ? t("kpi.afterCosts", { cost: usd(Math.abs(pnl.cost)) }) : tl("kpisub", "nothing booked") },
+    { label: tl("kpi", "Orders"), value: ov === null ? "—" : String(money.count), sub: tl("rangesub", rangeMeta.sub) },
     { label: tl("kpi", "Avg order"), value: ov === null ? "—" : usd(money.aov), sub: tl("kpisub", "per order") },
-  ]), [pnl, ov, money.aov, t, tl])
+  ]), [pnl, ov, money.aov, money.count, rangeMeta.sub, t, tl])
 
   /**
    * GMV per day across the window, scaled 0..1 — the shape of the run, nothing more.
@@ -265,30 +229,16 @@ export function StaffDashboard() {
   // Admin gets the money view — revenue, profit, volume, average — read over the chosen
   // window; the production counts it used to show now live in the Production line chart
   // below. Warehouse/operator keep the production tiles (a bit less than admin).
- const cards: { label: string; value: string | number; sub: string; icon: typeof Package; pos?: boolean; neg?: boolean }[] = isAdmin
-    ? [
-      // GMV, NOT REVENUE. This is orders.total — what buyers paid SELLERS on their own
-      // marketplaces. It flows through the platform; it is not money we receive, and
-      // calling it revenue is what made a $0 profit beside it look like a catastrophe
-      // rather than a missing calculation.
-      { label: tl("kpi", "GMV"), value: usd(money.revenue), sub: t("kpi.throughPlatform", { window: tl("rangesub", rangeMeta.sub) }), icon: CurrencyDollar, pos: true },
-      // OUR income, from the ledger — order charges and subscriptions booked to `factory`.
-      { label: tl("kpi", "Our revenue"), value: pnl ? usd(pnl.income) : "—",
- sub: pnl ? (pnl.known ? tl("rangesub", rangeMeta.sub) : tl("kpisub", "nothing booked yet")) : tl("kpisub", "loading"), icon: Receipt, pos: true },
-      // Income minus cost over the same window. Both sides are real ledger rows: a label
-      // cost is booked when a label is bought, an order charge when a seller is charged.
-      { label: tl("kpi", "Profit"), value: pnl && pnl.known ? usd(pnl.profit) : "—",
- sub: pnl && pnl.known ? t("kpi.afterCosts", { cost: usd(Math.abs(pnl.cost)) }) : tl("kpisub", "nothing booked yet"),
- icon: TrendUp, pos: !!(pnl && pnl.profit > 0), neg: !!(pnl && pnl.profit < 0) },
-      { label: tl("kpi", "Orders"), value: money.count, sub: tl("rangesub", rangeMeta.sub), icon: Package },
-      { label: tl("kpi", "Avg order"), value: usd(money.aov), sub: tl("kpisub", "per order"), icon: Receipt },
-    ]
-    /* The two floor roles have no tiles: their stage counts are the BRACKET below, which
-     * says the same things in the real vocabulary and adds the two these were missing.
-     * "In review" was never a stage label — the id is in_review and it reads Pending — and
-     * "In production · scan → pack" described a pick/pack ladder that normalizeStage folds
-     * onto `working`. Approved and Hold had nowhere to appear at all. */
- : []
+ /* NO TILE ROW, for any role.
+  *
+  * Admin's five were GMV, Our revenue, Profit, Orders and Avg order — and the money panel
+  * directly beneath them opened with the same GMV and carried three of the other four. One
+  * screen said $18,665 twice, eighteen inches apart. Orders was the only figure the panel
+  * did not already have, so it joined the side figures and the row went.
+  *
+  * The two floor roles lost theirs earlier for a different reason: their tiles were stage
+  * counts in a vocabulary that had drifted from the system. Both roads end here — the money
+  * is the panel, the stages are the bracket, and neither is drawn twice. */
 
   /* THE LADDER. `Overview.counts` is already the stage vocabulary — draft, pending,
    * approved, working, shipped, onHold — under the server's own spelling, and `line`
@@ -408,19 +358,6 @@ export function StaffDashboard() {
  role-tuned, so warehouse and operator get their production counts in the same
  shape admin gets money in.
  orders===null means NOT READ, so every tile shows — rather than 0. */}
-      {cards.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-          {cards.map((c) => (
-            <MiniStat
- key={c.label}
- label={c.label}
- value={ov === null ? "—" : String(c.value)}
- icon={c.icon}
-            />
-          ))}
-        </div>
-      )}
-
       {/* WHERE THE WORK IS, and — for operator and warehouse — which part of it is theirs.
           A block is a link into the queue at that stage; the ones past this role's reach are
           drawn dashed and say why on hover. */}
