@@ -14,7 +14,7 @@ import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { designSrc } from "@/lib/order-image"
-import { VariantPicker } from "@/components/app/variant-picker"
+import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
 import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
@@ -980,11 +980,37 @@ export function DesignCanvasDialog({
  /** The catalogue row this line resolves to. Lifted OUT of the faces memo because the
   *  print area and the printable rectangle are the product's, not the mockup's — and the
   *  order dialog had no way to ask for either. */
- const product = useMemo(() => resolveProduct(item, catalog ?? []), [item, catalog])
+  /**
+   * THE LINE AS IT STANDS RIGHT NOW, including a change made in this window.
+   *
+   * The dialog is handed a SNAPSHOT of the line — the order list holds `editing` as the item
+   * captured when the row was clicked — so a variant saved in here writes to the server and
+   * reloads the list behind us while this window carries on drawing the garment you just
+   * changed away from. The patch is merged locally so the stage, the faces, the print area
+   * and the embroidery gate all follow the change immediately.
+   *
+   * Merged, not replaced: change the colour and then the size and both must survive.
+   */
+ const [variantPatch, setVariantPatch] = useState<ItemSetupPatch | null>(null)
+ const liveItem = useMemo(() => {
+ if (!variantPatch) return item
+ const p = variantPatch
+ return {
+      ...item,
+      ...(p.blank !== undefined ? { blank: p.blank } : {}),
+      ...(p.color !== undefined ? { color: p.color } : {}),
+      ...(p.size !== undefined ? { size: p.size } : {}),
+      ...(p.printType !== undefined ? { print_type: p.printType } : {}),
+      ...(p.variant !== undefined ? { variant: p.variant } : {}),
+      ...(p.qty !== undefined ? { qty: p.qty } : {}),
+    } as OrderItem
+  }, [item, variantPatch])
+
+ const product = useMemo(() => resolveProduct(liveItem, catalog ?? []), [liveItem, catalog])
  const faces = useMemo(() => {
- const f = mockupFaces(product, item.color)
- return f.length ? f : (item.img ? [{ side: "front", url: item.img }] : [])
-  }, [product, item.color, item.img])
+ const f = mockupFaces(product, liveItem.color)
+ return f.length ? f : (liveItem.img ? [{ side: "front", url: liveItem.img }] : [])
+  }, [product, liveItem.color, liveItem.img])
  const [side, setSide] = useState(0)
   /**
    * WHOSE PHOTO THE STAGE DRAWS.
@@ -1112,7 +1138,7 @@ export function DesignCanvasDialog({
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
   // One shared rule (lib/variant-resolve) — the thread module and the machine-file step
   // below both read it, so they cannot drift apart again.
- const isEmb = isEmbroidery(item.print_type)
+ const isEmb = isEmbroidery(liveItem.print_type)
  const [threads, setThreads] = useState<Thread[]>([])
  const [picking, setPicking] = useState(false)
   // The thread MAP: which colour covers which part. ALWAYS on now — it was behind a "Map"
@@ -2223,9 +2249,9 @@ export function DesignCanvasDialog({
  state and does not need to own: the picker is on the order's item row, and two
  controls for one fact is how the two disagree. A line of text answers "what am
               I placing this on" without being a second place to change it. */}
-          {[item.color, item.size, item.print_type].some(Boolean) && (
+          {[liveItem.color, liveItem.size, liveItem.print_type].some(Boolean) && (
             <div className="mt-0.5 truncate text-xs text-muted-foreground">
-              {[item.blank || item.sku, item.color, item.size, item.print_type].filter(Boolean).join(" · ")}
+              {[liveItem.blank || liveItem.sku, liveItem.color, liveItem.size, liveItem.print_type].filter(Boolean).join(" · ")}
             </div>
           )}
         </DialogHeader>
@@ -2834,6 +2860,38 @@ export function DesignCanvasDialog({
             unknown length; the garment is not, and it must never leave the screen to let
             them through. */}
         <div className="mx-auto flex w-full max-w-[min(100%,560px)] flex-col gap-4 lg:mx-0 lg:w-[380px] lg:max-w-none lg:shrink-0 lg:overflow-y-auto">
+          {/**
+            * WHAT THIS IS BEING MADE ON, and the one control that changes it.
+            *
+            * The picker was pulled out of this window as "two places to change one fact" —
+            * and that was right about the duplication and wrong about which place to keep.
+            * You decide the garment while looking at the artwork on it: a colour that kills
+            * a design, a size whose print area is smaller than the art, a method the file
+            * cannot be stitched in. Sending someone back to the order row to change it, and
+            * then back in here to see the result, is the round trip the argument was trying
+            * to avoid.
+            *
+            * There is still ONE writer — `postItemSetup`, the same call the order row makes
+            * — so the two can't disagree; only one of them is now in front of the picture.
+            *
+            * `dense` because this is a 380px column, not a four-track row: the breakpoint
+            * cannot see the container, so the caller says so.
+            *
+            * The seller's listing image is untouched by this. That photo belongs to the
+            * line and stays where it is; this changes the blank underneath it.
+            */}
+          {!filesLocked && catalog && catalog.length > 0 && (
+            <VariantPicker
+              orderId={orderId}
+              item={liveItem}
+              catalog={catalog}
+              dense
+              onSaved={(patch) => {
+                if (patch) setVariantPatch((prev) => ({ ...(prev ?? {}), ...patch }))
+                onSaved?.()
+              }}
+            />
+          )}
           {/**
             * YOUR ARTWORK, ON SCREEN — the thing this window has never shown.
             *
