@@ -42,6 +42,30 @@ export function proxiedImageSrc(url?: string | null): string {
   return MARKETPLACE_CDN.test(host) ? `/api/etsy/img-proxy?url=${encodeURIComponent(url)}` : url
 }
 
+/**
+ * A LISTING PHOTO AT THE SIZE IT IS ACTUALLY DRAWN.
+ *
+ * Etsy keeps every photo at several widths and the sync stores the LARGEST — `imgUrlOf` in
+ * server/src/routes/etsy.js prefers `url_fullxfull`. A row tile is 96px. So every board was
+ * pulling a full-resolution product photo to paint a thumbnail, times every row: measured on
+ * live rows, 232kB and 68kB where 17kB and 7.6kB carry the same picture at 300x300 — which
+ * still covers a 96px tile on a 3x screen. Of 1,362 stored line images, 1,096 are
+ * `il_fullxfull` and 53 are `il_570xN`, so this is nearly all of them.
+ *
+ * ONLY `i.etsystatic.com`'s `il_<size>` shape is rewritten. Etsy's `ipf_` shape, our own
+ * paths, `data:` URLs and every other host come back exactly as given — including the
+ * supplier proxy `/api/ss/img`, which §2.9 governs and which this has no business touching.
+ * Anything that does not match is returned unchanged rather than guessed at.
+ *
+ * The STORED url is untouched — this is a projection at render time, not a migration. The
+ * designer and the print path keep the full-resolution one, which is exactly why this is not
+ * done at sync: the big image is still the right image, just not for a 96px square.
+ */
+export function thumbSrc(url?: string | null, size = "300x300"): string {
+  if (!url || !/^https?:\/\/i\.etsystatic\.com\//i.test(url)) return url || ""
+  return url.replace(/\/il_[a-zA-Z0-9]+\./, `/il_${size}.`)
+}
+
 export function designSrc(d?: string | null): string {
   if (!d) return ""
   return d.startsWith("data:") || d.startsWith("http") || d.startsWith("/") ? d : `data:image/png;base64,${d}`
