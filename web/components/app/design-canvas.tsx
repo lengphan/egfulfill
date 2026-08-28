@@ -13,6 +13,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { Dropzone, FileRow, fileNameFrom, fileRoleLabel } from "@/components/app/dropzone"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { ArtworkPanel } from "@/components/app/artwork-panel"
+import { FaceTile } from "@/components/app/face-tile"
 import { TabBar } from "@/components/app/tab-bar"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
@@ -804,64 +805,6 @@ const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
  * rather than pretending to be a broken image, because those need different actions from
  * whoever is looking.
  */
-/**
- * ONE FACE, DRAWN AS ITSELF.
- *
- * The sides were two words in pills under the garment — "Front" and "Back" — so the only way
- * to learn whether the back carried anything was to press it and look. On a four-face blank
- * that is three round trips to answer "is this line finished", which is the question the
- * window is open to answer.
- *
- * The tile is the garment with its own artwork on it, at the placement it is actually saved
- * at. Nothing here is interactive except the tile itself: it is a picture of a state, and a
- * handle on it. Same %-frame as the stage (square, `pos` in percentages), so what you see in
- * a 64px tile is what the 500px stage shows.
- */
-function FaceTile({ url, art, label, active, extra, onSelect }: {
- url: string
- art?: { data: string; pos: Pos } | null
- label: string
- active: boolean
-  /** What this face ADDS per unit, when it is not the first printed one. Null → free, and
-   *  nothing is said: a price of nothing is noise on every single-sided line. */
- extra?: string | null
- onSelect: () => void
-}) {
- return (
-    <button
- type="button"
- onClick={onSelect}
- aria-current={active ? "true" : undefined}
- title={art ? `${label} — has artwork` : `${label} — empty`}
- className={"group flex w-full flex-col items-center gap-1 rounded-lg border p-1 transition-colors "
-        + (active ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-accent/50")}
-    >
-      <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-muted/40">
-        {url && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={url} alt="" className="absolute inset-0 size-full object-contain p-[4%]" />
-        )}
-        {art?.data && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
- src={canvasReadableSrc(art.data)} alt=""
- className="absolute block"
- style={{
- left: `${art.pos.x}%`, top: `${art.pos.y}%`, width: `${art.pos.w}%`,
- transform: `translate(-50%,-50%) rotate(${art.pos.r}deg)`,
-            }}
-          />
-        )}
-      </span>
-      <span className={"w-full truncate text-center text-[10px] font-medium capitalize leading-none "
-        + (active ? "text-primary" : "text-muted-foreground")}>{label}</span>
-      {extra && (
-        <span className="text-[9px] leading-none tabular-nums text-muted-foreground">{extra}</span>
-      )}
-    </button>
-  )
-}
-
 function CustomerFileThumb({ src }: { src: string }) {
   const tl = useLabelT()
  const art = useArtworkSrc(src)
@@ -2510,7 +2453,9 @@ export function DesignCanvasDialog({
  const charges = !!sideFee && sideFee > 0 && (art ? costingFaces[k] : anyFaceHasArt)
  return (
                   <FaceTile
- key={f.side} url={f.url} art={art} label={f.side || "front"}
+ key={f.side} url={f.url} label={f.side || "front"}
+                    /* One artwork per face is this window's model, so: a list of one. */
+ layers={art ? [{ src: art.data, pos: art.pos }] : []}
  active={i === side} onSelect={() => goToSide(i)}
  extra={charges ? `+${sideFee.toLocaleString("en-US", { style: "currency", currency: "USD" })}` : null}
                   />

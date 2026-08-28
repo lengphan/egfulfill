@@ -20,6 +20,7 @@ import { proxiedImageSrc } from "@/lib/order-image"
 // The tile is shared with the order dialog — it takes props only, so it was always shared
 // code that happened to live in this one screen's file.
 import { ArtworkPanel } from "@/components/app/artwork-panel"
+import { FaceTile } from "@/components/app/face-tile"
 import { orderRefLabel } from "@/lib/order-format"
 import { useBackgroundRemoval } from "@/lib/remove-background"
 import { printZoneOf, printSizeOf } from "@/lib/print-zone"
@@ -1036,25 +1037,29 @@ export function DesignMaker() {
                 {Math.round(zoom * 100)}% · reset
               </button>
             )}
+            {/**
+              * THE SAME TILES THE ORDER DESIGNER USES.
+              *
+              * This was a pill row with a dot on the faces carrying work, and the note beside
+              * it admitted what the dot was for: with one stack per side, the pills were the
+              * only way to see that the back had anything on it, because the stage shows one
+              * face at a time. A dot says THAT there is something; the tile shows WHAT.
+              *
+              * The whole stack per face, not its bottom layer — a two-layer back drawn as one
+              * layer is a quiet misreport of the thing this is here to report.
+              */}
             {faces.length > 1 && (
-              <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-1 backdrop-blur">
+              <div className="flex items-center gap-1.5 rounded-xl border border-border bg-card/80 p-1.5 backdrop-blur">
                 {faces.map((f) => (
-                  <button
- key={f.side}
- onClick={() => setSide(f.side)}
- className={
-                      "eg-tap rounded-lg px-3 py-1 text-xs font-medium capitalize transition-colors " +
-                      (side === f.side ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {f.side}
-                    {/* A dot on a face that carries work. With one stack per side the pills
- are now the only way to see that the back has anything on it — the
- stage shows one face at a time. */}
-                    {((stacks[f.side]?.images.length ?? 0) + (stacks[f.side]?.texts.length ?? 0)) > 0 && (
-                      <span className={"ml-1.5 inline-block size-1.5 rounded-full align-middle " + (side === f.side ? "bg-primary-foreground/80" : "bg-primary")} />
-                    )}
-                  </button>
+                  <div key={f.side} className="w-[62px]">
+                    <FaceTile
+                      url={f.url}
+                      layers={(stacks[f.side]?.images ?? []).map((im) => ({ src: im.src, pos: im.pos }))}
+                      label={f.side}
+                      active={side === f.side}
+                      onSelect={() => setSide(f.side)}
+                    />
+                  </div>
                 ))}
               </div>
             )}
