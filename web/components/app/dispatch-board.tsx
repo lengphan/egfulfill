@@ -535,14 +535,35 @@ export function DispatchBoard({ segmented }: {
 
   // Is byeastside configured? Offering a route that can't work is worse than offering
   // one route, because the failure only shows after the click.
- const [dispatchOn, setDispatchOn] = useState(false)
+ /**
+  * THREE STATES, NOT TWO — "off" and "couldn't ask" are different facts and §4 forbids
+  * rendering them the same.
+  *
+  * This was a boolean seeded false with a `.catch(() => {})`. So any failure of
+  * /api/dispatch/status — a 500, an expired token, a dropped connection — left it false
+  * forever, and the page's PRIMARY route silently disappeared with nothing said. The
+  * partner being genuinely unconfigured looked exactly the same, which is why "we lost the
+  * Send button" is the shape this reaches a person in.
+  */
+ const [dispatchStatus, setDispatchStatus] = useState<"on" | "off" | "unknown">("off")
  useEffect(() => {
- const t = setTimeout(() => { getDispatchStatus().then((d) => setDispatchOn(!!d.configured)).catch(() => {}) }, 0)
+ const t = setTimeout(() => {
+ getDispatchStatus()
+      .then((d) => setDispatchStatus(d.configured ? "on" : "off"))
+      .catch(() => setDispatchStatus("unknown"))
+    }, 0)
  return () => clearTimeout(t)
   }, [])
+ const dispatchOn = dispatchStatus === "on"
 
  const chosen = queue.filter((o) => picked.has(o.id))
  const chosenWithLabel = chosen.filter((o) => !!o.tracking)
+
+ /* ONE CONDITION for the button and for the sentence that names it. Kept visible while a
+    file is staged even if the partner reads unconfigured, so a staged file can never
+    become unsendable — and visible on "unknown", because a route we merely failed to ASK
+    about should be offered and refused by the server, not deleted from the page. */
+ const canSendToPartner = dispatchOn || staged.length > 0 || dispatchStatus === "unknown"
 
  const toggle = (id: string) =>
  setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -1021,7 +1042,7 @@ export function DispatchBoard({ segmented }: {
  waits to be sent rather than sending itself, and this is what sends it. Kept
  visible while any file is waiting even if the partner reads as unconfigured,
  so a staged file can never become unsendable. */}
-            {(dispatchOn || staged.length > 0) && (
+            {canSendToPartner && (
               <Button size="sm" variant="outline" disabled={(!chosenWithLabel.length && !stagedChosen.length) || busy} onClick={sendToPartner}
  title={stagedChosen.length
                   ? `Upload ${chosenWithLabel.length ? tl("dispatch", "these labels and ") : ""}${stagedChosen.length} dropped file${stagedChosen.length === 1 ? "" : "s"} to byeastside's pre-scan queue`
@@ -1105,8 +1126,20 @@ export function DispatchBoard({ segmented }: {
  closing tag mid-line, which shipped as "Externalare labels from outside". */}
           Rows tagged <b>{tl("dispatch", "External")}</b>{" "}
  are labels from outside — they&apos;re not attached to an
-          EGFUL order and nothing is charged for them. Tick one and press{" "}
-          <b>{tl("dispatch", "Send to byeastside")}</b> to put it in their pre-scan queue.
+          EGFUL order and nothing is charged for them.{" "}
+          {/* NAMING A BUTTON THAT IS NOT THERE. This sentence was gated on
+              `staged.length > 0 || uploads.length > 0` while the button it names was gated
+              on `dispatchOn || staged.length > 0` — so with uploads present, nothing staged
+              and the partner reading unconfigured, the page instructed someone to press a
+              control it had hidden. Both now read `canSendToPartner`, and when the route is
+              unavailable the sentence says why instead. A refusal carries its reason. */}
+          {/* No "couldn't be reached" branch: an unknown status KEEPS the button, so the
+              only way to reach this else is a partner that really is not connected. */}
+          {canSendToPartner ? (
+            <>Tick one and press <b>{tl("dispatch", "Send to byeastside")}</b> to put it in their pre-scan queue.</>
+          ) : (
+            <>{tl("dispatch", "byeastside isn't connected, so they can't be sent — add its keys in Settings › Integrations.")}</>
+          )}
         </p>
       )}
 
