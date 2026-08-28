@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
+import type { PublicProduct } from "@/lib/api"
 import { TabBar } from "@/components/app/tab-bar"
 import { CARD, INK, SURFACE } from "@/components/marketing/bold-kit"
 
@@ -35,6 +37,24 @@ import { CARD, INK, SURFACE } from "@/components/marketing/bold-kit"
  * POSITIONS ARE PLACED, NEVER RANDOM. Random overlaps the type, collides, and changes on every
  * render, so a layout could never be judged. Objects deliberately cross the left and right
  * edges: a crop implies more beyond the frame, which is what turns empty space into a margin.
+ *
+ * ── CLICKING A BLANK OPENS THAT BLANK ────────────────────────────────────────────────────
+ *
+ * It used to port the field to the object's colour, and that was a dead end wearing an
+ * interaction's clothes: you clicked a hoodie and got a filter. A photograph of a product is
+ * the most direct promise a page can make, and the only honest way to keep it is to go to the
+ * product. /catalog/[slug] already existed the whole time.
+ *
+ * So the two jobs are split by CONTROL rather than shared by one: the bar above changes the
+ * colour, an object opens the product. Nothing on this page now does something other than
+ * what it looks like it does.
+ *
+ * A FORM WITH NO PUBLISHED PRODUCT IS NOT DRAWN. We have a photograph of a ring-spun crewneck
+ * and there is no crewneck in the published catalogue, so there is nowhere for it to go —
+ * and a picture of a garment you cannot buy is the catalogue lying about its range. It is
+ * dropped from every rack rather than pointed at the nearest similar thing, which would be
+ * worse: sending someone who clicked a crewneck to a hooded sweatshirt is not an
+ * approximation, it is the wrong product. Publish one and it returns on its own.
  */
 
 export type FormId = "tee" | "crew" | "hoodie" | "cap"
@@ -46,6 +66,20 @@ const FORM_LABEL: Record<FormId, string> = {
   crew: "Ring-spun crewneck",
   hoodie: "Heavy blend hoodie",
   cap: "Six-panel cap",
+}
+
+/**
+ * THE PRODUCT EACH PHOTOGRAPH IS OF — checked against the live catalogue, not assumed.
+ *
+ * A slug that stops being published resolves to nothing and its object disappears, which is
+ * the correct failure: the field can go stale in only one direction, toward showing less than
+ * we sell, never toward showing something we do not.
+ */
+const FORM_SLUG: Record<FormId, string> = {
+  tee: "gildan-unisex-heavy-cotton-t-shirt",
+  crew: "ring-spun-crewneck-sweatshirt",
+  hoodie: "comfort-colors-ring-spun-hooded-sweatshirt-1567",
+  cap: "adams-headwear-icon-sandwich-cap",
 }
 
 const STORIES: { id: StoryId; name: string }[] = [
@@ -127,35 +161,36 @@ const SOLO: Placed[] = [
 
 const srcOf = (form: FormId, story: StoryId) => `/frames/obj-${form}-${story}.png`
 
-function Rack({ items, story, solo, onPort }: {
+function Rack({ items, story, solo, priceOf }: {
   items: Placed[]
   story: StoryId
   solo: boolean
-  onPort: (s: StoryId) => void
+  /** null when this form is not a published product — the object is then not drawn at all. */
+  priceOf: (f: FormId) => number | null
 }) {
   const name = STORIES.find((s) => s.id === story)!.name
+  const shown = items.filter((it) => priceOf(it.form) !== null)
   return (
     <div
       className="relative w-full"
       style={{ minHeight: solo ? "clamp(24rem, 56vh, 37rem)" : "clamp(18rem, 38vh, 25rem)" }}
     >
-      {items.map((it, i) => {
+      {shown.map((it, i) => {
         /* The FIRST appearance of a form is the real one; later ones are the temporary
-           repeats above. Same click, same target — so they stay pressable with a mouse and
+           repeats noted above. Same destination — so they stay clickable with a mouse and
            stay out of the tab order and the accessibility tree. */
-        const dup = items.findIndex((o) => o.form === it.form) !== i
+        const dup = shown.findIndex((o) => o.form === it.form) !== i
+        const price = priceOf(it.form)
         return (
-        <button
+        <Link
           key={`${it.form}-${i}`}
+          href={`/catalog/${FORM_SLUG[it.form]}`}
           aria-hidden={dup || undefined}
           tabIndex={dup ? -1 : undefined}
-          type="button"
-          onClick={() => onPort(story)}
-          /* THE ACCESSIBLE NAME CARRIES BOTH FACTS, because the visible label only appears on
-             hover and a pointer is not the only way here. "Heavy blend hoodie in Charcoal" is
-             also what the click DOES — it ports the field to that story. */
+          /* The name says the garment AND the colour, because the visible label only appears
+             on hover and a pointer is not the only way here. */
           aria-label={`${FORM_LABEL[it.form]} in ${name}`}
-          className="group absolute block cursor-pointer focus-visible:outline-none"
+          className="group absolute block focus-visible:outline-none"
           style={{ left: `${it.x}%`, top: `${it.y}%`, width: `${it.w}%`, transform: "translate(-50%, -50%)" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -165,32 +200,44 @@ function Rack({ items, story, solo, onPort }: {
             className="block w-full origin-center transition-transform duration-500 ease-out will-change-transform motion-safe:group-hover:scale-[1.06] motion-safe:group-focus-visible:scale-[1.06]"
           />
           {/*
-            * THE LABEL IS AN AFFORDANCE, NOT A STATUS CHIP.
+            * THE LABEL NAMES THE PRODUCT AND ITS PRICE — the two things that decide whether
+            * the click is worth making. It used to read "+ Charcoal", which described the
+            * filter the click used to apply; the click goes to the product now, so the label
+            * had to move with it or it would be advertising the old behaviour.
             *
-            * §4 reserves the pill for things carrying stage meaning — an order stage, an HTTP
-            * method, RUSH/LATE — and forbids it for tags and toggles. This is neither: it is a
-            * hover readout naming the object under the cursor and what clicking it will do,
-            * which is why it is `rounded-lg` like every other control rather than
-            * `rounded-full`, and why it is absent until the pointer is on the object.
+            * §4 reserves the pill for stage meaning and forbids it for tags. This is neither:
+            * it is a hover readout of where the click leads, which is why it is `rounded-lg`
+            * like every other control rather than `rounded-full`.
             *
-            * The leading + is the verb. It says the click ADDS a filter rather than opening the
-            * product, which is the one thing a visitor could otherwise reasonably expect.
+            * The price is the REAL published one, "from" because it moves by size.
             */}
           <span
             className="pointer-events-none absolute left-full top-1/2 z-10 ml-1 hidden -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 lg:block"
             style={{ background: INK, color: CARD }}
           >
-            + {name}
+            {FORM_LABEL[it.form]} · from ${price!.toFixed(2)}
           </span>
-        </button>
+        </Link>
         )
       })}
     </div>
   )
 }
 
-export function ProductField({ className = "" }: { className?: string }) {
+export function ProductField({ products, className = "" }: {
+  products: PublicProduct[] | null
+  className?: string
+}) {
   const [story, setStory] = useState<StoryId | "all">("all")
+
+  /* Resolved against what is ACTUALLY published, every render. A form whose slug is missing
+     — the ring-spun crewneck today — returns null and is not drawn. */
+  const priceOf = (f: FormId): number | null => {
+    const p = (products ?? []).find((x) => x.slug === FORM_SLUG[f])
+    if (!p) return null
+    const n = p.priceFrom ?? p.price
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
 
   const tabs = [
     { id: "all" as const, label: "All" },
@@ -199,16 +246,15 @@ export function ProductField({ className = "" }: { className?: string }) {
 
   return (
     /* overflow-hidden is what lets an object cross the frame without giving the PAGE a
-       horizontal scrollbar — so it stays, and the padding below is what stops it also
-       slicing the bottom off the last rack. Measured: objects ran 29px past the section and
-       the iris hoodie met the CTA band with a flat cut edge. A rack places objects by
-       PERCENT of its own height, so the lowest of them always hangs past it; the section has
-       to carry that overhang itself. */
+       horizontal scrollbar — so it stays, and the padding is what stops it also slicing the
+       bottom off the last rack. Measured: objects ran 29px past the section and the iris
+       hoodie met the CTA band with a flat cut edge. A rack places objects by PERCENT of its
+       own height, so the lowest always hangs past it; the section carries that overhang. */
     <section className={"relative w-full overflow-hidden pb-16 " + className} style={{ background: SURFACE }}>
       {/* THE RULE UNDER THE LIVE WORD — components/app/tab-bar.tsx, not a fresh row of
           capsules. §4's own worked example: this bar was hand-rolled fourteen times before the
           primitive existed, and every new one was written because there was nothing to import.
-          There is now. */}
+          There is now. Colour lives HERE, and only here — an object opens its product. */}
       <div className="mx-auto max-w-[88rem] px-6 sm:px-10">
         <TabBar items={tabs} value={story} onChange={setStory} ariaLabel="Colour" />
       </div>
@@ -216,27 +262,28 @@ export function ProductField({ className = "" }: { className?: string }) {
       <div className="hidden lg:block">
         {story === "all"
           ? STORIES.map((s) => (
-              <Rack key={s.id} items={RACKS[s.id]} story={s.id} solo={false} onPort={setStory} />
+              <Rack key={s.id} items={RACKS[s.id]} story={s.id} solo={false} priceOf={priceOf} />
             ))
-          : <Rack items={SOLO} story={story} solo onPort={() => setStory("all")} />}
+          : <Rack items={SOLO} story={story} solo priceOf={priceOf} />}
       </div>
 
       {/* Below lg the racks become a grid. A field needs room a phone does not have; the same
-          objects and the same click, arranged rather than placed. */}
+          objects and the same destination, arranged rather than placed. */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 px-6 py-10 sm:grid-cols-3 lg:hidden">
         {(story === "all" ? STORIES : STORIES.filter((s) => s.id === story)).flatMap((s) =>
-          RACKS[s.id].map((it) => (
-            <button
-              key={`${s.id}-${it.form}`}
-              type="button"
-              onClick={() => setStory(story === "all" ? s.id : "all")}
-              aria-label={`${FORM_LABEL[it.form]} in ${s.name}`}
-              className="block"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={srcOf(it.form, s.id)} alt="" className="block w-full" />
-            </button>
-          )),
+          RACKS[s.id]
+            .filter((it, i, a) => a.findIndex((o) => o.form === it.form) === i && priceOf(it.form) !== null)
+            .map((it) => (
+              <Link
+                key={`${s.id}-${it.form}`}
+                href={`/catalog/${FORM_SLUG[it.form]}`}
+                aria-label={`${FORM_LABEL[it.form]} in ${s.name}`}
+                className="block"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={srcOf(it.form, s.id)} alt="" className="block w-full" />
+              </Link>
+            )),
         )}
       </div>
     </section>

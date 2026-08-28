@@ -380,7 +380,7 @@ export function BoldCatalog({ products, head }: { products: PublicProduct[] | nu
           The interaction is a product truth rather than a flourish: clicking a blank ports the
           whole field to that colour, which is the question a buyer actually has. Nothing
           reveals, nothing parallaxes. */}
-      <ProductField />
+      <ProductField products={products} />
 
       {/* WIDER THAN THE PROSE PAGES, on purpose. A catalogue is scanned, not read: nothing
           in the grid runs left-to-right, so width buys products per row rather than costing
