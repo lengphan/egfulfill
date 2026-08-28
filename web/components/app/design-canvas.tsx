@@ -16,7 +16,7 @@ import { ArtworkPanel } from "@/components/app/artwork-panel"
 import { TabBar } from "@/components/app/tab-bar"
 import { designSrc } from "@/lib/order-image"
 import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
-import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { deleteOrderDesign, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve"
 import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
@@ -1412,6 +1412,32 @@ export function DesignCanvasDialog({
   /** Every file on this line, whatever kind — the list under the stage. Carries the id
    *  because a row you cannot open is a row that only tells you something is missing. */
  const [lineFiles, setLineFiles] = useState<{ designId: string; kind: string; name: string }[]>([])
+  /**
+   * THE SELLER'S MACHINE-FILE LIBRARY — built, and reachable from neither editor until now.
+   *
+   * `getMachineFiles` and the by-id attach have both existed since the library was added
+   * (imported here as `attachLibraryFile`, because this file already has a local
+   * `attachMachineFile` that uploads a File — a different act on the same word):
+   * a stitch file is uploaded ONCE, filed as MF-<seq>, and attached to a line by id so the
+   * bytes never travel twice (a 40-line import re-posting an 8MB .EMB per line would be
+   * 320MB against a 60MB body limit). The only route onto a line was dragging the file in
+   * again, every time.
+   *
+   * Loaded lazily and only for embroidery: a DTG line has no use for it, and this should not
+   * cost a request on every window that opens.
+   */
+ const [machineLib, setMachineLib] = useState<MachineFile[] | null>(null)
+ const [attaching, setAttaching] = useState<string | null>(null)
+ useEffect(() => {
+    // Fetch once, when an embroidery line's Files tab is actually looked at. The condition
+    // is the tab and the print method — neither of which this fetch can alter — so it cannot
+    // re-satisfy itself (CLAUDE.md §2.8). `machineLib === null` is "not asked yet"; [] is
+    // "asked, and you have none", and those are different facts.
+ if (!open || !isEmb || ctxTab !== "files" || machineLib !== null) return
+ let live = true
+ getMachineFiles().then((r) => { if (live) setMachineLib(r ?? []) }).catch(() => { if (live) setMachineLib([]) })
+ return () => { live = false }
+  }, [open, isEmb, ctxTab, machineLib])
   /**
    * THE ARTWORK ON THIS FACE IS A FILE ON THIS LINE — SAVED OR NOT.
    *
@@ -2976,6 +3002,47 @@ export function DesignCanvasDialog({
               onFiles={(f) => void takeFiles(f)}
               onPick={() => uploadRef.current?.click()}
             />
+            {/**
+              * ATTACH ONE YOU ALREADY OWN, instead of finding the file again.
+              *
+              * Rows, not thumbnails: a .EMB has no picture. What identifies it is the
+              * reference a person types into an import sheet — MF-12 — and the name they
+              * gave it, so those are what the row leads with.
+              */}
+            {isEmb && (
+              <div className="flex flex-col gap-1.5">
+                <div className="text-xs font-medium text-foreground">{tl("canvas", "Your machine files")}</div>
+                {machineLib === null ? (
+                  <div className="flex justify-center py-2"><CircleNotch size={15} className="animate-spin text-muted-foreground" /></div>
+                ) : machineLib.length === 0 ? (
+                  /* An empty region may carry one sentence, because there is nothing else to read. */
+                  <p className="px-1 text-2xs text-muted-foreground">
+                    {tl("canvas", "Stitch files you upload are filed here and can be put on any line.")}
+                  </p>
+                ) : machineLib.slice(0, 8).map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5">
+                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium tabular-nums text-muted-foreground">{m.ref}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs" title={m.fileName || m.name}>{m.name || m.fileName}</span>
+                    <Button
+                      size="sm" variant="outline" className="h-7 shrink-0 px-2 text-2xs"
+                      disabled={attaching !== null || !item.line_id}
+                      onClick={async () => {
+                        setAttaching(m.id); setErr(null)
+                        try {
+                          const r = await attachLibraryFile(m.id, { orderId, lineId: String(item.line_id ?? "") })
+                          if (r?.error) setErr(r.error)
+                          else { setNotice(`${m.ref} attached to this line.`); await loadLineFiles() }
+                        } catch (e) {
+                          setErr(e instanceof Error ? e.message : "Couldn't attach that file.")
+                        } finally { setAttaching(null) }
+                      }}
+                    >
+                      {attaching === m.id ? <CircleNotch size={12} className="animate-spin" /> : tl("canvas", "Attach")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Saving a template is not ADDING a file, so it sits under the zone rather than
                 inside it — and only with artwork on the line, because there is otherwise
                 nothing to save. */}
