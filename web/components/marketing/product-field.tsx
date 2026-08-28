@@ -117,16 +117,68 @@ const RAILS: Record<StoryId, Slot[]> = {
 
 const srcOf = (form: FormId, story: StoryId) => `/frames/obj-${form}-${story}.png`
 
+/**
+ * ── PREVIEW: ONE RAIL HANGS ──────────────────────────────────────────────────────────────
+ *
+ * The Natural rail uses a HANGING photograph; the other two keep the folded flat-lays. Two
+ * shot types on one page is not the design — it is there so the difference can be judged
+ * side by side, which is the whole question. One of them comes out.
+ *
+ * WHY HANGING IS THE ONE THAT SAYS "RAIL". A folded garment rests ON something, so it is
+ * padded to a fixed HEM and reads as stock on a shelf — which is why the folded version has
+ * always looked like a conveyor. A hanging garment is suspended FROM something, so it is
+ * padded to a fixed SHOULDER LINE, and that shared top edge is what the eye reads as a rail.
+ *
+ * THE HOOK AND THE BAR ARE DRAWN, NOT PHOTOGRAPHED. Background removal ate the real hook —
+ * a thin bright wire against a pale ground is exactly what matting loses — and that turned
+ * out to be the better answer. One hook, one height, identical on every garment, so the
+ * rail's line is guaranteed by construction rather than by what the camera did that frame.
+ * A photographed hook would be a different length and angle in every shot.
+ */
+/**
+ * A hanging photograph per form, per story. A rail is a REAL rail only for the forms that
+ * have one — the others are simply not on it, rather than a folded garment floating between
+ * two hung ones, which reads as a mistake rather than as variety.
+ *
+ * The cap is deliberately absent and will stay absent: a cap does not go on a hanger. It
+ * belongs on a peg or a clip, which is a different object and a different shot.
+ */
+const HANG_SRC: Partial<Record<StoryId, Partial<Record<FormId, string>>>> = {
+  natural: {
+    tee: "/frames/hang-tee-side.png",
+    hoodie: "/frames/hang-hoodie-side.png",
+  },
+}
+
 /** How long one full pass takes. Slower than it feels it should be: this is ambient. */
 const DURATION: Record<StoryId, string> = { natural: "72s", charcoal: "88s", iris: "80s" }
 
-function Garment({ slot, story, price, hidden }: {
+function Garment({ slot, story, price, hidden, hang, i }: {
   slot: Slot
   story: StoryId
   price: number
   /** A clone in the loop's second copy, or a repeat of a form already on this rail. */
   hidden: boolean
+  /** The hanging photograph, when this rail is a real rail. */
+  hang?: string
+  /** Position along the track — drives the variation below. */
+  i: number
 }) {
+  /*
+   * ONE PHOTOGRAPH, MADE TO STOP LOOKING LIKE ONE.
+   *
+   * The first hanging rail put the same shirt at the same angle eleven times and it read as
+   * wallpaper — a texture, not stock. A real rail is never uniform: garments face both ways
+   * because people put them back however they came off, and they hang at slightly different
+   * lengths because hangers sit at different depths on the bar.
+   *
+   * Mirroring is the move that does the most for nothing. A flipped garment is a DIFFERENT
+   * silhouette to the eye — the sleeve is on the other side, the light falls the other way —
+   * while remaining the same honest photograph of the same product. It is not a claim about
+   * range; it is the same shirt, turned round, which is exactly what it would be on a rail.
+   */
+  const flip = hang ? i % 2 === 1 : false
+  const lengthJitter = hang ? 1 - ((i * 37) % 11) / 90 : 1
   const name = STORIES.find((s) => s.id === story)!.name
   return (
     <Link
@@ -135,17 +187,40 @@ function Garment({ slot, story, price, hidden }: {
       tabIndex={hidden ? -1 : undefined}
       aria-label={`${FORM_LABEL[slot.form]} in ${name}`}
       className="group relative block shrink-0 focus-visible:outline-none"
-      style={{
-        width: `calc(var(--rail-unit) * ${slot.w})`,
-        transform: `translateY(${slot.dy}%)`,
-      }}
+      style={hang
+        /* SIZED BY HEIGHT, NOT WIDTH. Garments on a rail hang to a common length, and the
+           turned shot is a 0.34 aspect — set by width it would be nearly three rail-heights
+           tall. Width follows from the photograph, which is also what varies along a real
+           rail as garments turn at different angles. */
+        ? { height: `calc(var(--rail-h) * ${(0.94 + (slot.w - 1) * 0.06) * lengthJitter})`, width: "auto" }
+        : { width: `calc(var(--rail-unit) * ${slot.w})`, transform: `translateY(${slot.dy}%)` }}
     >
+      <span className={hang ? "eg-sway flex h-full flex-col items-center" : "contents"} style={hang ? { ["--sway-dur" as string]: `${5.2 + (slot.w * 2.3) % 2.6}s`, animationDelay: `-${(slot.w * 3.7) % 4}s` } : undefined}>
+      {hang && (
+        /* THE HOOK. A stroke, not an image — see HANGING above. `origin-top` on the garment
+           below means the hover lift grows DOWN from the hook rather than around the
+           garment's middle, so the hanging point stays welded to the bar while it scales.
+           Scaling from the centre would lift the garment off its own hook. */
+        <svg viewBox="0 0 24 26" className="mx-auto block h-[22px] w-[24px]" aria-hidden="true" fill="none">
+          <path
+            d="M12 26V9M12 9c0-3.2 2-5 4.2-5 1.9 0 3.3 1.4 3.3 3.1"
+            stroke={INK}
+            strokeOpacity="0.42"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={srcOf(slot.form, story)}
+        src={hang ?? srcOf(slot.form, story)}
         alt=""
-        className="block w-full origin-center transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.09] motion-safe:group-focus-visible:scale-[1.09]"
+        className={"block w-full transition-transform duration-500 ease-out " + (hang
+          ? "origin-top motion-safe:group-hover:scale-[1.05] motion-safe:group-focus-visible:scale-[1.05]"
+          : "origin-center motion-safe:group-hover:scale-[1.09] motion-safe:group-focus-visible:scale-[1.09]")}
+        style={hang ? { height: "calc(100% - 22px)", width: "auto", transform: flip ? "scaleX(-1)" : undefined } : undefined}
       />
+      </span>
       {/*
         * THE LABEL NAMES THE GARMENT AND ITS REAL PRICE — the two things that decide whether
         * the click is worth making. §4 reserves the pill for stage meaning and forbids it for
@@ -165,12 +240,21 @@ function Garment({ slot, story, price, hidden }: {
   )
 }
 
-function Rail({ story, reverse, priceOf }: {
+function Rail({ story, reverse, priceOf, solo = false }: {
   story: StoryId
   reverse: boolean
   priceOf: (f: FormId) => number | null
+  /** One story selected: this rail is the whole field, so it gets the height three shared. */
+  solo?: boolean
 }) {
-  const slots = RAILS[story].filter((s) => priceOf(s.form) !== null)
+  /* Declared BEFORE the filter that reads them. They were below it, and because the use sits
+     inside a callback TypeScript cannot prove when it runs — so this compiled clean and threw
+     a temporal-dead-zone error only at prerender, taking the whole build down. */
+  const hangMap = HANG_SRC[story]
+  const isHanging = !!hangMap && Object.keys(hangMap).length > 0
+  const slots = RAILS[story].filter(
+    (sl) => priceOf(sl.form) !== null && (!isHanging || !!hangMap?.[sl.form]),
+  )
   if (!slots.length) return null
 
   /* THE TRACK IS THE SEQUENCE TWICE, and the animation translates it -50%. At that point the
@@ -183,9 +267,37 @@ function Rail({ story, reverse, priceOf }: {
       className="eg-rail-hold relative w-full overflow-hidden py-4"
       /* --rail-unit is the base object width; every slot scales off it, so one value tunes
          the whole rail's density and the depth differences survive. */
-      style={{ ["--rail-unit" as string]: "clamp(9rem, 17vw, 19rem)", ["--rail-dur" as string]: DURATION[story] }}
+      style={{
+        ["--rail-unit" as string]: "clamp(9rem, 17vw, 19rem)",
+        /* THREE RAILS SHARE THE PAGE; ONE RAIL OWNS IT. The two views answer different
+           questions — three is "what is the range", one is "show me this colour" — so the
+           single rail gets the height the other two were using. It is also the view that
+           survives a small range best: four large garments fill a screen where twelve small
+           ones put every repeat on show. */
+        /* 48vh, not 66. The page head is ~460px, so a 66vh rail totalled 1054px against a
+           900px viewport and the garments were sliced by the FOLD — which reads as a bug,
+           because a fold is not a frame edge the way the left and right margins are. */
+        ["--rail-h" as string]: solo ? "clamp(22rem, 48vh, 34rem)" : "clamp(19rem, 42vh, 30rem)",
+        ["--rail-dur" as string]: DURATION[story],
+      }}
     >
-      <div className={"eg-rail flex w-max items-center gap-[2.5vw]" + (reverse ? " eg-rail-rev" : "")}>
+      {isHanging && (
+        /* THE BAR, behind everything and edge to edge. It runs past both margins because a
+           rail does not end where the viewport does — that is the same reason objects cross
+           the frame. One hairline: §4's weight for a rule, not a drawn pole. */
+        <div
+          className="pointer-events-none absolute left-0 right-0 z-0"
+          /* The hook svg is 22px and sits at the very top of each item, which begins at the
+             rail's own 1rem of padding. The bar crosses it 4px down so the hook reads as
+             hanging OVER the bar rather than balanced on it. */
+          /* NOT `HAIRLINE`. That token is a card's edge against white and measures barely
+             1.02:1 on this ground — the bar was there and nobody could see it. A rail has to
+             read as a physical thing the hooks hang over, so it takes a real value: still one
+             pixel, still quiet, but actually present. */
+          style={{ top: "calc(1rem + 4px)", height: 1, background: "color-mix(in oklch, var(--mk-ink) 22%, transparent)" }}
+        />
+      )}
+      <div className={"eg-rail relative z-[1] flex w-max gap-[4vw] " + (isHanging ? "items-start" : "items-center") + (reverse ? " eg-rail-rev" : "")}>
         {track.map((slot, i) => (
           <Garment
             key={`${slot.form}-${i}`}
@@ -196,6 +308,8 @@ function Rail({ story, reverse, priceOf }: {
                already appeared is one of the temporary repeats. Both are the same product with
                the same destination, so they stay clickable and stay out of the a11y tree. */
             hidden={i >= slots.length || slots.findIndex((o) => o.form === slot.form) !== i}
+            hang={hangMap?.[slot.form]}
+            i={i}
           />
         ))}
       </div>
@@ -234,7 +348,7 @@ export function ProductField({ products, className = "" }: {
 
       <div className="mt-4 hidden lg:block">
         {shown.map((s, i) => (
-          <Rail key={s.id} story={s.id} reverse={i % 2 === 1} priceOf={priceOf} />
+          <Rail key={s.id} story={s.id} reverse={i % 2 === 1} priceOf={priceOf} solo={story !== "all"} />
         ))}
       </div>
 

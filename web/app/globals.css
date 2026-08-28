@@ -43,6 +43,9 @@
     --color-sidebar-accent: var(--sidebar-accent);
     --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
+  /* THE THING THAT IS CHOSEN. See the token itself for why it is not --primary. */
+    --color-selected: var(--selected);
+    --color-selected-foreground: var(--selected-foreground);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
     --color-chart-5: var(--chart-5);
@@ -146,6 +149,22 @@
    *
    * `rounded-badge` is the single exception the direction allows — the chip is the one
    * element SQUARER than a button, which is what now distinguishes it. */
+/**
+ * THE SELECTED THING, as one class rather than as fresh Tailwind every time.
+ *
+ * This idea was written out by hand as `bg-primary/10 text-primary` in 29 files. That is the
+ * shape a house rule dies in: nobody was careless, there was simply nothing to import, so
+ * every new selected state was two more utility classes chosen from memory — and half of
+ * them picked a different opacity.
+ *
+ * A ground carrying ink. Never a border, never a fill you have to hunt for: pair it with the
+ * element's own shape, and let the colour say only "this one".
+ */
+.eg-selected {
+  background-color: var(--selected);
+  color: var(--selected-foreground);
+}
+
     /* CONTROL STEPS. sm/md/lg are what Button, Input and .eg-control resolve through, and
      * pointing them at --radius its 26px made every 32px control a full capsule — a badge
      * shape on an action, which the direction reserves for things that are genuinely round.
@@ -386,6 +405,28 @@
      1.84:1 on parchment, so an accent-coloured ring would be a focus indicator you cannot
      see — the exact failure the palette gate exists to catch. */
     --ring: oklch(0.1822 0.0000 89.88);
+
+  /**
+   * SELECTED — a ground carrying ink, and the one place the periwinkle reaches light surfaces.
+   *
+   * The rail has shown the chosen item in this exact colour since it was built, and the app
+   * showed the same idea as `bg-primary/10` — a wash of the ink colour. So the two halves of
+   * one product said "this one" in two different ways, and the half you look at most said it
+   * in grey.
+   *
+   * It is a GROUND, never a fill you have to find: 1.67:1 against a white card, which is why
+   * it can never be a button (a borderless control needs 3:1 to have a shape) and why
+   * --brand and this are different tokens. Ink on it is 11.22:1.
+   *
+   * Measured against the eight reserved order statuses at 0.322 light, on a 0.171 floor.
+   *
+   * It INVERTS, like --primary does. A pale band on a dark card is the wrong shape — dark
+   * takes a deep periwinkle carrying light text, 0.323 clear of the dark status set on a
+   * 0.154 floor. The same value in both themes would collide with `pending` in dark, where
+   * the palette lifts every status: that is measured, not assumed.
+   */
+    --selected: oklch(0.845 0.110 282);
+    --selected-foreground: oklch(0.1822 0.0000 89.88);
   /* CATEGORICAL, in a FIXED order — validated, not eyeballed. Series 1 is the brand violet;
    * the rest are stepped so every ADJACENT pair survives deuteranopia and protanopia, and
    * every one clears 3:1 against the chart surface. Amber and green are deliberately not
@@ -535,6 +576,8 @@
     --border: oklch(0.315 0 0);
     --input: oklch(0.265 0 0);
     --ring: oklch(0.72 0 0);
+    --selected: oklch(0.420 0.090 282);
+    --selected-foreground: oklch(0.955 0 0);
   /* Dark mode is SELECTED, not flipped: its own steps measured against the dark surface,
    * in the SAME hue order as light so series 3 is teal on both. */
     --chart-1: oklch(0.86 0 0); /* cobalt, lifted for the dark ground */
@@ -868,6 +911,29 @@ td[align="right"] {
 .eg-rail-hold:focus-within .eg-rail { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .eg-rail { animation: none; }
+}
+
+/* THE SWAY. A garment hanging from a moving rail does not hold still, and the absence of that
+   is most of why a row of cut-outs reads as pasted-on rather than suspended. It is a small
+   rotation about the HOOK — transform-origin sits at the hanging point, not the object's
+   middle, because a shirt pivots where it is held. Rotating about the centre is the exact
+   move that makes a garment look like a sticker being wobbled.
+
+   ±1.1deg, and that is deliberately almost nothing: cloth on a hanger has a lot of mass and a
+   short pendulum, so it barely moves. Anything larger reads as wind, not weight.
+
+   Each garment gets its own period and delay at the call site, so the row never pulses in
+   unison — synchronised sway is the tell that it is an animation rather than a rail.
+
+   It KEEPS RUNNING when the rail is paused: stopping a rail does not stop the cloth, and
+   holding both still at once is what would look wrong. */
+@keyframes eg-sway {
+  0%, 100% { transform: rotate(-1.1deg); }
+  50%      { transform: rotate(1.1deg); }
+}
+.eg-sway { animation: eg-sway var(--sway-dur, 5.5s) ease-in-out infinite; transform-origin: 50% 3%; }
+@media (prefers-reduced-motion: reduce) {
+  .eg-sway { animation: none; }
 }
 
 /* ── Dithered hero plate ──────────────────────────────────────────────────────
