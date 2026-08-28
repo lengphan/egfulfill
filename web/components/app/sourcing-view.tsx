@@ -8,6 +8,9 @@ import { Loading } from "@/components/app/loading"
 import { AlibabaStatus } from "@/components/app/alibaba-status"
 import { AlibabaBrowse } from "@/components/app/alibaba-browse"
 import { Button } from "@/components/ui/button"
+import type { ColumnRegistry } from "@/lib/table-columns"
+import { ColumnsMenu } from "@/components/app/columns-menu"
+import { loadColumnOrder, loadHiddenColumns, saveColumnIds } from "@/lib/table-columns"
 import { FilterMenu } from "@/components/app/filter-menu"
 import { Input } from "@/components/ui/input"
 import { getSourcing, saveSourcing, deleteSourcing, fetchSourcingPrice, getSpydeckSaves,
@@ -76,6 +79,33 @@ const STAGE_WHY: Record<string, string> = {
  rotation: "A sample from this supplier was received — that is what approved it.",
  archived: "Archived.",
 }
+
+/**
+ * THE COLUMNS, AS DATA. They were nine literal <th>s with hand-written widths, which meant
+ * nothing could read them — not a Columns control, and not an archive wanting to line its
+ * own table up with this one. §4's rule for histories says an archive is handed the LIVE
+ * list's registry; this is Sourcing's.
+ *
+ * `locked` is Product: without it a row is five numbers and a stage, and you cannot tell
+ * which blank they are about.
+ */
+export type SourcingColId =
+  | "product" | "source" | "unit" | "moq" | "freight" | "landed" | "lead" | "stage"
+
+export const SOURCING_COLS: ColumnRegistry<SourcingColId> = {
+  product: { id: "product", label: "Product", locked: true },
+  source:  { id: "source",  label: "Source",       width: "w-32" },
+  unit:    { id: "unit",    label: "Unit",         width: "w-16", align: "right" },
+  moq:     { id: "moq",     label: "MOQ",          width: "w-16", align: "right" },
+  freight: { id: "freight", label: "Freight/unit", width: "w-28", align: "right" },
+  landed:  { id: "landed",  label: "Landed",       width: "w-20", align: "right" },
+  lead:    { id: "lead",    label: "Lead",         width: "w-14", align: "right" },
+  stage:   { id: "stage",   label: "Stage",        width: "w-24" },
+}
+export const SOURCING_COL_ORDER: SourcingColId[] =
+  ["product", "source", "unit", "moq", "freight", "landed", "lead", "stage"]
+/** Nothing hidden out of the box: every one of these is why the page exists. */
+export const SOURCING_HIDDEN_DEFAULT: SourcingColId[] = []
 
 export function SourcingView({ embedded }: {
   /** The page around it already says "Sourcing". Drop the view's own heading — and the
@@ -280,6 +310,22 @@ export function SourcingView({ embedded }: {
     URL.revokeObjectURL(url)
   }
 
+  /* Column layout, persisted per browser like the Orders table's. Read in an effect rather
+     than during render: localStorage does not exist on the server, and a first paint that
+     disagrees with the second is a flicker on every load. */
+  const [colOrder, setColOrder] = useState<SourcingColId[]>(SOURCING_COL_ORDER)
+  const [hiddenCols, setHiddenCols] = useState<SourcingColId[]>(SOURCING_HIDDEN_DEFAULT)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const isId = (v: unknown): v is SourcingColId =>
+        typeof v === "string" && v in SOURCING_COLS
+      setColOrder(loadColumnOrder("eg_sourcing_cols", SOURCING_COL_ORDER, isId))
+      setHiddenCols(loadHiddenColumns("eg_sourcing_hidden", SOURCING_HIDDEN_DEFAULT, isId))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+  const visibleCols = colOrder.filter((id) => !hiddenCols.includes(id))
+
  if (rows === null) return <Loading />
   const stageFilterEl = (
     <FilterMenu
@@ -335,7 +381,7 @@ export function SourcingView({ embedded }: {
       <div className={canBrowse && tab === "find" ? "hidden" : undefined}>
       <SectionCard>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-          {embedded ? <div className="flex-1">{rows.length > 0 && stageFilterEl}</div> : (
+          {embedded ? <div className="flex-1" /> : (
             <div className="flex-1">
               <h2 className="text-sm font-semibold">{tl("sourcing", "Sourcing")}</h2>
               <p className="text-xs text-muted-foreground">
@@ -488,6 +534,30 @@ export function SourcingView({ embedded }: {
             {tl("sourcing", "No sources saved yet. Add one to compare what a product lands at across suppliers.")}
           </div>
         ) : (
+          <>
+        {/* THE UTILITY LINE. /orders puts "962 orders · Filters · Columns" here, directly
+            above the header row and right-aligned, and it is the one band on the page whose
+            job is reshaping the table rather than acting on it. Sourcing had the filter up in
+            the action row and no Columns control at all. */}
+        {embedded && rows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+            {stageFilterEl}
+            <span className="ml-auto whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+              {shown.length} {shown.length === 1 ? "source" : "sources"}
+            </span>
+            <ColumnsMenu
+              cols={SOURCING_COLS}
+              order={colOrder}
+              hidden={hiddenCols}
+              isLocked={(id) => !!SOURCING_COLS[id].locked}
+              defaults={{ order: [...SOURCING_COL_ORDER], hidden: [...SOURCING_HIDDEN_DEFAULT] }}
+              labelNs="sourcing"
+              onOrder={(ids) => { setColOrder(ids); saveColumnIds("eg_sourcing_cols", ids) }}
+              onHidden={(ids) => { setHiddenCols(ids); saveColumnIds("eg_sourcing_hidden", ids) }}
+            />
+          </div>
+        )}
+
           <div className="overflow-x-auto">
             {/* table-fixed, or the w-* on the headers are only hints: auto layout hands the
                 numeric columns whatever they ask for and squeezes the one column holding a
@@ -497,14 +567,17 @@ export function SourcingView({ embedded }: {
               <thead className="border-b border-border text-left eg-label text-muted-foreground">
                 <tr>
                   <th className="w-10 px-4 py-2" />
-                  <th className="px-4 py-2 text-left">{tl("sourcing", "Product")}</th>
-                  <th className="w-32 px-4 py-2 text-left">{tl("sourcing", "Source")}</th>
-                  <th className="w-16 px-4 py-2 text-right">{tl("sourcing", "Unit")}</th>
-                  <th className="w-16 px-4 py-2 text-right">MOQ</th>
-                  <th className="w-28 px-4 py-2 text-right">{tl("sourcing", "Freight/unit")}</th>
-                  <th className="w-20 px-4 py-2 text-right">{tl("sourcing", "Landed")}</th>
-                  <th className="w-14 px-4 py-2 text-right">{tl("sourcing", "Lead")}</th>
-                  <th className="w-24 px-4 py-2 text-left">{tl("sourcing", "Stage")}</th>
+                  {/* FROM THE REGISTRY, so the header, the widths and the Columns control can
+                      never disagree — and a column turned off disappears from all three. */}
+                  {visibleCols.map((id) => (
+                    <th
+                      key={id}
+                      className={"px-4 py-2 " + (SOURCING_COLS[id].width ?? "") +
+                        (SOURCING_COLS[id].align === "right" ? " text-right" : " text-left")}
+                    >
+                      {tl("sourcing", SOURCING_COLS[id].label)}
+                    </th>
+                  ))}
                   <th className="w-24 px-4 py-2" />
                 </tr>
               </thead>
@@ -524,37 +597,49 @@ export function SourcingView({ embedded }: {
                           ? <img src={fullImg(r.image)} alt="" className="size-9 rounded border border-border object-cover" />
  : <span className="flex size-9 items-center justify-center rounded border border-dashed border-border text-2xs text-muted-foreground">—</span>}
                       </td>
-                      {/* A CARET, because the row expanding was the page's best feature and
- nothing said so. The profit calculator, the rival comparison and
- the agreed terms all live in that panel, and the only way to find
- out was to click a row that gave no sign it would do anything. */}
-                      <td className="px-4 py-3 font-medium">
-                        <span className="flex items-center gap-1.5">
-                          <CaretRight size={12} weight="bold"
- className={"shrink-0 text-muted-foreground transition-transform " + (isSel ? "rotate-90" : "")} />
-                          {r.title}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {r.supplierRef ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">{r.supplierRef}</span> : (r.shop || "—")}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{money(r.cost)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{moq.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{freightUnit ? money(freightUnit) : "—"}</td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{money(landed)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
-                      {/* DERIVED, so it is read. It was a dropdown, and every row sat at the
- first stage — because changing it changed nothing, and a label with
- no consequence is one nobody maintains. It now comes from what
- actually happened: a sample placed reads Sampling, a sample
- received reads Approved. The title says which fact put it here,
- because a stage you cannot argue with should still explain itself. */}
-                      <td className="px-4 py-3">
-                        <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
- title={STAGE_WHY[r.stage || "prospect"]}>
-                          {SOURCING_STAGES.find((s) => s.id === (r.stage || "prospect"))?.label ?? tl("sourcing", "Saved")}
-                        </span>
-                      </td>
+                      {/* ONE MAP, driven by the same visible-column list the header uses, so
+                          a column hidden in the menu leaves the header AND the cells together.
+                          Nine hand-written <td>s could not do that: the header knew about a
+                          column the row did not. */}
+                      {visibleCols.map((id) => {
+                        const align = SOURCING_COLS[id].align === "right" ? " text-right" : ""
+                        if (id === "product") return (
+                          /* A CARET, because the row expanding was the page's best feature and
+                             nothing said so. The profit calculator, the rival comparison and the
+                             agreed terms all live in that panel, and the only way to find out was
+                             to click a row that gave no sign it would do anything. */
+                          <td key={id} className="px-4 py-3 font-medium">
+                            <span className="flex items-center gap-1.5">
+                              <CaretRight size={12} weight="bold"
+                                className={"shrink-0 text-muted-foreground transition-transform " + (isSel ? "rotate-90" : "")} />
+                              {r.title}
+                            </span>
+                          </td>
+                        )
+                        if (id === "source") return (
+                          <td key={id} className="px-4 py-3 text-muted-foreground">
+                            {r.supplierRef ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">{r.supplierRef}</span> : (r.shop || "—")}
+                          </td>
+                        )
+                        if (id === "unit") return <td key={id} className={"px-4 py-3 tabular-nums" + align}>{money(r.cost)}</td>
+                        if (id === "moq") return <td key={id} className={"px-4 py-3 tabular-nums" + align}>{moq.toLocaleString()}</td>
+                        if (id === "freight") return <td key={id} className={"px-4 py-3 tabular-nums text-muted-foreground" + align}>{freightUnit ? money(freightUnit) : "—"}</td>
+                        if (id === "landed") return <td key={id} className={"px-4 py-3 font-semibold tabular-nums" + align}>{money(landed)}</td>
+                        if (id === "lead") return <td key={id} className={"px-4 py-3 tabular-nums text-muted-foreground" + align}>{r.leadDays != null ? `${r.leadDays}d` : "—"}</td>
+                        /* DERIVED, so it is read. It was a dropdown, and every row sat at the
+                           first stage — because changing it changed nothing, and a label with no
+                           consequence is one nobody maintains. It now comes from what actually
+                           happened: a sample placed reads Sampling, a sample received reads
+                           Approved. The title says which fact put it here. */
+                        return (
+                          <td key={id} className="px-4 py-3">
+                            <span className={"rounded-lg px-2 py-0.5 text-xs font-medium " + STAGE_PILL[r.stage || "prospect"]}
+                              title={STAGE_WHY[r.stage || "prospect"]}>
+                              {SOURCING_STAGES.find((st) => st.id === (r.stage || "prospect"))?.label ?? tl("sourcing", "Saved")}
+                            </span>
+                          </td>
+                        )
+                      })}
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           {r.url && (
@@ -690,6 +775,7 @@ export function SourcingView({ embedded }: {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </SectionCard>
 
