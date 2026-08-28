@@ -253,8 +253,19 @@ export function SupplierDetailDialog({
             </div>
             {/* The other angles of THIS colourway. A cap head-on says nothing about the back,
  which on a trucker or a snapback is half the product. Only shown when there is
- more than one — a single thumbnail under a photo of the same thing is furniture. */}
-            {frames.length > 1 && (
+ more than one — a single thumbnail under a photo of the same thing is furniture.
+
+                AND ONLY ONCE A COLOUR IS CHOSEN, which is the fix. Before that, `frames`
+                falls back to the style-level gallery — and for S&S that gallery is one photo
+                per colourway, so a 17-colour cap drew SEVENTEEN thumbnails in four rows,
+                directly above a Colours grid listing the same seventeen with their names.
+                The same information twice, and the copy without names was the taller one.
+
+                The colour grid below is already the colour picker and it is the better one.
+                Nothing is lost: every colourway is still one click away, and the strip now
+                appears when it has something the grid cannot show — the back and the side of
+                the colour you actually picked. */}
+            {colour && frames.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 {frames.map((u) => (
                   <button
@@ -365,13 +376,20 @@ export function SupplierDetailDialog({
                             Charcoal from Black. Supplier codes are prettified ("031753A -
                             Blk/Dk.Grn" → the readable half) and truncated; the full string
  stays on the button's title. */}
+                        {/* ...AND ALWAYS THE HEIGHT OF TWO, wrapped or not. `line-clamp-2`
+                            let a one-word name take one line and a compound take two, so in a
+                            flex-wrap grid each ROW sized to its tallest label — "Columbia Blue"
+                            made its whole row taller than the one beneath it, and seventeen
+                            swatches read as a ragged block rather than a palette. Reserving the
+                            second line costs one empty line under the short names and makes
+                            every row the same height, which is what a grid is for. */}
                         {/* TWO LINES, NOT AN ELLIPSIS. Otto names are compound — "Navy/White",
                             "Black/Dark Green", "Khaki/Navy" — and a single truncated line
  turned three different colourways into "Navy/W…", "Navy/Da…" and
                             "Navy/Kh…", which distinguishes nothing. Wrapping keeps the part
  that actually differs visible. */}
                         <span
- className={"line-clamp-2 w-full break-words text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
+ className={"line-clamp-2 min-h-[2.5em] w-full break-words text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
  title={c}
                         >
                           {prettyColorName(c)}
