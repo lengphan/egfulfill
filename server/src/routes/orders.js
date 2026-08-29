@@ -1707,7 +1707,19 @@ export function ordersRoutes(app, requireAuth) {
     // "<iso timestamp>|<order id>" — the last row of the previous page.
     const rawCursor = String(qy.cursor || '').trim();
     const cut = rawCursor.indexOf('|');
-    const cursor = pageSize && cut > 0 && !isNaN(Date.parse(rawCursor.slice(0, cut)))
+    /**
+     * A CURSOR WITHOUT A LIMIT MEANS "EVERYTHING AFTER THIS", and that is the point.
+     *
+     * Cutting the Vercel relay made every call cross-origin, so each one now carries a CORS
+     * preflight — and the preflight cache is keyed by the whole URL, cursor included, so a
+     * walk of six pages preflights six times and no entry is ever reused. Measured on the
+     * live app: ~1.1s of round trips carrying 0 bytes.
+     *
+     * So the client asks for a screenful, then asks for the remainder in ONE request. That
+     * needs a cursor that does not require a limit beside it. It was coupled only because
+     * paging arrived first, not for any reason of its own.
+     */
+    const cursor = cut > 0 && !isNaN(Date.parse(rawCursor.slice(0, cut)))
       ? { ts: rawCursor.slice(0, cut), id: rawCursor.slice(cut + 1) }
       : null;
     /** The keyset predicate + ORDER BY + LIMIT, numbered from however many params the

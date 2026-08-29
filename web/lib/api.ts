@@ -2250,66 +2250,45 @@ export function cachedOrders(): OrderRow[] | null {
  */
 export async function streamOrders(
   onPage: (rowsSoFar: OrderRow[], done: boolean) => void,
-  opts: { firstPage?: number; pageSize?: number; signal?: AbortSignal } = {},
+  opts: { firstPage?: number; signal?: AbortSignal } = {},
 ): Promise<OrderRow[]> {
-  /**
-   * THE FIRST PAGE IS THE SIZE OF A SCREEN; THE REST ARE AS BIG AS THEY LIKE.
-   *
-   * A board shows 25 rows. Asking for 100 to fill 25 makes the first paint wait on four
-   * screens nobody is looking at, and asking for 100 four more times makes ten requests of
-   * what could be five. So the first ask is a screenful and the ones behind it are large.
-   */
   const first = Math.max(1, Math.min(500, opts.firstPage ?? 25))
-  const rest = Math.max(1, Math.min(500, opts.pageSize ?? 200))
-  const MAX_PAGES = 200
-  const all: OrderRow[] = []
-  let cursor = ""
-  for (let n = 0; n < MAX_PAGES; n++) {
-    if (opts.signal?.aborted) return all
-    const size = n === 0 ? first : rest
-    const qs = `limit=${size}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
-    const rows = resolveImgRefs(await api<OrderRow[]>(`/api/orders?${qs}`, { signal: opts.signal }))
-    /**
-     * AN OLD SERVER IGNORES `limit` — and it would ignore `cursor` with it.
-     *
-     * Vercel and the VPS deploy separately, so for a few minutes this client can be talking
-     * to an API that predates paging. It would hand back the whole list every time, never
-     * satisfy `rows.length < size`, and walk the same 1.37MB up to MAX_PAGES: 274MB, on a
-     * loop, which is the §2.8 failure this repo has already paid for once.
-     *
-     * More rows than were asked for is proof the parameter did nothing. Take the full list
-     * — it IS the complete answer — and stop.
-     */
-    if (rows.length > size) {
-      onPage(rows, true)
-      _lists.set("orders", { at: Date.now(), data: rows })
-      return rows
-    }
-    all.push(...rows)
-    const done = rows.length < size
-    /**
-     * TWO RENDERS, NOT TEN.
-     *
-     * Handing every page to React made the list visibly tick: the row count, the pager and
-     * the "of N" all rewrote themselves once per request while you watched it load. Nothing
-     * after the first page changes what is ON SCREEN anyway — a board shows 25 rows — so
-     * the middle pages accumulate quietly and the total lands once, when it is true.
-     */
-    if (n === 0 || done) onPage(all.slice(), done)
-    if (done) {
-      // Only a COMPLETE walk may fill the shared entry. Seeding it from a partial list
-      // would hand every other board a truncated one that looks whole.
-      _lists.set("orders", { at: Date.now(), data: all })
-      return all
-    }
-    const last = rows[rows.length - 1]
-    // Can't keyset on a row with no key — stop with what we have rather than loop on the
-    // same cursor forever.
-    if (!last?.created_at || !last.id) return all
-    // The cursor the server keysets on: "<created_at>|<id>".
-    cursor = `${last.created_at}|${last.id}`
+  const get = (qs: string) =>
+    api<OrderRow[]>(`/api/orders?${qs}`, { signal: opts.signal }).then(resolveImgRefs)
+  const keep = (rows: OrderRow[], done: boolean) => {
+    onPage(rows.slice(), done)
+    // Only a COMPLETE list may fill the shared entry. Seeding it from a partial one would
+    // hand every other board a truncated list that looks whole.
+    if (done) _lists.set("orders", { at: Date.now(), data: rows })
+    return rows
   }
-  return all
+
+  // 1 — a screenful, so the board draws.
+  const head = await get(`limit=${first}`)
+  /**
+   * AN OLD SERVER IGNORES `limit`. Vercel and the VPS deploy apart, so for a few minutes
+   * this can be talking to an API that predates paging: it would return the whole list and
+   * ignore the cursor too. More rows than were asked for is proof the parameter did nothing
+   * — and the answer it gave IS the complete list, so take it and stop.
+   */
+  if (head.length > first) return keep(head, true)
+  if (head.length < first) return keep(head, true)   // that was all of them
+
+  const last = head[head.length - 1]
+  if (!last?.created_at || !last.id) return keep(head, true)   // nothing to page from
+  keep(head, false)
+  if (opts.signal?.aborted) return head
+
+  // 2 — everything after it, in ONE request. Not a loop: two awaits, so there is no
+  // condition a fetch of its own could re-satisfy (§2.8).
+  const tail = await get(`cursor=${encodeURIComponent(`${last.created_at}|${last.id}`)}`)
+  /**
+   * DEDUPED, because an API that predates the previous commit ignores a cursor that arrives
+   * without a limit and would hand back the whole list a second time. Keying on id makes
+   * that harmless instead of a board showing every order twice.
+   */
+  const have = new Set(head.map((o) => o.id))
+  return keep(head.concat(tail.filter((o) => !have.has(o.id))), true)
 }
 /** Orders to suggest when "@"-tagging in a support thread — the THREAD's seller's orders,
  *  so it works for staff on a seller's inbox thread too (getOrders is caller-only). */
