@@ -47,6 +47,8 @@ export default function Settings() {
   const [err, setErr] = useState<string | null>(null)
   const [push, setPush] = useState<PushState | null>(null)
   const [pushWhy, setPushWhy] = useState<string | null>(null)
+  const [upd, setUpd] = useState<"idle" | "checking" | "fetching" | "current">("idle")
+  const [updWhy, setUpdWhy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try { setMe(await getMe()); setErr(null) }
@@ -79,6 +81,38 @@ export default function Settings() {
         },
       },
     ])
+  }
+
+  /**
+   * PULL THE UPDATE NOW, rather than on the second cold start.
+   *
+   * expo-updates checks on launch, keeps running what it already has, and swaps to the new
+   * bundle the NEXT time the app opens. That is the right default — nobody should have a
+   * screen replaced under them mid-tap — but it means "force-quit it twice" is the only way
+   * to see a change, and that is folklore for anyone reviewing a build rather than using it.
+   *
+   * So: ask, fetch, reload, in one press. The line above already says which bundle is
+   * running; this is the control that changes it.
+   */
+  const checkForUpdate = async () => {
+    setUpdWhy(null)
+    /* A refusal carries its reason. In Expo Go and on a dev client there is no update to
+       fetch and the call throws — saying so is the answer, and it is not the same as
+       being up to date. */
+    if (!Updates.isEnabled) { setUpdWhy("This build reads its JS from the dev server, so there is nothing to fetch."); return }
+    setUpd("checking")
+    try {
+      const found = await Updates.checkForUpdateAsync()
+      if (!found.isAvailable) { setUpd("current"); return }
+      setUpd("fetching")
+      await Updates.fetchUpdateAsync()
+      /* No success state: the app restarts into the new bundle, so anything set here is
+         drawn for a frame and then thrown away with the JS context that drew it. */
+      await Updates.reloadAsync()
+    } catch (e) {
+      setUpd("idle")
+      setUpdWhy(e instanceof Error ? e.message : "Couldn't reach the update server.")
+    }
   }
 
   const version = Constants.expoConfig?.version ?? "—"
@@ -181,7 +215,26 @@ export default function Settings() {
       <View style={{ ...CARD, marginTop: 8, overflow: "hidden" }}>
         <Line label="Version" value={version} />
         <Line label="Update" value={jsVersion} last />
+        <Pressable
+          onPress={checkForUpdate}
+          disabled={upd === "checking" || upd === "fetching"}
+          style={({ pressed }) => ({
+            height: 48, alignItems: "center", justifyContent: "center",
+            borderTopWidth: 1, borderTopColor: C.border,
+            backgroundColor: pressed ? C.accent : "transparent",
+          })}
+        >
+          <Text style={{ fontSize: 15, fontFamily: F.semi, color: upd === "current" ? C.muted : C.fg }}>
+            {upd === "checking" ? "Checking…"
+              : upd === "fetching" ? "Downloading…"
+              : upd === "current" ? "Already the newest"
+              : "Check for updates"}
+          </Text>
+        </Pressable>
       </View>
+      {updWhy ? (
+        <Text style={{ fontSize: 13, color: C.warn, marginTop: 8, paddingHorizontal: 4 }}>{updWhy}</Text>
+      ) : null}
 
       <Pressable
         onPress={() => Linking.openURL("https://app.egful.store")}
