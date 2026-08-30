@@ -294,11 +294,16 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
          as one — no caption, here or on the page, says these are real results. */
       { title: "Every store, one queue", body: "Orders from Etsy, Shopify & TikTok Shop sync in automatically — no CSV exports, no copy-paste, no missed orders.", shot: "/frames/shot-orders.webp", shotAlt: "The order queue with Etsy, Shopify and TikTok Shop orders in one list" },
       { title: "Our factory, not a broker", body: "We own the machines. Checked at intake, after decoration and at pack, by the people who made it.", shot: "/frames/shot-design.webp", shotAlt: "The Design Lab, showing artwork ready to place on a garment" },
-      /* No capture yet — this card wants an order detail showing tracking pushed back to the
-         marketplace, and the queue shot already carries the tracking column. Two cards showing
-         the same screen would read as one screen photographed twice. The frame draws its
-         wireframe until there is a real one. */
-      { title: "Tracking, automatic", body: "Cheapest label bought and tracking pushed back to the marketplace for you." },
+      /* REAL FOOTAGE, not a screen. This card wanted an order detail showing tracking pushed
+         back to the marketplace — but the queue shot already carries the tracking column, and
+         two cards showing the same screen read as one screen photographed twice. So it takes
+         the thing the other three cannot: our own floor, moving.
+
+         It is film rather than a still because this is the one card whose subject is motion,
+         and FloorRail branches on the extension — a `.mp4` here becomes a muted looping video
+         that plays only while the card is on screen. It is not presented as a capture of the
+         app and must never be: it is footage of the conveyor, which is exactly what it is. */
+      { title: "Tracking, automatic", body: "Cheapest label bought and tracking pushed back to the marketplace for you.", shot: "/frames/floor-conveyor-loop.mp4", shotAlt: "Parcels moving along the conveyor on our own floor" },
       { title: "Transparent wallet", body: "A prepaid wallet with clear per-order charges and instant payouts. Always know exactly what you paid and why.", shot: "/frames/shot-dashboard.webp", shotAlt: "The seller dashboard, showing revenue, open orders and wallet balance" },
     ],
   },

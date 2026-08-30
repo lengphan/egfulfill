@@ -2,12 +2,9 @@
 
 import { motion, useReducedMotion } from "motion/react"
 import type { SiteContent } from "@/lib/site-content"
-import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, Window, ObjectTile, MediaHero, MediaBand } from "@/components/marketing/bold-kit"
-import { Arrow, RotaryBadge, SwingTag } from "@/components/marketing/stickers"
-import { ThreadCone, Printhead, ShippingBox, HangTag } from "@/components/marketing/objects"
-
-/** One object per feature section, in factory order: make → print → pack → label. */
-const FEATURE_OBJECTS = [ThreadCone, Printhead, ShippingBox, HangTag] as const
+import { ACCENT, ACCENT_INK, INK, SURFACE, ACID, HAIRLINE, EASE, MaskedWords, TypedPhrase, Pill, Band, MediaHero, MediaBand } from "@/components/marketing/bold-kit"
+import { RotaryBadge } from "@/components/marketing/stickers"
+import { FloorRail } from "@/components/marketing/floor-rail"
 import { CalloutList } from "@/components/marketing/bold-figure"
 import { EditableImage, EditableText, useEditableNum, useEditableSrc, useEditMode } from "@/components/marketing/edit-mode"
 
@@ -231,61 +228,12 @@ export function BoldHome({ content }: { content: SiteContent }) {
         </p>
       </Band>
 
-      {features.cards.slice(0, 4).map((c, i) => {
-        const Obj = FEATURE_OBJECTS[i % FEATURE_OBJECTS.length]
-        const flip = i % 2 === 1
-        return (
-          <Band key={`${c.title}-${i}`} tone={flip ? "card" : "paper"}>
-            <div className="grid items-center gap-x-14 gap-y-8 lg:grid-cols-2">
-              <div className={flip ? "lg:order-2" : undefined}>
-                <ObjectTile size={52}><Obj className="h-full w-full" /></ObjectTile>
-                <h3 className="mt-6 font-display text-[clamp(1.5rem,2.6vw,2.1rem)] font-semibold leading-[1.05] tracking-[-0.025em]">
-                  <EditableText path={`features.cards.${i}.title`}>{c.title}</EditableText>
-                </h3>
-                <p className="mt-3 max-w-md text-[16px] leading-relaxed" style={{ color: INK, opacity: 0.62 }}>
-                  <EditableText path={`features.cards.${i}.body`}>{c.body}</EditableText>
-                </p>
-              </div>
-              {/* THE FRAME TAKES A REAL CAPTURE, and draws a wireframe when it has none.
-                  That fallback is the point: an empty slot must read as "no screenshot yet",
-                  never as a plausible screen. A mocked-up queue with invented order numbers on
-                  a public page is what §4 forbids, so the honest empty beats the convincing
-                  fake. Replaceable in place like every other picture on the site, so a capture
-                  goes in through the editor rather than a deploy.
-
-                  THE CAPTION IS NOW A TAG STUCK TO THE PANEL, and it is the SAME STRING — the
-                  card's own title, straight from stored content. A sticker that states a fact
-                  of its own would be a fact an admin cannot edit and the page would eventually
-                  lie; taking the label that already exists cannot go out of date.
-
-                  It hangs off the corner deliberately. A label inside the frame is a caption;
-                  one breaking the edge is something applied to the object afterwards, which is
-                  the whole device — and it is why the wrapper is `relative` with no clipping. */}
-              <div className={"relative " + (flip ? "lg:order-1" : "")}>
-                <EditableImage path={`features.cards.${i}.shot`}>
-                  <Window src={c.shot} alt={c.shotAlt} tilt={flip ? -2 : 2} />
-                </EditableImage>
-                <SwingTag
-                  label={c.title}
-                  rotate={flip ? 4 : -4}
-                  className="absolute -top-3 left-3 z-10 sm:-left-4 sm:top-4"
-                />
-                {/* ONE ARROW ON THE PAGE, on the first card only. It points from the sentence
-                    to the panel that sentence is about, which is a relationship that is true
-                    by POSITION rather than by copy — so it survives any edit. A second one
-                    further down would make both read as decoration. */}
-                {i === 0 && (
-                  <Arrow
-                    dir="downRight"
-                    className="pointer-events-none absolute -left-16 top-1/2 hidden w-20 -translate-y-1/2 xl:block"
-                    aria-hidden
-                  />
-                )}
-              </div>
-            </div>
-          </Band>
-        )
-      })}
+      {/* THE FOUR CAPABILITIES ARE A RAIL, not four stacked bands — see floor-rail.tsx for
+          the reasoning and the reference it was measured against. The stored content is
+          unchanged: same four cards, same titles, same bodies, same real captures, and the
+          same editable paths. What changed is that they are now objects you move through
+          rather than boxes you scroll past. */}
+      <FloorRail cards={features.cards} />
 
       {/* ── THE FLOOR ─────────────────────────────────────────────────────────────
           The one photograph on this page of the thing we actually do. Everything above it is
