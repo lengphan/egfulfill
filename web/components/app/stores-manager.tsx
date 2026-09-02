@@ -84,11 +84,22 @@ const CHANNELS: { key: string; name: string; live: boolean; soon?: string; markH
  * module scope — a component declared inside render violates react-hooks/static-components
  * and remounts on every parent render, which would re-trigger the error state.
  */
+/** The channels whose mark ships as an SVG. Everything else in public/channels is a PNG. */
+const SVG_CHANNELS = new Set(["shopify", "walmart"])
+
 function ChannelMark({ channelKey, name, markH }: { channelKey: string; name: string; markH: number }) {
   // svg → png → icon. Brand press kits give one or the other and it's not worth caring
   // which; public/suppliers already stores PNGs (otto.png, ss.png), so both must work.
+  //
+  // START AT THE EXTENSION THAT EXISTS. Trying .svg first for every channel meant the four
+  // PNG-only marks each fired a guaranteed 404 before the fallback rendered them correctly:
+  // the page looked fine and cost four failed round trips on every load, and four red lines
+  // in the console that mask the errors worth reading. Only shopify and walmart ship an SVG.
+  // A channel missing from this set simply starts at .png and still falls back to the icon,
+  // so adding an SVG later means adding the key here — not touching the fallback chain.
  const [step, setStep] = useState(0)
- const src = step === 0 ? `/channels/${channelKey}.svg` : `/channels/${channelKey}.png`
+ const ext = step === 0 && SVG_CHANNELS.has(channelKey) ? "svg" : "png"
+ const src = `/channels/${channelKey}.${ext}`
   // CONSTRAINED BY HEIGHT, NOT BOXED. These are wordmarks — WooCommerce's is 3.8:1 and
   // Amazon's 2.3:1 — so a square plate shrinks them to a 24×6 smear. Height with free width
   // is the only arrangement in which marks of different aspect ratios read alike, and it's
