@@ -15,6 +15,7 @@ import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
 import { canMoveMoney, canSeeMoney, resolveSeller, canSurface } from '../auth.js';
 import { notify } from './notifications.js';
+import { egBroadcast } from '../events.js';
 import { notifyChannelStillOpen } from './orders.js';
 
 // Which part of an order a refund row paid back. Added idempotently at load, like the
@@ -526,6 +527,39 @@ export function orderRefundRoutes(app, requireAuth) {
       // what `out.refunded` / `out.parts` are. See the note on refundOrder's return.
       after: { refunded: out.refundedNow, parts: out.alloc, note: b.note || null, refundableLeft: out.refundable },
     });
+
+    /**
+     * A FULLY REFUNDED ORDER SAYS SO ON THE BOARD.
+     *
+     * Refunding moved the money and left `factory_status` alone, so an order refunded down
+     * to nothing kept whatever stage it was on — `in_review` renders as "Pending", which is
+     * how a fully refunded order sat in the queue reading as work waiting to start. The
+     * floor picks that up and MAKES it, with the money already back in the seller's wallet.
+     *
+     * `refunded` is not a new state invented here: it is already in EXCEPTIONS beside
+     * cancelled, already in MONEY_STAGES, already labelled "Refunded", and canSetStage
+     * already permits shipped -> refunded. Nothing had ever set it.
+     *
+     * ONLY WHEN NOTHING IS LEFT. A partial refund must not move the stage — sending back the
+     * shipping on a shipped order does not un-ship it — so this reads what the refund left
+     * behind rather than the caller's `full` flag, which describes the request and not the
+     * result. A cent of tolerance, because these are dollar amounts in floating point.
+     *
+     * Never over a stage that is already terminal for money: cancelled stays cancelled, and
+     * a second refund on an already-refunded order changes nothing.
+     */
+    if (Number(out.refundable ?? 0) <= 0.005) {
+      const cur = await q('select factory_status from orders where id=$1', [req.params.id])
+        .then((r) => String(r.rows[0]?.factory_status || '').toLowerCase()).catch(() => null);
+      if (cur !== null && cur !== 'refunded' && cur !== 'cancelled') {
+        await q("update orders set factory_status='refunded' where id=$1", [req.params.id]).catch(() => {});
+        audit(req, 'order.stage', {
+          entityType: 'order', entityId: String(req.params.id),
+          before: { factory_status: cur }, after: { factory_status: 'refunded', because: 'refunded in full' },
+        });
+        egBroadcast({ type: 'orders' });
+      }
+    }
 
     /**
      * KEEPING A FEE BACK is a refund AND a charge, never a smaller refund.
