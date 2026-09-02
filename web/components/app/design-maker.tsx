@@ -807,7 +807,11 @@ export function DesignMaker() {
                     onClick={() => { setProduct(p); setMockup(mockupOf(p)); setSide("front") }}
                     className="group rounded-xl border border-border bg-card p-2 text-left transition-colors hover:border-primary/50"
                   >
-                    <span className="block aspect-square overflow-hidden rounded-lg bg-muted/40">
+                    {/* WHITE, not a tint. Supplier blank photos ship on an opaque white
+                        ground, so a tinted well renders the photo's own white as a visible
+                        rectangle floating inside the card. Every other product-image well in
+                        the app is `bg-white object-contain` for exactly this reason. */}
+                    <span className="block aspect-square overflow-hidden rounded-lg bg-white">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={mockupOf(p)} alt="" className="size-full object-contain p-[6%]" />
                     </span>
