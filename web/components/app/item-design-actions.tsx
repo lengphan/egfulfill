@@ -2,13 +2,14 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
-import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock, CircleNotch, Kanban } from "@phosphor-icons/react"
+import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock, Kanban } from "@phosphor-icons/react"
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
-import { assignDesignCard, createDesignCard, getPinkStatus, type OrderDesignStatus } from "@/lib/api"
+import { SendToBoardDialog } from "@/components/app/send-to-board-dialog"
+import { getPinkStatus, type OrderDesignStatus } from "@/lib/api"
 
 type CardState = OrderDesignStatus["bySku"][string]
 
@@ -64,8 +65,10 @@ export function ItemDesignActions({
 }) {
   const tl = useLabelT()
  const [pushOpen, setPushOpen] = useState(false)
- const [sending, setSending] = useState(false)
- const [err, setErr] = useState<string | null>(null)
+  /* The board send is a dialog now, not a click — see send-to-board-dialog.tsx for why. */
+ const [boardOpen, setBoardOpen] = useState(false)
+  /* No `sending` / `err` here any more: both sends are dialogs, and each owns its own busy
+     state and its own refusal. Keeping a copy on the row would be two places to be wrong. */
   /** Held by an OUTSIDE vendor, versus sitting on our own board. Both are "a card exists
    *  for this line"; only one of them is somebody else's queue. */
  const withVendor = !!state?.vendor
@@ -123,25 +126,26 @@ export function ItemDesignActions({
    * `incoming` because that is where a designer LOOKS for new work — a card filed straight
    * into "in progress" starts in a lane nobody is watching, already claimed by no one.
    */
- const sendToBoard = async () => {
- setSending(true); setErr(null)
- try {
- const card = await createDesignCard({
- title: itemName || sku || "Design",
- data: artworkUrl || lineImage || undefined,
- sku: sku || undefined,
- col: "incoming",
-      })
- if (card.error) throw new Error(card.error)
- if (card.id) {
- const a = await assignDesignCard(String(card.id), { orderId, sku, lineId: lineId || undefined })
- if ((a as { error?: string })?.error) throw new Error(String((a as { error?: string }).error))
-      }
- onChanged?.()
-    } catch (e) {
- setErr(e instanceof Error ? e.message : "Couldn't send this line to the board.")
-    } finally { setSending(false) }
-  }
+ /**
+   * WHICH DESTINATION THIS LINE CAN GO TO, decided by how it is decorated.
+   *
+   * Embroidery arrives as a picture and has to be DIGITISED, which is our own board's whole
+   * job. DTG and DTF arrive print-ready and the work we buy outside is the artwork itself,
+   * which is Pink Design's. Offering both on every row made the menu a quiz with a wrong
+   * answer on it — and the wrong answer costs money, either paying a partner for digitising
+   * the queue was about to do, or parking a print job in a lane nobody digitises.
+   *
+   * The METHOD is read from the print type and from the sku's suffix, because order skus
+   * carry one (-EMB, -DTG, -DTF) and the two do not always both arrive. Anything that is
+   * neither — sublimation, screen, appliqué — keeps both routes, since there is no rule to
+   * apply and hiding an option nobody stated a rule for would be inventing one.
+   */
+ const method = `${printType || ""} ${sku || ""}`.toLowerCase()
+ const isEmb = /emb|stitch|embroid/.test(method)
+ const isPrintOnly = !isEmb && /dtg|dtf/.test(method)
+ const showBoard = !isPrintOnly
+ const showPartner = !isEmb
+
 
  return (
     <>
@@ -160,8 +164,6 @@ export function ItemDesignActions({
             {withVendor ? vendorLabel(state?.vendor) : tl("itemDesignActions", "Design board")}{lane ? ` · ${lane.label}` : ""}
           </span>
         )}
-        {/* A refusal carries its reason; nothing else here writes a sentence. */}
-        {err && <span className="text-xs text-alert">{err}</span>}
         {/* Tucked away, not on the row. The overwhelming majority of lines never need
  this, and a button that's usually wrong to press is worse than one click. */}
         <DropdownMenu>
@@ -169,28 +171,45 @@ export function ItemDesignActions({
  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
  aria-label={tl("itemDesignActions", "Design actions")}
           >
-            {sending ? <CircleNotch size={16} className="animate-spin" /> : <DotsThree size={16} weight="bold" />}
+            <DotsThree size={16} weight="bold" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuGroup>
               <DropdownMenuLabel>{tl("itemDesignActions", "Design")}</DropdownMenuLabel>
               {/* OURS FIRST. An embroidered line that arrived as an image is digitising
  work, and digitising is this board's whole job. */}
-              <DropdownMenuItem onClick={() => void sendToBoard()} disabled={!!boardBlocker || sending}>
+              {showBoard && (
+              <DropdownMenuItem onClick={() => setBoardOpen(true)} disabled={!!boardBlocker}>
                 <Kanban size={14} />
                 {/* The blocker IS the label. A greyed item says it cannot be pressed and
  not one word about why, which on a row that looks identical to the one
  above it is the most annoying kind of disabled. */}
                 {boardBlocker ?? tl("itemDesignActions", "Send to Board")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={!!partnerBlocker || sending}>
+              )}
+              {showPartner && (
+              <DropdownMenuItem onClick={() => setPushOpen(true)} disabled={!!partnerBlocker}>
                 <PaperPlaneTilt size={14} />
                 {partnerBlocker ?? tl("itemDesignActions", "Send to Pink Design")}
               </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <SendToBoardDialog
+        open={boardOpen}
+        onOpenChange={setBoardOpen}
+        orderId={orderId}
+        sku={sku}
+        lineId={lineId}
+        itemName={itemName}
+        artworkUrl={artworkUrl}
+        lineImage={lineImage}
+        printType={printType}
+        onSent={() => onChanged?.()}
+      />
 
       <PushToPartnerDialog
  open={pushOpen}
