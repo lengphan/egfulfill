@@ -737,9 +737,15 @@ export default function ChatPage() {
  else if (r.unavailable) setAiNote(r.error || "The assistant is briefly unavailable. Try again in a moment.")
           // Three different things used to share this one sentence, and two of them sent the
           // reader to Settings to fix a key that was never the problem. `reason` says which.
+          // SELLERS ARE NOT TOLD ABOUT THE SETTING. "Automatic replies are off here" names a
+          // switch a seller cannot see or change, on a thread they did not ask a question of
+          // — the note simply appeared in their conversation. Silence is honest here for the
+          // same reason the branches above are not: nobody pressed anything, so there is no
+          // action left unanswered. Their message sits waiting for a person, which is what a
+          // chat with a person looks like. Staff keep it, because staff can turn it back on.
  else if (r.disabled) setAiNote(
  r.reason === "seller-auto-reply-off"
-              ? "Automatic replies are off here — a teammate will answer you directly."
+              ? (isStaffUser ? "Automatic replies are off here — a teammate will answer you directly." : null)
  : "The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
  else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
  else if (r.empty) setAiNote(r.reason ? `Nothing to answer yet — ${r.reason}.` : "Nothing to answer yet.")
