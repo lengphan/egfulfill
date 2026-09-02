@@ -103,6 +103,19 @@ const SLOW_EXACT = new Set([
   "/api/wilcom/lettering",
   "/api/wilcom/lettering-preview",
   "/api/wilcom/design-preview",
+  // SHIPPING IS PROVIDER WORK TOO, and it was the one class this list missed.
+  //
+  // Buying a label is several round trips to Shippo — create the shipment, buy the
+  // transaction, read the label back — and address validation runs before it. Through
+  // Vercel's rewrite that is long enough to have the connection dropped mid-flight, and a
+  // dropped fetch rejects as `TypeError: Failed to fetch`, which the dialog then shows
+  // verbatim. That is the "Failed to fetch" under the rate list: the rates had already
+  // arrived on the shorter request, so the list stayed on screen while the buy died.
+  //
+  // Rate-shopping is the same shape — one call fanning out across every enabled carrier —
+  // so it goes direct as well rather than waiting to fail on a slow day.
+  "/api/usps/label",
+  "/api/shipping/rates",
 ])
 const isSlow = (path: string) => SLOW_EXACT.has(path.split("?")[0])
 
