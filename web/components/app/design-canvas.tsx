@@ -2729,15 +2729,23 @@ export function DesignCanvasDialog({
                   : quality.tone === "warn"
                   ? "Fine for DTG and DTF. Embroidery wants 300."
                   : undefined}
-                className={"inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 font-medium "
+                /* A READING, NOT A PILL. This sits beside a measurement in a strip of
+                   measurements, and a tinted lozenge there reads as a tag someone attached
+                   rather than as the file's own verdict — §4 keeps the filled capsule for
+                   status chips, where it has to mean something. Colour and a dot carry the
+                   warning; the fill was only ever decoration around it. */
+                className={"inline-flex items-center gap-1.5 font-medium "
                   /* The SAME tokens the Design Maker's meter uses — `hold` is the amber one
                      and there is no `--warning`, so `text-warning` would have rendered as
                      nothing at all. Two surfaces judging one file must not disagree. */
-                  + (quality.tone === "ok" ? "bg-success/10 text-success"
-                  : quality.tone === "warn" ? "bg-hold/10 text-hold"
-                  : quality.tone === "bad" ? "bg-destructive/10 text-destructive"
+                  + (quality.tone === "ok" ? "text-success"
+                  : quality.tone === "warn" ? "text-hold"
+                  : quality.tone === "bad" ? "text-destructive"
                   : "text-muted-foreground")}
               >
+                {quality.tone !== "ok" && quality.tone != null && (
+                  <span aria-hidden className="size-1.5 rounded-full bg-current" />
+                )}
                 {artDpi != null && <span className="tabular-nums">{Math.round(artDpi)} DPI</span>}
                 <span>{quality.label.replace("Print quality: ", "")}</span>
               </span>
@@ -2757,7 +2765,11 @@ export function DesignCanvasDialog({
             )}
             {artOutside && (
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="rounded-lg bg-hold/10 px-2 py-0.5 font-medium text-hold">
+                  {/* Same reasoning as the DPI reading above: the colour is the warning, the
+                      fill was decoration. Two tinted capsules side by side in one strip is
+                      what made this row read as chrome rather than as measurements. */}
+                  <span className="inline-flex items-center gap-1.5 font-medium text-hold">
+                    <span aria-hidden className="size-1.5 rounded-full bg-current" />
                     {tl("canvas", "Outside the print area")}
                   </span>
                   <button
