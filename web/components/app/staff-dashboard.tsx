@@ -368,6 +368,15 @@ export function StaffDashboard() {
       {/* WHERE THE WORK IS, and — for operator and warehouse — which part of it is theirs.
           A block is a link into the queue at that stage; the ones past this role's reach are
           drawn dashed and say why on hover. */}
+      {/* AND THE BRACKET OBEYS THE SAME RULE AS THE TILES ABOVE IT.
+          `ladder.counts` is built from `ov?.counts` with `?? 0` at every field, so a failed
+          read produced a full row
+          of confident zeros — directly under a banner saying "these counts are unavailable —
+          they are not zero". The two halves of one screen contradicted each other, and the
+          zeros were the louder half.
+          Hidden rather than dashed: the banner already says what happened and why, and a
+          bracket of em-dashes would be a second telling of it. */}
+      {ov !== null && (
       <div>
         {/* No label. Every block on the bracket is titled — DRAFT, PENDING, APPROVED — so a
             caption above them names a thing that already names itself. */}
@@ -383,6 +392,7 @@ export function StaffDashboard() {
  onPick={(stage) => router.push(`/production?stage=${encodeURIComponent(stage)}`)}
         />
       </div>
+      )}
 
       {/* Money chart + the one rate worth a gauge. Admin only, like the money itself. */}
       {isAdmin && (

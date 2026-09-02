@@ -116,6 +116,23 @@ const SLOW_EXACT = new Set([
   // so it goes direct as well rather than waiting to fail on a slow day.
   "/api/usps/label",
   "/api/shipping/rates",
+  /**
+   * AND THE ORDER LIST, for SIZE rather than for time.
+   *
+   * `originFor` already sends a request whose BODY is over a megabyte straight to the API,
+   * because Vercel's proxy is not a good place to carry megabytes. The order list is that
+   * same problem pointing the other way: streamOrders measured the full list at 971 orders
+   * / 1.37MB out of Jakarta, and `loadOrders()` asks for all of it in one unpaged GET.
+   *
+   * Carried through the rewrite, a response that size gets cut mid-flight on a slow moment,
+   * and a cut response rejects as `TypeError: Failed to fetch` — which the dashboard prints
+   * under its tiles. It is intermittent for exactly that reason: on a good moment the
+   * transfer finishes, which is why a refresh appears to "fix" it.
+   *
+   * Matched on the path alone, so `?limit=` and `?cursor=` come with it — the paged walk in
+   * streamOrders is the same bytes in smaller pieces and wants the same road.
+   */
+  "/api/orders",
 ])
 const isSlow = (path: string) => SLOW_EXACT.has(path.split("?")[0])
 
