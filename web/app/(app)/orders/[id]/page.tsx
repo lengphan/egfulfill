@@ -877,7 +877,13 @@ export default function OrderDetailPage() {
                           bottom-right corner is now INSIDE that strip. The ordinal was
                           sitting on top of the last field. The well's top-left corner is
                           the item's own zone and nothing else is in it. */}
-                      <span className="pointer-events-none absolute left-1 top-1 flex size-6 items-center justify-center rounded-full bg-primary text-2xs font-bold tabular-nums text-primary-foreground" title={`Item ${i + 1}`}>
+                      {/* z-10 AND A RING, because it was neither. Nothing here creates a
+                          stacking context, so the picture — later in DOM order — simply
+                          painted over the corner of the ordinal, and what was left read as a
+                          badge with a bite out of it. The ring is the card colour, so the
+                          chip separates from the white well it overlaps instead of merging
+                          into its rounded corner. */}
+                      <span className="pointer-events-none absolute left-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-primary text-2xs font-bold tabular-nums text-primary-foreground ring-2 ring-card" title={`Item ${i + 1}`}>
                         {i + 1}
                       </span>
                       {/* The blank with its artwork placed — the seller sees the same
