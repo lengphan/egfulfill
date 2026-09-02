@@ -2,16 +2,18 @@
 
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
-import { Plus, PenNib, X, Check } from "@phosphor-icons/react"
+import { Plus, PenNib, X, Check, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { EmptyState } from "@/components/app/empty-state"
 import { TemplatesPanel } from "@/components/app/templates-panel"
 import { MachineFilesPanel } from "@/components/app/machine-files-panel"
 import { DesignLabTabs, useDesignLabTab } from "@/components/app/design-lab-tabs"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { DesignStudioDialog, downscale } from "@/components/app/design-studio"
+// DesignStudioDialog is no longer mounted here — "Place on a mockup" was its only
+// trigger and it was removed. The component itself is untouched on disk.
+import { downscale } from "@/components/app/design-studio"
 import { readImageFile } from "@/components/app/design-canvas"
-import { Dropzone } from "@/components/app/dropzone"
 import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, saveDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
 import { Thumb } from "@/components/app/thumb"
@@ -65,7 +67,6 @@ function DesignLab() {
  const tab = useDesignLabTab()
  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
  const [signedOut, setSignedOut] = useState(false)
- const [studioOpen, setStudioOpen] = useState(false)
   /* The header's own picker. The zone still takes a drop; this is the click route, which is
      what "Import artwork" has to actually do to be telling the truth. */
  const pickRef = useRef<HTMLInputElement | null>(null)
@@ -176,11 +177,10 @@ function DesignLab() {
                 className="hidden"
                 onChange={(e) => { if (e.target.files?.length) void takeFiles(e.target.files); e.target.value = "" }}
               />
-              <Button size="sm" variant="outline" onClick={() => pickRef.current?.click()} disabled={signedOut}>
-                <Plus size={14} weight="bold" /> {tl("design", "Import artwork")}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setStudioOpen(true)} disabled={signedOut}>
-                {tl("design", "Place on a mockup")}
+              <Button size="sm" variant="outline" onClick={() => pickRef.current?.click()} disabled={signedOut || !!uploading}>
+                {uploading
+                  ? <><CircleNotch size={14} className="animate-spin" /> {tl("design", "Saving")} {uploading}</>
+                  : <><Plus size={14} weight="bold" /> {tl("design", "Import artwork")}</>}
               </Button>
             </div>
           }
@@ -191,26 +191,24 @@ function DesignLab() {
             </div>
           ) : (
             <div className="space-y-4 p-5">
-              {/* Same shape as the machine files tab: the zone IS the empty state, and once
- there are pictures it becomes one inline row above them. Two tabs of the same
-                  Lab that both take a file should not take it two different ways. */}
-              <Dropzone
-                icon={PenNib}
-                multiple
-                accept="image/*"
-                onFiles={takeFiles}
-                busy={uploading ? `Saving ${uploading}…` : null}
-                disabled={signedOut}
-                slim={list.length > 0}
-                label={signedOut ? tl("design", "Sign in to build your artwork library")
- : list.length > 0 ? tl("design", "Add more artwork") : tl("design", "Drop your artwork here")}
-                hint={tl("design", "PNG, JPG or SVG")}
-                action={!signedOut && list.length === 0 && (
-                  <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)}>
-                    <Plus size={14} weight="bold" /> {tl("design", "Place it on a mockup")}
-                  </Button>
-                )}
-              />
+              {/* NO DROPZONE. Import is a click now, and a dashed target above a populated
+                  grid was a second control claiming the same verb. Drag-and-drop went with
+                  it — the header button is the one way in.
+                  The zone WAS the empty state, so an empty library gets a real one rather
+                  than a blank panel: mark, line, note, one way out (§4). */}
+              {list.length === 0 && (
+                <EmptyState
+                  icon={PenNib}
+                  title={signedOut ? tl("design", "Sign in to build your artwork library")
+                    : tl("design", "No artwork yet")}
+                  note={tl("design", "PNG, JPG or SVG. Import one and it is reusable on every order.")}
+                  action={!signedOut && (
+                    <Button size="sm" variant="outline" onClick={() => pickRef.current?.click()}>
+                      <Plus size={14} weight="bold" /> {tl("design", "Import artwork")}
+                    </Button>
+                  )}
+                />
+              )}
               {upErr && <p className="text-sm text-alert">{upErr}</p>}
               {list.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -302,7 +300,6 @@ function DesignLab() {
         <TemplatesPanel />
       )}
 
-      <DesignStudioDialog open={studioOpen} onOpenChange={setStudioOpen} onSaved={load} />
     </div>
   )
 }
