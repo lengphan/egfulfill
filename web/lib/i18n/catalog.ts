@@ -3663,6 +3663,7 @@ const vi: Dict = {
   "design.View full size": "Xem kích thước đầy đủ",
   "design.PNG, JPG or SVG": "PNG, JPG hoặc SVG",
   "design.Place on a mockup": "Đặt lên ảnh mẫu",
+  "design.Import artwork": "Nhập thiết kế",
   "design.Place it on a mockup": "Đặt lên một ảnh mẫu",
   "design.Copy this artwork's reference": "Sao chép mã tham chiếu của thiết kế này",
   "designQuoteBanner.No thanks": "Không, cảm ơn",

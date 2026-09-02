@@ -1,7 +1,7 @@
 "use client"
 
 import { useLabelT, useDateFormat } from "@/lib/i18n"
-import { Suspense, useCallback, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { Plus, PenNib, X, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TemplatesPanel } from "@/components/app/templates-panel"
@@ -66,6 +66,9 @@ function DesignLab() {
  const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
  const [signedOut, setSignedOut] = useState(false)
  const [studioOpen, setStudioOpen] = useState(false)
+  /* The header's own picker. The zone still takes a drop; this is the click route, which is
+     what "Import artwork" has to actually do to be telling the truth. */
+ const pickRef = useRef<HTMLInputElement | null>(null)
  const [uploading, setUploading] = useState<string | null>(null)
  const [upErr, setUpErr] = useState<string | null>(null)
 
@@ -160,12 +163,26 @@ function DesignLab() {
         <SectionCard
  title={tl("design", "Your artwork")}
  actions={
-            // Named for what it DOES, now that dropping is how artwork gets added. It was
-            // "Add artwork", which is the zone's job — two controls claiming one verb, and
-            // the one that opened a mockup dialog was the louder of the two.
-            <Button size="sm" variant="outline" onClick={() => setStudioOpen(true)} disabled={signedOut}>
-              <Plus size={14} weight="bold" /> {tl("design", "Place on a mockup")}
-            </Button>
+            /* IMPORT IS THE HEADER'S JOB; the mockup studio is a second, quieter one.
+               This button used to open the studio while being the loudest control on the
+               panel, so the obvious way to get a file in was the one thing it did not do.
+               The zone still takes a drop — this is the click route, and now it imports. */
+            <div className="flex items-center gap-2">
+              <input
+                ref={pickRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => { if (e.target.files?.length) void takeFiles(e.target.files); e.target.value = "" }}
+              />
+              <Button size="sm" variant="outline" onClick={() => pickRef.current?.click()} disabled={signedOut}>
+                <Plus size={14} weight="bold" /> {tl("design", "Import artwork")}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setStudioOpen(true)} disabled={signedOut}>
+                {tl("design", "Place on a mockup")}
+              </Button>
+            </div>
           }
         >
           {designs === null ? (
