@@ -508,6 +508,27 @@ export default function OrderDetailPage() {
   /** Adding a LINE is staff-only and stops at approval — the server refuses it after. */
  const canAddItem = isStaff && beforeApproval
   /**
+   * REMOVING IS A DIFFERENT TEST FROM ADDING, and it mirrors the server's, not this file's
+   * `beforeApproval`.
+   *
+   * Adding is staff-only because a seller adding a line to an order they were already
+   * charged for is asking to be made something nobody billed. Taking one OFF only ever
+   * reduces what they are about to pay, and before submission nothing has been billed — so
+   * a seller who put the wrong blank on their own draft can now take it off, which is what
+   * the row was missing an X for.
+   *
+   * The seller's window is narrower than staff's on purpose. removeLine (orders.js) allows a
+   * seller only while `normalizeStage(factory_status) === ''` and approved_at is null.
+   * `stageNow` here is the RAW column, so the set is spelled out — normalizeStage collapses
+   * new / draft / none / pending onto '' — rather than reusing `beforeApproval`, which also
+   * counts in_review and never looks at approved_at. Drawing an X the API then 403s is the
+   * worst of the three possible behaviours.
+   */
+ const sellerMayPrune = !isStaff
+    && ["", "new", "draft", "none", "pending"].includes(stageNow)
+    && !order.approved_at
+ const canRemoveItem = (isStaff && beforeApproval) || sellerMayPrune
+  /**
    * WHO MAY REWRITE THE SHIP-TO — and this mirrors the SERVER'S OWN TEST, not the
    * `beforeApproval` two lines up.
    *
@@ -1081,12 +1102,13 @@ export default function OrderDetailPage() {
                             )}
                           </div>
                           {/* REMOVE, at the row it removes. Hidden on the same test the
-                              server enforces — staff, and before approval — so a refusal is
-                              never the first thing you learn about the rule. Its own control
-                              rather than a menu entry: ItemDesignActions renders only with a
-                              sku AND a design status, and a line added by mistake has
-                              neither — so the row most needing this would have had no way. */}
-                          {canAddItem && (
+                              server enforces — staff before approval, or the seller on their
+                              own un-submitted order — so a refusal is never the first thing
+                              you learn about the rule. Its own control rather than a menu
+                              entry: ItemDesignActions renders only with a sku AND a design
+                              status, and a line added by mistake has neither — so the row
+                              most needing this would have had no way. */}
+                          {canRemoveItem && (
                             <button
                               type="button"
                               onClick={() => void removeItem(it)}

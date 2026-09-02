@@ -2921,11 +2921,32 @@ export function ordersRoutes(app, requireAuth) {
    */
   const removeLine = async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
-    const stageNow = await q('select factory_status from orders where id=$1', [req.params.id])
-      .then((r) => (r.rowCount ? normalizeStage(r.rows[0].factory_status) : null)).catch(() => null);
-    if (stageNow === null) { reply.code(404); return { error: 'order not found' }; }
-    if (!(stageNow === '' || stageNow === 'in_review')) {
+    /**
+     * REMOVING IS NOT THE MIRROR OF ADDING, so it does not carry adding's rule.
+     *
+     * POST /items is staff-only because "a seller adding a line to an order they have
+     * already been charged for would be asking to be produced something nobody billed them
+     * for". Taking a line OFF runs the other way: it can only reduce what the seller is
+     * about to pay, and before submission nothing has been billed at all. A seller who put
+     * the wrong blank on their own draft had no way to take it off, which is why the row
+     * carried no X.
+     *
+     * The window is narrower than staff's, deliberately. Staff may still prune through
+     * `in_review`; a seller may only do it while the order is untouched — stage empty and
+     * never approved — which is exactly "before I submitted it". Once submitted the money
+     * has moved and the answer is Cancel, which refunds through the ledger rather than
+     * editing an order somebody is already making.
+     */
+    const row = await q('select factory_status, approved_at from orders where id=$1', [req.params.id])
+      .then((r) => (r.rowCount ? r.rows[0] : null)).catch(() => null);
+    if (!row) { reply.code(404); return { error: 'order not found' }; }
+    const stageNow = normalizeStage(row.factory_status);
+    if (!isStaff(req.user)) {
+      if (stageNow !== '' || row.approved_at) {
+        reply.code(409);
+        return { error: 'This order has already been submitted, so its lines are fixed. Cancel it to be refunded, then raise a new one.' };
+      }
+    } else if (!(stageNow === '' || stageNow === 'in_review')) {
       reply.code(409);
       return { error: 'This order has been approved — remove a line before approval, or cancel and raise a new order.' };
     }
