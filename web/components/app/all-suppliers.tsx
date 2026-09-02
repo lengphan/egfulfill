@@ -166,10 +166,30 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  return merged
   }, [])
 
+  /**
+   * WHICH QUERY THE ROWS ON SCREEN BELONG TO.
+   *
+   * `loadMore` awaits a page and then appends to whatever `prev` happens to be. Change the
+   * search while that request is in flight and `reload` replaces the list underneath it, so
+   * the old query's page lands on the new query's rows — a supplier list that is a mixture
+   * of two searches, and counts to match.
+   *
+   * A counter rather than the query string: the same term searched twice is two runs, and
+   * the earlier one's tail must not join the later one.
+   *
+   * This does NOT change WHEN anything fetches. loadMore stays a click (§2.8); the guard only
+   * decides whether a page that has already arrived is still wanted.
+   */
+ const reqSeq = useRef(0)
+
  const reload = useCallback((q: string) => {
  if (!getToken()) { setItems([]); return }
+ const mine = ++reqSeq.current
  setLoading(true); setSsOff(0); setOttoOff(0); setSanmarOff(0)
- fetchPage(q, 0, 0, 0).then((m) => setItems(m)).catch(() => setItems([])).finally(() => setLoading(false))
+ fetchPage(q, 0, 0, 0)
+      .then((m) => { if (reqSeq.current === mine) setItems(m) })
+      .catch(() => { if (reqSeq.current === mine) setItems([]) })
+      .finally(() => { if (reqSeq.current === mine) setLoading(false) })
   }, [fetchPage])
 
  useEffect(() => { const id = setTimeout(() => reload(debounced), 0); return () => clearTimeout(id) }, [debounced, reload, refreshKey])
@@ -178,7 +198,12 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  setLoading(true)
  const sOff = ssOff + PAGE, oOff = ottoOff + PAGE, saOff = sanmarOff + PAGE
  setSsOff(sOff); setOttoOff(oOff); setSanmarOff(saOff)
- try { const m = await fetchPage(debounced, sOff, oOff, saOff); setItems((prev) => [...(prev ?? []), ...m]) } finally { setLoading(false) }
+ const mine = reqSeq.current
+ try {
+ const m = await fetchPage(debounced, sOff, oOff, saOff)
+      // Superseded by a new search while this page was in flight — drop it rather than mix it in.
+ if (reqSeq.current === mine) setItems((prev) => [...(prev ?? []), ...m])
+    } finally { if (reqSeq.current === mine) setLoading(false) }
   }
 
  const cardData = (it: Item) => {

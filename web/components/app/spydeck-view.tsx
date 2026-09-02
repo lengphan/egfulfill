@@ -778,6 +778,20 @@ export function SpyDeckView() {
    * without it.
    */
  const catalogRef = useRef<CatalogProduct[] | null>(null)
+  /**
+   * WHICH SEARCH THE ROWS ON SCREEN BELONG TO.
+   *
+   * A search sets its first page, then goes back for pages 2-4 in the background. Start a
+   * second search while that is still in flight and the first one's continuation lands on
+   * the second one's list: `setResults(prev => [...prev, ...extra])` cannot tell whose
+   * `prev` it is holding. The stat row is computed over that list, so Results, Median price,
+   * Shops and Most viewed all reported a mixture of two searches — which is what "the totals
+   * are for all my search history" actually was.
+   *
+   * A counter, not the query string: searching the same term twice is still two runs, and
+   * the older one's tail must not join the newer one.
+   */
+ const runSeq = useRef(0)
  const startEdit = useCallback(async (l: UploadedListing, images: string[]) => {
  if (!catalogRef.current) {
  catalogRef.current = await getCatalogProducts().then((r): CatalogProduct[] => r ?? []).catch((): CatalogProduct[] => [])
@@ -1127,6 +1141,9 @@ export function SpyDeckView() {
  setView("search")
  setLoading(true)
  setError(null)
+    // Claimed BEFORE the try so the catch can check it too: a failed run must not blank a
+    // search that has already replaced it.
+ const mine = ++runSeq.current
  try {
  const sortMap: Record<string, { sort?: string; sortOrder?: string }> = {
  relevance: {}, newest: { sort: "created" }, price_asc: { sort: "price", sortOrder: "asc" }, price_desc: { sort: "price", sortOrder: "desc" },
@@ -1156,6 +1173,8 @@ export function SpyDeckView() {
        */
  const first = await searchEtsy(q, { ...shape, pages: 1 })
  const firstRows = first.results ?? []
+      // Superseded while the first page was in flight — drop it whole rather than paint it.
+ if (runSeq.current !== mine) return
       /*
        * HOW MANY ETSY MATCHED, which is not how many we hold.
        *
@@ -1175,11 +1194,12 @@ export function SpyDeckView() {
  try {
  const more = await searchEtsy(q, { ...shape, pages: EXTRA_PAGES, offset: PAGE_SIZE })
  const extra = more.results ?? []
- if (extra.length) {
+ if (extra.length && runSeq.current === mine) {
  setResults((prev) => {
               // `results` is null before a search has ever run. Appending to the first page
-              // we just set is the normal path; the ?? [] is what keeps a race — a second
-              // search clearing state mid-flight — from throwing instead of just appending.
+              // we just set is the normal path; the ?? [] keeps a mid-flight clear from
+              // throwing. The seq check above is what keeps these rows on their OWN search:
+              // `prev` alone cannot say which query it belongs to.
  const base = prev ?? []
  const seen = new Set(base.map((x) => String(x.listing_id)))
  return [...base, ...extra.filter((x) => !seen.has(String(x.listing_id)))]
@@ -1192,7 +1212,7 @@ export function SpyDeckView() {
  if (e instanceof ApiError && e.status === 401) setError("Sign in to research Etsy listings.")
  else if (e instanceof ApiError && e.status === 500) setError("Etsy isn't configured on the server yet.")
  else setError(e instanceof Error ? e.message : "Search failed.")
- setResults([]); setTotal(null)
+ if (runSeq.current === mine) { setResults([]); setTotal(null) }
     } finally {
  setLoading(false)
     }
