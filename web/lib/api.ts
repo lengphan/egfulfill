@@ -2469,10 +2469,31 @@ export function postItemStatus(id: string, sku: string, status: string, lineId?:
  */
 /** `seq` is the `#6` LABEL, not the id — staff only, and the server refuses a duplicate
  *  within a seller's own numbering. See OrderNumber in components/app/order-number.tsx. */
+/**
+ * THE ONE PLACE A STAGE CHANGE MOVES MONEY, so the one place that says so.
+ *
+ * Submitting to production charges the wallet and cancelling refunds it, and the server has
+ * always reported both back — `let _charged = 0, _refunded = 0;` in orders.js carries the
+ * comment "reported back so the UI can show the wallet moving". Nothing listened, so the
+ * header balance stayed on its old number until the next page load: the seller saw a fee
+ * confirmed and a balance that disagreed with it.
+ *
+ * Dispatched HERE rather than at the call sites because every board changes a stage through
+ * this function — the hub, the stage menu, the order page, the bulk paths. Wiring it per
+ * board would mean the next board added is the one that forgets.
+ *
+ * Only when money actually moved. A stage change that charges nothing must not make the
+ * balance flicker as though it had.
+ */
 export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string; carrier?: string; total?: number; seq?: number; meta?: Record<string, unknown>; address?: Record<string, string>; customer?: Record<string, string> }) {
-  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
+  return api<{ ok?: boolean; error?: string; charged?: number; refunded?: number }>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify(patch),
+  }).then((r) => {
+    if (typeof window !== "undefined" && ((r?.charged ?? 0) > 0 || (r?.refunded ?? 0) > 0)) {
+      window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
+    }
+    return r
   })
 }
 
