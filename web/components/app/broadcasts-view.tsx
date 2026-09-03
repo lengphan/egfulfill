@@ -995,10 +995,33 @@ export function BroadcastsView({ embedded }: {
 
               {/* ADDRESSES THAT CANNOT BE DELIVERED TO. Shown here because this is the last
  moment fixing them is cheap — after the send they are a red line on a row. */}
+              {/* "WILL FAIL" WAS ONLY EVER TRUE OF THE EMAIL.
+                  audienceSql builds the in-app audience without the address test — its own
+                  comment says "a seller with no address still has a bell" — so when
+                  Announcements is ticked these people DO get the message, in the app. Telling
+                  the sender it will fail made them chase a seller record to fix a delivery
+                  that was already happening, or worse, drop the recipient.
+                  So the warning states which channel is affected, and only claims a real
+                  failure when email is the only channel there is. */}
               {sendsEmail && !!count.invalid?.length && (
-                <div className="rounded-lg border border-hold/30 bg-hold/10 p-2.5 text-xs text-hold">
-                  {count.invalid.length} address{count.invalid.length === 1 ? "" : "es"} can&apos;t be delivered to and will fail:{" "}
-                  <span className="tabular-nums">{count.invalid.map((x) => x.email || "(blank)").join(", ")}</span>. Fix the seller record, or remove them below.
+                <div className={"rounded-lg border p-2.5 text-xs " + (sendsInApp
+                  ? "border-border bg-muted/40 text-muted-foreground"
+                  : "border-hold/30 bg-hold/10 text-hold")}>
+                  {sendsInApp ? (
+                    <>
+                      {count.invalid.length} {count.invalid.length === 1 ? "seller has" : "sellers have"} no usable
+                      email address, so {count.invalid.length === 1 ? "they get" : "they get"} this as an in-app
+                      announcement only:{" "}
+                      <span className="tabular-nums">{count.invalid.map((x) => x.email || "(no address)").join(", ")}</span>.
+                    </>
+                  ) : (
+                    <>
+                      {count.invalid.length} {count.invalid.length === 1 ? "seller" : "sellers"} cannot be reached:
+                      no usable email address, and In-app announcement is not ticked:{" "}
+                      <span className="tabular-nums">{count.invalid.map((x) => x.email || "(no address)").join(", ")}</span>.
+                      Tick In-app announcement, fix the seller record, or remove them below.
+                    </>
+                  )}
                 </div>
               )}
 

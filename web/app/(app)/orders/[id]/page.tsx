@@ -953,7 +953,15 @@ export default function OrderDetailPage() {
                           // when it is the one thing you actually check the order against.
                           // At 144 the composite (blank + placed artwork) is legible without
                           // opening the preview.
- size={144}
+                          //
+                          // 176 NOW, because the column beside it grew past 144 and left a
+                          // band of empty card under the picture. The avatar is square and
+                          // its size is an inline style, so height cannot be stretched to the
+                          // row on its own — the number is the only lever, and it moves the
+                          // width with it (the pair is size x 1.4 when both faces show, so
+                          // ~246px here). Still a FIXED size: it closes the ordinary gap, it
+                          // does not track a row that wraps to three lines.
+ size={176}
  bare
  className="rounded-none"
  onEdit={() => setCustomize(it)}
