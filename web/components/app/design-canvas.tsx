@@ -2999,7 +2999,21 @@ export function DesignCanvasDialog({
               */}
             {isEmb && (
               <div className="flex flex-col gap-1.5">
-                <div className="text-xs font-medium text-foreground">{tl("canvas", "Your machine files")}</div>
+                {/* FIVE, AND THE HEADING SAYS SO WHEN THERE ARE MORE.
+                    This is a shortcut, not the library — the newest handful covers the case
+                    it exists for (the file you just uploaded, going onto the line you are
+                    looking at). Everything older is still reachable: by its MF- ref in the
+                    import sheet's Machine File ID column, and in full in Design Lab.
+                    The count is in the heading rather than a sentence under the rows: "5 of
+                    23" is a fact about the list, and a populated region does not get prose. */}
+                <div className="text-xs font-medium text-foreground">
+                  {tl("canvas", "Recent files")}
+                  {machineLib && machineLib.length > 5 && (
+                    <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">
+                      5 / {machineLib.length}
+                    </span>
+                  )}
+                </div>
                 {machineLib === null ? (
                   <div className="flex justify-center py-2"><CircleNotch size={15} className="animate-spin text-muted-foreground" /></div>
                 ) : machineLib.length === 0 ? (
@@ -3007,7 +3021,7 @@ export function DesignCanvasDialog({
                   <p className="px-1 text-2xs text-muted-foreground">
                     {tl("canvas", "Stitch files you upload are filed here and can be put on any line.")}
                   </p>
-                ) : machineLib.slice(0, 8).map((m) => (
+                ) : machineLib.slice(0, 5).map((m) => (
                   <div key={m.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5">
                     <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium tabular-nums text-muted-foreground">{m.ref}</span>
                     <span className="min-w-0 flex-1 truncate text-xs" title={m.fileName || m.name}>{m.name || m.fileName}</span>
