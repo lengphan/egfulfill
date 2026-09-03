@@ -53,11 +53,29 @@ const publicPriceOf = (p: CatalogProduct) => {
  */
 type PublicState = { live: boolean; label: string; why: string | null }
 const publicStateOf = (p: CatalogProduct): PublicState => {
- const status = (p.status ?? "Active").trim().toLowerCase()
+  /**
+   * THE BADGE SAYS THE PRODUCT'S OWN STATUS, in the words the editor sets it in.
+   *
+   * It used to describe the marketing site instead — "On the site", "Not on the site" — so
+   * the chip on the card and the dropdown in the editor were two vocabularies for one field,
+   * and neither told you what the other would say. Active / Sellers only / Staff only are
+   * the three the editor writes; those are the three that show.
+   *
+   * "No price" survives as a SUFFIX rather than a status, because it never was one: it is a
+   * reason an otherwise-Active product is missing from the site, and dropping it would make
+   * a silently-absent product look correct on the card.
+   */
+ const raw = (p.status ?? "Active").trim()
+ const status = raw.toLowerCase()
+ const label = status === "active" ? "Active"
+    : status === "sellers only" ? "Sellers only"
+    : status === "staff only" ? "Staff only"
+    : raw || "Active"
+
  if (status !== "active") {
  return {
  live: false,
- label: status === "sellers only" ? "Sellers only" : status === "staff only" ? "Staff only" : "Not on the site",
+ label,
  why: status === "sellers only"
         ? "Orderable by sellers in the app. Set it Active to put it on the marketing site."
  : "Not on the public site. Set it Active to publish it.",
@@ -66,11 +84,11 @@ const publicStateOf = (p: CatalogProduct): PublicState => {
  if (publicPriceOf(p) === null) {
  return {
  live: false,
- label: "No price",
+ label: "Active · no price",
  why: "Active, but the site skips it until it has a price. Set a base price on the product.",
     }
   }
- return { live: true, label: "On the site", why: null }
+ return { live: true, label, why: null }
 }
 
 import { sizesOf } from "@/lib/variant-resolve"
@@ -411,7 +429,7 @@ export function ProductsCatalog() {
  but unpublishable, draft = deliberately not published. */}
                   {isStaff && (() => {
  const st = publicStateOf(p)
- const tone = st.live ? "text-shipped" : st.label === "No price" ? "text-hold" : "text-draft"
+ const tone = st.live ? "text-shipped" : st.label.includes("no price") ? "text-hold" : "text-draft"
  return (
                       <span
  title={st.why ?? tl("products", "On the public site.")}
@@ -445,7 +463,12 @@ export function ProductsCatalog() {
                       (with a muted placeholder when empty) so cards line up instead of
  each being as tall as whatever data it happens to carry. */}
                   <div className="mt-3 flex min-h-6 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1.5">
+                    {/* flex-1 + overflow-hidden, and BOTH are the fix. Every swatch is
+                        shrink-0, so `min-w-0` alone let the row keep its full natural width
+                        and simply paint over the type on a narrow card — the colours and
+                        "Headwear" sat on top of each other. Clipping a swatch at the edge is
+                        the honest degradation; two things sharing one set of pixels is not. */}
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
                       {colors.slice(0, 8).map((c) => {
  const img = p.colorImages?.[c]
  return (

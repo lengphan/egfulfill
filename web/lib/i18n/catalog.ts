@@ -4383,6 +4383,8 @@ const vi: Dict = {
   "photoStudio.Close-up detail": "Cận cảnh chi tiết",
   "products.On the site": "Trên trang web",
   "products.No price": "Chưa có giá",
+  "products.Active": "Đang hoạt động",
+  "products.Active · no price": "Đang hoạt động · chưa có giá",
   "purchasing.All suppliers": "Tất cả nhà cung cấp",
   "purchasing.Favorites": "Yêu thích",
   "purchasing.Cart": "Giỏ hàng",
