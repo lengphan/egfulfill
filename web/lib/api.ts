@@ -66,7 +66,25 @@ function baseFor(): string {
  * NEXT_PUBLIC_API_BASE is set the developer has named an API and we must not silently talk
  * to a different one.
  */
-const DIRECT_API_ORIGIN = process.env.NEXT_PUBLIC_DIRECT_API_BASE ?? "https://api.egful.store"
+/**
+ * AN EMPTY ENV VAR IS UNSET, NOT A CHOICE — and `??` does not know that.
+ *
+ * `??` catches null and undefined and passes an empty string straight through. Vercel had
+ * NEXT_PUBLIC_DIRECT_API_BASE defined-but-empty, so this evaluated to "" in the production
+ * build; `originFor` then bails on `!DIRECT_API_ORIGIN` before it ever consults SLOW_EXACT.
+ * The whole direct-origin escape hatch was dead in production — not one route, all of them,
+ * including the wilcom and desk renders it was written for. It failed silently because a
+ * request going the slow way still works, right up until it is slow enough to be cut.
+ *
+ * Proof it was compiled out: the deployed chunk reads
+ *   let i="https://egful.store"; t.default.env.NEXT_PUBLIC_DIRECT_API_BASE;
+ * with the fallback literal gone entirely and the env read left as a dead statement.
+ *
+ * `||` with a trim treats empty and whitespace as "not configured", which is what an empty
+ * env var means everywhere else. Naming a real origin still overrides it, so the escape
+ * hatch a developer sets by hand is untouched.
+ */
+const DIRECT_API_ORIGIN = (process.env.NEXT_PUBLIC_DIRECT_API_BASE || "").trim() || "https://api.egful.store"
 const DIRECT_BODY_BYTES = 1024 * 1024
 
 /**
