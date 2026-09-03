@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
-import { CircleNotch, Trash, Package, MagnifyingGlassPlus, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
+import { CircleNotch, Trash, Package, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -1610,18 +1610,43 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   )}
                   {images.map((src, i) => (
                     <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
-                      {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-2xs font-semibold uppercase text-primary-foreground">{tl("publish", "Primary")}</span>}
-                      <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                        {/* ZOOM ON THE PUBLISHABLE PHOTOS TOO. Only the competitor's shots
- opened full size, which had it exactly backwards: the photos that
- are actually going to a marketplace were the ones you could not
- inspect before sending them. */}
-                        <button onClick={() => setZoom({ which: "own", index: i })} aria-label={`View photo ${i + 1} larger`}
- className="cursor-zoom-in rounded bg-white/90 p-1 text-black"><MagnifyingGlassPlus size={11} weight="bold" /></button>
-                        {i !== 0 && <button onClick={() => makePrimary(i)} className="rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">{tl("publish", "Primary")}</button>}
-                        <button onClick={() => removeImage(i)} aria-label={tl("publish", "Remove photo")} className="rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
+                      {/* THE PICTURE IS THE BUTTON.
+                          A magnifier in the middle of the photo was a control you had to
+                          find and hit before you could look closer — and it sat ON the thing
+                          it was about, covering the part of the shot you were trying to
+                          judge. The photograph is already under the pointer; that is where
+                          every gallery worth copying puts this, and it is what the reference
+                          photo beside it has always done.
+
+                          Absolutely positioned as a SIBLING of the controls, not their
+                          parent: a button inside a button is invalid and the inner one never
+                          receives the click. */}
+                      <button
+ type="button"
+ onClick={() => setZoom({ which: "own", index: i })}
+ aria-label={`View photo ${i + 1} larger`}
+ title={tl("publish", "View full size")}
+ className="absolute inset-0 cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
+                      </button>
+                      {/* pointer-events-none, or the band across the bottom of the primary
+                          photo would be a dead strip that swallows the click. */}
+                      {i === 0 && <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-2xs font-semibold uppercase text-primary-foreground">{tl("publish", "Primary")}</span>}
+                      {/* THE SCRIM TAKES NO CLICKS — only the two controls on it do. So
+                          hovering darkens the tile and the rest of it still opens the photo,
+                          rather than the hover state quietly disabling the thing the hover
+                          was inviting.
+
+                          AND THE CONTROLS SIT IN A CORNER, not the middle. Centred, Remove
+                          landed exactly where the magnifier used to be — so the most natural
+                          place to click a photo to enlarge it was now the delete button.
+                          Measured with elementFromPoint at the tile's centre, which is the
+                          only way to catch a hit-target the eye reads as empty photo. */}
+                      <div className="pointer-events-none absolute inset-0 flex items-start justify-end gap-1 bg-black/40 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        {i !== 0 && <button onClick={() => makePrimary(i)} className="pointer-events-auto rounded bg-white/90 px-1.5 py-0.5 text-2xs font-semibold text-black">{tl("publish", "Primary")}</button>}
+                        <button onClick={() => removeImage(i)} aria-label={tl("publish", "Remove photo")} className="pointer-events-auto rounded bg-white/90 p-1 text-black"><Trash size={11} weight="bold" /></button>
                       </div>
                     </div>
                   ))}
