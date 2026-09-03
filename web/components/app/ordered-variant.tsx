@@ -29,7 +29,8 @@ import { decodeEntities } from "@/lib/order-format"
 export function OrderedVariant({ item, className = "", after, blankSku, showQty = true }: {
   item: OrderItem
   className?: string
-  after?: React.ReactNode
+  /** One node, or an array — an array becomes separately dot-separated parts. */
+  after?: React.ReactNode | React.ReactNode[]
   /**
    * Whether to print the quantity. Defaults ON, because for three of the four callers this
    * strip is the only place it appears.
@@ -141,9 +142,22 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
     </span>
   )
 
-  // Anything the caller wants on the end of the line — the stock pill sits here, next to
-  // Qty, because the two are read together: how many we need, how many we hold.
-  if (after) parts.push(<span key="a">{after}</span>)
+  /**
+   * Anything the caller wants on the end of the line — the stock reading and the thread
+   * chips sit here, next to Qty, because they are read together: how many we need, how many
+   * we hold, what it is stitched in.
+   *
+   * AN ARRAY BECOMES SEPARATE PARTS. Passed as one fragment they rendered flush against each
+   * other — "Stock: 0 ●● 2 threads" — so two independent facts read as one run-on value while
+   * every other field on the row was dot-separated. Each entry is its own part now and picks
+   * up the same separator and spacing as Qty and Stock.
+   *
+   * A part that renders nothing is hidden along with its separator (`empty:hidden` below),
+   * which is what lets a caller pass a component whose own guards may return null — LineStock
+   * does, four different ways — without leaving a dangling dot.
+   */
+  const extras = Array.isArray(after) ? after : after ? [after] : []
+  extras.forEach((node, i) => { if (node) parts.push(<span key={`a${i}`}>{node}</span>) })
 
   return (
     <div className={"mt-0.5 space-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
@@ -153,9 +167,15 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
         </div>
       )}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        {/* The separator is a PSEUDO-ELEMENT, not a child, so a part that renders nothing is
+            still `:empty` and takes its own dot down with it. As a real child the dot made
+            every wrapper non-empty, which is how a null LineStock left "Qty 5 · · Threads:"
+            on the row. */}
         {parts.map((p, i) => (
-          <span key={i} className="inline-flex items-baseline gap-2">
-            {i > 0 && <span aria-hidden className="text-border">·</span>}
+          <span
+            key={i}
+            className="inline-flex items-baseline gap-2 empty:hidden before:text-border before:content-['·'] first:before:content-none"
+          >
             {p}
           </span>
         ))}

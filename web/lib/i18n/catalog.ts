@@ -1116,6 +1116,7 @@ const vi: Dict = {
   "orders.Sending…": "Đang gửi…",
   "orders.Copying…": "Đang sao chép…",
   "orders.Stock:": "Tồn kho:",
+  "orders.Threads:": "Chỉ:",
   "orders.No variant chosen": "Chưa chọn phiên bản",
   "orders.Add to inventory": "Thêm vào kho",
   "orders.Packing slips": "Phiếu đóng gói",

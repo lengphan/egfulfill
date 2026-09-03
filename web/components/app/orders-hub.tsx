@@ -3018,10 +3018,14 @@ export function OrdersHub() {
                               // sku.
  blankSku={stockSkuOf(it, catalog, stock) || undefined}
  className="sm:pr-[15rem]"
- after={
-                                <>
-                                  <LineStock item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} onTrack={isStaff ? setTrackSku : undefined} />
-                                  {(() => {
+ /* AN ARRAY, NOT A FRAGMENT. As one fragment the stock reading and the thread
+                                 chips rendered flush together — "Stock: 0 ●● 2 threads" — while every
+                                 other field on the row was dot-separated. Each entry is its own part
+                                 now, so both pick up the row's separator and spacing; an entry that
+                                 renders nothing takes its dot with it. */
+ after={[
+                                  <LineStock key="stock" item={it} catalog={catalog} stock={stock} pos={pos} orderId={o.id} show={isStaff} onTrack={isStaff ? setTrackSku : undefined} />,
+                                  (() => {
                                     /**
                                      * THREADS ONLY ONCE A BLANK IS CHOSEN.
                                      *
@@ -3050,30 +3054,36 @@ export function OrdersHub() {
  if (!cones.length) return null
  return (
                                       <ThreadBreakdown artwork={artworkFor(o, it)}>
-                                        {/* THE CONES NEED ROOM. They were overlapped by half a
+                                        {/* LABEL THEN VALUE, exactly like Qty and Stock beside it.
+ It read "●● 2 threads" — a count in words where every
+ other field on this row is "Label: value", so the one
+ fact you cannot get from the chips (that there ARE
+ threads) was carried by the least scannable part of it.
+ The chips ARE the value; the count only matters past
+ the eight that fit, where it becomes "+N".
+
+ THE CONES NEED ROOM. They were overlapped by half a
  pixel (-space-x-0.5) inside a tinted box, so eight
- colours read as one smear and the count was pressed
- against them — on the one control here that opens
- something. Spaced, on the canvas like every other
- detail on this line, and underlined on hover so it
- says it can be pressed. The map behind it already
- names every cone and its code. */}
+ colours read as one smear. Spaced, on the canvas like
+ every other detail on this line, and underlined on
+ hover so it says it can be pressed. The map behind it
+ already names every cone and its code. */}
                                         <span
- className="inline-flex items-center gap-1.5 text-2xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+ className="inline-flex items-center gap-1.5 underline-offset-2 hover:text-foreground hover:underline"
  title={`${cones.length} thread colour${cones.length === 1 ? "" : "s"} matched — click for the cone map, with every name and code`}
                                         >
+                                          <span className="font-medium text-foreground/70">{tl("orders", "Threads:")}</span>
                                           <span className="flex items-center gap-1">
                                             {cones.slice(0, 8).map((c) => (
                                               <span key={c.code} className="size-2.5 rounded-full border border-black/10" style={{ background: c.hex }} />
                                             ))}
+                                            {cones.length > 8 ? <span className="tabular-nums">+{cones.length - 8}</span> : null}
                                           </span>
-                                          {cones.length} thread{cones.length === 1 ? "" : "s"}
                                         </span>
                                       </ThreadBreakdown>
                                     )
-                                  })()}
-                                </>
-                              }
+                                  })(),
+                                ]}
                             />
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
  artwork review (canDesign) picks it here while the order is

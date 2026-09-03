@@ -91,7 +91,22 @@ function stockKeys(productSku: string, size?: string | null, color?: string | nu
 
 export function stockSkuOf(item: OrderItem, catalog: CatalogProduct[], stock?: Record<string, number>): string {
   const product = resolveProduct(item, catalog)
-  const base = stripMethod(String(product?.sku || item.blank || "")).toUpperCase()
+  /**
+   * SAME BASE RULE AS orderStock BELOW — fall back to the line's own blank ONLY when no
+   * product resolved.
+   *
+   * This read `product?.sku || item.blank`, so a line that resolved to a product carrying no
+   * sku of its own fell through to `blank` — which holds a product NAME on most real lines.
+   * The name then became the stock key, and the two halves of one question gave opposite
+   * instructions about the same order: the List column's chip said "the product behind Tee
+   * has no SKU, give it one in Products" while the line under it offered an Add-to-inventory
+   * button seeded with "UNISEX COTTON SHIRT".
+   *
+   * orderStock was fixed for exactly this and this was not — the divergence §5 names, in the
+   * one file that exists to prevent it. Verified by driving both on the same line.
+   */
+  const productSku = stripMethod(String(product?.sku || "")).toUpperCase()
+  const base = productSku || (product ? "" : stripMethod(String(item.blank || "")).toUpperCase())
   if (!base) return ""
   const keys = stockKeys(product?.sku || "", item.size, item.color)
   // No map to consult (a caller that only wants the key it WOULD read) → the most specific.
