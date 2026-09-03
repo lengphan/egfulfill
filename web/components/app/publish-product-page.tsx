@@ -1786,6 +1786,47 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 </p>
               </div>
 
+              {/* METHOD, COLOURS AND SIZES BELONG TO THE BLANK, so they sit under the blank.
+                  They were down in the publish panel beside the shop checkboxes, which read
+                  as "how this listing goes out" when every one of them is "what this product
+                  IS" — the options come from the picked blank and change the moment it does.
+                  The giveaway was already here: the "publishes as a flat listing with no
+                  variants" warning sat in this card, referring to pickers two sections away. */}
+              {/* No "size priced" picker any more — the table below prices every size, so
+ choosing one to represent the rest was the thing hiding the others. */}
+              {blank && (
+                <label className="flex flex-col gap-1">
+                  <span className="eg-label text-muted-foreground">{tl("publish", "Method")}</span>
+                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select eg-control pr-8">
+                    {methodOpts.length === 0 && <option value="">{tl("publish", "Any")}</option>}
+                    {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {/* Colours and sizes are CHOICES now, not a readout. Every chip that's on
+ becomes an Etsy variant, so the listing offers what you meant to sell
+ rather than everything the blank happens to come in. No cap on the list:
+ hiding colours behind a "+N" made them unreachable. */}
+              {blank && colorOpts.length > 0 && (
+                <VariantChips
+ label={tl("publish", "Colours")}
+ options={colorOpts}
+ picked={pickedColors}
+ onChange={setPickedColors}
+ render={prettyColorName}
+                />
+              )}
+
+              {blank && sizeOpts.length > 0 && (
+                <VariantChips
+ label={tl("publish", "Sizes")}
+ options={sizeOpts}
+ picked={pickedSizes}
+ onChange={setPickedSizes}
+                />
+              )}
+
 
               {blank && (pickedColors.length === 0 || (sizeOpts.length > 0 && pickedSizes.length === 0)) && (
                 <p className="text-xs text-hold">
@@ -2030,40 +2071,6 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 />
               ))}
 
-              {/* No "size priced" picker any more — the table below prices every size, so
- choosing one to represent the rest was the thing hiding the others. */}
-              {blank && (
-                <label className="flex flex-col gap-1">
-                  <span className="eg-label text-muted-foreground">{tl("publish", "Method")}</span>
-                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select eg-control pr-8">
-                    {methodOpts.length === 0 && <option value="">{tl("publish", "Any")}</option>}
-                    {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </label>
-              )}
-
-              {/* Colours and sizes are CHOICES now, not a readout. Every chip that's on
- becomes an Etsy variant, so the listing offers what you meant to sell
- rather than everything the blank happens to come in. No cap on the list:
- hiding colours behind a "+N" made them unreachable. */}
-              {blank && colorOpts.length > 0 && (
-                <VariantChips
- label={tl("publish", "Colours")}
- options={colorOpts}
- picked={pickedColors}
- onChange={setPickedColors}
- render={prettyColorName}
-                />
-              )}
-
-              {blank && sizeOpts.length > 0 && (
-                <VariantChips
- label={tl("publish", "Sizes")}
- options={sizeOpts}
- picked={pickedSizes}
- onChange={setPickedSizes}
-                />
-              )}
 
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
 
