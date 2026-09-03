@@ -421,6 +421,10 @@ export function StaffDashboard() {
                 { label: tl("kpi", "Shipped"), value: ov === null ? "—" : `${shippedPct}%` },
               ]}
               bars={gmvBars}
+              barOrders={ov?.gmvBarOrders}
+              barValue={ov?.gmvBarValue}
+              barAt={ov?.gmvBarAt}
+              bucket={ov?.gmvBucket}
               aside={channelSlices.length > 1
                 ? <ChannelRing slices={channelSlices} caption={tl("kpi", "orders")} />
                 : undefined}

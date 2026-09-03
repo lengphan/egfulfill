@@ -103,6 +103,12 @@ export function reportsRoutes(app, requireStaff) {
     const slot = hourly ? HOUR : DAY;
     const span = Math.max(1, Math.min(90, hourly ? Math.round((days * DAY) / HOUR) : days));
     const bars = new Array(span).fill(0);
+    /* WHAT EACH COLUMN IS MADE OF. The scaled height alone cannot answer "when did orders
+       come in" — it is a shape with no numbers behind it. Orders and money per bucket, plus
+       the moment each bucket starts, so the panel can label a column without re-deriving the
+       arithmetic and getting a different answer. */
+    const barOrders = new Array(span).fill(0);
+    const barValue = new Array(span).fill(0);
     const prod = [], trans = [], tot = [];
     let onTimeHit = 0, onTimeN = 0;
 
@@ -120,7 +126,7 @@ export function reportsRoutes(app, requireStaff) {
         gmv += num(r.total);
         inWindow++;
         const i = span - 1 - Math.floor((Date.now() - t) / slot);
-        if (i >= 0 && i < span) bars[i] += num(r.total);
+        if (i >= 0 && i < span) { bars[i] += num(r.total); barValue[i] += num(r.total); barOrders[i]++; }
       }
 
       /*
@@ -169,6 +175,13 @@ export function reportsRoutes(app, requireStaff) {
       /** What one bar covers — 'hour' on a single-day window, 'day' otherwise. Sent so the
        *  panel never has to infer the slot from the bar count. */
       gmvBucket: hourly ? 'hour' : 'day',
+      /** Orders and money behind each column, and when each column starts (epoch ms). The
+       *  start is SENT rather than recomputed on the client: the index arithmetic here is the
+       *  only place that knows the slot size and the window's end, and two derivations of one
+       *  timestamp is two chances to be an hour out. */
+      gmvBarOrders: barOrders,
+      gmvBarValue: barValue.map((v) => Math.round(v * 100) / 100),
+      gmvBarAt: bars.map((_, i) => Date.now() - (span - 1 - i) * slot),
       speed: {
         production: { days: round1(median(prod)), n: prod.length },
         transit: { days: round1(median(trans)), n: trans.length },

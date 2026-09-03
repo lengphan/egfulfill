@@ -2382,6 +2382,14 @@ export type Overview = {
    *  day is a single full-height column, so the server switches slot size and says which it
    *  used rather than leaving the panel to infer it from the bar count. */
   gmvBucket?: "hour" | "day"
+  /** Orders behind each column — what the shape is actually made of. */
+  gmvBarOrders?: number[]
+  /** GMV behind each column, unscaled. */
+  gmvBarValue?: number[]
+  /** When each column starts, epoch ms. Sent rather than recomputed: the server owns the
+   *  slot size and the window's end, and two derivations of one timestamp is two chances to
+   *  be an hour out. */
+  gmvBarAt?: number[]
   speed: {
     production: { days: number | null; n: number }
     transit: { days: number | null; n: number }

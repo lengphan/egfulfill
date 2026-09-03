@@ -60,7 +60,11 @@ export function fulfillmentSpeed(orders: OrderRow[]): FulfillmentSpeed {
   }
 }
 
-export type RevPoint = { label: string; revenue: number; prev: number }
+export type RevPoint = { label: string; revenue: number; prev: number
+  /** How many orders make up this bucket. The revenue alone cannot say whether a tall
+   *  column was one big order or twenty small ones, which is the question a chart of
+   *  revenue is most often asked. */
+  orders: number }
 
 // Bucket revenue into n buckets of `daysPer` days each (current + previous window).
 function bucketize(orders: OrderRow[], n: number, daysPer: number, now: number, label: (i: number) => string): RevPoint[] {
@@ -68,15 +72,20 @@ function bucketize(orders: OrderRow[], n: number, daysPer: number, now: number, 
   const windowMs = n * span
   const cur = new Array(n).fill(0)
   const prev = new Array(n).fill(0)
+  const count = new Array(n).fill(0)
   for (const o of orders) {
     const t = orderTs(o)
     if (isNaN(t)) continue
     const age = now - t
     const total = orderTotalOf(o)
-    if (age >= 0 && age < windowMs) cur[n - 1 - Math.floor(age / span)] += total
+    if (age >= 0 && age < windowMs) {
+      const i = n - 1 - Math.floor(age / span)
+      cur[i] += total
+      count[i]++
+    }
     else if (age >= windowMs && age < 2 * windowMs) prev[n - 1 - Math.floor((age - windowMs) / span)] += total
   }
-  return cur.map((rev, i) => ({ label: label(i), revenue: Math.round(rev), prev: Math.round(prev[i]) }))
+  return cur.map((rev, i) => ({ label: label(i), revenue: Math.round(rev), prev: Math.round(prev[i]), orders: count[i] }))
 }
 
 /**

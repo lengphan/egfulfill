@@ -230,6 +230,9 @@ export function DashboardView() {
           { label: cl("kpi", "Wallet balance"), value: balance === null ? "—" : usd(balance) },
         ]}
         bars={bars}
+        barOrders={points.map((p) => p.orders)}
+        barValue={points.map((p) => p.revenue)}
+        barLabels={points.map((p) => p.label)}
         barsPrev={compare ? barsPrev : undefined}
         controls={
           <div className="flex items-center gap-2">

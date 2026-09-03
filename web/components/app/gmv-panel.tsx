@@ -29,6 +29,11 @@ export function GmvPanel({
   foot = [],
   bars = [],
   barsPrev,
+  barOrders,
+  barValue,
+  barAt,
+  barLabels,
+  bucket = "day",
   controls,
   aside,
   tone = "card",
@@ -45,6 +50,19 @@ export function GmvPanel({
   /** The same window, one period back. Drawn BEHIND at a third the strength, and only when
    *  the caller has a comparison to make — the panel never invents one. */
   barsPrev?: number[]
+  /** What each column is MADE OF. Without these the chart is a shape with no numbers behind
+   *  it — you can see a busy Tuesday and not know it was four orders or forty. */
+  barOrders?: number[]
+  barValue?: number[]
+  /** When each column starts, epoch ms. From the server, which owns the slot size. */
+  barAt?: number[]
+  /** Whether a column is an hour or a day — decides how its start is written. */
+  bucket?: "hour" | "day"
+  /** Ready-made column labels, for a caller that already has them. The seller's chart
+   *  bucketises client-side and its points carry a localised label already, so re-deriving
+   *  one from an epoch would be a second answer to a question already answered. Wins over
+   *  `barAt` when both are given. */
+  barLabels?: string[]
   /** A second, quieter row under the headline — the figures that qualify the qualifiers.
    *  Kept separate from `side` so the two tiers cannot silently merge into one long row. */
   foot?: GmvSide[]
@@ -100,9 +118,38 @@ export function GmvPanel({
       )}
 
       {bars.length > 0 && (
-        <div className="mt-auto flex h-28 items-stretch gap-1" aria-hidden>
-          {bars.map((h, i) => (
-            <span key={i} className="relative flex-1">
+        <div className="mt-auto flex h-28 items-stretch gap-1">
+          {bars.map((h, i) => {
+            const n = barOrders?.[i]
+            const when = barAt?.[i]
+            /* THE LABEL ON A COLUMN, and the reason the chart stopped being decoration.
+               Written in the reader's own locale and timezone from an epoch the server sent,
+               so "when did orders come in" is answered where the shape already is. An hourly
+               window says the hour; a daily one says the date. */
+            const label = barLabels?.[i]
+              ?? (when
+                ? new Date(when).toLocaleString(undefined, bucket === "hour"
+                    ? { hour: "numeric", minute: "2-digit" }
+                    : { month: "short", day: "numeric" })
+                : null)
+            const money = barValue?.[i]
+            const parts = [
+              label,
+              n != null ? `${n} ${n === 1 ? "order" : "orders"}` : null,
+              money ? `$${Math.round(money).toLocaleString("en-US")}` : null,
+            ].filter(Boolean)
+            return (
+            <span key={i} className="group relative flex-1" title={parts.join(" · ") || undefined}>
+              {/* ON TOP OF THE COLUMN, on hover. Pointer-events off so moving along the row
+                  never lands on the label instead of the next bar, and z-10 so it is not
+                  painted over by the bars after it. */}
+              {parts.length > 0 && (
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden
+                                 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-1.5 py-1
+                                 text-2xs font-medium text-background shadow-sm group-hover:block">
+                  {parts.join(" · ")}
+                </span>
+              )}
               {/* The comparison sits BEHIND, at a third the strength — a second full-strength
                   series would make the panel a chart to study rather than one to glance at. */}
               {barsPrev && barsPrev[i] !== undefined && (
@@ -122,7 +169,8 @@ export function GmvPanel({
                 style={{ height: `${Math.max(3, h * 100)}%` }}
               />
             </span>
-          ))}
+            )
+          })}
         </div>
       )}
       </div>
