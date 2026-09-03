@@ -4964,13 +4964,28 @@ export function pinkRequestFix(body: { cardId: string | number; message: string;
  *  are unproven against their live API — everything they need goes in the brief instead). */
 export type PartnerNote = { message: string; by?: string; at?: string }
 
-/** Design-partner state for one order's lines, keyed by SKU. Read separately from the
- *  order itself so a failure here costs a badge, not the order page. */
+/** Design-partner state for one order's lines. Read separately from the order itself so a
+ *  failure here costs a badge, not the order page.
+ *
+ *  KEYED BY LINE. Two lines of one sku are two jobs (CLAUDE.md 5), so a card belongs to a
+ *  line and only a line. `bySku` remains for rows written before design_cards had a line_id
+ *  — they carry a sku and no line — and is the fallback, never the first lookup. */
+export type OrderDesignCardState = {
+  cardId: string; vendor: string | null; vendorRef: string | null
+  col: string | null; updatedAt?: string
+}
 export type OrderDesignStatus = {
-  bySku: Record<string, {
-    cardId: string; vendor: string | null; vendorRef: string | null
-    col: string | null; updatedAt?: string
-  }>
+  byLine?: Record<string, OrderDesignCardState>
+  bySku: Record<string, OrderDesignCardState>
+}
+/** The card on THIS line: its own first, the legacy sku row only if it has none. */
+export function designCardFor(
+  status: OrderDesignStatus | null | undefined,
+  line: { line_id?: string | null; sku?: string | null },
+): OrderDesignCardState | undefined {
+  if (!status) return undefined
+  if (line.line_id && status.byLine?.[String(line.line_id)]) return status.byLine[String(line.line_id)]
+  return line.sku ? status.bySku?.[String(line.sku)] : undefined
 }
 export function getOrderDesignStatus(id: string) {
   return api<OrderDesignStatus>(`/api/orders/${encodeURIComponent(id)}/design-status`)

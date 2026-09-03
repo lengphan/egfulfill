@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Kanban, CircleNotch, Paperclip } from "@phosphor-icons/react"
+import { Cards, CircleNotch, Paperclip } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -101,7 +101,7 @@ export function SendToBoardDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Kanban size={18} weight="fill" />
+            <Cards size={18} weight="fill" />
             {tl("sendBoard", "Send to design board")}
           </DialogTitle>
         </DialogHeader>
@@ -171,7 +171,7 @@ export function SendToBoardDialog({
             {tl("sendBoard", "Cancel")}
           </Button>
           <Button onClick={() => void send()} disabled={busy}>
-            {busy ? <CircleNotch size={14} className="animate-spin" /> : <Kanban size={14} weight="fill" />}
+            {busy ? <CircleNotch size={14} className="animate-spin" /> : <Cards size={14} weight="fill" />}
             {busy ? tl("sendBoard", "Sending…") : tl("sendBoard", "Send to board")}
           </Button>
         </DialogFooter>

@@ -1,4 +1,4 @@
-import { Sparkle, Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
+import { Cards, Sparkle, Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -8,7 +8,7 @@ export const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Orders", href: "/production", icon: Printer, roles: ["operator", "warehouse", "admin"] },
   // Warehouse removed: the design board is about artwork moving toward approval, which is
   // upstream of anything the floor does — their work starts at the print queue.
-  { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "designer", "admin"] },
+  { label: "Board", href: "/designer", icon: Cards, roles: ["operator", "designer", "admin"] },
   // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
   // Shipping = Dispatch (today's out-queue) + Shipments (parcel archive) as two tabs.

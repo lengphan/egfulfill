@@ -16,6 +16,7 @@ import { deleteOrderItem } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
+import { designCardFor } from "@/lib/api"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StageBadge } from "@/components/app/stage-badge"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
@@ -1147,7 +1148,7 @@ export default function OrderDetailPage() {
                                   than in production, and the real endpoint does return the
                                   right shape, so this is a guard that was checking existence
                                   when it needed to check shape. */}
-                              {designStatus?.bySku && it.sku && (
+                              {designStatus && it.sku && (
                                 <ItemDesignActions
  orderId={id}
  sku={String(it.sku)}
@@ -1157,7 +1158,7 @@ export default function OrderDetailPage() {
  printType={it.print_type}
  artworkUrl={artwork}
  lineImage={it.img ?? undefined}
- state={designStatus.bySku[String(it.sku)]}
+ state={designCardFor(designStatus, { line_id: it.line_id, sku: it.sku })}
  onChanged={loadDesignStatus}
                                 />
                               )}

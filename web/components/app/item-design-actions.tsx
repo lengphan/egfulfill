@@ -2,7 +2,7 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useState } from "react"
-import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock, Kanban } from "@phosphor-icons/react"
+import { DotsThree, PaperPlaneTilt, CheckCircle, Eye, Clock, Cards } from "@phosphor-icons/react"
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem,
@@ -180,7 +180,7 @@ export function ItemDesignActions({
  work, and digitising is this board's whole job. */}
               {showBoard && (
               <DropdownMenuItem onClick={() => setBoardOpen(true)} disabled={!!boardBlocker}>
-                <Kanban size={14} />
+                <Cards size={14} />
                 {/* The blocker IS the label. A greyed item says it cannot be pressed and
  not one word about why, which on a row that looks identical to the one
  above it is the most annoying kind of disabled. */}

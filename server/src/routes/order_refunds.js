@@ -437,17 +437,35 @@ export function orderRefundRoutes(app, requireAuth) {
    */
   app.get('/api/orders/:id/design-status', { preHandler: requireAuth }, async (req, reply) => {
     if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
+    /**
+     * KEYED BY LINE, because that is what a card is attached to.
+     *
+     * This was `distinct on (sku)`, which is the one thing design_cards.js says not to do:
+     * "line_id IS the line's identity — two lines of the same sku are different jobs". So a
+     * card sent from line A collapsed onto its sibling B, and — because assignDesignCard
+     * writes line_id and this read it by sku — the row that actually went to the board could
+     * come back matching nothing at all. That is why "Send to Board" stayed pressable on a
+     * line already on it.
+     *
+     * Both maps are returned. `byLine` is the answer; `bySku` stays for rows written before
+     * line_id existed, which carry a sku and no line, and dropping them would un-flag real
+     * cards on live orders. Same precedence the rest of the app uses: line beats sku, sku is
+     * the legacy fallback.
+     */
     const r = await q(
-      `select distinct on (coalesce(sku,'')) coalesce(sku,'') as sku, id, vendor, vendor_ref, col, updated_at
+      `select distinct on (coalesce('L:' || line_id, 'S:' || coalesce(sku,'')))
+              coalesce(sku,'') as sku, line_id, id, vendor, vendor_ref, col, updated_at
          from design_cards where order_id = $1
-        order by coalesce(sku,''), id desc`,
+        order by coalesce('L:' || line_id, 'S:' || coalesce(sku,'')), id desc`,
       [String(req.params.id)]
     ).catch(() => ({ rows: [] }));
+    const shape = (c) => ({
+      cardId: String(c.id), vendor: c.vendor || null, vendorRef: c.vendor_ref || null,
+      col: c.col || null, updatedAt: c.updated_at,
+    });
     return {
-      bySku: Object.fromEntries(r.rows.map((c) => [c.sku, {
-        cardId: String(c.id), vendor: c.vendor || null, vendorRef: c.vendor_ref || null,
-        col: c.col || null, updatedAt: c.updated_at,
-      }])),
+      byLine: Object.fromEntries(r.rows.filter((c) => c.line_id).map((c) => [String(c.line_id), shape(c)])),
+      bySku: Object.fromEntries(r.rows.filter((c) => !c.line_id && c.sku).map((c) => [c.sku, shape(c)])),
     };
   });
 
