@@ -74,7 +74,26 @@ export function TabBar<T extends string>({
    */
   look?: "line" | "segmented"
 }) {
-  const text = size === "sm" ? "text-xs" : "text-sm"
+  /**
+   * `size` IS DENSITY, NOT TYPE SIZE — and that is the whole change here.
+   *
+   * `sm` used to drop the label to text-xs (12px). The app runs a deliberate six-step scale
+   * — 11 · 12 · 14 · 18 · 24 · 36 — chosen because "a pair that close is not a level of
+   * hierarchy: the eye cannot resolve it as a decision" (globals.css). 12px is a caption
+   * step, and a tab is not a caption: it is the way INTO a panel, and it was routinely
+   * ending up smaller than the body text it led to.
+   *
+   * There is no legal step between 12 and 14, so a compromise size would have to invent one
+   * and break the rule the scale exists to enforce. 14 it is, for both.
+   *
+   * What still separates the two is what always should have: a tight bar gets tighter
+   * padding, a smaller gap and a smaller icon. That is what "small" means on a filter strip
+   * — more of them in the same rail — not letters the reader has to lean in for.
+   *
+   * Safe on every bar: the row is overflow-x-auto with shrink-0 items, so labels that no
+   * longer fit scroll rather than fold or clip.
+   */
+  const text = "text-sm"
   const pad = size === "sm" ? "pb-1.5" : "pb-2"
   const gap = size === "sm" ? "gap-4" : "gap-5"
   return (
