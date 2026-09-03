@@ -217,7 +217,11 @@ const TT_EMPTY: TtFields = {
  * `dry` is its own state rather than a flavour of ok. A green tick beside a shop where
  * nothing was created is the dishonest empty state the house rules forbid.
  */
-type Outcome = { state: "running" | "ok" | "dry" | "fail"; text: string; note?: string; url?: string }
+type Outcome = { state: "running" | "ok" | "dry" | "fail"; text: string; note?: string; url?: string
+  /** Live, as opposed to a draft. A green tick cannot tell those apart, and they are not the
+   *  same outcome — a draft is not selling — so the row keeps its words when it is a draft
+   *  and drops them when the tick has already said everything. */
+  live?: boolean }
 
 /**
  * The three fields TikTok needs, for ONE shop.
@@ -441,7 +445,20 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
    * scannable three columns — mark, shop, link — and nothing on it can be cut.
    */
  const failed = outcome.state === "fail"
- const detail = [outcome.text, outcome.note].filter(Boolean).join(" ")
+  /**
+   * THE TICK ALREADY SAID IT.
+   *
+   * A green tick over "Listed live" is one fact told twice, on every successful row, in a
+   * list whose whole job is to show the exceptions. So a clean live success says nothing
+   * underneath and the row is just the shop, its mark and its link.
+   *
+   * A DRAFT still speaks. The tick is the same green for both, and "created a draft" is not
+   * "it is selling" — dropping that word would report a product live that nobody can buy.
+   * And any note at all — variants rejected, photos short, a dry run — is by definition the
+   * thing this list exists for.
+   */
+ const quiet = outcome.state === "ok" && outcome.live === true && !outcome.note
+ const detail = quiet ? "" : [outcome.text, outcome.note].filter(Boolean).join(" ")
   // A green tick already carries "this went well"; green words under it say it twice. Only
   // the two states that need attention are coloured.
  const detailCls = failed ? "text-destructive"
@@ -1036,9 +1053,20 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  return {
  state: "dry",
  text: "Dry run — nothing was sent",
+        /*
+         * THE MODE, AND WHAT THE MODE FOUND. "Live TikTok publishing is switched off" was
+         * the entire note when nothing was missing — which reads as "we know nothing", the
+         * opposite of the truth. The dry run resolves the shop, calls getShopCipher (so the
+         * shop is provably reachable), assembles the real payload and lists every required
+         * field that is absent. An empty list is a RESULT: this product would list.
+         * Otherwise the only way to learn that is to flip a switch nobody wants to flip
+         * blind.
+         */
  note: r.missing?.length
-            ? `Still needed before it can list: ${r.missing.join(", ")}.`
- : "Live TikTok publishing is switched off on the server.",
+            ? `Not ready: still needs ${r.missing.join(", ")}. Live publishing is also off on the server.`
+            : `Ready — the shop answered and nothing is missing${
+                r.wouldUploadImages ? `, ${r.wouldUploadImages} photo${r.wouldUploadImages === 1 ? "" : "s"} would upload` : ""
+              }. Only TIKTOK_PUBLISH_LIVE is holding it back.`,
         }
       }
  onPublished?.(undefined, recordCover(null), {
@@ -1056,6 +1084,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       })
  return {
  state: "ok",
+ live: goLive,
  text: goLive ? "Product listed" : "Draft product created",
  note: r.warnings?.length ? r.warnings.map((w) => w.message).filter(Boolean).join(" ") : undefined,
       }
@@ -1100,6 +1129,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       })
  return {
  state: "ok",
+ live: r.state === "active",
         // Shopify takes the status at creation, so what came back is what it is.
  text: r.state === "active" ? "Listed live" : "Draft product created",
  url: r.url,
@@ -1198,6 +1228,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  const live = r.state === "active"
  return {
  state: "ok",
+ live,
  text: live ? "Listed live" : "Draft listing created",
  url: r.url,
         // The one thing worth interrupting for: the listing exists but has no variants, so
