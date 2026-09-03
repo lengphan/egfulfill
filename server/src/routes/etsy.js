@@ -1975,6 +1975,33 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             products.push({ sku, property_values, offerings: [offering] });
           }
         }
+        /**
+         * ZERO OR ALL — never one of two. This is the rule that was rejecting variants.
+         *
+         * Etsy: "price_on_property: unsupported number of property IDs. Supports only
+         * zero or all 2 variation properties, as at least one `*_on_property` field is
+         * linked to all 2 properties." Once ANY of these three names every property on
+         * the listing, the others must name every property or none — one of two is not
+         * a legal answer.
+         *
+         * `sku_on_property` always names all of them, because a sku genuinely is per
+         * combination. So on a listing with both colour and size, `price_on_property:
+         * [514]` was the violation: one of two, next to a sku field naming two. The PUT
+         * 400'd, the catch below let the listing stand flat, and a listing published
+         * with its colours and sizes silently dropped.
+         *
+         * Price still only VARIES by size — a bigger garment costs more to make and a
+         * colour does not — but that is about the numbers, not the declaration. The
+         * products array already carries one offering per (colour, size) with its own
+         * price, so naming both properties describes exactly what was sent. Repeating
+         * the same price across the colours of one size is allowed; declaring a shape
+         * that disagrees with the offerings is not.
+         */
+        const varyPrice = !!(vSizes.length && b.size_prices
+          && vSizes.some((z) => Number(b.size_prices[z]) > 0));
+        const presentProps = [vColors.length ? 513 : null, vSizes.length ? 514 : null]
+          .filter((n) => n != null);
+
         try {
           // No profile means every offering would be rejected. Say which shop setting is
           // missing rather than surfacing Etsy's opaque 400.
@@ -1985,14 +2012,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               products,
-              // Etsy IGNORES per-offering prices unless told which property they vary on.
-              // Declared only when we actually sent differing prices, because naming a
-              // property with uniform prices makes Etsy demand one per value.
-              price_on_property: (vSizes.length && b.size_prices
-                && vSizes.some((z) => Number(b.size_prices[z]) > 0)) ? [514] : [],
+              price_on_property: varyPrice ? presentProps : [],
               quantity_on_property: [],
               // The sku varies on whichever properties we actually sent.
-              sku_on_property: [vColors.length ? 513 : null, vSizes.length ? 514 : null].filter((n) => n != null),
+              sku_on_property: presentProps,
             }),
           });
           variants_applied = products.length;
