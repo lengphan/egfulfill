@@ -86,7 +86,22 @@ export function reportsRoutes(app, requireStaff) {
     const KEY = { '': 'draft', in_review: 'pending', approved: 'approved', working: 'working', shipped: 'shipped', on_hold: 'onHold', cancelled: 'cancelled', refunded: 'refunded' };
 
     let gmv = 0, inWindow = 0;
-    const span = Math.max(1, Math.min(90, days));
+    /**
+     * THE BUCKET FOLLOWS THE WINDOW, because a one-day window bucketed by day is one bar.
+     *
+     * `span` was always `days`, so "Today" drew a single column at 100% height — a filled
+     * rectangle the width of the panel, which reads as a broken chart rather than as a day
+     * with one bar in it. The shape is the whole point of this series; one bar has no shape.
+     *
+     * Under two days the slot is an HOUR, which turns Today into 24 columns and keeps the
+     * same column design at every range. `since` is already a rolling window (now - days),
+     * so 24 hourly slots cover it exactly and no arithmetic below has to change — only the
+     * size of a slot and how many there are.
+     */
+    const HOUR = 36e5;
+    const hourly = days <= 1;
+    const slot = hourly ? HOUR : DAY;
+    const span = Math.max(1, Math.min(90, hourly ? Math.round((days * DAY) / HOUR) : days));
     const bars = new Array(span).fill(0);
     const prod = [], trans = [], tot = [];
     let onTimeHit = 0, onTimeN = 0;
@@ -104,7 +119,7 @@ export function reportsRoutes(app, requireStaff) {
         if (k) windowed[k]++;
         gmv += num(r.total);
         inWindow++;
-        const i = span - 1 - Math.floor((Date.now() - t) / DAY);
+        const i = span - 1 - Math.floor((Date.now() - t) / slot);
         if (i >= 0 && i < span) bars[i] += num(r.total);
       }
 
@@ -151,6 +166,9 @@ export function reportsRoutes(app, requireStaff) {
       money: { gmv: Math.round(gmv * 100) / 100, orders: inWindow, aov: inWindow ? Math.round((gmv / inWindow) * 100) / 100 : 0 },
       // Scaled 0..1, which is all the sparkline draws — the figures themselves are above.
       gmvBars: bars.map((v) => v / max),
+      /** What one bar covers — 'hour' on a single-day window, 'day' otherwise. Sent so the
+       *  panel never has to infer the slot from the bar count. */
+      gmvBucket: hourly ? 'hour' : 'day',
       speed: {
         production: { days: round1(median(prod)), n: prod.length },
         transit: { days: round1(median(trans)), n: trans.length },

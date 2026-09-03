@@ -2376,8 +2376,12 @@ export type Overview = {
   counts: OverviewCounts
   windowed: OverviewCounts
   money: { gmv: number; orders: number; aov: number }
-  /** Daily GMV scaled 0..1 — the shape of the run, which is all the sparkline draws. */
+  /** GMV per bucket, scaled 0..1 — the shape of the run, which is all the sparkline draws. */
   gmvBars: number[]
+  /** What ONE bar covers: 'hour' on a single-day window, 'day' otherwise. A day bucketed by
+   *  day is a single full-height column, so the server switches slot size and says which it
+   *  used rather than leaving the panel to infer it from the bar count. */
+  gmvBucket?: "hour" | "day"
   speed: {
     production: { days: number | null; n: number }
     transit: { days: number | null; n: number }
