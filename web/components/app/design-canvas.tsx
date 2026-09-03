@@ -2847,8 +2847,16 @@ export function DesignCanvasDialog({
             */}
           {/* Imported, never hand-rolled: the underline is the only active tab treatment in
               this app and hand-rolling is how that rule got broken in fourteen places. */}
+          {/* DEFAULT SIZE, not sm. `sm` is text-xs (12px), which is the right call for a dense
+              filter strip and the wrong one here: this is the panel's primary navigation —
+              the five places a line's work lives — sitting above a body set in 14px, so the
+              way in was the smallest type on the screen. md is text-sm and the five labels
+              still fit the rail comfortably.
+              Changed HERE rather than in the primitive: `sm` is used by fourteen other bars,
+              most of them genuinely dense, and re-sizing all of them off one screen is not a
+              judgement one screenshot supports. */}
           <TabBar
-            size="sm" spacing="none" className="sticky top-0 z-10 -mt-1 border-b-0 bg-popover pt-1"
+            spacing="none" className="sticky top-0 z-10 -mt-1 border-b-0 bg-popover pt-1"
             ariaLabel="Line panels"
             value={ctxTab} onChange={(v: string) => setCtxTab(v as CtxTab)}
             items={[
