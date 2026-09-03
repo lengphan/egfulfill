@@ -133,6 +133,24 @@ const SLOW_EXACT = new Set([
    * streamOrders is the same bytes in smaller pieces and wants the same road.
    */
   "/api/orders",
+  /**
+   * AND PUBLISHING, which is provider work by definition — the rule this list already states.
+   *
+   * A publish is not one call to us: shopify.js makes about ten outbound calls to Shopify
+   * per product (create, images, variants), Etsy does the draft then the inventory PUT, and
+   * the body can carry base64 artwork under the 1MB threshold that would otherwise route it
+   * direct on size alone. Through Vercel's rewrite that is long enough to have the
+   * connection dropped mid-flight, and a dropped fetch rejects as `TypeError: Failed to
+   * fetch` — which the dialog prints against the shop as though the shop refused.
+   *
+   * It reads as intermittent because it is: the same shop publishes fine when the run is
+   * quick and fails when it is not, which is exactly what "it worked before" looks like.
+   *
+   * Preflight checked on all three: api.egful.store answers with the app's origin allowed.
+   */
+  "/api/shopify/publish",
+  "/api/etsy/publish",
+  "/api/tiktok/publish",
 ])
 const isSlow = (path: string) => SLOW_EXACT.has(path.split("?")[0])
 
