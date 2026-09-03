@@ -64,7 +64,11 @@ const cellClass = (id: OrderColId) => {
 }
 function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
  switch (id) {
- case "order": return <span className="tabular-nums text-xs font-medium">{numOf(o)}</span>
+      /* THE ROW'S IDENTITY, and it was the SMALLEST thing on the row — text-xs against
+         the table's text-sm, so the number you scan for was set below the customer name,
+         the store and the cost. Matches the factory board, which has always rendered it
+         text-sm font-semibold; this table was the outlier. */
+ case "order": return <span className="tabular-nums text-sm font-semibold">{numOf(o)}</span>
  case "store": return <span className="text-muted-foreground">{storeOf(o)}</span>
  case "customer": return <span className="font-medium">{customerOf(o)}</span>
  case "items": return (

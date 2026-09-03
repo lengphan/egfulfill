@@ -695,9 +695,105 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
       variants,
     };
 
+    /**
+     * OVER A HUNDRED VARIANTS IS A GRAPHQL JOB — REST refuses the create outright.
+     *
+     *   "REST cannot perform create action on product(s) with more than 100 variants.
+     *    Please use GraphQL version 2024-04 or later."
+     *
+     * It is not a warning and not a partial success: nothing is created, so a 20-colour x
+     * 6-size matrix simply could not be published at all. The cap is on the CREATE, which
+     * is why splitting the axes or retrying never helped.
+     *
+     * GraphQL does it in two steps by design: `productCreate` takes the option AXES and
+     * makes one standalone variant from the first value of each, then
+     * `productVariantsBulkCreate` replaces that with the real matrix
+     * (REMOVE_STANDALONE_VARIANT) up to 2,048 variants, 250 at a time.
+     *
+     * REST IS KEPT FOR THE ORDINARY CASE. It is the proven path, every image call below is
+     * REST anyway, and swapping a working publish wholesale to fix a case it never reached
+     * is how a fix becomes an outage. The two paths converge on the same `created` shape,
+     * so nothing downstream knows which one ran.
+     *
+     * `sku` lives under `inventoryItem` here — it moved off the variant input in 2024-04,
+     * and `tracked: false` is the GraphQL spelling of the REST `inventory_management: null`
+     * this route has always sent. Validated against the live schema, not remembered.
+     */
+    const REST_VARIANT_CAP = 100;
+    const GQL_CHUNK = 250;
+    const gql = async (query, variables) => {
+      const d = await call('/graphql.json', { method: 'POST', body: JSON.stringify({ query, variables }) });
+      // A GraphQL error arrives inside a 200, so `call` cannot have caught it.
+      if (d && Array.isArray(d.errors) && d.errors.length) {
+        throw new Error(d.errors.map((e) => e && e.message).filter(Boolean).join('; '));
+      }
+      return (d && d.data) || {};
+    };
+    /** userErrors are the OTHER kind of failure inside a 200 — the mutation ran and refused. */
+    const orThrow = (payload, what) => {
+      const errs = (payload && payload.userErrors) || [];
+      if (errs.length) throw new Error(`${what}: ${errs.map((e) => e && e.message).filter(Boolean).join('; ')}`);
+      return payload || {};
+    };
+
     let created;
     try {
-      created = await call('/products.json', { method: 'POST', body: JSON.stringify({ product }) });
+      if (variants.length > REST_VARIANT_CAP) {
+        const pc = orThrow((await gql(
+          `mutation EgProductCreate($product: ProductCreateInput!) {
+             productCreate(product: $product) {
+               product { id status handle }
+               userErrors { field message }
+             }
+           }`,
+          { product: {
+              title,
+              descriptionHtml: product.body_html,
+              status: product.status === 'active' ? 'ACTIVE' : 'DRAFT',
+              tags: (Array.isArray(b.tags) ? b.tags : []).map(String).filter(Boolean),
+              productType: String(b.print_type || ''),
+              productOptions: options.map((o) => ({ name: o.name, values: o.values.map((v) => ({ name: v })) })),
+          } }
+        )).productCreate, 'Shopify rejected the product');
+        const gid = pc.product && pc.product.id;
+        if (!gid) throw new Error('Shopify created no product.');
+        // Everything downstream — the image uploads, published_listings, the admin URL —
+        // is keyed on the numeric id REST returns, so the gid is reduced to it here rather
+        // than in five places.
+        const numericId = String(gid).split('/').pop();
+
+        const gqlVariants = variants.map((v) => {
+          const optionValues = [];
+          if (v.option1) optionValues.push({ name: v.option1, optionName: options[0].name });
+          if (v.option2) optionValues.push({ name: v.option2, optionName: options[1].name });
+          const out = { price: v.price, optionValues };
+          // tracked:false mirrors the REST inventory_management:null above — we do not run
+          // Shopify's inventory for these; the floor's own stock is the authority.
+          out.inventoryItem = v.sku ? { sku: v.sku, tracked: false } : { tracked: false };
+          return out;
+        });
+        for (let i = 0; i < gqlVariants.length; i += GQL_CHUNK) {
+          const chunk = gqlVariants.slice(i, i + GQL_CHUNK);
+          orThrow((await gql(
+            `mutation EgVariantsBulk($productId: ID!, $variants: [ProductVariantsBulkInput!]!, $strategy: ProductVariantsBulkCreateStrategy) {
+               productVariantsBulkCreate(productId: $productId, variants: $variants, strategy: $strategy) {
+                 productVariants { id }
+                 userErrors { field message }
+               }
+             }`,
+            {
+              productId: gid,
+              variants: chunk,
+              // Only the FIRST batch clears the placeholder Shopify made from the first
+              // option values. Sending it again would delete the batch before it.
+              strategy: i === 0 ? 'REMOVE_STANDALONE_VARIANT' : 'DEFAULT',
+            }
+          )).productVariantsBulkCreate, `Shopify rejected variants ${i + 1}-${i + chunk.length}`);
+        }
+        created = { product: { id: numericId, status: (pc.product.status || 'DRAFT').toLowerCase() } };
+      } else {
+        created = await call('/products.json', { method: 'POST', body: JSON.stringify({ product }) });
+      }
     } catch (e) {
       reply.code(e.status === 403 || e.status === 401 ? 403 : 502);
       return {

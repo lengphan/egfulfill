@@ -458,7 +458,10 @@ function OutcomeLine({ dest, outcome, sameForAll }: { dest: PublishDestination; 
    * thing this list exists for.
    */
  const quiet = outcome.state === "ok" && outcome.live === true && !outcome.note
- const detail = quiet ? "" : [outcome.text, outcome.note].filter(Boolean).join(" ")
+  /* JOINED BY A DASH, not a space. `text` is a headline and `note` is a sentence, and a
+     bare space ran them together: "Dry run — nothing was sent Ready — the shop answered…"
+     read as one broken sentence with a capital letter in the middle of it. */
+ const detail = quiet ? "" : [outcome.text, outcome.note].filter(Boolean).join(" — ")
   // A green tick already carries "this went well"; green words under it say it twice. Only
   // the two states that need attention are coloured.
  const detailCls = failed ? "text-destructive"
@@ -1051,8 +1054,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  if (r.dryRun) {
         // Honest about the mode: nothing was sent, so this is not a success.
  return {
+        // A SHORT headline the note continues from — see the join in OutcomeLine. It read
+        // "Dry run — nothing was sent" and the note opened with its own capitalised
+        // sentence, so the two collided into one unreadable line.
  state: "dry",
- text: "Dry run — nothing was sent",
+ text: "Dry run",
         /*
          * THE MODE, AND WHAT THE MODE FOUND. "Live TikTok publishing is switched off" was
          * the entire note when nothing was missing — which reads as "we know nothing", the
@@ -1062,11 +1068,16 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
          * Otherwise the only way to learn that is to flip a switch nobody wants to flip
          * blind.
          */
+        /*
+         * NO ENV VAR NAMES IN COPY A SELLER READS. "Only TIKTOK_PUBLISH_LIVE is holding it
+         * back" names a server switch they cannot see, let alone set. The fact they need is
+         * that live publishing is off for this channel; who turns it on is our business.
+         */
  note: r.missing?.length
-            ? `Not ready: still needs ${r.missing.join(", ")}. Live publishing is also off on the server.`
-            : `Ready — the shop answered and nothing is missing${
+            ? `nothing was sent. Still needs ${r.missing.join(", ")} — and live publishing for TikTok is switched off.`
+            : `nothing was sent. The shop answered and every required field is present${
                 r.wouldUploadImages ? `, ${r.wouldUploadImages} photo${r.wouldUploadImages === 1 ? "" : "s"} would upload` : ""
-              }. Only TIKTOK_PUBLISH_LIVE is holding it back.`,
+              }. Live publishing for TikTok is switched off.`,
         }
       }
  onPublished?.(undefined, recordCover(null), {
@@ -2019,12 +2030,29 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                           />
                           <span className="font-medium">{d.shop_name}</span>
                           <span className="text-xs text-muted-foreground">{d.platform_label}</span>
-                          {d.dry_run && (
-                            <span className="whitespace-nowrap text-2xs font-medium text-hold">{tl("publish", "dry run")}</span>
-                          )}
-                          {isDone(d.connection_id) && (
-                            <span className="ml-auto text-2xs font-medium text-success">published</span>
-                          )}
+                          {/**
+                            * ONE STATUS WORD PER ROW, and never two that contradict.
+                            *
+                            * A dry-run shop showed BOTH — amber "dry run" and green
+                            * "published" — because `isDone` treats "dry" as done (correct:
+                            * it ran, so re-ticking it repeats it) and the green chip was
+                            * hung off that same predicate (wrong: nothing was published).
+                            * The row therefore claimed the product had gone live to a shop
+                            * that had explicitly sent nothing.
+                            *
+                            * So the chip reports the OUTCOME, and the pre-flight "dry run"
+                            * marker only shows while there is no outcome yet — once the run
+                            * has happened, what happened replaces what was going to happen.
+                            */}
+                          {(() => {
+                            const st = outcomes[d.connection_id]?.state
+                            if (st === "ok") return <span className="ml-auto whitespace-nowrap text-2xs font-medium text-success">{tl("publish", "published")}</span>
+                            if (st === "dry") return <span className="ml-auto whitespace-nowrap text-2xs font-medium text-hold">{tl("publish", "checked · not sent")}</span>
+                            if (st === "fail") return <span className="ml-auto whitespace-nowrap text-2xs font-medium text-destructive">{tl("publish", "refused")}</span>
+                            return d.dry_run
+                              ? <span className="ml-auto whitespace-nowrap text-2xs font-medium text-hold">{tl("publish", "dry run")}</span>
+                              : null
+                          })()}
                         </label>
                       )
                     })}

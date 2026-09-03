@@ -2468,6 +2468,73 @@ export function ordersRoutes(app, requireAuth) {
              charged: _charged || undefined, refunded: _refunded || undefined };
   });
 
+  /**
+   * WHAT THIS ORDER COST US — the factory's own side, read off the money itself.
+   *
+   * Everything the seller pays is already answered by /charges. This is the other
+   * direction: postage bought, the dispatch partner's pick fee, an outsourced design task
+   * — every external cost `recordCost` booked against this order id, plus any credit that
+   * came back.
+   *
+   * READ, NEVER RECOMPUTED. The figures are the rows written the moment each cost was
+   * incurred (costs.js), not today's settings multiplied by a count. Shippo tells us what a
+   * label cost exactly once, and a report that re-derives history from current rates
+   * misstates it — which is the whole reason that ledger exists.
+   *
+   * BLANKS ARE NOT HERE, and their absence is a fact rather than a gap. Stock is expensed
+   * when a purchase order is received (`recordCost('blanks', …, `po-<num>`)`), and one PO
+   * covers many orders — so there is no honest per-order actual to report. The quote's
+   * `supplierTotal` is the estimate, and the card must label it as one.
+   *
+   * STAFF ONLY, and not merely hidden: what we pay names our margin outright, and §2.9
+   * withholds that from every seller surface. Warehouse is excluded with every other money
+   * figure — canSeeMoney, the same predicate the charges route uses.
+   */
+  app.get('/api/orders/:id/costs', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    if (!canSeeMoney(req.user)) return { gated: true, lines: [], spent: 0, credited: 0, net: 0 };
+    const own = await q('select id from orders where id=$1', [req.params.id]);
+    if (!own.rows[0]) { reply.code(404); return { error: 'Order not found' }; }
+
+    // The cost types, and the words a person uses for them. An explicit map rather than
+    // pattern-matching the type string, for the same reason COST_TYPES is one: a type
+    // nobody listed becomes a visible unknown instead of a silently missing row.
+    const LABELS = {
+      'label-cost': 'Postage',
+      'expedite-cost': 'Dispatch partner',
+      'design-partner-cost': 'Design partner',
+      'blanks-cost': 'Blanks',
+      'sample-cost': 'Sample',
+      'bank-fee': 'Bank / FX fee',
+      'aigen-cost': 'AI generation',
+    };
+    const types = Object.keys(LABELS);
+    const creditTypes = types.map((t) => t + '-credit');
+
+    const r = await q(
+      `select type, ref, delta, note, created_at from wallet_ledger
+        where order_id = $1 and type = any($2) order by created_at`,
+      [String(req.params.id), [...types, ...creditTypes]]
+    ).catch(() => ({ rows: [] }));
+
+    const lines = [];
+    let spent = 0, credited = 0;
+    for (const row of r.rows) {
+      const credit = row.type.endsWith('-credit');
+      const base = credit ? row.type.slice(0, -'-credit'.length) : row.type;
+      const amt = Math.round(Math.abs(Number(row.delta) || 0) * 100) / 100;
+      if (!amt) continue;
+      if (credit) credited += amt; else spent += amt;
+      lines.push({
+        type: base, credit,
+        label: (LABELS[base] || base) + (credit ? ' — credited back' : ''),
+        amount: amt, note: row.note || null, at: row.created_at,
+      });
+    }
+    const money = (n) => Math.round(n * 100) / 100;
+    return { lines, spent: money(spent), credited: money(credited), net: money(spent - credited) };
+  });
+
   // What would this order cost to produce? The seller's Submit button reads this to show
   // the price BEFORE they commit, and to tell them the shortfall if they can't cover it.
   // Same quote the charge uses, so the number they see is the number they pay.

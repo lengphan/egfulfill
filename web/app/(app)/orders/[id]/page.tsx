@@ -43,6 +43,7 @@ import {
  getOrderMessages,
  getOrderQuote,
  getOrderCharges,
+ getOrderCosts,
  getCatalogProducts,
  postOrderMessage,
  uploadChatAttachment,
@@ -55,11 +56,12 @@ import {
  type ChatEntry,
  type OrderQuote,
  type OrderCharges,
+ type OrderCosts,
  type CatalogProduct,
  type ShipAddress,
 } from "@/lib/api"
 import { resolveProduct } from "@/lib/variant-resolve"
-import { resolvedOrderStage } from "@/lib/factory-status"
+import { resolvedOrderStage, isFactoryOrder } from "@/lib/factory-status"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { OrderStageMenu } from "@/components/app/order-stage-menu"
@@ -172,6 +174,9 @@ export default function OrderDetailPage() {
   /** Bumped whenever something that AFFECTS the price changes — see the quote effect. */
  const [quoteNonce, setQuoteNonce] = useState(0)
  const [charges, setCharges] = useState<OrderCharges | null>(null)
+ /** OUR side of the same order — what we spent, from the cost ledger. Staff only;
+  *  the route refuses a seller outright, so this stays null for them. */
+ const [costs, setCosts] = useState<OrderCosts | null>(null)
 
   // Staff processing controls (stage moves + labels). Gated exactly like the boards:
   // canFulfill = warehouse/admin; the ⋯ menu itself is per-stage/role-gated inside.
@@ -396,7 +401,22 @@ export default function OrderDetailPage() {
     // guidance) rejects a straight setState in an effect body; it cascades a render.
  const id = setTimeout(() => {
  if (!live) return
- if (!order || !submittable) { setQuote(null); setQuoteErr(null); return }
+      /**
+       * FETCHED AT EVERY STAGE NOW, not only while the order can still be submitted.
+       *
+       * The quote carries `supplierTotal` — what the blanks cost US — and that is a fact
+       * about the products, not about whether anyone has paid yet. Gating the fetch on
+       * `submittable` made it null the moment an order left Draft, which is why the
+       * factory cost block could never render on a real order: it tested
+       * `quote?.supplierTotal != null` inside the branch that only runs when `quote` is
+       * absent. Two conditions that could not both be true.
+       *
+       * WHICH ROWS TO SHOW IS A SEPARATE QUESTION and is decided by `submittable` below.
+       * Post-submit the quote's line costs are the FROZEN ones anyway, but the ledger is
+       * still the right source there — it sees expedited shipping, express and design
+       * files, which the quote cannot.
+       */
+ if (!order) { setQuote(null); setQuoteErr(null); return }
       // A SWALLOWED ERROR IS NOT AN EMPTY ORDER. `.catch(() => {})` left `quote` null,
       // which the Summary renders as an order that simply has no base cost, shipping or
       // fees — the exact picture a 500 from /quote produced, for months, with nothing on
@@ -409,7 +429,7 @@ export default function OrderDetailPage() {
     // `quoteNonce` — artwork decides the price now. A second printed side adds a surcharge
     // per unit (pricing.js sideAddOn), so placing or removing a design changes the total,
     // and without this the Summary kept the figure it had loaded on arrival.
-  }, [order, submittable, quoteNonce])
+  }, [order, quoteNonce])
 
   // What was ACTUALLY charged, from the ledger — the only complete source. The quote
   // above covers production + shipping and is the right thing to show BEFORE submit
@@ -422,9 +442,12 @@ export default function OrderDetailPage() {
  const t = setTimeout(() => {
  if (!live || !order) return
  getOrderCharges(order.id).then((c) => { if (live) setCharges(c) }).catch(() => { if (live) setCharges(null) })
+      // The other direction, and only for staff: a seller's request is refused, so asking
+      // would spend a round trip to be told no on every order they open.
+ if (isStaff) getOrderCosts(order.id).then((c) => { if (live) setCosts(c) }).catch(() => { if (live) setCosts(null) })
     }, 0)
  return () => { live = false; clearTimeout(t) }
-  }, [order])
+  }, [order, isStaff])
 
  if (orders === null) {
  return (
@@ -679,9 +702,67 @@ export default function OrderDetailPage() {
   // cost us. Null until they have actually been charged — subtracting real costs from a
   // quote nobody has paid reports a loss that hasn't happened.
  const labelCost = Number(order.label_cost ?? 0) || 0
- const factoryMargin = netCost != null && quote?.supplierTotal != null
-    ? netCost - quote.supplierTotal - labelCost
- : null
+
+  /**
+   * ── OUR SIDE: what this order cost the factory ────────────────────────────────────
+   *
+   * Two sources, and the difference between them is the point of the panel:
+   *
+   *   RECORDED  every external cost booked by recordCost against this order — postage,
+   *             the dispatch partner, an outsourced design task. Written the moment it was
+   *             incurred, net of any credit that came back. These are facts.
+   *   ESTIMATED the blanks. Stock is expensed when a PO is RECEIVED and one PO covers many
+   *             orders, so no honest per-order actual exists; the quote's supplierTotal is
+   *             the best figure there is. It is labelled as an estimate on the row, because
+   *             a guess printed beside three facts stops being readable as a guess.
+   */
+ const isFactory = isFactoryOrder(order)
+ const costLines = costs?.gated ? [] : (costs?.lines ?? [])
+ const recordedCost = costs?.gated ? null : (costs?.net ?? null)
+  /**
+   * POSTAGE IS IN BOTH PLACES, and adding both bills it twice.
+   *
+   * `orders.label_cost` and the ledger's `label-cost` row are the same money — recordCost
+   * writes the row at the same moment the column is stamped. So the ledger wins, and the
+   * column is used ONLY for orders bought before that ledger existed, which have the
+   * column and no row. Summing them was the obvious arithmetic and it is wrong.
+   */
+ const ledgerHasPostage = costLines.some((l) => l.type === "label-cost" && !l.credit)
+ const legacyPostage = !ledgerHasPostage && labelCost > 0 ? labelCost : 0
+ const blanksEstimate = quote?.supplierTotal ?? null
+  /** Null when we know NOTHING — "$0.00 of costs" and "nothing recorded" are different
+   *  answers, and only one of them may be subtracted from revenue. */
+ const ourTotal = recordedCost == null && blanksEstimate == null && !legacyPostage
+    ? null
+ : (recordedCost ?? 0) + (blanksEstimate ?? 0) + legacyPostage
+
+  /**
+   * WHAT IS LEFT — and the money coming IN is a different number on the two kinds of order.
+   *
+   *   A seller's order  what THEY paid us, net of refunds (netCost).
+   *   Our own order     what the BUYER paid, because nobody is billed internally: a factory
+   *                     order never passes in_review (FACTORY_LINE omits it) so
+   *                     chargeForSubmit never runs, and design fees skip it outright. The
+   *                     card used to report that as "not charged yet" forever, which is
+   *                     true and useless — the order has real revenue and real costs.
+   */
+ const takeIn = isFactory ? (hasRevenue ? revenue : null) : netCost
+ const factoryMargin = takeIn != null && ourTotal != null ? takeIn - ourTotal : null
+
+  /**
+   * ONE WORD FOR THE STATE OF THE MONEY, in the card's header rather than a sentence under
+   * every row. "Not charged yet" stated what had NOT happened, which tells a reader nothing
+   * they can act on; these say what IS true. The vocabulary is the one the design fees
+   * already use (OrderDesignFee.status) rather than a second one invented here.
+   */
+ const moneyState: { label: string; tone: string } = isFactory
+    ? { label: "Internal", tone: "bg-muted text-muted-foreground" }
+ : refundedTotal > 0.005
+      ? { label: netCost != null && netCost <= 0.005 ? "Refunded" : "Partly refunded",
+          tone: "bg-success/10 text-success" }
+ : cost != null
+        ? { label: "Charged", tone: "bg-primary/10 text-primary" }
+ : { label: "Estimated", tone: "bg-muted text-muted-foreground" }
 
  return (
     <div className="space-y-5">
@@ -1601,7 +1682,16 @@ export default function OrderDetailPage() {
             {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
    we'll charge to produce this); once submitted the price is frozen and it
    falls back to the order's own totals. */}
-            <SectionCard title="Summary">
+            {/* THE STATE OF THE MONEY, IN ONE WORD, in the header.
+                It used to be a sentence under the total ("not charged yet"), which states
+                what has NOT happened — a reader can do nothing with that, and on our own
+                orders it was permanent, because a factory order never passes in_review and
+                so is never charged at all. The chip says what IS true instead, in the
+                vocabulary the design fees already use: estimated · charged · refunded. */}
+            <SectionCard
+              title="Summary"
+              actions={<span className={"rounded-full px-2 py-0.5 text-2xs font-medium " + moneyState.tone}>{moneyState.label}</span>}
+            >
               <dl className="space-y-2 p-5 text-sm">
                 {/* THE PRICE IS MISSING BECAUSE WE COULDN'T GET IT — said out loud, because
    the alternative is a card that looks like an order nobody has priced. */}
@@ -1610,7 +1700,7 @@ export default function OrderDetailPage() {
                     Couldn&apos;t load this order&apos;s price. Nothing has been charged — reload, and tell us if it keeps failing.
                   </p>
                 )}
-                {quote && !quote.unpriced?.length ? (
+                {submittable && quote && !quote.unpriced?.length ? (
                   <>
                     {/* BASE COST, the same word the product editor uses for this number —
    what the seller is charged for the blank, as against "product cost",
@@ -1680,7 +1770,13 @@ export default function OrderDetailPage() {
                       <dt>Total</dt>
                       <dd className="tabular-nums">{usd(quote.total + dfTotal)}</dd>
                     </div>
-                    <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production. Design &amp; check fees are listed above; a design still under review shows “To Be Determined” until we confirm it.</p>
+                    {/* The "charged when you submit" half moved into the header chip —
+                        §4 forbids a sentence under a control that repeats what a label
+                        already says. What is left is the one thing the rows cannot say for
+                        themselves: why a fee reads To Be Determined. */}
+                    {designFees?.items?.some((f) => f.amount == null) && (
+                      <p className="pt-1 text-xs text-muted-foreground">A design still under review shows “To Be Determined” until we confirm the quote.</p>
+                    )}
                   </>
                 ) : feesGated ? (
                   /* A team member whose leader hasn't shared order fees. The server sent no
@@ -1754,39 +1850,13 @@ export default function OrderDetailPage() {
                       </div>
                     </div>
 
-                    {/* OUR SIDE OF THE SAME ORDER — staff only, and physically separated
-   from the seller's block above because the two are different pots of
-   money. What the blanks cost us is the number a margin is measured
-   against; the server strips it from a seller's quote entirely, so this
-   renders nothing for them even if the markup were wrong. */}
-                    {isStaff && quote?.supplierTotal != null && (
-                      <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-                        <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">Factory · not shown to the seller</div>
-                        <div className="flex justify-between text-sm">
-                          <dt className="text-muted-foreground">
-                            Product cost
-                            {/* A partial figure says so rather than reading as the total. */}
-                            {quote.supplierKnown != null && quote.lines && quote.supplierKnown < quote.lines.length && (
-                              <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
-                            )}
-                          </dt>
-                          <dd className="tabular-nums">{usd(quote.supplierTotal)}</dd>
-                        </div>
-                        {labelCost > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <dt className="text-muted-foreground">Postage we bought</dt>
-                            <dd className="tabular-nums">{usd(labelCost)}</dd>
-                          </div>
-                        )}
-                        <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
-                          <dt>Factory margin</dt>
-                          <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
-                            {factoryMargin != null ? usd(factoryMargin)
-   : <span className="font-normal italic text-muted-foreground">not charged yet</span>}
-                          </dd>
-                        </div>
-                      </div>
-                    )}
+                    {/* OUR SIDE OF THE SAME ORDER used to sit HERE, and could never render.
+                        It was inside this branch — the one that runs only when the quote is
+                        absent or unpriceable — while testing `quote?.supplierTotal != null`,
+                        which needs the quote present. Two conditions that cannot both hold
+                        on a normal order, so Product cost, Postage and Factory margin were
+                        invisible on every properly-priced order this app has ever had.
+                        It now sits after this whole ternary, where every state reaches it. */}
 
                     {/* The "no retail price recorded" line is gone. It was written for an
    occasional order nobody had typed a sale price on; the manual order
@@ -1796,6 +1866,88 @@ export default function OrderDetailPage() {
    out. */}
                   </>
                 )}
+                {/**
+                  * ── OUR SIDE OF THE SAME ORDER ──────────────────────────────────────
+                  *
+                  * Outside the ternary above, so it renders in EVERY state — quoted,
+                  * charged, refunded, and on our own orders. Inside it, it was unreachable
+                  * (see the note where it used to live).
+                  *
+                  * Three groups, in the order the question is actually asked: what came in,
+                  * what went out, what is left. The two pots stay physically apart — a
+                  * seller's money and ours on one card is only safe if the reader can never
+                  * mistake one for the other.
+                  *
+                  * ESTIMATES ARE MARKED ON THE ROW. Blanks are the only estimate here and
+                  * they are also the biggest number, so an unlabelled one would read as a
+                  * fact. Everything else is a cost we actually booked.
+                  */}
+                {isStaff && (ourTotal != null || takeIn != null) && (
+                  <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                    <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Factory · not shown to the seller
+                    </div>
+
+                    {/* WHAT CAME IN — a different number on the two kinds of order, and
+                        labelled as which. On our own order nobody is billed internally, so
+                        the honest figure is the buyer's. */}
+                    {takeIn != null && (
+                      <div className="flex justify-between text-sm">
+                        <dt className="text-muted-foreground">{isFactory ? "Customer paid" : "Seller paid us"}</dt>
+                        <dd className="tabular-nums">{usd(takeIn)}</dd>
+                      </div>
+                    )}
+
+                    {/* WHAT WENT OUT. */}
+                    {blanksEstimate != null && (
+                      <div className="flex justify-between text-sm">
+                        <dt className="text-muted-foreground">
+                          Blanks
+                          <span className="text-muted-foreground/70"> · estimated</span>
+                          {/* A partial figure says so rather than reading as the total. */}
+                          {quote?.supplierKnown != null && quote?.lines && quote.supplierKnown < quote.lines.length && (
+                            <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
+                          )}
+                        </dt>
+                        <dd className="tabular-nums">−{usd(blanksEstimate)}</dd>
+                      </div>
+                    )}
+                    {costLines.map((l, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <dt className="text-muted-foreground" title={l.note ?? undefined}>{l.label}</dt>
+                        <dd className={"tabular-nums " + (l.credit ? "text-success" : "")}>
+                          {l.credit ? "+" : "−"}{usd(l.amount)}
+                        </dd>
+                      </div>
+                    ))}
+                    {legacyPostage > 0 && (
+                      <div className="flex justify-between text-sm">
+                        {/* Bought before costs were booked to the ledger, so the order row is
+                            the only record of it. Never added alongside a ledger row for the
+                            same label — that would bill the postage twice. */}
+                        <dt className="text-muted-foreground">Postage</dt>
+                        <dd className="tabular-nums">−{usd(legacyPostage)}</dd>
+                      </div>
+                    )}
+                    {ourTotal === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Nothing has been spent on this order yet — no postage bought, no partner work booked.
+                      </p>
+                    )}
+
+                    {/* WHAT IS LEFT. Gross, and it says so: labour and consumables are not
+                        tracked anywhere, so calling this the margin full stop would overstate
+                        what we keep. */}
+                    <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                      <dt>Gross margin</dt>
+                      <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
+                        {factoryMargin != null ? usd(factoryMargin)
+   : <span className="font-normal italic text-muted-foreground">{isFactory ? "no sale price recorded" : "not charged yet"}</span>}
+                      </dd>
+                    </div>
+                  </div>
+                )}
+
                 {/* The unpriced lines say so on the rows themselves ("Not priced · pick a
    blank first"), which is where the fix is. Repeating it in red under the
    total made the same fact an alarm about the total. */}

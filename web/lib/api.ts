@@ -2753,6 +2753,41 @@ export function getOrderQuote(id: string) {
   return api<OrderQuote>(`/api/orders/${encodeURIComponent(id)}/quote`)
 }
 
+/**
+ * WHAT AN ORDER COST US — the factory's own side, and the mirror of OrderCharges.
+ *
+ * `OrderCharges` answers "what did the seller pay"; this answers "what did we spend".
+ * Every row is an external cost `recordCost` booked at the moment it was incurred —
+ * postage, the dispatch partner's fee, an outsourced design task — never a settings
+ * figure multiplied by a count, because prices move and history must not.
+ *
+ * BLANKS ARE DELIBERATELY ABSENT. Stock is expensed when a purchase order is received and
+ * one PO covers many orders, so there is no honest per-order actual. `OrderQuote.supplierTotal`
+ * is the estimate for that, and any surface showing the two together has to say which is which.
+ *
+ * STAFF ONLY — the route refuses a seller, and answers a warehouse hand with `gated`.
+ */
+export type OrderCost = {
+  type: string
+  /** A credit that came back — a refunded label, a task we weren't billed for. */
+  credit: boolean
+  label: string
+  amount: number
+  note: string | null
+  at: string
+}
+export type OrderCosts = {
+  gated?: boolean
+  lines: OrderCost[]
+  /** What went out, what came back, and the difference. */
+  spent: number
+  credited: number
+  net: number
+}
+export function getOrderCosts(id: string) {
+  return api<OrderCosts>(`/api/orders/${encodeURIComponent(id)}/costs`)
+}
+
 // Set a line item's variant picks (blank/colour/size/method). Keyed by line_id when
 // available, else sku. Rejected (409) once the order is submitted — its cost is frozen.
 export function postItemSetup(id: string, body: { line_id?: string; sku?: string; blank?: string; color?: string; size?: string; printType?: string; variant?: string; qty?: number }) {
