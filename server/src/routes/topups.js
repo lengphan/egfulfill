@@ -98,6 +98,11 @@ export function topupsRoutes(app, requireAuth) {
    * 'abandoned', not deleted — the virtual account stays live and vietqr.js still settles an
    * abandoned ref if the money turns up late.
    */
+  /* The seller's own "stop showing me this". Added at route load like every other late
+     column here — schema.sql only runs on a first DB init, so an existing deployment
+     would never see it otherwise. */
+  q('alter table topup_requests add column if not exists dismissed_at timestamptz').catch(() => {});
+
   async function ageOutStale() {
     await q(`update topup_requests set status='abandoned'
               where method='VietQR' and status='pending'
@@ -139,7 +144,7 @@ export function topupsRoutes(app, requireAuth) {
      * not rubbish — it is a payment they can still make. It just isn't anyone else's work.
      */
     const r = await q(
-      'select * from topup_requests where seller_id=$1 order by created_at desc limit 100',
+      'select * from topup_requests where seller_id=$1 and dismissed_at is null order by created_at desc limit 100',
       [req.user.sub]);
     return r.rows;
   });
@@ -197,6 +202,53 @@ export function topupsRoutes(app, requireAuth) {
 
   // Admin/staff reject a top-up (e.g. money never arrived) → status flips to 'rejected'
   // (NO credit). The seller's wallet reads this and shows the row as Rejected.
+  /**
+   * THE SELLER WITHDRAWS THEIR OWN REQUEST.
+   *
+   * A top-up they said they would send and then didn't — because they paid another way, or
+   * changed their mind — had no ending. VietQR has one (the dialog abandons its own ref on
+   * close, with a 30-minute age-out behind it), but a manual transfer has neither: it sits
+   * on their wallet page as pending forever, and the only two routes that could end it are
+   * Confirm and Reject, both staff-only. So the seller was left looking at a row about
+   * their own money that nobody but an admin could clear.
+   *
+   * 'abandoned', NOT 'rejected'. Rejected is a judgement staff made after reading a
+   * receipt, and it is the word the seller would then see against a request nobody ever
+   * looked at. Abandoned is the same word the closed-QR path already uses, and it is
+   * accurate: they withdrew it.
+   *
+   * ONLY THEIR OWN, and only while pending — a request already confirmed has moved money,
+   * and one already rejected has been answered.
+   *
+   * MANUAL TRANSFERS ARE DELIBERATELY NOT AGED OUT to match. A bank transfer can land days
+   * later and ageOutStale exists because a VietQR ref keeps settling regardless; expiring a
+   * manual request on a timer would hide real money somebody actually sent.
+   */
+  app.post('/api/topups/:id/withdraw', { preHandler: requireAuth }, async (req, reply) => {
+    /*
+     * DISMISSED, NOT DELETED, and that distinction is the whole reason for a column.
+     *
+     * An abandoned VietQR ref is still LIVE — vietqr.js settles it if the money turns up
+     * tomorrow — so the row cannot be thrown away or the payment would land with nothing to
+     * credit. What the seller is asking for is not "delete this", it is "stop showing me
+     * this". `dismissed_at` says exactly that and nothing more: the row survives, the ref
+     * survives, and the list stops carrying it.
+     *
+     * A still-pending request is also marked abandoned on the way out, because dismissing
+     * one IS withdrawing it. Rejected stays a staff word.
+     */
+    const r = await q(
+      `update topup_requests
+          set dismissed_at = now(),
+              status = case when status='pending' then 'abandoned' else status end
+        where id=$1 and seller_id=$2 and status in ('pending','abandoned')
+        returning *`,
+      [req.params.id, req.user.sub]
+    );
+    if (!r.rows[0]) { reply.code(404); return { error: 'Not found, not yours, or already settled.' }; }
+    return r.rows[0];
+  });
+
   app.post('/api/topups/:id/reject', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
     const r = await q(

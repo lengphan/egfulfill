@@ -689,6 +689,12 @@ export function confirmTopup(id: string, fee?: number) {
   return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/confirm`,
     { method: "POST", body: JSON.stringify({ fee: fee && fee > 0 ? fee : 0 }) })
 }
+/** The seller withdrawing their OWN pending request — 'abandoned', not 'rejected', because
+ *  nobody judged it. See the note on the route: a manual transfer otherwise had no ending. */
+export function withdrawTopup(id: string) {
+  return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/withdraw`, { method: "POST" })
+}
+
 export function rejectTopup(id: string) {
   return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/reject`, { method: "POST" })
 }

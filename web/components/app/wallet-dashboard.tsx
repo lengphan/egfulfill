@@ -3,7 +3,7 @@
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { labelRail } from "@/lib/payment-method"
-import { Plus, DownloadSimple } from "@phosphor-icons/react"
+import { Plus, DownloadSimple, X } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
 import { PayoutDialog } from "@/components/app/payout-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -23,7 +23,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ActionsPortal, useActionNode } from "@/components/app/console-shell"
 import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
-import { getCashAccounts, attributeLedgerEntry, type CashAccount, markLedgerTest, getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
+import { getCashAccounts, attributeLedgerEntry, type CashAccount, markLedgerTest, getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, withdrawTopup, getPayoutRequests, payPayout, rejectPayout, type LedgerRow, type WalletSummary, type TopupRequest, type PayoutRequest } from "@/lib/api"
 import { BillingView } from "@/components/app/billing-view"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -365,6 +365,8 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
    * when someone adds an account, not while reading a ledger. */
  const [accounts, setAccounts] = useState<CashAccount[]>([])
  const [pending, setPending] = useState<TopupRequest[]>([])
+  /* Which row is being cleared, so its own button greys rather than the whole list. */
+ const [dismissing, setDismissing] = useState<string | null>(null)
   // Kept so the attempt is still on the record — a rejected top-up never touches the
   // ledger, so without this it would disappear from the app entirely once it left the
   // banner, and "I definitely tried to pay" would have nothing behind it.
@@ -411,6 +413,19 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
   // is nothing to withdraw from it and no bank/card account to link, so those controls are
   // hidden for them. Sellers keep Withdraw, which now opens the payout flow.
    const isFactoryWallet = getUser()?.role === "admin"
+
+ /* Dismiss, never delete — the ref stays live and a late payment still credits. The row
+     is dropped locally as well as refetched, so it goes on the click rather than on the
+     round trip. */
+ const dismissTopup = async (id: string) => {
+ setDismissing(id)
+ try {
+ const r = await withdrawTopup(String(id))
+ if (r?.error) throw new Error(r.error)
+ setPending((prev) => prev.filter((x) => String(x.id) !== String(id)))
+    } catch { /* left in place; the next refresh is the correction */ }
+ finally { setDismissing(null) }
+  }
 
  const refresh = useCallback(() => {
     // Signed in → the real server balance (server-authoritative), or zeros if empty.
@@ -691,9 +706,31 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                         {p.method || tl("wallet", "Top-up")}{p.ref ? ` · ${p.ref}` : ""} · {fmtDate(p.created_at, { month: "short", day: "numeric" })}
                       </span>
                     </div>
-                    <span className={"font-semibold tabular-nums " + (rejected ? "text-muted-foreground line-through" : "text-foreground")}>
-                      {usd(Number(p.amount_usd) || 0, true)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={"font-semibold tabular-nums " + (rejected ? "text-muted-foreground line-through" : "text-foreground")}>
+                        {usd(Number(p.amount_usd) || 0, true)}
+                      </span>
+                      {/* A ROW YOU ARE NEVER GOING TO PAY NEEDS AN ENDING.
+                          VietQR abandons its own ref when the dialog closes and ages out
+                          after thirty minutes, but the row stays visible on purpose — the
+                          ref is still live, so it is a payment they can still make. A manual
+                          transfer had no ending at all: Confirm and Reject are both staff,
+                          so a seller was left looking at their own money with no way to
+                          clear it. This dismisses; it never deletes, because a late payment
+                          still has to find its row. */}
+                      {!rejected && (
+                        <button
+                          type="button"
+                          onClick={() => void dismissTopup(p.id)}
+                          disabled={dismissing === p.id}
+                          title={tl("wallet", "Remove this from the list — a late payment is still credited")}
+                          aria-label={tl("wallet", "Remove this top-up from the list")}
+                          className="eg-tap shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-alert/10 hover:text-alert focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                        >
+                          <X size={13} weight="bold" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )
               })}
