@@ -276,10 +276,9 @@ function TiktokFields({ dest, fields, onChange }: {
   }, [fields.categories, fields.query])
 
  return (
-    <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-      <div className="eg-label text-muted-foreground">
-        {dest.shop_name} needs
-      </div>
+    /* NO HEADING. It read "OLVERA-TEES needs" directly beneath the row that already
+       says OLVERA-TEES — the shop's name printed twice, a centimetre apart. */
+    <div className="space-y-3 rounded-lg border border-border bg-card p-3">
       {fields.loadErr && <p className="text-xs text-destructive">{fields.loadErr}</p>}
 
       {/* Leaf category — required. Search then pick from the tree. */}
@@ -679,7 +678,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * Defaults to draft, and resets to draft on nothing: an unticked box is the safe state,
    * so a seller can never go live by not noticing a control.
    */
- const [goLive, setGoLive] = useState(false)
+  /* (`goLive` state is gone. It existed to hold the radio pair's answer between the
+     choice and the press; the two are one gesture now, so the value is the argument
+     `publish` is called with and nothing has to remember it.) */
   /** Per-shop TikTok fields, keyed by connection_id — see TtFields. */
  const [tt, setTt] = useState<Record<string, TtFields>>({})
   /** What happened at each shop, keyed by connection_id. Survives a retry so a shop that
@@ -1028,7 +1029,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * TikTok-only requirements. The server is DRY-RUN until its TIKTOK_PUBLISH_LIVE flag is
    * set, so a dry run comes back with the assembled payload rather than a live product.
    */
- const publishToTiktokShop = async (d: PublishDestination): Promise<Outcome> => {
+ const publishToTiktokShop = async (d: PublishDestination, goLive: boolean): Promise<Outcome> => {
  const f = tt[d.connection_id] ?? TT_EMPTY
     // Guarded here as well as in publish(): TikTok's create call has no meaning without a
     // leaf category, so this function must not be able to send one without it.
@@ -1114,7 +1115,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * verbatim rather than folded into "publish failed", because the fix (reconnect the shop)
    * is not one anybody would guess.
    */
- const publishToShopifyStore = async (d: PublishDestination): Promise<Outcome> => {
+ const publishToShopifyStore = async (d: PublishDestination, goLive: boolean): Promise<Outcome> => {
  try {
  const r = await publishShopify({
  connection_id: d.connection_id,
@@ -1156,7 +1157,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     }
   }
 
- const publishToEtsyShop = async (d: PublishDestination): Promise<Outcome> => {
+ const publishToEtsyShop = async (d: PublishDestination, goLive: boolean): Promise<Outcome> => {
  try {
  const r = await publishEtsy({
  connection_id: d.connection_id,
@@ -1399,7 +1400,16 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
     }).catch(() => {})
   }
 
- const publish = async () => {
+  /**
+   * THE CHOICE IS AN ARGUMENT, not state read at send time.
+   *
+   * Draft-or-live used to be a radio pair above, so `goLive` was settled long before the
+   * press and every sender could close over it. It is the BUTTON now — and
+   * `setGoLive(v); publish()` would send the previous value, because the senders' closures
+   * capture the render they were created in. Threaded explicitly instead, which is also the
+   * honest shape: what this run does is decided by which button was pressed.
+   */
+ const publish = async (goLive: boolean) => {
  if (!title.trim() || !priceReady) {
       // Say WHICH is missing, and — when it's the price — name the two ways to supply it,
       // because "a retail price is required" on a screen where every size shows a price is
@@ -1445,10 +1455,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
       }
  setOutcomes((o) => ({ ...o, [cid]: { state: "running", text: "Publishing…" } }))
  const out = d.platform === "etsy"
-        ? await publishToEtsyShop(d)
+        ? await publishToEtsyShop(d, goLive)
  : d.platform === "tiktok"
-          ? await publishToTiktokShop(d)
- : await publishToShopifyStore(d)
+          ? await publishToTiktokShop(d, goLive)
+ : await publishToShopifyStore(d, goLive)
  setOutcomes((o) => ({ ...o, [cid]: out }))
     }
  setBusy(false)
@@ -2038,10 +2048,10 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                     {dests.map((d) => {
  const on = picked.includes(d.connection_id)
  return (
+                        <div key={d.connection_id} className={on ? "rounded-lg bg-primary/5" : ""}>
                         <label
- key={d.connection_id}
  className={"flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors " +
-                            (on ? "bg-primary/5 text-primary" : "hover:bg-muted/60")}
+                            (on ? "text-primary" : "hover:bg-muted/60")}
                         >
                           <input
  type="checkbox"
@@ -2079,81 +2089,55 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                               : null
                           })()}
                         </label>
+                        {/* WHAT THIS SHOP NEEDS, UNDER THIS SHOP.
+                            It sat a screenful below, after the draft/live choice, under a
+                            heading that repeated the shop's own name — so a panel about
+                            OLVERA-TEES was nowhere near the row where OLVERA-TEES was
+                            ticked, and the rail was long enough that ticking a TikTok shop
+                            looked like it had done nothing.
+
+                            COLLAPSED BY DEFAULT once it is complete, open while anything is
+                            missing: the fields are only interesting when they are wrong, and
+                            a summary that says what is outstanding is shorter than the form
+                            and tells you whether you need it. `<details>` because that is
+                            what the three other collapsibles in this app already are. */}
+                        {on && d.platform === "tiktok" && (() => {
+                          const missing = missingFor(d)
+                          return (
+                            <details open={missing.length > 0} className="px-2 pb-2">
+                              <summary className="cursor-pointer list-none text-xs text-muted-foreground marker:content-none">
+                                <span className="underline-offset-2 hover:underline">
+                                  {missing.length
+                                    ? `Needs ${missing.join(", ")}`
+                                    : tl("publish", "Shipping and category — set")}
+                                </span>
+                              </summary>
+                              <div className="pt-2">
+                                <TiktokFields
+ dest={d}
+ fields={tt[d.connection_id] ?? TT_EMPTY}
+ onChange={(patch) => setTt((m) => ({ ...m, [d.connection_id]: { ...(m[d.connection_id] ?? TT_EMPTY), ...patch } }))}
+                                />
+                              </div>
+                            </details>
+                          )
+                        })()}
+                        </div>
                       )
                     })}
                   </div>
                 )}
               </div>
 
-              {/* DRAFT OR LIVE — asked once, for every shop ticked above.
-                  Two radio rows rather than a "publish live" checkbox: a checkbox states one
- option and leaves the other implied, and the implied one here is the one
- that puts a product in front of buyers. Both outcomes are written down, and
- the sentence under each says what actually happens rather than what it is
- called, because "draft" means a slightly different thing in each of the
- three admins this can reach. */}
-              {dests !== null && dests.length > 0 && (
-                <div className="space-y-1">
-                  <span className="eg-label text-muted-foreground">{tl("publish", "When it’s created")}</span>
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    {[
-                      { live: false, label: tl("publish", "Save as draft") },
-                      { live: true, label: tl("publish", "Publish live") },
-                    ].map((o) => (
-                      <label
- key={o.label}
-                        /* ONLY THE CHOSEN ONE IS DRAWN.
-                           Both cards carried a border, so the unpicked one was outlined in
-                           `--border` — a warm taupe from the base palette — sitting directly
- beside a periwinkle-tinted card. Two lines in two unrelated hues,
- a centimetre apart, which is what reads as muddy: the eye sees a
- colour decision where none was made.
-                           A ring rather than a border on the selected one, so the two states
- are the same size and nothing shifts by a pixel when you switch. */
-                        /* THE PANEL IS THE CONTROL. No dot, no sentence under it — the two
- labels already say the whole difference, and a radio beside a
- tinted panel states the same fact twice.
-                           The input stays, visually hidden: it is what makes this a real
- radio group for the keyboard and a screen reader, and the ring
- follows its focus so tabbing is still visible. */
- className={"flex cursor-pointer items-center justify-center rounded-lg px-2.5 py-2.5 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring " +
-                          (goLive === o.live ? "bg-primary/5 ring-1 ring-primary/60" : "hover:bg-muted/60")}
-                      >
-                        <input
- type="radio"
- name="publish-state"
- checked={goLive === o.live}
- onChange={() => { setResult(null); setGoLive(o.live) }}
- className="sr-only"
-                        />
-                        <span className={"font-medium " + (goLive === o.live ? "text-primary" : "text-foreground")}>{o.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {/* Etsy is the one that can say yes to the button and no to the listing, and
- it is worth saying so BEFORE the publish rather than only in the outcome:
-                      Etsy will not take a listing live without a photo, and photos are uploaded
- after the listing exists. */}
-                  {goLive && pickedDests.some((d) => d.platform === "etsy") && (
-                    <p className="text-2xs text-muted-foreground">
-                      {tl("publish", "Etsy activates after the photos upload — if it refuses, the listing stays a draft and we’ll say why.")}
-                    </p>
-                  )}
-                </div>
-              )}
+              {/* THE DRAFT-OR-LIVE RADIO PAIR IS GONE — it is the BUTTON now.
+                  Two tinted panels asked the question, then a third button carried it out,
+                  so the decision and the act were separate gestures with a long panel of
+                  TikTok fields between them. Two buttons at the foot say the same thing in
+                  the place you were already going to press. */}
 
-              {/* ONE BLOCK PER TICKED TIKTOK SHOP. A category tree is read against a shop's
- cipher and a warehouse belongs to one shop, so two TikTok shops get two
- sets of fields rather than one shared set that would be wrong for one of
- them. Etsy and Shopify rows expand to nothing — ticking them adds no work. */}
-              {pickedDests.filter((d) => d.platform === "tiktok").map((d) => (
-                <TiktokFields
- key={d.connection_id}
- dest={d}
- fields={tt[d.connection_id] ?? TT_EMPTY}
- onChange={(patch) => setTt((m) => ({ ...m, [d.connection_id]: { ...(m[d.connection_id] ?? TT_EMPTY), ...patch } }))}
-                />
-              ))}
+              {/* The per-shop TikTok fields moved UNDER THE SHOP ROW that needs them —
+                  see the shop list above. They were down here, a screenful below the tick
+                  that summoned them, under a heading repeating the shop's own name. */}
 
 
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
@@ -2187,24 +2171,37 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
               {/* IP warning — only for the competitor's OWN photos, and only until the
  seller acknowledges it. Publishing someone else's images to your shop can
  get a listing pulled and, repeated, put the shop at risk. */}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={leave}>{tl("publish", "Cancel")}</Button>
-                {/* The label says what will actually happen. "Publish draft" over four ticked
- shops understates it, and after a partial failure the button's job has
- changed to retrying only what failed — which the label has to admit, or
- it reads as "publish everything again" and nobody presses it. */}
-                {/* ONE WORD, AND A GUARD.
-                    The shops are ticked directly above, so "to 3 shops" repeated a list the
- eye had just read, and the shop glyph decorated a button whose position
- and colour already say what it is.
-                    What the label MUST still carry is the difference between a first send and
- a second one: publishing again over shops that already took the listing
- creates a DUPLICATE in each of them, and that is not something to discover
- afterwards. So the word changes with the state — Retry after a partial
- failure, Reupload once anything has gone out. */}
-                <Button onClick={publish} disabled={busy || !dests?.length}>
+              {/* THREE BUTTONS, AND THE CHOICE IS THE PRESS.
+                  Draft-or-live was two tinted panels near the top of the rail, then Publish
+                  at the bottom — a decision made in one place and carried out in another,
+                  with a screenful between them, and nothing at the button to say which way
+                  it had been set. The two outcomes are the two buttons now.
+
+                  A HIERARCHY, not a palette (§4): live is what this screen is FOR, so it is
+                  the filled one; draft is a real but secondary action; Cancel is minor. And
+                  the words still change with the state — publishing again over a shop that
+                  already took the listing creates a DUPLICATE, which is not something to
+                  discover afterwards. */}
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="ghost" onClick={leave}>{tl("publish", "Cancel")}</Button>
+                <Button variant="outline" onClick={() => publish(false)} disabled={busy || !dests?.length}>
+                  {tl("publish", "Save as draft")}
+                </Button>
+                <Button
+ onClick={() => publish(true)}
+ disabled={busy || !dests?.length}
+                  /* ON THE BUTTON, NOT UNDER IT. Etsy is the one that can say yes to the
+                     press and no to the listing — it will not take a listing live without a
+                     photo, and photos upload after the listing exists. That was a paragraph
+                     beneath the controls, which §4 calls a defect, and it appeared whether or
+                     not you were going live: it is only true of THIS button. A caveat about
+                     one control belongs in that control's title. */
+ title={pickedDests.some((d) => d.platform === "etsy")
+                    ? tl("publish", "Etsy activates after the photos upload — if it refuses, the listing stays a draft and we’ll say why.")
+ : undefined}
+                >
                   {busy && <CircleNotch size={15} className="animate-spin" />}
-                  {anyFailed ? tl("publish", "Retry") : anyPublished ? tl("publish", "Reupload") : tl("publish", "Publish")}
+                  {anyFailed ? tl("publish", "Retry live") : anyPublished ? tl("publish", "Reupload live") : tl("publish", "Publish live")}
                 </Button>
               </div>
               {/* THE STANDING PARAGRAPH IS GONE.
