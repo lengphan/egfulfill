@@ -4311,8 +4311,6 @@ const vi: Dict = {
   "designMaker.Print quality: good": "Chất lượng in: tốt",
   "designMaker.Print quality: usable": "Chất lượng in: dùng được",
   "designMaker.Print quality: too low": "Chất lượng in: quá thấp",
-  "designMaker.Low resolution": "Độ phân giải thấp",
-  "canvas.Low resolution": "Độ phân giải thấp",
   "designer.Incoming": "Mới về",
   "designer.In review": "Đang duyệt",
   "designer.Status": "Trạng thái",
