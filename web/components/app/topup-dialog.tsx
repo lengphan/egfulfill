@@ -216,24 +216,29 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
                   for this request alone, the money can only arrive there, and the callback
                   now matches on it as well as on the reference. The QR carries both, so a
                   scan cannot get either wrong. */}
-              {/* TWO HALVES, AND ONLY ONE IS OURS. VietQR prepends its virtual-account code
-                  to whatever we send, so the line is long whatever we do — but the part a
-                  person needs to recognise is "TOPUP EG000001", and printing both at the
-                  same weight buried it in sixteen characters of routing. Theirs is muted,
-                  ours is ink. The value copied or typed is still the WHOLE string: whether
-                  VietQR needs its own prefix to match the transfer is their behaviour, not
-                  ours, and dropping it would gamble a payment on an assumption. */}
-              <div className="flex items-start justify-between gap-3 py-1">
+              {/**
+                * THE REFERENCE, AND NOTHING ELSE.
+                *
+                * VietQR prepends a sixteen-character virtual-account code to the content it
+                * generates. It is theirs, it is in the QR, and a person scanning never types
+                * any of it — so the only reader of this row is somebody entering the transfer
+                * by hand, and what they need is the shortest string that identifies the
+                * payment. That is "TOPUP EG000001".
+                *
+                * IT IS SAFE TO DROP because the money is routed by the ACCOUNT above, which
+                * is virtual and issued for this request alone, and the callback now matches
+                * on it as well as on the reference. Neither half of that depends on VietQR's
+                * own prefix surviving a retype.
+                *
+                * The full string stays on the row's title for support, and the QR is
+                * untouched — a scan still sends exactly what VietQR generated.
+                */}
+              <div className="flex items-start justify-between gap-3 py-1" title={payment.content || undefined}>
                 <dt className="shrink-0 text-xs text-muted-foreground">{tl("topup", "Description")}</dt>
                 <dd className="min-w-0 break-all text-right text-xs font-medium">
-                  {(() => {
- const full = String(payment.content || payment.note || "")
- if (!full.trim()) return <span className="text-hold">{tl("topup", "Description not returned")}</span>
- const mine = payment.note ? full.slice(full.indexOf(payment.note)) : ""
- const theirs = mine ? full.slice(0, full.length - mine.length) : ""
- if (!mine) return full
- return (<><span className="font-normal text-muted-foreground">{theirs}</span>{mine}</>)
-                  })()}
+                  {payment.note
+                    ? `TOPUP ${payment.note}`
+                    : <span className="text-hold">{tl("topup", "Description not returned")}</span>}
                 </dd>
               </div>
             </dl>
