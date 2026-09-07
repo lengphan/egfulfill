@@ -15,6 +15,7 @@ import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/li
 import { sellerNav, allowedByPerms } from "@/lib/nav"
 import { getMyAccess } from "@/lib/api"
 import { LowBalanceBanner } from "@/components/app/low-balance-banner"
+import { ChatLauncher } from "@/components/app/chat-launcher"
 
 // The (app) shell is role-aware: sellers see the seller Sidebar; staff who may use a page
 // (per their role — admin all, operator/warehouse a curated set, designer none) see the
@@ -102,6 +103,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <PageTransition>{children}</PageTransition>
           </main>
         </div>
+        {/* The conversation, on every page — see chat-launcher.tsx. It hides itself on
+            /chat, so this is safe to mount unconditionally. */}
+        <ChatLauncher />
       </div>
       </ConfirmProvider>
     )
@@ -123,6 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
+      <ChatLauncher />
     </div>
     </ConfirmProvider>
   )

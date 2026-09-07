@@ -502,7 +502,7 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
 
               {/* Weight always — it is the one thing no package can tell us. */}
               <div className="flex flex-wrap items-end gap-2">
-                <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">{tl("label", "Weight lb")}</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
+                <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground" title={tl("label", "Postage is quoted against this. The carrier re-weighs the parcel and bills the difference.")}>{tl("label", "Weight lb")}</span><Input type="number" min={0} value={pkg.lb} onChange={(e) => { setPkg({ ...pkg, lb: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 <label className="flex w-20 flex-col gap-1"><span className="text-2xs text-muted-foreground">oz</span><Input type="number" min={0} value={pkg.oz} onChange={(e) => { setPkg({ ...pkg, oz: Math.max(0, Number(e.target.value) || 0) }); invalidateRates() }} className="h-9" /></label>
                 {/* The mailer's own size, stated rather than sitting in three boxes nobody
  needs to touch — five cramped inputs in a row was the "weird" part. */}

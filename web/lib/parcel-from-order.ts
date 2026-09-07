@@ -80,39 +80,34 @@ export function parcelFromOrder(items: OrderItem[] | undefined, catalog: Catalog
 }
 
 /**
- * WHERE THE NUMBERS CAME FROM — and it must speak loudest when it knows least.
+ * WHERE THE NUMBERS CAME FROM — and ONLY when that is a problem.
  *
- * It returned NULL when nothing was known, which is precisely the case worth a sentence:
- * parcelFromOrder gives up when no line has a weight, the dialog keeps its stock mailer, and
- * a figure nobody measured is bought as though somebody had. That is what a carrier
- * correction is made of — USPS weighs the parcel days later and bills the band it actually
- * fell in ($1.65 on a $6.24 label, on one we declared at 6 oz and they weighed at a pound).
+ * This used to speak in every state, in two or three lines. The confirming one ("From the 2
+ * products in this order. Adjust if the pack differs.") is prose under a control that has
+ * nothing to report: the figures are right, they are already on screen, and the sentence
+ * pushed the actual controls down a row on every label anyone bought. It is gone — silence
+ * is what "we measured this" looks like.
  *
- * `tone` is for the caller to paint with, because "assumed" and "measured" must not look
- * alike on a control that spends money.
+ * What survives is the two states that cost money, cut to one short line each. The detail
+ * they used to carry — that the carrier re-weighs and bills the difference — belongs in the
+ * field's own `title`, not under it (CLAUDE.md §4).
+ *
+ * `tone` stays so the caller can paint it, and is now always "warn": nothing else speaks.
  */
 export function parcelBasisNote(g: ParcelGuess | null, itemCount = 0, shownOz = 0): { text: string; tone: "warn" | "info" } | null {
   if (!g) {
     if (!itemCount) return null
-    /* IT NAMES THE FIGURE IT IS TALKING ABOUT. This opened "No weight is recorded for
-       anything on this order" while a weight sat in the field two lines above it, so the
-       note read as contradicting the screen and the honest reading — that the number is the
-       mailer's, not the parcel's — was the one nobody took. */
+    /* IT NAMES THE FIGURE IT IS TALKING ABOUT. Opening with "nothing is weighed" while a
+       weight sits in the field two lines above reads as contradicting the screen; the
+       honest reading is that the number is the mailer's, not the parcel's. */
     return {
       tone: "warn",
-      text: `${shownOz > 0
-        ? `The ${shownOz} oz above is the stock mailer, not this order — nothing on it has a weight recorded.`
-        : "Nothing on this order has a weight recorded."} Weigh it, or set the weight on the product — the carrier re-weighs it later and bills the difference.`,
+      text: shownOz > 0 ? `${shownOz} oz is the stock mailer, not this order` : "Nothing on this order is weighed",
     }
   }
   if (g.unknown > 0) {
-    return {
-      tone: "warn",
-      text: `From ${g.known} of ${g.known + g.unknown} items — the rest have no size recorded, so this is under-declared. Check it before buying.`,
-    }
+    return { tone: "warn", text: `Weighed from ${g.known} of ${g.known + g.unknown} items — under-declared` }
   }
-  return {
-    tone: "info",
-    text: `From the ${g.known === 1 ? "product" : `${g.known} products`} in this order. Adjust if the pack differs.`,
-  }
+  // Everything is known. Nothing to say.
+  return null
 }

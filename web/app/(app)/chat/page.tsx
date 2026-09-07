@@ -13,6 +13,7 @@ import { Markdown, hasMarkdown } from "@/components/app/markdown"
 import { SupportHoursEditor } from "@/components/app/support-hours-editor"
 import { GenerateButton, AnimateImageButton, EditImageButton, type GenSettings } from "@/components/app/generate-menu"
 import { promptWarning } from "@/lib/image-gen"
+import { buildRail, pinnedChannelIds, STAFF_CHANNEL, type Convo } from "@/lib/chat-rail"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -28,20 +29,9 @@ const SUGGESTIONS = [
   "How do I connect my Etsy shop?",
 ]
 
-// A conversation in the left rail. Channels fan out on ONE dimension — seller identity.
-// Everything else is a single room, so the rail has a fixed height no matter how many
-// orders are open. Per-order talk now rides inside a channel as an order_ref chip; it
-// used to spawn a room per order (plus a second `design-<id>` room), which buried the
-// real conversations under dozens of empty ones.
-type Convo = {
- id: string; kind: "support" | "staff" | "inbox" | "announce" | "gen"; title: string; sub: string
- escalated?: boolean
-  /** Incoming messages since our last reply — the unread badge. Zero once answered, which
-   * is how every other messenger behaves: the badge is a to-do, not a size. */
- count?: number
-}
-const STAFF_CHANNEL = "staff-general"
-const ANNOUNCE_CHANNEL = "announce"
+// The rail's shape — the row type, the channel ids and the builder — lives in
+// lib/chat-rail.ts, because the floating launcher on every other page draws the same list
+// and a second copy of it would disagree quietly (CLAUDE.md §5).
 
 // One "@" suggestion — either a teammate (mentioning them notifies) or an order to tag.
 type MentionItem = { kind: "order"; o: OrderRow } | { kind: "person"; p: MentionPerson }
@@ -237,68 +227,9 @@ export default function ChatPage() {
  return () => { alive = false; clearTimeout(id) }
   }, [isStaffUser, isDesigner])
 
- const convos = useMemo<Convo[]>(() => {
- const list: Convo[] = []
-    /*
-     * The newest message stands in for the subtitle; an empty room says so, because a blank
-     * line beside a title reads as a row that failed to load rather than one nobody has used.
-     *
-     * "Attachment" is the SERVER's word for a message that is a file and nothing else (see
-     * the channel-summary query) — the one string in this rail we do not author here. It is
-     * matched exactly and translated, so a Vietnamese seller does not get one English row
-     * among Vietnamese ones. It used to carry a 📎 as well.
-     */
-    const lastLine = (last?: string) =>
-      !last ? tl("chat", "No messages yet") : last === "Attachment" ? tl("chat", "Attachment") : last
- const pin = (c: Convo): Convo => {
- const m = chanMeta[c.id]
- return { ...c, sub: lastLine(m?.last), count: m?.unread || 0 }
-    }
-    /*
-     * A PINNED ROW READS LIKE EVERY OTHER ROW.
-     *
-     * These four carried a fixed subtitle — "All boards — production & artwork", "Your AI
-     * assistant" — which is a description of the room, not news from it. Sitting directly
-     * above seller threads that show their newest message, the effect was that the rooms
-     * with the most traffic in them were the only ones that never looked like anything had
-     * happened. `pin()` gives them the same two facts a seller row carries: what was said
-     * last, and how much of it you haven't seen (see chanMeta).
-     */
- if (isStaffUser) list.push(pin({ id: STAFF_CHANNEL, kind: "staff", title: tl("chat", "EG Channel"), sub: "" }))
- if (supportId) list.push(pin({ id: supportId, kind: "support", title: isStaffUser ? tl("chat", "My Assistant") : tl("chat", "EGFUL Support"), sub: "" }))
-    /*
-     * GENERATIONS — the account's own channel, so AI images stop arriving in the middle of a
-     * support conversation staff are reading. Listed only when the server says this account
-     * has one (it names the id: a team member cannot derive their owner's account id).
-     */
-
-    // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
- if (!isDesigner) list.push(pin({ id: ANNOUNCE_CHANNEL, kind: "announce", title: tl("chat", "Announcements"), sub: "" }))
-    /**
-     * NEWEST MESSAGE FIRST, under the pinned channels.
-     *
-     * Escalated threads were floated to the top, on the argument that an explicit request
-     * for a human should not be buried. In an inbox someone is WORKING, it buries the thing
-     * they are actually mid-sentence with: a reply arrives, the row does not move, and the
-     * conversation you were in sits below two older ones that carry a flag. The flag is
-     * still on the row and still legible — "Needs a human" — which is what makes it
-     * findable without also making it the sort.
-     *
-     * The server already returns `last_at desc`; this sorts explicitly rather than relying
-     * on it, so the rail cannot quietly change meaning if that query is ever reordered.
-     */
- if (isStaffUser) for (const t of [...inbox].sort((a, b) => (b.last_at || 0) - (a.last_at || 0))) {
- if (t.order_id === supportId) continue // don't list my own thread twice
- list.push({
- id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
- sub: t.last ? lastLine(t.last).slice(0, 40) : tl("chat", "Support request"), escalated: !!t.escalated, count: t.unanswered ?? 0,
-      })
-    }
-    // Channels opened from the directory that have no messages yet, so they don't
-    // vanish from the rail the moment you click one.
- for (const c of opened) if (!list.some((x) => x.id === c.id)) list.push(c)
- return list
-  }, [isStaffUser, isDesigner, supportId, inbox, opened, chanMeta, tl])
+ const convos = useMemo<Convo[]>(
+ () => buildRail({ staff: isStaffUser, designer: isDesigner, supportId, inbox, chanMeta, opened, tl }),
+    [isStaffUser, isDesigner, supportId, inbox, chanMeta, opened, tl])
 
   // Filtered rail. Searching only narrows what's already there; sellers who have
   // never written in come from the directory below, not from this list.
@@ -535,11 +466,9 @@ export default function ChatPage() {
    * and this count are two different requests on two different timers, so the badge on the
    * room you are looking at would otherwise sit there for up to a poll interval.
    */
- const pinnedIds = useMemo(() => [
-    ...(isStaffUser ? [STAFF_CHANNEL] : []),
-    ...(supportId ? [supportId] : []),
-    ...(isDesigner ? [] : [ANNOUNCE_CHANNEL]),
-  ], [isStaffUser, isDesigner, supportId])
+ const pinnedIds = useMemo(
+ () => pinnedChannelIds({ staff: isStaffUser, designer: isDesigner, supportId }),
+    [isStaffUser, isDesigner, supportId])
 
  const refreshChanMeta = useCallback(() => {
  if (!pinnedIds.length || !getToken()) return

@@ -8,6 +8,7 @@ import { useRailCollapsed } from "@/lib/rail"
 import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { TopBar } from "@/components/app/topbar"
+import { ChatLauncher } from "@/components/app/chat-launcher"
 import { CommandPalette } from "@/components/app/command-palette"
 import { getUser, getToken } from "@/lib/auth"
 import { STAFF_ROLES, staffNav, landingFor } from "@/lib/staff-nav"
@@ -63,6 +64,10 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
             no per-page opt-out. See app/globals.css. */}
         <main className="eg-content mx-auto px-4 py-5 md:px-10 md:py-8">{children}</main>
       </div>
+      {/* Boards are their own shell (see the note on StaffSidebar above), so the launcher
+          has to be mounted here too — wiring it into app-shell alone left every board
+          without it, which is where staff actually spend the day. */}
+      <ChatLauncher />
     </div>
     </ConfirmProvider>
   )
