@@ -120,6 +120,13 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // matching on sku alone — and two lines of the same sku are different jobs, so a second
   // line either silently reused the first card or duplicated it. See CLAUDE.md §5.
   q('alter table design_cards add column if not exists line_id text').catch(() => {});
+  /* AND REPAIR WHAT THE ASSIGN PATH ALREADY WROTE. Until the fix above, assigning a card
+     with no line stored `''` rather than NULL, which collapses every such card on an order
+     onto one design-status key — so the cards are on the board and the order says nothing.
+     Fixing the write does not un-break a card sent last week, and this is the only place
+     that runs on every deploy. Idempotent and a no-op once clean. */
+  q("update design_cards set line_id = null where line_id = ''").catch(() => {});
+  q("update design_cards set sku = null where sku = ''").catch(() => {});
   // Looked up per ORDER by the item dialog and the order page, so give it an index rather
   // than a sequential scan of the whole board on every order someone opens.
   q('create index if not exists design_cards_order_idx on design_cards (order_id)').catch(() => {});
@@ -377,8 +384,24 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
        card.title || null, card.art_hash || null, lineId || null]
     );
 
+    /**
+     * NULL, NOT AN EMPTY STRING — and the line two dozen above already knew that.
+     *
+     * `lineId` is `''` when the caller sent none, and this wrote that `''` straight into the
+     * column while the order_designs insert in the same function passed `lineId || null`.
+     * The two writes in one handler disagreed, and the empty string is the one that breaks:
+     * the design-status read keys rows on `coalesce('L:' || line_id, 'S:' || sku)`, and
+     * `'L:' || ''` is `'L:'` — not null — so EVERY line-less card on an order collapses to
+     * one key and `distinct on` keeps exactly one of them.
+     *
+     * Measured: two cards sent to the board from one order came back as one. The other line
+     * showed no chip at all, which reads as "this was never sent" on a line that was — and
+     * "Send to Board" stays pressable on it, one click from a duplicate job.
+     *
+     * `sku` gets the same treatment for the same reason: `bySku` is keyed on it.
+     */
     await q('update design_cards set order_id=$2, line_id=$3, sku=$4 where id=$1::bigint',
-      [String(card.id), orderId, lineId, sku]);
+      [String(card.id), orderId, lineId || null, sku || null]);
 
     audit(req, 'design.card.assigned', {
       entityType: 'design_card', entityId: String(card.id),

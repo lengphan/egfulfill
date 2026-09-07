@@ -479,11 +479,24 @@ export function orderRefundRoutes(app, requireAuth) {
      * cards on live orders. Same precedence the rest of the app uses: line beats sku, sku is
      * the legacy fallback.
      */
+    /*
+     * `nullif(…, '')` ON BOTH KEYS, and it is not defensive tidiness.
+     *
+     * An EMPTY line_id is not null, so `'L:' || line_id` is `'L:'` — a real value — and every
+     * line-less card on the order collapses onto that one key, where `distinct on` keeps
+     * exactly one and silently drops the rest. Two cards sent to the board came back as one;
+     * the other line showed no chip at all, which reads as "never sent" on a line that was.
+     *
+     * design_cards.js now writes NULL and repairs the rows it already wrote, so this is the
+     * belt to that braces: a read that cannot be broken by an empty string arriving from any
+     * path, present or future.
+     */
     const r = await q(
-      `select distinct on (coalesce('L:' || line_id, 'S:' || coalesce(sku,'')))
-              coalesce(sku,'') as sku, line_id, id, vendor, vendor_ref, col, updated_at
+      `select distinct on (coalesce('L:' || nullif(line_id,''), 'S:' || coalesce(nullif(sku,''),'')))
+              coalesce(nullif(sku,''),'') as sku, nullif(line_id,'') as line_id,
+              id, vendor, vendor_ref, col, updated_at
          from design_cards where order_id = $1
-        order by coalesce('L:' || line_id, 'S:' || coalesce(sku,'')), id desc`,
+        order by coalesce('L:' || nullif(line_id,''), 'S:' || coalesce(nullif(sku,''),'')), id desc`,
       [String(req.params.id)]
     ).catch(() => ({ rows: [] }));
     const shape = (c) => ({
