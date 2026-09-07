@@ -123,13 +123,33 @@ function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
       </span>
     )
   }
-  /* THE BUYER'S MONEY, OR A DASH. This printed `$0.00` on every manual order, which is the
-     one number it definitely was not — see revenueOf. */
+  /**
+   * WHAT THIS ORDER COSTS YOU — not what the buyer paid.
+   *
+   * This read `revenueOf`, the RETAIL price, and the manual order form stopped asking for one
+   * a while ago — so every manual order printed a dash in the column a seller reads to find
+   * out what they are about to be billed. The number they actually want was already on the
+   * row: attachCost puts it there, the LEDGER's figure once the order is charged and the live
+   * ladder before that.
+   *
+   * The estimate says it is one. Money that moved and a price nobody has paid are different
+   * claims, and a column that renders them identically is one you cannot trust either half of.
+   * Retail stays as the fallback for a marketplace order, which does carry a sale price.
+   */
  case "total": {
+ const c = o.cost == null ? null : Number(o.cost)
+ if (c == null || !isFinite(c)) {
  const r = revenueOf(o)
  return r == null
-      ? <span className="text-muted-foreground/60" title="No retail price recorded for this order">—</span>
-      : <span className="font-medium">{usd(r)}</span>
+        ? <span className="text-muted-foreground/60" title="Not priced yet — pick a blank on every line">—</span>
+        : <span className="font-medium">{usd(r)}</span>
+    }
+ return (
+      <span className="font-medium" title={o.cost_estimated ? "Estimated from today's prices — charged when you submit" : "Charged to your wallet"}>
+        {usd(c)}
+        {o.cost_estimated ? <span className="ml-1 text-2xs font-normal text-muted-foreground">est.</span> : null}
+      </span>
+    )
   }
  case "date": return <span className="text-muted-foreground">{fmtDate(o.created_at)}</span>
   }

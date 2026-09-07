@@ -41,8 +41,25 @@ const CHARGE_KINDS = [
   { type: 'order-charge', label: 'Production',         ref: (id) => id },
   { type: 'expedite',     label: 'Expedited Shipping', ref: (id) => `expedite-${id}` },
   { type: 'express-ship', label: 'Express shipping',   ref: (id) => `express-${id}` },
-  { type: 'design-fee',   label: 'Design service',     ref: (id) => `design-${id}` },
 ];
+/**
+ * THE DESIGN FEE, WHICH THIS FILE HAS NEVER SEEN.
+ *
+ * It was in the list above as `{ type: 'design-fee', ref: design-<id> }`, and BOTH halves
+ * were wrong. chargeDesign moves the money as `design-work` — so the factory's leg is
+ * `design-work-in`, and `design-fee-in` is a type nothing has ever written — and it books
+ * ONE ROW PER DESIGN, `design-<order>-<line>`, while the list above is matched on exact
+ * refs. Two misses, same row.
+ *
+ * The result was an order that under-reported what it had taken: a seller charged $43.18
+ * read "You paid $41.18", the $2 sitting in their statement with nothing on the order to
+ * explain it — and the refund allocator, which works from these same parts, could not give
+ * it back either.
+ *
+ * Prefix-matched like the adjustments and the file sales, because one order can carry
+ * several: two designs on two lines are two fees, each refundable on its own.
+ */
+const DESIGN_TYPE = 'design-work';
 // Design-file sales key on `orderId|sku`, so they're matched by prefix rather than
 // by an exact ref — one order can sell several files.
 const FILE_TYPES = ['emb-file', 'design-file'];
@@ -150,10 +167,14 @@ export async function orderCharges(orderId) {
   const refs = CHARGE_KINDS.map((k) => k.ref(id));
   const inTypes = CHARGE_KINDS.map((k) => k.type + '-in');
 
-  const [flat, files, fees, refunds] = await Promise.all([
+  const [flat, designs, files, fees, refunds] = await Promise.all([
     q(`select type, ref, delta, note, created_at from wallet_ledger
         where account='factory' and type = any($1) and ref = any($2) order by created_at`,
       [inTypes, refs]),
+    // One row per design, keyed `design-<order>-<line>` — see the note on DESIGN_TYPE.
+    q(`select type, ref, delta, note, created_at from wallet_ledger
+        where account='factory' and type=$1 and (ref = $2 or ref like $3) order by created_at`,
+      [DESIGN_TYPE + '-in', `design-${id}`, `design-${id}-%`]),
     q(`select type, ref, delta, note, created_at from wallet_ledger
         where type = any($1) and ref like $2 order by created_at`,
       [FILE_TYPES, id + '|%']),
@@ -182,11 +203,17 @@ export async function orderCharges(orderId) {
       if (split.shipping > 0) lines.push({ part: 'shipping', label: PART_LABELS.shipping, amount: split.shipping, at: r.created_at });
       continue;
     }
-    const part = kind?.type === 'expedite' ? 'expedite'
-      : kind?.type === 'express-ship' ? 'express'
-        : kind?.type === 'design-fee' ? 'design' : 'files';
+    const part = kind?.type === 'expedite' ? 'expedite' : 'express';
     chargedBy[part] += amt;
     lines.push({ part, label: kind?.label || r.type, amount: amt, note: r.note, at: r.created_at });
+  }
+  /* Each design fee is its own line, named by its own note — "Design fee · logo.png" is the
+     row a seller checks a $2 against, and two of them summed would lose both. */
+  for (const r of designs.rows) {
+    const amt = money(r.delta);
+    if (amt <= 0) continue;
+    chargedBy.design += amt;
+    lines.push({ part: 'design', label: PART_LABELS.design, amount: amt, note: r.note, at: r.created_at });
   }
   // Each adjustment is its OWN line, never a merged total: the reason is the point of the
   // row, and two adjustments summed into one line lose both of them.

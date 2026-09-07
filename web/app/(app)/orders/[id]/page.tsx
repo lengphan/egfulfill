@@ -1008,9 +1008,15 @@ export default function OrderDetailPage() {
             onChange={goTab}
             items={[
               { id: "items" as const, label: "Items", count: items.length },
-              { id: "files" as const, label: "Files" },
+              { id: "files" as const, label: "Files", count: dfiles.length || undefined },
               { id: "history" as const, label: "History" },
-              { id: "activity" as const, label: "Activity" },
+              /* A NOTE ON AN ORDER IS THE ONE THING HERE NOBODY MAY MISS — "chỉ trắng giúp
+                 em" changes what gets sewn, and it was sitting behind a word that looked
+                 identical whether the conversation was empty or not. Items has carried its
+                 count all along; this is the tab where a missed count costs a remake. */
+              /* `|| undefined` — no badge at zero. A count that is always drawn is a count
+                 nobody reads, and "Activity 0" is the tab saying nothing twice. */
+              { id: "activity" as const, label: "Activity", count: messages.length || undefined },
             ]}
           />
 
