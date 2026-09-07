@@ -22,6 +22,7 @@
 //   GET  /api/manifests          → history
 //   GET  /api/manifests/:id      → one manifest
 import { q } from '../db.js';
+import { orderLabel } from '../order-label.js';
 import { readShipFrom } from './factory_settings.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
@@ -88,7 +89,7 @@ export function manifestRoutes(app, requireWarehouse) {
       groups: groups.map((g) => ({
         carrierAccount: g.carrierAccount,
         count: g.orders.length,
-        orders: g.orders.map((o) => ({ id: o.id, num: o.seq ? '#' + o.seq : o.id, tracking: o.tracking })),
+        orders: g.orders.map((o) => ({ id: o.id, num: orderLabel(o.id, o.seq), tracking: o.tracking })),
       })),
       skipped,
     };
@@ -105,7 +106,7 @@ export function manifestRoutes(app, requireWarehouse) {
     const eligible = [];
     const skipped = [];
     for (const o of rows) {
-      const num = o.seq ? '#' + o.seq : o.id;
+      const num = orderLabel(o.id, o.seq);
       if (!o.tracking) { skipped.push({ id: o.id, num, reason: 'No label bought yet — there is nothing to manifest.' }); continue; }
       if (o.manifested_at) { skipped.push({ id: o.id, num, reason: 'Already on a SCAN form. A label cannot appear on two.' }); continue; }
       if (o.label_scanned_at) { skipped.push({ id: o.id, num, reason: 'Already scanned — a SCAN form would add nothing.' }); continue; }
@@ -278,7 +279,7 @@ export function manifestRoutes(app, requireWarehouse) {
       id: row.id, createdAt: row.created_at, shipmentDate: row.shipment_date, status, pdf,
       count: (row.order_ids || []).length,
       orders: orders.map((o) => ({
-        id: o.id, num: o.seq ? '#' + o.seq : o.id, tracking: o.tracking,
+        id: o.id, num: orderLabel(o.id, o.seq), tracking: o.tracking,
         // The honest per-parcel state: on the form vs actually accepted by the carrier.
         accepted: !!o.label_scanned_at, acceptedAt: o.label_scanned_at, delivery: o.delivery_status,
       })),

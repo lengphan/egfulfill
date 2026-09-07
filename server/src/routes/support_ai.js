@@ -12,6 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { orderLabel } from '../order-label.js';
 import { egBroadcast } from '../events.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
 import { generateImage, imageConfig, priceUsd, IMAGE_MODELS, ASPECT_RATIOS, RATIO_HINTS } from '../gemini.js';
@@ -382,7 +383,7 @@ async function accountContext(sellerId) {
     if (o.rows.length) {
       lines.push('Recent orders (newest first):');
       for (const r of o.rows) {
-        const num = r.seq ? `#${r.seq}` : r.id;
+        const num = orderLabel(r.id, r.seq);
         const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
         const total = r.total != null ? ` · $${Number(r.total).toFixed(2)}` : '';
         lines.push(`- ${num}${date ? ` (placed ${date})` : ''}: ${sellerStatus(r)}${total}`);

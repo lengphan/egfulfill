@@ -3,6 +3,7 @@
 //   • staff   → all orders
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { orderLabel, orderLabelOf } from '../order-label.js';
 import { hashOf, isPhash } from '../fingerprint.js';
 import { isStaff, resolveSeller as _resolveSeller, canSurface, canSeeMoney } from '../auth.js';
 import { egBroadcast } from '../events.js';
@@ -1962,7 +1963,10 @@ export function ordersRoutes(app, requireAuth) {
     // A NEW order is the thing the floor most needs to hear about — and only a new
     // one, so re-saving an order doesn't re-alert everyone.
     if (isNew) {
-      const num = o.seq ? `#${o.seq}` : o.id;
+      /* The NUMBER, never the key — see server/src/order-label.js. This fell back to
+         the raw id, which is how a notification came to read "New order
+         FF-jc92mr-mtqqrbdq-9ngy8". */
+      const num = orderLabel(o.id, o.seq);
       notify({
         roles: ['admin', 'operator', 'warehouse'],
         type: 'order-new',
@@ -2375,7 +2379,7 @@ export function ordersRoutes(app, requireAuth) {
         const row = (await q('select seller_id, seq from orders where id=$1', [req.params.id])).rows[0];
         if (!row || !row.seller_id) return;
         if (await chargedAmount(req.params.id) <= 0) return;
-        const num = row.seq ? `#${row.seq}` : req.params.id;
+        const num = orderLabel(req.params.id, row.seq);   // never the raw key — see order-label.js
         notify({
           userIds: [String(row.seller_id)],
           type: 'order-edited',
@@ -3480,7 +3484,9 @@ export function ordersRoutes(app, requireAuth) {
       `select i.name, o.seq from order_items i join orders o on o.id = i.order_id
         where i.order_id=$1 and i.${key}=$2 limit 1`, [orderId, lineId || sku])
       .then((r) => r.rows[0]).catch(() => null);
-    const orderLabel = line && line.seq ? `#${line.seq}` : orderId;
+    /* Same rule as everywhere else, and through the same helper: a ledger note carrying a
+       database key is one a seller reads on their statement and cannot place. */
+    const orderRef = orderLabel(orderId, line && line.seq);
     const itemLabel = (line && line.name) || sku || lineId;
 
     const ref = `design-${orderId}-${lineId || sku}`;
@@ -3488,7 +3494,7 @@ export function ordersRoutes(app, requireAuth) {
       await moveFunds({
         from: row.seller_id, to: 'factory', amount,
         type: 'design-work', ref,
-        note: `${tier === 'supplied' ? 'Design file check' : 'Design work'} · ${itemLabel} · ${orderLabel}`,
+        note: `${tier === 'supplied' ? 'Design file check' : 'Design work'} · ${itemLabel} · ${orderRef}`,
         by: req.user && req.user.sub,
       });
     } catch (e) {
@@ -3895,7 +3901,7 @@ export function ordersRoutes(app, requireAuth) {
        limit 500`).catch(() => ({ rows: [] }));
     return {
       rows: r.rows.map((x) => ({
-        orderId: x.order_id, num: x.seq ? '#' + x.seq : x.order_id,
+        orderId: x.order_id, num: orderLabel(x.order_id, x.seq),
         sku: x.sku, name: x.name, updatedAt: x.updated_at, lines: x.lines,
         // Stated as what it means, not as a count nobody can interpret.
         overwritten: x.saves > 1,
@@ -4186,7 +4192,7 @@ export function ordersRoutes(app, requireAuth) {
         `insert into order_messages (order_id, sender_id, sender_role, body, meta)
          values ($1, null, 'assistant', $2, $3)`,
         [channel, text, JSON.stringify({
-          by: `Order brief · ${o.seq ? '#' + o.seq : o.id}`,
+          by: `Order brief · ${orderLabel(o.id, o.seq)}`,
           internal: true, summary: true, order_ref: orderId,
         })]);
       egBroadcast({ type: 'order-message' });
@@ -4513,7 +4519,7 @@ export function ordersRoutes(app, requireAuth) {
     let about = '';
     if (ref) {
       const o = (await q('select seq from orders where id=$1', [ref])).rows[0];
-      about = ` on ${o?.seq ? '#' + o.seq : ref}`;
+      about = ` on ${orderLabel(ref, o?.seq)}`;
     }
     if (channel === 'staff-general') {
       notify({

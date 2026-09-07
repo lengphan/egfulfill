@@ -439,7 +439,7 @@ export async function chargeOrderFee({ orderId, amount, note, by, clientId }) {
     // TELL THEM. A debit that appears with no warning is the one that becomes a support
     // thread; the reason is already written, so it costs nothing to send it.
     notify({ userIds: [row.seller_id], type: 'order-fee',
-             title: `$${amt.toFixed(2)} charged on order ${id}`,
+             title: `$${amt.toFixed(2)} charged on order ${await orderLabelOf(id)}`,
              body: why, href: `/orders/${encodeURIComponent(id)}`, entityId: id }).catch(() => {});
 
     const after = await orderCharges(id);

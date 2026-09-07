@@ -573,7 +573,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
           standalone: true,
         })),
         ...r.rows.map((x) => ({
-        id: x.id, num: x.seq ? '#' + x.seq : x.id,
+        id: x.id, num: orderLabel(x.id, x.seq),
         customer: x.customer || null, state: x.state || null,
         address: addrLine(x.address_json),
         tracking: x.tracking, carrier: x.carrier || null,
@@ -1166,7 +1166,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         limit 500`, args);
     return {
       scans: r.rows.map((x) => ({
-        id: x.id, num: x.seq ? '#' + x.seq : x.id,
+        id: x.id, num: orderLabel(x.id, x.seq),
         customer: x.customer || null,
         tracking: x.tracking || null, carrier: x.carrier || null,
         scannedAt: x.label_scanned_at,

@@ -12,6 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { orderLabel } from '../order-label.js';
 import { storageEnabled, putObject, fromDataUrl, getObject } from '../storage.js';
 
 // seller_images is created idempotently at route load, like the other late-added tables.
@@ -155,7 +156,7 @@ export function designImagesRoutes(app, requireAuth) {
     for (const x of r.rows) {
       if (seen.has(x.url)) continue;
       seen.add(x.url);
-      out.push({ url: x.url, orderRef: x.seq ? `#${x.seq}` : x.order_id, name: x.name || '' });
+      out.push({ url: x.url, orderRef: orderLabel(x.order_id, x.seq), name: x.name || '' });
     }
     return { images: out };
   });
