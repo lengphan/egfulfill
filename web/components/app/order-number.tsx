@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { updateOrder, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf } from "@/lib/order-format"
+import { cn } from "@/lib/utils"
 
 /**
  * THE ORDER NUMBER, AND THE ONE PLACE IT CAN BE CHANGED.
@@ -21,14 +22,36 @@ import { numOf } from "@/lib/order-format"
  * ONE COMPONENT, not an edit affordance per board. §4: a rule with no primitive is a wish —
  * the number is rendered on the order page, the staff hub, the dashboard and the staff
  * dashboard, and four hand-rolled inline editors would be four sets of behaviour for the
- * same field. Boards pass `editable` (staff only); everywhere else it renders exactly the
- * span it replaced.
+ * same field.
+ *
+ * THE EDIT LIVES ON THE ORDER PAGE, AND NOWHERE ELSE. In a LIST the number is the row's
+ * identity and the row opens the order — so a click there has one meaning, and an editor
+ * that opened instead was a control ambushing the gesture the whole table teaches. It also
+ * put the field where the least context is: a hub row shows a number, a store and a date,
+ * which is not enough to be sure you are renumbering the right order. Open it and change it
+ * there, where the buyer, the lines and the money are on screen. Lists therefore pass no
+ * `editable` at all and get the plain span the component replaced.
+ *
+ * IT OWNS ITS OWN SIZE, and that is the point of the rest of this docblock being true.
+ * The number was rendered at THREE sizes across eight sites — text-sm/600 on the staff hub,
+ * dispatch and the staff dashboard, text-xs/600 on the seller dashboard, text-xs/500 on the
+ * seller list, text-xs/400 in the assign dialog — because this component took `className`
+ * and rendered whatever it was handed. A primitive that owns behaviour but not appearance
+ * is half a primitive; the size drifts at the speed new call sites are written.
+ *
+ * It is the row's IDENTITY, so it is the largest thing in the row: `text-sm font-semibold`
+ * against a table body that is `text-sm` and a store/date/tracking that are `text-xs`.
+ * `cn()` is tailwind-merge, so a caller that genuinely needs another size still wins by
+ * passing one — but it has to say so.
  *
  * SHAPE SAYS KIND (§4). Read-only it is type, because that is what it is. Pressed, it becomes
  * a real `Input` — a field you SET — with its own confirm and cancel. It never wears button
  * chrome while it is only a label; the hover tint is the whole hint, and the `title` says the
  * rest so no sentence has to sit underneath it.
  */
+/** The row's identity, and the largest thing in it. See the docblock above. */
+const BASE = "tabular-nums text-sm font-semibold"
+
 export function OrderNumber({
   order,
   editable = false,
@@ -65,7 +88,7 @@ export function OrderNumber({
   const role = getUser()?.role || ""
   const mayEdit = editable && !!role && role !== "seller"
 
-  if (!mayEdit) return <span className={className}>{label}</span>
+  if (!mayEdit) return <span className={cn(BASE, className)}>{label}</span>
 
   const open = () => {
     setDraft(order.seq ? String(order.seq) : "")
@@ -100,7 +123,7 @@ export function OrderNumber({
            number both opened the editor and left the page it was on. */
         onClick={(e) => { e.stopPropagation(); e.preventDefault(); open() }}
         title={tl("orderNumber", "Change this order's number")}
-        className={`-mx-1 rounded px-1 text-left hover:bg-accent ${className}`}
+        className={cn("-mx-1 rounded px-1 text-left hover:bg-accent", BASE, className)}
       >
         {label}
       </button>

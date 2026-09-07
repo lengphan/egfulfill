@@ -1003,7 +1003,7 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   { id: "files", label: "Files", cell: (c) => ((c.file_count ?? 0) > 0 ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Paperclip size={11} weight="bold" /> {c.file_count}</span> : <span className="text-muted-foreground">—</span>) },
   // The lane IS the status, so it's labelled "Status". (The old separate "Status" column only
   // said Credited/—, which the Payout column already implies — removed.)
-  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium " + lanePill(col.accent)}>{col.label}</span> } },
+  { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center rounded-md px-2 py-0.5 font-medium " + lanePill(col.accent)}>{col.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
 const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]

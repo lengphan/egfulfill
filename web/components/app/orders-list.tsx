@@ -70,7 +70,9 @@ function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
          text-sm font-semibold; this table was the outlier. */
  case "order": return <span className="tabular-nums text-sm font-semibold">{numOf(o)}</span>
  case "store": return <span className="text-muted-foreground">{storeOf(o)}</span>
- case "customer": return <span className="font-medium">{customerOf(o)}</span>
+      /* NOT font-medium. The buyer's name is the one column nobody scans a queue by, and
+         weighting it put it above the order number and the status — the two that are. */
+ case "customer": return <span>{customerOf(o)}</span>
  case "items": return (
       <div className="flex min-w-0 items-center gap-2.5">
         {/* NO PICTURE IN THE PARENT ROW — owner's call, 2026-08-26.

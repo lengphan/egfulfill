@@ -779,8 +779,12 @@ export default function OrderDetailPage() {
               {/* The number is a LABEL (orders.seq), and staff can correct it in place —
                   a mistyped one otherwise had to be lived with. Not the id: that is the key
                   ten tables join on. See components/app/order-number.tsx. */}
-              <h1 className="font-title text-2xl font-semibold tracking-tight">
-                <OrderNumber order={order} editable={isStaff} onSaved={() => reloadAll()} />
+              <h1 className="font-title tracking-tight">
+                {/* The one site where the number is a page TITLE rather than a row's
+                    identity, so it overrides the primitive's row size explicitly. It used
+                    to inherit text-2xl from this h1; the primitive owns the size now, and
+                    an inherited size no longer reaches past it. */}
+                <OrderNumber order={order} editable={isStaff} onSaved={() => reloadAll()} className="text-2xl" />
               </h1>
               {/*
                 * THE FACTORY READS ITS OWN VOCABULARY.

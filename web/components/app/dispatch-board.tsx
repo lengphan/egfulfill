@@ -176,7 +176,9 @@ function DispStatus({ k, label }: { k: DispKey; label: string }) {
    * decoration around it.
    */
  const m = DISP_MARK[k]
- return <span className={"block max-w-full truncate text-xs font-medium " + m.cls}>{tl("dispatch", label)}</span>
+  // NO SIZE OF ITS OWN, matching StageBadge and SellerStatusBadge: a status set 12px in a
+  // 14px row is the second thing you scan, rendered smaller than the store name.
+ return <span className={"block max-w-full truncate font-medium " + m.cls}>{tl("dispatch", label)}</span>
 }
 
 // Shared column template for the history table — the header and every row use it so the
@@ -1391,8 +1393,8 @@ export function DispatchBoard({ segmented }: {
                     <div onClick={() => toggleTimeline(o.id)} className={HIST_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"}>
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
                       <DispStatus k={d.key} label={d.label} />
-                      <span className="truncate tabular-nums text-sm font-semibold">
-                        <OrderNumber order={o} editable onSaved={() => load()} />
+                      <span className="truncate">
+                        <OrderNumber order={o} />
                       </span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
                       <span className="truncate text-xs text-muted-foreground">{platformOf(o)}{o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() ? ` · ${o.store}` : ""}</span>
@@ -1514,8 +1516,8 @@ export function DispatchBoard({ segmented }: {
                       spans could not stay aligned with a header that can hide a column. */}
                   {visibleCols.map((id) => {
                     if (id === "order") return (
-                      <span key={id} className="truncate tabular-nums text-sm font-semibold">
-                        <OrderNumber order={o} editable onSaved={() => load()} />
+                      <span key={id} className="truncate">
+                        <OrderNumber order={o} />
                       </span>
                     )
                     if (id === "customer") return <span key={id} className="truncate text-sm">{customerOf(o)}</span>

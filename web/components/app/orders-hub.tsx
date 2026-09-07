@@ -2066,8 +2066,8 @@ export function OrdersHub() {
  order: (
                   /* Staff can correct the number in place — it is orders.seq, a label, and a
                      mistyped one used to be permanent. Not the id: ten tables join on that. */
-                  <div className="min-w-0 truncate tabular-nums text-sm font-semibold" title={numOf(o)}>
-                    <OrderNumber order={o} editable={isStaff} onSaved={() => load()} />
+                  <div className="min-w-0 truncate" title={numOf(o)}>
+                    <OrderNumber order={o} />
                   </div>
                 ),
                 /**
