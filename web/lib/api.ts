@@ -601,6 +601,11 @@ export type TopupRequest = {
   status: "pending" | "received" | "rejected" | "abandoned"
   txn_id?: string | null
   created_at: string
+  /** Staff-only fields — the admin list needs to say WHOSE money it was and when it landed. */
+  seller_email?: string | null
+  seller_name?: string | null
+  confirmed_at?: string | null
+  note?: string | null
 }
 export function getMyTopups() {
   return api<TopupRequest[]>(`/api/topups`)
@@ -1972,7 +1977,9 @@ export type POLine = {
   /** Which orders drove this line. `order` is the internal id (`etsy-3311908445`); `num` is
    *  what a human calls it (`#4099`) and is what the cart shows — they are not the same
    *  string for a marketplace order. `num` is absent on lines parked before it was carried. */
-  sources?: { order: string; num?: string; qty: number }[]
+  /** `seller` is who the order belongs to. `#64` is minted per account, so the number alone
+   *  cannot identify an order on the factory's own list, which holds every seller's at once. */
+  sources?: { order: string; num?: string; seller?: string | null; qty: number }[]
   /** Product thumbnail, captured when the line was picked. Supplier names differ by a
    *  single word, so the picture is what confirms the right sku was chosen. Lines without
    *  one (auto-replenished from inventory) resolve it by sku at render time. */

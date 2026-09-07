@@ -30,6 +30,80 @@ import { getToken, getUser } from "@/lib/auth"
 const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date(s); return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
 
+/**
+ * EVERY TOP-UP, INCLUDING THE ONES ALREADY CONFIRMED.
+ *
+ * Confirming a transfer credits the SELLER's ledger, so it lands in the seller's transaction
+ * history and nowhere in the factory's — which is why an admin who had just approved $200
+ * could not find it anywhere afterwards. The pending panel drops the row the moment it is
+ * approved (correctly: it is a queue), and nothing else in the app kept a list.
+ *
+ * So this is the record: the same rows the queue works from, all statuses, whoever they
+ * belong to. Staff only, and read-only — approving still happens in the queue above, because
+ * a list you can act on from two places is one that gets acted on twice.
+ */
+function TopupHistory() {
+  const tl = useLabelT()
+ const fmtDT = useDateFormat()
+ const [rows, setRows] = useState<TopupRequest[] | null>(null)
+ useEffect(() => {
+ const t = setTimeout(() => { getTopups().then((r) => setRows(r ?? [])).catch(() => setRows([])) }, 0)
+ return () => clearTimeout(t)
+  }, [])
+  /* The word says what happened to the money; the tone says whether it is finished. Not a
+     filled pill on every row — these are four states of one fact, and only two need reading
+     twice (§4). */
+ const TONE: Record<string, string> = {
+ received: "text-success", pending: "text-hold", rejected: "text-alert", abandoned: "text-muted-foreground",
+  }
+ const WORD: Record<string, string> = {
+ received: "Credited", pending: "Awaiting review", rejected: "Rejected", abandoned: "Not paid",
+  }
+ return (
+    <Card className="overflow-hidden">
+      <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="whitespace-nowrap">{tl("wallet", "Date")}</TableHead>
+            <TableHead>{tl("wallet", "Seller")}</TableHead>
+            <TableHead>{tl("wallet", "Method")}</TableHead>
+            <TableHead>{tl("wallet", "Reference")}</TableHead>
+            <TableHead>{tl("wallet", "Status")}</TableHead>
+            <TableHead className="text-right">{tl("wallet", "Amount")}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows === null ? (
+            <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">{tl("wallet", "Loading…")}</TableCell></TableRow>
+          ) : !rows.length ? (
+            <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">{tl("wallet", "No top-ups yet.")}</TableCell></TableRow>
+          ) : rows.map((t) => (
+            <TableRow key={t.id}>
+              {/* WHEN THE MONEY LANDED, falling back to when it was asked for. Two different
+                  facts, so the row says which by showing the request date only while there is
+                  nothing else to show. */}
+              <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDT(t.confirmed_at || t.created_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</TableCell>
+              <TableCell className="max-w-[240px] truncate" title={t.seller_email || undefined}>
+                {t.seller_name || t.seller_email || "—"}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">{t.method || "transfer"}</TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground" title={t.txn_id || undefined}>{t.ref || "—"}</TableCell>
+              <TableCell className={"whitespace-nowrap font-medium " + (TONE[t.status] ?? "")}>
+                {tl("wallet", WORD[t.status] ?? t.status)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
+                {usd2(Number(t.amount_usd) || 0)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      </div>
+    </Card>
+  )
+}
+
 // Admin review of pending seller top-ups (moved here from the old Console).
 function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
   const tl = useLabelT()
@@ -880,11 +954,15 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
             <TabsList>
               <TabsTrigger value="transactions">{tl("wallet", "Transaction history")}</TabsTrigger>
               <TabsTrigger value="partners">{tl("wallet", "Partner history")}</TabsTrigger>
+              {/* Beside the ledger, not inside it: a top-up credits the SELLER's ledger, so it
+                  never appears in this one and had nowhere else to be read. */}
+              <TabsTrigger value="topups">{tl("wallet", "Top-ups")}</TabsTrigger>
             </TabsList>
             {exportBtn}
           </div>
           <TabsContent value="transactions">{txCard}</TabsContent>
           <TabsContent value="partners"><BillingView /></TabsContent>
+          <TabsContent value="topups"><TopupHistory /></TabsContent>
         </Tabs>
       ) : txCard
       })()}

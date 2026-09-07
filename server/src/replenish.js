@@ -97,9 +97,31 @@ export async function autoReplenish(orderId) {
    * with the id asks a buyer to go and translate it before they can tell what they are
    * buying for. Falls back to the id, which is what it used to show.
    */
-  const orderNum = String(
-    (await q('select num from orders where id=$1', [orderId]).catch(() => ({ rows: [] }))).rows[0]?.num || orderId
-  );
+  /* THE COLUMN IS `seq`, AND THERE IS NO `num`.
+     This read `select num from orders`, which the orders table has never had — so every call
+     threw, the .catch swallowed it, and the fallback fired for EVERY order. The result is the
+     bug you can see on the purchase page: a parked shortage tagged `etsy-4162283361` or
+     `FF-jgpyfg-mtqn3omr-12sfjz`, the raw key, on a screen whose whole job is telling a buyer
+     what they are buying for. A silent fallback that always runs is indistinguishable from
+     having no feature.
+
+     MIRRORS numOf in web/lib/order-format.ts, which is the one definition of what this string
+     looks like: our own orders are `#seq`; a marketplace order keeps the receipt number the
+     buyer and the marketplace both quote, with the routing prefix taken off and a hash in
+     front, because Etsy prints its own receipts that way too. */
+  /* AND WHOSE ORDER IT IS. `seq` is minted per SELLER (max+1 within one account), so two
+     sellers both have a #64 — and this screen is the factory's, with every seller's shortages
+     in one list. A number that is only unique inside an account is not an answer on a page
+     that crosses accounts, so the name travels with it. Staff-only surface; a seller never
+     reads another seller's row here. */
+  const ordRow = (await q(
+    `select o.seq, coalesce(nullif(u.name,''), u.email) as seller
+       from orders o left join users u on u.id = o.seller_id
+      where o.id = $1`, [orderId]).catch(() => ({ rows: [] }))).rows[0];
+  const seq = ordRow?.seq;
+  const orderSeller = ordRow?.seller ? String(ordRow.seller) : null;
+  const plain = String(orderId).replace(/^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i, '');
+  const orderNum = seq ? `#${seq}` : (/^\d+$/.test(plain) ? `#${plain}` : String(orderId));
 
   // One catalog read for the whole call — matchProduct walks it per line.
   const idx = await catalogIndex();
@@ -295,7 +317,7 @@ export async function autoReplenish(orderId) {
   for (const [supplier, items] of bySupplier) {
     for (const it of items) {
       const hit = list.find((x) => lineKey(x) === lineKey(it));
-      const src = { order: String(orderId), num: orderNum, qty: it.qty };
+      const src = { order: String(orderId), num: orderNum, seller: orderSeller, qty: it.qty };
       if (hit) {
         // Same blank needed by another order: raise the quantity and record who for,
         // rather than a second row saying the same thing with no context.

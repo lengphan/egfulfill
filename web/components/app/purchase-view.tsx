@@ -134,11 +134,26 @@ function SourceTags({ line }: { line: POLine }) {
         // made a 24-character key look like one, and that format appears nowhere else in the
         // product, because everywhere else holds the order row and shows its #seq. The full
         // id stays in the title for anyone who needs to match it against the database.
- const label = s.num || shortOrderRef(s.order)
+        /* `num` IS ONLY TRUSTED WHEN IT IS NOT THE ID. Every line parked before today carries
+           the raw id in this field — replenish.js read a column the orders table has never
+           had, and its catch fell back to the id for every order ever parked. Those rows are
+           in the saved cart now and cannot be rewritten from here, so the check is the fix:
+           anything that equals the id is treated as no number at all and shortened. */
+ const num = s.num && s.num !== s.order ? s.num : ""
+ const label = num || shortOrderRef(s.order)
+        /* AND WHOSE IT IS — ALWAYS, when we know it. `#64` is minted per ACCOUNT (max(seq)+1
+           within one seller), and this is the factory's list, holding every seller's shortages
+           at once. So the number alone cannot identify an order here, and the failure it
+           causes is silent: a buyer opens the #64 that belongs to somebody else and orders
+           against the wrong job. Whether THIS row happens to mix sellers is beside the point —
+           the ambiguity is across the whole list, not within a chip set. */
+ const who = s.seller ? String(s.seller) : ""
  return (
-          <span key={i} className="rounded bg-muted px-1.5 py-0.5 tabular-nums text-2xs text-muted-foreground"
- title={`${s.qty} of these are for order ${label}${s.num ? ` (${s.order})` : ""}`}>
-            {label} ×{s.qty}
+          <span key={i} className="rounded bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground"
+ title={`${s.qty} of these are for order ${label}${who ? ` (${who})` : ""} — ${s.order}`}>
+            <span className="tabular-nums">{label}</span>
+            {who && <span className="opacity-70"> · {who}</span>}
+            <span className="tabular-nums"> ×{s.qty}</span>
           </span>
         )
       })}
