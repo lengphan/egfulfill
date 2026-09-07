@@ -478,11 +478,14 @@ export function DesignerBoard() {
  if (laneOf(card, lanes) === to && !extra) return
  const role = getUser()?.role
  const fromApproved = laneOf(card, lanes) === "approved"
-    // Admin-only into Approved — that lane releases the designer's payout, so a stray drag by
-    // a designer/operator/warehouse shouldn't reach it. The server enforces this too (reverts
-    // the lane + refuses the credit); this just explains it instead of a silent snap-back.
- if (to === "approved" && role !== "admin") {
- await confirm({ title: tl("designer", "Only an admin can approve"), body: "Moving a card to Approved releases the designer's payout, so it's limited to admins. Ask an admin to approve it.", confirmLabel: "OK" })
+    /* APPROVING IS THE OPERATOR'S CALL TOO — owner's, 2026-09-07. Mirrors `mayApprove` in
+       server/src/routes/design_cards.js; the server is what enforces it (it reverts the lane
+       rather than rejecting the batch), and this exists so a refusal is a sentence instead of
+       a silent snap-back. The payout objection no longer holds: the credit is idempotent on
+       `DSN-<id>`, so approve-twice and Fix-and-back cannot pay twice — while one approver for
+       the whole board is a queue that stalls every day. */
+ if (to === "approved" && role !== "admin" && role !== "operator") {
+ await confirm({ title: tl("designer", "You can't approve a design"), body: "Approving a design is an operator's or an admin's call. Ask one of them to sign this off.", confirmLabel: "OK" })
  return
     }
     // Confirm pulling a card back OUT of Approved — it reopens signed-off work. (The payout was

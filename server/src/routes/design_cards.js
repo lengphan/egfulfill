@@ -631,11 +631,23 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // send vendor:null and claim it anyway. Factory roles are untouched: operator,
     // warehouse and admin can still move, delete, and attach files to these cards.
     const isDesigner = (req.user && req.user.role) === 'designer';
-    // Only an ADMIN may move a card INTO Approved. That lane releases the designer's payout
-    // and tells the floor the design is final, so a stray drag by a designer/operator/warehouse
-    // must not trigger it. Enforced the same way as the vendor lock below — by preserving the
-    // stored lane, not rejecting the whole save — so other edits in the batch are untouched.
-    const isAdmin = (req.user && req.user.role) === 'admin';
+    /**
+     * WHO MAY LAND A CARD IN APPROVED — admin AND operator, owner's call 2026-09-07.
+     *
+     * This was admin-only on the argument that the lane releases the designer's payout, so a
+     * stray drag must not reach it. The payout half of that has since stopped being a risk:
+     * the credit is idempotent on `DSN-<id>` (wallet_ledger's (account, type, ref) key) and
+     * the card carries its own `credited` flag, so approving twice — or dragging out to Fix
+     * and back — cannot pay twice. What was left was a queue where every finished design
+     * waited on one person, which is the slower failure and the one that happens daily.
+     *
+     * A designer still may not approve their own work, and neither may warehouse: signing
+     * off a design is production judgement, and an operator is who exercises it.
+     *
+     * Enforced the same way as the vendor lock below — by preserving the stored lane rather
+     * than rejecting, so other edits in the same batch are untouched.
+     */
+    const mayApprove = ['admin', 'operator'].includes((req.user && req.user.role) || '');
     // Named apart from the `ids` used by the prune below: that one is the set to KEEP,
     // this one is the set to read lanes from. Same shape, opposite purpose.
     const priorIds = rows.map((c) => c.id).filter((v) => v != null).map(String);
@@ -666,10 +678,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
         c.vendor = lock.vendor;           // can't un-outsource it to unlock the above
         c.vendor_ref = lock.vendor_ref;
       }
-      // Admin-only Approved gate: a non-admin can't land a card in Approved. Revert to the
-      // stored lane (or 'incoming' for a brand-new card), so the payout it would release
-      // never fires from a mistaken drag. Un-approving is NOT gated here — that's a UI confirm.
-      if (!isAdmin) {
+      // The Approved gate: a role that may not approve can't land a card there. Revert to
+      // the stored lane (or 'incoming' for a brand-new card). Un-approving is NOT gated
+      // here — that's a UI confirm.
+      if (!mayApprove) {
         const prev = before.get(String(c.id));
         if (String(c.col || '').toLowerCase() === 'approved' && String((prev && prev.col) || '').toLowerCase() !== 'approved') {
           c.col = (prev && prev.col) || 'incoming';

@@ -2335,7 +2335,7 @@ const vi: Dict = {
   "designer.Fix": "Sửa",
   "designer.Back to work": "Quay lại làm việc",
   "designer.Move out of Approved?": "Chuyển ra khỏi cột Đã duyệt?",
-  "designer.Only an admin can approve": "Chỉ quản trị viên mới duyệt được",
+  "designer.You can't approve a design": "Bạn không thể duyệt thiết kế",
   "designer.Embroidery": "Thêu",
   "designer.Show stitches": "Hiện đường thêu",
   "designer.Show": "Hiện",
