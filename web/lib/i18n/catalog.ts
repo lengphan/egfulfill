@@ -3757,6 +3757,7 @@ const vi: Dict = {
   "notifications.Unread only": "Chỉ chưa đọc",
   "notifications.Which notifications to show": "Hiển thị thông báo nào",
   "notifications. · opens the related page": " · mở trang liên quan",
+  "orderGrid.Drag to resize — double-click to reset": "Kéo để đổi kích thước — nhấp đúp để đặt lại",
   "orderGrid.Add rows": "Thêm dòng",
   "orderGrid.Back": "Quay lại",
   "orderGrid.Working…": "Đang xử lý…",

@@ -93,6 +93,10 @@ const FIXED_OPTIONS: Record<string, string[]> = {
   print_type: COLUMN_OPTIONS.print_type ?? [],
 }
 
+/** Where a viewer's dragged column widths and row heights live. Per BROWSER, not per sheet:
+ *  the 21 columns are the same on every sheet, so a width learned once should hold. */
+const SIZING_KEY = "eg.sheet.grid.sizing"
+
 const NARROW = new Set(["item_quantity", "item_size", "item_price", "ship_state", "ship_zip"])
 const widthFor = (key: string) => (NARROW.has(key) ? "min-w-20" : "min-w-32")
 
@@ -212,6 +216,86 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    *  (which must close it) from the LIST scrolling (which must not). */
   const menuRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
+
+  /**
+   * ── DRAG A SEPARATOR, MOVE A COLUMN OR A ROW ──────────────────────────────────────────
+   *
+   * 21 columns share one width rule (`widthFor`), so every address column is as wide as the
+   * longest one anybody has ever needed and "Ship Address 2" is as wide as "Ship Address 1"
+   * — which is why the sheet scrolls sideways past everything you are actually typing. There
+   * is nothing wrong with the default; there is something wrong with it being the only one.
+   *
+   * SIZES ARE THE VIEWER'S, NOT THE SHEET'S. Two people filling the same sheet want different
+   * columns wide, and a width saved on the row would travel to the factory as if it meant
+   * something. So this lives in localStorage — wrapped, because a private window throws on
+   * read and a grid that cannot open is a worse bug than a column that is too narrow.
+   *
+   * The handle is a strip on the separator itself, and DOUBLE-CLICK PUTS IT BACK. A resize
+   * with no way home is a state you can enter and not leave, which is the same objection
+   * that got the canvas its zoom reset.
+   */
+  const [colW, setColW] = useState<Record<string, number>>({})
+  const [rowH, setRowH] = useState<Record<number, number>>({})
+  /* The ref is what the pointer handlers read and write; the state exists to re-render.
+     A drag fires dozens of moves a second and every one of them needs the value BEFORE it,
+     which a state updater cannot hand back synchronously. */
+  const sizing = useRef<{ cols: Record<string, number>; rows: Record<number, number> }>({ cols: {}, rows: {} })
+  const drag = useRef<{ axis: "col" | "row"; key: string; from: number; at: number } | null>(null)
+
+  /** Narrow enough to be a deliberate choice, wide enough to still be a column. */
+  const MIN_COL = 56
+  const MIN_ROW = 24
+
+  const saveSizing = useCallback(() => {
+    try { localStorage.setItem(SIZING_KEY, JSON.stringify(sizing.current)) } catch { /* no storage; the sizes are still live on screen */ }
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(SIZING_KEY)
+        const v = raw ? JSON.parse(raw) : null
+        if (!v || typeof v !== "object") return
+        sizing.current = { cols: v.cols ?? {}, rows: v.rows ?? {} }
+        setColW(sizing.current.cols); setRowH(sizing.current.rows)
+      } catch { /* unreadable or from an older shape — the defaults are correct */ }
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  const startResize = (e: React.PointerEvent<HTMLElement>, axis: "col" | "row", key: string, from: number) => {
+    // The header cell under it opens a sort/menu on click and the row number does nothing;
+    // either way the drag is not a click on the thing it sits on.
+    e.preventDefault(); e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { axis, key, from, at: axis === "col" ? e.clientX : e.clientY }
+  }
+  const moveResize = (e: React.PointerEvent<HTMLElement>) => {
+    const d = drag.current
+    if (!d) return
+    const delta = (d.axis === "col" ? e.clientX : e.clientY) - d.at
+    const next = Math.max(d.axis === "col" ? MIN_COL : MIN_ROW, Math.round(d.from + delta))
+    if (d.axis === "col") { sizing.current.cols = { ...sizing.current.cols, [d.key]: next }; setColW(sizing.current.cols) }
+    else { sizing.current.rows = { ...sizing.current.rows, [Number(d.key)]: next }; setRowH(sizing.current.rows) }
+  }
+  const endResize = (e: React.PointerEvent<HTMLElement>) => {
+    if (!drag.current) return
+    drag.current = null
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+    saveSizing()
+  }
+  /** Back to automatic — the size is REMOVED, not set to whatever the default happens to
+   *  be today, so a column reset now still follows a change to `widthFor` later. */
+  const resetSize = (axis: "col" | "row", key: string) => {
+    if (axis === "col") {
+      const rest = { ...sizing.current.cols }; delete rest[key]
+      sizing.current.cols = rest; setColW(rest)
+    } else {
+      const rest = { ...sizing.current.rows }; delete rest[Number(key)]
+      sizing.current.rows = rest; setRowH(rest)
+    }
+    saveSizing()
+  }
 
   /**
    * VALIDATION IS THE IMPORTER'S, RUN LIVE.
@@ -485,16 +569,34 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
               <th className="w-10 border-b border-border px-2 py-1.5 text-left font-medium text-muted-foreground">#</th>
-              {CSV_COLUMNS.map((col) => (
-                <th
-                  key={col.key}
-                  title={col.help}
-                  className={`${widthFor(col.key)} border-b border-l border-border px-2 py-1.5 text-left font-medium whitespace-nowrap`}
-                >
-                  {col.header}
-                  {col.required && <span className="ms-1 text-destructive">*</span>}
-                </th>
-              ))}
+              {CSV_COLUMNS.map((col) => {
+                const w = colW[col.key]
+                return (
+                  <th
+                    key={col.key}
+                    title={col.help}
+                    style={w ? { width: w, minWidth: w, maxWidth: w } : undefined}
+                    className={`${w ? "" : widthFor(col.key)} relative overflow-hidden border-b border-l border-border px-2 py-1.5 text-left font-medium text-ellipsis whitespace-nowrap`}
+                  >
+                    {col.header}
+                    {col.required && <span className="ms-1 text-destructive">*</span>}
+                    {/* THE SEPARATOR IS THE CONTROL. It sits ON the border it moves, which is
+                        the only place a resize handle is ever looked for — and it is 6px
+                        rather than 1 because a 1px target is a border, not a control. */}
+                    <span
+                      role="separator"
+                      aria-orientation="vertical"
+                      title={tl("orderGrid", "Drag to resize — double-click to reset")}
+                      onPointerDown={(e) => startResize(e, "col", col.key, e.currentTarget.parentElement?.getBoundingClientRect().width ?? MIN_COL)}
+                      onPointerMove={moveResize}
+                      onPointerUp={endResize}
+                      onPointerCancel={endResize}
+                      onDoubleClick={() => resetSize("col", col.key)}
+                      className="absolute inset-y-0 right-0 z-20 w-1.5 cursor-col-resize touch-none select-none hover:bg-primary/40"
+                    />
+                  </th>
+                )
+              })}
               <th className="w-8 border-b border-l border-border" />
             </tr>
           </thead>
@@ -513,13 +615,28 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                * An untouched row is not a mistake; it is an untouched row.
                */
               const started = rows[r].some((v) => v.trim() !== "")
+              const h = rowH[r]
               return (
-                <tr key={r}>
+                <tr key={r} style={h ? { height: h } : undefined}>
                   <td
                     title={started ? (rec?._errors || rec?._warnings || undefined) : undefined}
-                    className="border-b border-border bg-muted/40 px-2 py-1 text-right text-muted-foreground tabular-nums"
+                    className="relative border-b border-border bg-muted/40 px-2 py-1 text-right text-muted-foreground tabular-nums"
                   >
                     {r + 1}
+                    {/* Same control on the other axis, on the row's own bottom border — the
+                        row number is the only cell that is not an input, so it is the only
+                        one a drag can start from without fighting the caret. */}
+                    <span
+                      role="separator"
+                      aria-orientation="horizontal"
+                      title={tl("orderGrid", "Drag to resize — double-click to reset")}
+                      onPointerDown={(e) => startResize(e, "row", String(r), e.currentTarget.closest("tr")?.getBoundingClientRect().height ?? MIN_ROW)}
+                      onPointerMove={moveResize}
+                      onPointerUp={endResize}
+                      onPointerCancel={endResize}
+                      onDoubleClick={() => resetSize("row", String(r))}
+                      className="absolute inset-x-0 bottom-0 z-20 h-1.5 cursor-row-resize touch-none select-none hover:bg-primary/40"
+                    />
                   </td>
                   {CSV_COLUMNS.map((col, c) => {
                     const opts = optionsFor(col.key, row)
@@ -553,7 +670,11 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                              merely-selected cell must not show one — otherwise the rule
                              "if it is flashing, paste goes in the box" is unreadable. */
                           style={editing === `${r}-${c}` ? undefined : { caretColor: "transparent" }}
-                          className="w-full bg-transparent px-2 py-1 outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
+                          /* min-w-0: an input's intrinsic width is its `size` attribute
+                             (~20 characters), and a table column cannot be narrower than the
+                             box inside it — so without this the resize stops dead at ~170px
+                             and reads as broken. */
+                          className="h-full w-full min-w-0 bg-transparent px-2 py-1 outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
                         />
                       </td>
                     )
