@@ -1441,11 +1441,42 @@ export function ordersRoutes(app, requireAuth) {
       // No images: this index only prices lines, and the image keys are ~7MB of base64.
       catalogIndex({ withImages: false }).catch(() => ({ exact: new Map(), rows: [] })),
       feeSettings().catch(() => ({})),
+      /**
+       * EVERY LEG THIS ORDER TOOK, not just the production one.
+       *
+       * This read `order-charge-in` at ref = the order id, which is the charge raised at
+       * submit and nothing else — so a board's Total said $41.18 for an order whose seller
+       * had actually paid $44.18: the design fee (`design-<id>-<line>`) and a price
+       * adjustment (`fee-<id>-<stamp>`) are separate rows with their own refs, exactly as
+       * the order page's own breakdown reads them.
+       *
+       * A figure a seller checks their statement against has to be the whole of it. The refs
+       * are matched by PATTERN because two of the five carry a suffix — one order can hold
+       * several design fees and several adjustments — and the owner is resolved in JS below
+       * rather than parsed out of the string: our ids contain hyphens themselves, so
+       * `design-FF-a-b-FFL-c` cannot be split back into id and line by counting dashes.
+       */
       q(`select ref, coalesce(sum(delta),0) as amt from wallet_ledger
-          where type=$1 and ref = any($2::text[]) group by ref`, [CHARGE_TYPE + '-in', ids])
+          where account='factory' and type = any($1::text[])
+            and (ref = any($2::text[]) or ref like any($3::text[]))
+          group by ref`,
+        [['order-charge-in', 'expedite-in', 'express-ship-in', 'design-work-in', 'order-fee-in'],
+         ids.flatMap((id) => [id, `expedite-${id}`, `express-${id}`, `design-${id}`]),
+         ids.flatMap((id) => [`design-${id}-%`, `fee-${id}-%`])])
         .then((r) => r.rows).catch(() => []),
     ]);
-    const charged = new Map(chargedRows.map((r) => [String(r.ref), parseFloat(r.amt) || 0]));
+    /* Which order a ref belongs to. Longest id first, so an id that is a prefix of another
+       cannot claim its rows. */
+    const byLen = [...ids].sort((a, b) => b.length - a.length);
+    const ownerOf = (ref) => byLen.find((id) =>
+      ref === id || ref === `expedite-${id}` || ref === `express-${id}`
+      || ref === `design-${id}` || ref.startsWith(`design-${id}-`) || ref.startsWith(`fee-${id}-`)) || null;
+    const charged = new Map();
+    for (const r of chargedRows) {
+      const id = ownerOf(String(r.ref));
+      if (!id) continue;
+      charged.set(id, (charged.get(id) || 0) + (parseFloat(r.amt) || 0));
+    }
     for (const o of rows) {
       const paid = charged.get(String(o.id)) || 0;
       if (paid > 0) { o.cost = paid; o.cost_estimated = false; continue; }

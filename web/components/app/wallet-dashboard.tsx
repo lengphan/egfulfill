@@ -259,6 +259,24 @@ function txMeta(type: string, delta: number): { label: string; tone: string } {
  if (t === "manual-income") return { label: "Income", tone: EM }
  if (t === "manual-expense") return { label: "Expense", tone: AM }
  if (t === "adjust") return { label: "Adjustment", tone: MUT }
+  /**
+   * THE TWO CHARGES AN ORDER RAISES BESIDE PRODUCTION, which fell through to "Debit".
+   *
+   * A statement line that says only "Debit −$2.00" is the row a seller writes in to ask
+   * about, and the answer is already in the ledger: `design-work` is the fee for digitising
+   * artwork, `order-fee` is a price adjustment somebody charged with a reason attached. Both
+   * directions, because the factory reads the same table from the other side — its credit is
+   * the seller's debit and calling both "Debit" was how one row managed to be wrong twice.
+   */
+ if (t === "design-work-out") return { label: "Design fee", tone: MUT }
+ if (t === "design-work-in") return { label: "Design fee", tone: EM }
+ if (t === "order-fee-out") return { label: "Price adjustment", tone: MUT }
+ if (t === "order-fee-in") return { label: "Price adjustment", tone: EM }
+ if (t === "expedite-out") return { label: "Expedited shipping", tone: MUT }
+ if (t === "expedite-in") return { label: "Expedited shipping", tone: EM }
+ if (t === "express-ship-out") return { label: "Express shipping", tone: MUT }
+ if (t === "express-ship-in") return { label: "Express shipping", tone: EM }
+ if (t === "emb-file" || t === "design-file") return { label: "Design file", tone: MUT }
  return { label: delta >= 0 ? "Credit" : "Debit", tone: MUT }
 }
 type Row = {
