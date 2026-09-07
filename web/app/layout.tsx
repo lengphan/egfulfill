@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Geist_Mono, Inter, Outfit, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
+import { Archivo, Geist_Mono, Inter, Outfit, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -64,6 +64,21 @@ const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter"
  */
 const outfit = Outfit({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-outfit" })
 const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-grotesk" })
+
+/**
+ * THE BRAND DISPLAY FACE, and the WIDTH AXIS is the whole reason it is here.
+ *
+ * Archivo ships a real `wdth` axis (62–125) alongside weight, so one family covers a
+ * condensed 8rem headline and a wide 11px label without a second alphabet — which is the
+ * marketing redesign's signature and, not incidentally, keeps the one-face rule the product
+ * runs on. `axes: ["wdth"]` is required: next/font subsets a variable font to the weight axis
+ * only unless the extra axis is named, and a missing axis fails SILENTLY at the browser,
+ * snapping every width back to 100 with nothing in the console.
+ *
+ * MARKETING ONLY. Nothing under app/(app) or app/(boards) references it, and mobile does not
+ * get it — the same fence the two display faces above sit behind.
+ */
+const archivo = Archivo({ subsets: ["latin"], axes: ["wdth"], variable: "--font-archivo" })
 
 /**
  * ONE FACE. Inter, for everything.
@@ -153,6 +168,7 @@ export default function RootLayout({
         inter.variable,
         outfit.variable,
         grotesk.variable,
+        archivo.variable,
       )}
     >
       <body>

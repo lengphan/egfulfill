@@ -78,7 +78,11 @@ export function HelpCenter() {
           {HELP_CATEGORIES.map((c) => {
             const Ico = ICONS[c.icon] ?? Rocket
             return (
-              <a key={c.id} href={`#${c.id}`} className="group rounded-xl border border-border p-4 transition-colors hover:border-primary hover:bg-accent">
+              /* bg-card. These carried a border and NO ground, so they took the page's grey
+                 while every other card on the screen was white — six grey boxes above a run
+                 of white ones, which reads as two kinds of thing rather than one. §4: the
+                 canvas is white, cards are white, and the border is what separates them. */
+              <a key={c.id} href={`#${c.id}`} className="group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary hover:bg-accent">
                 <Ico size={18} weight="regular"  className="shrink-0 text-primary" />
                 <div className="mt-3 font-semibold">{tl("helpCat", c.title)}</div>
                 <div className="mt-1 text-sm text-muted-foreground">{tl("helpCatDesc", c.desc)}</div>

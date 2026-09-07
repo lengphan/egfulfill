@@ -73,6 +73,21 @@ export default function ChatPage() {
  const [drafting, setDrafting] = useState(false)
  const [activeId, setActiveId] = useState<string | null>(null)
  const [messages, setMessages] = useState<ChatEntry[] | null>(null)
+  /** See the note on the shell below: the pane takes whatever is left under the chrome. */
+ const fillRef = useRef<HTMLDivElement | null>(null)
+ const [fillH, setFillH] = useState("calc(100svh - 8rem)")
+ useEffect(() => {
+ const measure = () => {
+ const el = fillRef.current
+ if (!el) return
+      // rect.top is viewport-space, which is what we want: nothing above this scrolls.
+ const top = Math.max(0, Math.round(el.getBoundingClientRect().top))
+ setFillH(`calc(100svh - ${top}px - 2rem)`)
+    }
+ const t = setTimeout(measure, 0)
+ window.addEventListener("resize", measure)
+ return () => { clearTimeout(t); window.removeEventListener("resize", measure) }
+  }, [])
  const [input, setInput] = useState("")
  const [sending, setSending] = useState(false)
  const [aiTyping, setAiTyping] = useState(false)
@@ -784,12 +799,21 @@ export default function ChatPage() {
 
  return (
     <>
-    {/* One height for everyone: staff and sellers both render this through the same shell
-        (topbar 3.5rem + main py-6 = 6.5rem, plus a little slack). The staff branch used
- to subtract only the topbar, so the pane ran 3rem taller than its space — the
-        PAGE scrolled and the composer fell below the fold. min-h-0 lets the inner panes
- own their own scrolling instead of growing the container as threads are added. */}
-    <div className="flex h-[calc(100svh-7rem)] min-h-0 gap-4">
+    {/**
+      * MEASURED, NOT GUESSED.
+      *
+      * This subtracted a constant — 7rem, written when the topbar was 3.5rem and the main
+      * padding was py-6. Both changed (h-16 and md:py-8), and a seller with a low balance
+      * gets a banner above this as well, so the pane ran taller than the space it had and
+      * the PAGE scrolled: the composer fell below the fold and the whole window moved every
+      * time you typed. A number that has to be kept in step with three other files is one
+      * that will be wrong again.
+      *
+      * So it reads its own distance from the top of the viewport and takes the rest, less
+      * the main's bottom padding. Scrolling INSIDE the panes is untouched and correct — the
+      * thread scrolls, the rail scrolls, the page does not.
+      */}
+    <div ref={fillRef} style={{ height: fillH }} className="flex min-h-0 gap-4">
       {/* conversation rail */}
       {/* w-60, not w-72. A rail row carries a name, one line of the newest message and a
  count — none of which get more legible with another 48px, because all three
@@ -1176,6 +1200,26 @@ export default function ChatPage() {
               {aiNote && (
                 <div className="mx-auto max-w-sm rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
                   {aiNote}
+                </div>
+              )}
+              {/**
+                * SOMEBODY IS COMING — said after the seller's own last message.
+                *
+                * A support thread that answers nothing looks identical to one that was never
+                * delivered: the message sits there, the room is silent, and the only way to
+                * find out whether it arrived is to send it again. This is the receipt, and it
+                * says the two things a person waiting actually wants — that it landed, and
+                * that they do not have to wait in silence to add to it.
+                *
+                * ONLY WHEN THE LAST WORD IS THEIRS, and only on the support thread. Once
+                * anyone replies it disappears on its own, because the reply is the better
+                * version of the same message. Not a control and not prose under one: it is a
+                * state of the conversation, which is the one thing this column is for.
+                */}
+              {isSupport && !aiTyping && !streaming && messages && messages.length > 0
+                && (messages[messages.length - 1].me ?? messages[messages.length - 1].role === "seller") && (
+                <div className="mx-auto max-w-sm px-3 text-center text-xs text-muted-foreground">
+                  {tl("chat", "Sent — a representative will reply here. Keep typing if there is more.")}
                 </div>
               )}
               {/* SAID BEFORE THE PRESS, while the composer is armed to generate.

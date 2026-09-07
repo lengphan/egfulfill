@@ -26,6 +26,7 @@ type Dict = Record<string, string>
 
 // English is complete; other locales may be PARTIAL — missing keys fall back to English.
 const en: Dict = {
+  "chat.Sent — a representative will reply here. Keep typing if there is more.": "Sent — a representative will reply here. Keep typing if there is more.",
   "canvas.Your product photo": "Your product photo",
   "canvas.Our product photo": "Our product photo",
   "canvas.The backdrop the artwork sits on": "The backdrop the artwork sits on",
@@ -161,6 +162,7 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "chat.Sent — a representative will reply here. Keep typing if there is more.": "Đã gửi — nhân viên sẽ trả lời ngay tại đây. Cứ nhắn tiếp nếu bạn còn điều muốn nói.",
   "designMaker.Back to the blank": "Quay lại phôi",
   "designMaker.Mockups": "Ảnh mẫu",
   "designMaker.Publish on this photo": "Đăng trên ảnh này",

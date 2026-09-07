@@ -565,8 +565,12 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             <div className="relative flex h-full flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="font-title text-2xl font-semibold tracking-tight">{brand.title}</span>
+                {/* THE CHIP CANNOT BE THE GROUND IT SITS ON. The accent and the campaign
+                    backdrop are the same periwinkle, so on a photographed cover the date
+                    dissolved into the wall behind the model — visible in the render, not in
+                    the markup. Paper on a photograph, accent on the flat plate. */}
                 <span className="rounded-lg px-3 py-1 text-[10px] font-semibold uppercase tracking-widest"
- style={{ background: HOUSE.lime, color: HOUSE.ink }}>
+ style={{ background: brand.cover ? HOUSE.paper : HOUSE.lime, color: HOUSE.ink }}>
                   {fmtDate(new Date(), { month: "long", year: "numeric" })}
                 </span>
               </div>
