@@ -265,7 +265,11 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
   /** Which whole row is selected, by index. Cleared the moment a cell takes focus — a
    *  sheet cannot have both a live cell and a live row without the next keypress being
    *  ambiguous about which one it means. */
-  const [selRow, setSelRow] = useState<number | null>(null)
+  const [sel, setSel] = useState<{ anchor: number; end: number } | null>(null)
+  /** The selected rows as an inclusive [lo, hi]. A plain click is a range of one; Shift
+   *  extends from the anchor — the row first clicked — in either direction, the way every
+   *  sheet does it. Copy, paste and Delete all act on the whole range. */
+  const selRange = sel ? [Math.min(sel.anchor, sel.end), Math.max(sel.anchor, sel.end)] as const : null
   /**
    * THE SUGGESTION MENU, POSITIONED BY US.
    *
@@ -599,7 +603,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
   const openMenu = useCallback((el: HTMLElement, key: string) => {
     const r = el.getBoundingClientRect()
     setMenu({ key, left: r.left, top: r.bottom, width: r.width })
-  }, [])
+  }, [setMenu])
 
   /* The menu is fixed, so it does not travel with the cell — anything that MOVES the cell
      has to close it, or it hangs over the sheet pointing at nothing. Capture phase, because
@@ -649,7 +653,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
   const removeRow = (r: number) => {
     setEditing(null)
     setMenu(null)
-    setSelRow(null)
+    setSel(null)
     writeRows((p) => (p.length <= 1 ? [blankRow()] : p.filter((_, i) => i !== r)))
   }
 
@@ -666,10 +670,10 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * the safe one: the row stays where it is, so nothing below it shifts up under the cursor.
    * Removing a row is still the X at the end, which is the destructive act and looks like it.
    */
-  const clearRow = (r: number) => {
+  const clearRows = (lo: number, hi: number) => {
     setEditing(null)
     setMenu(null)
-    writeRows((p) => p.map((row, i) => (i === r ? blankRow() : row)))
+    writeRows((p) => p.map((row, i) => (i >= lo && i <= hi ? blankRow() : row)))
   }
 
   const complete = async () => {
@@ -740,18 +744,37 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                */
               const started = rows[r].some((v) => v.trim() !== "")
               const h = rowH[r]
-              const isSel = selRow === r
+              const isSel = !!selRange && r >= selRange[0] && r <= selRange[1]
               return (
                 <tr key={r} style={h ? { height: h } : undefined} data-selected={isSel || undefined} className={isSel ? "bg-accent" : undefined}>
                   <td
                     title={started ? (rec?._errors || rec?._warnings || undefined) : tl("orderGrid", "Click to select the row")}
                     tabIndex={0}
                     aria-selected={isSel}
-                    onClick={() => { setEditing(null); setMenu(null); setSelRow((cur) => (cur === r ? null : r)) }}
+                    data-rownum={r}
+                    /* SHIFT EXTENDS, a plain click restarts. Clicking the row that is the whole
+                       selection deselects it; Shift+click keeps the first-clicked anchor and
+                       moves the far end, so 1142 then Shift+1149 is eight rows either way round.
+                       Shift+↑/↓ does the same from the keyboard and follows focus down the
+                       numbers, so a range can be walked out without the mouse. */
+                    onClick={(e) => {
+                      setEditing(null); setMenu(null)
+                      const shift = e.shiftKey
+                      setSel((cur) => shift && cur ? { anchor: cur.anchor, end: r }
+                        : cur && cur.anchor === r && cur.end === r ? null
+                        : { anchor: r, end: r })
+                    }}
                     onKeyDown={(e) => {
-                      if (!isSel) return
-                      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); clearRow(r) }
-                      else if (e.key === "Escape") setSelRow(null)
+                      if (!isSel || !selRange) return
+                      const [lo, hi] = selRange
+                      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); clearRows(lo, hi) }
+                      else if (e.key === "Escape") setSel(null)
+                      else if (e.shiftKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                        e.preventDefault()
+                        const to = Math.max(0, Math.min(rows.length - 1, (sel?.end ?? r) + (e.key === "ArrowDown" ? 1 : -1)))
+                        setSel((cur) => (cur ? { anchor: cur.anchor, end: to } : { anchor: to, end: to }))
+                        gridRef.current?.querySelector<HTMLElement>(`td[data-rownum="${to}"]`)?.focus()
+                      }
                     }}
                     /* COPY AND PASTE A WHOLE ROW, through the clipboard the sheet already speaks.
                        Copy writes the row as one tab-separated line — the same shape a spreadsheet
@@ -762,11 +785,16 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                        and no async clipboard API. Only while the row is selected — a stray ⌘C on
                        an unselected number must not silently replace what someone copied. */
                     onCopy={(e) => {
-                      if (!isSel) return
+                      if (!isSel || !selRange) return
                       e.preventDefault()
-                      e.clipboardData.setData("text/plain", rows[r].join("\t"))
+                      // Every selected row, one per line — the block shape the paste side and
+                      // every spreadsheet already read.
+                      e.clipboardData.setData("text/plain", rows.slice(selRange[0], selRange[1] + 1).map((row) => row.join("\t")).join("\n"))
                     }}
-                    onPaste={(e) => { if (isSel) onPaste(e, r, 0) }}
+                    /* Paste lands at the TOP of the selection and spreads down through the block
+                       handler, so a copied eight-row range dropped on a selected 1150 fills
+                       1150–1157 — the selection is where it starts, not a mask on how far it goes. */
+                    onPaste={(e) => { if (isSel && selRange) onPaste(e, selRange[0], 0) }}
                     className={"relative cursor-pointer select-none border-b border-border px-2 py-1 text-right tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring "
                       + (isSel ? "bg-primary text-primary-foreground" : "bg-muted/40 text-muted-foreground hover:bg-muted")}
                   >
@@ -809,7 +837,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                            * undo the point of double-clicking.
                            */
                           onFocus={(e) => {
-                            setSelRow(null)
+                            setSel(null)
                             if (editing !== `${r}-${c}`) e.currentTarget.select()
                             if (list?.length) openMenu(e.currentTarget, `${r}-${c}`)
                           }}
