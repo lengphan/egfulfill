@@ -56,7 +56,11 @@ export function OrderAdjustPanel({ orderId, onCharged }: { orderId: string; onCh
     try {
       const r = await chargeOrderFee(orderId, { amount: amt, note: note.trim(), clientId: newClientId() })
       if (r.error) {
-        setMsg({ ok: false, text: r.shortfall ? `${r.error} They need ${usd(r.shortfall)} more in the wallet.` : r.error })
+        // A shortfall is the seller's to fix, and the server has already asked them — in
+        // their support chat and on the bell — so the operator is told that, not left to.
+        setMsg({ ok: false, text: r.shortfall
+          ? `${r.error} They need ${usd(r.shortfall)} more in the wallet${r.sellerTold ? " — they've been asked in chat to top up; press Charge again once it lands" : ""}.`
+          : r.error })
         return
       }
       setMsg({ ok: true, text: `Charged ${usd(r.charged || amt)} to the seller's wallet.` })

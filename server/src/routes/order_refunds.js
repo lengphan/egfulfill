@@ -428,7 +428,29 @@ export async function chargeOrderFee({ orderId, amount, note, by, clientId }) {
     } catch (e) {
       // The shortfall is the useful half of this — it is the number they have to top up by.
       if (e && e.code === 'INSUFFICIENT_FUNDS') {
-        return { error: e.message, shortfall: e.shortfall, balance: e.balance };
+        /**
+         * TELL THE SELLER, NOT JUST THE OPERATOR. The operator can do nothing about an
+         * empty wallet; the seller can, and the moment to ask is now, with the figure and
+         * the reason in hand. It goes into their support thread — the one place they already
+         * talk to us — as a message from Support, and rings the bell with a link to the
+         * wallet (owner's call, 2026-09-07: "send them a notification to continue with top up").
+         * The adjustment itself is NOT parked: once the money is there the operator presses
+         * Charge again, and the idempotency key is fresh each press, so nothing doubles.
+         */
+        const short = Number(e.shortfall) || amt;
+        const label = await orderLabelOf(id);
+        const line = `A $${amt.toFixed(2)} price adjustment on order ${label} (${why}) needs $${short.toFixed(2)} more in your wallet. ` +
+                     `Top up and we'll apply it — nothing has been charged yet.`;
+        await q(
+          `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+           values ($1, null, 'assistant', $2, $3)`,
+          [`support-${row.seller_id}`, line, JSON.stringify({ by: 'EGFUL Support', system: true, order_ref: id, ts: Date.now() })]
+        ).catch(() => {});
+        egBroadcast({ type: 'order-message' });
+        notify({ userIds: [row.seller_id], type: 'order-fee-short',
+                 title: `Top up $${short.toFixed(2)} to cover an adjustment on order ${label}`,
+                 body: why, href: '/wallet', entityId: id }).catch(() => {});
+        return { error: e.message, shortfall: e.shortfall, balance: e.balance, sellerTold: true };
       }
       throw e;
     }

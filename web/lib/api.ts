@@ -5000,7 +5000,7 @@ export function chargeOrderFee(
   id: string,
   body: { amount: number; note: string; clientId?: string }
 ) {
-  return api<OrderCharges & { ok?: boolean; charged?: number; error?: string; shortfall?: number; balance?: number | null }>(
+  return api<OrderCharges & { ok?: boolean; charged?: number; error?: string; shortfall?: number; balance?: number | null; sellerTold?: boolean }>(
     `/api/orders/${encodeURIComponent(id)}/fee`,
     { method: "POST", body: JSON.stringify(body) }
   )
