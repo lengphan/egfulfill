@@ -213,7 +213,16 @@ export default function ProductDetailPage() {
                 <span className="rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">{product.type}</span>
               )}
             </div>
-            <h1 className="mt-2 font-title text-3xl font-semibold tracking-tight">{product.name ?? tl("productPage", "Untitled")}</h1>
+            {/* THE MAKER, ABOVE THE NAME. The brand split takes "Gildan" off the front of the
+                title and files it as its own field — which is right, and left the fact
+                invisible on the one page that has room to state it properly. An eyebrow is
+                where a garment names its maker, and here there is no card-height cost to it.
+                Never the SUPPLIER: `brand` is what the label says (§2.9), and the import
+                refuses a supplier's name into this field for exactly this reason. */}
+            {product.brand && (
+              <div className="mt-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{product.brand}</div>
+            )}
+            <h1 className={(product.brand ? "mt-0.5" : "mt-2") + " font-title text-3xl font-semibold tracking-tight"}>{product.name ?? tl("productPage", "Untitled")}</h1>
             <div className="mt-1 tabular-nums text-sm text-muted-foreground">{product.sku ?? "—"}</div>
           </div>
 

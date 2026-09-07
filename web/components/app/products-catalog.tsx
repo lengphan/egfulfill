@@ -211,7 +211,10 @@ export function ProductsCatalog() {
       // sheet or a purchase order, and it is the only identifier a product has until ours is
       // assigned. Only ever PRESENT for staff: sellerSafe strips supplierSku server-side, so
       // a seller's copy has nothing here to match on.
- const hay = `${p.name ?? ""} ${p.sku ?? ""} ${p.supplierSku ?? ""} ${p.type ?? ""}`.toLowerCase()
+      /* BRAND IS SEARCHABLE. The split lifts "Gildan" out of the NAME and into its own field,
+         so without it here the one thing the split just made explicit becomes the one thing
+         you can no longer type into the box — the split would have made search worse. */
+ const hay = `${p.name ?? ""} ${p.brand ?? ""} ${p.sku ?? ""} ${p.supplierSku ?? ""} ${p.type ?? ""}`.toLowerCase()
  return hay.includes(query.toLowerCase())
     })
   }, [products, cat, query])
@@ -454,7 +457,19 @@ export function ProductsCatalog() {
  that don't are exactly the ones you need to find, and a row reading
                           "—" tells you nothing about which blank it is. sellerSafe strips
  supplierSku, so a seller sees "—" here, never a supplier's code. */}
-                      <div className="mt-0.5 truncate tabular-nums text-xs text-muted-foreground">{p.sku || p.supplierSku || "—"}</div>
+                      {/* THE MAKER, on the line that already exists. The brand split pulls
+                          "Gildan" off the front of the name and files it — and then nothing
+                          on this card said it, so the split read as deleting the word. It
+                          rides beside the sku rather than on a line of its own: an eyebrow
+                          would leave an empty slot on every product that has no brand, and
+                          the cards would stop lining up.
+                          Never the SUPPLIER (§2.9) — `brand` is what is on the garment's own
+                          label, and brandOfSupplierStyle refuses a supplier's name on the way
+                          in precisely so this line is safe to print. */}
+                      <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-xs text-muted-foreground">
+                        <span className="shrink-0 tabular-nums">{p.sku || p.supplierSku || "—"}</span>
+                        {p.brand && <span className="truncate">· {p.brand}</span>}
+                      </div>
                     </div>
                     <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
                   </div>
