@@ -93,6 +93,7 @@ export function SupplierDetailDialog({
  const [d, setD] = useState<Detail | null>(null)
  const [err, setErr] = useState<string | null>(null)
  const [colour, setColour] = useState<string | null>(null)
+ const [hoverColour, setHoverColour] = useState<string | null>(null)
   /**
    * THE VARIANT AND HOW MANY, decided here rather than back on the grid.
    *
@@ -188,7 +189,10 @@ export function SupplierDetailDialog({
         * the swatches get six or seven to a row, and the content reaches the edge instead of
         * trailing off.
         */}
-      <DialogContent className="sm:max-w-4xl">
+      {/* ONE SCREEN, AND THE DIALOG SCROLLS ITSELF. With 67 colours the panel grew past the
+          viewport and took the PAGE's scrollbar with it, so choosing a colour meant losing
+          the photograph and the size row off the top of the window. */}
+      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-4xl">
         {/**
           * THE PRODUCT IDENTIFIES ITSELF ONCE, AT THE TOP.
           *
@@ -340,63 +344,56 @@ export function SupplierDetailDialog({
                     They are chips now: the ones with a photo show it, the rest show their
  colour, and every one of them changes the picture. The name is on hover
  and on the selected chip, which is the only moment it matters. */}
-                <Section label={`Colours${d.colors.length ? ` (${d.colors.length})` : ""}`}>
+                {/**
+                  * A PALETTE, NOT A LIST OF CARDS.
+                  *
+                  * Every swatch used to carry its own two-line name underneath, in a 4.5rem
+                  * column. That is right for seventeen colours and unusable for sixty-seven:
+                  * the block ran four screens deep, and picking a colour meant scrolling past
+                  * the photograph, the sizes and the description to get to it and then
+                  * scrolling back to see what changed.
+                  *
+                  * The names have not been thrown away — the reason they were added still
+                  * stands, that a zoomed crop cannot always separate Charcoal from Black. They
+                  * moved to where a name is actually needed: the one you are pointing at, or
+                  * the one you have chosen, printed once beside the heading. Hover, focus and
+                  * the title attribute all reach it, so nothing is keyboard- or touch-only.
+                  *
+                  * The grid caps its own height and scrolls, so the picture and the size row
+                  * stay on screen while you work through the palette.
+                  */}
+                <Section
+ label={`Colours${d.colors.length ? ` (${d.colors.length})` : ""}`}
+ note={prettyColorName(hoverColour ?? colour ?? "")}
+                >
                   {d.colors.length ? (
-                    <span className="flex flex-wrap gap-x-2 gap-y-2">
-                      {d.colors.map((c) => (
-                        <span key={c} className="flex w-[4.5rem] flex-col items-center gap-1">
-                        <button
+                    <div className="max-h-52 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] gap-2">
+                        {d.colors.map((c) => (
+                          <button
+ key={c}
  type="button"
  title={d.stockByColor ? `${c} — ${d.stockByColor[c] ?? 0} in stock at the supplier` : c}
+ aria-label={c}
+ onMouseEnter={() => setHoverColour(c)}
+ onMouseLeave={() => setHoverColour(null)}
+ onFocus={() => setHoverColour(c)}
+ onBlur={() => setHoverColour(null)}
  onClick={() => { setColour(c === colour ? null : c); setFrame(null) }}
-                          // NOT dimmed by stock. Fading the unavailable ones washed out the
-                          // whole palette — seventeen pale blobs that read as "this widget is
-                          // broken" rather than "these colours are short", and it hid the very
-                          // thing a swatch exists to show: the colour. Stock is a number, and
-                          // it belongs on the line below, in words.
-                          /**
-                           * BIGGER, AND ZOOMED INTO THE GARMENT.
-                           *
-                           * These were 24px showing the WHOLE product photo — which on a
-                           * studio shot is mostly white backdrop, so seventeen swatches read
-                           * as seventeen white circles with a speck in the middle. A swatch
-                           * exists to show the COLOUR, so the picture is scaled up and pulled
-                           * to the body of the garment. Same treatment the product card
-                           * already uses (260% at center 42%).
-                           */
- className={"relative size-9 shrink-0 overflow-hidden rounded-full border-2 bg-muted transition-transform hover:scale-110 "
-                            + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
+                            /* NOT dimmed by stock — fading the short ones washes out the whole
+                               palette and hides the one thing a swatch exists to show. Stock is
+                               a number and it lives in the table below.
+                               Zoomed to 260% at center 42%: at this size an un-zoomed studio
+                               shot is mostly white backdrop with a speck of garment in it. */
+ className={"relative aspect-square w-full overflow-hidden rounded-full border-2 bg-muted transition-transform hover:scale-110 "
+                              + (c === colour ? "border-primary ring-2 ring-primary/40" : "border-black/15")}
  style={d.colorImages[c]
-                            ? { backgroundImage: `url("${d.colorImages[c]}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
+                              ? { backgroundImage: `url("${d.colorImages[c]}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
  : { background: colorHex(c) }}
-                        />
-                        {/* THE NAME UNDER THE SWATCH. It was on hover and on the selected chip
- only, so reading the palette meant pointing at each circle in turn
-                            — and a zoomed crop of a garment is not always enough to tell
-                            Charcoal from Black. Supplier codes are prettified ("031753A -
-                            Blk/Dk.Grn" → the readable half) and truncated; the full string
- stays on the button's title. */}
-                        {/* ...AND ALWAYS THE HEIGHT OF TWO, wrapped or not. `line-clamp-2`
-                            let a one-word name take one line and a compound take two, so in a
-                            flex-wrap grid each ROW sized to its tallest label — "Columbia Blue"
-                            made its whole row taller than the one beneath it, and seventeen
-                            swatches read as a ragged block rather than a palette. Reserving the
-                            second line costs one empty line under the short names and makes
-                            every row the same height, which is what a grid is for. */}
-                        {/* TWO LINES, NOT AN ELLIPSIS. Otto names are compound — "Navy/White",
-                            "Black/Dark Green", "Khaki/Navy" — and a single truncated line
- turned three different colourways into "Navy/W…", "Navy/Da…" and
-                            "Navy/Kh…", which distinguishes nothing. Wrapping keeps the part
- that actually differs visible. */}
-                        <span
- className={"line-clamp-2 min-h-[2.5em] w-full break-words text-center text-2xs leading-tight " + (c === colour ? "font-medium text-foreground" : "text-muted-foreground")}
- title={c}
-                        >
-                          {prettyColorName(c)}
-                        </span>
-                        </span>
-                      ))}
-                    </span>
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ) : "—"}
                 </Section>
                 {/* "Orderable skus 24" is colours × sizes — a number already implied by the
@@ -528,10 +525,16 @@ export function SupplierDetailDialog({
  * the whole width, and the three blocks stack instead of interleaving. It also removes the
  * rules that were drawing double lines against the action row.
  */
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+/** `note` rides on the heading's own line, right-aligned — the palette uses it to name the
+ *  colour under the pointer, which is the one label that has to exist and the sixty-six
+ *  that do not. Absent on every other section, which then reads exactly as it did. */
+function Section({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
  return (
     <div className="space-y-1.5">
-      <div className="eg-label text-muted-foreground">{label}</div>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="eg-label text-muted-foreground">{label}</div>
+        {note && <div className="min-w-0 truncate text-xs font-medium text-foreground">{note}</div>}
+      </div>
       <div className="text-sm">{children}</div>
     </div>
   )

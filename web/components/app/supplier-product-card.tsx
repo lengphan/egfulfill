@@ -274,13 +274,18 @@ export function SupplierProductCard({
             same handler as Add to Products (onEditVariants === onAdd in every caller), so
             it was a second button for the one action, worded as if it did something else.
             With it gone, the full size set expands here rather than hiding behind it. */}
-        <div className={"mt-1 flex items-center gap-1 " + (showAllSizes ? "flex-wrap" : "h-5 overflow-hidden")}>
+        {/* NOT PILLS. A size is not a status and not a control here, and §4 keeps the
+            bordered capsule for things that are. It also could not survive the row it sits
+            in: at h-5 with overflow-hidden the boxes were clipped top and bottom, so what
+            actually rendered was a row of brackets. Words, separated by a middot, clip
+            honestly and read faster. */}
+        <div className={"mt-1 flex items-center gap-1.5 " + (showAllSizes ? "flex-wrap" : "h-5 overflow-hidden")}>
           {sizeNames.length === 0 ? (
             // Three DIFFERENT empty states, said apart. "One size" is a fact the supplier
             // gave us (OSFM); a bare count is names-missing; "—" is genuinely unknown, which
             // for S&S means the sizes just haven't loaded — never dressed up as one-size.
             data.oneSize ? (
-              <span className="rounded border border-border px-1 py-0.5 text-2xs font-medium text-muted-foreground" title={tl("supplierProductCard", "One size fits most — this product isn't broken out by size")}>
+              <span className="text-2xs font-medium text-muted-foreground" title={tl("supplierProductCard", "One size fits most — this product isn't broken out by size")}>
                 {tl("supplierProductCard", "One size")}
               </span>
             ) : (
@@ -288,9 +293,9 @@ export function SupplierProductCard({
             )
           ) : (
             <>
-              {(showAllSizes ? sizeNames : sizeNames.slice(0, 6)).map((sz) => (
-                <span key={sz} className="shrink-0 rounded border border-border px-1 py-0.5 text-2xs font-medium text-muted-foreground">{sz}</span>
-              ))}
+              <span className={"min-w-0 text-2xs font-medium text-muted-foreground " + (showAllSizes ? "" : "truncate")}>
+                {(showAllSizes ? sizeNames : sizeNames.slice(0, 6)).join(" · ")}
+              </span>
               {sizeNames.length > 6 && (
                 <button
                   onClick={() => setShowAllSizes((v) => !v)}

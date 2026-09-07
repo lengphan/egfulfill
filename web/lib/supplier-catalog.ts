@@ -58,10 +58,38 @@ type SanmarFb = { name?: string | null; price?: number | string | null; image?: 
  * where the real brand is missing. The server strips it again on the way to any public
  * shape; this stops it being stored in the first place.
  */
-const SUPPLIER_NAMES = new Set(["sanmar", "s&s", "ss", "ssactivewear", "s&s activewear", "otto", "ottocap", "otto cap"])
+const SUPPLIER_NAMES = new Set(["sanmar", "s&s", "ss", "ssactivewear", "s&s activewear", "ss activewear", "otto", "ottocap", "otto cap"])
 export function brandOfSupplierStyle(raw?: string | null): string {
   const t = String(raw ?? "").trim()
   return SUPPLIER_NAMES.has(t.toLowerCase()) ? "" : t
+}
+/**
+ * THE SUPPLIER'S NAME COMES OFF THE TITLE TOO, even though it never becomes the brand.
+ *
+ * brandOfSupplierStyle refuses "Otto Cap" and "SanMar" into the brand field, which is right
+ * — who supplies us is not a product attribute (§2.9). But the supplier's own feed writes
+ * itself into the TITLE as well ("OTTO CAP® 6 Panel Low Profile Baseball Cap"), and
+ * stripBrandPrefix only strips a prefix it is storing as a brand. So the field stayed empty,
+ * the name kept the word, and publish sends the NAME to Etsy and Shopify — the leak the
+ * brand guard exists to prevent, arriving through the other door.
+ *
+ * Removes a LEADING supplier name only. "Otto" in the middle of a product name is part of the
+ * name, and a title that is nothing but the supplier's name is left alone rather than emptied.
+ */
+export function stripSupplierPrefix(name?: string | null): string {
+  const n = String(name ?? "").trim()
+  if (!n) return n
+  /* LONGEST FIRST, and only on a word boundary. Both were found by running it rather than
+     reading it: iterating the set in its own order matched "otto" inside "OTTO CAP®" and left
+     "CAP® 6 Panel Low Profile", and a prefix match with no boundary turned "Ottoman Rib Knit
+     Beanie" into "man Rib Knit Beanie" — a product renamed into nonsense on the way in. */
+  for (const sup of [...SUPPLIER_NAMES].sort((a, b) => b.length - a.length)) {
+    const esc = sup.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const cut = n.replace(new RegExp(`^${esc}(?![A-Za-z])[\\s®™,·|-]*`, "i"), "").trim()
+    if (cut === "") return n   // the title was NOTHING but the supplier's name — leave it whole
+    if (cut !== n) return cut
+  }
+  return n
 }
 export function stripBrandPrefix(name?: string | null, brand?: string | null): string {
   const n = String(name ?? "").trim()
@@ -97,7 +125,7 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
   const d = await getSsStyle(styleID)
   if (d.error) throw new Error(d.error)
   return {
-    id: "SS-" + styleID, name: stripBrandPrefix(d.title || fb.title || styleID, brandOfSupplierStyle(d.brand ?? fb.brand)),
+    id: "SS-" + styleID, name: stripSupplierPrefix(stripBrandPrefix(d.title || fb.title || styleID, brandOfSupplierStyle(d.brand ?? fb.brand))),
     brand: brandOfSupplierStyle(d.brand ?? fb.brand) || undefined,
     type: typeFromName(d.title || fb.title || ""), method: "DTG", status: "Active",
     // The supplier's price IS our cost (S&S returns wholesale/net). It belongs in Product
@@ -144,7 +172,7 @@ export async function ottoCatalogProduct(style: string, fb: OttoFb): Promise<Cat
   const colorImages = d && !d.error ? driveMap(d.colorImages) : {}
   if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = driveImg(fb.image)
   return {
-    id: "OTTO-" + style, name: stripBrandPrefix(d?.name || fb.name || style, brandOfSupplierStyle(fb.brand)),
+    id: "OTTO-" + style, name: stripSupplierPrefix(stripBrandPrefix(d?.name || fb.name || style, brandOfSupplierStyle(fb.brand))),
     // Otto's style detail carries no brand of its own, so the browse row's is the only one
     // there is — and it falls back to "Otto Cap", which brandOfSupplierStyle refuses.
     brand: brandOfSupplierStyle(fb.brand) || undefined,
@@ -168,7 +196,7 @@ export async function sanmarCatalogProduct(style: string, fb: SanmarFb): Promise
   const colorImages = d && !d.error ? { ...d.colorImages } : {}
   if (Object.keys(colorImages).length === 0) for (const c of fb.colors ?? []) colorImages[c] = fb.image ?? ""
   return {
-    id: "SANMAR-" + style, name: stripBrandPrefix(d?.name || fb.name || style, brandOfSupplierStyle(d?.brand ?? fb.brand)),
+    id: "SANMAR-" + style, name: stripSupplierPrefix(stripBrandPrefix(d?.name || fb.name || style, brandOfSupplierStyle(d?.brand ?? fb.brand))),
     brand: brandOfSupplierStyle(d?.brand ?? fb.brand) || undefined,
     type: typeFromName(d?.name || fb.name || ""), method: "DTG", status: "Active",
     productCost: Number(d?.price ?? fb.price) || undefined,
