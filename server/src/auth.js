@@ -205,6 +205,22 @@ export const canManageUsers = (user) => !!user && user.role === 'admin';
 export const canMoveMoney = (user) => !!user && user.role === 'admin';
 
 /**
+ * Who may CHARGE an order more than it was quoted — the price adjustment on its own.
+ *
+ * Wider than canMoveMoney by one role, operator, and for one direction only. An
+ * adjustment is the floor's finding written into the price: the parcel weighed more than
+ * the estimate, a colour was added at the machine, a line was re-printed. The operator is
+ * the person who knows that, at the moment it is known, and routing it through an admin
+ * meant it was recorded late or not at all (owner's call, 2026-09-07).
+ *
+ * It is money OUT of a seller's wallet into the house, against a named order, with a
+ * reason the seller reads — the least dangerous shape money can take here. Sending money
+ * BACK stays canMoveMoney: that is the direction a mistake or a favour costs the business,
+ * and it keeps its single owner.
+ */
+export const canAdjustPrice = (user) => !!user && ['admin', 'operator'].includes(user.role);
+
+/**
  * Who may SEE money at all — prices, costs, what an order earned, what it can refund.
  *
  * Separate from canMoveMoney because reading and moving are different questions for every

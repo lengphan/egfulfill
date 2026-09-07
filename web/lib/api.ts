@@ -4978,6 +4978,8 @@ export type OrderCharges = {
   refunds: { amount: number; part: string | null; note?: string | null; at: string; by?: string | null }[]
   charged: number; refunded: number; refundable: number
   canRefund?: boolean
+  /** May charge an adjustment (admin and operator) — one role wider than canRefund. */
+  canAdjust?: boolean
   /** True when the caller is a team member whose leader has NOT granted 'order_fees'.
    *  The server withholds the amounts rather than the client hiding them, so everything
    *  above arrives empty — treat this as "not allowed to see", never as "nothing was

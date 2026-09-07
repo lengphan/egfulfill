@@ -3989,6 +3989,8 @@ const vi: Dict = {
   "orderRefund.Taken from the seller’s wallet against this order": "Được trừ từ ví của người bán cho đơn hàng này",
   "orderRefund.Kept back out of this refund — both are recorded separately": "Được giữ lại khỏi lần hoàn này — cả hai đều được ghi nhận riêng",
   "orderRefund.Everything charged on this order has been refunded.": "Mọi khoản đã tính trên đơn hàng này đều đã được hoàn.",
+  "orderRefund.Price adjustment": "Điều chỉnh giá",
+  "orderRefund.Charged against this order from the seller’s wallet, with your reason on their statement.": "Trừ từ ví của người bán cho đơn hàng này, kèm lý do của bạn trên sao kê của họ.",
   "orderRefund.Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it.": "Tiền vào thẳng số dư ví của người bán. Tích vào một mục để hoàn toàn bộ mục đó, hoặc nhập số tiền để hoàn một phần.",
   "orderRefund.An adjustment is charged against this order and shows here as a refundable part, so it can be taken back the same way.": "Khoản điều chỉnh được tính vào đơn hàng này và hiện ở đây như một phần có thể hoàn, nên cũng lấy lại được theo cách tương tự.",
   "orderStageMenu.Order actions": "Thao tác đơn hàng",

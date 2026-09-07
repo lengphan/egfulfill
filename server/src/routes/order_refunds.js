@@ -13,7 +13,7 @@
 import { q, withLock } from '../db.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
-import { canMoveMoney, canSeeMoney, resolveSeller, canSurface } from '../auth.js';
+import { canMoveMoney, canAdjustPrice, canSeeMoney, resolveSeller, canSurface } from '../auth.js';
 import { notify } from './notifications.js';
 import { egBroadcast } from '../events.js';
 import { notifyChannelStillOpen } from './orders.js';
@@ -550,7 +550,7 @@ export function orderRefundRoutes(app, requireAuth) {
                charged: 0, refunded: 0, refundable: 0 };
     }
     const state = await orderCharges(req.params.id);
-    return { ...state, canRefund: canRefund(req.user) };
+    return { ...state, canRefund: canRefund(req.user), canAdjust: canAdjustPrice(req.user) };
   });
 
   app.post('/api/orders/:id/refund', { preHandler: requireAuth }, async (req, reply) => {
@@ -661,14 +661,15 @@ export function orderRefundRoutes(app, requireAuth) {
   /**
    * A price adjustment on its own — no refund involved.
    *
-   * Same authority as a refund (canMoveMoney: admin and warehouse), because it is the same
-   * act: moving money between a seller's wallet and the house against a specific order. An
-   * operator may not do it for the same reason they may not refund one.
+   * Its OWN gate, one role wider than a refund's. canAdjustPrice admits the operator,
+   * because this is the floor's finding priced in — see the note on it in auth.js. It is
+   * the only money route an operator has, and it only ever runs one way: out of the
+   * seller, into the house. Sending money back stays canRefund.
    */
   app.post('/api/orders/:id/fee', { preHandler: requireAuth }, async (req, reply) => {
-    if (!canRefund(req.user)) {
+    if (!canAdjustPrice(req.user)) {
       reply.code(403);
-      return { error: 'Only an admin can adjust what an order charges.' };
+      return { error: 'Only an admin or an operator can adjust what an order charges.' };
     }
     const b = req.body || {};
     const out = await chargeOrderFee({
