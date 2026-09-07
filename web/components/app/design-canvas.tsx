@@ -988,7 +988,29 @@ export function DesignCanvasDialog({
  const product = useMemo(() => resolveProduct(liveItem, catalog ?? []), [liveItem, catalog])
  const faces = useMemo(() => {
  const f = mockupFaces(product, liveItem.color)
- return f.length ? f : (liveItem.img ? [{ side: "front", url: liveItem.img }] : [])
+ const base = f.length ? f : (liveItem.img ? [{ side: "front", url: liveItem.img }] : [])
+    /*
+     * THE STANDARD SURFACES ARE ALWAYS ON OFFER — owner's call, 2026-09-07.
+     *
+     * The pills only appeared when the PRODUCT declared per-side mockups, and most do not:
+     * an apron, a cap, a tote with one photo got a single "front" face and no pills at
+     * all, so there was no way to put a second position on it from here even though the
+     * server has stored one artwork per side for weeks. "No surfaces in the designer" was
+     * exactly that — the surfaces were gated on staff having uploaded a back photo.
+     *
+     * So the four faces almost anything has are padded in, drawn on the front's photo when
+     * the product has no picture of its own for that side. The print zone still comes per
+     * side from print-zone.ts, and any extra face the product DOES declare (sleeve, hood,
+     * wrap) is kept ahead of the padding, in its own order. A face with a borrowed photo is
+     * still a real position: it stores, it costs, it reaches the floor.
+     */
+ const STANDARD = ["front", "back", "left", "right"]
+ const frontUrl = base.find((x) => (x.side || "front").toLowerCase() === "front")?.url || base[0]?.url || liveItem.img || ""
+    /* Padded even with NO picture at all — a line with no blank picked yet has none, and
+       that is exactly the line someone opens to set up. FaceTile draws a blank tile for an
+       empty url, and the stage already copes with an empty backdrop. */
+ const have = new Set(base.map((x) => (x.side || "front").toLowerCase()))
+ return [...base, ...STANDARD.filter((k) => !have.has(k)).map((k) => ({ side: k, url: frontUrl }))]
   }, [product, liveItem.color, liveItem.img])
  const [side, setSide] = useState(0)
   /**

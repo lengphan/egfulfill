@@ -66,13 +66,26 @@ type State = "todo" | "doing" | "done"
  * Nothing here is coloured. Colour in this product now means one thing — this needs you —
  * and it belongs to the status word, not to four sub-states of readiness.
  */
+/**
+ * REVERSED, 2026-09-07 — BOLD IS WHAT EXISTS.
+ *
+ * The inversion above ("finished fades, outstanding stays dark") was measured against a
+ * real row and failed it: a semibold "Label" sat directly over the popover line "No label
+ * bought yet". Weight is read as presence — a bold word says "there is one" — and no
+ * amount of intent makes a reader see "this is the thing still to do" in it. The owner
+ * read it the way anyone would, and asked for bold to mean what is available.
+ *
+ * So: DONE is ink and semibold, DOING is ink and normal, TODO fades. The Stock chip in
+ * orders-hub imports these, so "in stock" is now the bold one there too — the same rule,
+ * read the same way, on the fourth pill of the set.
+ */
 export const CHIP_TONE = {
-  /* Finished. Muted and normal weight: present, checkable, quiet. */
- done: "text-muted-foreground/70 font-normal hover:text-muted-foreground",
-  /* Under way. Full ink, normal weight — it is moving, but it is not finished. */
+  /* Finished — it is there. Ink and semibold. */
+ done: "text-foreground font-semibold hover:bg-muted",
+  /* Under way. Full ink, normal weight — moving, not finished. */
  doing: "text-foreground font-normal hover:bg-muted",
-  /* Not started. Ink and semibold: the only thing on the row asking for anything. */
- todo: "text-foreground font-semibold hover:bg-muted",
+  /* Not started — nothing to show. Faded, normal weight. */
+ todo: "text-muted-foreground/70 font-normal hover:text-muted-foreground",
 } as const
 
 /** A file reachable from a tag. `href` opens directly; `designId` goes through the API so
