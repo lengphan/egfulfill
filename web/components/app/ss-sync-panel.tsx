@@ -4,7 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
 import { CircleNotch, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { getSsSyncStatus, startSsSyncAll, stopSsSyncAll, type SsSyncStatus } from "@/lib/api"
+import { getSsSyncStatus, startSsSyncAll, stopSsSyncAll, syncSanmarCatalog, type SsSyncStatus } from "@/lib/api"
 
 /**
  * Catalogue sync — pulls every S&S style into the local table so search can find it.
@@ -44,11 +44,30 @@ export function SsSyncPanel() {
     return () => clearInterval(id)
   }, [st?.running, load])
 
-  const start = async (refresh: boolean) => {
+  /**
+   * ONE BUTTON, AND IT REFRESHES.
+   *
+   * There were three: "Refresh all styles" on the toolbar (a full S&S pull plus a SanMar
+   * re-read), "Sync all styles" here (the same S&S pull, skipping anything already held),
+   * and a quiet "refresh existing" link beside it (the pull that does NOT skip). Three
+   * controls, two of them the same call, and the difference between them — whether a style
+   * we already hold gets re-read — was the one thing none of the labels said. So the button
+   * that looked like the main one was the one that could never update a price.
+   *
+   * It refreshes now. Prices, stock and images move on the supplier's side, and a sync that
+   * skips everything it has seen before cannot bring any of that back; new styles land
+   * either way. It costs the better part of an hour, which is what the progress bar and the
+   * Stop button are for.
+   *
+   * SanMar rides along, as it did from the toolbar: its re-read is cheap and server-side.
+   * Otto is a file import and has nothing to pull.
+   */
+  const start = async () => {
     setBusy(true); setErr(null)
     try {
-      const r = await startSsSyncAll(refresh)
+      const r = await startSsSyncAll(true)
       if (r.error) { setErr(r.error); return }
+      syncSanmarCatalog().catch(() => { /* the S&S sync is the point; SanMar is a bonus pass */ })
       load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't start the sync.")
@@ -73,9 +92,9 @@ export function SsSyncPanel() {
   if (!st) {
     return (
       <>
-        <Button size="sm" variant="outline" onClick={() => start(false)} disabled={busy}>
+        <Button size="sm" variant="outline" onClick={() => void start()} disabled={busy}>
           {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
-          Sync all styles
+          {tl("ssSync", "Sync all styles")}
         </Button>
       </>
     )
@@ -121,18 +140,11 @@ export function SsSyncPanel() {
           {tl("ssSync", "Stop")}
         </Button>
       ) : (
-        <>
-          <Button size="sm" onClick={() => start(false)} disabled={busy}>
-            {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
-            Sync all styles
-          </Button>
-          {/* Refresh re-fetches styles already held — prices and stock move, so an
-              occasional full pass is worth an hour; a normal run should skip them. */}
-          <button onClick={() => start(true)} disabled={busy}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground">
-            {tl("ssSync", "refresh existing")}
-          </button>
-        </>
+        <Button size="sm" onClick={() => void start()} disabled={busy}
+          title={tl("ssSync", "Re-reads every S&S style — new ones and the prices, stock and photos of the ones we already hold — and re-reads SanMar's catalogue on the server. Takes the better part of an hour and runs in the background.")}>
+          {busy ? <CircleNotch size={13} className="animate-spin" /> : null}
+          {tl("ssSync", "Sync all styles")}
+        </Button>
       )}
     </>
   )

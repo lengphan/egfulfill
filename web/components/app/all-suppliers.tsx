@@ -131,7 +131,6 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   // swatches already make — so cache both from that one call rather than fetching twice.
  const [detailSizes, setDetailSizes] = useState<Record<string, string[]>>({})
  const [importing, setImporting] = useState(false)
- const [refreshing, setRefreshing] = useState(false)
  const [msg, setMsg] = useState<string | null>(null)
  const fileRef = useRef<HTMLInputElement>(null)
 
@@ -216,13 +215,13 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
     // ONLY once sizes are actually resolved (favourite-joined, or a detail call returned)
     // and came back empty — before that, empty means unloaded, so oneSize stays undefined
     // and the card shows "—".
- if (it.supplier === "ss") return { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, oneSize: ((it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`])?.length === 0) && (it.ss.sizes !== undefined || detailSizes[`ss:${it.ss.styleID}`] !== undefined), favorited: it.ss.favorited }
+ if (it.supplier === "ss") return { id: it.ss.styleID, styleNo: it.ss.styleName || it.ss.partNumber || "", title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, oneSize: ((it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`])?.length === 0) && (it.ss.sizes !== undefined || detailSizes[`ss:${it.ss.styleID}`] !== undefined), favorited: it.ss.favorited }
     // Otto: the list returns every size, so an empty set is a real fact — the product has
     // no size dimension, i.e. one size / OSFM.
- if (it.supplier === "otto") return { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, oneSize: (it.otto.sizes?.length ?? 0) === 0, favorited: it.otto.favorited }
+ if (it.supplier === "otto") return { id: it.otto.style, styleNo: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, oneSize: (it.otto.sizes?.length ?? 0) === 0, favorited: it.otto.favorited }
     // SanMar: the imported catalog aggregates every colour and size per style, so — like
     // Otto — an empty size set is a real fact. Image is already proxied by the API.
- return { id: it.sanmar.style, title: it.sanmar.name || it.sanmar.style, brand: it.sanmar.brand || "SanMar", subtitle: it.sanmar.category || undefined, image: it.sanmar.image, price: it.sanmar.price, priceMax: it.sanmar.price_max, colors: it.sanmar.colors, sizes: it.sanmar.sizes ?? [], sizesCount: it.sanmar.sizes?.length ?? 0, oneSize: (it.sanmar.sizes?.length ?? 0) === 0, favorited: it.sanmar.favorited }
+ return { id: it.sanmar.style, styleNo: it.sanmar.style, title: it.sanmar.name || it.sanmar.style, brand: it.sanmar.brand || "SanMar", subtitle: it.sanmar.category || undefined, image: it.sanmar.image, price: it.sanmar.price, priceMax: it.sanmar.price_max, colors: it.sanmar.colors, sizes: it.sanmar.sizes ?? [], sizesCount: it.sanmar.sizes?.length ?? 0, oneSize: (it.sanmar.sizes?.length ?? 0) === 0, favorited: it.sanmar.favorited }
   }
 
  const keyOf = (it: Item) => `${it.supplier}:${it.id}`
@@ -468,23 +467,6 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
   /** The blank whose full detail is open. Null = closed. */
  const [detail, setDetail] = useState<{ item: Item; supplier: "ss" | "otto" | "sanmar"; styleId: string; seed: { name?: string | null; brand?: string | null; image?: string | null; price?: string | null; styleNo?: string | null } } | null>(null)
 
-  /**
-   * The one refresh worth a button.
-   *
-   * SanMar re-reads itself nightly from the host cron, and S&S now has its own daily pull —
-   * so the only reason left to press anything is impatience: a style you have just been told
-   * about and want in the grid NOW. That is a full S&S sync, which is what this does.
-   */
- const onSyncAll = async () => {
- setRefreshing(true); setMsg(null)
- try {
- const r = await startSsSyncAll(false)
- setMsg(r?.already ? "A catalogue sync is already running — leave it going." : "Syncing the S&S catalogue in the background; new styles appear as they land.")
-      // SanMar's re-read is cheap and server-side, so it rides along rather than needing
-      // its own button.
- syncSanmarCatalog().then(() => reload(debounced)).catch(() => {})
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't start the sync.") } finally { setRefreshing(false) }
-  }
 
 
   /**
@@ -599,14 +581,11 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} disabled={importing}>
               {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} Import
             </Button>
-            {/* ONE refresh. "Sync SanMar" re-read a file a host cron already re-reads at
-                04:20, and "Refresh" only warmed the S&S image cache — two buttons for work
- that now happens on a schedule. What is left is the deliberate one: a full
-                S&S catalogue pull, which is the only sync a person has any reason to force. */}
-            <Button size="sm" variant="outline" onClick={onSyncAll} disabled={importing || refreshing}
- title={tl("allSuppliers", "Force a full S&S catalogue pull now. SanMar refreshes nightly on the server; Otto is a file import.")}>
-              {tl("allSuppliers", "Refresh all styles")}
-            </Button>
+            {/* THE SYNC BUTTON LIVES IN SsSyncPanel, and there is one of it. This was a
+                second control calling the same endpoint with the opposite refresh flag, sat
+                beside the panel's own — so the toolbar offered "Refresh all styles" and
+                "Sync all styles" next to each other, and neither label said which one could
+                actually update a price. See the note on `start` in ss-sync-panel.tsx. */}
           </>
         )}
         {/* The sync controls live in THIS row now. They had a strip of their own that was

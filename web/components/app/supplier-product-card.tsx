@@ -19,6 +19,10 @@ export type SupplierCardData = {
   title: string
   brand?: string | null
   subtitle?: string | null // category
+  /** THE NUMBER A PERSON SAYS OUT LOUD — "1717", "5000", "PC61". Not the id: S&S's styleID
+   *  is an internal row number (16) that appears on no spec sheet and no purchase order.
+   *  This is the only string on the card anybody arrives searching for, so it prints. */
+  styleNo?: string | null
   image?: string | null
   price?: number | string | null
   priceMax?: number | string | null
@@ -224,7 +228,15 @@ export function SupplierProductCard({
         {/* Fixed-height brand + 2-line title so titles align across every card (S&S + Otto). */}
         <div className="h-4 truncate eg-label text-muted-foreground">{data.brand || ""}</div>
         <div className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug">{data.title}</div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        {/* THE STYLE NUMBER, ON THE CARD. It was nowhere in the grid, so someone hunting for
+            1717 had to open styles one at a time to find out which one it was — on a page
+            whose whole job is finding a blank. It leads the line, in ink, because it is what
+            is being scanned for; the category follows it, quieter.
+            Staff-only surface (the supplier filter and the supplier badge are right there),
+            so §2.9 does not reach it — what must never carry a supplier's code is a SELLER's
+            copy of a product, which sellerSafe strips. */}
+        <div className="mt-0.5 flex items-baseline gap-1.5 text-xs text-muted-foreground">
+          {data.styleNo && <span className="shrink-0 font-medium tabular-nums text-foreground">{data.styleNo}</span>}
           {data.subtitle && <span className="truncate">{data.subtitle}</span>}
           {priceLabel && <span className="ml-auto shrink-0 font-semibold text-foreground">{priceLabel}</span>}
         </div>
