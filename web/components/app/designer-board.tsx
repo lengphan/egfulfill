@@ -874,9 +874,14 @@ export function DesignerBoard() {
                               {cardLabel(c)}
                             </button>
                           )}
-                          {/* Order ID + file number ALWAYS show so a card is readable at a glance —
- a card with no order says "No order" rather than going blank, and the
- file count shows even at 0. Method/product sits between them when set. */}
+                          {/* THREE THINGS: the name above, the artwork's number, and how many
+                              files are on it — owner's call, 2026-09-07.
+                              ─────────────────────────────────────────────────────────────
+                              The card carried five. The order reference and the
+                              colour/size/method line are ORDER detail: a designer working a
+                              queue is looking for a piece of artwork, and neither of those
+                              tells them which one this is. They are still one click away in
+                              the card, which is where an order belongs. */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-2xs text-muted-foreground">
                             {/* THE ARTWORK'S NUMBER, in the spelling the order page uses. The
                                 card stores it BARE — `1143` — because that column is a key,
@@ -887,18 +892,6 @@ export function DesignerBoard() {
                               <span className="rounded bg-muted px-1.5 py-0.5 font-medium tabular-nums" title={tl("designer", "This artwork's number — the same on the order")}>
                                 {designLabel(c.design_id)}
                               </span>
-                            )}
-                            <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums" title={c.order_id ? `Order ${c.order_id}` : tl("designer", "Not attached to an order")}>
-                              {/* shortOrderRef, not slice(0,14). Truncating at a character
- count cut `etsy-4149084185` to `etsy-414908418` — a number
- with its last digit removed, which still LOOKS like an
- order number and matches nothing. The shared formatter
- takes the routing prefix off a marketplace id and shortens
- one of ours to the segment that distinguishes it. */}
-                              {c.order_id ? shortOrderRef(String(c.order_id)) : tl("designer", "No order")}
-                            </span>
-                            {(c.product || c.type) && (
-                              <span className="rounded bg-muted px-1.5 py-0.5">{c.product || c.type}</span>
                             )}
                             <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5" title={`${c.file_count ?? 0} design file${(c.file_count ?? 0) === 1 ? "" : "s"}`}>
                               <Paperclip size={9} weight="bold" />{c.file_count ?? 0}
@@ -911,8 +904,13 @@ export function DesignerBoard() {
  what the outsourced task costs us. Neutral text, NO colour — " · paid"
  once actually credited, " · partner" for an outsourced card, else the
  plain rate. */}
-                          <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5 text-xs text-muted-foreground">
-                            <span className="shrink-0 tabular-nums">DSN-{c.id}</span>
+                          <div className="mt-auto flex items-center justify-end gap-1.5 pt-1.5 text-xs text-muted-foreground">
+                            {/* NO `DSN-{c.id}` HERE ANY MORE. That was the card ROW's key wearing
+                                the artwork prefix — `DSN-1787136256067`, a millisecond timestamp —
+                                sitting under a badge that says `DSN-1042` and means something
+                                else entirely. One prefix, two different things, and the longer,
+                                louder one was the one that meant nothing to a designer. The
+                                number that identifies the work is the badge above. */}
                             {/* EMB-check cards carry no payout (factory check, not designer
  work), so the footer figure is suppressed for them. */}
                             {!isDesigner && !isEmbCard(c) && (() => {
