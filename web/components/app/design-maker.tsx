@@ -23,7 +23,7 @@ import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { matchThreadColors, type Thread } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
-import { layerDpi, dpiWarning, useNaturalSizes } from "@/lib/print-quality"
+import { layerDpi, dpiWarning, printedInches, useNaturalSizes } from "@/lib/print-quality"
 import { designFaces, setTypeMockups, typeMockupOf, methodsOf, colorsOf, sizesOf, isEmbroidery } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
@@ -118,7 +118,7 @@ async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 90
  * has drawn something is owed the picture of it, even when a supplier's CDN is having a bad
  * afternoon.
  */
-async function composeOnMockup(mockupUrl: string, images: ImageLayer[], texts: TextLayer[], size = 1400): Promise<string> {
+async function composeOnMockup(mockupUrl: string, images: ImageLayer[], texts: TextLayer[], size = 1200): Promise<string> {
  const c = document.createElement("canvas"); c.width = size; c.height = size
  const ctx = c.getContext("2d")
  if (!ctx) return ""
@@ -131,7 +131,23 @@ async function composeOnMockup(mockupUrl: string, images: ImageLayer[], texts: T
  ctx.drawImage(bg, (size - w) / 2, (size - h) / 2, w, h)
   }
  await drawStack(ctx, size, images, texts)
- try { return c.toDataURL("image/png") } catch { return "" }
+  /**
+   * JPEG, AND THIS IS NOT A DETAIL.
+   *
+   * These go to the publish page through sessionStorage, which holds a few megabytes for the
+   * whole draft. A 1400px PNG of a photograph is two to four of them EACH, so picking three
+   * mockups overflowed the handover and the page refused to open — "this design is too large
+   * for the browser to hand over", which is the stash working exactly as designed and the
+   * caller handing it something absurd.
+   *
+   * A mockup is a photograph with artwork on it: there is no transparency to keep and no
+   * flat colour to protect, which is the whole case for PNG. At 0.82 the same frame is a
+   * couple of hundred kilobytes and no marketplace thumbnail can tell the difference.
+   *
+   * The flattened ARTWORK stays PNG — it is the print file, its background is transparent,
+   * and JPEG has no alpha.
+   */
+ try { return c.toDataURL("image/jpeg", 0.82) } catch { return "" }
 }
 
 const rid = () => "t" + Math.random().toString(36).slice(2, 8)
@@ -332,6 +348,20 @@ export function DesignMaker() {
  const measured = images.map(dpiOf).filter((d): d is number => d != null)
  const worstDpi = measured.length ? Math.min(...measured) : null
  const worstWarn = dpiWarning(images.length === 0 ? null : worstDpi)
+  /** THE OFFENDING LAYER'S OWN FIGURES — the pixels it has and the inches it is being asked
+   *  to cover. Two facts a person can act on, where a DPI number is one they cannot: nobody
+   *  resizes a file to "150 DPI", they make the print smaller or find a bigger picture. */
+ const worstArt = (() => {
+ if (!worstWarn) return null
+ const worst = images.reduce<{ im: ImageLayer; d: number } | null>((acc, im) => {
+ const d = dpiOf(im)
+ return d != null && (!acc || d < acc.d) ? { im, d } : acc
+    }, null)
+ if (!worst) return null
+ const px = natural.get(worst.im.src)?.w ?? 0
+ const inches = printedInches(worst.im.pos.w, zone.w, areaIn.w)
+ return px > 0 && inches != null ? { px: Math.round(px), inches: inches.toFixed(1) } : null
+  })()
   /** Stage zoom — shared with the order designer, which had none. See lib/stage-zoom.ts for
    *  why this scales a WRAPPER and never the artwork's own percentages. */
  const { zoom, reset: resetZoom, ref: stageWrap, style: zoomStyle } = useStageZoom()
@@ -712,15 +742,16 @@ export function DesignMaker() {
                * photographs of the product elsewhere. The mockups panel is where they said
                * which garments this design sells on; this is where that answer is spent.
                *
-               * Composited at 1400px, which is past what a marketplace thumbnail needs and
-               * under what a browser struggles to hold several of. The flattened artwork
-               * still leads the list: it is the print file, and a listing whose first image
-               * is a mockup buries the thing being sold.
+               * Composited at 1200px JPEG — see composeOnMockup: PNG at 1400 is megabytes
+               * apiece and three of them overflowed the sessionStorage handover, which is
+               * what "this design is too large for the browser to hand over" was. The
+               * flattened artwork still leads the list: it is the print file, and a listing
+               * whose first image is a mockup buries the thing being sold.
                */
  const shots: string[] = []
  if (composed) shots.push(composed)
  for (const m of mockPicks) {
- const shot = await composeOnMockup(m, frontStack.images, frontStack.texts, 1400).catch(() => "")
+ const shot = await composeOnMockup(m, frontStack.images, frontStack.texts, 1200).catch(() => "")
  if (shot) shots.push(shot)
               }
  const id = stashPublishDraft({
@@ -1307,9 +1338,15 @@ export function DesignMaker() {
                 {product ? tl("designMaker", "set on this product") : tl("designMaker", "standard size")}
               </span>
             </div>
-            <div className="flex items-baseline justify-between text-2xs text-muted-foreground">
+            {/* THE TARGET, LABELLED AS ONE. "3600 × 4800 px" sat immediately above a red
+                "Low resolution" and read as a contradiction — the panel appeared to state a
+                large number and then call it small. They are two different files: this is
+                what a full-bleed file for this area WOULD need, and the warning is about the
+                artwork actually on the stage. Saying "a full-bleed file needs" is the whole
+                fix. */}
+            <div className="flex items-baseline justify-between gap-2 text-2xs text-muted-foreground">
+              <span>{tl("designMaker", "A full-bleed file needs")}</span>
               <span className="tabular-nums">{Math.round(areaIn.w * 300)} × {Math.round(areaIn.h * 300)} px</span>
-              <span>{tl("designMaker", "at 300 DPI")}</span>
             </div>
             {/* ONLY WHEN IT IS TOO LOW — see `dpiWarning`. A meter that reported "good" on
                 every correctly-sized file trained the eye to skip the row, which is exactly
@@ -1320,9 +1357,14 @@ export function DesignMaker() {
               <div className="flex items-start gap-1.5 text-2xs text-destructive" role="status"
                 title={worstDpi != null ? `${Math.round(worstDpi)} DPI as placed` : undefined}>
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
+                {/* AND WHAT IS ACTUALLY WRONG, in the artwork's own numbers. The label alone
+                    invited the reader to compare it against the target above and conclude the
+                    two disagreed. A refusal carries its reason (§4), and the reason here is a
+                    measurement: this many pixels across that many inches. */}
                 <span>
                   {tl("designMaker", worstWarn.label)}
-                  <> {tl("designMaker", "— scale it down, or send a larger file.")}</>
+                  {worstArt && <> — <span className="tabular-nums">{worstArt.px} px</span> {tl("designMaker", "across")} <span className="tabular-nums">{worstArt.inches}&quot;</span></>}
+                  <> {tl("designMaker", "— print it smaller, or upload a higher-resolution file.")}</>
                 </span>
               </div>
             )}

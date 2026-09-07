@@ -64,9 +64,13 @@ export function dpiVerdict(dpi: number | null): { tone: "ok" | "warn" | "bad" | 
  */
 export function dpiWarning(dpi: number | null): { label: string; hint: string } | null {
   if (dpiVerdict(dpi).tone !== "bad") return null
+  /* THE ADVICE HAS TO NAME WHAT IT IS ABOUT. "Low resolution — scale it down" reads as a
+     contradiction: the file is too small, so make it smaller? What is scaled down is the
+     PRINT, not the file, and saying "at this size" is what makes the sentence hold together
+     — resolution is pixels over inches, and there are two ways to raise it. */
   return {
-    label: "Low resolution",
-    hint: "Scale it down, or replace it with a larger file — this will look soft in print.",
+    label: "Low resolution at this size",
+    hint: "Print it smaller on the garment, or upload a higher-resolution file — as placed, this will look soft.",
   }
 }
 

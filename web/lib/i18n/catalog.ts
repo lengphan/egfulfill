@@ -26,6 +26,11 @@ type Dict = Record<string, string>
 
 // English is complete; other locales may be PARTIAL — missing keys fall back to English.
 const en: Dict = {
+  "designMaker.A full-bleed file needs": "A full-bleed file needs",
+  "designMaker.across": "across",
+  "designMaker.Low resolution at this size": "Low resolution at this size",
+  "canvas.Low resolution at this size": "Low resolution at this size",
+  "designMaker.— print it smaller, or upload a higher-resolution file.": "— print it smaller, or upload a higher-resolution file.",
   "designMaker.Colours": "Colours",
   "designMaker.Sizes": "Sizes",
   "settings.QR shape": "QR shape",
@@ -189,6 +194,11 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "designMaker.A full-bleed file needs": "File tràn nền cần",
+  "designMaker.across": "trên",
+  "designMaker.Low resolution at this size": "Độ phân giải thấp so với kích thước in",
+  "canvas.Low resolution at this size": "Độ phân giải thấp so với kích thước in",
+  "designMaker.— print it smaller, or upload a higher-resolution file.": "— hãy in nhỏ lại, hoặc tải lên file có độ phân giải cao hơn.",
   "designMaker.Colours": "Màu sắc",
   "designMaker.Sizes": "Kích cỡ",
   "settings.QR shape": "Kiểu mã QR",
