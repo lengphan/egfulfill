@@ -24,9 +24,11 @@ import { useStageZoom } from "@/lib/stage-zoom"
 import { matchThreadColors, type Thread } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { layerDpi, dpiWarning, useNaturalSizes } from "@/lib/print-quality"
-import { designFaces, setTypeMockups, typeMockupOf, methodsOf, isEmbroidery } from "@/lib/variant-resolve"
+import { designFaces, setTypeMockups, typeMockupOf, methodsOf, colorsOf, sizesOf, isEmbroidery } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
+import { swatchBg } from "@/lib/color-swatch"
+import { methodByKey } from "@/lib/print-method"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
 // when the product has no imagery of its own — that outline exists precisely so a new
@@ -643,8 +645,15 @@ export function DesignMaker() {
               // would land on an empty form with no explanation.
  const id = stashPublishDraft({
  prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl: art, designPos: artPos },
- returnTo: "/design/maker",
- returnLabel: "Back to Design",
+              /* BACK TO THE BLANK, not to the picker. `/design/maker` with nothing on it is
+                 the "What are you making?" screen, so pressing Back after publishing threw
+                 away the garment you had chosen and asked you to choose it again — the one
+                 question you had already answered twice. The maker reads `?product=` on
+                 mount, which is the same route the catalogue's own "Design this" uses.
+                 The LAYERS are still lost — they live in memory — and that is a separate
+                 gap; landing on the right blank is the half that costs nothing. */
+ returnTo: product?.id ? `/design/maker?product=${encodeURIComponent(String(product.id))}` : "/design/maker",
+ returnLabel: "Back to the design",
  title: tl("designMaker", "Publish product"),
               })
  if (!id) { setPubErr("Couldn't open the publish page — this design is too large for the browser to hand over."); return }
@@ -848,11 +857,50 @@ export function DesignMaker() {
               <div className="text-sm font-semibold">{tl("designMaker", "Blank")}</div>
               <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}>{mockup ? tl("designMaker", "Change blank") : tl("designMaker", "Pick a blank")}</Button>
               {product && (
-                <div className="space-y-0.5 text-xs text-muted-foreground">
-                  <div className="font-medium text-foreground">{product.name}</div>
-                  {/* Never the supplier — see CLAUDE.md 2.9. The seller sees what they are
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="space-y-0.5">
+                    <div className="font-medium text-foreground">{product.name}</div>
+                    {/* Never the supplier — see CLAUDE.md 2.9. The seller sees what they are
  buying from US, not who we buy it from. */}
-                  {product.sku && <div className="tabular-nums text-2xs">{product.sku}</div>}
+                    {product.sku && <div className="tabular-nums text-2xs">{product.sku}</div>}
+                  </div>
+                  {/**
+                    * WHAT THIS BLANK COMES IN, said HERE.
+                    *
+                    * The panel named the garment and stopped, so the colours, the sizes and
+                    * the techniques it can be made in were facts you could only discover by
+                    * reaching the publish step and being asked to pick them — at which point
+                    * you are choosing a variant for a design you have already finished, with
+                    * no way to see whether the colour you had in mind exists without going
+                    * back. They are the blank's own facts and they belong beside its name.
+                    *
+                    * Read through the same resolvers the rest of the app uses (colorsOf /
+                    * sizesOf / methodsOf), so this cannot drift from what publish offers.
+                    */}
+                  {(() => {
+ const cols = colorsOf(product)
+ const szs = sizesOf(product)
+ const mths = methodsOf(product)
+ if (!cols.length && !szs.length && !mths.length) return null
+ return (
+                      <div className="space-y-1.5 border-t border-border pt-2">
+                        {cols.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            {cols.slice(0, 9).map((c) => (
+                              <span key={c} title={c}
+ className="size-3.5 shrink-0 rounded-full border border-black/15"
+ style={{ background: swatchBg(c) ?? "var(--muted)" }} />
+                            ))}
+                            {cols.length > 9 && <span className="text-2xs">+{cols.length - 9}</span>}
+                          </div>
+                        )}
+                        {szs.length > 0 && <div className="text-2xs">{szs.join(" · ")}</div>}
+                        {mths.length > 0 && (
+                          <div className="text-2xs">{mths.map((m) => methodByKey(m)?.label ?? m).join(" · ")}</div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>
