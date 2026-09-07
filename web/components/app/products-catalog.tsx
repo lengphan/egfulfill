@@ -16,6 +16,7 @@ import { planBrandSplit } from "@/lib/brand-split"
 import { nextEgSku } from "@/lib/sku"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { discounted } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 
@@ -471,7 +472,23 @@ export function ProductsCatalog() {
                         {p.brand && <span className="truncate">· {p.brand}</span>}
                       </div>
                     </div>
-                    <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
+                    {/* WHAT YOU PAY, AND WHAT IT LISTS AT. A plan that promises "20% off all
+                        blanks" is unprovable while every price on the screen is the list one
+                        — the seller has to place an order and read the summary to find out
+                        whether the thing they are paying $29 a month for is real. Struck
+                        through, so the discount is visible where the decision is made.
+                        The SERVER computes the charge (pricing.js); this mirrors it. */}
+                    {(() => {
+ const list = priceOf(p)
+ const net = discounted(list)
+ if (net == null) return <div className="shrink-0 font-semibold tabular-nums">{usd(list)}</div>
+ return (
+                        <div className="shrink-0 text-right">
+                          <div className="text-2xs tabular-nums text-muted-foreground line-through">{usd(list)}</div>
+                          <div className="font-semibold tabular-nums">{usd(net)}</div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Colours + type share one fixed-height row. Both slots always render

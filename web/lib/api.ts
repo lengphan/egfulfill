@@ -2755,6 +2755,11 @@ export type OrderQuote = {
    *  never shipping, which is a courier's price and not ours to discount. 0 when there is
    *  no ladder configured or the seller earned no rung, which is the default. */
   volumePct: number
+  /** The seller's PLAN rate, and which of the two actually applied — best-of, never the sum
+   *  (see effectiveDiscountPct). `discountFrom` is null when neither did, so the row can name
+   *  the discount instead of showing an unexplained deduction. */
+  planPct?: number
+  discountFrom?: "plan" | "volume" | null
   volumeDiscount: number
   /** What earned the rate: units shipped last period, and the 1-based rung. Null once the
    *  order is charged — `volumeFrozen` — because the stamped rate is then all we know, and

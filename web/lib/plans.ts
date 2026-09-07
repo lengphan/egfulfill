@@ -69,6 +69,31 @@ export function getPlan(): PlanId {
   return p === "pro" || p === "enterprise" ? p : "starter"
 }
 
+/**
+ * THE BLANK DISCOUNT A PLAN CARRIES — presentation only, mirroring the server.
+ *
+ * The charge is computed in server/src/pricing.js (planRateFor + effectiveDiscountPct);
+ * this exists so a price on a card can be shown STRUCK THROUGH beside what the seller will
+ * actually pay. A discount nobody can see before they order is one they have no reason to
+ * believe they are getting — which is exactly what "20% off all blanks" was on the Pro card
+ * for as long as nothing implemented it.
+ *
+ * The numbers are the ones we publish, and the server's defaults are the same. Where an
+ * admin has set a different rate in settings the SERVER is the truth; the worst this can be
+ * is out of date on a card, never wrong on an invoice.
+ */
+export const PLAN_BLANK_DISCOUNT: Record<PlanId, number> = { starter: 0, pro: 20, enterprise: 25 }
+export function planDiscountPct(plan: PlanId = getPlan()): number {
+  return PLAN_BLANK_DISCOUNT[plan] ?? 0
+}
+/** List price → what this seller pays, rounded to the cent. Returns null when there is no
+ *  discount, so a caller can render one price rather than two identical ones. */
+export function discounted(price: number, plan: PlanId = getPlan()): number | null {
+  const pct = planDiscountPct(plan)
+  if (!(pct > 0) || !(price > 0)) return null
+  return Math.round(price * (1 - pct / 100) * 100) / 100
+}
+
 export function planMeta(id: PlanId): PlanTier {
   return PLAN_TIERS.find((t) => t.id === id) ?? PLAN_TIERS[0]
 }

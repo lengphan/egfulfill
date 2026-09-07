@@ -1847,7 +1847,12 @@ export default function OrderDetailPage() {
                     {quote.volumeDiscount > 0 && (
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">
-                          Volume discount<span className="opacity-70"> · {quote.volumePct}%</span>
+                          {/* NAMED. Two rates can produce this line — the volume ladder and
+                              the plan — and best-of means exactly one of them did. "Volume
+                              discount" on a Pro seller's order who shipped nothing last month
+                              is a deduction attributed to a thing that did not happen. */}
+                          {quote.discountFrom === "plan" ? "Plan discount" : "Volume discount"}
+                          <span className="opacity-70"> · {quote.discountFrom === "plan" ? (quote.planPct ?? 0) : quote.volumePct}%</span>
                         </dt>
                         <dd className="tabular-nums text-success">−{usd(quote.volumeDiscount)}</dd>
                       </div>

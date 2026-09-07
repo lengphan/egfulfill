@@ -521,6 +521,40 @@ export function extraFeeOf(row, fees) {
  * module did before volume existed. The failure mode of a discount engine has to be
  * "charge the list price", never "give it away".
  */
+/**
+ * THE SELLER'S PLAN RATE — the discount the pricing page has been SELLING.
+ *
+ * "20% off all blanks" is printed on the Pro card and nothing implemented it: this module
+ * has never read `plan`, as the note on effectiveDiscountPct says in as many words. A seller
+ * paying $29 a month for a discount that does not exist is the one pricing bug that cannot
+ * be argued with, so this is the switch that note was written for.
+ *
+ * THE RATES ARE SETTINGS, defaulting to what we publish. A percentage typed into code is one
+ * nobody can correct when the offer changes, and the offer is on a marketing page that an
+ * admin already edits.
+ *
+ * FAILS TO ZERO, exactly like volumeRateFor: no plan, no row, an unreadable settings table
+ * — all of them price at the list price. The failure mode of a discount engine is "charge
+ * full", never "give it away".
+ *
+ * FROZEN THE SAME WAY. A charged order answers from the stamped rate (see volumeRateFor);
+ * this is only ever consulted for an order nobody has paid for yet.
+ */
+const PLAN_DISCOUNT_DEFAULT = { starter: 0, pro: 20, enterprise: 25 };
+async function planRateFor(sellerId) {
+  if (!sellerId) return 0;
+  try {
+    const r = await q('select coalesce(plan, \'starter\') as plan from users where id=$1', [sellerId]);
+    const plan = String(r.rows[0]?.plan || 'starter').toLowerCase().trim();
+    if (!plan || plan === 'starter') return 0;
+    const st = await q("select value from settings where key=$1", [`plan_discount_${plan}`])
+      .then((x) => x.rows[0]?.value).catch(() => null);
+    const set = Number(st);
+    const pct = Number.isFinite(set) && set >= 0 ? set : (PLAN_DISCOUNT_DEFAULT[plan] ?? 0);
+    return Math.min(100, Math.max(0, pct));
+  } catch { return 0; }
+}
+
 async function volumeRateFor(orderId) {
   const none = { pct: 0, units: 0, index: 0, frozen: false };
   try {
@@ -645,7 +679,13 @@ export async function quoteOrder(orderId) {
   const sidesOf = (it) => sidesByKey.get(it.line_id ? `L:${it.line_id}` : `S:${it.sku}`) ?? 1;
   const { lines, unpriced } = priceLines(items, idx, fees, sidesOf);
   const volume = await volumeRateFor(orderId);
-  const totals = computeTotals(lines, fees, volume.pct);
+  /* BEST-OF, never the sum — see effectiveDiscountPct. A frozen (already charged) order
+     carries its stamped rate and must not gain a second one afterwards: the plan rate is
+     consulted only while the price is still a quote. */
+  const sellerId = await q('select seller_id::text as seller_id from orders where id=$1', [orderId])
+    .then((r) => r.rows[0]?.seller_id || null).catch(() => null);
+  const planPct = volume.frozen ? 0 : await planRateFor(sellerId).catch(() => 0);
+  const totals = computeTotals(lines, fees, effectiveDiscountPct([volume.pct, planPct]));
   // Null when NOTHING is known — "$0.00 of blanks" and "we don't know" are different
   // answers, and only one of them should be subtracted from anything.
   const known = lines.filter((l) => l.supplierCost != null);
@@ -657,6 +697,11 @@ export async function quoteOrder(orderId) {
     // stamped rate is all we know about a charge that already happened — reporting this
     // month's units beside last month's charged rate would invite the two to be read as
     // one statement.
+    /* WHICH RATE WON, so a seller reading a deduction is told where it came from. Best-of
+       means at most one applies, and an unnamed discount is one nobody trusts. */
+    planPct,
+    discountFrom: effectiveDiscountPct([volume.pct, planPct]) === 0 ? null
+      : (planPct >= volume.pct ? 'plan' : 'volume'),
     volumeUnits: volume.frozen ? null : volume.units,
     volumeTier: volume.frozen ? null : volume.index,
     volumeFrozen: volume.frozen,

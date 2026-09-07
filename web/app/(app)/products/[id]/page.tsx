@@ -15,6 +15,7 @@ import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 import { framingStyle } from "@/lib/product-framing"
 import { swatchBg } from "@/lib/color-swatch"
+import { discounted } from "@/lib/plans"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
@@ -238,7 +239,20 @@ export default function ProductDetailPage() {
  with the parcel left out. The shipping table underneath is the missing half,
  and it says it in figures rather than in a word. */}
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-semibold tabular-nums">{usd(priceOf(product))}</span>
+            {/* THE LIST PRICE STRUCK THROUGH, and what this seller actually pays beside it.
+                See lib/plans.ts: the server computes the charge, this mirrors it, and a
+                discount nobody can see before ordering is one they have no reason to believe
+                in — which is what the Pro card's "20% off all blanks" was. */}
+            {(() => {
+ const list = priceOf(product)
+ const net = discounted(list)
+ return (
+                <span className="flex items-baseline gap-2">
+                  {net != null && <span className="text-lg tabular-nums text-muted-foreground line-through">{usd(list)}</span>}
+                  <span className="text-3xl font-semibold tabular-nums">{usd(net ?? list)}</span>
+                </span>
+              )
+            })()}
           </div>
           <ShippingFees
  first={shipFee || shipFirstFee(product, fees?.shipBands)}
