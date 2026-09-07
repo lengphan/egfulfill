@@ -128,8 +128,12 @@ export function NotificationBell() {
         className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none"
       >
         <Bell size={18} />
+        {/* AT THE CORNER, not on the bell. `top-1.5 right-1.5` was 6px inside a 36px
+            button whose 18px glyph is centred — so the badge sat on the bell's upper half
+            and hid it. Same offset and size as the cart badge two buttons along, so the
+            two counts in the header sit the same way. */}
         {unread > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex min-w-4 items-center justify-center rounded-full border-2 border-card bg-pop px-1 text-xs font-bold leading-none text-pop-foreground">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-pop px-1 text-xs font-bold leading-none text-pop-foreground">
             {unread > 9 ? "9+" : unread}
           </span>
         )}

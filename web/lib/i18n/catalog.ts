@@ -315,6 +315,7 @@ const vi: Dict = {
   "noLayerSelected.No layer selected": "Chưa chọn lớp nào",
   "noLayerSelectedNote.Select artwork or text on the blank to edit it here.": "Chọn thiết kế hoặc chữ trên phôi để chỉnh sửa tại đây.",
   "orderGrid.Redo (⇧⌘Z)": "Làm lại (⇧⌘Z)",
+  "orderGrid.Click to select the row": "Nhấn để chọn cả dòng",
   "orderGrid.Undo the last change (⌘Z)": "Hoàn tác thay đổi gần nhất (⌘Z)",
   "ordersList.Filter orders": "Lọc đơn hàng",
   "products.Category": "Danh mục",
