@@ -1310,6 +1310,16 @@ const vi: Dict = {
   // ── Orders hub ────────────────────────────────────────────────────────────
   // The stage vocabulary itself lives in lib/factory-status.ts and is translated where it
   // renders; these are the hub's own words.
+  "orders.position": "vị trí in",
+  "orders.positions": "vị trí in",
+  "sides.front": "Mặt trước",
+  "sides.back": "Mặt sau",
+  "sides.left": "Bên trái",
+  "sides.right": "Bên phải",
+  "sides.sleeve": "Tay áo",
+  "sides.hood": "Mũ",
+  "sides.inside": "Mặt trong",
+  "sides.wrap": "Bao quanh",
   "orders.Item": "Sản phẩm",
   "orders.Draft": "Nháp",
   "orders.Rush": "Gấp",
@@ -3990,7 +4000,8 @@ const vi: Dict = {
   "orderRefund.Kept back out of this refund — both are recorded separately": "Được giữ lại khỏi lần hoàn này — cả hai đều được ghi nhận riêng",
   "orderRefund.Everything charged on this order has been refunded.": "Mọi khoản đã tính trên đơn hàng này đều đã được hoàn.",
   "orderRefund.Price adjustment": "Điều chỉnh giá",
-  "orderRefund.Charged against this order from the seller’s wallet, with your reason on their statement.": "Trừ từ ví của người bán cho đơn hàng này, kèm lý do của bạn trên sao kê của họ.",
+  "orderRefund.Reason — the seller reads it": "Lý do — người bán sẽ đọc được",
+  "orderRefund.Charge": "Tính phí",
   "orderRefund.Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it.": "Tiền vào thẳng số dư ví của người bán. Tích vào một mục để hoàn toàn bộ mục đó, hoặc nhập số tiền để hoàn một phần.",
   "orderRefund.An adjustment is charged against this order and shows here as a refundable part, so it can be taken back the same way.": "Khoản điều chỉnh được tính vào đơn hàng này và hiện ở đây như một phần có thể hoàn, nên cũng lấy lại được theo cách tương tự.",
   "orderStageMenu.Order actions": "Thao tác đơn hàng",

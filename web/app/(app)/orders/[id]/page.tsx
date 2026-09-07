@@ -1,5 +1,6 @@
 "use client"
 
+import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
@@ -14,6 +15,7 @@ import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, 
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { deleteOrderItem } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
+import { OrderAdjustPanel } from "@/components/app/order-adjust-panel"
 import { DesignFeeAmount } from "@/components/app/design-charge"
 import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { designCardFor } from "@/lib/api"
@@ -37,6 +39,8 @@ import {
  indexDesigns,
  designsBySide,
  designForLine,
+ sidesForLine,
+ ALL_SIDES,
  getOrderDesigns,
  getDesignFiles,
  type DesignFileRow,
@@ -111,6 +115,7 @@ export default function OrderDetailPage() {
  const params = useParams<{ id: string }>()
  const router = useRouter()
  const id = decodeURIComponent(String(params?.id ?? ""))
+ const tl = useLabelT()
  const [orders, setOrders] = useState<OrderRow[] | null>(null)
  const [one, setOne] = useState<OrderRow | null>(null)
   // Fetching TikTok's own label for this order. Kept local to the Shipping card — it's a
@@ -132,6 +137,8 @@ export default function OrderDetailPage() {
   // What the buyer paid, when nothing recorded it — a manual order has no marketplace to
   // ask, so it is typed here or it is never known.
  const [editRetail, setEditRetail] = useState(false)
+ // Bumped after a price adjustment so the refund panel re-reads its parts.
+ const [adjRev, setAdjRev] = useState(0)
  const [retailDraft, setRetailDraft] = useState("")
   // The ship-to, while the order has not started. Etsy hands us receipts with the street
   // lines withheld and the city/zip intact, so an order can look addressed and still have
@@ -1046,6 +1053,12 @@ export default function OrderDetailPage() {
  const card = isStaff ? cardForLine(boardCards, { line_id: it.line_id, sku: it.sku }) : undefined
  const design = designForLine(designs, it)
  const artwork = designSrc(design?.data)
+                  /* WHICH POSITIONS ARE PICKED, on the row — so "how many faces does this
+                     line print" is read down the list rather than found by opening each
+                     designer. From the per-face map the Files tab already reads; the
+                     singular `design` above stays the front, which is what the avatar wants. */
+ const picked = Object.keys(sidesForLine(designSides, it)).map((k) => k.toLowerCase())
+    .sort((a, b) => (ALL_SIDES as readonly string[]).indexOf(a) - (ALL_SIDES as readonly string[]).indexOf(b))
  const qty = Number(it.qty) || 1
                   /**
                    * WHAT THIS LINE COSTS, from the quote — not unit_price.
@@ -1361,6 +1374,16 @@ export default function OrderDetailPage() {
                           VariantStrip: a settled line and an editable one describe the same
                           thing, so they must not be two different shapes. */}
                       <div className="w-full basis-full">
+                        {(it.sku || it.line_id) && (
+                          <div className="mb-1.5 flex flex-wrap items-center gap-1 text-2xs">
+                            <span className={picked.length ? "font-medium text-foreground" : "text-muted-foreground"}>
+                              {picked.length} {tl("orders", picked.length === 1 ? "position" : "positions")}
+                            </span>
+                            {picked.map((k) => (
+                              <span key={k} className="rounded bg-muted px-1.5 py-0.5 capitalize text-foreground">{tl("sides", k)}</span>
+                            ))}
+                          </div>
+                        )}
                         {canEditVariants ? (
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
                         ) : (
@@ -2024,9 +2047,14 @@ export default function OrderDetailPage() {
 
             {/* Sits under Summary: what was charged, then what can be sent back. Renders
    nothing for sellers and for staff without the permission. */}
-            <OrderRefundPanel orderId={id} />
+            <OrderRefundPanel key={adjRev} orderId={id} />
             </>
           )}
+
+          {/* The price adjustment stands on its own and at EVERY stage — a draft included,
+              which is when the floor finds what the quote missed. Seller orders only: a
+              factory-owned order has no wallet to charge. */}
+          {!order.factory_order && <OrderAdjustPanel orderId={id} onCharged={() => { setAdjRev((n) => n + 1); reloadAll() }} />}
 
           {/* THE RECORD MOVED TO ITS OWN TAB. It sat here, last and collapsed, under
               Customer -> Shipping -> Summary -> Refund — the order the questions come in,

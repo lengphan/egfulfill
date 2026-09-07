@@ -6,7 +6,7 @@ import { ArrowUUpLeft, CircleNotch, CheckCircle, Warning } from "@phosphor-icons
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderCharges, refundOrder, chargeOrderFee, type OrderCharges } from "@/lib/api"
+import { getOrderCharges, refundOrder, type OrderCharges } from "@/lib/api"
 
 const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
 
@@ -79,23 +79,20 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
     )
   }
  if (!state) return null                       // still loading
-  // Staff who can neither refund nor adjust don't get the panel. The server enforces both;
-  // hiding it just avoids offering an action that would only ever 403. An operator holds
-  // the second flag and not the first: they can price in what the floor found, never send
-  // money back — so below, the tick boxes and the refund half only exist for `mayRefund`.
- if (!state.canRefund && !state.canAdjust) return null
+  // Staff who can't refund don't get the panel. The server enforces this; hiding it just
+  // avoids offering an action that would only ever 403.
+ if (!state.canRefund) return null
   // Nothing was ever charged (an unsubmitted order) — there's no money story to tell yet.
  if (state.charged <= 0) return null
 
  const parts = state.parts
- const mayRefund = !!state.canRefund
  const toggle = (k: string) => setPicked((p) => {
  const n = new Set(p); if (!n.delete(k)) n.add(k); return n
   })
 
   // What the current selection would pay out. A typed amount overrides a ticked part, so
   // the figure shown is always the figure that will move.
- const selected = mayRefund ? parts.filter((p) => picked.has(p.key) && p.refundable > 0) : []
+ const selected = parts.filter((p) => picked.has(p.key) && p.refundable > 0)
  const planned = selected.reduce((s, p) => {
  const typed = Number(amounts[p.key])
  return s + (isFinite(typed) && typed > 0 ? Math.min(typed, p.refundable) : p.refundable)
@@ -138,36 +135,6 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
     } finally { sending.current = false; setBusy(false) }
   }
 
-  /**
-   * A price adjustment on its own — money the other way, no refund involved.
-   *
-   * Same guard as a refund (the ref, not `busy`) for the same reason: each press mints its
-   * own idempotency key, so two presses that beat the re-render are two charges, not one
-   * deduped retry.
-   */
- const charge = async () => {
- if (sending.current) return
- sending.current = true
- setBusy(true); setMsg(null)
- try {
- const r = await chargeOrderFee(orderId, { amount: feeAmt, note: note.trim(), clientId: newClientId() })
- if (r.error) {
- setMsg({ ok: false, text: r.shortfall
-          ? `${r.error} They need ${usd(r.shortfall)} more in the wallet.`
- : r.error })
- return
-      }
- setMsg({ ok: true, text: `Charged ${usd(r.charged || feeAmt)} to the seller's wallet.` })
- setFee(""); setNote("")
- setState(r)
-      /* Re-tick what is refundable now: the charge just made itself refundable, and the
- panel opens with everything ticked. Same re-seed the load path does. */
- setPicked(new Set(r.parts.filter((p) => p.refundable > 0).map((p) => p.key)))
-    } catch {
- setMsg({ ok: false, text: "Couldn't charge the adjustment — nothing was taken." })
-    } finally { sending.current = false; setBusy(false) }
-  }
-
   /* "Everything" means every refundable part is ticked AND nobody typed a smaller amount
  into one. A typed-down part is a partial refund even when all the boxes are ticked. */
   /* Parsed once. Negative and non-numeric collapse to 0, which reads as "no adjustment"
@@ -185,8 +152,8 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
 
  return (
     <SectionCard
- title={mayRefund ? tl("orderRefund", "Refund") : tl("orderRefund", "Price adjustment")}
- actions={mayRefund ? <span className="text-xs text-muted-foreground">{usd(state.refundable)} refundable</span> : undefined}
+ title={tl("orderRefund", "Refund")}
+ actions={<span className="text-xs text-muted-foreground">{usd(state.refundable)} refundable</span>}
     >
       <div className="divide-y divide-border">
         {parts.map((p) => {
@@ -194,20 +161,15 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  return (
             <label
  key={p.key}
- className={"flex items-center gap-3 px-5 py-2.5 text-sm " + (spent ? "opacity-60" : mayRefund ? "cursor-pointer" : "")}
+ className={"flex items-center gap-3 px-5 py-2.5 text-sm " + (spent ? "opacity-60" : "cursor-pointer")}
             >
-              {/* The tick is the refund. Without that authority the row is a read of what
- the order cost — the operator needs the figures to price an adjustment
- against, not a control that would 403. */}
-              {mayRefund && (
-                <input
+              <input
  type="checkbox"
  disabled={spent || busy}
  checked={picked.has(p.key)}
  onChange={() => toggle(p.key)}
  className="size-4 accent-primary"
-                />
-              )}
+              />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{p.label}</div>
                 {/* State what's gone rather than only what's left — a part that's already
@@ -221,7 +183,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
                 <span className="inline-flex items-center gap-1 text-xs text-success">
                   <CheckCircle size={12} weight="fill" /> {tl("orderRefund", "fully refunded")}
                 </span>
-              ) : mayRefund && (
+              ) : (
                 <Input
  value={amounts[p.key] ?? ""}
  placeholder={p.refundable.toFixed(2)}
@@ -248,7 +210,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  the other direction — an order that has been fully refunded can still turn out to
  have cost more, and hiding the whole footer once the refundable balance hits zero
  took the only control that could record that away with it. */}
-        {nothingLeft && mayRefund && (
+        {nothingLeft && (
           <p className="text-sm text-muted-foreground">{tl("orderRefund", "Everything charged on this order has been refunded.")}</p>
         )}
         {(
@@ -262,7 +224,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
             />
 
             {/**
-              * THE ADJUSTMENT — the other direction of the same money.
+              * THE KEEP-BACK — money the other way, out of the same press.
               *
               * A quote can be wrong upward as well as downward: a heavier parcel than the
               * estimate, a colour added at the machine, one line re-printed. There was no way
@@ -273,14 +235,18 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               * is the same decision with the same authority, made at the same moment, by the
               * same person — and because keeping a fee back out of a refund is the two of
               * them together, which two separate panels could not express in one press.
+              *
+              * ONLY while a part is ticked. A plain adjustment with no refund attached is the
+              * Price adjustment card beside this one (order-adjust-panel.tsx), which also
+              * exists on a draft; here the row would just be that card again, under a list
+              * of charges the Summary already prints.
               */}
+            {selected.length > 0 && (
             <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium">{tl("orderRefund", "Charge an adjustment")}</div>
                 <div className="text-xs text-muted-foreground">
-                  {selected.length
-                    ? tl("orderRefund", "Kept back out of this refund — both are recorded separately")
- : tl("orderRefund", "Taken from the seller’s wallet against this order")}
+                  {tl("orderRefund", "Kept back out of this refund — both are recorded separately")}
                 </div>
               </div>
               <Input
@@ -293,6 +259,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  className="h-8 w-24 text-right tabular-nums"
               />
             </label>
+            )}
             {/* ONE BUTTON, and it always states the amount it will send.
                 Two buttons made the reader compare them to work out which was which, on a
  panel where the difference is money leaving. The amount follows the ticks:
@@ -308,11 +275,11 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
             <div className="flex">
               <Button
  className="w-full justify-center"
- onClick={() => (selected.length ? send(isEverything ? "full" : "selected") : void charge())}
+ onClick={() => void send(isEverything ? "full" : "selected")}
                 /* A reason is OPTIONAL on a refund and REQUIRED on a charge: money arriving
  explains itself, money leaving does not. The server refuses it either way;
  this only stops the round trip. */
- disabled={busy || (!selected.length && feeAmt <= 0) || (feeAmt > 0 && !note.trim())}
+ disabled={busy || !selected.length || (feeAmt > 0 && !note.trim())}
               >
                 {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
                 {/* ONE BUTTON, NAMING ALL OF WHAT IT DOES. With an adjustment typed it is two
@@ -321,9 +288,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  ticked and nothing kept back is still "Full refund": that is the whole
  order going back, and saying so beats restating a figure the header
  already carries. */}
-                {!selected.length
-                  ? `Charge ${usd(feeAmt)}`
- : feeAmt > 0
+                {feeAmt > 0
                     ? `${isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}, keep ${usd(feeAmt)}`
  : isEverything ? tl("orderRefund", "Full refund") : `Refund ${usd(planned)}`}
               </Button>
@@ -336,11 +301,7 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              {selected.length
-                ? tl("orderRefund", "Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it.")
- : mayRefund
-                  ? tl("orderRefund", "An adjustment is charged against this order and shows here as a refundable part, so it can be taken back the same way.")
-                  : tl("orderRefund", "Charged against this order from the seller’s wallet, with your reason on their statement.")}
+              {tl("orderRefund", "Goes straight to the seller’s wallet balance. Tick a part to refund it in full, or type an amount to refund some of it.")}
             </p>
           </>
         )}
