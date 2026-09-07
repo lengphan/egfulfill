@@ -106,7 +106,7 @@ export default function SheetsPage() {
         <div className="text-sm text-muted-foreground">{tl("sheet", "Loading…")}</div>
       ) : !sheets.length ? (
         /* An empty state may carry one sentence, because there is nothing else to read. */
-        <div className="rounded-xl border border-border p-8 text-center">
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
           <div className="text-sm font-medium">{tl("sheet", "No sheets yet")}</div>
           <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
             {tl("sheet", "A sheet is where you type orders in bulk. It saves as you go, so you can leave it and come back.")}
@@ -114,7 +114,13 @@ export default function SheetsPage() {
           <Button className="mt-4" onClick={start} disabled={busy}>{tl("sheet", "New sheet")}</Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border">
+        /* A CARD IS WHITE. This had the border and no fill, so a light-grey table sat on
+           the light-grey page with a hairline between them and the whole list read as
+           barely there — "difficult to see" is exactly what a card with no ground looks
+           like. §4: the canvas is white, cards are white, the grey is the gap BETWEEN
+           surfaces. The header band is the only tint, and it only reads once the sheet
+           under it is white. */
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs text-muted-foreground">
               <tr>

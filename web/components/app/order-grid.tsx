@@ -262,6 +262,10 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * Enter, or moving away. Clicking or arrowing to a cell only SELECTS it.
    */
   const [editing, setEditing] = useState<string | null>(null)
+  /** Which whole row is selected, by index. Cleared the moment a cell takes focus — a
+   *  sheet cannot have both a live cell and a live row without the next keypress being
+   *  ambiguous about which one it means. */
+  const [selRow, setSelRow] = useState<number | null>(null)
   /**
    * THE SUGGESTION MENU, POSITIONED BY US.
    *
@@ -645,7 +649,27 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
   const removeRow = (r: number) => {
     setEditing(null)
     setMenu(null)
+    setSelRow(null)
     writeRows((p) => (p.length <= 1 ? [blankRow()] : p.filter((_, i) => i !== r)))
+  }
+
+  /**
+   * THE ROW NUMBER SELECTS THE ROW, which is what it does in every sheet anyone has used.
+   *
+   * It was the one cell in the grid that was not an input and did nothing at all — it
+   * carried the drag-to-resize handle on its bottom border and otherwise just printed a
+   * number. So there was no way to say "this row" and no way to empty one: clearing eleven
+   * cells meant eleven Deletes, and the only row-level control was Remove, which is a
+   * different act with a different consequence.
+   *
+   * Selected, Delete CLEARS the row rather than deleting it — the spreadsheet meaning, and
+   * the safe one: the row stays where it is, so nothing below it shifts up under the cursor.
+   * Removing a row is still the X at the end, which is the destructive act and looks like it.
+   */
+  const clearRow = (r: number) => {
+    setEditing(null)
+    setMenu(null)
+    writeRows((p) => p.map((row, i) => (i === r ? blankRow() : row)))
   }
 
   const complete = async () => {
@@ -716,11 +740,35 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                */
               const started = rows[r].some((v) => v.trim() !== "")
               const h = rowH[r]
+              const isSel = selRow === r
               return (
-                <tr key={r} style={h ? { height: h } : undefined}>
+                <tr key={r} style={h ? { height: h } : undefined} data-selected={isSel || undefined} className={isSel ? "bg-accent" : undefined}>
                   <td
-                    title={started ? (rec?._errors || rec?._warnings || undefined) : undefined}
-                    className="relative border-b border-border bg-muted/40 px-2 py-1 text-right text-muted-foreground tabular-nums"
+                    title={started ? (rec?._errors || rec?._warnings || undefined) : tl("orderGrid", "Click to select the row")}
+                    tabIndex={0}
+                    aria-selected={isSel}
+                    onClick={() => { setEditing(null); setMenu(null); setSelRow((cur) => (cur === r ? null : r)) }}
+                    onKeyDown={(e) => {
+                      if (!isSel) return
+                      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); clearRow(r) }
+                      else if (e.key === "Escape") setSelRow(null)
+                    }}
+                    /* COPY AND PASTE A WHOLE ROW, through the clipboard the sheet already speaks.
+                       Copy writes the row as one tab-separated line — the same shape a spreadsheet
+                       puts on the clipboard, so it pastes into Excel and Sheets too. Paste hands
+                       the clipboard to the block handler at column 0, which is the existing
+                       "spread a TSV block from here" path: nothing new decides how a pasted row
+                       lands. Both are native events on the focused cell, so no permission prompt
+                       and no async clipboard API. Only while the row is selected — a stray ⌘C on
+                       an unselected number must not silently replace what someone copied. */
+                    onCopy={(e) => {
+                      if (!isSel) return
+                      e.preventDefault()
+                      e.clipboardData.setData("text/plain", rows[r].join("\t"))
+                    }}
+                    onPaste={(e) => { if (isSel) onPaste(e, r, 0) }}
+                    className={"relative cursor-pointer select-none border-b border-border px-2 py-1 text-right tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring "
+                      + (isSel ? "bg-primary text-primary-foreground" : "bg-muted/40 text-muted-foreground hover:bg-muted")}
                   >
                     {r + 1}
                     {/* Same control on the other axis, on the row's own bottom border — the
@@ -730,8 +778,9 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                       role="separator"
                       aria-orientation="horizontal"
                       title={tl("orderGrid", "Drag to resize — double-click to reset")}
-                      onPointerDown={(e) => startResize(e, "row", String(r), e.currentTarget.closest("tr")?.getBoundingClientRect().height ?? MIN_ROW)}
-                      onDoubleClick={() => resetSize("row", String(r))}
+                      onPointerDown={(e) => { e.stopPropagation(); startResize(e, "row", String(r), e.currentTarget.closest("tr")?.getBoundingClientRect().height ?? MIN_ROW) }}
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => { e.stopPropagation(); resetSize("row", String(r)) }}
                       className="absolute inset-x-0 bottom-0 z-20 h-1.5 cursor-row-resize touch-none select-none hover:bg-primary/40"
                     />
                   </td>
@@ -760,6 +809,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                            * undo the point of double-clicking.
                            */
                           onFocus={(e) => {
+                            setSelRow(null)
                             if (editing !== `${r}-${c}`) e.currentTarget.select()
                             if (list?.length) openMenu(e.currentTarget, `${r}-${c}`)
                           }}

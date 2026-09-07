@@ -639,7 +639,12 @@ export function ImportOrdersDialog({
                 required ones were scattered through the optional ones, so working out what you
                 actually had to fill meant reading every chip and its colour. Now the answer is
                 the first block, and the rest can be ignored. */}
-            <details className="rounded-xl border border-border bg-muted/20" open>
+            {/* THE BORDER SEPARATES, NOT A FILL. Three grey panels sat inside this white
+                dialog — the column map, the Sheet block and the notice — so the card had
+                grey boxes on it and the eye read them as gaps rather than as regions.
+                §4: cards are white and separated by the border, and the grey stays outside
+                as the page. The border is unchanged; only the fill has gone. */}
+            <details className="rounded-xl border border-border" open>
               <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
                 {tl("import", "Columns —")} <span className="text-muted-foreground">{tl("import", "grouped the way you fill them")}</span>
               </summary>
@@ -710,7 +715,7 @@ export function ImportOrdersDialog({
                     four of them, so editing here meant scrolling a viewport at a spreadsheet.
                     It opens as a full page instead, in its own tab, so the seller keeps this
                     one — and the orders behind it — where they were. */}
-                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <div className="rounded-xl border border-border p-4">
                   {/* SAME WINDOW. A new tab would make "Back" mean "close this", which is a
                       different promise from the one a seller who came from Orders expects —
                       and it strands the dialog open behind a tab they can no longer see. */}
@@ -747,7 +752,7 @@ export function ImportOrdersDialog({
             </Tabs>
 
             {notice && (
-              <div className="mt-3 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+              <div className="mt-3 rounded-lg border border-border p-2.5 text-xs text-muted-foreground">
                 {notice}
                 {/* Manual escape hatch when the clipboard is unavailable — a dead end here means
                     building 22 columns by hand, which is where import failures start. */}
