@@ -23,7 +23,7 @@ import { resolveProduct, mockupFaces, isEmbroidery } from "@/lib/variant-resolve
 import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { useIsNarrow } from "@/lib/use-narrow"
-import { layerDpi, dpiVerdict, printedInches, useNaturalSizes } from "@/lib/print-quality"
+import { layerDpi, dpiWarning, printedInches, useNaturalSizes } from "@/lib/print-quality"
 import { TIER_LABEL, TIER_WHY, feeFor } from "@/lib/design-fee"
 import { fileToUploadUrl } from "@/lib/chat-upload"
 import { perceptualHash } from "@/lib/phash"
@@ -1098,7 +1098,7 @@ export function DesignCanvasDialog({
  const natural = useNaturalSizes(designUrl ? [designUrl] : [])
  const artDpi = layerDpi(natural.get(designUrl)?.w ?? 0, pos.w, zone.w, areaIn.w)
  const artIn = printedInches(pos.w, zone.w, areaIn.w)
- const quality = dpiVerdict(designUrl ? artDpi : null)
+ const artWarn = dpiWarning(designUrl ? artDpi : null)
   /**
    * IS IT OUTSIDE WHAT WE CAN PRINT — and the one press that fixes it.
    *
@@ -2708,13 +2708,16 @@ export function DesignCanvasDialog({
           {/**
             * WHAT IT PRINTS AT — the one number this window owed and never said.
             *
-            * Placed size first, because that is the fact; the verdict second, because that is
-            * our opinion of it. Both are read off the LIVE placement, so dragging the corner
-            * moves them — which is what makes it a measurement rather than a badge.
+            * Placed size is the FACT and is always shown; it is read off the LIVE placement,
+            * so dragging the corner moves it, which is what makes it a measurement rather
+            * than a badge.
             *
-            * No sentence under it. The tone carries "too low" on its own and the title says
-            * what to do about it, per §4 — a paragraph explaining DPI under a control is the
-            * exact shape this codebase keeps having to delete.
+            * The VERDICT is an opinion, and an opinion only earns a place here when you have
+            * to act on it — so it appears only when the file is genuinely too low, and it
+            * never states the figure. See `dpiWarning`.
+            *
+            * No sentence under it either. The title says what to do, per §4 — a paragraph
+            * explaining DPI under a control is the exact shape this codebase keeps deleting.
             */}
           {designUrl && !ownMockups[sideKey] && (
             <div className="flex items-center justify-center gap-2 text-xs">
@@ -2723,32 +2726,28 @@ export function DesignCanvasDialog({
                   {artIn.toFixed(1)}&Prime; wide
                 </span>
               )}
-              <span
-                title={quality.tone === "bad"
-                  ? "Scale it down, or replace it with a larger file — this will look soft in print."
-                  : quality.tone === "warn"
-                  ? "Fine for DTG and DTF. Embroidery wants 300."
-                  : undefined}
-                /* A READING, NOT A PILL. This sits beside a measurement in a strip of
-                   measurements, and a tinted lozenge there reads as a tag someone attached
-                   rather than as the file's own verdict — §4 keeps the filled capsule for
-                   status chips, where it has to mean something. Colour and a dot carry the
-                   warning; the fill was only ever decoration around it. */
-                className={"inline-flex items-center gap-1.5 font-medium "
-                  /* The SAME tokens the Design Maker's meter uses — `hold` is the amber one
-                     and there is no `--warning`, so `text-warning` would have rendered as
-                     nothing at all. Two surfaces judging one file must not disagree. */
-                  + (quality.tone === "ok" ? "text-success"
-                  : quality.tone === "warn" ? "text-hold"
-                  : quality.tone === "bad" ? "text-destructive"
-                  : "text-muted-foreground")}
-              >
-                {quality.tone !== "ok" && quality.tone != null && (
+              {/* ONLY WHEN IT IS ACTUALLY TOO LOW, and never as a figure — see `dpiWarning`.
+                  This strip is measurements a person checks; a verdict that fires on every
+                  file is not a measurement, it is chrome, and it was drowning the one case
+                  that needed reading. The DPI itself stays in the tooltip.
+
+                  A READING, NOT A PILL. A tinted lozenge here reads as a tag someone
+                  attached rather than as the file's own verdict — §4 keeps the filled
+                  capsule for status chips. Colour and a dot carry the warning.
+
+                  `text-destructive` is the same token the Design Maker's meter uses: two
+                  surfaces judging one file must not disagree. */}
+              {artWarn && (
+                <span
+                  title={artDpi != null
+                    ? `${Math.round(artDpi)} DPI as placed — ${artWarn.hint}`
+                    : artWarn.hint}
+                  className="inline-flex items-center gap-1.5 font-medium text-destructive"
+                >
                   <span aria-hidden className="size-1.5 rounded-full bg-current" />
-                )}
-                {artDpi != null && <span className="tabular-nums">{Math.round(artDpi)} DPI</span>}
-                <span>{quality.label.replace("Print quality: ", "")}</span>
-              </span>
+                  <span>{tl("canvas", artWarn.label)}</span>
+                </span>
+              )}
               {/* The warning carries its own fix. Not a sentence underneath it — the button
                   IS the explanation of what is wrong, per §4. */}
               {/* THE WAY BACK. A zoom with no reset is a state you can enter and not leave —

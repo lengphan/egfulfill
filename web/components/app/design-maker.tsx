@@ -23,7 +23,7 @@ import { printZoneOf, printSizeOf } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { matchThreadColors, type Thread } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
-import { layerDpi, dpiVerdict, useNaturalSizes } from "@/lib/print-quality"
+import { layerDpi, dpiWarning, useNaturalSizes } from "@/lib/print-quality"
 import { designFaces, setTypeMockups, typeMockupOf, methodsOf, isEmbroidery } from "@/lib/variant-resolve"
 import { useRouter } from "next/navigation"
 import { stashPublishDraft } from "@/lib/publish-draft"
@@ -59,15 +59,6 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
  img.onerror = () => resolve(null)   // a broken layer is skipped, never fatal to the flatten
  img.src = src
   })
-}
-
-/** The meter's three states. Amber and red are the reserved warning/alert hues and this is
- * a warning about work, so it uses them rather than inventing a fourth signal colour. */
-const QUALITY_TONE: Record<string, string> = {
- ok: "text-success",
- warn: "text-hold",
- bad: "text-destructive",
- unknown: "text-muted-foreground",
 }
 
 /** One face's worth of design. The editor holds a map of these keyed by side. */
@@ -277,7 +268,7 @@ export function DesignMaker() {
  const dpiOf = (im: ImageLayer) => layerDpi(natural.get(im.src)?.w ?? 0, im.pos.w, zone.w, areaIn.w)
  const measured = images.map(dpiOf).filter((d): d is number => d != null)
  const worstDpi = measured.length ? Math.min(...measured) : null
- const quality = dpiVerdict(images.length === 0 ? null : worstDpi)
+ const worstWarn = dpiWarning(images.length === 0 ? null : worstDpi)
   /** Stage zoom — shared with the order designer, which had none. See lib/stage-zoom.ts for
    *  why this scales a WRAPPER and never the artwork's own percentages. */
  const { zoom, reset: resetZoom, ref: stageWrap, style: zoomStyle } = useStageZoom()
@@ -1077,16 +1068,18 @@ export function DesignMaker() {
               <span className="tabular-nums">{Math.round(areaIn.w * 300)} × {Math.round(areaIn.h * 300)} px</span>
               <span>{tl("designMaker", "at 300 DPI")}</span>
             </div>
-            {/* Only once there is something to judge. A meter that is wrong while idle is
- one nobody reads when it matters. */}
-            {images.length > 0 && (
-              <div className={"flex items-start gap-1.5 text-2xs " + QUALITY_TONE[quality.tone]} role="status">
+            {/* ONLY WHEN IT IS TOO LOW — see `dpiWarning`. A meter that reported "good" on
+                every correctly-sized file trained the eye to skip the row, which is exactly
+                the row that had to be read the one time it went red. Silence IS the pass.
+                The figure is in the tooltip; the sentence is the refusal's reason, which §4
+                allows and which a label alone cannot carry. */}
+            {worstWarn && (
+              <div className="flex items-start gap-1.5 text-2xs text-destructive" role="status"
+                title={worstDpi != null ? `${Math.round(worstDpi)} DPI as placed` : undefined}>
                 <span className="mt-1 size-1.5 shrink-0 rounded-full bg-current" />
                 <span>
-                  {tl("designMaker", quality.label)}
-                  {worstDpi != null && <span className="tabular-nums"> · {Math.round(worstDpi)} DPI</span>}
-                  {quality.tone === "bad" && <> {tl("designMaker", "— scale it down, or send a larger file.")}</>}
-                  {quality.tone === "warn" && <> {tl("designMaker", "— fine for DTG and DTF; embroidery wants 300.")}</>}
+                  {tl("designMaker", worstWarn.label)}
+                  <> {tl("designMaker", "— scale it down, or send a larger file.")}</>
                 </span>
               </div>
             )}
@@ -1129,19 +1122,22 @@ export function DesignMaker() {
               <div className="space-y-1">
                 {[...images].reverse().map((im) => {
                   // Per LAYER, because the summary above names the worst one and this is
-                  // how you find out which one that is.
+                  // how you find out which one that is. Only the bad one is marked: a dot
+                  // beside every layer is a legend, not a finding.
  const d = dpiOf(im)
- const v = dpiVerdict(d)
+ const w = dpiWarning(d)
  return (
                     <button key={im.id} onClick={() => setSelected(im.id)}
  className={"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors " + (selected === im.id ? "eg-selected" : "hover:bg-accent")}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={im.src} alt="" className="eg-checker size-7 shrink-0 rounded border border-border object-contain" />
                       <span className="truncate">{im.name || tl("designMaker", "Image")}</span>
-                      <span
- className={"ml-auto size-1.5 shrink-0 rounded-full bg-current " + QUALITY_TONE[v.tone]}
- title={d == null ? tl("designMaker", "Measuring this layer") : `${Math.round(d)} DPI as placed — ${v.label.replace("Print quality: ", "")}`}
-                      />
+                      {w && (
+                        <span
+ className="ml-auto size-1.5 shrink-0 rounded-full bg-current text-destructive"
+ title={`${Math.round(d as number)} DPI as placed — ${w.hint}`}
+                        />
+                      )}
                     </button>
                   )
                 })}

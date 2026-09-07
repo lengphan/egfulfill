@@ -46,6 +46,31 @@ export function dpiVerdict(dpi: number | null): { tone: "ok" | "warn" | "bad" | 
 }
 
 /**
+ * WHAT TO PUT ON SCREEN — which is not the same as what we measured.
+ *
+ * A verdict is only worth a person's attention when they have to ACT on it. `good` and
+ * `usable` both mean "this will print", and a strip that announces that is chrome: the
+ * meter was green beside every correctly-sized file, so the one time it went red it read
+ * as more of the same. Only `bad` speaks.
+ *
+ * And it speaks in WORDS. "15 DPI" is a number a seller can do nothing with that "low
+ * resolution" does not already tell them — they cannot add pixels to a file they were
+ * sent, and the fix (scale it down, or find a bigger one) is the same at 15 as at 90.
+ * The figure stays on `layerDpi` for anything that needs to reason about it, and in the
+ * tooltip for anyone who wants it.
+ *
+ * Returns null when there is nothing to say. Render nothing — not an empty span, not a
+ * grey dot; a placeholder for a warning is how the row grew back.
+ */
+export function dpiWarning(dpi: number | null): { label: string; hint: string } | null {
+  if (dpiVerdict(dpi).tone !== "bad") return null
+  return {
+    label: "Low resolution",
+    hint: "Scale it down, or replace it with a larger file — this will look soft in print.",
+  }
+}
+
+/**
  * THE PIXELS A PLACED IMAGE ACTUALLY HAS.
  *
  * Module-scope and content-keyed by src, so the same artwork on three layers is measured
