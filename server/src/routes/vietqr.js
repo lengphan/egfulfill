@@ -29,7 +29,21 @@ const VQ_API_PASS = process.env.VIETQR_API_PASSWORD || '';
 async function vqOutboundToken() {
   if (!VQ_API_USER || !VQ_API_PASS) throw new Error('Server missing VIETQR_API_USERNAME / VIETQR_API_PASSWORD');
   const auth = Buffer.from(VQ_API_USER + ':' + VQ_API_PASS).toString('base64');
-  const r = await fetch(VQ_API_BASE + '/vqr/api/token_generate', { method: 'POST', headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/json' } });
+  /**
+   * A TIMEOUT, because without one this route cannot fail — it can only hang.
+   *
+   * Neither call here carried an AbortSignal, so an unreachable VietQR (their host down,
+   * our egress blocked, a route that black-holes) left the request open until the OS gave
+   * up on the socket, minutes later. Fastify holds the connection that whole time, and the
+   * gateway in front of it gives up first — so what reaches the seller is a bare 502 with no
+   * body, from Caddy or Cloudflare rather than from us, carrying nothing about what failed.
+   * That is the "Couldn't start the payment" with a gateway error under it.
+   *
+   * Ten seconds. Their token endpoint answers in about a tenth of a second when it is well;
+   * anything past ten is not slow, it is broken, and saying so is worth more than waiting.
+   */
+  const r = await fetch(VQ_API_BASE + '/vqr/api/token_generate', { method: 'POST', signal: AbortSignal.timeout(10000), headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/json' } })
+    .catch((e) => { throw new Error(e?.name === 'TimeoutError' ? `VietQR did not answer within 10s (${VQ_API_BASE}) — check the server can reach it` : `VietQR unreachable: ${e?.message || e}`); });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.access_token) throw new Error('VietQR get-token failed: ' + (d.message || ('HTTP ' + r.status)));
   return d.access_token;
@@ -398,7 +412,8 @@ export function vietqrRoutes(app, requireAuth) {
     const orderId = ('EG' + Date.now().toString(36)).toUpperCase().slice(0, 13);
     try {
       const gr = await fetch(VQ_API_BASE + '/vqr/api/qr/generate-customer', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        // See the note on vqOutboundToken: no signal meant no failure, only a hang.
+        method: 'POST', signal: AbortSignal.timeout(15000), headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content: note, amount, orderId, qrType: 0, transType: 'C' })
       });
       const gd = await gr.json().catch(() => ({}));
@@ -508,7 +523,8 @@ export function vietqrRoutes(app, requireAuth) {
     let genContent = content;
     try {
       const gr = await fetch(VQ_API_BASE + '/vqr/api/qr/generate-customer', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        // See the note on vqOutboundToken: no signal meant no failure, only a hang.
+        method: 'POST', signal: AbortSignal.timeout(15000), headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content, amount, orderId, qrType: 0, transType: 'C' })
       });
       const gd = await gr.json().catch(() => ({}));
@@ -520,6 +536,7 @@ export function vietqrRoutes(app, requireAuth) {
 
     try {
       const cr = await fetch(VQ_API_BASE + '/vqr/bank/api/test/transaction-callback', {
+        signal: AbortSignal.timeout(15000),
         method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ bankAccount: account, content: genContent, amount, bankCode, transType: 'C' })
       });
