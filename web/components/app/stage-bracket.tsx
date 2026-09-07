@@ -79,7 +79,11 @@ export function StageBracket({
 }) {
   const tl = useLabelT()
   const line = lineFor(isFactory)
-  const labelOf = (id: string) => ALL_STATUSES.find((s) => s.id === id)?.label ?? id
+  /* THE LABEL GOES THROUGH tl. ALL_STATUSES is the vocabulary — ids and their English
+     words — and rendering that word straight out of the table left DRAFT / PENDING /
+     APPROVED / WORKING / SHIPPED / HOLD in English on a dashboard that was otherwise
+     entirely in Vietnamese. The id is untouched; only what is drawn changes. */
+  const labelOf = (id: string) => tl("stage", ALL_STATUSES.find((s) => s.id === id)?.label ?? id)
 
   /**
    * THE DASHES MARK A BOUNDARY, so a role with no boundary gets none.

@@ -399,11 +399,15 @@ export function OrdersList() {
         )}
         {/* toolbar */}
         <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* THE LABEL IS TRANSLATED, THE ID IS NOT. `f` is both the filter's value and its
+              English word, and passing it straight through as the label left the one row of
+              controls on this page in English while everything around it turned. matchesFilter
+              still compares the ID, so the vocabulary itself is untouched. */}
           <TabBar
             look="segmented"
             spacing="none"
             ariaLabel={tl("ordersList", "Filter orders")}
-            items={SELLER_FILTERS.map((f) => ({ id: f, label: f }))}
+            items={SELLER_FILTERS.map((f) => ({ id: f, label: tl("ordersList", f) }))}
             value={filter}
             onChange={setFilter}
           />

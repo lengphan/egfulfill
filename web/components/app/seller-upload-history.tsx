@@ -63,10 +63,14 @@ export function SellerUploadHistory() {
             the only active treatment. It was a run of capsules with a filled black one, which
             is a primary button's shape and fill — on a row where nothing is a primary
             button. */}
+        {/* THE LABEL IS TRANSLATED, THE ID IS NOT. `f` is both the filter's value and its
+            English word, and passing it straight through as the label left this row of
+            controls in English while everything around it turned. matchesFilter still
+            compares the ID, so the vocabulary itself is untouched. */}
         <TabBar
           size="sm"
           ariaLabel="Filter uploads"
-          items={SELLER_FILTERS.map((f) => ({ id: f, label: f }))}
+          items={SELLER_FILTERS.map((f) => ({ id: f, label: tl("uploadHistory", f) }))}
           value={filter}
           onChange={setFilter}
           className="border-b-0"
