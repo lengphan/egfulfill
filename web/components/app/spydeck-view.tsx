@@ -1626,31 +1626,60 @@ function SpyDeckLocked() {
     "Competitor pricing at a glance",
     "One-click add-to-store",
   ]
- return (
+  /**
+   * ONE LEFT SPINE, and three jobs in order: what it is, what you get, what it costs.
+   *
+   * It was a centred stack — mark, title, a three-line ragged paragraph, a left-aligned list
+   * inside a centred block, a centred button — so nothing on the card shared an edge with
+   * anything else, which is most of why it read as a template rather than as part of this
+   * app. Centring is for a region with ONE thing in it (see empty-state); this has four.
+   *
+   * THE PRICE IS A FACT, NOT A CLAUSE. It was the last words of a paragraph, which is where
+   * a reader asking "what does it cost" never looks. It sits beside the button now, at the
+   * moment the question is actually asked.
+   *
+   * The lock sits INSIDE the tile. It hung off the corner at -bottom-1 -right-1, breaking
+   * the one square edge the card had — the same objection that moved the design canvas's
+   * download button back within its thumbnail.
+   */
+  return (
     <div className="mx-auto max-w-xl py-8">
-      <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-8 text-center">
-        <span className="relative flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Binoculars size={26} weight="fill" />
-          <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full border-2 border-card bg-foreground text-background">
-            <LockSimple size={11} weight="fill" />
+      <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+        <div className="flex items-start gap-4">
+          <span className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Binoculars size={24} weight="fill" />
+            <span className="absolute bottom-0.5 right-0.5 flex size-[17px] items-center justify-center rounded-full bg-foreground text-background">
+              <LockSimple size={9} weight="fill" />
+            </span>
           </span>
-        </span>
-        <h2 className="mt-4 text-xl font-semibold tracking-tight">{tl("spydeck", "SpyDeck is a research add-on")}</h2>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          Unlock product research to find winning listings before you print. Included free on Pro &amp; Enterprise,
- or add it to any plan for ${cfg.price}/mo.
-        </p>
-        <ul className="mt-5 grid w-full gap-2 text-left sm:grid-cols-2">
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold tracking-tight">{tl("spydeck", "SpyDeck is a research add-on")}</h2>
+            {/* ONE line. The old three explained the feature, the price and the plans at
+                once, and the list below already says what the feature is. */}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {tl("spydeck", "Find the listings that are already selling, before you print.")}
+            </p>
+          </div>
+        </div>
+
+        <ul className="mt-6 grid gap-x-6 gap-y-2.5 border-t border-border pt-5 sm:grid-cols-2">
           {perks.map((p) => (
-            <li key={p} className="flex items-start gap-2 text-sm text-muted-foreground">
-              <Check size={15} weight="bold" className="mt-0.5 shrink-0 text-primary" />
+            <li key={p} className="flex items-start gap-2 text-sm">
+              <Check size={14} weight="bold" className="mt-[3px] shrink-0 text-primary" />
               <span>{p}</span>
             </li>
           ))}
         </ul>
-        <Link href="/settings?tab=plan" className={cn(buttonVariants(), "mt-6 w-full sm:w-auto")}>
-          {tl("spydeck", "See plans")}
-        </Link>
+
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-border pt-5">
+          <Link href="/settings?tab=plan" className={cn(buttonVariants())}>
+            {tl("spydeck", "See plans")}
+          </Link>
+          <span className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">${cfg.price}/mo</span>{" "}
+            {tl("spydeck", "on any plan — included on Pro & Enterprise")}
+          </span>
+        </div>
       </div>
     </div>
   )

@@ -1987,6 +1987,8 @@ const vi: Dict = {
   "broadcasts.Subject and body only, to the seller’s notifications. Goes to everyone in the audience — including anyone who opted out of marketing email, since that isn’t an opt-out from the app.": "Chỉ tiêu đề và nội dung, gửi vào phần thông báo của người bán. Đến với mọi người trong danh sách — kể cả những ai đã từ chối nhận email tiếp thị, vì đó không phải là từ chối nhận thông báo trong ứng dụng.",
   "broadcasts.No per-address record for this one — it was sent before addresses were kept. The counts above are what was logged at the time.": "Không có bản ghi theo từng địa chỉ cho lần gửi này — nó được gửi trước khi hệ thống lưu địa chỉ. Các con số ở trên là những gì đã được ghi lại lúc đó.",
   "spydeck.SpyDeck is a research add-on": "SpyDeck là tiện ích nghiên cứu thị trường",
+  "spydeck.Find the listings that are already selling, before you print.": "Tìm những sản phẩm đang bán chạy, trước khi bạn in.",
+  "spydeck.on any plan — included on Pro & Enterprise": "cho mọi gói — miễn phí với gói Pro & Enterprise",
   "spydeck.Product research": "Nghiên cứu sản phẩm",
   "spydeck.Research the competition": "Nghiên cứu đối thủ",
   "spydeck.Search": "Tìm kiếm",

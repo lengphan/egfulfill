@@ -3,7 +3,7 @@
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Check, MagnifyingGlass, Sparkle } from "@phosphor-icons/react"
+import { Check, MagnifyingGlass, Sparkle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,7 +26,22 @@ import {
  type PlanId,
 } from "@/lib/plans"
 
-const usd = (n: number) => (n === 0 ? "Free" : `$${n}`)
+/**
+ * TWO FORMATTERS, because "Free" is a fact about a PRICE and a lie about a BALANCE.
+ *
+ * There was one, and it turned every zero into "Free" — so a wallet with nothing in it
+ * reported "Wallet balance: Free" beside a $29 charge it could not cover. A tier at $0 is
+ * genuinely free; money you hold is $0.00 and nothing else.
+ *
+ * `money` also fixes the decimals. `$${n}` printed $29.5 for 29.5, and printed "$NaN" for
+ * anything that arrived unset — a broken number reaching a person's screen dressed as a
+ * price. An unusable figure renders as a dash, which is the honest shape for one.
+ */
+const money = (n: unknown) => {
+  const v = Number(n)
+  return Number.isFinite(v) ? `$${v.toFixed(2).replace(/\.00$/, "")}` : "\u2014"
+}
+const planPrice = (n: number) => (Number(n) === 0 ? "Free" : money(n))
 function useFmtDate() {
   const fmtDate = useDateFormat()
   return useCallback((s?: string | null) => {
@@ -151,11 +166,25 @@ export function SubscriptionPanel() {
  await refresh()
     } catch (e) {
       // 402 = the wallet can't cover it. Not a dead end — offer the top-up.
- if (e instanceof ApiError && e.status === 402) {
- const m = /balance is \$([0-9.]+) — this costs \$([0-9.]+)/.exec(e.message)
- const balance = m ? Number(m[1]) : (billing?.balance ?? 0)
- const amount = m ? Number(m[2]) : (priceOf(pending) ?? 0)
- setShort({ amount, balance, shortfall: Number((amount - balance).toFixed(2)) })
+      if (e instanceof ApiError && e.status === 402) {
+        /**
+         * READ THE FIELDS, NOT THE SENTENCE.
+         *
+         * This scraped two numbers out of the error's prose with a regex — em dash and all —
+         * so the shortfall depended on the server never rewording its own message, and when
+         * the match failed it fell through to `priceOf(pending) ?? 0`, which cannot catch a
+         * NaN because NaN is not null. That is where "You need $NaN more" came from.
+         *
+         * billing.js has returned `amount`, `balance` and `shortfall` as real fields on this
+         * 402 all along, and ApiError carries the parsed body for exactly this. The old
+         * fallbacks stay for an older server, and every value is checked for being a finite
+         * number before it can reach the screen.
+         */
+        const b = (e.body ?? {}) as { amount?: unknown; balance?: unknown; shortfall?: unknown }
+        const n = (v: unknown, fallback: number) => (Number.isFinite(Number(v)) ? Number(v) : fallback)
+        const balance = n(b.balance, n(billing?.balance, 0))
+        const amount = n(b.amount, n(priceOf(pending), 0))
+        setShort({ amount, balance, shortfall: n(b.shortfall, Number((amount - balance).toFixed(2))) })
       }
  setErr(e instanceof Error ? e.message : "Could not change your plan")
     } finally { setBusy(false) }
@@ -176,7 +205,7 @@ export function SubscriptionPanel() {
             <div>
               <div className="text-sm text-muted-foreground">{current.name} plan · billed monthly</div>
               <div className="mt-1 text-4xl font-bold tracking-tight">
-                {usd(current.monthlyPrice)}
+                {planPrice(current.monthlyPrice)}
                 {current.monthlyPrice > 0 && <span className="text-base font-normal text-muted-foreground">/mo</span>}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">{current.tagline}</div>
@@ -260,7 +289,7 @@ export function SubscriptionPanel() {
                 )}
               </div>
               <div className="mt-2 text-2xl font-bold tracking-tight">
-                {usd(t.monthlyPrice)}
+                {planPrice(t.monthlyPrice)}
                 {t.monthlyPrice > 0 && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
               </div>
               {/* What choosing THIS plan means for the month already paid for: how many
@@ -274,7 +303,7 @@ export function SubscriptionPanel() {
                   ) : alreadyPaidFor(t.id as PlanId) ? (
                     <span className="font-medium text-success">$0 now — paid through {fmtDate(billing.renews_at)}</span>
                   ) : (priceOf({ plan: t.id as PlanId }) ?? 0) > 0 ? (
-                    <>{usd(priceOf({ plan: t.id as PlanId }) ?? 0)} now for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left</>
+                    <>{money(priceOf({ plan: t.id as PlanId }) ?? 0)} now for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left</>
                   ) : null}
                 </div>
               )}
@@ -383,8 +412,8 @@ export function SubscriptionPanel() {
  of Pro you already bought". Spell out the date and the days so the choice is
  made with the facts, and offer the obvious alternative: wait it out. */}
           {isDowngrade && billing?.renews_at && daysLeft > 0 && (
-            <div className="rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
-              <div className="font-medium">You keep {currentTier?.shortName ?? tl("subscription", "your current plan")} until {fmtDate(billing.renews_at)}.</div>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+              <div className="font-medium text-hold">You keep {currentTier?.shortName ?? tl("subscription", "your current plan")} until {fmtDate(billing.renews_at)}.</div>
               <p className="mt-1">
                 Nothing is charged now. You&apos;ll keep {currentTier?.shortName ?? tl("subscription", "your plan")}
                 {includedFree || spydeckAddon ? tl("subscription", " and SpyDeck") : ""} for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left,
@@ -396,8 +425,8 @@ export function SubscriptionPanel() {
 
           {/* Returning to a tier this paid month already covers — no second charge. */}
           {!isDowngrade && pending?.plan && alreadyPaidFor(pending.plan) && (priceOf(pending) ?? 0) === 0 && billing?.renews_at && (
-            <div className="rounded-lg border border-shipped/30 bg-shipped/12 p-3 text-sm text-shipped">
-              <div className="font-medium">{tl("subscription", "Already paid — nothing to charge.")}</div>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+              <div className="font-medium text-shipped">{tl("subscription", "Already paid — nothing to charge.")}</div>
               <p className="mt-1">
                 Your {pendingTier?.shortName ?? "plan"} month runs through {fmtDate(billing.renews_at)}
                 {daysLeft > 0 ? ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}. Switching back now costs $0,
@@ -410,18 +439,21 @@ export function SubscriptionPanel() {
             <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">{tl("subscription", "Due now")}</dt>
-                <dd className="font-semibold tabular-nums">{usd(priceOf(pending ?? {}) ?? 0)}</dd>
+                <dd className="font-semibold tabular-nums">{money(priceOf(pending ?? {}) ?? 0)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">{tl("subscription", "Wallet balance")}</dt>
-                <dd className="tabular-nums">{usd(billing.balance)}</dd>
+                <dd className="tabular-nums">{money(billing.balance)}</dd>
               </div>
             </dl>
           )}
 
           {short && (
-            <div className="rounded-lg border border-hold/30 bg-hold/10 p-3 text-sm text-hold">
-              You need {usd(short.shortfall)} more. Top up your wallet, then come back and finish.
+            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+              {/* Colour on the mark and the figure, not the panel — see the note on
+                  LowBalanceBanner. Two washed tints stacked is what made these read cheap. */}
+              <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-hold" />
+              <span>You need <strong className="text-hold">{money(short.shortfall)}</strong> more. Top up your wallet, then come back and finish.</span>
             </div>
           )}
           {err && !short && <p className="text-sm text-destructive">{err}</p>}
@@ -430,7 +462,7 @@ export function SubscriptionPanel() {
             {short && <Button variant="outline" onClick={() => router.push("/wallet")}>{tl("subscription", "Top up wallet")}</Button>}
             <Button variant="ghost" onClick={() => setPending(null)} disabled={busy}>{tl("subscription", "Cancel")}</Button>
             <Button onClick={commit} disabled={busy}>
-              {busy ? tl("subscription", "Working…") : (priceOf(pending ?? {}) ?? 0) > 0 ? `Pay ${usd(priceOf(pending ?? {}) ?? 0)}` : tl("subscription", "Confirm")}
+              {busy ? tl("subscription", "Working…") : (priceOf(pending ?? {}) ?? 0) > 0 ? `Pay ${money(priceOf(pending ?? {}) ?? 0)}` : tl("subscription", "Confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

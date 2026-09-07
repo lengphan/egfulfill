@@ -52,19 +52,30 @@ export function LowBalanceBanner() {
  const blocking = w.balance <= 0
  const negative = w.balance < 0
 
+ /**
+   * THE MARK CARRIES THE COLOUR, NOT THE GROUND.
+   *
+   * This was a filled amber panel, and it sits on the dashboard's grey — two washed tints
+   * against each other, which is the one place a tinted block has nothing to hold onto. The
+   * app already reached this conclusion twice (the DPI reading, the "outside the print area"
+   * chip): colour the thing that means something and leave the surface alone.
+   *
+   * So: the ordinary card the rest of the page is made of, with the warning in the icon and
+   * in the figure — the two things being warned ABOUT. Blocking keeps a red hairline as
+   * well, because "cannot submit" is a different claim from "getting low" and one of them
+   * has to be louder.
+   */
  return (
-    <div className={"flex flex-wrap items-center gap-2 rounded-lg border px-4 py-2.5 text-sm " + (
- blocking
-        ? "border-destructive/30 bg-destructive/10 text-destructive"
- : "border-hold/20 bg-hold/10 text-hold")}>
-      <Warning size={16} weight="fill" className="shrink-0" />
+    <div className={"flex flex-wrap items-center gap-2.5 rounded-lg border bg-card px-4 py-2.5 text-sm text-foreground " + (
+ blocking ? "border-destructive/40" : "border-border")}>
+      <Warning size={16} weight="fill" className={"shrink-0 " + (blocking ? "text-destructive" : "text-hold")} />
       <span className="min-w-0 flex-1">
         {negative ? (
-          <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until it’s positive.")}</>
+          <>{tl("lowBalanceBanner", "Your balance is")} <strong className={blocking ? "text-destructive" : "text-hold"}>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until it’s positive.")}</>
         ) : blocking ? (
-          <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until you top up.")}</>
+          <>{tl("lowBalanceBanner", "Your balance is")} <strong className={blocking ? "text-destructive" : "text-hold"}>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until you top up.")}</>
         ) : (
-          <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Submitting an order charges it — top up before it runs out.")}</>
+          <>{tl("lowBalanceBanner", "Your balance is")} <strong className={blocking ? "text-destructive" : "text-hold"}>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Submitting an order charges it — top up before it runs out.")}</>
         )}
       </span>
       <Link href="/wallet" className="shrink-0 font-medium underline">{tl("lowBalanceBanner", "Top up")}</Link>
