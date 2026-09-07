@@ -125,7 +125,13 @@ export default function SheetsPage() {
                     copy the alignment rule exists to prevent. */}
                 <th className="px-3 py-2 text-right font-medium">{tl("sheet", "Rows")}</th>
                 <th className="px-3 py-2 text-left font-medium">{tl("sheet", "Updated")}</th>
-                <th className="w-40 px-3 py-2" />
+                {/* ONE ACTION PER COLUMN. They were both in one flex cell, and Delete only
+                    exists on a draft — so on a sent sheet Duplicate slid right into the space
+                    Delete had left and the button's edge moved row by row down the list. §4:
+                    an element that is present on some rows and absent on others needs its own
+                    track, not a shared row that reflows around it. */}
+                <th className="px-3 py-2" />
+                <th className="w-24 px-3 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -157,17 +163,19 @@ export default function SheetsPage() {
                   <td className="px-3 py-2 text-xs text-muted-foreground">
                     {new Date(s.updatedAt).toLocaleString()}
                   </td>
-                  <td className="px-3 py-2">
-                    <div className="flex justify-end gap-1.5">
-                      <Button variant="outline" size="sm" onClick={() => copy(s.id)} disabled={busy}>
-                        {tl("sheet", "Duplicate")}
+                  <td className="px-3 py-2 text-right">
+                    <Button variant="outline" size="sm" onClick={() => copy(s.id)} disabled={busy}>
+                      {tl("sheet", "Duplicate")}
+                    </Button>
+                  </td>
+                  {/* Empty on a sent sheet, never missing: the cell holds the column open so
+                      Duplicate beside it cannot move. */}
+                  <td className="px-3 py-2 text-right">
+                    {s.status === "draft" && (
+                      <Button variant="ghost" size="sm" onClick={() => remove(s.id)} disabled={busy}>
+                        {tl("sheet", "Delete")}
                       </Button>
-                      {s.status === "draft" && (
-                        <Button variant="ghost" size="sm" onClick={() => remove(s.id)} disabled={busy}>
-                          {tl("sheet", "Delete")}
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </td>
                 </tr>
               ))}
