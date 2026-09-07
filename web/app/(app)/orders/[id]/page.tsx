@@ -755,6 +755,96 @@ export default function OrderDetailPage() {
    * they can act on; these say what IS true. The vocabulary is the one the design fees
    * already use (OrderDesignFee.status) rather than a second one invented here.
    */
+  /**
+   * WHAT THE BUYER PAID, as an editable cell — one copy, used on both kinds of order.
+   *
+   * It used to exist only inside the seller branch, which a factory order never reaches. So
+   * on our own orders the one number Gross margin needs had no field to be typed into, and
+   * the margin sat at "no sale price recorded" permanently.
+   */
+ const customerPaidCell = (
+    <dd className="tabular-nums">
+      {editRetail ? (
+        <span className="flex items-center gap-1">
+          <Input
+ autoFocus value={retailDraft} inputMode="decimal"
+ onChange={(e) => setRetailDraft(e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") void saveRetail(); if (e.key === "Escape") setEditRetail(false) }}
+ className="h-7 w-24 text-right text-sm"
+          />
+          <Button size="sm" variant="ghost" onClick={() => void saveRetail()}>Save</Button>
+        </span>
+      ) : (
+        <button
+ onClick={() => { setRetailDraft(revenue ? String(revenue) : ""); setEditRetail(true) }}
+ className="underline-offset-2 hover:underline"
+        >
+          {hasRevenue ? usd(revenue) : <span className="italic text-muted-foreground">not recorded</span>}
+        </button>
+      )}
+    </dd>
+  )
+
+  /**
+   * WHAT WENT OUT — the factory's own costs, as rows. ONE definition, rendered on our own
+   * orders and inside the staff block on a seller's, because two copies of this list is how
+   * the two views come to disagree about what an order cost.
+   *
+   * ESTIMATES ARE MARKED ON THE ROW. Blanks are the only estimate here and also the biggest
+   * number, so an unlabelled one would read as a fact. Everything else is a cost we booked.
+   */
+ const spendRows = (
+    <>
+      {blanksEstimate != null && (
+        <div className="flex justify-between text-sm">
+          <dt className="text-muted-foreground">
+            Blanks
+            <span className="text-muted-foreground/70"> · estimated</span>
+            {/* A partial figure says so rather than reading as the total. */}
+            {quote?.supplierKnown != null && quote?.lines && quote.supplierKnown < quote.lines.length && (
+              <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
+            )}
+          </dt>
+          <dd className="tabular-nums">−{usd(blanksEstimate)}</dd>
+        </div>
+      )}
+      {costLines.map((l, i) => (
+        <div key={i} className="flex justify-between text-sm">
+          <dt className="text-muted-foreground" title={l.note ?? undefined}>{l.label}</dt>
+          <dd className={"tabular-nums " + (l.credit ? "text-success" : "")}>
+            {l.credit ? "+" : "−"}{usd(l.amount)}
+          </dd>
+        </div>
+      ))}
+      {legacyPostage > 0 && (
+        <div className="flex justify-between text-sm">
+          {/* Bought before costs were booked to the ledger, so the order row is the only
+              record of it. Never added alongside a ledger row for the same label — that
+              would bill the postage twice. */}
+          <dt className="text-muted-foreground">Postage</dt>
+          <dd className="tabular-nums">−{usd(legacyPostage)}</dd>
+        </div>
+      )}
+      {ourTotal === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Nothing has been spent on this order yet — no postage bought, no partner work booked.
+        </p>
+      )}
+    </>
+  )
+
+  /** WHAT IS LEFT. Gross, and it says so: labour and consumables are not tracked anywhere,
+   *  so calling this the margin full stop would overstate what we keep. */
+ const grossMarginRow = (
+    <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+      <dt>Gross margin</dt>
+      <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
+        {factoryMargin != null ? usd(factoryMargin)
+ : <span className="font-normal italic text-muted-foreground">{isFactory ? "no sale price recorded" : "not charged yet"}</span>}
+      </dd>
+    </div>
+  )
+
  const moneyState: { label: string; tone: string } = isFactory
     ? { label: "Internal", tone: "bg-muted text-muted-foreground" }
  : refundedTotal > 0.005
@@ -1704,7 +1794,29 @@ export default function OrderDetailPage() {
                     Couldn&apos;t load this order&apos;s price. Nothing has been charged — reload, and tell us if it keeps failing.
                   </p>
                 )}
-                {submittable && quote && !quote.unpriced?.length ? (
+                {/**
+                  * ── OUR OWN ORDER: ONE COLUMN OF MONEY, AND IT IS OURS ──────────────────
+                  *
+                  * Nobody is billed internally, so every seller-facing figure on this card is
+                  * a price that will never be charged: Base cost, Shipping and Total describe
+                  * a transaction that does not exist, "You paid" reads "not charged yet"
+                  * forever (a factory order skips in_review, so chargeForSubmit never runs),
+                  * and the real numbers sat below them in a bordered box captioned as if we
+                  * were hiding them from a seller who cannot open this page.
+                  *
+                  * So on the factory's own orders there is no second card and no seller side:
+                  * what the buyer paid, what it cost us, what is left.
+                  */}
+                {isFactory && isStaff ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Customer paid</dt>
+                      {customerPaidCell}
+                    </div>
+                    {spendRows}
+                    {grossMarginRow}
+                  </>
+                ) : submittable && quote && !quote.unpriced?.length ? (
                   <>
                     {/* BASE COST, the same word the product editor uses for this number —
    what the seller is charged for the blank, as against "product cost",
@@ -1825,26 +1937,7 @@ export default function OrderDetailPage() {
                     <div className="mt-3 space-y-2 border-t border-border pt-3">
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-muted-foreground">Customer paid</dt>
-                        <dd className="tabular-nums">
-                          {editRetail ? (
-                            <span className="flex items-center gap-1">
-                              <Input
-   autoFocus value={retailDraft} inputMode="decimal"
-   onChange={(e) => setRetailDraft(e.target.value)}
-   onKeyDown={(e) => { if (e.key === "Enter") void saveRetail(); if (e.key === "Escape") setEditRetail(false) }}
-   className="h-7 w-24 text-right text-sm"
-                              />
-                              <Button size="sm" variant="ghost" onClick={() => void saveRetail()}>Save</Button>
-                            </span>
-                          ) : (
-                            <button
-   onClick={() => { setRetailDraft(revenue ? String(revenue) : ""); setEditRetail(true) }}
-   className="underline-offset-2 hover:underline"
-                            >
-                              {hasRevenue ? usd(revenue) : <span className="italic text-muted-foreground">not recorded</span>}
-                            </button>
-                          )}
-                        </dd>
+                        {customerPaidCell}
                       </div>
                       <div className="flex justify-between font-semibold">
                         <dt>Estimated profit</dt>
@@ -1873,82 +1966,42 @@ export default function OrderDetailPage() {
                 {/**
                   * ── OUR SIDE OF THE SAME ORDER ──────────────────────────────────────
                   *
-                  * Outside the ternary above, so it renders in EVERY state — quoted,
-                  * charged, refunded, and on our own orders. Inside it, it was unreachable
-                  * (see the note where it used to live).
+                  * A SELLER'S order only. On our own there is no second side to keep apart —
+                  * the whole card is already ours — and the branch above draws it as one list
+                  * rather than a box inside a box.
+                  *
+                  * Outside the ternary above, so it renders in EVERY state of a seller's
+                  * order — quoted, charged, refunded. Inside it, it was unreachable (see the
+                  * note where it used to live).
                   *
                   * Three groups, in the order the question is actually asked: what came in,
                   * what went out, what is left. The two pots stay physically apart — a
                   * seller's money and ours on one card is only safe if the reader can never
                   * mistake one for the other.
                   *
-                  * ESTIMATES ARE MARKED ON THE ROW. Blanks are the only estimate here and
-                  * they are also the biggest number, so an unlabelled one would read as a
-                  * fact. Everything else is a cost we actually booked.
+                  * The caption says FACTORY and stops there. "Not shown to the seller" was
+                  * telling the only people who can see this card a rule they already work
+                  * under — §4's prose-under-a-control, one line up.
                   */}
-                {isStaff && (ourTotal != null || takeIn != null) && (
+                {isStaff && !isFactory && (ourTotal != null || takeIn != null) && (
                   <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3">
                     <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Factory · not shown to the seller
+                      Factory
                     </div>
 
-                    {/* WHAT CAME IN — a different number on the two kinds of order, and
-                        labelled as which. On our own order nobody is billed internally, so
-                        the honest figure is the buyer's. */}
+                    {/* WHAT CAME IN. */}
                     {takeIn != null && (
                       <div className="flex justify-between text-sm">
-                        <dt className="text-muted-foreground">{isFactory ? "Customer paid" : "Seller paid us"}</dt>
+                        <dt className="text-muted-foreground">Seller paid us</dt>
                         <dd className="tabular-nums">{usd(takeIn)}</dd>
                       </div>
                     )}
 
                     {/* WHAT WENT OUT. */}
-                    {blanksEstimate != null && (
-                      <div className="flex justify-between text-sm">
-                        <dt className="text-muted-foreground">
-                          Blanks
-                          <span className="text-muted-foreground/70"> · estimated</span>
-                          {/* A partial figure says so rather than reading as the total. */}
-                          {quote?.supplierKnown != null && quote?.lines && quote.supplierKnown < quote.lines.length && (
-                            <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
-                          )}
-                        </dt>
-                        <dd className="tabular-nums">−{usd(blanksEstimate)}</dd>
-                      </div>
-                    )}
-                    {costLines.map((l, i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <dt className="text-muted-foreground" title={l.note ?? undefined}>{l.label}</dt>
-                        <dd className={"tabular-nums " + (l.credit ? "text-success" : "")}>
-                          {l.credit ? "+" : "−"}{usd(l.amount)}
-                        </dd>
-                      </div>
-                    ))}
-                    {legacyPostage > 0 && (
-                      <div className="flex justify-between text-sm">
-                        {/* Bought before costs were booked to the ledger, so the order row is
-                            the only record of it. Never added alongside a ledger row for the
-                            same label — that would bill the postage twice. */}
-                        <dt className="text-muted-foreground">Postage</dt>
-                        <dd className="tabular-nums">−{usd(legacyPostage)}</dd>
-                      </div>
-                    )}
-                    {ourTotal === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Nothing has been spent on this order yet — no postage bought, no partner work booked.
-                      </p>
-                    )}
+                    {spendRows}
 
-                    {/* WHAT IS LEFT. Gross, and it says so: labour and consumables are not
-                        tracked anywhere, so calling this the margin full stop would overstate
-                        what we keep. */}
-                    <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
-                      <dt>Gross margin</dt>
-                      <dd className={"tabular-nums " + (factoryMargin != null && factoryMargin < 0 ? "text-destructive" : "")}>
-                        {factoryMargin != null ? usd(factoryMargin)
-   : <span className="font-normal italic text-muted-foreground">{isFactory ? "no sale price recorded" : "not charged yet"}</span>}
-                      </dd>
-                    </div>
+                    {/* WHAT IS LEFT. */}
+                    {grossMarginRow}
                   </div>
                 )}
 

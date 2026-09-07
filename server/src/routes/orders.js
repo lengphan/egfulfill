@@ -1875,22 +1875,38 @@ export function ordersRoutes(app, requireAuth) {
         reply.code(403); return { error: 'Not allowed to modify this order' };
       }
     }
-    // This route only ever creates SELLER/staff-made orders — Etsy imports use
-    // importReceipt(). So factory_order is always false here (insert AND on
-    // conflict), guaranteeing manual orders stay visible to the seller even if a
-    // prior run mis-flagged them.
+    /**
+     * WHOSE ORDER THIS IS — decided by the OWNER'S ROLE, the same way the backfill above
+     * decides it, and at the moment the row is written rather than at the next boot.
+     *
+     * It was hard-coded `false`, which put every staff-made order on the WRONG SIDE of every
+     * downstream rule until the process next restarted and the backfill flipped it. On the
+     * order page that is not cosmetic: a factory order takes its money from the buyer
+     * (takeIn = revenue) while a seller's takes it from what the seller was charged — so an
+     * admin's own order rendered as a seller order that had never been charged. Base cost and
+     * shipping showed as if somebody were being billed for them, "You paid" read "not charged
+     * yet" forever (a factory order skips in_review, so chargeForSubmit never runs), and Gross
+     * margin stayed blank however many times the sale price was typed in.
+     *
+     * ON CONFLICT it is LEFT ALONE. `excluded` carries the EDITOR's role, not the owner's, so
+     * asserting it here would flip a seller's order to factory the first time staff corrected
+     * an address. The old forced-false could only ever fire on a staff edit anyway — a seller
+     * touching a factory row is refused by the ownership guard above, several lines before it.
+     */
+    const factoryOwned = isStaff(req.user);
+    // Etsy imports don't come through here at all — importReceipt() writes those.
     // `(xmax = 0) as inserted` distinguishes a fresh INSERT from an ON CONFLICT
     // UPDATE — needed so editing an order doesn't re-alert the floor as if it were new.
     const up = await q(
       `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order, created_by, label_only)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false, $16, $17)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        on conflict (id) do update set
          store=excluded.store, customer=excluded.customer, address=excluded.address,
          status=excluded.status, factory_status=excluded.factory_status,
          total=excluded.total, profit=excluded.profit, delivery=excluded.delivery,
          carrier=excluded.carrier, tracking=excluded.tracking,
          seq=coalesce(orders.seq, excluded.seq),
-         meta=coalesce(excluded.meta, orders.meta), factory_order=false,
+         meta=coalesce(excluded.meta, orders.meta),
          created_by=coalesce(orders.created_by, excluded.created_by),
          -- Never un-flags an existing order: a label-only row that later gains real work
          -- is a decision someone makes, not something an edit should do by accident.
@@ -1900,7 +1916,7 @@ export function ordersRoutes(app, requireAuth) {
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
        o.delivery || null, o.carrier || null, o.tracking || null,
        (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
-       (o.meta && typeof o.meta === 'object') ? o.meta : {}, req.user.sub || null,
+       (o.meta && typeof o.meta === 'object') ? o.meta : {}, factoryOwned, req.user.sub || null,
        // Only ever set by the standalone-label flow. Anything else omits it and gets false.
        o.labelOnly === true]
     );
