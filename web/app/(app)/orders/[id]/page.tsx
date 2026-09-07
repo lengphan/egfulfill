@@ -1232,7 +1232,7 @@ export default function OrderDetailPage() {
                       <div className="relative shrink-0">
                         {/* The line's files, on the corner of its own picture — see
                             LineDownloads for why they are not a link under the text. */}
-                        <LineDownloads design={design} files={dfiles} item={it} />
+                        <LineDownloads design={design} files={dfiles} item={it} sides={sidesForLine(designSides, it)} />
                         <ItemAvatar
  item={it}
  designs={designs}
@@ -1284,6 +1284,20 @@ export default function OrderDetailPage() {
                                 all, so it keeps the count here — otherwise de-duplicating
                                 would have deleted it. */}
                             <OrderedVariant item={it} blankSku={resolveProduct(it, catalog)?.sku ?? undefined} showQty={unit <= 0} />
+                            {/* THE POSITIONS, directly under the codes — one column of facts
+                                about the line, all on the same left edge. It sat over the
+                                spec strip at the foot of the card, the width of the artwork
+                                away from the text it belongs with (owner's call, 2026-09-07). */}
+                            {(it.sku || it.line_id) && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1 text-2xs">
+                                <span className={picked.length ? "font-medium text-foreground" : "text-muted-foreground"}>
+                                  {picked.length} {tl("orders", picked.length === 1 ? "position" : "positions")}
+                                </span>
+                                {picked.map((k) => (
+                                  <span key={k} className="rounded bg-muted px-1.5 py-0.5 capitalize text-foreground">{tl("sides", k)}</span>
+                                ))}
+                              </div>
+                            )}
                             {/* THIS LINE's board state, with the lane named. "Sent to design"
  and "Approved" are different answers, and until now the only
  signal was an order-wide chip that lit for every item the
@@ -1470,16 +1484,6 @@ export default function OrderDetailPage() {
                           VariantStrip: a settled line and an editable one describe the same
                           thing, so they must not be two different shapes. */}
                       <div className="w-full basis-full">
-                        {(it.sku || it.line_id) && (
-                          <div className="mb-1.5 flex flex-wrap items-center gap-1 text-2xs">
-                            <span className={picked.length ? "font-medium text-foreground" : "text-muted-foreground"}>
-                              {picked.length} {tl("orders", picked.length === 1 ? "position" : "positions")}
-                            </span>
-                            {picked.map((k) => (
-                              <span key={k} className="rounded bg-muted px-1.5 py-0.5 capitalize text-foreground">{tl("sides", k)}</span>
-                            ))}
-                          </div>
-                        )}
                         {canEditVariants ? (
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reloadOne} />
                         ) : (

@@ -106,7 +106,8 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    * times.
    */
   const parts: React.ReactNode[] = []
-  if (sku) parts.push(<span key="s"><span className="font-medium text-foreground/70">{tl("orderedVariant", "Listing SKU:")}</span> <span className="tabular-nums">{sku}</span></span>)
+  const ids: React.ReactNode[] = []
+  if (sku) ids.push(<span key="s"><span className="font-medium text-foreground/70">{tl("orderedVariant", "Listing SKU:")}</span> <span className="tabular-nums">{sku}</span></span>)
   // The blank stands in where there is no listing sku — a manual line — and sits beside it
   // where there is one, because they are different codes for different things.
   /**
@@ -122,7 +123,7 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    * the name when the blank matches no catalog product, because saying nothing there would
    * hide that the line has a blank at all.
    */
-  if (blankSku || blank) parts.push(
+  if (blankSku || blank) ids.push(
     <span key="b" title={blank || undefined}>
       <span className="font-medium text-foreground/70">{tl("orderedVariant", "Blank SKU:")}</span>{" "}
       <span className="tabular-nums">{blankSku || blank}</span>
@@ -158,6 +159,7 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
    */
   const extras = Array.isArray(after) ? after : after ? [after] : []
   extras.forEach((node, i) => { if (node) parts.push(<span key={`a${i}`}>{node}</span>) })
+  const tail = parts
 
   return (
     <div className={"mt-0.5 space-y-0.5 text-xs leading-snug text-muted-foreground " + className}>
@@ -166,20 +168,28 @@ export function OrderedVariant({ item, className = "", after, blankSku, showQty 
           <span className="font-medium text-foreground/70">{tl("orderedVariant", "Ordered:")}</span> {ordered}
         </div>
       )}
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        {/* The separator is a PSEUDO-ELEMENT, not a child, so a part that renders nothing is
-            still `:empty` and takes its own dot down with it. As a real child the dot made
-            every wrapper non-empty, which is how a null LineStock left "Qty 5 · · Threads:"
-            on the row. */}
-        {parts.map((p, i) => (
-          <span
-            key={i}
-            className="inline-flex items-baseline gap-2 empty:hidden before:text-border before:content-['·'] first:before:content-none"
-          >
-            {p}
-          </span>
-        ))}
-      </div>
+      {/* THE TWO CODES STACK, one per row, so both labels start at the same x.
+          Dot-separated they wrapped whenever the card was narrow — "Listing SKU: EG-18009"
+          on one line and "· Blank SKU: EG-18009" indented under it by the width of a dot,
+          which is the crooked pair the owner pointed at (2026-09-07). A code is scanned
+          down a column, and a column has one left edge. */}
+      {ids.map((p, i) => <div key={`id${i}`}>{p}</div>)}
+      {tail.length > 0 && (
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {/* The separator is a PSEUDO-ELEMENT, not a child, so a part that renders nothing is
+              still `:empty` and takes its own dot down with it. As a real child the dot made
+              every wrapper non-empty, which is how a null LineStock left "Qty 5 · · Threads:"
+              on the row. */}
+          {tail.map((p, i) => (
+            <span
+              key={i}
+              className="inline-flex items-baseline gap-2 empty:hidden before:text-border before:content-['·'] first:before:content-none"
+            >
+              {p}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
