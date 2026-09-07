@@ -257,7 +257,11 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {smallPresets.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
+          <button key={v} onClick={() => setAmount(String(v))} /* SMALLER. These were p-3 at text-base — a row of buttons the size of the primary
+             action, for a shortcut into a field that is right underneath them. A preset is a
+             convenience, not the main way to enter an amount, and it was the loudest thing in
+             the dialog. */
+ className={"rounded-lg border px-2 py-2 text-center text-sm font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
         ))}
       </div>
 
@@ -371,7 +375,11 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {smallPresets.map((v) => (
-          <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
+          <button key={v} onClick={() => setAmount(String(v))} /* SMALLER. These were p-3 at text-base — a row of buttons the size of the primary
+             action, for a shortcut into a field that is right underneath them. A preset is a
+             convenience, not the main way to enter an amount, and it was the loudest thing in
+             the dialog. */
+ className={"rounded-lg border px-2 py-2 text-center text-sm font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
         ))}
       </div>
       <label className="flex flex-col gap-1.5">
@@ -463,12 +471,20 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
       <div className="space-y-2">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {smallPresets.map((v) => (
-            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
+            <button key={v} onClick={() => setAmount(String(v))} /* SMALLER. These were p-3 at text-base — a row of buttons the size of the primary
+             action, for a shortcut into a field that is right underneath them. A preset is a
+             convenience, not the main way to enter an amount, and it was the loudest thing in
+             the dialog. */
+ className={"rounded-lg border px-2 py-2 text-center text-sm font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {bulkPresets.map((v) => (
-            <button key={v} onClick={() => setAmount(String(v))} className={"rounded-xl border p-3 text-center text-base font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
+            <button key={v} onClick={() => setAmount(String(v))} /* SMALLER. These were p-3 at text-base — a row of buttons the size of the primary
+             action, for a shortcut into a field that is right underneath them. A preset is a
+             convenience, not the main way to enter an amount, and it was the loudest thing in
+             the dialog. */
+ className={"rounded-lg border px-2 py-2 text-center text-sm font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
           ))}
         </div>
       </div>
