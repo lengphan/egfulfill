@@ -538,7 +538,8 @@ export function ProductsCatalog() {
       )}
 
       {isStaff && (
-        <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={(products?.length ?? 0) + 1000} nextSku={nextEgSku(products ?? [])} />
+        <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={(products?.length ?? 0) + 1000} nextSku={nextEgSku(products ?? [])}
+ takenSkus={(products ?? []).filter((p) => p.id !== editing?.id).map((p) => String(p.sku ?? "")).filter(Boolean)} />
       )}
       {isStaff && (
         <BrandSplitDialog open={splitOpen} onOpenChange={setSplitOpen} products={products ?? []} onApply={persist} />

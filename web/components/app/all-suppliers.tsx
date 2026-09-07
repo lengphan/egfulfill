@@ -25,7 +25,7 @@ import {
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { driveImg, prettyColor, driveMap, ssCatalogProduct, ssStockByColor, ottoCatalogProduct, sanmarCatalogProduct } from "@/lib/supplier-catalog"
-import { nextEgSku } from "@/lib/sku"
+import { nextEgSku, cleanSku } from "@/lib/sku"
 import { ourSku } from "@/lib/our-sku"
 import { EmptyState } from "@/components/app/empty-state"
 
@@ -124,6 +124,9 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  const [previewStock, setPreviewStock] = useState<Record<string, number> | null>(null)
   /** The next free EG-#### to offer in the review step — see addToCatalog. */
  const [previewNextSku, setPreviewNextSku] = useState<string | undefined>(undefined)
+  /** And what is already taken, so the editor can refuse a collision. Read in the same
+   *  call: two products cannot share a sku, and nothing below this screen enforces it. */
+ const [previewTaken, setPreviewTaken] = useState<string[]>([])
   // S&S only returns sizes on the STYLE DETAIL, which is the same request the colour
   // swatches already make — so cache both from that one call rather than fetching twice.
  const [detailSizes, setDetailSizes] = useState<Record<string, string[]>>({})
@@ -330,7 +333,10 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
       // seller's listing — so without a number to offer here the field would open blank and
       // the product would save with no sku at all. confirmAdd assigns one regardless; this
       // is so the operator SEES which one before agreeing to it.
- getCatalogProducts().then((ps) => setPreviewNextSku(nextEgSku(ps))).catch(() => {})
+ getCatalogProducts().then((ps) => {
+ setPreviewNextSku(nextEgSku(ps))
+ setPreviewTaken(ps.map((p) => String(p.sku ?? "")).filter(Boolean))
+      }).catch(() => {})
       // Stock for the review step, so a style can be trimmed to what the supplier can
       // actually fill BEFORE it becomes a product. S&S only — the other two would cost a
       // call per sku / per style, and null means "not asked", never "none".
@@ -378,9 +384,23 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
        * The supplier's code is not thrown away: it moves to `supplierSku`, which is where it
        * belongs and which the server strips from a seller's copy.
        */
- const withSku = ourSku(product.sku)
+      /**
+       * AND IT IS RE-CHECKED HERE, against the catalogue as it is at SAVE time.
+       *
+       * The number the editor pre-filled was computed when the review window opened, so
+       * adding two blanks in a row offered both the same one — and this branch could not
+       * catch it, because it only ever ran when the sku was MISSING and the editor always
+       * fills it in. Two Richardson caps went in carrying EG-18007 between them.
+       *
+       * A collision is re-minted rather than refused: the operator did not choose this
+       * number, we offered it, so silently handing out the right one is the honest fix. A
+       * number they TYPED is refused in the editor instead, where they can see it.
+       */
+ const taken = new Set(existing.filter((p) => p.id !== product.id).map((p) => cleanSku(String(p.sku ?? ""))).filter(Boolean))
+ const staged = ourSku(product.sku)
+ const withSku = staged && !taken.has(cleanSku(staged))
         ? product
- : { ...product, sku: nextEgSku(existing), supplierSku: product.supplierSku || product.sku || undefined }
+ : { ...product, sku: nextEgSku(existing), supplierSku: product.supplierSku || (staged ? undefined : product.sku) || undefined }
  const next = existing.some((p) => p.id === withSku.id) ? existing.map((p) => (p.id === withSku.id ? withSku : p)) : [...existing, withSku]
  await saveCatalogProducts(next)
  if (previewKey) setAdded((prev) => new Set(prev).add(previewKey))
@@ -776,6 +796,7 @@ export function AllSuppliers({ refreshKey = 0 }: { refreshKey?: number }) {
  onSave={confirmAdd}
  newIdSeed={0}
  nextSku={previewNextSku}
+ takenSkus={previewTaken}
  title={tl("allSuppliers", "Review before adding")}
  ctaLabel="Add to Products"
  stockByColor={previewStock}

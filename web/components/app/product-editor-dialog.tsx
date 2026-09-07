@@ -269,7 +269,7 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
 // Create/edit one catalog product. Colors/sizes are chips (with supplier-suggested picks),
 // pricing shows the live margin, and supplier-derived blanks pre-fill description + cost.
 export function ProductEditorDialog({
- open, onOpenChange, product, onSave, newIdSeed, nextSku, title, ctaLabel,
+ open, onOpenChange, product, onSave, newIdSeed, nextSku, takenSkus, title, ctaLabel,
  stockByColor,
 }: {
  open: boolean
@@ -291,6 +291,11 @@ export function ProductEditorDialog({
    * stocked, can't be resolved from an order line, and publishes a variant sku built on
    * an empty base. */
  nextSku?: string
+  /** Every OTHER product's sku. `catalog_products.sku` has no unique index and the
+   * whole-list POST does not check, so two products CAN carry EG-18007 — and then the
+   * shelf, matchProduct and the variant skus resolve two different garments to one row.
+   * Refused here, where the person who typed it is looking. */
+ takenSkus?: string[]
   /** Override the heading/CTA. A supplier import passes a product that does NOT exist
    * yet, so the defaults ("Edit product" / "Save changes") would misdescribe it. */
  title?: string
@@ -903,6 +908,20 @@ export function ProductEditorDialog({
  const save = () => {
  if (saving) return
  if (!name.trim()) { setErr("Give the product a name."); return }
+    /**
+     * ONE SKU, ONE PRODUCT. Nothing below this line enforces it: the column has no unique
+     * index, the whole-list POST rewrites every row without looking, and the number offered
+     * for a new product is computed from a catalogue read that can be a few seconds old — so
+     * staging two supplier styles in one sitting handed both the same EG-####. Two Richardson
+     * caps shipped that way. A shared sku is not a cosmetic clash: stock is held against it,
+     * matchProduct resolves an order line by it, and the variant skus are built from it, so
+     * both garments end up drawing on one shelf and one price.
+     */
+ const mySku = cleanSku(sku) || cleanSku(nextSku ?? "")
+ if (mySku && (takenSkus ?? []).some((t) => cleanSku(t) === mySku)) {
+ setErr(`${mySku} already belongs to another product. Give this one its own number — stock and pricing are both held against it.`)
+ return
+    }
     /**
      * NO BASE COST, NO PRODUCT — the one refusal that protects the margin.
      *
