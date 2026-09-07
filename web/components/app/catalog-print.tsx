@@ -687,44 +687,23 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
           })()}
 
           {/**
-            * ── CHAPTERS ────────────────────────────────────────────────────────────────
+            * ── NO CHAPTER PAGES ────────────────────────────────────────────────────────
             *
-            * Cover, statistics, then twenty-nine identical spec pages, then a back cover. A
-            * catalogue that never changes register is a price list with a cover on it, and
-            * the reader has no way to tell where the caps end and the bags begin except by
-            * reading every page.
+            * There was one full-bleed coloured page per category — the name at 150pt over
+            * the brand ground with its counts along the foot — on the argument that a book
+            * which never changes register is a price list with a cover on it.
             *
-            * So one full-bleed page per category, type only: the name at 180pt in ink on the
-            * brand ground, its count along the foot. No image, no product — this is the one
-            * page in the book that is allowed to be a breath, and it costs nothing to
-            * produce, which is the point. Grouped on `type`, the field the catalogue already
-            * sorts and filters by; a style with none falls under the last group rather than
-            * inventing a chapter of one.
+            * It printed one before nearly every product instead, which is the opposite of a
+            * breath: `isFirstOfCat` compares each style's `type` with the PREVIOUS row's, so
+            * it only groups when the rows happen to arrive sorted by type, and they do not.
+            * A reader flicking through got a coloured sheet, a product, a coloured sheet, a
+            * product.
             *
-            * The rows themselves are UNCHANGED and in the same order — the breaker is
-            * inserted before the first style of each new category, so nothing moves.
+            * Removed rather than repaired (owner's call, 2026-09-07): sorting the rows to
+            * make it work would reorder the catalogue itself, and the catalogue's order is a
+            * choice somebody made. The book is the products.
             */}
-          {rows.map((st, i) => {
-            const catOf = (x: LookbookStyle) => String(x.type ?? "").trim()
-            const cat = catOf(st)
-            const isFirstOfCat = cat && (i === 0 || catOf(rows[i - 1]) !== cat)
-            const inCat = rows.filter((x) => catOf(x) === cat)
-            const breaker = isFirstOfCat ? (
-              <section
-                key={`cat-${cat}`}
-                className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col items-center justify-center overflow-hidden p-[18mm] print:mb-0 print:shadow-none"
-                style={{ height: "210mm", background: HOUSE.lime, color: HOUSE.ink }}
-              >
-                <h2 className="text-center font-title font-semibold leading-[0.86] tracking-[-0.03em]" style={{ fontSize: "150px" }}>
-                  {cat}
-                </h2>
-                <div className="mt-8 text-[11px] font-semibold uppercase tracking-[0.18em] tabular-nums">
-                  {inCat.length} style{inCat.length === 1 ? "" : "s"}
-                  {" · "}
-                  {inCat.reduce((n, x) => n + x.colors.length, 0)} colourways
-                </div>
-              </section>
-            ) : null
+          {rows.map((st) => {
             // The photo this page can show, and whether the left column has anything at all
             // to hold. In EDIT mode it always does — the attach-a-photo and add-a-description
             // affordances are the reason you opened the mode on a page that has neither.
@@ -783,9 +762,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  const colCap = swatchCols * (st.description ? 2 : 3)
             /* ONE STYLE PER PAGE. A4 LANDSCAPE at 297×210mm with the page break forced
                after, so a colourway grid never starts on one sheet and finishes on the next
-               — the one thing that makes a printed catalogue look homemade. The chapter
-               breaker, when this style opens a category, is rendered ahead of it. */
- return (<>{breaker}
+               — the one thing that makes a printed catalogue look homemade. */
+ return (
             <section
  key={st.ref}
  className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[14mm] print:mb-0 print:shadow-none"
@@ -1261,7 +1239,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <span>{fmtDate(new Date(), { month: "long", year: "numeric" })}</span>
               </footer>
             </section>
-          </>)})}
+          )})}
 
           {/* ── PRICE LIST ───────────────────────────────────────────────────────────
               Every style on one run of tables, immediately before the back cover.
