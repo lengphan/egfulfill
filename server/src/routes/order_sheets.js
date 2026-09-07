@@ -68,6 +68,28 @@ export function orderSheetsRoutes(app, requireAuth) {
     return row.seller_id === (await owner(user)) ? row : null;
   }
 
+  /**
+   * A SHEET SAVED BEFORE THE PRICE COLUMN WAS REMOVED.
+   *
+   * `rows` is positional — the grid verbatim in CSV_COLUMNS order — so dropping a column
+   * from that list shifts every cell after it on every sheet already stored. Price was index
+   * 18 of 21, which puts Store Name and Internal Notes one place to the right of where the
+   * grid now looks for them: a saved draft would reopen with the store name under Price's
+   * old heading and nobody would know why.
+   *
+   * So an old-width row is narrowed HERE, on the way out, and the next save writes it back
+   * in the new shape. Length is the only signal there is — the rows carry no header — which
+   * is why the check is exact rather than `>=`: a row of some other width is not a row this
+   * knows how to fix, and guessing at one would corrupt the thing it is trying to rescue.
+   *
+   * DELETE THIS once no 21-wide sheet is left. It is dated, not permanent: 2026-09-07.
+   */
+  const OLD_WIDTH = 21;
+  const PRICE_AT = 18;
+  const narrow = (rows) => (Array.isArray(rows) ? rows.map((x) => (
+    Array.isArray(x) && x.length === OLD_WIDTH ? [...x.slice(0, PRICE_AT), ...x.slice(PRICE_AT + 1)] : x
+  )) : []);
+
   const shape = (r, withRows) => ({
     id: String(r.id),
     name: r.name || '',
@@ -77,7 +99,7 @@ export function orderSheetsRoutes(app, requireAuth) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     completedAt: r.completed_at,
-    ...(withRows ? { rows: r.rows || [] } : {}),
+    ...(withRows ? { rows: narrow(r.rows) } : {}),
   });
 
   app.get('/api/order_sheets', { preHandler: requireAuth }, async (req) => {

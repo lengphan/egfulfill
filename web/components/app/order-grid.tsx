@@ -97,7 +97,7 @@ const FIXED_OPTIONS: Record<string, string[]> = {
  *  the 21 columns are the same on every sheet, so a width learned once should hold. */
 const SIZING_KEY = "eg.sheet.grid.sizing"
 
-const NARROW = new Set(["item_quantity", "item_size", "item_price", "ship_state", "ship_zip"])
+const NARROW = new Set(["item_quantity", "item_size", "ship_state", "ship_zip"])
 const widthFor = (key: string) => (NARROW.has(key) ? "min-w-20" : "min-w-32")
 
 /** Column index by key, so the narrowing below never counts columns by hand. */

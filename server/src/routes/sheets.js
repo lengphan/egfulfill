@@ -127,7 +127,6 @@ const T_COLUMNS = [
   { h: 'Print Type', g: 'product', duty: '', sample: 'DTG printing', opts: 'methods', dep: 'methods' },
   { h: 'Color', g: 'product', duty: '', sample: 'White', opts: 'colors', dep: 'colors' },
   { h: 'Size', g: 'product', duty: '', sample: 'L', opts: 'sizes', dep: 'sizes' },
-  { h: 'Price', g: 'product', duty: '', sample: '24.00' },
   { h: 'Store Name', g: 'extras', duty: '', sample: 'Main Store' },
   { h: 'Internal Notes', g: 'extras', duty: '', sample: 'Example row — safe to delete' },
 ];

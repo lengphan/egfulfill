@@ -16,8 +16,14 @@ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
  * warning the first sign of trouble is work that won't go to production. This arrives
  * while there's still time to top up.
  *
- * Two states, deliberately distinct: BELOW ZERO is already blocking, LOW is not yet. One
- * message for both would either over-alarm at $40 or under-alarm at -$5.
+ * Three states, deliberately distinct: EMPTY and BELOW ZERO are already blocking, LOW is not
+ * yet. One message for all three would either over-alarm at $40 or under-alarm at -$5.
+ *
+ * ZERO IS NOT LOW. It was tested with `balance < 0`, so an account sitting at exactly $0.00
+ * read "top up before it runs out" — advice about a future that had already happened, in the
+ * amber that means "not yet". The submit gate is `balance < due` and an order that prices at
+ * $0 is refused outright, so at zero EVERY order is blocked, which is the same fact a
+ * negative balance carries and it must not be dressed as a warning.
  *
  * The threshold comes from the server with the balance, so this never decides for itself
  * what "low" means. House accounts get nothing — they're allowed to run negative, which
@@ -42,17 +48,21 @@ export function LowBalanceBanner() {
   }, [load])
 
  if (!w || !w.low) return null
+  /** Nothing can be submitted at or below zero — see the docblock. */
+ const blocking = w.balance <= 0
  const negative = w.balance < 0
 
  return (
     <div className={"flex flex-wrap items-center gap-2 rounded-lg border px-4 py-2.5 text-sm " + (
- negative
+ blocking
         ? "border-destructive/30 bg-destructive/10 text-destructive"
  : "border-hold/20 bg-hold/10 text-hold")}>
       <Warning size={16} weight="fill" className="shrink-0" />
       <span className="min-w-0 flex-1">
         {negative ? (
           <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until it’s positive.")}</>
+        ) : blocking ? (
+          <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Orders can’t be submitted to production until you top up.")}</>
         ) : (
           <>{tl("lowBalanceBanner", "Your balance is")} <strong>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Submitting an order charges it — top up before it runs out.")}</>
         )}

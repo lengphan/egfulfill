@@ -108,7 +108,6 @@ export const CSV_COLUMNS: CsvColumn[] = [
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
   { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
   { header: "Size", key: "item_size", required: false, section: "product", help: "Garment size." },
-  { header: "Price", key: "item_price", required: false, section: "product", help: "What the BUYER paid per unit (your sale price). Records only — it does NOT set the fulfilment charge, which comes from the blank's pricing at submit." },
   // ── EXTRAS ────────────────────────────────────────────────────────────────
   { header: "Store Name", key: "store_name", required: false, section: "extras", help: "Which shop the order came from." },
   { header: "Internal Notes", key: "internal_notes", required: false, section: "extras", help: "Private note for your team. Saved with the order." },
@@ -276,6 +275,14 @@ const COL_ALIASES: Record<string, string[]> = {
   template_id: ["template_id", "template", "tpl", "tpl_id", "design_template", "template_design_id", "design_template_id"],
   item_name: ["item_name", "item", "product", "product_name", "title", "lineitem_name", "item_title", "product_title", "description"],
   item_quantity: ["item_quantity", "quantity", "qty", "lineitem_quantity", "line_item_quantity", "item_qty"],
+  /* NO LONGER A COLUMN IN THE SHEET, still read from an uploaded FILE.
+     The grid dropped it because it was the one money column on a screen full of production
+     facts, and it was read as ours: it is the BUYER's price, records only, and what we
+     charge is quoted from the blank at submit and shown on the order. A Shopify or Etsy
+     export carries a price whether we ask for it or not, so parsing it still costs nothing
+     and still lands the sale on the order — dropping it from the parser would throw away
+     data the file already contains. `shipping_service` and `sales_channel` below have been
+     column-less aliases for the same reason for as long as this file has existed. */
   item_price: ["item_price", "price", "unit_price", "lineitem_price", "line_item_price", "product_price"],
   print_type: ["print_type", "print", "method", "technique", "print_method", "decoration"],
   item_color: ["item_color", "color", "colour", "variant_color"],

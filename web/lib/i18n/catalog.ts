@@ -3979,6 +3979,7 @@ const vi: Dict = {
   "lowBalanceBanner.Your balance is": "Số dư của bạn là",
   "lowBalanceBanner.. Orders can’t be submitted to production until it’s positive.": ". Không thể gửi đơn vào sản xuất cho đến khi số dư dương.",
   "lowBalanceBanner.. Submitting an order charges it — top up before it runs out.": ". Gửi một đơn hàng sẽ trừ vào số dư — hãy nạp thêm trước khi hết.",
+  "lowBalanceBanner.. Orders can’t be submitted to production until you top up.": ". Không thể gửi đơn vào sản xuất cho đến khi bạn nạp thêm tiền.",
   "notificationBell.Notifications": "Thông báo",
   "notificationBell.Mark all read": "Đánh dấu đã đọc tất cả",
   "notificationBell.See all notifications": "Xem tất cả thông báo",
