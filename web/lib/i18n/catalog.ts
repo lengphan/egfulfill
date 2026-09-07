@@ -2491,6 +2491,8 @@ const vi: Dict = {
   "canvas.Sent — with our team": "Đã gửi — đang ở chỗ đội ngũ của chúng tôi",
   "canvas.Send to Board": "Gửi lên Bảng",
   "canvas.Send to the design board": "Gửi lên bảng thiết kế",
+  "canvas.Order · design · side · printed width — set for you": "Đơn · thiết kế · mặt · bề rộng in — đã điền sẵn",
+  "canvas.What the design is — e.g. Dragon chest": "Thiết kế là gì — ví dụ: Rồng trước ngực",
   "canvas.Send this line to a designer": "Gửi dòng này cho nhà thiết kế",
   "canvas.Apply All": "Áp dụng tất cả",
   "canvas.Apply file to all lines": "Áp dụng tệp cho mọi dòng",

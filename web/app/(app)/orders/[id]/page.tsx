@@ -2076,6 +2076,7 @@ export default function OrderDetailPage() {
  open={!!customize}
  onOpenChange={(v) => !v && setCustomize(null)}
  orderId={id}
+ orderLabel={numOf(order)}
  item={customizeLive ?? customize}
  initialDesign={designSrc(designForLine(designs, customize)?.data)}
  initialPos={designForLine(designs, customize)?.pos}

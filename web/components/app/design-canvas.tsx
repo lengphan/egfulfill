@@ -829,12 +829,14 @@ function CustomerFileThumb({ src }: { src: string }) {
 }
 
 export function DesignCanvasDialog({
- open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
+ open, onOpenChange, orderId, orderLabel, item, initialDesign, initialPos, onSaved, catalog,
  siblings, designs, onSendToDesigner, filesLocked, sideFee,
 }: {
  open: boolean
  onOpenChange: (v: boolean) => void
  orderId: string
+  /** The order's number as people say it (#66) — the first token of every card title. */
+ orderLabel?: string
  item: OrderItem
  initialDesign?: string
  initialPos?: DesignPos | null
@@ -1520,10 +1522,15 @@ export function DesignCanvasDialog({
  const [pinkOpen, setPinkOpen] = useState(false)
   /** Re-read this line's board card. Exposed so a partner push can refresh the subtitle
    * without a second copy of the query. */
+ /** How many cards this order already has — the next one is D<n+1>. */
+ const [cardCount, setCardCount] = useState(0)
  const loadCards = useCallback(() => {
  if (!isStaff) return
  getOrderDesignCards(orderId)
-      .then((cards) => setBoardCard(cardForLine(cards ?? [], { line_id: item.line_id, sku: item.sku }) ?? null))
+      .then((cards) => {
+ setBoardCard(cardForLine(cards ?? [], { line_id: item.line_id, sku: item.sku }) ?? null)
+ setCardCount((cards ?? []).length)
+      })
       .catch(() => setBoardCard(null))
   }, [isStaff, orderId, item.line_id, item.sku])
  useEffect(() => {
@@ -1559,6 +1566,23 @@ export function DesignCanvasDialog({
    *  field you can correct beats one you must fill. */
  const [cardTitle, setCardTitle] = useState("")
  const [cardNote, setCardNote] = useState("")
+  /**
+   * THE TITLE'S AUTOMATED HALF — `#66-D2 · Front · 11.7"` — and the person types only the
+   * half a machine cannot: what the design IS.
+   *
+   * Owner's call (2026-09-07): every card was titled with the listing's keyword string, so
+   * a board of forty cards read as forty near-identical product names, and the facts a
+   * designer actually sorts by — which order, which face, how wide — were typed by hand
+   * or not at all. Order number first because that is how the floor refers to work; D<n>
+   * counts the cards already on this order so two faces of one order stay distinct; side
+   * and printed width come off the canvas, where they are measured rather than guessed.
+   */
+ const cardPrefix = [
+    [orderLabel, `D${cardCount + 1}`].filter(Boolean).join("-"),
+ sideName.charAt(0).toUpperCase() + sideName.slice(1),
+ artIn ? `${artIn.toFixed(1)}"` : "",
+  ].filter(Boolean).join(" · ")
+ const fullCardTitle = (name: string) => `${cardPrefix} · ${name.trim() || item.name || item.sku || "Design"}`
   /** Click the artwork to see it big. The shared lightbox, never a seventh hand-rolled one. */
  const [zoom, setZoom] = useState<string | null>(null)
  const openSendPanel = () => {
@@ -1572,7 +1596,7 @@ export function DesignCanvasDialog({
  setSending(true); setErr(null)
  try {
  const card = await createDesignCard({
- title: cardTitle.trim() || item.name || item.sku || "Design",
+ title: fullCardTitle(cardTitle),
  description: cardNote.trim() || undefined,
  data: designUrl || undefined,
  sku: item.sku || undefined,
@@ -3682,12 +3706,21 @@ export function DesignCanvasDialog({
             <div className="space-y-3">
               <div>
                 <label htmlFor="send-card-title" className="mb-1 block text-sm font-medium">{tl("canvas", "Title")}</label>
-                <Input
-                  id="send-card-title"
-                  value={cardTitle}
-                  onChange={(e) => setCardTitle(e.target.value)}
-                  placeholder={item.name || item.sku || tl("canvas", "Design")}
-                />
+                {/* The prefix is SHOWN, not typed: it sits in the field's chrome ahead of
+                    the caret, so what is saved is exactly what is on screen and the only
+                    thing to enter is the name. */}
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 whitespace-nowrap rounded-lg border border-input bg-muted px-2.5 py-1.5 text-sm tabular-nums text-muted-foreground" title={tl("canvas", "Order · design · side · printed width — set for you")}>
+                    {cardPrefix}
+                  </span>
+                  <Input
+                    id="send-card-title"
+                    value={cardTitle}
+                    onChange={(e) => setCardTitle(e.target.value)}
+                    placeholder={tl("canvas", "What the design is — e.g. Dragon chest")}
+                    className="min-w-0 flex-1"
+                  />
+                </div>
               </div>
               <div className="flex gap-3">
                 {designUrl && (

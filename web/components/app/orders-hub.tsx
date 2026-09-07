@@ -3469,6 +3469,7 @@ export function OrdersHub() {
  open
  onOpenChange={(v) => { if (!v) setEditing(null) }}
  orderId={editing.order.id}
+ orderLabel={numOf(editing.order)}
  item={editingLive?.item ?? editing.item}
  initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
  initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
