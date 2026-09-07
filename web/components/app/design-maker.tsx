@@ -3,7 +3,7 @@
 import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { TextT, CursorClick, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, CaretDown, type Icon } from "@phosphor-icons/react"
+import { TextT, CursorClick, CircleNotch, FloppyDisk, Stack, ArrowLeft, TShirt, ImageSquare, Images, CaretDown, type Icon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer, type ImageLayer } from "@/components/app/design-canvas"
@@ -69,11 +69,10 @@ export type SideStack = { images: ImageLayer[]; texts: TextLayer[] }
  * new object every time and defeat every equality check that reads it. */
 const EMPTY_STACK: SideStack = Object.freeze({ images: [], texts: [] }) as SideStack
 
-async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 900): Promise<string> {
- const c = document.createElement("canvas"); c.width = size; c.height = size
- const ctx = c.getContext("2d")
- const first = images[0]?.src ?? ""
- if (!ctx) return first
+/** The stack, drawn onto a context whose square is `size`. Layer positions are percentages
+ *  of the STAGE, and the stage is that square — which is what lets the same routine flatten
+ *  a print file and composite a mockup without either one re-deriving the geometry. */
+async function drawStack(ctx: CanvasRenderingContext2D, size: number, images: ImageLayer[], texts: TextLayer[]) {
  for (const layer of images) {
  const img = await loadImage(layer.src)
  if (!img) continue
@@ -96,7 +95,43 @@ async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 90
  ctx.fillText(t.text || "", 0, 0)
  ctx.restore()
   }
+}
+
+async function composeDesign(images: ImageLayer[], texts: TextLayer[], size = 900): Promise<string> {
+ const c = document.createElement("canvas"); c.width = size; c.height = size
+ const ctx = c.getContext("2d")
+ const first = images[0]?.src ?? ""
+ if (!ctx) return first
+ await drawStack(ctx, size, images, texts)
  try { return c.toDataURL("image/png") } catch { return first }
+}
+
+/**
+ * THE DESIGN ON THE GARMENT — one listing photo, flattened.
+ *
+ * Same geometry as composeDesign, with the product's own photograph underneath: the mockup
+ * is drawn CONTAINED in the square (never cropped — a listing shot cut off at the shoulders
+ * is worse than a letterboxed one) on white, then the stack goes over it at exactly the
+ * percentages the stage was showing. What you previewed is what publishes.
+ *
+ * A mockup that fails to load returns the artwork alone rather than nothing: a seller who
+ * has drawn something is owed the picture of it, even when a supplier's CDN is having a bad
+ * afternoon.
+ */
+async function composeOnMockup(mockupUrl: string, images: ImageLayer[], texts: TextLayer[], size = 1400): Promise<string> {
+ const c = document.createElement("canvas"); c.width = size; c.height = size
+ const ctx = c.getContext("2d")
+ if (!ctx) return ""
+ ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, size, size)
+ const bg = await loadImage(mockupUrl)
+ if (bg) {
+ const nw = bg.naturalWidth || 1, nh = bg.naturalHeight || 1
+ const scale = Math.min(size / nw, size / nh)
+ const w = nw * scale, h = nh * scale
+ ctx.drawImage(bg, (size - w) / 2, (size - h) / 2, w, h)
+  }
+ await drawStack(ctx, size, images, texts)
+ try { return c.toDataURL("image/png") } catch { return "" }
 }
 
 const rid = () => "t" + Math.random().toString(36).slice(2, 8)
@@ -139,12 +174,15 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
  * One idiom instead — icon over label, all the same size — so the panel is a set of tools
  * rather than a pile of controls, and the panel beside it shows one at a time.
  */
-type ToolKey = "blank" | "images" | "text"
+type ToolKey = "blank" | "images" | "text" | "mockups"
 
 const TOOLS: { key: ToolKey; label: string; Icon: Icon }[] = [
   { key: "blank", label: "Blank", Icon: TShirt },
   { key: "images", label: "Artwork", Icon: ImageSquare },
   { key: "text", label: "Text", Icon: TextT },
+  /* MOCKUPS LAST, because it is what you do once the design is done: pick the photographs
+     this design will be SOLD on. Everything above it makes the artwork; this one dresses it. */
+  { key: "mockups", label: "Mockups", Icon: Images },
 ]
 
 export function DesignMaker() {
@@ -153,6 +191,25 @@ export function DesignMaker() {
  const productParam = search.get("product")
  const templateParam = search.get("template")
  const [mockup, setMockup] = useState("")
+  /**
+   * ── THE MOCKUPS THIS DESIGN SELLS ON ────────────────────────────────────────────────
+   *
+   * A listing needs several photographs of one design — the front, the back, three
+   * colourways — and this editor produced exactly one: whatever was on the stage when you
+   * pressed Publish. Every other picture was a job for somewhere else, so the answer to "how
+   * will it look in navy" was to change the blank, look, and change it back.
+   *
+   * `mockPicks` is the SET a seller has chosen to publish. `mockPreview` is the one the stage
+   * is showing, which is how you judge the choice — the design is already positioned in
+   * percentages of the stage, so swapping the photograph under it costs nothing and moves
+   * nothing.
+   *
+   * Candidates are the product's OWN photography: the per-side faces and every colourway
+   * image it carries. Nothing is generated and nothing is invented — a mockup that is not a
+   * picture of the garment being sold is a claim we cannot make.
+   */
+ const [mockPicks, setMockPicks] = useState<string[]>([])
+ const [mockPreview, setMockPreview] = useState("")
   // Kept alongside the mockup so the printable zone can be resolved from the product's
   // own printAreas (falling back to its garment type).
  const [product, setProduct] = useState<CatalogProduct | null>(null)
@@ -643,8 +700,27 @@ export function DesignMaker() {
               // sessionStorage rather than as a prop — see lib/publish-draft.ts. A failed
               // stash is said out loud: navigating to a page whose draft was never stored
               // would land on an empty form with no explanation.
+              /**
+               * EVERY MOCKUP THE SELLER CHOSE, each with the design on it.
+               *
+               * Publish used to receive ONE picture — the flattened artwork — so a listing
+               * began with a transparent PNG of a logo and the seller went looking for
+               * photographs of the product elsewhere. The mockups panel is where they said
+               * which garments this design sells on; this is where that answer is spent.
+               *
+               * Composited at 1400px, which is past what a marketplace thumbnail needs and
+               * under what a browser struggles to hold several of. The flattened artwork
+               * still leads the list: it is the print file, and a listing whose first image
+               * is a mockup buries the thing being sold.
+               */
+ const shots: string[] = []
+ if (composed) shots.push(composed)
+ for (const m of mockPicks) {
+ const shot = await composeOnMockup(m, frontStack.images, frontStack.texts, 1400).catch(() => "")
+ if (shot) shots.push(shot)
+              }
  const id = stashPublishDraft({
- prefill: { title: name, images: composed ? [composed] : [], blank: product, designUrl: art, designPos: artPos },
+ prefill: { title: name, images: shots, blank: product, designUrl: art, designPos: artPos },
               /* BACK TO THE BLANK, not to the picker. `/design/maker` with nothing on it is
                  the "What are you making?" screen, so pressing Back after publishing threw
                  away the garment you had chosen and asked you to choose it again — the one
@@ -905,6 +981,65 @@ export function DesignMaker() {
               )}
             </div>
           )}
+          {tool === "mockups" && (
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="text-sm font-semibold">{tl("designMaker", "Mockups")}</div>
+                <span className="text-2xs tabular-nums text-muted-foreground">{mockPicks.length} {tl("designMaker", "chosen")}</span>
+              </div>
+              {/* ONE SENTENCE, because an empty region may carry one (§4) and this panel is
+                  otherwise a grid of pictures with no way to know what pressing one does. */}
+              <p className="text-2xs text-muted-foreground">
+                {tl("designMaker", "Tick the photos this design publishes on. Press one to see it on the stage.")}
+              </p>
+              {(() => {
+                /* THE PRODUCT'S OWN PHOTOGRAPHY, de-duplicated: the faces it defines per side
+                   and every colourway it carries. A garment with neither has nothing to offer
+                   here, and says so rather than drawing an empty grid. */
+ const cands = Array.from(new Set([
+                  ...faces.map((f) => f.url),
+                  ...Object.values(product?.colorImages ?? {}),
+                ].filter(Boolean))) as string[]
+ if (!cands.length) {
+ return <p className="text-2xs text-muted-foreground">{tl("designMaker", "This blank has no photos yet — publish will use the design on its own.")}</p>
+                }
+ return (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {cands.map((u) => {
+ const on = mockPicks.includes(u)
+ return (
+                        <button
+ key={u}
+ type="button"
+ onClick={() => {
+ setMockPreview(u)
+ setMockPicks((prev) => (prev.includes(u) ? prev.filter((x) => x !== u) : [...prev, u]))
+                          }}
+ title={on ? tl("designMaker", "Publishing on this photo — press to remove") : tl("designMaker", "Publish on this photo")}
+ className={"relative aspect-square overflow-hidden rounded-lg border bg-white transition-colors "
+                            + (on ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary")}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={u} alt="" className="size-full object-contain" />
+                          {on && (
+                            <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-2xs font-bold text-primary-foreground">
+                              {mockPicks.indexOf(u) + 1}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+              {mockPreview && (
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => setMockPreview("")}
+                  title={tl("designMaker", "Show the blank this design was made on")}>
+                  {tl("designMaker", "Back to the blank")}
+                </Button>
+              )}
+            </div>
+          )}
           {/* Artwork — your reusable uploads + buyer art from your orders. */}
           {/**
             * THE SHARED PANEL — this screen no longer keeps its own.
@@ -992,7 +1127,9 @@ export function DesignMaker() {
                  * A PLAIN BLOCK COMMENT, not the JSX form. This is an ATTRIBUTE LIST, where
                  * a JSX comment is a syntax error — the file does not compile, and the branch
                  * this arrived on did not. CLAUDE.md records the same trap on design-canvas. */
-                mockup={faceUrl || (side === "front" ? mockup : "")}
+                /* The previewed mockup wins: choosing a photograph in the Mockups panel is
+                   asking to see the design ON it, and the artwork's percentages do not move. */
+                mockup={mockPreview || faceUrl || (side === "front" ? mockup : "")}
                 // The stack, not a single artwork. `designUrl`/`pos` are left unset here on
                 // purpose: passing both would draw the bottom layer twice.
  images={images} updateImage={updateImage}

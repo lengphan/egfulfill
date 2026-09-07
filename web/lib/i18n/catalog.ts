@@ -161,6 +161,16 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "designMaker.Back to the blank": "Quay lại phôi",
+  "designMaker.Mockups": "Ảnh mẫu",
+  "designMaker.Publish on this photo": "Đăng trên ảnh này",
+  "designMaker.Publishing on this photo — press to remove": "Sẽ đăng trên ảnh này — nhấn để bỏ",
+  "designMaker.Show the blank this design was made on": "Hiện phôi mà thiết kế này được tạo trên đó",
+  "designMaker.This blank has no photos yet — publish will use the design on its own.": "Phôi này chưa có ảnh — khi đăng sẽ chỉ dùng riêng thiết kế.",
+  "designMaker.Tick the photos this design publishes on. Press one to see it on the stage.": "Chọn những ảnh mà thiết kế này sẽ được đăng lên. Nhấn vào một ảnh để xem thử trên khung.",
+  "designMaker.chosen": "đã chọn",
+  "lookbook.Cover photo": "Ảnh bìa",
+  "lookbook.Full-bleed behind the cover type. Shoot it with the lower-left third empty — the words set there, in ink, with no scrim.": "Tràn nền phía sau chữ bìa. Chụp sao cho góc dưới bên trái trống — chữ sẽ đặt ở đó, màu mực, không phủ lớp tối.",
   "canvas.Your product photo": "Ảnh sản phẩm của bạn",
   "canvas.Our product photo": "Ảnh sản phẩm của chúng tôi",
   "canvas.The backdrop the artwork sits on": "Nền mà thiết kế được đặt lên",
