@@ -925,6 +925,9 @@ export function priceCatalogPicks(body: { refs?: string[]; markupPct?: number; r
  *  cannot be laid out. */
 export type LookbookStyle = {
   ref: string; name: string; sku: string; description: string; brand: string
+  /** The product's category — what the printed book's chapter breaks group on. Optional: a
+   *  SAVED export predates it, and a style with none simply prints no breaker. */
+  type?: string
   /** Which list this page came from — our own catalogue products, or a picked S&S style.
    *  It decides where an edit is written, so it travels with the style rather than being
    *  re-derived from the shape of the ref. OPTIONAL: a saved export predates it. */

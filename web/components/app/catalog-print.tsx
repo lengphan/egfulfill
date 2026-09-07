@@ -242,7 +242,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  const [title, setTitle] = useState<string | null>(null)
  const [brand, setBrand] = useState<LookbookBrand>({
  title: "EGFUL", headline: "The catalogue", tagline: "Print-on-demand, made to order",
- accent: HOUSE.accent, contact: "", email: "", phone: "", site: "", address: "",
+ accent: HOUSE.accent, contact: "", email: "", phone: "", site: "", address: "", cover: "",
   })
   // Best-effort: a settings read that fails must not stop a catalogue printing. The
   // defaults above are the house brand, so a failure prints the house cover.
@@ -260,6 +260,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  contact: g("lookbook_contact"),
  email: g("lookbook_email"), phone: g("lookbook_phone"),
  site: g("lookbook_site"), address: g("lookbook_address"),
+          /* The cover frame. A URL rather than an upload field: it is one image for the whole
+             book, and every other asset this app stores is already a URL. */
+ cover: g("lookbook_cover"),
         })
       }).catch(() => {})
     }, 0)
@@ -533,72 +536,68 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
  the marketing site's own hero move, and the reason the catalogue had no
               "colour pop" is that it opened straight onto a white spec sheet. A cover is
  also what makes the PDF read as a document rather than as a print-out. */}
+          {/**
+            * ONE PHOTOGRAPH, FULL BLEED — and the type in the corner it leaves empty.
+            *
+            * It was four supplier cut-outs on white tiles against a coloured plate: a white
+            * picture inside a white box on a colour, which reads as a screenshot of a
+            * spreadsheet rather than as a cover, on the one page a buyer sees before deciding
+            * whether to read the rest.
+            *
+            * The frame is a SETTING (`lookbook_cover`), so a trade show or a private-label
+            * buyer is a swap rather than a deploy — and when there is none the page falls
+            * back to the flat brand ground it already had, which still prints finished.
+            *
+            * INK ON THE PHOTOGRAPH, NO SCRIM. The campaign direction is shot for this: a
+            * periwinkle seamless with the subject in the right two-thirds and the lower-left
+            * left empty, measured at 11.2:1 for #121212. A black scrim over a pale saturated
+            * ground dulls it to mud instead of darkening it, so there isn't one — the empty
+            * corner is what makes the type readable, and it is the photographer's job.
+            */}
           <section
- className="eg-sheet eg-cover mx-auto mb-6 flex w-[297mm] flex-col justify-between overflow-hidden p-[18mm] print:mb-0 print:shadow-none"
- style={{ height: "210mm", background: brand.accent, color: HOUSE.paper }}
+ className="eg-sheet eg-cover relative mx-auto mb-6 w-[297mm] overflow-hidden p-[18mm] print:mb-0 print:shadow-none"
+ style={{ height: "210mm", background: brand.cover ? HOUSE.paper : brand.accent, color: brand.cover ? HOUSE.ink : HOUSE.paper }}
           >
-            <div className="flex items-start justify-between">
-              <span className="font-title text-2xl font-bold tracking-tight">{brand.title}</span>
-              <span className="rounded-lg px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
+            {brand.cover && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={brand.cover} alt="" className="absolute inset-0 size-full object-cover" />
+            )}
+            <div className="relative flex h-full flex-col justify-between">
+              <div className="flex items-start justify-between">
+                <span className="font-title text-2xl font-semibold tracking-tight">{brand.title}</span>
+                <span className="rounded-lg px-3 py-1 text-[10px] font-semibold uppercase tracking-widest"
  style={{ background: HOUSE.lime, color: HOUSE.ink }}>
-                {fmtDate(new Date(), { month: "long", year: "numeric" })}
-              </span>
-            </div>
+                  {fmtDate(new Date(), { month: "long", year: "numeric" })}
+                </span>
+              </div>
 
-            {/* TWO COLUMNS, because the sheet turned on its side and the type did not.
-                A portrait cover is a column of words with the plate around it; the same
- arrangement on a 297mm page is that column pinned to the left edge with half
- a sheet of empty colour beside it. The words keep the left, and the right
- carries the thing the document is about — the products, in a grid, off the
- catalogue itself. Nothing invented: they are the first styles in the book. */}
-            <div className="grid flex-1 grid-cols-[minmax(0,1fr)_118mm] items-center gap-10">
-              <div>
-                {/* BROKEN AT THE LAST SPACE, not typed with a <br>. The cover name is editable
- now, so the line break cannot be part of the string — "The catalogue" has to
- set the way it always did while "Spring Blanks 2026" sets on its own terms.
-                    A single word simply fills one line. */}
-                <h1 className="font-title font-black leading-[0.88] tracking-tight" style={{ fontSize: "68px" }}>
+              {/* THE LOWER-LEFT THIRD, which is the composition's own empty corner. Scale does
+                  the work, not weight: 110px semibold at -0.03em reads as a cover where
+                  font-black at 68px read as a warning label. */}
+              <div className="max-w-[150mm]">
+                <h1 className="font-title font-semibold leading-[0.86] tracking-[-0.03em]" style={{ fontSize: "110px" }}>
                   {(() => {
  const words = brand.headline.trim().split(/\s+/)
  if (words.length < 2) return brand.headline
  return <>{words.slice(0, -1).join(" ")}<br />{words[words.length - 1]}</>
                   })()}
                 </h1>
-                <p className="mt-5 max-w-[105mm] text-base leading-relaxed" style={{ color: "rgba(250,248,243,0.75)" }}>
+                <p className="mt-4 text-base leading-relaxed" style={{ color: brand.cover ? "rgba(18,18,18,0.75)" : "rgba(250,248,243,0.75)" }}>
                   {brand.tagline}
                 </p>
-                {/* The lime rule — one bright line, the counterpart colour doing the job it
- can do on a dark ground where it measures 16.6:1. */}
-                <div className="mt-7 h-1.5 w-28 rounded-full" style={{ background: HOUSE.lime }} />
               </div>
 
-              {/* FOUR REAL PRODUCTS, on white tiles so the garments read against the plate.
-                  Only styles that actually have a photograph — a cover is the one page that
- cannot afford an empty well, so a thin catalogue simply shows fewer. */}
-              {(() => {
- const shots = rows.map(heroImage).filter(Boolean).slice(0, 4)
- if (!shots.length) return <span />
- return (
-                  <div className={"grid gap-3 " + (shots.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
-                    {shots.map((src, i) => (
-                      <div key={i} className="flex aspect-square items-center justify-center overflow-hidden rounded-xl p-3"
- style={{ background: PLATE }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="size-full object-contain" />
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-            </div>
-
-            <div className="flex items-end justify-between text-xs" style={{ color: "rgba(250,248,243,0.7)" }}>
-              <span>
-                <strong style={{ color: HOUSE.paper }}>{rows.length}</strong> style{rows.length === 1 ? "" : "s"}
-                {" · "}
-                <strong style={{ color: HOUSE.paper }}>{rows.reduce((n, s) => n + s.colors.length, 0)}</strong> colourways
-              </span>
-              {title && <span>{title}</span>}
+              {/* THE COUNTED LINE, along the foot as one rule of small caps — styles,
+                  colourways, month. Every figure is counted from the pages behind it. */}
+              <div className="flex items-end justify-between text-[10px] font-semibold uppercase tracking-widest"
+ style={{ color: brand.cover ? "rgba(18,18,18,0.7)" : "rgba(250,248,243,0.7)" }}>
+                <span className="tabular-nums">
+                  {rows.length} style{rows.length === 1 ? "" : "s"}
+                  {" · "}
+                  {rows.reduce((n, s2) => n + s2.colors.length, 0)} colourways
+                </span>
+                {title && <span className="normal-case tracking-normal">{title}</span>}
+              </div>
             </div>
           </section>
 
@@ -683,7 +682,45 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
             )
           })()}
 
-          {rows.map((st) => {
+          {/**
+            * ── CHAPTERS ────────────────────────────────────────────────────────────────
+            *
+            * Cover, statistics, then twenty-nine identical spec pages, then a back cover. A
+            * catalogue that never changes register is a price list with a cover on it, and
+            * the reader has no way to tell where the caps end and the bags begin except by
+            * reading every page.
+            *
+            * So one full-bleed page per category, type only: the name at 180pt in ink on the
+            * brand ground, its count along the foot. No image, no product — this is the one
+            * page in the book that is allowed to be a breath, and it costs nothing to
+            * produce, which is the point. Grouped on `type`, the field the catalogue already
+            * sorts and filters by; a style with none falls under the last group rather than
+            * inventing a chapter of one.
+            *
+            * The rows themselves are UNCHANGED and in the same order — the breaker is
+            * inserted before the first style of each new category, so nothing moves.
+            */}
+          {rows.map((st, i) => {
+            const catOf = (x: LookbookStyle) => String(x.type ?? "").trim()
+            const cat = catOf(st)
+            const isFirstOfCat = cat && (i === 0 || catOf(rows[i - 1]) !== cat)
+            const inCat = rows.filter((x) => catOf(x) === cat)
+            const breaker = isFirstOfCat ? (
+              <section
+                key={`cat-${cat}`}
+                className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col items-center justify-center overflow-hidden p-[18mm] print:mb-0 print:shadow-none"
+                style={{ height: "210mm", background: HOUSE.lime, color: HOUSE.ink }}
+              >
+                <h2 className="text-center font-title font-semibold leading-[0.86] tracking-[-0.03em]" style={{ fontSize: "150px" }}>
+                  {cat}
+                </h2>
+                <div className="mt-8 text-[11px] font-semibold uppercase tracking-[0.18em] tabular-nums">
+                  {inCat.length} style{inCat.length === 1 ? "" : "s"}
+                  {" · "}
+                  {inCat.reduce((n, x) => n + x.colors.length, 0)} colourways
+                </div>
+              </section>
+            ) : null
             // The photo this page can show, and whether the left column has anything at all
             // to hold. In EDIT mode it always does — the attach-a-photo and add-a-description
             // affordances are the reason you opened the mode on a page that has neither.
@@ -740,10 +777,11 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
              * disappearing — which is the difference between a shorter list and a wrong one.
              */
  const colCap = swatchCols * (st.description ? 2 : 3)
- return (
-            // ONE STYLE PER PAGE. A4 LANDSCAPE at 297×210mm with the page break forced after
-            // so a colourway grid never starts on one sheet and finishes on the next —
-            // which is the one thing that makes a printed catalogue look homemade.
+            /* ONE STYLE PER PAGE. A4 LANDSCAPE at 297×210mm with the page break forced
+               after, so a colourway grid never starts on one sheet and finishes on the next
+               — the one thing that makes a printed catalogue look homemade. The chapter
+               breaker, when this style opens a category, is rendered ahead of it. */
+ return (<>{breaker}
             <section
  key={st.ref}
  className="eg-sheet mx-auto mb-6 flex w-[297mm] flex-col overflow-hidden bg-white p-[14mm] print:mb-0 print:shadow-none"
@@ -1219,7 +1257,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 <span>{fmtDate(new Date(), { month: "long", year: "numeric" })}</span>
               </footer>
             </section>
-          )})}
+          </>)})}
 
           {/* ── PRICE LIST ───────────────────────────────────────────────────────────
               Every style on one run of tables, immediately before the back cover.

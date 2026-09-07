@@ -16,6 +16,10 @@ import { HOUSE_ACCENT } from "@/components/app/catalog-print"
  *  buyer changes one of them and not the other. */
 export type LookbookBrand = {
   title: string; headline: string; tagline: string; accent: string; contact: string
+  /** THE COVER PHOTOGRAPH — a URL, and the one asset this document has. Empty falls back to
+   *  the flat brand ground, which still prints finished, so an install with no photography
+   *  is not a broken cover. */
+  cover: string
   /** The back cover's reach-us block, one field each so it can be laid out and so a missing
    *  one is visible rather than buried in a paragraph. Blank rows are not printed. */
   email: string; phone: string; site: string; address: string
@@ -54,6 +58,7 @@ export function LookbookBrandingDialog({
   const [phone, setPhone] = useState(brand.phone)
   const [site, setSite] = useState(brand.site)
   const [address, setAddress] = useState(brand.address)
+  const [cover, setCover] = useState(brand.cover)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -67,6 +72,7 @@ export function LookbookBrandingDialog({
       setTitle(brand.title); setHeadline(brand.headline)
       setTagline(brand.tagline); setAccent(brand.accent); setContact(brand.contact)
       setEmail(brand.email); setPhone(brand.phone); setSite(brand.site); setAddress(brand.address)
+      setCover(brand.cover)
       setErr(null)
     }, 0)
     return () => clearTimeout(t)
@@ -96,13 +102,14 @@ export function LookbookBrandingDialog({
         lookbook_phone: phone.trim(),
         lookbook_site: site.trim(),
         lookbook_address: address,
+        lookbook_cover: cover.trim(),
       } as Parameters<typeof setFactorySettings>[0])
       if ((r as { error?: string })?.error) throw new Error((r as { error?: string }).error!)
       onSaved({
         title: title.trim() || "EGFUL",
         headline: headline.trim() || "The catalogue",
         tagline: tagline.trim(), accent: accent.trim(), contact,
-        email: email.trim(), phone: phone.trim(), site: site.trim(), address,
+        email: email.trim(), phone: phone.trim(), site: site.trim(), address, cover: cover.trim(),
       })
       onOpenChange(false)
     } catch (e) {
@@ -132,6 +139,17 @@ export function LookbookBrandingDialog({
           <label className="block space-y-1">
             <span className="text-sm font-medium">{tl("lookbook", "Cover tagline")}</span>
             <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder={tl("lookbook", "Print-on-demand, made to order")} className="h-9" />
+          </label>
+          {/* THE COVER PHOTOGRAPH. A URL, because it is one image for the whole book and every
+              other asset in this app is already one — and because a cover is the piece most
+              likely to change for a trade show or a private-label edition, which should be a
+              paste, not a deploy. Empty prints the flat brand ground it always did. */}
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">{tl("lookbook", "Cover photo")}</span>
+            <Input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://…" className="h-9" />
+            <span className="block text-xs text-muted-foreground">
+              {tl("lookbook", "Full-bleed behind the cover type. Shoot it with the lower-left third empty — the words set there, in ink, with no scrim.")}
+            </span>
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium">{tl("lookbook", "Accent colour")}</span>

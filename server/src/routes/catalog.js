@@ -1301,6 +1301,11 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       const legacyRef = String(d.id ?? d.sku ?? '');
       return withOverride({
         ref, source: 'mine', name: d.name || '', sku: d.sku || '',
+        /* THE CATEGORY, so the printed book can have chapters. It is the same `type` the
+           catalogue grid groups and filters by — Apparel, Headwear, Bags, Drinkware — and
+           the lookbook was the one reader that never received it, which is why twenty-nine
+           spec pages ran together with nothing between the caps and the bags. */
+        type: String(d.type || '').trim(),
         description: d.description || '', brand: notSupplier(d.brand),
         image: supplierArt.get(sid) || d.image || d.img || '',
         price: row.catalog_price == null ? null : Number(row.catalog_price),
