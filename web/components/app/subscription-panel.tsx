@@ -201,7 +201,19 @@ export function SubscriptionPanel() {
       {/* Current plan */}
       <SectionCard title={tl("subscription", "Your plan")}>
         <div className="p-5">
-          <div className="flex items-end justify-between gap-4 rounded-xl border border-border bg-muted/40 p-5">
+          {/**
+            * THE CARD GROUND, not a tint on top of it.
+            *
+            * bg-muted/40 over a white card computes to #F6F7F9 — measured, and body text on
+            * it is 16.3:1, so this was never a legibility failure. What it was is the third
+            * near-identical light grey in one view: the page is grey, the card is white, and
+            * this panel sits between them saying nothing that its border does not already
+            * say. §4 has the rule — the canvas is white, cards are white, the border
+            * separates them — and the same tint was taken off the wallet's warnings earlier
+            * for the same reason: colour the thing that means something, leave the ground
+            * alone. Body text goes to 17.4:1 as a side effect.
+            */}
+          <div className="flex items-end justify-between gap-4 rounded-xl border border-border bg-card p-5">
             <div>
               <div className="text-sm text-muted-foreground">{current.name} plan · billed monthly</div>
               <div className="mt-1 text-4xl font-bold tracking-tight">
@@ -412,7 +424,7 @@ export function SubscriptionPanel() {
  of Pro you already bought". Spell out the date and the days so the choice is
  made with the facts, and offer the obvious alternative: wait it out. */}
           {isDowngrade && billing?.renews_at && daysLeft > 0 && (
-            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+            <div className="rounded-lg border border-border bg-card p-3 text-sm text-foreground">
               <div className="font-medium text-hold">You keep {currentTier?.shortName ?? tl("subscription", "your current plan")} until {fmtDate(billing.renews_at)}.</div>
               <p className="mt-1">
                 Nothing is charged now. You&apos;ll keep {currentTier?.shortName ?? tl("subscription", "your plan")}
@@ -425,7 +437,7 @@ export function SubscriptionPanel() {
 
           {/* Returning to a tier this paid month already covers — no second charge. */}
           {!isDowngrade && pending?.plan && alreadyPaidFor(pending.plan) && (priceOf(pending) ?? 0) === 0 && billing?.renews_at && (
-            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+            <div className="rounded-lg border border-border bg-card p-3 text-sm text-foreground">
               <div className="font-medium text-shipped">{tl("subscription", "Already paid — nothing to charge.")}</div>
               <p className="mt-1">
                 Your {pendingTier?.shortName ?? "plan"} month runs through {fmtDate(billing.renews_at)}
@@ -436,7 +448,7 @@ export function SubscriptionPanel() {
           )}
 
           {billing && (priceOf(pending ?? {}) ?? 0) > 0 && (
-            <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+            <dl className="space-y-2 rounded-lg border border-border bg-card p-4 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">{tl("subscription", "Due now")}</dt>
                 <dd className="font-semibold tabular-nums">{money(priceOf(pending ?? {}) ?? 0)}</dd>
@@ -449,7 +461,7 @@ export function SubscriptionPanel() {
           )}
 
           {short && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3 text-sm text-foreground">
+            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-3 text-sm text-foreground">
               {/* Colour on the mark and the figure, not the panel — see the note on
                   LowBalanceBanner. Two washed tints stacked is what made these read cheap. */}
               <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-hold" />
