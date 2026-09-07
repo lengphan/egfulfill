@@ -656,6 +656,33 @@ export function priceLines(items, idx, fees, sidesOf = () => 1) {
   return { lines, unpriced };
 }
 
+/**
+ * THE RATE THIS SELLER WOULD GET ON A NEW ORDER — for a quote, before one exists.
+ *
+ * quoteOrder reads the discount off an ORDER (frozen if charged, else the ladder). A quote
+ * has no order, and a partner pricing a basket needs the same number the charge will use or
+ * the quote is decoration. Best-of the volume ladder and the plan rate, exactly as
+ * quoteOrder combines them — one function, so the two cannot disagree.
+ *
+ * Fails to zero like everything else here: no seller, no tiers, an unreadable settings row
+ * all quote the list price. A quote that promises a discount the charge does not honour is
+ * worse than one that does not mention it.
+ */
+export async function sellerDiscountPct(sellerId) {
+  if (!sellerId) return 0;
+  try {
+    const tiers = await q('select value from settings where key=$1', ['volume_tiers'])
+      .then((s) => normalizeTiers(s.rows[0]?.value || [])).catch(() => []);
+    let volumePct = 0;
+    if (tiers.length) {
+      const units = await unitsForSeller(String(sellerId), previousPeriod(periodKey(new Date())));
+      volumePct = volumeTierFor(units, tiers).pct || 0;
+    }
+    const planPct = await planRateFor(sellerId).catch(() => 0);
+    return effectiveDiscountPct([volumePct, planPct]);
+  } catch { return 0; }
+}
+
 export async function quoteOrder(orderId) {
   const [items, fees, idx, sideRows] = await Promise.all([
     q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee, line_id from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),

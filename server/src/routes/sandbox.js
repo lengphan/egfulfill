@@ -12,7 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
-import { quoteSpec } from '../pricing.js';
+import { quoteSpec, catalogIndex, feeSettings, priceLines, computeTotals, sellerDiscountPct } from '../pricing.js';
 import { limited, LIMITS } from '../ratelimit.js';
 import { stripMethod } from '../replenish.js';
 import { VISIBLE_TO_PARTNERS } from './inventory.js';
@@ -646,6 +646,77 @@ export function sandboxRoutes(app, requireAuth) {
     return { object: 'order', mode: 'test', id: req.params.id, status: 'in_production',
       tracking: { carrier: 'USPS', code: null, url: null }, total: null, created: nowISO(),
       _note: 'Simulated lookup — this id resolves to no real order, so total is null.' };
+  });
+
+  /**
+   * QUOTE A BASKET — the price before there is an order.
+   *
+   * Every comparable API has this and we did not: Printify prices postage on
+   * /orders/shipping.json, Printful splits it into /shipping/rates and /orders/estimate,
+   * Gelato answers /v4/orders:quote. Without it a partner cannot tell a customer what
+   * anything costs until the order already exists and the money has moved, which makes
+   * POST /orders the only way to ask a question.
+   *
+   * IT IS THE SAME ARITHMETIC THAT BILLS. priceLines and computeTotals are the functions
+   * quoteOrder runs — the per-size cost ladder, the print-method surcharge, the dearest
+   * line setting the postage, the extra-item rate, the seller's discount. A quote computed
+   * some other way is a number we would then have to defend when the charge disagreed.
+   *
+   * WHAT IT DOES NOT SAY. Nothing about what a blank costs US, who supplies it, or the
+   * margin between the two — §2.9, and the same reason quoteOrder strips supplierCost from
+   * a seller's copy. A quote is what YOU pay.
+   *
+   * Postage here is our fulfilment charge, not a live carrier rate: it is the ladder the
+   * order will actually be billed on, and it is knowable without an address. Saying so in
+   * the response is the difference between a quote and a guess.
+   */
+  app.post('/api/v1/orders/quote', async (req, reply) => {
+    const k = await requireKey(req, reply, { scope: 'orders.read' }); if (k.error) return k;
+    const b = req.body || {};
+    const items = Array.isArray(b.items) ? b.items : null;
+    if (!items || !items.length) return bad(reply, 'A quote needs a non-empty "items" array.', ['items'], k.mode);
+    try {
+      const [idx, fees] = await Promise.all([catalogIndex({ withImages: false }), feeSettings()]);
+      /* The API's item shape into the one the pricer reads. `blank` carries the product
+         name or sku a partner sent; matchProduct tries both halves of a composite. */
+      const mapped = items.map((it) => ({
+        sku: it.product_id || it.sku || null,
+        blank: it.blank || it.product || null,
+        name: it.name || null,
+        size: it.size || null,
+        print_type: it.method || it.print_type || null,
+        qty: Math.max(1, parseInt(it.quantity ?? it.qty, 10) || 1),
+      }));
+      const { lines, unpriced } = priceLines(mapped, idx, fees);
+      if (unpriced.length) {
+        reply.code(400);
+        return { error: 'Some lines have no catalogue match, so they cannot be priced.',
+          code: 'unpriceable_lines', mode: k.mode,
+          unpriced: unpriced.map((u) => ({ sku: u.sku, reason: u.reason })),
+          detail: 'Every line must match a catalogue product. Check the sku, size and print method against GET /api/v1/products.' };
+      }
+      /* A TEST KEY QUOTES THE SAME NUMBERS. The whole promise of the sandbox is that you
+         build against it and flip one key — a quote that differed would break exactly that.
+         The only difference is the discount: it belongs to a real seller. */
+      const pct = k.mode === 'live' ? await sellerDiscountPct(k.seller_id).catch(() => 0) : 0;
+      const t = computeTotals(lines, fees, pct);
+      return {
+        object: 'quote', mode: k.mode, currency: 'USD',
+        lines: lines.map((l, i) => ({
+          line: i + 1, sku: l.sku || null, product: l.name || null,
+          size: mapped[i]?.size ?? null, method: mapped[i]?.print_type ?? null,
+          quantity: l.qty, unit_price: money(l.unitCost), line_total: money(l.unitCost * l.qty),
+        })),
+        totals: {
+          items: money(t.subtotal),
+          shipping: money(t.shipping),
+          discount: t.volumeDiscount > 0 ? { percent: t.volumePct, amount: money(t.volumeDiscount) } : null,
+          total: money(t.total),
+          units: t.units,
+        },
+        _note: 'Shipping is the fulfilment charge for this basket, not a live carrier rate. Nothing was created and nothing was charged.',
+      };
+    } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: k.mode }; }
   });
 
   /**

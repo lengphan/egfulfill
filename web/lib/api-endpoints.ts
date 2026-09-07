@@ -91,6 +91,44 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     ),
   },
   {
+    id: "quote-order",
+    response: `{
+  "object": "quote",
+  "mode": "live",
+  "currency": "USD",
+  "lines": [
+    { "line": 1, "sku": "16468", "product": "Heavy Cotton Tee", "size": "L",
+      "method": "DTG", "quantity": 2, "unit_price": 8.50, "line_total": 17.00 }
+  ],
+  "totals": { "items": 17.00, "shipping": 7.99, "discount": { "percent": 20, "amount": 3.40 },
+    "total": 21.59, "units": 2 }
+}`,
+    method: "POST",
+    path: "/api/v1/orders/quote",
+    title: "Quote an order",
+    description: "What a basket costs, before there is an order. Same items array as Create order; the shipping address is not needed. It runs the SAME pricing the charge runs — the per-size cost ladder, the print-method surcharge, the dearest line setting postage, the extra-item rate and your own discount — so the figure here is the figure you are billed. Shipping is our fulfilment charge for the basket, not a live carrier rate. Nothing is created and nothing is charged.",
+    body: JSON.stringify(
+      { items: [{ product_id: "16468", quantity: 2, color: "Black", size: "L", method: "DTG" }] },
+      null,
+      2
+    ),
+  },
+  {
+    id: "cancel-order",
+    response: `{
+  "object": "order",
+  "mode": "live",
+  "id": "API-9F2C1A",
+  "status": "cancelled",
+  "refunded": 21.59
+}`,
+    method: "POST",
+    path: "/api/v1/orders/:id/cancel",
+    title: "Cancel order",
+    description: "Cancels an order that has not reached production and returns everything still owed to your balance, releasing the units it had reserved. Refused with 409 once the order is approved — the same rule the app itself applies, so a partner and a seller can never get different answers about the same order. Cancelling twice answers 200 with the current state rather than an error, so a retried timeout is safe.",
+    param: { name: "id", placeholder: "ord_test123" },
+  },
+  {
     id: "get-order",
     response: `{
   "object": "order",
