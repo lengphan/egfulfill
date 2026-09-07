@@ -1,6 +1,7 @@
 import type { CatalogProduct, OrderItem } from "@/lib/api"
 import { normalizeMethods } from "@/lib/print-method"
 import { bySize } from "@/lib/size-order"
+import { prettyColorName } from "@/lib/color-name"
 
 // Client mirror of pricing.js matchProduct / eg-design-tools.js chosenProduct: resolve an
 // order line to its catalog product. Picked blank (it.blank) wins; then the SKU matched
@@ -105,6 +106,34 @@ export function colorsOf(p: CatalogProduct | null): string[] {
 }
 
 /**
+ * THE PHOTO FOR ONE COLOURWAY — matched LOOSELY, because the two strings come from
+ * different places and were only ever compared exactly.
+ *
+ * `colorImages` is keyed by whatever the product editor stored ("Fern", "S.Pnk/Blk"), and
+ * the colour on a line is whatever the picker, the marketplace or a CSV put there — a
+ * different case, a stray space, a prettified two-tone name. `p.colorImages[color]` needs
+ * them identical, and when they were not it returned undefined and the caller quietly fell
+ * back to the product's hero shot. On screen that is "picking a colour doesn't change the
+ * picture", with nothing to say why.
+ *
+ * Exact first, then case- and space-insensitive, then both sides run through the same
+ * prettifier the swatches use. An empty string is a real answer — the editor writes "" for
+ * a colourway nobody has photographed — so it stays falsy and the hero still wins.
+ */
+export function colorImageOf(p: CatalogProduct | null, color?: string | null): string {
+  const want = String(color ?? "").trim()
+  if (!p?.colorImages || !want) return ""
+  const map = p.colorImages
+  if (map[want]) return map[want]
+  const norm = (v: string) => v.toLowerCase().replace(/\s+/g, " ").trim()
+  const loose = norm(want)
+  for (const [k, v] of Object.entries(map)) if (v && norm(k) === loose) return v
+  const pretty = norm(prettyColorName(want))
+  for (const [k, v] of Object.entries(map)) if (v && norm(prettyColorName(k)) === pretty) return v
+  return ""
+}
+
+/**
  * DOES THIS LINE GET STITCHED?
  *
  * One rule, because two things depend on it and they must never disagree: the thread-match
@@ -151,7 +180,7 @@ export function mockupFaces(p: CatalogProduct | null, color?: string | null): Mo
   if (!p) return []
   const sides = { ...(p.side_mockups ?? {}), ...(p.sideMockups ?? {}) } as Record<string, string>
   // Front: the chosen colour's image wins, else the product's main mockup/hero/first image.
-  const byColor = color && p.colorImages ? p.colorImages[color] : ""
+  const byColor = colorImageOf(p, color)
   const front = byColor || sides.front || p.mockup || p.img || p.image || p.hero
     || p.images?.[0] || Object.values(p.colorImages ?? {}).find(Boolean) || ""
   const faces: MockupFace[] = []

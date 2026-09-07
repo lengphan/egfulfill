@@ -39,6 +39,26 @@ const MAP: Record<string, string> = {
   espresso: "#4b3621", pepper: "#4a4a48", moss: "#8a8b5c", watermelon: "#f2637f",
   dusk: "#7a8ba3", "blue jean": "#3b5b7c", "true navy": "#1e293b", butter: "#f3e2a9",
   yam: "#d98f4e", brick: "#8f3b32", seafoam: "#93e0c6", "light green": "#a8d5a2",
+  // ── The Colorblast / garment-dyed family ─────────────────────────────────────────────
+  // Measured against a live product page: a Comfort Colors Colorblast tee offers Amethyst,
+  // Clay, Fern, Ocean, Smoke, Umber and Citrine, and not one of them was here — so the
+  // product page drew four of its ten colours as TEXT CHIPS beside six circles, and the
+  // manual order's colour menu showed a row of identical pale dots. Both surfaces were
+  // working correctly on a map that had never heard of the garment.
+  //
+  // These are muted, washed pigments by definition — a garment dye is not a screen colour —
+  // so they sit well below full saturation. A bright dot beside a washed name is a wrong
+  // chip, which this map already treats as worse than no chip at all (see "blue jean").
+  amethyst: "#a08cb4", clay: "#b9a394", fern: "#7d8f6a", ocean: "#5d87a1", umber: "#6b5a4e",
+  citrine: "#d3bd52", bay: "#77b0a8", blossom: "#f0c3cd", "blue spruce": "#3f5e5a",
+  chambray: "#8fa8bf", chili: "#a83c32", "china blue": "#4a6d8c", crimson: "#9e1b32",
+  crunchberry: "#c94f7c", emerald: "#2e8b6e", "flo blue": "#2f5f9e", granite: "#7d7f7c",
+  grape: "#6b4c72", hemp: "#b7ad8e", hydrangea: "#7d8fc4", "ice blue": "#bcd8e6",
+  "island green": "#3aa86b", "island reef": "#8fd6c0", lagoon: "#4a8f9e",
+  "chalky mint": "#a8d5c4", terracotta: "#b5624a", rust: "#9c4a2f", sage: "#9caf88",
+  oat: "#ded3bf", wheat: "#d9c69a", mauve: "#9a7b8c", blush: "#e8b4bc", plum: "#6b3f5b",
+  "bright salmon": "#f4837c", "bright orange": "#f2650d",
+  taupe: "#a99a8b", greige: "#b6ada1", pebble: "#c9c3ba", flint: "#6f7378",
 }
 
 const ABBR: Record<string, string> = {

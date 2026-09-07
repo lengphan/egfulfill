@@ -2547,6 +2547,20 @@ export function DesignCanvasDialog({
               </button>
             )}
           </div>
+          {/**
+            * A VIEWPORT AROUND THE ZOOM, and the zoom lives inside it.
+            *
+            * `scale()` paints outside the element's layout box — the box keeps its original
+            * size, the pixels do not. So zooming past 100% sent the garment straight over the
+            * Design / Artwork / Files column beside it, and under the panel below it: the
+            * gesture worked and the result landed on somebody else's furniture.
+            *
+            * `overflow-hidden` makes this box the edge of the canvas, which is what a zoom
+            * needs to be usable at all — it is the difference between magnifying a picture
+            * and making it bigger than the window. The height is the same ceiling the column
+            * already sets on itself, so nothing about the resting layout moves.
+            */}
+          <div className="relative w-full overflow-hidden">
           {/* The zoom wrapper. It scales this box, NOT the artwork's percentages — see
               lib/stage-zoom.ts. `origin-top` so zooming grows the garment downward from
               where the eye already is rather than pushing its collar off the top. */}
@@ -2705,6 +2719,7 @@ export function DesignCanvasDialog({
             </button>
           )}
           </div>
+          </div>{/* /zoom viewport — see the note above stageWrap */}
           {/**
             * WHAT IT PRINTS AT — the one number this window owed and never said.
             *

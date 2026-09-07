@@ -14,21 +14,27 @@ import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 import { framingStyle } from "@/lib/product-framing"
+import { swatchBg } from "@/lib/color-swatch"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 
-const SWATCH: Record<string, string> = {
- black: "#191918", white: "#f4f2ef", navy: "#25314d", "sport grey": "#b7b7b3", grey: "#9ca3af",
- gray: "#9ca3af", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf", maroon: "#6d2233",
- red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e", forest: "#2f5540",
- pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
-}
-/** The mapped hex, or null when this map has never heard of the colour. The difference
- *  matters on this page: a colour we cannot draw is shown as its NAME rather than as the
- *  generic grey every other unmapped colour would also get — forty identical grey dots is
- *  not a swatch row, it is a picture of a broken one. */
-const knownHex = (name: string): string | null => SWATCH[name.toLowerCase().trim()] ?? null
+/**
+ * THE SHARED MAP, not a private nineteen-entry copy.
+ *
+ * This page kept its own list of nineteen colour names, so a Comfort Colors run — Clay,
+ * Fern, Umber, Amethyst — drew as text chips here while the same product's swatches
+ * rendered correctly on the catalogue card and in the supplier grid, which both read
+ * lib/color-swatch. Two maps for one fact, and the smaller one won on the page a buyer
+ * actually looks at (§5).
+ *
+ * swatchBg, not swatchHex: a two-tone name ("Navy/White") comes back as a split gradient
+ * rather than as its first half, which is what the other surfaces already show.
+ *
+ * Null still means something here — a colour we genuinely cannot draw is printed as its
+ * NAME rather than as the generic grey every other unknown would also get. Forty identical
+ * grey dots is not a swatch row, it is a picture of a broken one. */
+const knownHex = (name: string): string | null => swatchBg(name)
 
 /**
  * Every PHOTO we can show — colour shots, the gallery, the hero — de-duped.
