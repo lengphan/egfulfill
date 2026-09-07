@@ -17,6 +17,7 @@ import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 import { isStaff } from '../auth.js';
 import { notify } from './notifications.js';
+import { nextTopupRef, topupContent } from '../topup-ref.js';
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const VQ_USER = process.env.VIETQR_USERNAME || '';   // inbound: VietQR -> us
@@ -435,16 +436,9 @@ export function vietqrRoutes(app, requireAuth) {
     // Human-readable reference WE control: EG + zero-padded sequential number
     // (e.g. EG000007). Alphanumeric so it survives the bank memo; this is the key
     // that links the seller's wallet, the admin ledger, and the bank transfer.
-    let note;
-    try {
-      const seqRow = await q(
-        "insert into settings (key,value,updated_at) values ('topup_seq','1',now()) " +
-        "on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value"
-      );
-      note = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
-    } catch (e) {
-      note = String(body.note || ('EG' + Date.now().toString(36))).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 23);
-    }
+    /* ONE PLACE MINTS IT — see server/src/topup-ref.js for why this stopped being three
+       copies of a query that could break permanently on a value nobody knew was there. */
+    const note = await nextTopupRef();
     const bankCode = process.env.VIETQR_BANK_CODE || 'BIDV';
     const account  = VQ_BANK_ACCOUNT;
     const name     = process.env.VIETQR_ACCOUNT_NAME || 'PHAN MY LINH';
@@ -456,7 +450,7 @@ export function vietqrRoutes(app, requireAuth) {
       const gr = await fetch(VQ_API_BASE + '/vqr/api/qr/generate-customer', {
         // See the note on vqOutboundToken: no signal meant no failure, only a hang.
         method: 'POST', signal: AbortSignal.timeout(15000), headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content: note, amount, orderId, qrType: 0, transType: 'C' })
+        body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content: topupContent(note), amount, orderId, qrType: 0, transType: 'C' })
       });
       const gd = await gr.json().catch(() => ({}));
       recordUsage('vietqr', { endpoint: 'qr/generate', ok: gr.ok });

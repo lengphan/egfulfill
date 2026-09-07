@@ -6,6 +6,7 @@
 // Credentials are read at CALL time: Settings › Integrations writes them to the DB and
 // into process.env live, but a boot-time `const` would pin the old value until a redeploy.
 import { notify } from './notifications.js';
+import { nextTopupRef } from '../topup-ref.js';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 
@@ -30,8 +31,7 @@ async function recordTopup(app, user, amount, txnId, note) {
   try {
     const ex = await q('select ref from topup_requests where txn_id=$1 limit 1', [txnId]);
     if (ex.rows[0]) return ex.rows[0].ref;
-    const seqRow = await q("insert into settings (key,value,updated_at) values ('topup_seq','1',now()) on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value");
-    ref = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
+    ref = await nextTopupRef();
     const ins = await q(
       "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,$5,'received',$6, now()) returning id",
       [user.sub, user.email || null, amount, ref, note || 'Card top-up', txnId]
