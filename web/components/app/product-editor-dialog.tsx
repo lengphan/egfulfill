@@ -889,10 +889,60 @@ export function ProductEditorDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ourSku])
 
+  /** Product-level cost/base/shipping default = the first size's tier (or the loaded value).
+   *  Lives out here rather than inside `save` because the base-cost refusal at the top of
+   *  save has to read the same figure the save itself writes. */
+ const firstTierNum = (k: keyof Tier, stateVal: string): number | undefined => {
+ const tv = (sizes.length ? tiers[sizes[0]]?.[k] : "")?.trim()
+ if (tv) return Number(tv) || 0
+ const sv = stateVal.trim()
+ return sv === "" ? undefined : Number(sv) || 0
+  }
+
  const [saving, setSaving] = useState(false)
  const save = () => {
  if (saving) return
  if (!name.trim()) { setErr("Give the product a name."); return }
+    /**
+     * NO BASE COST, NO PRODUCT — the one refusal that protects the margin.
+     *
+     * A supplier import fills in `productCost` (what we PAY) and deliberately leaves the base
+     * blank, and server/pricing.js then derives base = productCost + the `base_markup`
+     * setting. That is a convenience, not a price: it hands the entire margin of every
+     * imported blank to one number in Settings that nobody re-checks, and at markup 0 the
+     * order bills the seller EXACTLY what the garment cost us. The catalogue card says
+     * "no price" while the order quotes $30.45 — two screens telling opposite stories about
+     * the same product, which is how this was found.
+     *
+     * So the base is typed here, once, while somebody is looking at the garment. Per SIZE
+     * where sizes exist, because that is the row the quote reads first; the product-level
+     * figure (the first size's tier) covers any size left blank, exactly as pricing.js
+     * falls back.
+     *
+     * AND IT MUST BEAT WHAT WE PAY. A base at or under the supplier cost is the same zero-
+     * margin order arrived at by hand rather than by an empty field — the refusal names the
+     * size and both numbers rather than saying "invalid".
+     */
+ const savedBase = Number(firstTierNum("price", basePrice) ?? 0) || 0
+ if (sizes.length === 0) {
+ if (!(savedBase > 0)) { setErr("Set a base cost before saving — it is what the seller is charged. Without one the order prices itself at what we pay the supplier plus the markup setting, which can be no margin at all."); return }
+    } else {
+ const unpriced = sizes.filter((s) => {
+ const p = num(tiers[s]?.price)
+ return !(p > 0) && !(savedBase > 0)
+      })
+ if (unpriced.length) {
+ setErr(`Set a base cost for ${unpriced.length === sizes.length ? "each size" : unpriced.join(", ")} before saving — it is what the seller is charged, and without it the order prices itself at what we pay the supplier plus the markup setting.`)
+ return
+      }
+ const atCost = sizes
+        .map((s) => ({ s, base: num(tiers[s]?.price) > 0 ? num(tiers[s].price) : savedBase, cost: num(tiers[s]?.cost) > 0 ? num(tiers[s].cost) : (num(productCost) || 0) }))
+        .find((r) => r.cost > 0 && r.base > 0 && r.base <= r.cost)
+ if (atCost) {
+ setErr(`Base cost for ${atCost.s} is $${atCost.base.toFixed(2)} against the $${atCost.cost.toFixed(2)} the blank costs us — that order makes nothing. Price it above the product cost.`)
+ return
+      }
+    }
  const colorImages: Record<string, string> = {}
  for (const c of colors) colorImages[c] = colorImgs[c] || ""
     /**
@@ -912,13 +962,6 @@ export function ProductEditorDialog({
  if (!c || !colors.includes(c)) continue
  if (!colorGallery[c]) colorGallery[c] = []
  colorGallery[c].push(u)
-    }
-    // Product-level cost/base/shipping default = the first size's tier (or the loaded value).
- const firstTierNum = (k: keyof Tier, stateVal: string): number | undefined => {
- const tv = (sizes.length ? tiers[sizes[0]]?.[k] : "")?.trim()
- if (tv) return Number(tv) || 0
- const sv = stateVal.trim()
- return sv === "" ? undefined : Number(sv) || 0
     }
     /**
      * A RENAME KEEPS THE OLD NAME. An order line names its blank in TEXT, and both resolvers
