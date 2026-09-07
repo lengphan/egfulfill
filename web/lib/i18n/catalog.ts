@@ -26,6 +26,10 @@ type Dict = Record<string, string>
 
 // English is complete; other locales may be PARTIAL — missing keys fall back to English.
 const en: Dict = {
+  "settings.QR shape": "QR shape",
+  "settings.Virtual account — long description, cannot be mistyped": "Virtual account — long description, cannot be mistyped",
+  "settings.Your account — one short reference, like other VN shops": "Your account — one short reference, like other VN shops",
+  "settings.Simple shows your real account number and identifies the payment by its reference alone.": "Simple shows your real account number and identifies the payment by its reference alone.",
   "apiEndpoint.Validate key": "Validate key",
   "apiEndpoint.List products": "List products",
   "apiEndpoint.Create order": "Create order",
@@ -183,6 +187,10 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "settings.QR shape": "Kiểu mã QR",
+  "settings.Virtual account — long description, cannot be mistyped": "Tài khoản ảo — nội dung dài, không thể gõ sai",
+  "settings.Your account — one short reference, like other VN shops": "Tài khoản của bạn — một mã ngắn, giống các shop Việt khác",
+  "settings.Simple shows your real account number and identifies the payment by its reference alone.": "Kiểu đơn giản hiện số tài khoản thật của bạn và nhận diện giao dịch chỉ bằng mã tham chiếu.",
   "apiEndpoint.Validate key": "Kiểm tra khoá",
   "apiEndpoint.List products": "Danh sách sản phẩm",
   "apiEndpoint.Create order": "Tạo đơn hàng",

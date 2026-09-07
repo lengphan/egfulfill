@@ -504,6 +504,9 @@ export type VietqrPayment = {
   qrLink?: string
   /** OUR short reference (EG000007) — what the wallet poll matches on. */
   note?: string
+  /** True when the server built the SIMPLE shape: your own account and this reference alone
+   *  as the description. False/absent = VietQR's virtual account. */
+  simple?: boolean
   /** The FULL transfer description as it reaches the bank. VietQR wraps our ref in a
    *  virtual-account prefix, so this is what the payer actually sees — showing `note`
    *  alone is why the description here didn't match the VietQR side. */
@@ -539,14 +542,17 @@ export function createVietqrPayment(amount: number, amountUsd?: number) {
 export type VqrTier = { usd: number; rate: number }
 // The full top-up config the Add Funds dialog runs on: the VietQR rate + volume tiers, the
 // admin-set minimum (USD, applies to EVERY method), and the quick-amount presets.
-export type TopupConfig = { rate: number; tiers: VqrTier[]; minUsd: number; smallPresets: number[]; bulkPresets: number[] }
+export type TopupConfig = { rate: number; tiers: VqrTier[]; minUsd: number; smallPresets: number[]; bulkPresets: number[]; qrMode?: "va" | "simple" }
 export function getVietqrRate() {
   return api<TopupConfig>(`/api/vietqr/rate`)
 }
 export function setVietqrRate(
   rate: number,
   tiers?: VqrTier[],
-  extra?: { minUsd?: number; smallPresets?: number[]; bulkPresets?: number[] },
+  /** `qrMode` picks the SHAPE of the payment: 'va' is VietQR's virtual account (the account
+   *  identifies the payment, the description is long); 'simple' is your own account with one
+   *  short reference (the description identifies it). See create-payment in vietqr.js. */
+  extra?: { minUsd?: number; smallPresets?: number[]; bulkPresets?: number[]; qrMode?: "va" | "simple" },
 ) {
   return api<Partial<TopupConfig> & { ok?: boolean; error?: string }>(`/api/vietqr/rate`, { method: "PUT", body: JSON.stringify({ rate, tiers, ...extra }) })
 }

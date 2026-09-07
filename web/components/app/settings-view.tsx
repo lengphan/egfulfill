@@ -1146,6 +1146,7 @@ function PlatformPanel() {
  const [payoutMax, setPayoutMax] = useState("")
   // USD→VND rate for VietQR top-ups (separate endpoint; admin-only to change).
  const [vqrRate, setVqrRate] = useState("")
+ const [vqrQrMode, setVqrQrMode] = useState<"va" | "simple">("va")
   // Volume tiers: top up ≥ $usd, get the better $1 = rate₫. Held as strings for editing.
  const [vqrTiers, setVqrTiers] = useState<{ usd: string; rate: string }[]>([])
   // Top-up minimum (USD, applies to EVERY method) + the quick-amount presets. Presets held
@@ -1224,6 +1225,7 @@ function PlatformPanel() {
  setVqrMin(v.minUsd != null ? String(v.minUsd) : "")
  setVqrSmall((v.smallPresets || []).join(", "))
  setVqrBulk((v.bulkPresets || []).join(", "))
+ setVqrQrMode(v.qrMode === "simple" ? "simple" : "va")
       }).catch(() => {})
  setTypes(r.product_types ?? [])
  setThreads(r.thread_palette ?? [])
@@ -1318,6 +1320,7 @@ function PlatformPanel() {
  minUsd: vqrMin === "" ? undefined : Math.max(0, Math.round(Number(vqrMin) || 0)),
  smallPresets: vqrSmall.trim() ? parseList(vqrSmall) : undefined,
  bulkPresets: vqrBulk.trim() ? parseList(vqrBulk) : undefined,
+ qrMode: vqrQrMode,
         })
  if (rr.error) throw new Error(rr.error)
       }
@@ -1470,6 +1473,20 @@ function PlatformPanel() {
           <FeeGroup
  title={tl("settings", "VietQR top-up rate")}
           >
+            {/* THE SHAPE OF THE PAYMENT. Two ways the same transfer can be identified, and the
+                difference is which half is unique: the ACCOUNT (VietQR mints one per top-up,
+                and the description carries their sixteen-character code) or the DESCRIPTION
+                (your own account every time, one short reference). Simple is what every
+                Vietnamese storefront shows; it also means a payer who edits the description
+                leaves money we cannot match, which is the whole of the trade. */}
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium">{tl("settings", "QR shape")}</span>
+              <select className="eg-control h-9" value={vqrQrMode} onChange={(e) => setVqrQrMode(e.target.value as "va" | "simple")}>
+                <option value="va">{tl("settings", "Virtual account — long description, cannot be mistyped")}</option>
+                <option value="simple">{tl("settings", "Your account — one short reference, like other VN shops")}</option>
+              </select>
+              <span className="text-2xs text-muted-foreground">{tl("settings", "Simple shows your real account number and identifies the payment by its reference alone.")}</span>
+            </label>
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium">{tl("settings", "Base rate — VND per $1")}</span>
               <Input value={vqrRate} onChange={(e) => setVqrRate(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="25400" className="h-9" />

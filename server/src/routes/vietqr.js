@@ -387,7 +387,11 @@ export function vietqrRoutes(app, requireAuth) {
   app.get('/api/vietqr/rate', { preHandler: requireAuth }, async () => {
     const r = await q("select value from settings where key='vqr_rate'");
     const rate = r.rows[0] && Number(r.rows[0].value) > 0 ? Number(r.rows[0].value) : 25400;
-    return { rate, ...(await topupConfig(rate)) };
+    /* The admin screen needs to render the switch in the position it is actually in. */
+    const qrMode = await q("select value from settings where key='vqr_qr_mode'")
+      .then((x) => String(x.rows[0]?.value ?? '').replace(/"/g, '').trim().toLowerCase())
+      .catch(() => '');
+    return { rate, qrMode: qrMode === 'simple' ? 'simple' : 'va', ...(await topupConfig(rate)) };
   });
   app.put('/api/vietqr/rate', { preHandler: requireAuth }, async (req, reply) => {
     if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only — only an admin can set the exchange rate' }; }
@@ -403,6 +407,13 @@ export function vietqrRoutes(app, requireAuth) {
     if (b.minUsd !== undefined) {
       const m = Math.max(0, Math.round(Number(b.minUsd) || 0));
       await q("insert into settings (key,value,updated_at) values ('vqr_min_usd',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [String(m)]);
+    }
+    /* WHICH SHAPE THE QR TAKES — see the note in create-payment. Written here because this
+       is already the admin's VietQR screen, and a payment setting that needs a second place
+       to live is one nobody finds. Only the two known values; anything else is ignored
+       rather than stored, so a typo cannot put the flow into a state with no code path. */
+    if (b.qrMode === 'va' || b.qrMode === 'simple') {
+      await q("insert into settings (key,value,updated_at) values ('vqr_qr_mode',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(b.qrMode)]);
     }
     if (Array.isArray(b.smallPresets)) {
       await q("insert into settings (key,value,updated_at) values ('vqr_small_presets',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(cleanList(b.smallPresets))]);
@@ -442,6 +453,55 @@ export function vietqrRoutes(app, requireAuth) {
     const bankCode = process.env.VIETQR_BANK_CODE || 'BIDV';
     const account  = VQ_BANK_ACCOUNT;
     const name     = process.env.VIETQR_ACCOUNT_NAME || 'PHAN MY LINH';
+    /**
+     * ── TWO SHAPES OF THE SAME PAYMENT ───────────────────────────────────────────────
+     *
+     * VIRTUAL ACCOUNT (default). VietQR mints an account per request and stamps its own
+     * sixteen-character code into the content. The ACCOUNT identifies the payment, so a
+     * payer who mangles the description is still credited — but the description is long and
+     * unfamiliar, and the account number changes every time.
+     *
+     * SIMPLE. Your real account, unchanged, and one short reference in the content — the
+     * shape every Vietnamese storefront uses. The DESCRIPTION identifies the payment, and
+     * that is the whole of the trade: a payer who edits it leaves money we cannot match.
+     * It works at all only because the webhook above is a TRANSACTION SYNC — VietQR posts
+     * every balance change on the linked account, not only its own virtual ones — so a
+     * plain transfer still arrives here to be reconciled.
+     *
+     * The QR is VietQR's public image service: the same EMVCo payload their app would
+     * produce, from a URL, with no key. Deliberately NOT built here — a locally composed QR
+     * is what this project shipped once before, and money landed untracked because nothing
+     * on VietQR's side had ever heard of it.
+     *
+     * Default stays VA. This is a setting so it can be tried on one payment and put back
+     * without a deploy, which is the only honest way to change how money arrives.
+     */
+    const qrMode = await q("select value from settings where key='vqr_qr_mode'")
+      .then((r) => String(r.rows[0]?.value ?? '').replace(/"/g, '').trim().toLowerCase())
+      .catch(() => '');
+    if (qrMode === 'simple') {
+      const qrLink = 'https://img.vietqr.io/image/' + encodeURIComponent(bankCode) + '-'
+        + encodeURIComponent(account) + '-compact2.png'
+        + '?amount=' + encodeURIComponent(String(amount))
+        + '&addInfo=' + encodeURIComponent(note)
+        + '&accountName=' + encodeURIComponent(name);
+      try {
+        await q(
+          `insert into topup_requests
+             (seller_id, seller_email, amount_usd, vnd, ref, method, status,
+              qr_code, qr_content, bank_code, va_account, receiver_name)
+           values ($1,$2,$3,$4,$5,'VietQR','pending',$6,$7,$8,$9,$10)`,
+          [req.user.sub, req.user.email || null, body.amountUsd ?? null, amount, note,
+           null, note, bankCode || null, account || null, name || null]
+        );
+      } catch (e) { req.log?.warn?.({ err: String(e) }, 'vietqr simple pending topup insert failed'); }
+      return {
+        qrLink, qrCode: null, note, content: note,
+        account, vaAccount: account, bankCode, name,
+        amount, amountUsd: body.amountUsd ?? null, simple: true,
+      };
+    }
+
     let token;
     try { token = await vqOutboundToken(); }
     catch (e) { reply.code(502); return { error: 'VietQR auth failed: ' + e.message }; }

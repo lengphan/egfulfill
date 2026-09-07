@@ -236,9 +236,15 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
               <div className="flex items-start justify-between gap-3 py-1" title={payment.content || undefined}>
                 <dt className="shrink-0 text-xs text-muted-foreground">{tl("topup", "Description")}</dt>
                 <dd className="min-w-0 break-all text-right text-xs font-medium">
-                  {payment.note
-                    ? `TOPUP ${payment.note}`
-                    : <span className="text-hold">{tl("topup", "Description not returned")}</span>}
+                  {/* EXACTLY WHAT TO TYPE, and the two shapes differ. On the simple QR the
+                      description IS the identifier, so it is printed verbatim; on a virtual
+                      account it is ours plus VietQR's routing code, and only ours is worth
+                      reading (see the note above). */}
+                  {payment.simple
+                    ? (payment.content || payment.note)
+                    : payment.note
+                      ? `TOPUP ${payment.note}`
+                      : <span className="text-hold">{tl("topup", "Description not returned")}</span>}
                 </dd>
               </div>
             </dl>
