@@ -2495,30 +2495,9 @@ export function DesignCanvasDialog({
               * dropzone.tsx); every row here can be downloaded, which is the reason to print
               * a file name in the first place.
               */}
-            {/**
-              * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the title says
-              * in as many words because it is the one thing about this control that can be
-              * misread. Most sellers already have product photography; placing on our blank
-              * photo means the picture they list with and the picture the floor works from
-              * are two different images of one job.
-              *
-              * It does NOT replace the print file. The design is still what is placed, saved
-              * and printed, and a line with a photo and no design cannot ship — the gate
-              * reads order_designs, and this is stored somewhere else on purpose.
-              */}
-            <button
- type="button"
- onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
- disabled={mockBusy}
- title={ownMockups[sideKey]
-                ? tl("canvas", "Put our product photo back")
- : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
- aria-label={ownMockups[sideKey] ? tl("canvas", "Use our product photo") : tl("canvas", "Use my own product photo")}
- className={railBtn + (ownMockups[sideKey] ? " eg-selected" : "")}
-            >
-              {mockBusy ? <CircleNotch size={18} className="animate-spin" /> : <ImageSquare size={18} weight="bold" />}
-              <span className={railWord}>{ownMockups[sideKey] ? tl("canvas", "Our photo") : tl("canvas", "Mockup")}</span>
-            </button>
+            {/* THE BACKDROP CONTROL MOVED — it is in the Design panel now, beside the
+                variant picker. See the note there: this rail acts on the ARTWORK, and the
+                blank underneath it is not artwork. */}
             {/**
               * SEND, on the rail with the rest.
               *
@@ -2890,6 +2869,41 @@ export function DesignCanvasDialog({
             ]}
           />
           {ctxTab === "design" && (<>
+          {/**
+            * YOUR OWN PHOTO BEHIND THE ARTWORK — and it is a BACKDROP, which the label says
+            * in as many words because it is the one thing about this control that can be
+            * misread. Most sellers already have product photography; placing on our blank
+            * photo means the picture they list with and the picture the floor works from are
+            * two different images of one job.
+            *
+            * It does NOT replace the print file. The design is still what is placed, saved
+            * and printed, and a line with a photo and no design cannot ship — the gate reads
+            * order_designs, and this is stored somewhere else on purpose.
+            *
+            * OFF THE STAGE RAIL, WHERE IT DID NOT BELONG. That rail is the design tool: every
+            * other mark on it — rotate, lock, erase, delete — acts on the ARTWORK under the
+            * cursor, which is why it sits over the picture at all. This one changes the
+            * GARMENT behind the artwork, so it was the only button there whose target was not
+            * the thing you were pointing at, and it kept the left half of the window from
+            * being purely the product. It belongs with the blank's other facts.
+            */}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">{ownMockups[sideKey] ? tl("canvas", "Your product photo") : tl("canvas", "Our product photo")}</div>
+              <div className="text-2xs text-muted-foreground">{tl("canvas", "The backdrop the artwork sits on")}</div>
+            </div>
+            <Button
+              type="button" size="sm" variant="outline"
+              onClick={() => (ownMockups[sideKey] ? void clearOwnMockup() : mockupRef.current?.click())}
+              disabled={mockBusy}
+              title={ownMockups[sideKey]
+                ? tl("canvas", "Put our product photo back")
+                : tl("canvas", "Use your own product photo as the backdrop — the design file is still needed")}
+            >
+              {mockBusy ? <CircleNotch size={14} className="animate-spin" /> : <ImageSquare size={14} weight="bold" />}
+              {ownMockups[sideKey] ? tl("canvas", "Use ours") : tl("canvas", "Use mine")}
+            </Button>
+          </div>
           {!filesLocked && catalog && catalog.length > 0 && (
             <VariantPicker
               orderId={orderId}

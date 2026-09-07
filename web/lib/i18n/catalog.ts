@@ -26,6 +26,11 @@ type Dict = Record<string, string>
 
 // English is complete; other locales may be PARTIAL — missing keys fall back to English.
 const en: Dict = {
+  "canvas.Your product photo": "Your product photo",
+  "canvas.Our product photo": "Our product photo",
+  "canvas.The backdrop the artwork sits on": "The backdrop the artwork sits on",
+  "canvas.Use ours": "Use ours",
+  "canvas.Use mine": "Use mine",
   "stage.Approved": "Approved",
   "stage.Hold": "Hold",
   "kpi.Where the work is": "Where the work is",
@@ -156,6 +161,11 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "canvas.Your product photo": "Ảnh sản phẩm của bạn",
+  "canvas.Our product photo": "Ảnh sản phẩm của chúng tôi",
+  "canvas.The backdrop the artwork sits on": "Nền mà thiết kế được đặt lên",
+  "canvas.Use ours": "Dùng ảnh của chúng tôi",
+  "canvas.Use mine": "Dùng ảnh của tôi",
   "stage.Approved": "Đã duyệt",
   "stage.Hold": "Tạm giữ",
   "kpi.Where the work is": "Công việc đang ở đâu",

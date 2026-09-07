@@ -205,16 +205,18 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  missing="Bank not returned"
               />
               <Detail label={tl("topup", "Account")} value={payment.vaAccount || payment.account} mono missing="Account not returned" />
-              {/* The FULL description, not just our ref. VietQR wraps our EG-code in a
- virtual-account prefix, so the bank shows something longer — which is
- why this never matched what you saw on the VietQR side. Our ref is
- inside it, and that substring is what the poll reconciles on. */}
+              {/* The FULL description, not just our ref: VietQR wraps our EG-code in the
+                  virtual account's own prefix, so the bank shows something longer than the
+                  reference we minted.
+
+                  NO SENTENCE UNDER IT. It used to carry "send the description exactly as
+                  shown — our reference sits inside it", which is prose explaining a field
+                  that is already on screen (§4) and, worse, made the seller responsible for
+                  our reconciliation. They are not: the ACCOUNT above is a virtual one issued
+                  for this request alone, the money can only arrive there, and the callback
+                  now matches on it as well as on the reference. The QR carries both, so a
+                  scan cannot get either wrong. */}
               <Detail label={tl("topup", "Description")} value={payment.content || payment.note} mono missing="Description not returned" />
-              {payment.content && payment.note && payment.content !== payment.note && (
-                <p className="mt-2 text-2xs text-muted-foreground">
-                  Send the description exactly as shown. Our reference <span className="tabular-nums">{payment.note}</span>{" "}sits inside it — that&apos;s what matches the payment to your wallet.
-                </p>
-              )}
             </dl>
           </div>
         )}

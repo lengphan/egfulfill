@@ -40,6 +40,10 @@ const VQ_PASS = process.env.VIETQR_PASSWORD || '';
  * to be wrong for this direction the token call returns a plain 401, which says so.
  */
 const VQ_API_BASE = (process.env.VIETQR_API_BASE || process.env.VIETQR_ENDPOINT_URL || 'https://dev.vietqr.org').replace(/\/+$/, '');
+/** OUR OWN receiving account. Named here because two routes need it: create-payment asks
+ *  VietQR for a virtual account against it, and the callback below has to be able to tell a
+ *  real VA apart from this — see the note on the candidate query. */
+const VQ_BANK_ACCOUNT = (process.env.VIETQR_BANK_ACCOUNT || '1231255899').trim();
 const VQ_API_USER = process.env.VIETQR_API_USERNAME || process.env.VIETQR_USERNAME || '';
 const VQ_API_PASS = process.env.VIETQR_API_PASSWORD || process.env.VIETQR_PASSWORD || '';
 async function vqOutboundToken() {
@@ -168,11 +172,33 @@ export function vietqrRoutes(app, requireAuth) {
          * 'pending' would leave that money arriving with nothing to reconcile it against,
          * which is the one outcome worse than a noisy list.
          */
+        /**
+         * MATCHED BY THE VIRTUAL ACCOUNT AS WELL AS BY THE REFERENCE.
+         *
+         * The ref-inside-the-content rule makes reconciliation depend on the payer leaving
+         * the description alone — which is why the QR panel had to carry a sentence telling
+         * them to. But a virtual account IS the reference: VietQR issues one per request and
+         * the money can only arrive there, so it identifies the request more strongly than a
+         * substring ever could, and it cannot be retyped away.
+         *
+         * ONLY WHEN IT IS GENUINELY VIRTUAL. `va_account` falls back to our real receiving
+         * account when VietQR returns no VA — so matching on it blindly would make every
+         * pending request a candidate for every transfer into that account, which is the
+         * opposite of identifying one. Compared against VQ_BANK_ACCOUNT for exactly that.
+         *
+         * Everything else the query already enforced still holds: a ref must be long enough
+         * to mean something, the amount must cover the declared one, and at most one request
+         * is settled per transaction.
+         */
+        const paidTo = String(b.bankaccount || '').trim();
         const cands = (await q(
           `select * from topup_requests
-             where status in ('pending','abandoned') and ref is not null and length(ref) >= 6
-               and $1 ilike '%'||ref||'%'
-             order by created_at asc`, [content]
+             where status in ('pending','abandoned')
+               and (
+                 (ref is not null and length(ref) >= 6 and $1 ilike '%'||ref||'%')
+                 or ($2 <> '' and $2 <> $3 and va_account is not null and va_account = $2)
+               )
+             order by created_at asc`, [content, paidTo, VQ_BANK_ACCOUNT]
         ).catch(() => ({ rows: [] }))).rows || [];
         // Tolerance for bank rounding / fees, not for underpayment: 1% or 2,000₫.
         const covers = (rec) => {
@@ -420,7 +446,7 @@ export function vietqrRoutes(app, requireAuth) {
       note = String(body.note || ('EG' + Date.now().toString(36))).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 23);
     }
     const bankCode = process.env.VIETQR_BANK_CODE || 'BIDV';
-    const account  = process.env.VIETQR_BANK_ACCOUNT || '1231255899';
+    const account  = VQ_BANK_ACCOUNT;
     const name     = process.env.VIETQR_ACCOUNT_NAME || 'PHAN MY LINH';
     let token;
     try { token = await vqOutboundToken(); }
