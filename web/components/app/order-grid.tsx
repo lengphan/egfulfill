@@ -538,15 +538,21 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * The grid GROWS to fit. Silently truncating a 300-row paste to the 8 visible rows is the
    * kind of quiet data loss someone only finds after submitting.
    */
-  const onPaste = useCallback((e: React.ClipboardEvent, r: number, c: number) => {
+  const onPaste = useCallback((e: React.ClipboardEvent, r: number, c: number, fillRows?: number) => {
     // EDITING WINS. The caret is in the text, so the clipboard belongs to this cell — even
     // when it carries newlines, which is exactly the copied-address case.
     if (editing === `${r}-${c}`) return
     const text = e.clipboardData.getData("text/plain")
     if (!text || (!text.includes("\t") && !text.includes("\n"))) return   // one cell: let the browser do it
     e.preventDefault()
-    const block = parsePasted(text)
+    let block = parsePasted(text)
     if (!block.length) return
+    /* THE SELECTION IS FILLED, not just started. Copy one row, select ten, paste — and only
+       the first got it, which is the one outcome nobody selecting ten rows wants. When the
+       selection is LARGER than the clipboard, the block repeats down through it, the way
+       Sheets and Excel tile a paste over a bigger selection. When it is smaller, the block
+       still pastes in full: a selection of one must never truncate eight copied rows. */
+    if (fillRows && fillRows > block.length) block = Array.from({ length: fillRows }, (_, i) => block[i % block.length])
     writeRows((prev) => {
       const need = r + block.length
       const next = prev.map((row) => row.slice())
@@ -794,7 +800,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                     /* Paste lands at the TOP of the selection and spreads down through the block
                        handler, so a copied eight-row range dropped on a selected 1150 fills
                        1150–1157 — the selection is where it starts, not a mask on how far it goes. */
-                    onPaste={(e) => { if (isSel && selRange) onPaste(e, selRange[0], 0) }}
+                    onPaste={(e) => { if (isSel && selRange) onPaste(e, selRange[0], 0, selRange[1] - selRange[0] + 1) }}
                     className={"relative cursor-pointer select-none border-b border-border px-2 py-1 text-right tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring "
                       + (isSel ? "bg-primary text-primary-foreground" : "bg-muted/40 text-muted-foreground hover:bg-muted")}
                   >
