@@ -1,12 +1,12 @@
 "use client"
 
 import { useLabelT } from "@/lib/i18n"
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { FilePdf, ArrowSquareOut, UploadSimple, Barcode, Lock, X, Clock, CheckCircle, Warning } from "@phosphor-icons/react"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useConfirm } from "@/components/app/confirm-dialog"
-import { DISPATCH_GRID } from "@/components/app/dispatch-grid"
+import { DISPATCH_GRID, type DispatchColId } from "@/components/app/dispatch-grid"
 import { uploadDispatchLabel, deleteDispatchUpload, type DispatchUpload } from "@/lib/api"
 import { readLabelPdf, PARSE_NOTE, PARSE_WHY, type LabelParse } from "@/lib/label-pdf"
 
@@ -329,11 +329,20 @@ export function useLabelPullBack(onChanged: () => void) {
 }
 
 /** A file on this machine that has not been sent. */
-export function StagedLabelRow({ s, picked, onToggle, onDiscard, template }: {
+export function StagedLabelRow({ s, picked, onToggle, onDiscard, template, cols }: {
   /** THE QUEUE'S OWN TEMPLATE. These rows sit inside the dispatch list, so they cannot own a
    *  copy of the column widths — that is exactly the drift dispatch-grid.ts was written to
    *  stop. Handed down rather than imported. */
   template: string
+  /** …AND THE QUEUE'S VISIBLE COLUMNS, for the same reason and it is the same bug.
+   *
+   *  The template is built from the columns that are ON (dispatchTemplate), while this row
+   *  emitted all seven unconditionally. Turn one off in the Columns control and the row had
+   *  more children than the grid had tracks, so the surplus wrapped onto an implicit second
+   *  line — the tracking number and the row's own buttons appearing UNDER the row, which is
+   *  what "this row is pushed down" is. The header, the tracks and the cells are three
+   *  readings of one list and all three now come from the same array. */
+  cols: readonly DispatchColId[]
  s: StagedLabel
  picked: boolean
  onToggle: (key: string) => void
@@ -342,12 +351,9 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard, template }: {
   const tl = useLabelT()
  const k = stagedKeyOf(s)
  const p = s.parse
- return (
-          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={{ gridTemplateColumns: template }}>
-            <input
- type="checkbox" checked={picked} onChange={() => onToggle(k)}
- className="size-4 shrink-0 accent-primary" aria-label={`Select ${s.name}`}
-            />
+ const cell = (id: DispatchColId) => {
+ switch (id) {
+ case "order": return (
             <span className="flex min-w-0 flex-col">
               <span className="flex min-w-0 items-center gap-1.5">
                 <FilePdf size={13} className="shrink-0 text-muted-foreground" />
@@ -355,18 +361,34 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard, template }: {
               </span>
               <ExternalTag />
             </span>
-            <Recipient parse={p} />
-            <span className="truncate text-xs text-muted-foreground">{tl("externalLabels", "On this machine")}</span>
-            <span className="text-xs text-muted-foreground">{p?.pages || "—"}</span>
+          )
+ case "customer": return <Recipient parse={p} />
+ case "channel": return <span className="truncate text-xs text-muted-foreground">{tl("externalLabels", "On this machine")}</span>
+ case "units": return <span className="text-xs text-muted-foreground">{p?.pages || "—"}</span>
+ case "shipto": return (
             <span className="truncate text-xs text-muted-foreground" title={p?.addressLines.join(", ") || undefined}>
               {p?.shipTo || "—"}
             </span>
+          )
+ case "status": return (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Clock size={13} weight="bold" className="shrink-0" /> {tl("externalLabels", "Waiting to send")}
             </span>
+          )
+ case "tracking": return (
             <span className="truncate text-xs tabular-nums text-muted-foreground" title={p?.tracking || undefined}>
               {p?.tracking || "—"}
             </span>
+          )
+    }
+  }
+ return (
+          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={{ gridTemplateColumns: template }}>
+            <input
+ type="checkbox" checked={picked} onChange={() => onToggle(k)}
+ className="size-4 shrink-0 accent-primary" aria-label={`Select ${s.name}`}
+            />
+            {cols.map((id) => <Fragment key={id}>{cell(id)}</Fragment>)}
             <span className="flex justify-end">
               {/* Nothing to recall — it never left. So this is a plain discard, not a
  pull-back, and it says the difference by being a different word. */}
@@ -385,9 +407,11 @@ export function StagedLabelRow({ s, picked, onToggle, onDiscard, template }: {
 }
 
 /** A label that IS with byeastside. */
-export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack, template }: {
+export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack, template, cols }: {
   /** See StagedLabelRow — the same template the queue above is drawn with. */
   template: string
+  /** …and the same visible-column set, for the reason written there. */
+  cols: readonly DispatchColId[]
  u: DispatchUpload
  picked: boolean
  onToggle: (key: string) => void
@@ -403,12 +427,9 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack,
   // before sending, because theirs is what their queue will actually scan.
  const tracked = (u.labels ?? []).map((l) => l.trackingNumber).filter(Boolean) as string[]
  const trackText = tracked[0] || u.tracking || null
- return (
-          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={{ gridTemplateColumns: template }}>
-            <input
- type="checkbox" checked={picked} onChange={() => onToggle(k)}
- className="size-4 shrink-0 accent-primary" aria-label={`Select ${u.file_name || "label"}`}
-            />
+ const cell = (id: DispatchColId) => {
+ switch (id) {
+ case "order": return (
             <span className="flex min-w-0 flex-col">
               <span className="flex min-w-0 items-center gap-1.5">
                 <FilePdf size={13} className="shrink-0 text-muted-foreground" />
@@ -422,6 +443,8 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack,
                 Sent {dt(u.created_at)}
               </span>
             </span>
+          )
+ case "customer": return (
             <span className="min-w-0">
               {u.recipient
                 ? <span className="truncate text-sm">{u.recipient}</span>
@@ -430,9 +453,11 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack,
  title={tl("externalLabels", "Either the label is a picture with no text in it, or it was sent before we started reading names off labels. Open the label to see who it's for.")}
                   >{tl("externalLabels", "No name on file")}</span>}
             </span>
-            <span className="truncate text-xs text-muted-foreground">byeastside</span>
-            <span className="text-xs text-muted-foreground">{u.total_pages ?? "—"}</span>
-            <span className="truncate text-xs text-muted-foreground" title={u.ship_to || undefined}>{u.ship_to || "—"}</span>
+          )
+ case "channel": return <span className="truncate text-xs text-muted-foreground">byeastside</span>
+ case "units": return <span className="text-xs text-muted-foreground">{u.total_pages ?? "—"}</span>
+ case "shipto": return <span className="truncate text-xs text-muted-foreground" title={u.ship_to || undefined}>{u.ship_to || "—"}</span>
+ case "status": return (
             <span className={"min-w-0 text-xs font-medium " + TONE[p.tone]} title={p.title}>
               <span className="flex items-center gap-1.5">
                 <PI size={13} weight="bold" className="shrink-0" />
@@ -442,6 +467,8 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack,
  their dashboard shows, so the two can be matched up. */}
               {u.status && <span className="block truncate eg-label opacity-70">{u.status}</span>}
             </span>
+          )
+ case "tracking": return (
             <span className="min-w-0 text-xs">
               {trackText ? (
                 <>
@@ -452,6 +479,16 @@ export function UploadLabelRow({ u, picked, onToggle, busy, pulling, onPullBack,
                 </>
               ) : <span className="text-muted-foreground">—</span>}
             </span>
+          )
+    }
+  }
+ return (
+          <label className={DISPATCH_GRID + " cursor-pointer py-3 transition-colors hover:bg-accent/40"} style={{ gridTemplateColumns: template }}>
+            <input
+ type="checkbox" checked={picked} onChange={() => onToggle(k)}
+ className="size-4 shrink-0 accent-primary" aria-label={`Select ${u.file_name || "label"}`}
+            />
+            {cols.map((id) => <Fragment key={id}>{cell(id)}</Fragment>)}
             <span className="flex justify-end gap-1">
               {u.public_url && (
                 <a

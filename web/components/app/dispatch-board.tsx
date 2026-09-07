@@ -1481,6 +1481,7 @@ export function DispatchBoard({ segmented }: {
  key={r.key} s={r.s}
  picked={extPicked.has(r.key)} onToggle={toggleExt} onDiscard={discardStaged}
                     template={gridStyle.gridTemplateColumns}
+                    cols={visibleCols}
                   />
                 )
               }
@@ -1491,6 +1492,7 @@ export function DispatchBoard({ segmented }: {
  picked={extPicked.has(r.key)} onToggle={toggleExt}
  busy={busy} pulling={pulling} onPullBack={(u) => void pullBackOne(u)}
                     template={gridStyle.gridTemplateColumns}
+                    cols={visibleCols}
                   />
                 )
               }

@@ -102,18 +102,36 @@ export function ApproveOrderButton({
     } finally { setBusy(false) }
   }
 
+  const why = blocked
+    ? `${incomplete} item${incomplete === 1 ? "" : "s"} still need a blank, colour, size & method — set them before starting.`
+    : isFactoryOrder(order)
+      ? target === "approved" ? tl("approveOrderButton", "Confirm the blank on every line") : tl("approveOrderButton", "Put this into production")
+      : target === "approved"
+        ? tl("approveOrderButton", "Confirm the blank on every line — the warehouse starts production from there")
+        : tl("approveOrderButton", "Accept this order into production")
+
+  /**
+   * THE REASON HAS TO BE REACHABLE, and on a disabled button it was not.
+   *
+   * `buttonVariants` carries `disabled:pointer-events-none`, so the browser never fires a
+   * hover on this button in exactly the state where the title is the only thing explaining
+   * itself. Measured on the live page: `pointerEvents: "none"`, title present, unreadable.
+   *
+   * So pressing Approve on an order missing a blank did nothing, said nothing, and left the
+   * order on Pending — which reads as a button that is broken rather than a rule that is
+   * being applied. §4: a refusal carries its reason; that is not a subtitle, it is the answer.
+   *
+   * The wrapper is not disabled, so it takes the hover the button cannot, and the reason is
+   * there for the one person who needs it without adding a line of prose under a control
+   * for everyone who does not.
+   */
   return (
+    <span title={why} className={blocked ? "inline-flex cursor-not-allowed" : "inline-flex"}>
     <Button
       size={size}
       onClick={approve}
       disabled={busy || blocked}
-      title={blocked
-        ? `${incomplete} item${incomplete === 1 ? "" : "s"} still need a blank, colour, size & method — set them before starting.`
-        : isFactoryOrder(order)
-          ? target === "approved" ? tl("approveOrderButton", "Confirm the blank on every line") : tl("approveOrderButton", "Put this into production")
-          : target === "approved"
-            ? tl("approveOrderButton", "Confirm the blank on every line — the warehouse starts production from there")
-            : tl("approveOrderButton", "Accept this order into production")}
+      title={why}
     >
       {/* ONE WORD, both kinds of order. "Approve" and "Start" were the same write with two
           names, and the row in the hub had a third ("Next stage") for the same act on a
@@ -121,5 +139,6 @@ export function ApproveOrderButton({
           Who is waiting is already on the row: a seller's order says Pending. */}
       {busy ? <CircleNotch size={14} className="animate-spin" /> : word}
     </Button>
+    </span>
   )
 }
