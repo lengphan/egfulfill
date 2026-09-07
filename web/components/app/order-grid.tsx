@@ -263,26 +263,44 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     return () => clearTimeout(t)
   }, [])
 
+  /**
+   * THE DRAG LIVES ON THE WINDOW, not on the handle.
+   *
+   * It was `setPointerCapture` plus onPointerMove/onPointerUp on the strip itself, and that
+   * left a resize that never ended: if the up event does not land back on the handle — the
+   * capture not taking, a release outside the window, the node re-rendering mid-drag — then
+   * `drag.current` is still set, and the next time the pointer merely PASSES OVER the strip
+   * the column follows it. Hovering resized. A gesture whose end depends on the pointer
+   * coming home is a gesture that will sometimes not end.
+   *
+   * Window listeners cannot miss: pointerup anywhere finishes it, pointercancel finishes it,
+   * and they are removed the moment it does — so between drags there is nothing listening at
+   * all and a hover is only a hover.
+   */
   const startResize = (e: React.PointerEvent<HTMLElement>, axis: "col" | "row", key: string, from: number) => {
     // The header cell under it opens a sort/menu on click and the row number does nothing;
     // either way the drag is not a click on the thing it sits on.
     e.preventDefault(); e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    drag.current = { axis, key, from, at: axis === "col" ? e.clientX : e.clientY }
-  }
-  const moveResize = (e: React.PointerEvent<HTMLElement>) => {
-    const d = drag.current
-    if (!d) return
-    const delta = (d.axis === "col" ? e.clientX : e.clientY) - d.at
-    const next = Math.max(d.axis === "col" ? MIN_COL : MIN_ROW, Math.round(d.from + delta))
-    if (d.axis === "col") { sizing.current.cols = { ...sizing.current.cols, [d.key]: next }; setColW(sizing.current.cols) }
-    else { sizing.current.rows = { ...sizing.current.rows, [Number(d.key)]: next }; setRowH(sizing.current.rows) }
-  }
-  const endResize = (e: React.PointerEvent<HTMLElement>) => {
-    if (!drag.current) return
-    drag.current = null
-    e.currentTarget.releasePointerCapture?.(e.pointerId)
-    saveSizing()
+    const at = axis === "col" ? e.clientX : e.clientY
+    drag.current = { axis, key, from, at }
+    const move = (ev: PointerEvent) => {
+      const d = drag.current
+      if (!d) return
+      const delta = (d.axis === "col" ? ev.clientX : ev.clientY) - d.at
+      const next = Math.max(d.axis === "col" ? MIN_COL : MIN_ROW, Math.round(d.from + delta))
+      if (d.axis === "col") { sizing.current.cols = { ...sizing.current.cols, [d.key]: next }; setColW(sizing.current.cols) }
+      else { sizing.current.rows = { ...sizing.current.rows, [Number(d.key)]: next }; setRowH(sizing.current.rows) }
+    }
+    const end = () => {
+      drag.current = null
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", end)
+      window.removeEventListener("pointercancel", end)
+      saveSizing()
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", end)
+    window.addEventListener("pointercancel", end)
   }
   /** Back to automatic — the size is REMOVED, not set to whatever the default happens to
    *  be today, so a column reset now still follows a change to `widthFor` later. */
@@ -588,9 +606,6 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                       aria-orientation="vertical"
                       title={tl("orderGrid", "Drag to resize — double-click to reset")}
                       onPointerDown={(e) => startResize(e, "col", col.key, e.currentTarget.parentElement?.getBoundingClientRect().width ?? MIN_COL)}
-                      onPointerMove={moveResize}
-                      onPointerUp={endResize}
-                      onPointerCancel={endResize}
                       onDoubleClick={() => resetSize("col", col.key)}
                       className="absolute inset-y-0 right-0 z-20 w-1.5 cursor-col-resize touch-none select-none hover:bg-primary/40"
                     />
@@ -631,9 +646,6 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                       aria-orientation="horizontal"
                       title={tl("orderGrid", "Drag to resize — double-click to reset")}
                       onPointerDown={(e) => startResize(e, "row", String(r), e.currentTarget.closest("tr")?.getBoundingClientRect().height ?? MIN_ROW)}
-                      onPointerMove={moveResize}
-                      onPointerUp={endResize}
-                      onPointerCancel={endResize}
                       onDoubleClick={() => resetSize("row", String(r))}
                       className="absolute inset-x-0 bottom-0 z-20 h-1.5 cursor-row-resize touch-none select-none hover:bg-primary/40"
                     />
