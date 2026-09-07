@@ -26,6 +26,8 @@ type Dict = Record<string, string>
 
 // English is complete; other locales may be PARTIAL — missing keys fall back to English.
 const en: Dict = {
+  "designMaker.Colours": "Colours",
+  "designMaker.Sizes": "Sizes",
   "settings.QR shape": "QR shape",
   "settings.Virtual account — long description, cannot be mistyped": "Virtual account — long description, cannot be mistyped",
   "settings.Your account — one short reference, like other VN shops": "Your account — one short reference, like other VN shops",
@@ -187,6 +189,8 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "designMaker.Colours": "Màu sắc",
+  "designMaker.Sizes": "Kích cỡ",
   "settings.QR shape": "Kiểu mã QR",
   "settings.Virtual account — long description, cannot be mistyped": "Tài khoản ảo — nội dung dài, không thể gõ sai",
   "settings.Your account — one short reference, like other VN shops": "Tài khoản của bạn — một mã ngắn, giống các shop Việt khác",

@@ -208,6 +208,10 @@ export function DesignMaker() {
    * image it carries. Nothing is generated and nothing is invented — a mockup that is not a
    * picture of the garment being sold is a claim we cannot make.
    */
+ /** WHICH colourways and sizes this design is published on. null = all of them, which is
+   *  what a freshly chosen blank means — see the toggle note in the Blank panel. */
+ const [pickColors, setPickColors] = useState<string[] | null>(null)
+ const [pickSizes, setPickSizes] = useState<string[] | null>(null)
  const [mockPicks, setMockPicks] = useState<string[]>([])
  const [mockPreview, setMockPreview] = useState("")
   // Kept alongside the mockup so the printable zone can be resolved from the product's
@@ -491,7 +495,7 @@ export function DesignMaker() {
  setCatalogRows(rows ?? [])
  if (!productParam) return
  const p = catalogRef.current.find((x) => String(x.id) === productParam || String(x.sku) === productParam)
- if (p) { setMockup(mockupOf(p)); setProduct(p); setSide("front") }
+ if (p) { setMockup(mockupOf(p)); setProduct(p); setSide("front"); setPickColors(null); setPickSizes(null) }
         })
         .catch(() => {})
     }, 0)
@@ -562,7 +566,7 @@ export function DesignMaker() {
    */
  const byName = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
  const p = (d.blankSku ? catalogRef.current.find((x) => x.sku === d.blankSku) : null) ?? byName
- if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
+ if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front"); setPickColors(null); setPickSizes(null) }
   }
 
  useEffect(() => {
@@ -720,7 +724,10 @@ export function DesignMaker() {
  if (shot) shots.push(shot)
               }
  const id = stashPublishDraft({
- prefill: { title: name, images: shots, blank: product, designUrl: art, designPos: artPos },
+ prefill: { title: name, images: shots, blank: product, designUrl: art, designPos: artPos,
+                  /* The variant axes as CHOSEN here, so publish does not ask again for a
+                     decision that was already made on the blank. null = every one. */
+ colors: pickColors ?? undefined, sizes: pickSizes ?? undefined },
               /* BACK TO THE BLANK, not to the picker. `/design/maker` with nothing on it is
                  the "What are you making?" screen, so pressing Back after publishing threw
                  away the garment you had chosen and asked you to choose it again — the one
@@ -880,7 +887,10 @@ export function DesignMaker() {
                   <button
                     key={String(p.id)}
                     type="button"
-                    onClick={() => { setProduct(p); setMockup(mockupOf(p)); setSide("front") }}
+                    /* A NEW BLANK CLEARS THE PICKS. Sizes and colourways chosen on one garment mean
+                       nothing on another, and carrying them over silently publishes a range nobody
+                       chose. null = all of the new blank's, which is what picking one means. */
+                    onClick={() => { setProduct(p); setMockup(mockupOf(p)); setSide("front"); setPickColors(null); setPickSizes(null) }}
                     className="group rounded-xl border border-border bg-card p-2 text-left transition-colors hover:border-primary/50"
                   >
                     {/* WHITE, not a tint. Supplier blank photos ship on an opaque white
@@ -954,25 +964,73 @@ export function DesignMaker() {
                     * sizesOf / methodsOf), so this cannot drift from what publish offers.
                     */}
                   {(() => {
- const cols = colorsOf(product)
- const szs = sizesOf(product)
- const mths = methodsOf(product)
- if (!cols.length && !szs.length && !mths.length) return null
- return (
-                      <div className="space-y-1.5 border-t border-border pt-2">
+                    const cols = colorsOf(product)
+                    const szs = sizesOf(product)
+                    const mths = methodsOf(product)
+                    if (!cols.length && !szs.length && !mths.length) return null
+                    /* NULL MEANS ALL, and that is the state a freshly picked blank is in.
+                       A listing that offers everything the garment comes in is the common
+                       case, so it is the default and costs no clicks; unticking is how you
+                       narrow it. Storing the picks as a list with null for "all" also means
+                       a colourway added upstream next month is included rather than silently
+                       dropped, which is the same rule the lookbook's page picker follows. */
+                    const onCol = (c: string) => !pickColors || pickColors.includes(c)
+                    const onSz = (z: string) => !pickSizes || pickSizes.includes(z)
+                    const toggle = (list: string[] | null, all: string[], v: string) => {
+                      const cur = list ?? all
+                      const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]
+                      // Back to null when everything is on: "all" is a state, not a full list
+                      // that happens to match today's range.
+                      return next.length === all.length ? null : next
+                    }
+                    return (
+                      <div className="space-y-2.5 border-t border-border pt-2.5">
                         {cols.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            {cols.slice(0, 9).map((c) => (
-                              <span key={c} title={c}
- className="size-3.5 shrink-0 rounded-full border border-black/15"
- style={{ background: swatchBg(c) ?? "var(--muted)" }} />
-                            ))}
-                            {cols.length > 9 && <span className="text-2xs">+{cols.length - 9}</span>}
+                          <div className="space-y-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-xs font-medium text-foreground">{tl("designMaker", "Colours")}</span>
+                              <span className="text-2xs tabular-nums text-muted-foreground">{(pickColors ?? cols).length}/{cols.length}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {cols.map((c) => (
+                                <button
+                                  key={c} type="button" title={c} aria-pressed={onCol(c)}
+                                  onClick={() => setPickColors((p) => toggle(p, cols, c))}
+                                  className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 "
+                                    + (onCol(c) ? "border-black/25 ring-2 ring-primary/40" : "border-black/10 opacity-30")}
+                                  style={{ background: swatchBg(c) ?? "var(--muted)" }}
+                                />
+                              ))}
+                            </div>
                           </div>
                         )}
-                        {szs.length > 0 && <div className="text-2xs">{szs.join(" · ")}</div>}
+                        {szs.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-xs font-medium text-foreground">{tl("designMaker", "Sizes")}</span>
+                              <span className="text-2xs tabular-nums text-muted-foreground">{(pickSizes ?? szs).length}/{szs.length}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {szs.map((z) => (
+                                <button
+                                  key={z} type="button" aria-pressed={onSz(z)}
+                                  onClick={() => setPickSizes((p) => toggle(p, szs, z))}
+                                  className={"rounded-md px-1.5 py-0.5 text-xs transition-colors "
+                                    + (onSz(z) ? "eg-selected font-medium" : "text-muted-foreground/60 hover:text-foreground")}
+                                >
+                                  {z}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* METHODS ARE THE GARMENT'S, not the listing's — a blank can be
+                            embroidered or printed because of what it is, and this editor
+                            makes ONE design. Read-only, and at a size somebody can read. */}
                         {mths.length > 0 && (
-                          <div className="text-2xs">{mths.map((m) => methodByKey(m)?.label ?? m).join(" · ")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {mths.map((m) => methodByKey(m)?.label ?? m).join(" · ")}
+                          </div>
                         )}
                       </div>
                     )
@@ -1371,6 +1429,8 @@ export function DesignMaker() {
  setProduct(cp)
  setMockup(p.img || (cp ? mockupOf(cp) : ""))
  setSide("front")
+          // A new blank means a new range — see the note on the tile above.
+ setPickColors(null); setPickSizes(null)
  setTool("images")
         }} />
       {/* Reached from the Templates source's "Browse all", so it lands on Templates —
