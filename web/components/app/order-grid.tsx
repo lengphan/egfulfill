@@ -23,6 +23,7 @@ import { useLabelT } from "@/lib/i18n"
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ArrowCounterClockwise, ArrowClockwise } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   CSV_COLUMNS,
@@ -178,16 +179,77 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
      forgotten by the next thing that edits a cell.
      The callback is read from the PROP, not held in a ref — writing a ref during render is
      what react-hooks/refs rejects, and there is nothing here a dependency cannot express. */
-  const writeRows = useCallback((fn: (prev: string[][]) => string[][]) => {
+  /**
+   * ── UNDO ─────────────────────────────────────────────────────────────────────────────
+   *
+   * A sheet is the one surface in this app where a mistake is a keystroke: paste into the
+   * wrong row, hit Delete on a selected cell, drag a fill you did not mean. There was no way
+   * back from any of it — the autosave had already written it, and Ctrl+Z did nothing
+   * because every cell is its own <input> and the browser's own undo stops at the cell you
+   * are in. So the grid keeps its own stack.
+   *
+   * WHOLE SNAPSHOTS, not diffs. `rows` is a few hundred short strings; fifty copies of it
+   * cost less than the code needed to invert an edit correctly, and an inverse that is
+   * subtly wrong is worse than no undo at all.
+   *
+   * CONSECUTIVE KEYSTROKES IN ONE CELL COLLAPSE. Typing an address is one action to the
+   * person doing it, and an undo that walks back a letter at a time is one nobody presses
+   * twice. Same cell within a second replaces the top of the stack rather than pushing;
+   * anything else — a different cell, a paste, a row added, a second of thought — starts a
+   * new entry.
+   */
+  const past = useRef<string[][][]>([])
+  const future = useRef<string[][][]>([])
+  const lastTag = useRef<{ tag: string; at: number } | null>(null)
+  /* The stacks are refs (a drag writes them dozens of times a second and none of that
+     should re-render); this mirrors just the two facts the buttons need. Refs cannot be
+     read during render — react-hooks/refs is right about that — so the mirror is state. */
+  const [hist, setHist] = useState({ undo: false, redo: false })
+  const noteHistory = useCallback(() => setHist({ undo: past.current.length > 0, redo: future.current.length > 0 }), [])
+  const HISTORY_MAX = 60
+
+  /* One place every mutation goes through, so "tell the caller it changed" cannot be
+     forgotten by the next thing that edits a cell.
+     The callback is read from the PROP, not held in a ref — writing a ref during render is
+     what react-hooks/refs rejects, and there is nothing here a dependency cannot express. */
+  const writeRows = useCallback((fn: (prev: string[][]) => string[][], tag?: string) => {
     setRows((prev) => {
       const next = fn(prev)
+      const now = Date.now()
+      const coalesce = !!tag && lastTag.current?.tag === tag && now - (lastTag.current?.at ?? 0) < 1000
+      if (!coalesce) {
+        past.current = [...past.current, prev].slice(-HISTORY_MAX)
+        future.current = []
+      }
+      lastTag.current = tag ? { tag, at: now } : null
       // OUT of the updater. React may invoke an updater more than once, and a side effect
       // inside one runs as many times as it does — queueMicrotask keeps the state function
       // pure while still firing on the EVENT rather than from an effect watching `rows`.
-      queueMicrotask(() => onRowsChange?.(next))
+      queueMicrotask(() => { onRowsChange?.(next); noteHistory() })
       return next
     })
-  }, [onRowsChange])
+  }, [onRowsChange, noteHistory])
+
+  /* Undo and redo write through setRows DIRECTLY, never through writeRows — going back
+     through it would file the undo itself as a new edit and there would be no way forward.
+     They still tell the caller, because the sheet has to save what you can now see. */
+  const step = useCallback((back: boolean) => {
+    setRows((cur) => {
+      const from = back ? past : future
+      const to = back ? future : past
+      if (!from.current.length) return cur
+      const next = from.current[from.current.length - 1]
+      from.current = from.current.slice(0, -1)
+      to.current = [...to.current, cur].slice(-HISTORY_MAX)
+      lastTag.current = null
+      queueMicrotask(() => { onRowsChange?.(next); noteHistory() })
+      return next
+    })
+  }, [onRowsChange, noteHistory])
+  const undo = useCallback(() => step(true), [step])
+  const redo = useCallback(() => step(false), [step])
+  const canUndo = hist.undo
+  const canRedo = hist.redo
   /**
    * SELECTED IS NOT EDITING, and paste is where the difference matters.
    *
@@ -453,7 +515,8 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
         next[r][IDX.print_type] = ""
       }
       return next
-    })
+    /* Tagged with the cell, so a burst of typing in one box is ONE undo — see writeRows. */
+    }, `cell:${r}:${c}`)
   }, [writeRows])
 
   /**
@@ -499,6 +562,24 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
       const sel = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${r + dr}-${c + dc}"]`)
       sel?.focus()
     }
+    /* UNDO / REDO, and they have to be caught HERE. Every cell is its own <input>, so the
+       browser's native undo applies to the box you are in and stops there — press it after
+       a paste that filled four rows and one cell steps back. Cmd/Ctrl+Z and its shifted
+       twin (plus Ctrl+Y, which is what a Windows hand reaches for) belong to the SHEET. */
+    if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z" || e.key === "y" || e.key === "Y")) {
+      e.preventDefault()
+      const isRedo = e.key === "y" || e.key === "Y" || e.shiftKey
+      setEditing(null)
+      if (isRedo) redo(); else undo()
+      return
+    }
+    /* DELETE CLEARS A SELECTED CELL, whole. Inside an edit it is the ordinary key and must
+       stay one — deleting a character is not "empty this box". */
+    if (editing !== key && (e.key === "Delete" || e.key === "Backspace")) {
+      e.preventDefault()
+      setCell(r, c, "")
+      return
+    }
     if (e.key === "Escape") { setEditing(null); return }
     // Left/Right inside a value belong to the CARET, not to the grid — stepping columns
     // while someone is editing a street name is how a half-typed address ends up split.
@@ -509,7 +590,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     // Any character typed into a merely-selected cell starts editing it, so the next paste
     // lands in the cell rather than across the sheet.
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) setEditing(key)
-  }, [editing])
+  }, [editing, undo, redo, setCell])
 
   const openMenu = useCallback((el: HTMLElement, key: string) => {
     const r = el.getBoundingClientRect()
@@ -577,10 +658,14 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     <div className={fill ? "flex min-h-0 flex-1 flex-col gap-3" : "space-y-3"}>
       <div
         ref={gridRef}
+        /* A SHEET IS WHITE. This inherited the page's muted ground, so every cell was grey
+           and the rules between them were the only lighter thing on it — the data sat in
+           the dimmest layer of the screen, on the one surface where reading it IS the task.
+           Card ground, hairline rules, and the grey stays outside as the page. */
         className={
           fill
-            ? "min-h-0 flex-1 overflow-auto rounded-xl border border-border"
-            : "max-h-[52vh] overflow-auto rounded-xl border border-border"
+            ? "min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card"
+            : "max-h-[52vh] overflow-auto rounded-xl border border-border bg-card"
         }
       >
         <table className="w-max min-w-full border-collapse text-xs">
@@ -662,7 +747,23 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                         <input
                           data-cell={`${r}-${c}`}
                           value={row[c] ?? ""}
-                          onFocus={(e) => { if (list?.length) openMenu(e.currentTarget, `${r}-${c}`) }}
+                          /**
+                           * ONE CLICK SELECTS THE WHOLE VALUE. Every cell is an <input>, so a
+                           * click used to drop a caret wherever the pointer landed and typing
+                           * INSERTED into the middle of an address. A spreadsheet does not
+                           * work that way: click picks the cell, and what you type replaces
+                           * what was in it. Selecting the text is what makes both true at
+                           * once, and it is why Delete on a selected cell empties it.
+                           *
+                           * Skipped once the cell is being edited, or the double-click that
+                           * enters editing would immediately re-select the whole value and
+                           * undo the point of double-clicking.
+                           */
+                          onFocus={(e) => {
+                            if (editing !== `${r}-${c}`) e.currentTarget.select()
+                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`)
+                          }}
+                          onClick={(e) => { if (editing !== `${r}-${c}`) e.currentTarget.select() }}
                           onChange={(e) => {
                             setEditing(`${r}-${c}`)
                             setCell(r, c, e.target.value)
@@ -673,7 +774,15 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                           /* Double-click is the spreadsheet gesture for "let me into this
                              value". A single click only selects, so the next paste still
                              spreads across rows the way a copied column should. */
-                          onDoubleClick={() => setEditing(`${r}-${c}`)}
+                          /* DOUBLE CLICK EDITS INSIDE. The caret goes where it was put, the
+                             selection is dropped, and from here on the keys are the value's,
+                             not the sheet's. */
+                          onDoubleClick={(e) => {
+                            setEditing(`${r}-${c}`)
+                            const el = e.currentTarget
+                            const at = el.selectionEnd ?? el.value.length
+                            requestAnimationFrame(() => el.setSelectionRange(at, at))
+                          }}
                           onBlur={() => {
                             setEditing((k) => (k === `${r}-${c}` ? null : k))
                             setMenu((m) => (m?.key === `${r}-${c}` ? null : m))
@@ -769,6 +878,17 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
           {busy ? tl("orderGrid", "Working…") : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
         </Button>
         <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
+        {/* THE KEYSTROKE IS THE REAL CONTROL; these say it exists. Ghost, not outline: they
+            are minor next to Add rows and Complete, and a disabled one is the honest way to
+            say there is nothing to go back to (§4's variant hierarchy). */}
+        <Button variant="ghost" size="sm" onClick={undo} disabled={busy || !canUndo}
+          title={tl("orderGrid", "Undo the last change (⌘Z)")}>
+          <ArrowCounterClockwise size={14} weight="bold" /> {tl("orderGrid", "Undo")}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={redo} disabled={busy || !canRedo}
+          title={tl("orderGrid", "Redo (⇧⌘Z)")}>
+          <ArrowClockwise size={14} weight="bold" /> {tl("orderGrid", "Redo")}
+        </Button>
         {/* THE ONLY SENTENCE ON THIS SCREEN, and it is here because the state is not
             otherwise readable: a draft and a submitted order look the same from a grid that
             has just emptied. §4 allows a warning to carry its reason. */}

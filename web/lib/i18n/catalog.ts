@@ -3767,6 +3767,8 @@ const vi: Dict = {
   "notifications. · opens the related page": " · mở trang liên quan",
   "orderGrid.Drag to resize — double-click to reset": "Kéo để đổi kích thước — nhấp đúp để đặt lại",
   "orderGrid.Add rows": "Thêm dòng",
+  "orderGrid.Undo": "Hoàn tác",
+  "orderGrid.Redo": "Làm lại",
   "orderGrid.Back": "Quay lại",
   "orderGrid.Working…": "Đang xử lý…",
   "orderGrid.Remove this row": "Xoá dòng này",
