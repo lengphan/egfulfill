@@ -719,6 +719,9 @@ export function updateUserAdmin(id: string, patch: { role?: string; password?: s
 }
 
 export type AuditRow = { id: number | string; ts: string; actor?: string | null; actor_email?: string | null; actor_name?: string | null; actor_role?: string | null; action: string; entity_type?: string | null; entity_id?: string | null; note?: string | null;
+  /** For an order row: the number every other screen prints (#66) and whose order it is
+   *  ("Home Threads · Uyen"). Joined server-side, so the log never shows a raw key. */
+  entity_label?: string | null; entity_owner?: string | null;
   /** State snapshots the audit row carries — a deleted card's title/payout survive here even
    *  though the card is gone, and a lane move records its from/to cols. Shape varies by action. */
   before?: Record<string, unknown> | null; after?: Record<string, unknown> | null }

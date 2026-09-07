@@ -3,6 +3,7 @@
 //   audit(req, 'order.updated', { entityType:'order', entityId:id, before, after, note })
 // Fire-and-forget: it must NEVER throw or block the request it's recording.
 import { q } from './db.js';
+import { orderLabel } from './order-label.js';
 import { isStaff } from './auth.js';
 
 let _ready = null;
@@ -92,7 +93,41 @@ export function auditRoutes(app, requireAdmin, requireAuth) {
                  from audit_log ${where.length ? 'where ' + where.join(' and ') : ''}
                  order by ts desc, id desc limit ${lim}`;
     const r = await q(sql, vals);
-    return r.rows;
+    return withOrderNames(r.rows);
+  });
+}
+
+/**
+ * THE ORDER, NAMED — on every row that touches one.
+ *
+ * `entity_id` is `orders.id`: FF-ombao6-mtqzzojb-w95or for one of ours, a key that appears on
+ * no other screen and belongs to no one you can picture. An activity log that reads "Charged
+ * order FF-ombao6-mtqzzojb-w95or" three times in a row is a list of events with no way to
+ * tell which of two hundred orders they happened to, or whose.
+ *
+ * One query for the page, not one per row: the distinct order ids are collected and looked
+ * up together, and rows for orders that no longer exist keep their raw id rather than losing
+ * their subject. The label is the same one every other surface prints (order-label.js), and
+ * the owner is the shop first, then the seller's name — which is how a person actually
+ * locates an order: "the Home Threads one", not "the one belonging to uyen@…".
+ */
+async function withOrderNames(rows) {
+  const ids = [...new Set(rows.filter((x) => x.entity_type === 'order' && x.entity_id).map((x) => String(x.entity_id)))];
+  if (!ids.length) return rows;
+  let by = new Map();
+  try {
+    const r = await q(
+      `select o.id, o.seq, o.store, coalesce(nullif(u.name,''), u.email) as seller
+         from orders o left join users u on u.id = o.seller_id
+        where o.id = any($1::text[])`, [ids]);
+    by = new Map(r.rows.map((o) => [String(o.id), o]));
+  } catch { return rows; }
+  return rows.map((x) => {
+    if (x.entity_type !== 'order') return x;
+    const o = by.get(String(x.entity_id));
+    if (!o) return x;
+    const owner = [o.store, o.seller].filter(Boolean).join(' · ');
+    return { ...x, entity_label: orderLabel(o.id, o.seq), entity_owner: owner || null };
   });
 }
 

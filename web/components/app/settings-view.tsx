@@ -2778,7 +2778,15 @@ function ActivityPanel() {
  rows={audit}
  variant="card"
  empty={filtered ? "No activity matches these filters." : "No activity recorded yet."}
- subject={(a) => (a.entity_type ? <span className="text-muted-foreground">{a.entity_type} {a.entity_id ?? ""}</span> : null)}
+ /* THE NUMBER AND THE OWNER, never the key. "order FF-ombao6-mtqzzojb-w95or" was a row
+                 with no way to tell which order, or whose; "order #66 · Home Threads · Uyen" is one
+                 you can find. The raw id stays on the hover for anyone matching against the DB. */
+ subject={(a) => (a.entity_type ? (
+                <span className="text-muted-foreground" title={a.entity_id ?? undefined}>
+                  {a.entity_type} <span className="font-medium text-foreground tabular-nums">{a.entity_label ?? a.entity_id ?? ""}</span>
+                  {a.entity_owner && <span> · {a.entity_owner}</span>}
+                </span>
+              ) : null)}
         />
       </div>
     </SectionCard>
