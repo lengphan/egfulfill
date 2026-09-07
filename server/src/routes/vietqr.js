@@ -22,12 +22,28 @@ const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const VQ_USER = process.env.VIETQR_USERNAME || '';   // inbound: VietQR -> us
 const VQ_PASS = process.env.VIETQR_PASSWORD || '';
 
-// Outbound: us -> VietQR (Account API creds VietQR issued, for get-token/generate/test).
-const VQ_API_BASE = (process.env.VIETQR_API_BASE || 'https://dev.vietqr.org').replace(/\/+$/, '');
-const VQ_API_USER = process.env.VIETQR_API_USERNAME || '';
-const VQ_API_PASS = process.env.VIETQR_API_PASSWORD || '';
+/**
+ * Outbound: us -> VietQR (the Account API credentials VietQR issued, for
+ * get-token / generate / test).
+ *
+ * TWO SPELLINGS, ONE CREDENTIAL. VietQR's onboarding hands over a single customer pair —
+ * `customer-vso…` and its password — and their own instructions name them
+ * VIETQR_USERNAME / VIETQR_PASSWORD / VIETQR_ENDPOINT_URL. This file had claimed the short
+ * names for the INBOUND direction (the Basic auth VietQR presents when it calls our webhook)
+ * and required a second, longer-named copy for the outbound one. So a server set up exactly
+ * as VietQR instructed had every value present and still failed with "Server missing
+ * VIETQR_API_USERNAME / VIETQR_API_PASSWORD" — the credentials were there, under the name
+ * the vendor uses rather than the name we invented.
+ *
+ * The API_ names still WIN, for an install where the two directions genuinely differ. The
+ * fallback only fires where the alternative is failing outright, and if the pair turns out
+ * to be wrong for this direction the token call returns a plain 401, which says so.
+ */
+const VQ_API_BASE = (process.env.VIETQR_API_BASE || process.env.VIETQR_ENDPOINT_URL || 'https://dev.vietqr.org').replace(/\/+$/, '');
+const VQ_API_USER = process.env.VIETQR_API_USERNAME || process.env.VIETQR_USERNAME || '';
+const VQ_API_PASS = process.env.VIETQR_API_PASSWORD || process.env.VIETQR_PASSWORD || '';
 async function vqOutboundToken() {
-  if (!VQ_API_USER || !VQ_API_PASS) throw new Error('Server missing VIETQR_API_USERNAME / VIETQR_API_PASSWORD');
+  if (!VQ_API_USER || !VQ_API_PASS) throw new Error('Server missing VIETQR_API_USERNAME / VIETQR_API_PASSWORD (or VIETQR_USERNAME / VIETQR_PASSWORD)');
   const auth = Buffer.from(VQ_API_USER + ':' + VQ_API_PASS).toString('base64');
   /**
    * A TIMEOUT, because without one this route cannot fail — it can only hang.
@@ -508,7 +524,18 @@ export function vietqrRoutes(app, requireAuth) {
   app.get('/api/vietqr/selftest', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
     const qy = req.query || {};
-    const out = { base: VQ_API_BASE };
+    /* WHICH NAMES ANSWERED. "Server missing X" is only half an answer when the value is on
+       the box under a different name — this says which slot each half came from, without
+       ever printing the value. */
+    const out = {
+      base: VQ_API_BASE,
+      baseFrom: process.env.VIETQR_API_BASE ? 'VIETQR_API_BASE' : process.env.VIETQR_ENDPOINT_URL ? 'VIETQR_ENDPOINT_URL' : 'default',
+      outboundUserFrom: process.env.VIETQR_API_USERNAME ? 'VIETQR_API_USERNAME' : process.env.VIETQR_USERNAME ? 'VIETQR_USERNAME' : 'MISSING',
+      outboundPassFrom: process.env.VIETQR_API_PASSWORD ? 'VIETQR_API_PASSWORD' : process.env.VIETQR_PASSWORD ? 'VIETQR_PASSWORD' : 'MISSING',
+      /* The other direction, which fails silently: without it VietQR's "this transfer
+         landed" callback is refused and a paid QR never credits the wallet. */
+      inboundAuth: (process.env.VIETQR_USERNAME && process.env.VIETQR_PASSWORD) ? 'set' : 'MISSING',
+    };
     let token;
     try { token = await vqOutboundToken(); out.step1_getToken = 'ok'; }
     catch (e) { out.step1_getToken = 'FAILED: ' + e.message; return out; }
