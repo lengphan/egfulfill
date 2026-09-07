@@ -288,20 +288,24 @@ export function ApiPlayground() {
               }
             >
               <span className={"rounded px-1.5 py-0.5 font-mono text-2xs font-bold " + toneFor(e.method)}>{e.method}</span>
-              <span className="truncate font-medium">{e.title}</span>
+              {/* THROUGH tl. The endpoint list is a constant, so its titles rendered their
+                  English word with no t() anywhere near them — the same hole the order
+                  filters and the stage bracket were in, and the same one the i18n gate
+                  cannot see. The METHOD chip beside it stays English: GET is protocol. */}
+              <span className="truncate font-medium">{tl("apiEndpoint", e.title)}</span>
             </button>
           ))}
         </div>
 
         {/* Request / response */}
         <div className="space-y-4">
-          <SectionCard title={selected.title}>
+          <SectionCard title={tl("apiEndpoint", selected.title)}>
             <div className="space-y-4 p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className={"rounded px-2 py-1 font-mono text-xs font-bold " + toneFor(selected.method)}>{selected.method}</span>
                 <code className="rounded bg-muted px-2 py-1 font-mono text-xs">{resolvedPath}</code>
               </div>
-              <p className="text-sm text-muted-foreground">{selected.description}</p>
+              <p className="text-sm text-muted-foreground">{tl("apiEndpointDesc", selected.description)}</p>
 
               {selected.param && (
                 <label className="flex flex-col gap-1.5">
