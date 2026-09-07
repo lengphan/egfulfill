@@ -147,26 +147,6 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     description: "What is currently on account. Negative means charges exceed funds. Needs the billing.read scope.",
   },
   {
-    id: "statement",
-    response: `{
-  "object": "statement",
-  "period": { "from": "2026-07-01", "to": "2026-07-31" },
-  "opening_balance": 12.30,
-  "closing_balance": 90.80,
-  "totals": { "charges": -46.00, "credits": 124.50, "net": 78.50 },
-  "lines": [
-    { "id": "1", "date": "2026-07-02T09:14:22.104Z", "type": "order-out",
-      "order_id": "API-9F2C1A", "description": "Order API-9F2C1A",
-      "amount": -24.50, "balance": -12.20 }
-  ]
-}`,
-    method: "GET",
-    path: "/api/v1/statement",
-    title: "Statement",
-    description:
-      "Every movement in a period with a running balance, defaulting to the current calendar month. Pass ?from=YYYY-MM-DD&to=YYYY-MM-DD. opening_balance + totals.net always equals closing_balance. Needs billing.read.",
-  },
-  {
     id: "webhooks-list",
     response: `[
   { "id": 3,

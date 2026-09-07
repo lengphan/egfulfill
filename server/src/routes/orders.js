@@ -687,7 +687,16 @@ async function chargeForSubmit(orderId, sellerId, by, hideMoney = false, extra =
 // owed back" — a $10 goodwill refund followed by a cancel must return $40, not $50.
 // Reading the remainder makes both directions safe: nothing is paid twice, and a
 // partly-refunded order still gets its balance back rather than being treated as done.
-async function refundForCancel(orderId, sellerId, by) {
+/**
+ * THE STAGES A SELLER MAY STILL CANCEL FROM — accepted, not started.
+ *
+ * Exported because the public API has to answer this question with the SAME list. A second
+ * copy in sandbox.js would be a rule that can drift, and the two readers of it are "refund
+ * this money" and "refuse this call": the pair you least want disagreeing.
+ */
+export const CANCELLABLE_STAGES = ['', 'new', 'draft', 'in_review'];
+
+export async function refundForCancel(orderId, sellerId, by) {
   const state = await orderCharges(orderId);
   if (state.charged <= 0) return { ok: true, nothingToRefund: true };
   if (state.refundable <= 0) return { ok: true, already: true };
@@ -2133,7 +2142,7 @@ export function ordersRoutes(app, requireAuth) {
       // charged) but nobody has picked the order up, so cancelling is still safe and
       // fully refundable. Once it's working or beyond, the floor owns it and the only
       // route back is a refund REQUEST the factory approves.
-      const SELLER_ZONE = ['', 'new', 'draft', 'in_review'];
+      const SELLER_ZONE = CANCELLABLE_STAGES;
       // ONCE ACCEPTED, ALWAYS ACCEPTED. The stage alone made this window re-openable by an
       // ordinary undo on the board — see approved_at. Both tests still have to pass, so an
       // order that has never been approved and is sitting at Pending is cancellable exactly
@@ -3502,27 +3511,22 @@ export function ordersRoutes(app, requireAuth) {
     }
 
     /**
-     * Say WHY, on the order, in the seller's own thread.
+     * NO AUTOMATED NOTE ON THE THREAD ANY MORE.
      *
-     * A charge they can see but not account for is worse than a surprise — it reads as an
-     * error, and the first thing they do is ask. The tier itself stays internal: "your
-     * design was classified complex" invites an argument about the classification rather
-     * than about the price, and the classification is our judgement to make.
+     * This posted a paragraph into the seller's own conversation every time a design fee
+     * landed — "Digitising the artwork for X came to $2.00. That's our standard rate…" —
+     * and it was written for a product where the charge appeared NOWHERE ELSE. That was
+     * true: orderCharges matched the wrong ledger type and the wrong ref shape, so no
+     * design fee ever reached the order Summary, and the seller's statement labelled it a
+     * bare "Debit". Both were fixed today. The fee is now a named row on the order and a
+     * named line on the statement, which is where money belongs.
      *
-     * Posted automatically. A note somebody has to remember to write is a note that mostly
-     * doesn't get written, and the charge lands either way.
+     * So the note is not explaining an unexplained charge; it is a robot talking in a room
+     * meant for people, once per fee, on a thread whose unread count a seller is supposed
+     * to trust. The reason still exists in three places that outlive a chat message: the
+     * ledger note, the audit row, and the Summary's own label.
      */
-    const why = tier === 'supplied'
-      ? `You sent your own machine file for ${itemLabel}. We open and check every one before it goes near a machine — wrong size, wrong format and wrong machine type are all common and all expensive to find at the press. That check is ${fmtMoney(amount)}, which is less than having us digitise it.`
-      : tier === 'complex'
-        ? `Digitising the artwork for ${itemLabel} came to ${fmtMoney(amount)} — this one needed more work than a standard design, which you approved before we started.`
-        : `Digitising the artwork for ${itemLabel} came to ${fmtMoney(amount)}. That's our standard rate for turning a picture into a stitch file.`;
-    await q(
-      `insert into order_messages (order_id, sender_id, sender_role, body, meta)
-       values ($1, null, 'assistant', $2, $3)`,
-      [orderId, why, JSON.stringify({ by: 'Billing', design_fee: amount, order_ref: orderId })]
-    ).catch(() => {});
-    egBroadcast({ type: 'order-message' });
+
     // EVERY line this one payment covers is stamped, not just the one that triggered it —
     // otherwise the next line carrying the same file walks back in and bills it again.
     const stampIds = sameDesign.map((l) => l.line_id).filter(Boolean);

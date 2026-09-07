@@ -26,6 +26,7 @@ type Dict = Record<string, string>
 
 // English is complete; other locales may be PARTIAL — missing keys fall back to English.
 const en: Dict = {
+  "apiPlayground.Try a call with your key": "Try a call with your key",
   "designMaker.A full-bleed file needs": "A full-bleed file needs",
   "designMaker.across": "across",
   "designMaker.Low resolution at this size": "Low resolution at this size",
@@ -194,6 +195,7 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "apiPlayground.Try a call with your key": "Thử một lệnh gọi bằng khoá của bạn",
   "designMaker.A full-bleed file needs": "File tràn nền cần",
   "designMaker.across": "trên",
   "designMaker.Low resolution at this size": "Độ phân giải thấp so với kích thước in",

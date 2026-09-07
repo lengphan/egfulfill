@@ -200,7 +200,12 @@ export function ApiPlayground() {
 
       {/* Key bar */}
       <SectionCard
- title={<span className="flex items-center gap-2">{tl("apiPlayground", "Your API key")}
+ /* NOT "Your API key" — this is a SCRATCH FIELD, and the name made it read as a second
+      place keys live. They live in one place, Settings › API keys, which is the only place
+      that can show a plaintext key at all: what we store is a hash (api_keys.key_hash), so
+      nothing here could pre-fill it even if it wanted to. Naming it for what it does ends
+      the question of which of the two screens is the real one. */
+ title={<span className="flex items-center gap-2">{tl("apiPlayground", "Try a call with your key")}
           {/* SANDBOX IS NOT A SUCCESS AND LIVE IS NOT AN ERROR.
               These were `shipped` and `alert` — emerald and red, both reserved floor
               statuses, on a badge that names an ENVIRONMENT. Sandbox is the safe default and

@@ -17,6 +17,7 @@ import { limited, LIMITS } from '../ratelimit.js';
 import { stripMethod } from '../replenish.js';
 import { VISIBLE_TO_PARTNERS } from './inventory.js';
 import { emitWebhook } from '../webhooks.js';
+import { CANCELLABLE_STAGES, refundForCancel } from './orders.js';
 
 const PREFIX = 'egk_test_';
 const LIVE_PREFIX = 'egk_live_';
@@ -603,55 +604,17 @@ export function sandboxRoutes(app, requireAuth) {
     } catch (e) { reply.code(500); return { error: 'Could not read balance.' }; }
   });
 
-  app.get('/api/v1/statement', async (req, reply) => {
-    const k = await requireKey(req, reply, { scope: 'billing.read' }); if (k.error) return k;
-    const qy = req.query || {};
-    // Default to the current calendar month — the period anyone reconciling actually wants.
-    const now = new Date();
-    const from = String(qy.from || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10));
-    const to = String(qy.to || now.toISOString().slice(0, 10));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-      return bad(reply, 'from and to must be YYYY-MM-DD dates.', ['from', 'to'], k.mode);
-    }
-    try {
-      const acct = String(k.seller_id);
-      // Opening balance is everything BEFORE the window — without it the closing figure
-      // can't be checked against anything and the statement is just a list.
-      const open = await q('select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1 and created_at < $2::date',
-        [acct, from]).then((r) => money(r.rows[0] && r.rows[0].bal));
-      // `to` is inclusive: a partner asking for 01→31 means the whole 31st, so compare
-      // against the following midnight rather than dropping the last day's charges.
-      const r = await q(
-        `select id, created_at, type, ref, note, delta, order_id
-           from wallet_ledger
-          where account=$1 and created_at >= $2::date and created_at < ($3::date + interval '1 day')
-          order by created_at, id`,
-        [acct, from, to]
-      );
-      let running = open;
-      const lines = r.rows.map((row) => {
-        const amount = money(row.delta);
-        running = money(running + amount);
-        return { id: String(row.id), date: row.created_at, type: row.type,
-          order_id: row.order_id || null, reference: row.ref || null,
-          description: row.note || row.type, amount, balance: running };
-      });
-      const sum = (f) => money(lines.filter(f).reduce((s, l) => s + l.amount, 0));
-      return {
-        object: 'statement', mode: k.mode, account: acct, currency: 'USD',
-        period: { from, to },
-        opening_balance: open,
-        closing_balance: running,
-        totals: {
-          charges: sum((l) => l.amount < 0),
-          credits: sum((l) => l.amount > 0),
-          net: money(running - open),
-        },
-        lines,
-        _note: 'Charges are negative, credits positive. The ledger is append-only, so a closed period never changes.',
-      };
-    } catch (e) { reply.code(500); return { error: 'Could not build statement.' }; }
-  });
+  /**
+   * STATEMENT WAS REMOVED (2026-09-07), on the owner's call.
+   *
+   * It read the same append-only ledger the wallet page already renders, for a period a
+   * partner cannot export from anywhere else — an endpoint that duplicates a screen and is
+   * reconciled by nobody. `GET /api/v1/balance` stays, because a 402 with no way to ask
+   * "how much is on account" is a dead end.
+   *
+   * Deliberately not left as a stub returning 410: the docs list is the API's surface, and
+   * an endpoint that answers anything at all is one somebody integrates against.
+   */
 
   app.get('/api/v1/orders/:id', async (req, reply) => {
     const k = await requireKey(req, reply, { scope: 'orders.read' }); if (k.error) return k;
@@ -683,6 +646,59 @@ export function sandboxRoutes(app, requireAuth) {
     return { object: 'order', mode: 'test', id: req.params.id, status: 'in_production',
       tracking: { carrier: 'USPS', code: null, url: null }, total: null, created: nowISO(),
       _note: 'Simulated lookup — this id resolves to no real order, so total is null.' };
+  });
+
+  /**
+   * CANCEL AN ORDER — the door back out, which this API did not have.
+   *
+   * POST /api/v1/orders creates work and money moves at submit; without this, a partner
+   * integration could raise an order and never withdraw it, so a mistyped quantity was a
+   * support ticket. The app has allowed a seller to cancel before production since the
+   * beginning; this is that, through a key.
+   *
+   * THE SAME RULE AND THE SAME REFUND PATH, both imported. `CANCELLABLE_STAGES` is the
+   * stage list orders.js gates its own cancel on, and `refundForCancel` is the function
+   * that puts the money back and releases the reserved units. A second copy of either here
+   * would be a rule that can drift between "refuse this call" and "return this money",
+   * which is the pair you least want disagreeing.
+   *
+   * ONCE APPROVED, NEVER. `approved_at` is checked as well as the stage, because an order
+   * that was accepted and then walked backwards on a board is still an order the floor has
+   * started — the same reasoning the app's own guard carries.
+   *
+   * IDEMPOTENT. Cancelling twice answers 200 with the state, not an error: a partner
+   * retrying a timeout must not be told their cancellation failed when it succeeded.
+   */
+  app.post('/api/v1/orders/:id/cancel', async (req, reply) => {
+    const k = await requireKey(req, reply, { scope: 'orders.write' }); if (k.error) return k;
+    const id = String(req.params.id || '').trim();
+    if (k.mode === 'test') {
+      /* A test key cancels nothing and says so in the shape live returns, so a parser
+         written against the sandbox meets no undefined on its first real cancellation. */
+      return { object: 'order', mode: 'test', id, status: 'cancelled', refunded: 0,
+        _note: 'Simulated — a test key never touches a real order or any money.' };
+    }
+    try {
+      const r = await q(
+        'select id, seller_id, factory_status, status, approved_at from orders where id=$1 and seller_id=$2',
+        [id, String(k.seller_id)]);
+      const o = r.rows[0];
+      if (!o) { reply.code(404); return { error: 'Order not found', mode: 'live' }; }
+      const already = String(o.factory_status || o.status || '').toLowerCase() === 'cancelled';
+      if (already) return { object: 'order', mode: 'live', id: o.id, status: 'cancelled', refunded: 0, already: true };
+      const stage = String(o.factory_status || '').toLowerCase();
+      if (!CANCELLABLE_STAGES.includes(stage) || o.approved_at) {
+        reply.code(409);
+        return { error: 'This order is already in production — it cannot be cancelled through the API.',
+                 status: stage || 'in_production', mode: 'live' };
+      }
+      const back = await refundForCancel(id, String(k.seller_id), null);
+      if (back && back.error) { reply.code(409); return { error: back.error, mode: 'live' }; }
+      await q("update orders set factory_status='cancelled', status='cancelled' where id=$1", [id]);
+      emitWebhook(String(k.seller_id), 'order.cancelled', { id, refunded: back?.refunded || 0 });
+      return { object: 'order', mode: 'live', id, status: 'cancelled', refunded: back?.refunded || 0,
+        _note: 'Everything still owed on this order has been returned to your balance.' };
+    } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: 'live' }; }
   });
 
   // ── Shipping (v1) ──────────────────────────────────────────────────────────
