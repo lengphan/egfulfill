@@ -231,6 +231,19 @@ export function ChatLauncher() {
     <>
       {/* The panel. Anchored to the bubble on a desktop; a sheet within the margins on a
           phone, where a 380px card floating over a 390px screen is just a worse page. */}
+      {/* THE SCRIM, the house way to lift a surface (globals.css: shadows are none; a dialog
+          separates from the page with a scrim). Without it this white card sat on a white
+          700-row table with a 10% hairline for an edge, and the eye read one continuous
+          sheet — "the chat is getting lost". Same tint and blur the Dialog backdrop uses,
+          so the panel reads as the one lit thing; a click on it closes, as Escape does. It
+          sits UNDER the bubble (z-30 < z-40), so the bubble still toggles. */}
+      {open && (
+        <div
+          aria-hidden
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-30 bg-black/30 supports-backdrop-filter:backdrop-blur-sm"
+        />
+      )}
       {open && (
         <div
           role="dialog"
