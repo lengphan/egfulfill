@@ -4,11 +4,34 @@
 //   2) SMTP (SMTP_HOST + nodemailer) — fallback for hosts where SMTP is open.
 // Fully dormant until one is configured; sendMail() is then a silent best-effort no-op.
 
+/**
+ * WHO THE MAIL IS FROM — the BRAND, never the mailbox.
+ *
+ * An inbox lists the display name, and ours was arriving as "No Reply": the address is
+ * `no-reply@egful.store`, which is correct — nobody reads replies to it — but that is a
+ * fact about the MAILBOX, and a recipient scanning a list of senders needs the fact about
+ * the company. Every other line in their inbox says who it is from.
+ *
+ * The code's own default has always been `EGFUL <…>`, so this is coming from SMTP_FROM /
+ * MAIL_FROM in the environment, where somebody wrote the mailbox's name into the display
+ * slot. Rather than depend on a variable that is edited by hand on a server and did not
+ * survive the last rebuild, a display name that is merely a restatement of "no-reply" is
+ * treated as ABSENT and the brand is used. A real name — "EGFUL Support", "EGFUL
+ * Fulfilment" — is left exactly as written.
+ *
+ * MAIL_FROM_NAME overrides the brand for anyone who wants a different one.
+ */
+const BRAND = () => (process.env.MAIL_FROM_NAME || 'EGFUL').trim() || 'EGFUL';
+/** Names that say what the mailbox is for rather than who is writing. */
+const NO_REPLY_NAME = /^(no[-_. ]?reply|do[-_. ]?not[-_. ]?reply|noreply|donotreply|automated|system)$/i;
 function parseFrom(s) {
-  s = s || 'EGFUL <no-reply@egful.store>';
+  s = s || `${BRAND()} <no-reply@egful.store>`;
   const m = String(s).match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
-  if (m) return { name: m[1] || 'EGFUL', email: m[2] };
-  return { name: 'EGFUL', email: String(s).trim() };
+  if (m) {
+    const name = String(m[1] || '').replace(/^["']|["']$/g, '').trim();
+    return { name: !name || NO_REPLY_NAME.test(name) ? BRAND() : name, email: m[2].trim() };
+  }
+  return { name: BRAND(), email: String(s).trim() };
 }
 
 // ── 1) Brevo transactional HTTP API (preferred on SMTP-blocked hosts) ──────────
@@ -94,7 +117,9 @@ export async function sendMail(opts) {
       return false;
     }
     await m.sendMail(Object.assign(
-      { from: opts.from || process.env.SMTP_FROM || ('EGFUL <no-reply@' + process.env.SMTP_HOST + '>') }, opts));
+      // Through parseFrom as well, so the SMTP path and the API path cannot disagree about
+      // the name an inbox shows. Rebuilt into one header rather than passed raw.
+      { from: (() => { const f = parseFrom(opts.from || process.env.SMTP_FROM || process.env.MAIL_FROM || ('no-reply@' + process.env.SMTP_HOST)); return `${f.name} <${f.email}>`; })() }, opts));
     return true;
   } catch (e) {
     _lastError = (_lastError ? _lastError + ' | ' : '') + 'smtp: ' + (e && e.message ? e.message : String(e));
