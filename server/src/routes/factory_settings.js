@@ -492,6 +492,12 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
         garment: Number(nums.ship_garment) || 0,
       },
       shipExtra: Number(nums.ship_extra) || 0,
+      // THE METHOD SURCHARGES, same reason: the product page prices a chosen variant
+      // (size + method) and a product with no methodPrices of its own falls back to these,
+      // exactly as pricing.js methodAddOn does. Our prices to them, not costs — seller-safe.
+      methods: Object.fromEntries(
+        ['emb', 'dtg', 'dtf', 'apl', 'lsr', 'scr', 'sub', 'vnl'].map((k) => [k, Number(nums[`method_${k}`]) || 0])
+      ),
     };
   });
 

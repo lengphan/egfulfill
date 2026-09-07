@@ -84,6 +84,16 @@ export default function ProductDetailPage() {
  const [active, setActive] = useState(0)
   /** The swatch under the cursor (or keyboard focus), named beside the Colors count. */
  const [hoverColor, setHoverColor] = useState<string | null>(null)
+  /**
+   * THE VARIANT BEING PRICED. Owner's call (2026-09-07): the page printed a price on every
+   * size chip and the method surcharges in a card of their own, three screens down — so the
+   * number a seller would actually be charged for "Clay · L · Embroidery" was arithmetic
+   * they had to do. Now colour, size and method are picked, and the one figure at the top
+   * is that variant's. Null means "the first one", so the page opens priced.
+   */
+ const [pickColor, setPickColor] = useState<string | null>(null)
+ const [pickSize, setPickSize] = useState<string | null>(null)
+ const [pickMethod, setPickMethod] = useState<string | null>(null)
   // The platform's shipping fees — the other half of what a seller pays. Seller-safe read,
   // so this page shows the same two numbers a board or the public site does.
  const [fees, setFees] = useState<DesignFees | null>(null)
@@ -147,6 +157,20 @@ export default function ProductDetailPage() {
  const shipFee = Number(product.shippingFee ?? product.shipping_fee ?? 0) || 0
  const hasEmb = techs.some((t) => t.key === "emb")
  const hasPrint = techs.some((t) => t.key !== "emb")
+  /** The chosen variant, first-of-each until something is pressed. */
+ const selColor = pickColor && colors.includes(pickColor) ? pickColor : colors[0] ?? null
+ const selSize = pickSize && sizes.includes(pickSize) ? pickSize : sizes[0] ?? null
+ const selMethod = techs.find((t) => t.key === pickMethod) ?? techs[0] ?? null
+  /** The method's add-on — the product's own figure, else the platform's, else nothing.
+   *  Mirrors methodAddOn in server/src/pricing.js: product override first, then fees. */
+ const methodFee = (key: string | null | undefined, label?: string) => {
+ if (!key) return 0
+ const own = product.methodPrices?.[key.toUpperCase()] ?? (label ? product.methodPrices?.[label.split(" ")[0]] : undefined)
+ if (typeof own === "number" && own > 0) return own
+ const plat = fees?.methods?.[key.toLowerCase()]
+ return typeof plat === "number" && plat > 0 ? plat : 0
+  }
+ const unitList = (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label)
 
  return (
     <div className="space-y-5">
@@ -244,7 +268,7 @@ export default function ProductDetailPage() {
                 discount nobody can see before ordering is one they have no reason to believe
                 in — which is what the Pro card's "20% off all blanks" was. */}
             {(() => {
- const list = priceOf(product)
+ const list = unitList
  const net = discounted(list)
  return (
                 <span className="flex items-baseline gap-2">
@@ -253,6 +277,12 @@ export default function ProductDetailPage() {
                 </span>
               )
             })()}
+          </div>
+          {/* WHICH VARIANT THAT IS — the figure's label, not a caption: three picks below
+              move it, and a price with no variant named beside it is the ambiguity this
+              replaced. */}
+          <div className="text-sm text-muted-foreground">
+            {[selColor, selSize, selMethod?.label].filter(Boolean).join(" · ")}
           </div>
           <ShippingFees
  first={shipFee || shipFirstFee(product, fees?.shipBands)}
@@ -284,7 +314,7 @@ export default function ProductDetailPage() {
                   <span>Colors ({colors.length})</span>
                   {/* min-h-0 not needed: the row is one line high either way, so naming a
  colour cannot move the swatches under the cursor. */}
-                  <span className="truncate normal-case tracking-normal text-foreground">{hoverColor ?? ""}</span>
+                  <span className="truncate normal-case tracking-normal text-foreground">{hoverColor ?? selColor ?? ""}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {colors.length ? (
@@ -302,18 +332,20 @@ export default function ProductDetailPage() {
                         <span key={c} className="rounded-lg border border-border px-2 py-1 text-xs">{c}</span>
                       )
  return (
-                        <span
+                        <button
+ type="button"
  key={c}
  title={c}
  aria-label={c}
- tabIndex={0}
+ aria-pressed={c === selColor}
+ onClick={() => setPickColor(c)}
                           // Focus as well as hover: forty swatches with the name only on
                           // mouseover is forty things a keyboard cannot read.
  onMouseEnter={() => setHoverColor(c)}
  onMouseLeave={() => setHoverColor(null)}
  onFocus={() => setHoverColor(c)}
  onBlur={() => setHoverColor(null)}
- className="size-7 shrink-0 rounded-full border border-black/10 bg-muted transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+ className={"size-7 shrink-0 rounded-full border border-black/10 bg-muted transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 " + (c === selColor ? "ring-2 ring-foreground ring-offset-2 ring-offset-card" : "")}
  style={
  img
                               ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
@@ -333,25 +365,45 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {sizes.length ? (
- sizes.map((s) => {
-                      // The price rides ON the chip rather than behind a click. There is
-                      // nothing to select on this page — it is a record, not an order form —
-                      // so a chip that had to be pressed to reveal a number would be a
-                      // control that looks live and submits nothing. Nine sizes, nine prices,
-                      // all readable at once.
- const own = tierOf(s)
- return (
-                        <span key={s} className="flex items-center gap-1.5 rounded border border-border px-2 py-1 text-xs font-medium">
-                          {s}
-                          <span className={"tabular-nums " + (own ? "text-foreground" : "text-muted-foreground")} title={own ? `This size is priced on its own` : tl("productPage", "No tier of its own — charged the base price")}>
-                            {usd(priceOfSize(s))}
-                          </span>
-                        </span>
-                      )
-                    })
+ sizes.map((s) => (
+                      /* NO PRICE ON THE CHIP. The chips used to carry one each — nine sizes,
+                         nine figures — and read as a price list for a product whose real
+                         price also depends on the method. The chip is the pick; the figure
+                         at the top is the answer. */
+                      <button
+ type="button"
+ key={s}
+ aria-pressed={s === selSize}
+ onClick={() => setPickSize(s)}
+ className={"rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " + (s === selSize ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/40")}
+                      >
+                        {s}
+                      </button>
+                    ))
                   ) : (
                     <span className="text-sm text-muted-foreground">—</span>
                   )}
+                </div>
+              </div>
+              {/* THE METHOD IS A VARIANT. It had a card of its own under the description,
+                  with the surcharge printed on each chip — the third input to the price,
+                  three screens from the other two (owner's call, 2026-09-07). */}
+              <div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {tl("productPage", "Print methods")} ({techs.length})
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {techs.map((t) => (
+                    <button
+ type="button"
+ key={t.key}
+ aria-pressed={t.key === selMethod?.key}
+ onClick={() => setPickMethod(t.key)}
+ className={"rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " + (t.key === selMethod?.key ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/40")}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -369,22 +421,6 @@ export default function ProductDetailPage() {
               </ul>
             </SectionCard>
           )}
-
-          {/* Print methods available — chips per technique, with the per-unit surcharge
- when the product carries one (methodPrices). */}
-          <SectionCard title={tl("productPage", "Printing methods")}>
-            <div className="flex flex-wrap gap-2 p-5">
-              {techs.map((t) => {
- const fee = product.methodPrices?.[t.key.toUpperCase()] ?? product.methodPrices?.[t.label.split(" ")[0]]
- return (
-                  <span key={t.key} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1 text-sm font-medium">
-                    {t.label}
-                    {typeof fee === "number" && fee > 0 && <span className="text-xs text-muted-foreground">+{usd(fee)}</span>}
-                  </span>
-                )
-              })}
-            </div>
-          </SectionCard>
 
           {/* File guidelines — the artwork requirements from the old HTML PDP, shown per
  method the product actually supports. */}

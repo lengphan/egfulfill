@@ -3355,7 +3355,7 @@ export function getFactorySettings() {
  *  billed nothing while every product page printed it. `shipExtra` is each additional unit
  *  in the same parcel. */
 export type ShipBands = { cap: number; heavy: number; garment: number }
-export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number }
+export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number; /** Platform per-unit surcharge by method key (emb, dtf…) — the fallback when a product sets none. */ methods?: Record<string, number> }
 export function getDesignFees() {
   return api<DesignFees>(`/api/design_fees`)
 }
