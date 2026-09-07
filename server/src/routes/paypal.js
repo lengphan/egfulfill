@@ -5,6 +5,7 @@
 // .env:  PAYPAL_CLIENT_ID=...  PAYPAL_SECRET=...  PAYPAL_ENV=sandbox|live
 // Credentials are read at CALL time: Settings › Integrations writes them to the DB and
 // into process.env live, but a boot-time `const` would pin the old value until a redeploy.
+import { notify } from './notifications.js';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 
@@ -131,6 +132,17 @@ export function paypalRoutes(app, requireAuth) {
               [req.user.sub, Number(amount) || 0, String(topupId), req.user.sub]
             );
           }
+          /* Same as stripe.js: a self-crediting top-up left nothing on an admin's screen to
+             say money had arrived. Inside the `else`, so only a NEW capture rings. */
+          notify({
+            roles: ['admin'],
+            type: 'topup-received',
+            title: `Top-up received — $${(Number(amount) || 0).toFixed(2)}`,
+            body: `${req.user.email || 'A seller'} topped up via PayPal. The wallet is credited.`,
+            href: '/wallet',
+            entityId: ref,
+            excludeUserId: req.user.sub,
+          });
         }
       } catch (e) { app.log.error('paypal topup record failed: ' + e.message); }
       return { ok: true, amount, captureId: cap.id, status: d.status, ref, txnId: cap.id };

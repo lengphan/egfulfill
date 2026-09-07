@@ -171,7 +171,9 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <span className="flex size-14 items-center justify-center rounded-full bg-hold/15 text-hold"><Warning size={28} weight="fill" /></span>
         <div className="font-semibold">{tl("topup", "Couldn’t start the payment")}</div>
-        <div className="text-sm text-muted-foreground">{error}</div>
+        {/* NEVER an empty line under the heading — a refusal with no reason is the same as
+            no refusal (§4). api.ts now always carries one; this is the belt. */}
+        <div className="text-sm text-muted-foreground">{error || tl("topup", "The payment service didn’t answer. Try again, and tell us if it keeps failing.")}</div>
         <Button variant="outline" className="w-full" onClick={() => setPhase("amount")}>{tl("topup", "Try again")}</Button>
       </div>
     )

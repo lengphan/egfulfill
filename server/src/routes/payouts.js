@@ -10,6 +10,7 @@ import { q } from '../db.js';
 import { canMoveMoney } from '../auth.js';
 import { balanceOf } from './wallet.js';
 import { sendMail, mailConfigured } from '../mailer.js';
+import { notify } from './notifications.js';
 
 // Amount guardrails — ADMIN-CONFIGURABLE via factory settings (Settings › Platform):
 //   payout_min  a request must be at least this
@@ -114,6 +115,27 @@ export function payoutsRoutes(app, requireAuth) {
        values ($1,$2,$3,$4,$5,$6,'pending') returning *`,
       [req.user.sub, (me && me.name) || null, (me && me.email) || req.user.email || null, amount, JSON.stringify(prof), note]
     );
+    /**
+     * THE BELL, NOT JUST THE INBOX.
+     *
+     * This mailed the admins and stopped there — so a withdrawal sat in Pending payouts with
+     * nothing on screen to say it had arrived, and whether anyone learned about it depended
+     * on a Brevo key and someone reading email. Every other thing a seller does that needs a
+     * factory hand (a consignment inbound, a design decision) rings the bell; money was the
+     * one that did not.
+     *
+     * ADMINS ONLY, because approving a payout is admin-only (canMoveMoney refuses everyone
+     * else) and a notification whose link the recipient cannot act on is noise.
+     */
+    notify({
+      roles: ['admin'],
+      type: 'payout-requested',
+      title: `Payout requested — $${amount.toFixed(2)}`,
+      body: `${(me && me.name) || req.user.email || 'A seller'} asked to withdraw $${amount.toFixed(2)}.`,
+      href: '/wallet',
+      entityId: r.rows[0] && r.rows[0].id,
+      excludeUserId: req.user.sub,
+    });
     // Best-effort admin heads-up. Fire-and-forget — the pending row is the source of truth.
     (async () => {
       try {

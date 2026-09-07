@@ -654,10 +654,12 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
         ))}
       </StatGrid>
 
-      {/* Second copy of the pending-top-up notice — right above the ledger, where the credit
- lands, so a reviewer working the transactions doesn't miss it. Stays in sync with the
- top-of-page copy via the wallet-changed event. */}
-      <AdminTopups onReviewed={() => { refresh(); window.dispatchEvent(new CustomEvent("eg-wallet-changed")) }} />
+      {/* ONE pending-top-up panel, at the top of the page. There were two — this was the
+          second, "so a reviewer working the transactions doesn't miss it" — and they render
+          the same rows with the same Confirm & credit button, one screen apart, each
+          announcing "Pending top-ups (1)". That reads as two requests for the same money,
+          which is the one thing a money screen must never say. A panel that must be seen
+          belongs at the top; a duplicate is not emphasis. */}
 
       {(() => {
       /* Tabbed = the factory lens, where Transaction and Partner sit under one pair of tabs.

@@ -1020,6 +1020,7 @@ const vi: Dict = {
   "topup.Top up more for a better rate": "Nạp nhiều hơn để có tỷ giá tốt hơn",
   "topup.Top up more, pay a better rate": "Nạp nhiều hơn, tỷ giá tốt hơn",
   "topup.Couldn’t start the payment": "Không thể bắt đầu thanh toán",
+  "topup.The payment service didn’t answer. Try again, and tell us if it keeps failing.": "Dịch vụ thanh toán không phản hồi. Hãy thử lại, và báo cho chúng tôi nếu vẫn lỗi.",
   "topup.You’ll pay": "Bạn sẽ trả",
   "topup.← Change amount": "← Đổi số tiền",
 
@@ -4023,6 +4024,9 @@ const vi: Dict = {
   "stockSplitWarning.or order anyway and accept the split": "hoặc vẫn đặt và chấp nhận đơn bị tách",
   "stockSplitWarning.S&S will ship nothing for this line and report it back as an error — the order still goes, just without this.": "S&S sẽ không gửi gì cho dòng này và báo lại thành lỗi — đơn hàng vẫn đi, chỉ là thiếu mục này.",
   "stripeCardForm.Pay now": "Thanh toán ngay",
+  "stripeCardForm.Wallet credit": "Nạp vào ví",
+  "stripeCardForm.Card fee": "Phí thẻ",
+  "stripeCardForm.You pay": "Bạn trả",
   "stripeCardForm.Processing…": "Đang xử lý…",
   "stripeCardForm.Preparing secure card form…": "Đang chuẩn bị biểu mẫu thẻ bảo mật…",
   "topbar.Orders": "Đơn hàng",

@@ -8,6 +8,8 @@ import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getStripeConfig, createStripeIntent, verifyStripeIntent } from "@/lib/api"
 
+const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
+
 // Inner form — inside <Elements>, so it can use useStripe/useElements.
 function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () => void; onError: (m: string) => void }) {
   const tl = useLabelT()
@@ -58,6 +60,9 @@ export function StripeCardForm({ amount, onPaid, onError }: { amount: number; on
  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
  const [clientSecret, setClientSecret] = useState("")
  const [intentId, setIntentId] = useState("")
+  /** What the card will actually be billed, and the processor's cut inside it — both from
+   *  the SERVER, which is the only side that decides them. */
+ const [cost, setCost] = useState<{ credit: number; charge: number; fee: number; pct: number; fixed: number } | null>(null)
  const [loading, setLoading] = useState(true)
  const [err, setErr] = useState<string | null>(null)
 
@@ -74,6 +79,12 @@ export function StripeCardForm({ amount, onPaid, onError }: { amount: number; on
  if (!alive) return
  setClientSecret(intent.clientSecret)
  setIntentId(intent.id)
+ if (intent.charge != null && intent.credit != null) {
+ setCost({
+ credit: intent.credit, charge: intent.charge, fee: intent.fee ?? Number((intent.charge - intent.credit).toFixed(2)),
+ pct: intent.feeCfg?.pct ?? cfg.fee?.pct ?? 0, fixed: intent.feeCfg?.fixed ?? cfg.fee?.fixed ?? 0,
+          })
+        }
       } catch (e) {
  if (alive) setErr(e instanceof Error ? e.message : "Card unavailable.")
       } finally {
@@ -97,6 +108,36 @@ export function StripeCardForm({ amount, onPaid, onError }: { amount: number; on
 
  return (
     <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+      {/**
+        * WHAT THE CARD IS BILLED, BEFORE IT IS BILLED.
+        *
+        * The processor keeps a cut of every charge, and it is added on top rather than taken
+        * out of the top-up — so the wallet gets the round number and the card pays a few
+        * dollars more. A surprise on a statement is how a fee becomes a dispute, so the three
+        * figures are on screen before the button: what you get, what the fee is, what you pay.
+        *
+        * Read from the server's own numbers. The client must never compute a charge it is
+        * about to make somebody agree to.
+        */}
+      {cost && (
+        <dl className="mb-4 space-y-1.5 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">{tl("stripeCardForm", "Wallet credit")}</dt>
+            <dd className="tabular-nums">{usd(cost.credit)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">
+              {tl("stripeCardForm", "Card fee")}
+              <span className="opacity-70"> · {cost.pct}% + {usd(cost.fixed)}</span>
+            </dt>
+            <dd className="tabular-nums">{usd(cost.fee)}</dd>
+          </div>
+          <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
+            <dt>{tl("stripeCardForm", "You pay")}</dt>
+            <dd className="tabular-nums">{usd(cost.charge)}</dd>
+          </div>
+        </dl>
+      )}
       <PayForm intentId={intentId} onPaid={onPaid} onError={onError} />
     </Elements>
   )

@@ -5,6 +5,7 @@
 // .env:  STRIPE_SECRET_KEY=sk_...   STRIPE_PUBLISHABLE_KEY=pk_...
 // Credentials are read at CALL time: Settings › Integrations writes them to the DB and
 // into process.env live, but a boot-time `const` would pin the old value until a redeploy.
+import { notify } from './notifications.js';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 
@@ -53,6 +54,19 @@ async function recordTopup(app, user, amount, txnId, note) {
         [user.sub, Number(amount) || 0, String(topupId), note || 'Card top-up', user.sub]
       );
     }
+    /* AND THE FACTORY IS TOLD. A card top-up credits itself, so nothing ever appeared on an
+       admin's screen to say money had come in — the balance simply changed. Inside the try
+       and after the ledger write, so a notification can only follow a credit that happened;
+       idempotent by the topup_requests lookup above, so a replayed webhook rings once. */
+    notify({
+      roles: ['admin'],
+      type: 'topup-received',
+      title: `Top-up received — $${(Number(amount) || 0).toFixed(2)}`,
+      body: `${(user && user.email) || 'A seller'} topped up by card. The wallet is credited.`,
+      href: '/wallet',
+      entityId: ref,
+      excludeUserId: user && user.sub,
+    });
   } catch (e) { app.log.error('stripe topup record failed: ' + e.message); }
   return ref;
 }
@@ -81,8 +95,42 @@ export function stripeRoutes(app, requireAuth) {
     } catch { return null; }
   }
 
+  /**
+   * WHAT THE CARD COSTS US, AND WHO PAYS IT.
+   *
+   * Stripe keeps a cut of every charge (2.9% + 30¢ on a standard US card). Topping up $200
+   * therefore landed $193.50 with us and $200 in the seller's wallet — we paid the processor
+   * for the privilege of being paid. The fee is now added ON TOP: the seller is charged more,
+   * the wallet is credited exactly what they asked for, and the figure is shown before they
+   * press anything.
+   *
+   * IT IS A GROSS-UP, NOT A SURCHARGE. Adding 2.9% of $200 leaves us short, because Stripe
+   * takes its percentage of the LARGER total it actually processes. charge = (want + fixed) /
+   * (1 - pct) is the amount whose fee-inclusive remainder is exactly `want`.
+   *
+   * Both numbers are settings, not constants: Stripe's rate differs by country and by card,
+   * and a rate typed into code is one nobody can correct when it changes. Defaults are the
+   * standard US online rate.
+   */
+  async function feeCfg() {
+    const def = { pct: 2.9, fixed: 0.3 };
+    try {
+      const r = await q("select key, value from settings where key in ('stripe_fee_pct','stripe_fee_fixed')");
+      const by = Object.fromEntries(r.rows.map((x) => [x.key, x.value]));
+      const pct = Number(by.stripe_fee_pct);
+      const fixed = Number(by.stripe_fee_fixed);
+      return {
+        // A rate at or above 100% would divide by zero or go negative below.
+        pct: Number.isFinite(pct) && pct >= 0 && pct < 50 ? pct : def.pct,
+        fixed: Number.isFinite(fixed) && fixed >= 0 ? fixed : def.fixed,
+      };
+    } catch { return def; }
+  }
+  /** Rounded UP to the cent: rounding down leaves us paying the last cent of every top-up. */
+  const grossUp = (want, cfg) => Math.ceil(((want + cfg.fixed) / (1 - cfg.pct / 100)) * 100) / 100;
+
   // Publishable key is public — the frontend needs it to mount the Payment Element.
-  app.get('/api/stripe/config', { preHandler: requireAuth }, async () => ({ publishableKey: pkKey(), enabled: !!(skKey() && pkKey()) }));
+  app.get('/api/stripe/config', { preHandler: requireAuth }, async () => ({ publishableKey: pkKey(), enabled: !!(skKey() && pkKey()), fee: await feeCfg() }));
 
   // Mode comes from the key prefix (sk_test_ / sk_live_). Worth surfacing loudly: a live
   // secret key pasted in while testing means real charges against a real card, and the
@@ -101,14 +149,27 @@ export function stripeRoutes(app, requireAuth) {
       const amt = Number((req.body || {}).amount) || 0;
       if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
       const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
+      const cfg = await feeCfg();
+      const charge = grossUp(amt, cfg);
       const pi = await stripe('/payment_intents', {
-        amount: String(Math.round(amt * 100)),
+        amount: String(Math.round(charge * 100)),
         currency: 'usd',
-        'automatic_payment_methods[enabled]': 'true',
+        /**
+         * CARD ONLY. `automatic_payment_methods` offered whatever the account has enabled —
+         * Cash App Pay and Amazon Pay turned up in the element, and both are REDIRECT
+         * methods: confirming one without a `return_url` fails with Stripe's own error
+         * printed under the button ("You must provide a `return_url` …"), which is what a
+         * seller was hitting. This flow is a dialog inside the app with no redirect to come
+         * back from, so the only method it can honestly offer is the one it can complete.
+         */
+        'payment_method_types[]': 'card',
         description: 'EGFUL wallet top-up',
+        // WHAT TO CREDIT, decided here and read back on verify — never inferred from the
+        // amount received, which now includes the processor's cut.
+        'metadata[credit]': String(amt),
         'metadata[seller]': (req.user && (req.user.email || req.user.sub)) || ''
       });
-      return { clientSecret: pi.client_secret, id: pi.id };
+      return { clientSecret: pi.client_secret, id: pi.id, credit: amt, charge, fee: Number((charge - amt).toFixed(2)), feeCfg: cfg };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
@@ -120,7 +181,13 @@ export function stripeRoutes(app, requireAuth) {
       if (!id) { reply.code(400); return { error: 'id required' }; }
       const pi = await stripe('/payment_intents/' + encodeURIComponent(id));
       const ok = pi.status === 'succeeded';
-      const amount = (Number(pi.amount_received) || 0) / 100;
+      const received = (Number(pi.amount_received) || 0) / 100;
+      /* CREDIT WHAT WAS ASKED FOR, not what was charged — the difference is the processor's
+         fee, which the seller pays and we never hold. Capped at what actually arrived so a
+         forged metadata value cannot mint balance, and falling back to the received amount
+         for an intent created before the fee existed. */
+      const intended = Number(pi.metadata && pi.metadata.credit);
+      const amount = Number.isFinite(intended) && intended > 0 ? Math.min(intended, received) : received;
       if (!ok) return { ok, amount, status: pi.status };
       const ref = await recordTopup(app, req.user, amount, id, 'Card top-up');
       return { ok, amount, status: pi.status, ref, txnId: id };
@@ -172,9 +239,13 @@ export function stripeRoutes(app, requireAuth) {
       const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
       if (!pmId) { reply.code(400); return { error: 'paymentMethodId required' }; }
       const customer = await customerFor(req.user);
+      const cfg = await feeCfg();
+      const charge = grossUp(amt, cfg);
       const pi = await stripe('/payment_intents', {
-        amount: String(Math.round(amt * 100)), currency: 'usd', customer, payment_method: pmId,
+        amount: String(Math.round(charge * 100)), currency: 'usd', customer, payment_method: pmId,
         confirm: 'true', description: 'EGFUL wallet top-up (saved card)',
+        // Same as create-intent: the wallet gets `amt`, the card pays the fee on top.
+        'metadata[credit]': String(amt),
         // Off-session saved-card charge: enable automatic methods but DISALLOW
         // redirect-based ones, so Stripe doesn't require a return_url (was throwing
         // "you must provide a `return_url`" on confirm).
@@ -183,12 +254,11 @@ export function stripeRoutes(app, requireAuth) {
         'metadata[seller]': (req.user && (req.user.email || req.user.sub)) || ''
       });
       if (pi.status === 'succeeded') {
-        const amount = (Number(pi.amount_received) || 0) / 100 || amt;
-        const ref = await recordTopup(app, req.user, amount, pi.id, 'Card top-up (saved)');
-        return { ok: true, amount, status: pi.status, ref, txnId: pi.id };
+        const ref = await recordTopup(app, req.user, amt, pi.id, 'Card top-up (saved)');
+        return { ok: true, amount: amt, charge, fee: Number((charge - amt).toFixed(2)), status: pi.status, ref, txnId: pi.id };
       }
       // requires_action (3-D Secure) etc. → let the client finish with the clientSecret.
-      return { ok: false, status: pi.status, clientSecret: pi.client_secret, id: pi.id };
+      return { ok: false, status: pi.status, clientSecret: pi.client_secret, id: pi.id, credit: amt, charge, fee: Number((charge - amt).toFixed(2)) };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }

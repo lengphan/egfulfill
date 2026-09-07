@@ -6,6 +6,7 @@
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { sendMail, mailConfigured } from '../mailer.js';
+import { notify } from './notifications.js';
 
 export function topupsRoutes(app, requireAuth) {
   q(`create table if not exists topup_requests (
@@ -59,6 +60,18 @@ export function topupsRoutes(app, requireAuth) {
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') returning *`,
       [req.user.sub, req.user.email || null, b.name || null, Number(b.amount) || 0, Math.round(Number(b.vnd) || 0), b.ref || null, b.note || null, b.method || null, b.attachment || null]
     );
+    /* THE BELL, NOT JUST THE INBOX — see the same note in payouts.js. A seller's money
+       arriving is the event a factory most needs to see, and it was email-only. Admins,
+       because confirming a transfer is admin-only. */
+    notify({
+      roles: ['admin'],
+      type: 'topup-requested',
+      title: `Top-up pending — $${(Number(b.amount) || 0).toFixed(2)}`,
+      body: `${req.user.email || b.name || 'A seller'} submitted a transfer${b.method ? ' via ' + b.method : ''}. Confirm it to credit their wallet.`,
+      href: '/wallet',
+      entityId: r.rows[0] && r.rows[0].id,
+      excludeUserId: req.user.sub,
+    });
     // Best-effort: email the admins that a manual top-up is awaiting review. Fire-and-
     // forget so it NEVER blocks or fails the response (the pending row is the source of truth).
     (async () => {

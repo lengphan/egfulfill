@@ -289,7 +289,19 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const renewed = res.headers.get("X-Session-Token")
   if (renewed) setToken(renewed)
   if (!res.ok) {
-    let message = res.statusText
+    /**
+     * `statusText` IS EMPTY OVER HTTP/2 — every browser reports "" — so this was the reason
+     * a failed call could reach the screen with NO reason at all. The VietQR dialog printed
+     * "Couldn't start the payment" above a blank line whenever the failure came back as
+     * anything but JSON: a gateway 502, an HTML error page, a proxy timeout. The panel was
+     * doing its job; there was nothing in the message to show.
+     *
+     * A JSON `error` from our own API still wins — this is only the floor beneath it.
+     */
+    let message = res.statusText || (
+      res.status >= 502 && res.status <= 504 ? `The server didn't respond (HTTP ${res.status}). It may be restarting — try again in a moment.`
+      : `Request failed (HTTP ${res.status}).`
+    )
     let body: unknown
     try {
       body = await res.json()
@@ -551,11 +563,14 @@ export function vietqrStatus(ref: string) {
 }
 
 // ─────────────────── Wallet top-up: Stripe (card, API) ───────────────────
+/** `fee` is the processing rate the server will add on top of a top-up — see stripe.js. */
 export function getStripeConfig() {
-  return api<{ publishableKey: string; enabled: boolean }>(`/api/stripe/config`)
+  return api<{ publishableKey: string; enabled: boolean; fee?: { pct: number; fixed: number } }>(`/api/stripe/config`)
 }
+/** `credit` is what the wallet gets, `charge` is what the card is billed; the difference is
+ *  the processor's cut, which the server computes — never the client. */
 export function createStripeIntent(amount: number) {
-  return api<{ clientSecret?: string; id?: string; error?: string }>(`/api/stripe/create-intent`, {
+  return api<{ clientSecret?: string; id?: string; error?: string; credit?: number; charge?: number; fee?: number; feeCfg?: { pct: number; fixed: number } }>(`/api/stripe/create-intent`, {
     method: "POST",
     body: JSON.stringify({ amount }),
   })
