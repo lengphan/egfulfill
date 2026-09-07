@@ -242,9 +242,19 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
  const cost = Number(t.cost)
  const hasPrice = t.price.trim() !== "" && isFinite(price) && price > 0
  const hasCost = t.cost.trim() !== "" && isFinite(cost) && cost > 0
-    // A tier now exists if EITHER number is present: product cost alone is enough,
-    // because pricing derives the base cost from it plus the markup.
- if (!hasPrice && !hasCost) continue
+    /* A tier exists if ANY of the three is present. Price alone is a price; product cost
+       alone is enough, because pricing derives the base from it plus the markup; and WEIGHT
+       ALONE is a fact about the garment that has nothing to do with money.
+       That last one was being thrown away. The S&S and SanMar imports write a weight-only
+       row per size — `{ size, price: 0, shipping: null, weightOz }`, the whole reason the
+       per-size weights come across at all — and this dropped every one of them the first
+       time anybody opened the product and pressed Save. The loss is invisible on the product
+       screen and shows up days later on a shipping label: parcelFromOrder finds nothing to
+       weigh, the dialog keeps its stock mailer, and USPS re-weighs the parcel and bills the
+       band it actually fell in. */
+ const wRaw = Number(t.weightOz)
+ const hasWeight = t.weightOz.trim() !== "" && isFinite(wRaw) && wRaw > 0
+ if (!hasPrice && !hasCost && !hasWeight) continue
  const ship = t.shipping.trim() === "" ? null : Number(t.shipping)
     // Blank price is optional and NULL when unset — never 0. Zero would mean "we give the
     // garment away", and the server only uses this field when it is a real number.

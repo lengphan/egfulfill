@@ -264,7 +264,7 @@ const vi: Dict = {
   "ui.More actions": "Thêm thao tác",
   "ui.Open order": "Mở đơn",
   "ui.Reopen label": "Mở lại nhãn",
-  "ui.Print blank labels": "In nhãn phôi",
+  "ui.Print barcode": "In mã vạch",
   "ui.Set all items to": "Đặt tất cả thành",
   "ui.Production": "Sản xuất",
   "ui.Exceptions": "Sự cố",

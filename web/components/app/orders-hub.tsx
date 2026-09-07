@@ -2629,7 +2629,7 @@ export function OrdersHub() {
  read as two lists that happened to share a popup. The icons
  were also the weaker half of each row: a truck, a printer
  and a barcode next to "Create new label", "Reopen label"
- and "Print blank labels" restate the word beside them and
+ and "Print barcode" restate the word beside them and
  add a column of colour to a list whose job is to be read
  quickly. Same call as the Download button on the design
  files panel. A spinner is the exception, because it says
@@ -2726,7 +2726,7 @@ export function OrdersHub() {
  onClick={() => printable && setBarcodeOrder(o)}
  title={printable ? undefined : tl("orders", "Pick a blank on at least one line first — the barcode is the stock code")}
                                   >
-                                    {tl("ui", "Print blank labels")}
+                                    {tl("ui", "Print barcode")}
                                   </DropdownMenuItem>
                                 )
                               })()}

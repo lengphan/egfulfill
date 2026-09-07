@@ -91,12 +91,18 @@ export function parcelFromOrder(items: OrderItem[] | undefined, catalog: Catalog
  * `tone` is for the caller to paint with, because "assumed" and "measured" must not look
  * alike on a control that spends money.
  */
-export function parcelBasisNote(g: ParcelGuess | null, itemCount = 0): { text: string; tone: "warn" | "info" } | null {
+export function parcelBasisNote(g: ParcelGuess | null, itemCount = 0, shownOz = 0): { text: string; tone: "warn" | "info" } | null {
   if (!g) {
     if (!itemCount) return null
+    /* IT NAMES THE FIGURE IT IS TALKING ABOUT. This opened "No weight is recorded for
+       anything on this order" while a weight sat in the field two lines above it, so the
+       note read as contradicting the screen and the honest reading — that the number is the
+       mailer's, not the parcel's — was the one nobody took. */
     return {
       tone: "warn",
-      text: "No weight is recorded for anything on this order, so this is the stock mailer rather than a measurement. Weigh it, or set the weight on the product — the carrier re-weighs it later and bills the difference.",
+      text: `${shownOz > 0
+        ? `The ${shownOz} oz above is the stock mailer, not this order — nothing on it has a weight recorded.`
+        : "Nothing on this order has a weight recorded."} Weigh it, or set the weight on the product — the carrier re-weighs it later and bills the difference.`,
     }
   }
   if (g.unknown > 0) {

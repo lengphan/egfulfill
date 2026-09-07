@@ -259,7 +259,12 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
         /* NO EARLY RETURN when nothing is known. That left the stock mailer on screen with
  no note at all — the one state that costs money, presented as if it had been
  checked. The guess stands; what changes is that it now says it is one. */
- if (!g) { setBasis(parcelBasisNote(null, order.items?.length ?? 0)); return }
+ if (!g) {
+          // The oz on screen is the stock mailer's, and the note says so by NAME — see
+          // parcelBasisNote. Read off `pkg` rather than `weightOz`, which adds the tare.
+ setBasis(parcelBasisNote(null, order.items?.length ?? 0, (Number(pkg.lb) || 0) * 16 + (Number(pkg.oz) || 0)))
+ return
+        }
  setPkg((p) => ({
  lb: Math.floor(g.weightOz / 16) || 0,
  oz: g.weightOz ? Math.round(g.weightOz % 16) : p.oz,

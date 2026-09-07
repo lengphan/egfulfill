@@ -38,6 +38,28 @@ export function LineDownloads({ design, files, item }: {
 
   const stem = (item.name || item.sku || "design").replace(/[^a-z0-9]+/gi, "-").slice(0, 40)
 
+  /**
+   * THE FILE'S OWN NAME, the same as the stitch-file row beside it.
+   *
+   * This row said "Artwork" while the row under it said `dragon-print-v2.emb`, so the one
+   * file somebody uploads by name was the one the list refused to name — and on an order
+   * where two lines carry different art there was nothing to tell them apart. `name` is
+   * stored per design row (order_designs.name) and written by every upload path.
+   *
+   * Truncated by the same `truncate` the machine row uses, with the full name in the title:
+   * a 60-character marketplace filename must not widen the popover or wrap to three lines.
+   */
+  const artName = String(design?.name ?? "").trim()
+  /* WHAT IT ACTUALLY IS, rather than a hardcoded "PNG". The badge is the fact you scan for
+     when a line carries a JPG the printer will refuse; the extension is read from the name,
+     then the URL, then the data: URI's own mime type. */
+  const extFrom = (s: string) => (/\.([a-z0-9]{2,5})(?:$|[?#])/i.exec(s)?.[1] ?? "").toUpperCase()
+  const artExt = extFrom(artName)
+    || extFrom(art.startsWith("data:") ? "" : art)
+    || (/^data:image\/([a-z0-9.+-]+)/i.exec(art)?.[1] ?? "").toUpperCase()
+    || "PNG"
+  const artLabel = artExt === "JPEG" ? "JPG" : artExt
+
   const grab = async (f: DesignFileRow) => {
     setBusy(f.designId)
     try {
@@ -87,12 +109,12 @@ export function LineDownloads({ design, files, item }: {
         {art && (
           <a
             href={art}
-            download={`${stem}.png`}
+            download={artName || `${stem}.${artLabel.toLowerCase()}`}
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
           >
             <DownloadSimple size={14} weight="bold" className="shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{tl("lineDownloads", "Artwork")}</span>
-            <span className="shrink-0 text-2xs text-muted-foreground">PNG</span>
+            <span className="min-w-0 flex-1 truncate" title={artName || undefined}>{artName || tl("lineDownloads", "Artwork")}</span>
+            <span className="shrink-0 text-2xs text-muted-foreground">{artLabel}</span>
           </a>
         )}
         {machine.map((f) => (
