@@ -236,10 +236,13 @@ export type SiteContent = {
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
   hero: {
-    headline: "What if every order",
-    accent: "printed itself?",
-    subhead:
-      "Etsy, Shopify and TikTok Shop orders land in one queue. We print, embroider, pack and ship them in our own factory — then push the tracking back to your storefront.",
+    /* TWO SHORT LINES, and the shortness is structural rather than a preference. The home
+       hero sets these at up to 11.5vw — around 165px on a laptop — and picks its ramp from
+       the longest line, so a long headline does not overflow, it just gets SMALLER. Four and
+       eleven characters is what the design was drawn around and what fills the page. */
+    headline: "Sell it.",
+    accent: "We make it.",
+    subhead: "Connect Etsy, Shopify or TikTok Shop. Every order is printed, packed and shipped from our own factory.",
     ctaPrimary: "Start for free",
     ctaSecondary: "See how it works",
     worksWithLabel: "Works with",

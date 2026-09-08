@@ -5,7 +5,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
-import type { PublicProduct } from "@/lib/api"
 
 /**
  * THE PRODUCTS PAGE — one garment shot large, then every other one shot identically.
@@ -36,38 +35,27 @@ const HEADWEAR = [
   { img: "beanie", name: "Cuffed beanie", methods: ["Embroidery"] },
 ]
 
-function money(n: number) {
-  return "$" + (Number.isInteger(n) ? n : n.toFixed(2))
-}
+/** Every method any blank takes, in the floor's own order — derived from BLANKS/HEADWEAR so
+ *  a tab can never be offered that matches nothing. */
+const ALL = [...BLANKS, ...HEADWEAR]
 
 export function PloyProducts({
-  products,
   headline,
   accent,
   lead,
 }: {
-  /** null means the read FAILED. [] means the catalogue is genuinely empty. §4 — those are
-   *  different facts and this page says which. */
-  products: PublicProduct[] | null
   headline: string
   accent: string
   lead: string
 }) {
-  const [method, setMethod] = useState<string>("All")
-
-  /* The filter offers only the methods the LIVE catalogue actually contains, so it can never
-     present a tab that returns nothing. Derived, not a second hardcoded list. */
+  const [method, setMethod] = useState("All")
   const methods = useMemo(() => {
     const set = new Set<string>()
-    for (const p of products ?? []) for (const m of p.methods ?? []) set.add(m)
+    for (const b of ALL) for (const m of b.methods) set.add(m)
     return ["All", ...[...set].sort()]
-  }, [products])
-
-  const visible = useMemo(
-    () => (products ?? []).filter((p) => method === "All" || (p.methods ?? []).includes(method)),
-    [products, method],
-  )
-
+  }, [])
+  const blanks = BLANKS.filter((b) => method === "All" || b.methods.includes(method))
+  const headwear = HEADWEAR.filter((b) => method === "All" || b.methods.includes(method))
   return (
     <div className="bg-ploy-ground text-ploy-ink">
       {/* ── ONE GARMENT, LARGE ─────────────────────────────────────────────── */}
@@ -78,7 +66,7 @@ export function PloyProducts({
         >
           <div className="grid items-end gap-8 md:grid-cols-[1.05fr_0.95fr]">
             <div className="pb-10 md:pb-16 md:pt-4">
-              <h1 className="ploy-display text-[clamp(2.6rem,6.4vw,5.6rem)]">
+              <h1 className="ploy-display text-[clamp(2rem,4.4vw,3.8rem)]">
                 <motion.span {...reveal(0)} className="block">{headline}</motion.span>
                 <motion.span {...reveal(0.1)} className="block">{accent}</motion.span>
               </h1>
@@ -147,8 +135,31 @@ export function PloyProducts({
           and nothing else.
         </motion.p>
 
-        <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-          {BLANKS.map((b, i) => (
+        {/* A RULE UNDER THE LIVE WORD, never a row of capsules (§4). This is a FIELD — you
+            set it — so it wears no fill and no button chrome, and the underline is the only
+            active treatment. It filters by what each garment can actually be decorated with,
+            which is the only question worth asking of a blank. */}
+        <motion.div {...reveal(0.2)} className="mt-10 -mb-px flex gap-6 overflow-x-auto border-b border-ploy-ink/15">
+          {methods.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMethod(m)}
+              aria-pressed={method === m}
+              className={
+                "-mb-px shrink-0 border-b-2 pb-3 text-[15px] transition-colors " +
+                (method === m
+                  ? "border-ploy-ink font-medium text-ploy-ink"
+                  : "border-transparent text-ploy-ink/55 hover:text-ploy-ink")
+              }
+            >
+              {m}
+            </button>
+          ))}
+        </motion.div>
+
+        <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+          {blanks.map((b, i) => (
             <motion.article
               key={b.img}
               {...reveal(0.05 * i)}
@@ -156,11 +167,11 @@ export function PloyProducts({
               transition={HOVER}
               className="overflow-hidden rounded-2xl bg-ploy-paper"
             >
-              <div className="aspect-[3/4] overflow-hidden bg-ploy-sky">
+              <div className="aspect-[4/5] overflow-hidden bg-ploy-sky">
                 <Image
                   src={`/ploy/blank/${b.img}.webp`}
                   alt={`A model wearing a blank ${b.name.toLowerCase()}, framed from the collarbone down`}
-                  width={900}
+                  width={960}
                   height={1200}
                   loading="lazy"
                   className="h-full w-full object-cover"
@@ -177,7 +188,7 @@ export function PloyProducts({
         {/* Headwear cannot be shot from the collarbone down, so it is its own pair rather
             than two odd frames in a grid that is uniform by definition. */}
         <div className="mt-3 grid grid-cols-2 gap-3 md:mt-4 md:gap-4">
-          {HEADWEAR.map((b, i) => (
+          {headwear.map((b, i) => (
             <motion.article
               key={b.img}
               {...reveal(0.05 * i)}
@@ -197,81 +208,16 @@ export function PloyProducts({
         </div>
       </section>
 
-      {/* ── THE LIVE CATALOGUE ─────────────────────────────────────────────── */}
-      <section id="catalogue" className="px-6 pt-24 md:px-8 md:pt-32">
-        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky px-8 py-16 md:px-14 md:py-20">
-          <h2 className="ploy-display text-[clamp(2.2rem,5.4vw,4.4rem)]">
-            <motion.span {...reveal(0)} className="block">Published today.</motion.span>
-          </h2>
+      {/* THE LIVE CATALOGUE GRID WAS REMOVED HERE (owner's call, 2026-09-08).
+          It listed the published products straight from /api/public/products, and it worked —
+          but its rows are supplier stock photography on white, next to an art-directed shoot
+          on periwinkle, and the seam between the two halves was the loudest thing on the page.
 
-          {/* A RULE UNDER THE LIVE WORD, never a row of capsules (§4). The underline is the
-              only active treatment, and the row is a real filter — it is a FIELD, so it wears
-              no fill and no button chrome. */}
-          {products !== null && products.length > 0 && methods.length > 2 && (
-            <motion.div {...reveal(0.1)} className="mt-8 -mb-px flex gap-6 overflow-x-auto border-b border-ploy-ink/15">
-              {methods.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMethod(m)}
-                  aria-pressed={method === m}
-                  className={
-                    "-mb-px shrink-0 border-b-2 pb-3 text-[15px] transition-colors " +
-                    (method === m
-                      ? "border-ploy-ink font-medium text-ploy-ink"
-                      : "border-transparent text-ploy-ink/55 hover:text-ploy-ink")
-                  }
-                >
-                  {m}
-                </button>
-              ))}
-            </motion.div>
-          )}
-
-          {/* THREE OUTCOMES, THREE MESSAGES. A failed read and an empty catalogue must never
-              look the same — that is the defect §4 names, and it once had this page reporting
-              "nothing published" while the API was answering perfectly. */}
-          {products === null ? (
-            <p className="mt-10 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
-              The catalogue could not be loaded just now. This is our end, not yours — the
-              products are still there.{" "}
-              <Link href="/contact" className="underline underline-offset-4">Tell us</Link> if it stays this way.
-            </p>
-          ) : products.length === 0 ? (
-            <p className="mt-10 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
-              Nothing is published to the public catalogue yet. The blanks above are what the
-              floor keeps — <Link href="/signup" className="underline underline-offset-4">start free</Link> and
-              you can order any of them.
-            </p>
-          ) : (
-            <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-              {visible.map((p, i) => (
-                <motion.div key={p.slug} {...reveal(0.04 * Math.min(i, 8))} whileHover={{ y: -4 }} transition={HOVER}>
-                  <Link href={`/catalog/${p.slug}`} className="block overflow-hidden rounded-2xl bg-ploy-paper">
-                    <div className="aspect-square overflow-hidden bg-ploy-sky/60">
-                      {/* The image is served from OUR url — the public shape resolves the
-                          supplier's address server-side, and it never reaches this markup
-                          (§2.9). No image is an honest blank tile, not a placeholder. */}
-                      {p.image ? (
-                        <Image src={p.image} alt={p.name} width={600} height={600} loading="lazy" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="h-full w-full" />
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <p className="truncate text-[15px] font-semibold">{p.name}</p>
-                      <p className="mt-1 text-[13px] tabular-nums text-ploy-ink/60">
-                        {p.priceVaries ? "from " : ""}
-                        {money(p.priceFrom ?? p.price)}
-                      </p>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      </section>
+          WHAT THIS COSTS, so it is not rediscovered: /catalog no longer links to any
+          /catalog/[slug] page, so those detail pages are reachable only from the sitemap and
+          have no internal links pointing at them. The route, the fetch and the allow-list are
+          all untouched and the grid is about twenty lines to restore — the right moment is
+          when the catalogue has photography that belongs beside the blanks above. */}
     </div>
   )
 }

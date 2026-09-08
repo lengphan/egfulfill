@@ -73,7 +73,7 @@ export function PloyHome({ content }: { content: SiteContent }) {
  */
 const LEAD = [
   "A sale is the easy half. What follows it is a blank to source, a file to place, a machine to set for the method, a parcel to label and a tracking number to put back on the listing before the buyer asks — and every one of those is somewhere an order can quietly stop.",
-  "All of it runs on one floor and lands in one queue. You connect the shop once, place the artwork once, and the steps below happen whether or not you are watching them.",
+  "All of it runs in one factory and lands in one queue. You connect the shop once, place the artwork once, and the steps below happen whether or not you are watching them.",
 ]
 
 /** Break a stored sentence into at most `max` display lines, keeping the punctuation. */

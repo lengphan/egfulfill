@@ -71,7 +71,7 @@ export function PloyMethods() {
 
           <div className="mt-10 flex flex-col gap-6 md:ml-auto md:mt-4 md:max-w-xl">
             <motion.p {...reveal(0.2)} className="text-[17px] leading-relaxed text-ploy-ink/70">
-              Every method runs on our own floor, so an order that mixes embroidery and DTG is still
+              Every method runs in our own factory, so an order that mixes embroidery and DTG is still
               one order, one QC pass and one parcel.
             </motion.p>
             <motion.div {...reveal(0.3)} className="flex gap-2">

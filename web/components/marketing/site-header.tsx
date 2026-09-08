@@ -9,6 +9,7 @@ const nav = [
   { label: "Features", href: "/features" },
   { label: "How it works", href: "/how-it-works" },
   { label: "Pricing", href: "/pricing" },
+  { label: "Integrations", href: "/integrations" },
   { label: "API", href: "/docs" },
   // A published contact route has to be reachable from the top of every page, not only from
   // the footer — it is the one thing a visitor (or a marketplace reviewer) looks for by name.
