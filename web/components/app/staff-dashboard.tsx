@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
-import { PageObject, ROLE_OBJECT } from "@/components/app/page-object"
+import { PageBand, ROLE_PHOTO } from "@/components/app/page-band"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, CircleNotch, Warning } from "@phosphor-icons/react"
@@ -326,34 +326,23 @@ export function StaffDashboard() {
       {/* The admin's announcement, if there is one. */}
       <DashboardTicker />
 
-      {/* A GROUND UNDER THE GREETING, AND NOWHERE ELSE.
-          The marketing site's grammar is a band that is a fill; the app had none of it, so the
-          first screen opened on bare canvas. This gives the one block that is not data a
-          ground — `bg-brand`, the app token a skin is allowed to move, and it carries
-          `brand-foreground` so the type is a foreground we control rather than a hue.
-
-          IT STOPS AT THE GREETING. §4 is explicit that the canvas stays white: a tint behind a
-          700-row queue is a sheet you read THROUGH all day. This is a header, not a wash. */}
-      {/* No loose glyph beside the name — see the note in dashboard-view.tsx. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand px-5 py-4 text-brand-foreground">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
-            <p className="text-sm text-brand-foreground/70">
-              {/* The full weekday and date went. Anyone reading this knows what day it is,
-                  and it was the widest thing under their own name. What arrived today is the
-                  half that is actually news, so it stands alone — and when nothing has, the
-                  line is dropped rather than padded back out with a date. */}
-              {stats.createdToday > 0
-                ? <><span className="font-medium text-brand-foreground">{stats.createdToday}</span> {t("dash.newToday")}</>
-                : todayLabel}
-            </p>
-          </div>
-          {/* One object, chosen by ROLE, so an operator's board and a warehouse board are
-              recognisable before either title is read. The band's right side was empty. */}
-          <PageObject src={ROLE_OBJECT[role ?? ""] ?? ROLE_OBJECT.admin} />
-
-        </div>
+      {/* THE BAND IS THE PLATE, AND THE PHOTOGRAPH IS CHOSEN BY ROLE — see page-band.tsx
+          for why it is neither `bg-brand` nor a render any more. Admin carries no photo: its
+          band holds the date range, and that control is the one thing that would have to sit
+          under the image. */}
+      <PageBand
+        photo={ROLE_PHOTO[role ?? ""]}
+        title={<>{greeting}, {name}</>}
+        sub={
+          /* The full weekday and date went. Anyone reading this knows what day it is, and it
+             was the widest thing under their own name. What arrived today is the half that is
+             actually news, so it stands alone — and when nothing has, the line is the date
+             rather than padding. */
+          stats.createdToday > 0
+            ? <><span className="font-medium text-[var(--mk-acid)]">{stats.createdToday}</span> {t("dash.newToday")}</>
+            : todayLabel
+        }
+      >
         {/* Money window — admin only, since the money cards are. */}
         {isAdmin && (
           <TabBar
@@ -366,7 +355,7 @@ export function StaffDashboard() {
             onChange={setRange}
           />
         )}
-      </div>
+      </PageBand>
 
       {loadErr && (
         <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
