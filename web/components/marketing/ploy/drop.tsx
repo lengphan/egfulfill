@@ -38,25 +38,33 @@ type Piece = { src: string; dx: number; w: number; sit: number; rot: number; del
 /** Base lands first and the apex last, because that is the order a heap is built and the
  *  order gravity would deliver it. `z` rises with the stack so it reads toward the viewer. */
 const LEFT: Piece[] = [
-  { src: CHROME, dx: 10, w: 132, sit: 0, rot: -12, delay: 0, z: 1 },
-  { src: CLOUD, dx: 96, w: 140, sit: 4, rot: 7, delay: 0.08, z: 1 },
-  { src: GREEN, dx: 176, w: 118, sit: 0, rot: 16, delay: 0.16, z: 1 },
-  { src: STAR, dx: 54, w: 96, sit: 62, rot: 19, delay: 0.3, z: 2 },
-  { src: CHROME, dx: 140, w: 104, sit: 70, rot: -17, delay: 0.4, z: 2 },
-  { src: CLOUD, dx: 8, w: 88, sit: 96, rot: 11, delay: 0.5, z: 2 },
-  { src: GREEN, dx: 104, w: 78, sit: 132, rot: -9, delay: 0.62, z: 3 },
-  { src: STAR, dx: 58, w: 60, sit: 178, rot: 14, delay: 0.76, z: 3 },
+  // base — the heaviest pieces, overlapping hard so the foot of the pile is solid
+  { src: CHROME, dx: 4, w: 128, sit: 0, rot: -12, delay: 0, z: 1 },
+  { src: CLOUD, dx: 74, w: 134, sit: 2, rot: 8, delay: 0.06, z: 1 },
+  { src: GREEN, dx: 146, w: 116, sit: 0, rot: 15, delay: 0.12, z: 1 },
+  { src: CHROME, dx: 206, w: 104, sit: 4, rot: -9, delay: 0.18, z: 1 },
+  // second course, sitting in the gaps of the first
+  { src: STAR, dx: 42, w: 92, sit: 54, rot: 18, delay: 0.28, z: 2 },
+  { src: GREEN, dx: 112, w: 98, sit: 58, rot: -14, delay: 0.35, z: 2 },
+  { src: CLOUD, dx: 178, w: 86, sit: 52, rot: 10, delay: 0.42, z: 2 },
+  // third
+  { src: CHROME, dx: 76, w: 84, sit: 106, rot: -16, delay: 0.52, z: 3 },
+  { src: STAR, dx: 140, w: 76, sit: 110, rot: 12, delay: 0.6, z: 3 },
+  // apex
+  { src: GREEN, dx: 106, w: 62, sit: 156, rot: -7, delay: 0.72, z: 4 },
 ]
 
 const RIGHT: Piece[] = [
-  { src: CLOUD, dx: -186, w: 126, sit: 0, rot: 9, delay: 0.05, z: 1 },
-  { src: CHROME, dx: -100, w: 144, sit: 2, rot: -14, delay: 0.13, z: 1 },
-  { src: GREEN, dx: -16, w: 112, sit: 0, rot: 12, delay: 0.21, z: 1 },
-  { src: STAR, dx: -142, w: 92, sit: 64, rot: -21, delay: 0.34, z: 2 },
-  { src: CLOUD, dx: -54, w: 100, sit: 72, rot: 15, delay: 0.45, z: 2 },
-  { src: CHROME, dx: -118, w: 82, sit: 120, rot: 8, delay: 0.58, z: 3 },
-  { src: STAR, dx: -34, w: 74, sit: 128, rot: -11, delay: 0.68, z: 3 },
-  { src: GREEN, dx: -84, w: 58, sit: 176, rot: 17, delay: 0.82, z: 3 },
+  { src: CLOUD, dx: -212, w: 122, sit: 0, rot: 10, delay: 0.04, z: 1 },
+  { src: CHROME, dx: -142, w: 136, sit: 3, rot: -13, delay: 0.1, z: 1 },
+  { src: GREEN, dx: -70, w: 114, sit: 0, rot: 14, delay: 0.16, z: 1 },
+  { src: CLOUD, dx: -8, w: 100, sit: 4, rot: -8, delay: 0.22, z: 1 },
+  { src: STAR, dx: -180, w: 90, sit: 56, rot: -19, delay: 0.3, z: 2 },
+  { src: CHROME, dx: -110, w: 96, sit: 60, rot: 13, delay: 0.38, z: 2 },
+  { src: GREEN, dx: -42, w: 84, sit: 54, rot: -11, delay: 0.45, z: 2 },
+  { src: CLOUD, dx: -146, w: 80, sit: 108, rot: 9, delay: 0.55, z: 3 },
+  { src: STAR, dx: -76, w: 74, sit: 112, rot: -15, delay: 0.63, z: 3 },
+  { src: CHROME, dx: -112, w: 58, sit: 158, rot: 6, delay: 0.75, z: 4 },
 ]
 
 function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
@@ -117,7 +125,12 @@ function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
             height={700}
             unoptimized
             draggable={false}
-            className="h-auto w-full drop-shadow-[0_14px_22px_rgba(33,33,33,0.20)]"
+            /* NO DROP-SHADOW ON THE PIECES. Each carried one, and eight overlapping in a heap
+                stack into a grey smudge behind the pile — a rectangle of haze that reads as a
+                box someone forgot to remove. The renders already carry their own lighting and
+                contact shadow; a CSS shadow on top of a rendered object is a second light
+                source from a different direction. */
+            className="h-auto w-full"
           />
         </motion.div>
       ))}
@@ -125,11 +138,37 @@ function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
   )
 }
 
-export function PloyDrop() {
+/**
+ * FOUR LAYOUTS, so the arrangement can be judged rather than argued about. `mound` is the
+ * shipped one; the rest exist for /preview/heaps and are cheap to delete once one is chosen.
+ */
+export type DropVariant = "mound" | "column" | "drift" | "arc"
+
+/** A tall narrow stack hugging the outer edge — the pieces climb rather than spread. */
+const COL_L: Piece[] = LEFT.map((p, i) => ({ ...p, dx: 20 + (i % 2) * 46, sit: i * 46, w: Math.round(p.w * 0.82) }))
+const COL_R: Piece[] = RIGHT.map((p, i) => ({ ...p, dx: -(20 + (i % 2) * 46), sit: i * 46, w: Math.round(p.w * 0.82) }))
+
+/** Low and wide — nothing stacks more than two deep, so it reads as scattered, not piled. */
+const DRIFT_L: Piece[] = LEFT.map((p, i) => ({ ...p, dx: i * 34, sit: (i % 2) * 34, w: Math.round(p.w * 0.9) }))
+const DRIFT_R: Piece[] = RIGHT.map((p, i) => ({ ...p, dx: -(i * 34), sit: (i % 2) * 34, w: Math.round(p.w * 0.9) }))
+
+/** A shallow arc, highest at the outer edge and falling toward the card. */
+const ARC_L: Piece[] = LEFT.map((p, i) => ({ ...p, dx: 10 + i * 30, sit: Math.round(150 - Math.pow(i - 0, 1.6) * 12), w: Math.round(p.w * 0.86) }))
+const ARC_R: Piece[] = RIGHT.map((p, i) => ({ ...p, dx: -(10 + i * 30), sit: Math.round(150 - Math.pow(i - 0, 1.6) * 12), w: Math.round(p.w * 0.86) }))
+
+const SETS: Record<DropVariant, [Piece[], Piece[]]> = {
+  mound: [LEFT, RIGHT],
+  column: [COL_L, COL_R],
+  drift: [DRIFT_L, DRIFT_R],
+  arc: [ARC_L, ARC_R],
+}
+
+export function PloyDrop({ variant = "mound" }: { variant?: DropVariant }) {
+  const [left, right] = SETS[variant] ?? SETS.mound
   return (
     <>
-      <Heap pieces={LEFT} side="left" />
-      <Heap pieces={RIGHT} side="right" />
+      <Heap pieces={left} side="left" />
+      <Heap pieces={right} side="right" />
     </>
   )
 }
