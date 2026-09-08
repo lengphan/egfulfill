@@ -291,7 +291,6 @@ export function DashboardView() {
           <StageBracket
             role="seller"
             counts={ladder.counts}
-            mix={ladder.mix}
             onPick={(stage) => router.push(`/orders?stage=${encodeURIComponent(stage)}`)}
           />
         </div>

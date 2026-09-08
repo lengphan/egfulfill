@@ -392,7 +392,6 @@ export function StaffDashboard() {
            * which are sellers' and all of which pass through it. Dropping it here hid 26
            * orders from the operator whose whole job on this line is approving them. */
  counts={ladder.counts}
- mix={ladder.mix}
  ages={stageAges}
  onPick={(stage) => router.push(`/production?stage=${encodeURIComponent(stage)}`)}
         />
