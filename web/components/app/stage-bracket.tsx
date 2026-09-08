@@ -38,7 +38,6 @@ export type StageMix = Record<string, Record<string, number>>
  *  whole reason the production-line card used to exist beneath this one. */
 export type StageAges = Record<string, number>
 
-const MIX_CLASS = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4"]
 
 /**
  * DAYS, THEN MONTHS, THEN YEARS — because this app has orders whose oldest Draft is from
@@ -60,7 +59,6 @@ export function StageBracket({
   role,
   isFactory,
   counts,
-  mix,
   ages,
   onPick,
   className,
@@ -70,7 +68,6 @@ export function StageBracket({
   /** Factory roles drop `in_review` from the line; a seller keeps it. `lineFor` owns that. */
   isFactory?: boolean
   counts: StageCounts
-  mix?: StageMix
   ages?: StageAges
   /** A block is a link into the queue at that stage. Out-of-zone blocks still navigate —
    *  looking is not setting. */
@@ -106,7 +103,6 @@ export function StageBracket({
     const allowed = !showsZone || canSetStage(role, from, id, isFactory)
     const why = allowed ? null : stageDenialReason(role, from, id, isFactory)
     const n = counts[id] ?? 0
-    const split = Object.entries(mix?.[id] ?? {}).filter(([, v]) => v > 0)
     // Only where there is something to be old. "0 orders, oldest 6 days" is not a fact.
     const age = n > 0 ? ages?.[id] : undefined
 
@@ -135,13 +131,11 @@ export function StageBracket({
             <span className="text-2xs tabular-nums opacity-60">{ageLabel(age as number, tl("stage", "today"))}</span>
           )}
         </div>
-        {split.length > 0 && (
-          <div className="mt-1.5 flex h-1 gap-0.5 overflow-hidden rounded-full" aria-hidden>
-            {split.map(([name, v], j) => (
-              <span key={name} className={MIX_CLASS[j % MIX_CLASS.length]} style={{ flexGrow: v }} />
-            ))}
-          </div>
-        )}
+        {/* NO CHANNEL BAR. Each block carried a 4px stripe split by marketplace, which at
+            that height is four colours nobody can read a proportion off — and it put a
+            second colour system next to the stage vocabulary, which is the one thing on
+            this row that has to mean something. The split lives on the queue, where a
+            channel is a column you can sort. */}
       </button>
     )
   }

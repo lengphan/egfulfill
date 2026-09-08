@@ -134,22 +134,19 @@ export function ShortcutsCard({
  onDrop: () => onDrop(i),
  onDragEnd: () => { dragFrom.current = null; setDragOver(null) },
           } : {}
- const tileCls = "group relative flex min-h-[96px] flex-col items-start justify-center gap-2.5 rounded-lg border p-4 transition-colors " +
+ const tileCls = "group relative flex min-h-[96px] flex-col items-start justify-center rounded-lg border p-4 transition-colors " +
             (dragOver === i ? "border-primary bg-primary/5 " : "border-border ") +
             (editing ? "cursor-grab bg-card active:cursor-grabbing" : "hover:border-primary/40 hover:bg-accent")
  const inner = (
             <>
-              {/* NO ICON. A tinted chip was tried first and rejected — four tiles each wearing
- the same violet square meant the eye met four identical marks before it read a
- single word. The bare 22px outline that replaced it was the other failure §4
- names: a loose stroke floating in whitespace is decoration the eye reads past,
- and it was carrying no information the label did not already carry.
-                  What is left is a rule, which is the house's own active mark (a tab is a rule
- under the live word), and it goes to `--brand` on hover — so the tile says
- "pick me" with the one token a skin is allowed to move. The icon still exists on
- the item; it is what the add-menu below is listed with, where a 16px glyph beside
- a single word IS the difference between two rows. */}
-              <span className="h-1 w-6 rounded-full bg-border transition-colors group-hover:bg-brand" />
+              {/* NOTHING ABOVE THE WORD. Three marks were tried here and all three went: a
+ tinted chip (four tiles wearing four identical coloured squares, met before a
+ single word is read), a bare 22px outline (§4's loose stroke floating in
+ whitespace, carrying nothing the label did not), and a hairline rule that took
+ the brand colour on hover — which put a second colour system on a factory
+ screen where colour is stage vocabulary. The label and its line are the tile.
+ The icon still exists on the item: the add-menu below lists single words, and
+ there a 16px glyph IS the difference between two rows. */}
               <span className="min-w-0">
                 <span className="block text-base font-semibold leading-tight tracking-tight">{nl("nav", q.label)}</span>
                 {/* NOT truncated. The description is the whole reason the tile isn't just a
