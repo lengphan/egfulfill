@@ -6,6 +6,7 @@ import Link from "next/link"
 import { motion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
+import { displayWord } from "./step-word"
 import { FACTORY_STAGES } from "@/lib/factory-status"
 import type { Step } from "@/lib/site-content"
 
@@ -46,7 +47,7 @@ function StoryStep({
         {step.n || String(i + 1).padStart(2, "0")}
       </motion.span>
       <div>
-        <h3 className="ploy-display text-[clamp(2rem,5vw,3.6rem)]">{step.word || step.title.split(" ")[0]}</h3>
+        <h3 className="ploy-display text-[clamp(2rem,5vw,3.6rem)]">{displayWord(step)}</h3>
         <p className="mt-3 max-w-xl text-[19px] font-semibold leading-tight">{step.title}</p>
         <p className="mt-3 max-w-xl text-[16px] leading-relaxed text-ploy-ink/65">{step.body}</p>
       </div>

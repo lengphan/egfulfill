@@ -5,6 +5,7 @@ import { motion, useScroll, useSpring, useTransform, type MotionValue } from "mo
 import { reveal, rise } from "./motion"
 import { Num } from "./num"
 import { Straddle } from "./straddle"
+import { displayWord } from "./step-word"
 import type { Stat, Step } from "@/lib/site-content"
 
 /**
@@ -63,9 +64,8 @@ function StepRow({ i, total, step, progress }: { i: number; total: number; step:
       >
         {step.n || String(i + 1).padStart(2, "0")}
       </motion.span>
-      {/* The stored `word` if there is one, else the first word of the title — never blank. */}
       <h3 className="ploy-display self-center text-[clamp(3rem,8vw,6.75rem)] text-ploy-ink md:order-1">
-        {step.word || step.title.split(" ")[0]}
+        {displayWord(step)}
       </h3>
       <div className="col-span-2 max-w-[34rem] md:order-3 md:col-span-1 md:self-center">
         <p className="text-[22px] font-semibold leading-tight">{step.title}</p>

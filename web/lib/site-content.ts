@@ -348,7 +348,12 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ],
   },
   cta: {
-    heading: "Send us your next order.",
+    /* SHORT, and that is structural. This is set at up to 10vw and picks its ramp from the
+       longest line, so a long sentence does not overflow — it shrinks, and then it is a
+       paragraph in a display face. Three or four words a line is what fills the page.
+       (The STORED value is currently "Ready to put fulfillment on autopilot?", which is
+       exactly the sentence this note is about; it needs an edit in Settings › Site content.) */
+    heading: "Stop touching orders.",
     subhead: "Connect a store and your first order can be on a machine today. No monthly fee.",
     button: "Start for free",
   },
