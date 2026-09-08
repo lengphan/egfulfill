@@ -58,26 +58,29 @@ type Piece = { src: string; x: number; y: number; w: number; rot: number; delay:
  * before anything lands on it, which is the order gravity would deliver and the reason it
  * reads as settling rather than as a swarm arriving.
  */
-function buildMountain(seed: number, courses = 24, baseCount = 26): Piece[] {
+function buildMountain(seed: number, courses = 8, baseCount = 9): Piece[] {
   const r = mulberry32(seed)
   const out: Piece[] = []
   for (let c = 0; c < courses; c++) {
     const t = c / (courses - 1)
     // How many in this course, and how wide it spreads: both taper toward the summit.
-    /* The taper is GENTLE — `** 1.06` and a spread that only closes to 55% — because a
-       steep one produces a narrow peak with empty ground either side of it, and the brief
-       is to occupy the margin, not to draw a triangle in the middle of it. It still narrows,
-       so the silhouette is a bank rather than a wall. */
-    const n = Math.max(2, Math.round(baseCount * (1 - t) ** 1.06))
-    const spread = 1 - t * 0.45
+    /* ENOUGH TO READ, NOT ENOUGH TO BECOME TEXTURE. Six hundred pieces filled the margin but
+       nothing in it could be seen to FALL — at that density it is a moving surface, and the
+       whole point is watching separate objects arrive and settle. Around forty a side is the
+       number where each one is still its own shape and the pile is still a pile. */
+    const n = Math.max(2, Math.round(baseCount * (1 - t) ** 0.9))
+    const spread = 1 - t * 0.42
     for (let i = 0; i < n; i++) {
       const jitter = (r() - 0.5) * 0.16
       out.push({
         src: SRCS[Math.floor(r() * SRCS.length)],
         // 0..1 across the mountain's own width, centred and narrowing as it climbs
-        x: Math.min(1, Math.max(0, 0.5 + ((i + 0.5) / n - 0.5) * spread + jitter)),
-        y: c * 27 + (r() - 0.5) * 13,
-        w: Math.round((112 - t * 52) * (0.76 + r() * 0.44)),
+        /* Held to 0.12..0.88 so a piece's half-width never hangs past the container. That
+           is what lets the section drop `overflow` entirely — nothing has to be cut off to
+           keep the page from scrolling sideways. */
+        x: Math.min(0.88, Math.max(0.12, 0.5 + ((i + 0.5) / n - 0.5) * spread + jitter)),
+        y: c * 52 + (r() - 0.5) * 16,
+        w: Math.round((132 - t * 46) * (0.8 + r() * 0.36)),
         rot: Math.round((r() - 0.5) * 54),
         delay: t * 0.9 + r() * 0.22,
         z: c,
@@ -91,83 +94,71 @@ const LEFT = buildMountain(20260908)
 const RIGHT = buildMountain(77712345)
 
 /**
- * FOUR DEPTH BANDS, NOT 614 TRANSFORMS.
+ * ONE PIECE, ONE TRANSFORM — so they arrive one at a time.
  *
- * The fall is scroll-LINKED now: dragging the page back up lifts the objects out again,
- * because their position is a function of where the section is rather than a one-shot
- * animation that has already finished. That is the difference between a thing that happened
- * and a thing you are doing.
+ * This was four depth bands sharing four transforms, which was the right trade at six hundred
+ * pieces and the wrong one at eighty: everything in a band moved together, so the pile landed
+ * in four slabs rather than piece by piece. Eighty subscriptions is a cost worth paying for
+ * the thing the effect is actually for.
  *
- * Doing it per piece would mean six hundred `useTransform` subscriptions recomputing on every
- * scroll frame. Instead the pieces are grouped into four bands by height, and each BAND gets
- * one transform — eight in total for both mountains. The bands travel at different rates, so
- * the pile also gains parallax: the base barely moves, the summit swings furthest, which is
- * what makes it read as depth rather than as one flat image sliding.
+ * EACH PIECE OWNS A SLICE OF THE SCROLL. `from` is where it starts moving and `to` where it
+ * lands, and the slices overlap — so at any moment several are in the air and none of them
+ * began together. Base first, summit last, because that is the order a pile is built and the
+ * order gravity would deliver it.
  *
- * The value is sprung for the same reason the steps' pipe is: a native wheel arrives in
- * discrete jumps, and a raw scroll value makes six hundred objects step with them.
+ * IT IS LINKED, NOT PLAYED: scrolling down brings a piece in, scrolling up takes the same
+ * piece back out along the same path. Nothing here fires once.
  */
-const BANDS = 4
+function Falling({ p, progress, reduced }: { p: Piece; progress: MotionValue<number>; reduced: boolean }) {
+  // The window this piece travels in. `delay` already rises with height, so the sequence is
+  // the pile's own build order; 0.52 leaves room for the last one to still finish inside 1.
+  const from = Math.min(0.52, p.delay * 0.52)
+  const to = Math.min(1, from + 0.46)
+  /* -430, not -780. With clipping removed a piece travelling the full height of the section
+     rose over the plan cards above and sat on their copy for the middle of the fall — the one
+     thing an object must not do. Starting lower keeps every piece inside this section's own
+     air, so it still enters from off-screen without ever crossing another block's text. */
+  const y = useTransform(progress, [from, to], [-430, 0])
+  const opacity = useTransform(progress, [from, Math.min(1, from + 0.1)], [0, 1])
+
+  return (
+    <motion.div
+      style={{
+        left: `${p.x * 100}%`,
+        bottom: p.y,
+        width: p.w,
+        marginLeft: -p.w / 2,
+        zIndex: p.z,
+        rotate: p.rot,
+        ...(reduced ? {} : { y, opacity }),
+      }}
+      className="absolute select-none"
+    >
+      {/* A plain <img>: eighty next/image wrappers for a decorative cut-out that is already
+          webp and already sized buys nothing. No drop-shadow — overlapping shadows in a pile
+          stack into a grey smudge behind it, and the renders carry their own contact shadow. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={p.src} alt="" draggable={false} className="h-auto w-full" loading="lazy" />
+    </motion.div>
+  )
+}
 
 function Mountain({ pieces, side, progress }: { pieces: Piece[]; side: "left" | "right"; progress: MotionValue<number> }) {
-  const reduced = useReducedMotion()
-  const maxZ = Math.max(...pieces.map((p) => p.z), 1)
-
-  /* Deeper bands travel less. Hooks must not be called in a loop with a variable count, so
-     the four are written out — BANDS is a constant and this stays honest about it. */
-  const y0 = useTransform(progress, [0, 1], [-520, 0])
-  const y1 = useTransform(progress, [0, 1], [-680, 0])
-  const y2 = useTransform(progress, [0, 1], [-840, 0])
-  const y3 = useTransform(progress, [0, 1], [-1000, 0])
-  const o0 = useTransform(progress, [0, 0.25], [0, 1])
-  const o1 = useTransform(progress, [0.05, 0.35], [0, 1])
-  const o2 = useTransform(progress, [0.12, 0.45], [0, 1])
-  const o3 = useTransform(progress, [0.2, 0.55], [0, 1])
-  const ys = [y0, y1, y2, y3]
-  const os = [o0, o1, o2, o3]
-
+  const reduced = useReducedMotion() ?? false
   return (
     <div
       aria-hidden
       className={
-        /* `z-0` makes its own stacking context, so the per-piece z (0..23) is compared only
-           inside this layer and can never beat the CTA content's z-10 — without it a piece
-           painted straight over the headline. And it is narrower than the margin looks: at
-           36vw the two mountains met the centred card and buried the first and last letters. */
-        "pointer-events-none absolute bottom-0 z-0 hidden h-full w-[clamp(260px,27vw,400px)] overflow-visible md:block " +
+        /* `z-0` makes its own stacking context, so the per-piece z is compared only inside
+           this layer and can never beat the CTA content's z-10 — without it a piece painted
+           straight over the headline. Narrower than the margin looks, so the two mountains
+           never meet the centred card and bury the heading's first and last letters. */
+        "pointer-events-none absolute bottom-0 z-0 hidden h-full w-[clamp(260px,27vw,400px)] md:block " +
         (side === "left" ? "left-0" : "right-0")
       }
     >
-      {Array.from({ length: BANDS }).map((_, band) => (
-        <motion.div
-          key={band}
-          className="absolute inset-0"
-          style={reduced ? undefined : { y: ys[band], opacity: os[band] }}
-        >
-          {pieces
-            .filter((p) => Math.min(BANDS - 1, Math.floor((p.z / (maxZ + 1)) * BANDS)) === band)
-            .map((p, i) => (
-              <div
-                key={i}
-                style={{
-                  left: `${p.x * 100}%`,
-                  bottom: p.y,
-                  width: p.w,
-                  marginLeft: -p.w / 2,
-                  zIndex: p.z,
-                  transform: `rotate(${p.rot}deg)`,
-                }}
-                className="absolute select-none"
-              >
-                {/* A plain <img>: six hundred next/image wrappers is six hundred components
-                    for a decorative cut-out already encoded as webp and already sized. No
-                    drop-shadow — at this density overlapping shadows stack into a grey
-                    smudge behind the pile. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.src} alt="" draggable={false} className="h-auto w-full" loading="lazy" />
-              </div>
-            ))}
-        </motion.div>
+      {pieces.map((p, i) => (
+        <Falling key={i} p={p} progress={progress} reduced={reduced} />
       ))}
     </div>
   )
@@ -178,7 +169,9 @@ export function PloyDrop() {
   /* Measured against the SECTION this sits in: the pile is fully down by the time the
      section's bottom reaches the bottom of the screen, and fully lifted before it enters. */
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end end"] })
-  const progress = useSpring(scrollYProgress, { stiffness: 60, damping: 22, restDelta: 0.001 })
+  /* Sprung, and softly: a native wheel arrives in discrete jumps, and eighty pieces stepping
+     with them is the difference between settling and stuttering. */
+  const progress = useSpring(scrollYProgress, { stiffness: 42, damping: 24, restDelta: 0.0005 })
 
   return (
     <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 z-0">

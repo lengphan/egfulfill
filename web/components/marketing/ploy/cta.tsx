@@ -31,13 +31,12 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
     /* `relative` so the heaps can anchor to this section's own corners, and `overflow-hidden`
        so a piece thrown hard cannot widen the page. The content below keeps z-10, so objects
        pass BEHIND the headline as they fall and never rest on a word. */
-    /* `overflow-x-clip`, NOT `overflow-hidden`. The mountains are taller than this section —
-       that is the point, they rise past its top edge and over the block above — and
-       `overflow-hidden` cut their summits off in a straight horizontal line. Clipping ONE
-       axis keeps the vertical spill while still stopping a piece whose half-width hangs past
-       the container from widening the page and adding a sideways scrollbar. Same reason the
-       hero uses it (see ploy/hero.tsx). */
-    <section className={`relative overflow-x-clip ${GUTTER} ${SECTION}`}>
+    /* NO `overflow` AT ALL, so nothing is ever cut. The mountains rise past this section's
+       top edge on purpose, and any clipping — hidden OR clip — sliced their summits and
+       their base in a straight line, which is the one thing a pile of objects must not have.
+       Nothing needs clipping either: every piece is held inside its own container's width
+       (see the x clamp in drop.tsx), so none of them can widen the page. */
+    <section className={`relative ${GUTTER} ${SECTION}`}>
       <div className="relative z-10 flex flex-col items-center text-center">
         <h2 className="ploy-display max-w-[16ch]" style={{ fontSize: size }}>
           {heading.map((l, i) => (
