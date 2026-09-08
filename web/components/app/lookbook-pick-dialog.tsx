@@ -83,7 +83,7 @@ export function LookbookPickDialog({
                     className={"flex flex-col overflow-hidden rounded-lg border text-left transition-colors "
                       + (on ? "border-primary ring-1 ring-primary" : "border-border opacity-55 hover:opacity-100")}
                   >
-                    <Thumb src={o.image ?? ""} alt="" fit="contain" className="aspect-square w-full p-1" />
+                    <Thumb src={o.image ?? ""} alt="" fit="contain" className="aspect-square w-full bg-white p-1" />
                     <span className="truncate border-t border-border px-1.5 py-1 text-2xs font-medium">{o.value}</span>
                   </button>
                 )

@@ -202,9 +202,9 @@ export function ProductPickerDialog({
                     onClick={() => pick(p)}
                     className="group flex flex-col overflow-hidden rounded-xl border border-border text-left transition-colors hover:border-primary hover:bg-accent"
                   >
-                    <div className="relative flex aspect-square items-center justify-center bg-muted">
+                    <div className="relative flex aspect-square items-center justify-center bg-white">
                       {src ? (
-                        <Image src={src} alt={p.name ?? ""} fill unoptimized sizes="200px" className="object-cover" />
+                        <Image src={src} alt={p.name ?? ""} fill unoptimized sizes="200px" className="object-contain p-2" />
                       ) : (
                         <Package size={26} weight="duotone" className="text-muted-foreground/50" />
                       )}

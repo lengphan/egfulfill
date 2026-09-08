@@ -319,7 +319,18 @@ export function DashboardView() {
  onClick={() => router.push(`/products?q=${encodeURIComponent(b.name)}`)}
                 className="eg-tap overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-primary/40"
               >
-                <Thumb src={b.img} alt={b.name} fit="contain" className="aspect-[4/3] w-full bg-muted/40" />
+                {/* A WHITE BED, because we do not control what arrives here.
+                    `b.img` is the ORDER LINE's picture, so it is a supplier packshot on
+                    one row and a seller's own lifestyle shot on the next. Measured on the
+                    live catalogue: 16 of 22 are cut out on #ffffff, the other 6 carry their
+                    own beige/grey/dark scene, and the ratios run 0.67 to 1.49. Against a
+                    grey plate the clean majority fitted to height and wore ~40% of the tile
+                    as grey bands — our chrome inventing the coloured background the picture
+                    didn't have. White lets a cut-out merge with the tile and leaves the
+                    photograph that has a scene reading as its own rectangle, which is the
+                    honest rendering of both. Contain stays: the tile answers "which blank
+                    is this", so it shows the whole garment. */}
+                <Thumb src={b.img} alt={b.name} fit="contain" className="aspect-[4/3] w-full bg-white" />
                 <div className="border-t border-border px-3 py-2.5">
                   <div className="truncate text-sm font-medium leading-tight">{b.name}</div>
                   <div className="mt-1 text-2xs tabular-nums text-muted-foreground">

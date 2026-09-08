@@ -562,8 +562,13 @@ type Group = { key: string; name: string; product: CatalogProduct | null; image:
 function Thumb({ src, name, size = 60 }: { src: string; name: string; size?: number }) {
   const tl = useLabelT()
  return src ? (
-    <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-muted/40" style={{ width: size, height: size }}>
-      <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-cover" />
+    /* White bed, whole garment — the tile ProductThumb describes, at this size. It was a
+       grey plate under object-cover, which cropped a third off a portrait packshot: at 34px
+       a cap lost its brim and every tee in the column read as the same rectangle of fabric.
+       The MISSING tile below stays muted on purpose — a photo and a hole must not look
+       alike (§4). */
+    <span className="block shrink-0 overflow-hidden rounded-md border border-border bg-white" style={{ width: size, height: size }}>
+      <Image src={src} alt="" width={size * 2} height={size * 2} unoptimized className="size-full object-contain" />
     </span>
   ) : (
     /* NOT THE FIRST LETTER. Half these names begin with a digit — "47 Brand Trawler Cap"

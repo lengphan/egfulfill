@@ -249,9 +249,9 @@ export function ProductCombobox({
                       (i === cursor ? "bg-accent" : "hover:bg-accent")
                     }
                   >
-                    <span className="relative size-8 shrink-0 overflow-hidden rounded border border-border bg-muted/40">
+                    <span className="relative size-8 shrink-0 overflow-hidden rounded border border-border bg-white">
                       {img ? (
-                        <Image src={img} alt="" fill unoptimized sizes="32px" className="object-cover" />
+                        <Image src={img} alt="" fill unoptimized sizes="32px" className="object-contain" />
                       ) : (
                         <span className="flex size-full items-center justify-center text-muted-foreground">
                           <Package size={13} weight="duotone" />

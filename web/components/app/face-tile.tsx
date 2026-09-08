@@ -44,7 +44,7 @@ export function FaceTile({ url, layers, label, active, extra, onSelect }: {
       className={"group flex w-full flex-col items-center gap-1 rounded-lg border p-1 transition-colors "
         + (active ? "border-selected eg-selected" : "border-transparent hover:border-border hover:bg-accent/50")}
     >
-      <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-muted/40">
+      <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-white ring-1 ring-inset ring-border">
         {url && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={url} alt="" className="absolute inset-0 size-full object-contain p-[4%]" />
