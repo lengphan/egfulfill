@@ -858,7 +858,7 @@ export function SpyDeckView() {
        * The fallbacks stay for every listing published before this was recorded.
        */
  const sub = l.l.submitted
- const draftId = stashPublishDraft({
+ void stashPublishDraft({
  prefill: {
  title: sub?.title || l.l.product?.title || l.l.published?.title || l.l.title,
  description: sub?.description || l.l.product?.description || "",
@@ -881,10 +881,11 @@ export function SpyDeckView() {
  returnTo: "/spydeck",
  returnLabel: "Back to SpyDeck",
  title: tl("spydeck", "Edit listing"),
-      })
+      }).then((draftId) => {
  setEditing(null)
  if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
  router.push(`/publish?d=${draftId}`)
+      })
     }, 0)
  return () => clearTimeout(id)
   }, [editing, router])
@@ -924,7 +925,7 @@ export function SpyDeckView() {
      */
  if (!(makeDetail?.forId === String(l.listing_id) && makeDetail.status === "done")) return
  const id = setTimeout(() => {
- const draftId = stashPublishDraft({
+ void stashPublishDraft({
  prefill: {
  title: l.title,
  description: detail?.description ?? l.description ?? "",
@@ -948,10 +949,11 @@ export function SpyDeckView() {
  returnTo: "/spydeck",
  returnLabel: "Back to SpyDeck",
  title: tl("spydeck", "Create product"),
-      })
+      }).then((draftId) => {
  setMakeListing(null)
  if (!draftId) { setPublishErr("Couldn't open the publish page — that listing's photos are too large for the browser to hand over."); return }
  router.push(`/publish?d=${draftId}`)
+      })
     }, 0)
  return () => clearTimeout(id)
   }, [makeListing, makeDetail, router])

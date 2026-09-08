@@ -743,8 +743,8 @@ export function DesignMaker() {
                * which garments this design sells on; this is where that answer is spent.
                *
                * Composited at 1200px JPEG — see composeOnMockup: PNG at 1400 is megabytes
-               * apiece and three of them overflowed the sessionStorage handover, which is
-               * what "this design is too large for the browser to hand over" was. The
+               * apiece. The handover itself is IndexedDB now (lib/publish-draft.ts), so the
+               * count of mockups is no longer capped by a 5MB sessionStorage quota. The
                * flattened artwork still leads the list: it is the print file, and a listing
                * whose first image is a mockup buries the thing being sold.
                */
@@ -754,7 +754,7 @@ export function DesignMaker() {
  const shot = await composeOnMockup(m, frontStack.images, frontStack.texts, 1200).catch(() => "")
  if (shot) shots.push(shot)
               }
- const id = stashPublishDraft({
+ const id = await stashPublishDraft({
  prefill: { title: name, images: shots, blank: product, designUrl: art, designPos: artPos,
                   /* The variant axes as CHOSEN here, so publish does not ask again for a
                      decision that was already made on the blank. null = every one. */

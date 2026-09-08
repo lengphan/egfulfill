@@ -523,13 +523,13 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
    * null there is no such draft — the tab was closed, or this URL was shared
    * a draft the listing to publish
    *
-   * The middle case is real and has to be said. sessionStorage dies with the tab, so a
-   * bookmarked /publish?d=… opens to nothing, and an empty form with no explanation is
+   * The middle case is real and has to be said. A draft is swept after a day, so a
+   * bookmarked /publish?d=… can open to nothing, and an empty form with no explanation is
    * exactly the "broken feature or empty state?" ambiguity the house rules forbid.
    */
  const [draft, setDraft] = useState<PublishDraft | null | undefined>(undefined)
  useEffect(() => {
- const t = setTimeout(() => setDraft(readPublishDraft(draftId)), 0)
+ const t = setTimeout(() => { void readPublishDraft(draftId).then(setDraft).catch(() => setDraft(null)) }, 0)
  return () => clearTimeout(t)
   }, [draftId])
  const prefill = draft?.prefill ?? null
