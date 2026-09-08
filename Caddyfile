@@ -140,7 +140,21 @@ egful.store {
 	# were tracked and returning 200 on the live apex — they name S&S and Otto Cap
 	# outright, which is exactly the §2.9 disclosure that must never be reachable.
 	# They are named individually because .png cannot be blocked by extension here.
-	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /tools /tools/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md /images/*.pdf /images/*.PDF /images/*.pes /images/*.PES /images/*.dst /images/*.DST /images/*.emb /images/*.EMB /images/SS-Activewear-logo.png /images/otto-updatedlogo_0.png
+	#
+	# A `*` IN A PATH MATCHER DOES NOT CROSS `/`. So `/*.md` hides CLAUDE.md at the root
+	# and nothing deeper — skills/shop-amazon.md was serving 200 the whole time this list
+	# claimed to hide markdown. Anything nested needs its own `/dir /dir/*` pair, which is
+	# why the tail of this line is directories rather than extensions.
+	#
+	# The rest of that tail is what a working copy leaves behind and this exclusion list
+	# therefore publishes by default (§2.5). Measured on the live apex, all 200: a 449KB
+	# orders.html.bak, four puppeteer harnesses (audit1.js, lbl2_tmp.js, op_thread_check.js,
+	# dup-audit.mjs) whose route tables name every staff surface and role we have, the
+	# fix_*.py one-offs, two wallet design mockups, and the editor workspace file. Nothing
+	# secret in any single one — but together they are a map of the private app drawn for
+	# anyone who guesses a filename, and none of it was ever meant to be a web asset.
+	# dashboard-drag.js and nav-drag.js are NOT here: 4 and 18 legacy pages load them.
+	@hidden path /.env* /*/.env* /.git /.git/* /.github /.github/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /mobile /mobile/* /tools /tools/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md /images/*.pdf /images/*.PDF /images/*.pes /images/*.PES /images/*.dst /images/*.DST /images/*.emb /images/*.EMB /images/SS-Activewear-logo.png /images/otto-updatedlogo_0.png /*.bak /*.py /*.mjs /audit1.js /lbl2_tmp.js /op_thread_check.js /ss_wallet_*.png /*.code-workspace /skills /skills/* /agent-memory /agent-memory/* /projects /projects/* /scratchpad /scratchpad/* /agents /rules /.playwright-mcp /.playwright-mcp/*
 	handle @hidden {
 		respond 404
 	}
