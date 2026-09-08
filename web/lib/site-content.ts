@@ -317,7 +317,10 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ],
   },
   steps: {
-    heading: "Live in three steps.",
+    /* COUNT-FREE ON PURPOSE. It said "three" while the list below it holds four, and a
+       heading that counts the thing under it is a heading that goes wrong the next time
+       someone adds a step. */
+    heading: "From sold to shipped.",
     items: [
       { n: "01", word: "Connect", title: "Plug in the shop you already run.", body: "Sign in to Etsy, Shopify or TikTok Shop. Existing orders import right away; new ones stream into one queue from then on." },
       { n: "02", word: "Design", title: "Upload once, place once.", body: "Map your artwork to a product. Placement, print files and thread colours are set in the Design Lab and kept for every order after." },
