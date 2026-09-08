@@ -43,9 +43,30 @@ import { useConfirm } from "@/components/app/confirm-dialog"
  * numOf/plainNum are NOT re-derived here — the prefix table lives in lib/order-format.
  */
 const isLoose = (s: ShipmentRow) => /^sh_/.test(s.id)
-const shipNum = (s: ShipmentRow) =>
- isLoose(s) ? s.id : s.num.startsWith("#") ? s.num : plainNum(s.id)
-const shipOrigin = (s: ShipmentRow) => (isLoose(s) ? "Label with no order" : platformFromId(s.id))
+
+/**
+ * A LOOSE LABEL'S REFERENCE — short, upper-case, and NOT the storage id.
+ *
+ * The identifier line used to print `sh_mts8ui40q98s` verbatim: an internal primary key, in
+ * the column a person reads first, on every re-ship and sample in the list. Six of them
+ * stacked are six unreadable strings that differ in the middle, which is the worst possible
+ * shape for something the eye is meant to tell apart.
+ *
+ * The two lines swap round instead. Line one says WHAT it is in words — every other row in
+ * this column is a number a seller would read out, and a loose label has none, so saying so
+ * is more honest than printing a key that looks like one. Line two carries a short reference,
+ * which is what support actually needs to find the row again: the tail of the id, prefixed so
+ * it cannot be mistaken for an order number, and matching the `MF-…` shape the machine-file
+ * library already uses.
+ *
+ * The FULL id is still on the row's title attribute, so nothing is lost for anyone who needs
+ * to paste it.
+ */
+const looseRef = (id: string) => "LBL-" + id.replace(/^sh_/, "").slice(-8).toUpperCase()
+
+const shipNum = (s: ShipmentRow, loose = "Loose label") =>
+ isLoose(s) ? loose : s.num.startsWith("#") ? s.num : plainNum(s.id)
+const shipOrigin = (s: ShipmentRow) => (isLoose(s) ? looseRef(s.id) : platformFromId(s.id))
 
 /** What the CARRIER says. Kept visually distinct from the factory stage, because the whole
  * reason to open this page is usually that the two disagree. */
@@ -405,7 +426,7 @@ export function ShipmentsView() {
  receipt number leads, and the marketplace becomes a caption, which is
  the same shape the Customer column beside it already uses. */}
                     <td className="px-5 py-2.5">
-                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.id}>{shipNum(s)}</div>
+                      <div className="max-w-[9.5rem] truncate text-sm font-semibold tabular-nums" title={s.id}>{shipNum(s, tl("shipments", "Loose label"))}</div>
                       <div className="text-2xs text-muted-foreground">{shipOrigin(s)}</div>
                     </td>
                     <td className="px-3 py-2.5">

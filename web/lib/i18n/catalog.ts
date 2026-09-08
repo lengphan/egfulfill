@@ -227,6 +227,7 @@ const vi: Dict = {
   // see it and the gate will never ask for it. The cards are listed here anyway — an
   // undetectable key still resolves at runtime, and leaving them out would have meant a
   // panel that stayed English on a Vietnamese board with nothing reporting it.
+  "shipments.Loose label": "Nhãn rời",
   "settings.Dashboard announcement": "Thông báo trên bảng điều khiển",
   "settings.Scroll speed": "Tốc độ chạy",
   "settings.Slow": "Chậm",
