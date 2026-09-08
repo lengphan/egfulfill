@@ -37,34 +37,57 @@ type Piece = { src: string; dx: number; w: number; sit: number; rot: number; del
 
 /** Base lands first and the apex last, because that is the order a heap is built and the
  *  order gravity would deliver it. `z` rises with the stack so it reads toward the viewer. */
+/**
+ * THE MOUND FILLS ITS MARGIN. It used to sit in the outer corner about 250px wide, which left
+ * a corridor of empty ground between the pile and the sign-up card — the exact space it was
+ * put there to occupy. It now spans the full width of the margin and climbs in five courses,
+ * so the heap reaches from the page edge to the card and from the floor to roughly the card's
+ * own height.
+ *
+ * Five courses, narrowing as they rise — 5 / 4 / 3 / 2 / 1 — which is what gives a heap its
+ * triangle. The base overlaps hard so the foot reads as solid rather than as a row of
+ * separate objects, and every course lands before the one above it, because that is the order
+ * gravity would deliver it.
+ */
 const LEFT: Piece[] = [
-  // base — the heaviest pieces, overlapping hard so the foot of the pile is solid
-  { src: CHROME, dx: 4, w: 128, sit: 0, rot: -12, delay: 0, z: 1 },
-  { src: CLOUD, dx: 74, w: 134, sit: 2, rot: 8, delay: 0.06, z: 1 },
-  { src: GREEN, dx: 146, w: 116, sit: 0, rot: 15, delay: 0.12, z: 1 },
-  { src: CHROME, dx: 206, w: 104, sit: 4, rot: -9, delay: 0.18, z: 1 },
-  // second course, sitting in the gaps of the first
-  { src: STAR, dx: 42, w: 92, sit: 54, rot: 18, delay: 0.28, z: 2 },
-  { src: GREEN, dx: 112, w: 98, sit: 58, rot: -14, delay: 0.35, z: 2 },
-  { src: CLOUD, dx: 178, w: 86, sit: 52, rot: 10, delay: 0.42, z: 2 },
+  // base
+  { src: CHROME, dx: -14, w: 134, sit: 0, rot: -12, delay: 0, z: 1 },
+  { src: CLOUD, dx: 66, w: 142, sit: 3, rot: 8, delay: 0.05, z: 1 },
+  { src: GREEN, dx: 152, w: 124, sit: 0, rot: 15, delay: 0.1, z: 1 },
+  { src: CHROME, dx: 232, w: 130, sit: 4, rot: -9, delay: 0.15, z: 1 },
+  { src: STAR, dx: 312, w: 112, sit: 0, rot: 20, delay: 0.2, z: 1 },
+  // second course
+  { src: GREEN, dx: 26, w: 112, sit: 60, rot: 13, delay: 0.28, z: 2 },
+  { src: CLOUD, dx: 110, w: 118, sit: 64, rot: -11, delay: 0.33, z: 2 },
+  { src: CHROME, dx: 196, w: 106, sit: 58, rot: 16, delay: 0.38, z: 2 },
+  { src: GREEN, dx: 274, w: 100, sit: 62, rot: -14, delay: 0.43, z: 2 },
   // third
-  { src: CHROME, dx: 76, w: 84, sit: 106, rot: -16, delay: 0.52, z: 3 },
-  { src: STAR, dx: 140, w: 76, sit: 110, rot: 12, delay: 0.6, z: 3 },
+  { src: STAR, dx: 70, w: 98, sit: 120, rot: -17, delay: 0.5, z: 3 },
+  { src: CHROME, dx: 152, w: 104, sit: 124, rot: 10, delay: 0.55, z: 3 },
+  { src: CLOUD, dx: 234, w: 92, sit: 118, rot: -8, delay: 0.6, z: 3 },
+  // fourth
+  { src: GREEN, dx: 110, w: 86, sit: 176, rot: 12, delay: 0.68, z: 4 },
+  { src: STAR, dx: 186, w: 80, sit: 180, rot: -13, delay: 0.73, z: 4 },
   // apex
-  { src: GREEN, dx: 106, w: 62, sit: 156, rot: -7, delay: 0.72, z: 4 },
+  { src: CHROME, dx: 150, w: 64, sit: 232, rot: 7, delay: 0.84, z: 5 },
 ]
 
 const RIGHT: Piece[] = [
-  { src: CLOUD, dx: -212, w: 122, sit: 0, rot: 10, delay: 0.04, z: 1 },
-  { src: CHROME, dx: -142, w: 136, sit: 3, rot: -13, delay: 0.1, z: 1 },
-  { src: GREEN, dx: -70, w: 114, sit: 0, rot: 14, delay: 0.16, z: 1 },
-  { src: CLOUD, dx: -8, w: 100, sit: 4, rot: -8, delay: 0.22, z: 1 },
-  { src: STAR, dx: -180, w: 90, sit: 56, rot: -19, delay: 0.3, z: 2 },
-  { src: CHROME, dx: -110, w: 96, sit: 60, rot: 13, delay: 0.38, z: 2 },
-  { src: GREEN, dx: -42, w: 84, sit: 54, rot: -11, delay: 0.45, z: 2 },
-  { src: CLOUD, dx: -146, w: 80, sit: 108, rot: 9, delay: 0.55, z: 3 },
-  { src: STAR, dx: -76, w: 74, sit: 112, rot: -15, delay: 0.63, z: 3 },
-  { src: CHROME, dx: -112, w: 58, sit: 158, rot: 6, delay: 0.75, z: 4 },
+  { src: CLOUD, dx: -14, w: 130, sit: 0, rot: 11, delay: 0.03, z: 1 },
+  { src: CHROME, dx: -70, w: 140, sit: 3, rot: -13, delay: 0.08, z: 1 },
+  { src: GREEN, dx: -154, w: 122, sit: 0, rot: 14, delay: 0.13, z: 1 },
+  { src: CLOUD, dx: -234, w: 128, sit: 4, rot: -7, delay: 0.18, z: 1 },
+  { src: STAR, dx: -314, w: 110, sit: 0, rot: 18, delay: 0.23, z: 1 },
+  { src: CHROME, dx: -30, w: 110, sit: 60, rot: -12, delay: 0.3, z: 2 },
+  { src: GREEN, dx: -112, w: 116, sit: 64, rot: 14, delay: 0.35, z: 2 },
+  { src: CLOUD, dx: -198, w: 104, sit: 58, rot: -15, delay: 0.4, z: 2 },
+  { src: STAR, dx: -276, w: 98, sit: 62, rot: 9, delay: 0.45, z: 2 },
+  { src: CHROME, dx: -72, w: 96, sit: 120, rot: 16, delay: 0.52, z: 3 },
+  { src: GREEN, dx: -154, w: 102, sit: 124, rot: -10, delay: 0.57, z: 3 },
+  { src: STAR, dx: -236, w: 90, sit: 118, rot: 13, delay: 0.62, z: 3 },
+  { src: CLOUD, dx: -112, w: 84, sit: 176, rot: -11, delay: 0.7, z: 4 },
+  { src: CHROME, dx: -188, w: 78, sit: 180, rot: 8, delay: 0.75, z: 4 },
+  { src: GREEN, dx: -152, w: 62, sit: 232, rot: -6, delay: 0.86, z: 5 },
 ]
 
 function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
@@ -75,10 +98,8 @@ function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
    * Each piece used to carry its own `whileInView`, and none of them ever fired: a piece
    * starts 820px ABOVE where it lands, so its box at mount is off the top of the section and
    * the observer never saw it enter. They sat transparent and high, which is why the page
-   * rendered nineteen objects and showed none.
-   *
-   * One observer on the container — which is where it belongs anyway, because a heap should
-   * begin falling as a heap rather than each piece deciding for itself.
+   * rendered nineteen objects and showed none. One observer on the container — which is where
+   * it belongs anyway, because a heap should begin falling as a heap.
    */
   const ref = useRef<HTMLDivElement>(null)
   const inView = useInView(ref, { once: true, margin: "-80px" })
@@ -87,7 +108,7 @@ function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
       ref={ref}
       aria-hidden
       className={
-        "pointer-events-none absolute bottom-0 hidden h-full w-[clamp(300px,30vw,440px)] md:block " +
+        "pointer-events-none absolute bottom-0 hidden h-full w-[clamp(300px,34vw,470px)] md:block " +
         (side === "left" ? "left-0" : "right-0")
       }
     >
@@ -106,13 +127,9 @@ function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
           transition={
             reduced
               ? { duration: 0 }
-              : /**
-                 * SLOW AND SOFT. It was stiffness 115 / damping 9.5 — a drop with a hard
-                 * bounce, and sixteen of those read as things thrown at the page rather than
-                 * settling onto it. A weak spring with real mass takes roughly twice as long
-                 * and lands with one small give. The long delays let a heap assemble piece by
-                 * piece while you watch, which is the part that reads as graceful.
-                 */
+              : /* Slow and soft. A stiff spring with low damping reads as things thrown at the
+                   page; a weak one with real mass takes about twice as long and lands with one
+                   small give. The long delays let a heap assemble course by course. */
                 { type: "spring", stiffness: 30, damping: 14, mass: 1.8, delay: p.delay }
           }
           style={{ [side]: p.dx, width: p.w, bottom: p.sit, zIndex: p.z }}
@@ -125,11 +142,8 @@ function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
             height={700}
             unoptimized
             draggable={false}
-            /* NO DROP-SHADOW ON THE PIECES. Each carried one, and eight overlapping in a heap
-                stack into a grey smudge behind the pile — a rectangle of haze that reads as a
-                box someone forgot to remove. The renders already carry their own lighting and
-                contact shadow; a CSS shadow on top of a rendered object is a second light
-                source from a different direction. */
+            /* NO DROP-SHADOW. Eight overlapping in a heap stack into a grey smudge that reads
+               as a box behind the pile; the renders already carry their own contact shadow. */
             className="h-auto w-full"
           />
         </motion.div>
