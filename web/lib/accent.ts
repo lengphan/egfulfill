@@ -28,7 +28,7 @@ export type AccentKey = "rose" | "lime"
 
 export const ACCENTS: { key: AccentKey; label: string; what: string }[] = [
   { key: "rose", label: "Rose", what: "Warm pink. The default." },
-  { key: "lime", label: "Lime", what: "Bright yellow-green." },
+  { key: "lime", label: "Lime", what: "The marketing green." },
 ]
 
 const STORE_KEY = "eg_accent"

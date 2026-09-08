@@ -1225,8 +1225,21 @@ td[align="right"] {
 [data-pop="rose"] { --pop: oklch(0.74 0.200 335); --pop-foreground: oklch(0.175 0 0); }
 .dark[data-pop="rose"], .dark [data-pop="rose"] { --pop: oklch(0.74 0.235 335); --pop-foreground: oklch(0.145 0 0); }
 
-[data-pop="lime"] { --pop: oklch(0.89 0.195 112); --pop-foreground: oklch(0.175 0 0); }
-/* Lime is the same colour in both themes — at L 0.89 it is already above the whole dark
+/* THE MARKETING LIME, EXACTLY — #D4F897, the acid the skins already paint the hero plate
+   with. It was oklch(0.89 0.195 112) = #DFE610, a highlighter yellow that shares only a
+   name with the site's lime: two different colours in one product both called "the one
+   bright thing". Now that the accent fills the selected nav item, the app and the marketing
+   page sit next to each other in a screenshot, and they have to be the same green.
+
+   IT ALSO PASSES, WHICH #DFE610 NEVER DID. Measured: ink 15.96:1 light / 16.66:1 dark, and
+   nearest reserved colour ΔE 0.380 light (floor 0.171) · 0.156 dark (floor 0.154). The
+   shipped yellow collided with `hold` in dark at 0.145.
+
+   DO NOT TUNE IT. The dark margin is 0.002, against `success` — emerald, the other green in
+   the system. Measured either side of this value: L0.90 C0.14 gives 0.131 and L0.92 C0.17
+   gives 0.151, both COLLIDE. #D4F897 is not a starting point, it is the window. */
+[data-pop="lime"] { --pop: oklch(0.9317 0.1287 125.4); --pop-foreground: oklch(0.175 0 0); }
+/* Lime is the same colour in both themes — at L 0.93 it is already above the whole dark
    palette, so it needs no dark step, only the darker ink. */
 .dark[data-pop="lime"], .dark [data-pop="lime"] { --pop-foreground: oklch(0.145 0 0); }
 

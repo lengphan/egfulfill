@@ -83,28 +83,53 @@ const reserved = (t) => Object.entries(t).filter(([k]) => k.startsWith('--status
 /* ── the candidates ───────────────────────────────────────────────────────────── */
 // Each is [L, C, H] per theme. Dark sits slightly lower in L and a touch higher in C, the
 // same relationship the shipped coral already has, because a dark surface eats chroma.
-const CANDIDATES = [
-  // Hue chosen by MEASUREMENT, not by taste. A sweep of the whole circle (every hue × every
-  // in-gamut L and C that keeps ink readable) says where a pop can actually live:
-  //
-  //   best   325–335 rose · 105–115 lime · 300–310 orchid · 215 cyan
-  //   worst  30–50 — CORAL. Headroom −0.002: there is NO lightness and NO chroma at coral's
-  //          hue that clears the floor in dark mode. It is boxed in by `alert` (25) on one
-  //          side and `backorder` (50) on the other, and the dark palette lifts every status
-  //          into the same bright band, so the gap coral has in light mode closes entirely.
-  //
-  // So the default is ROSE — the warm pink nearest coral that has room. It cost nothing to
-  // move: --pop was defined in both themes and rendered nowhere, so this changes a colour
-  // that has never once been on screen.
-  //
-  // AND THERE ARE ONLY TWO. Orchid (310) and Cyan (215) clear the floor in dark ONLY as pale
-  // near-white tints (L 0.89, C 0.065) — the washed-out look already rejected once. The
-  // reserved status vocabulary occupies most of the circle at the lightness a readable FILL
-  // needs, so the accent has exactly two homes. Two vetted presets is the honest answer; a
-  // longer list would be four swatches of which two quietly lie in dark mode.
-  { key: 'rose', name: 'Rose', light: [0.74, 0.200, 335], dark: [0.74, 0.235, 335] },
-  { key: 'lime', name: 'Lime', light: [0.89, 0.195, 112], dark: [0.89, 0.195, 112] },
-]
+/**
+ * READ FROM THE STYLESHEET, NOT RETYPED HERE.
+ *
+ * This list used to be five hardcoded [L,C,H] triples, and nothing ever compared them to the
+ * `[data-pop="…"]` rules the app actually ships. So the gate could pass a colour the product
+ * does not use, or fail one it does, and either way print a confident number — the same
+ * shape of bug as a measurement written into a comment (CLAUDE.md §4), which this very file
+ * exists to prevent. Caught while changing lime: the gate and the stylesheet were about to
+ * disagree by one preset.
+ *
+ * Light comes from `[data-pop="x"]`; dark from `.dark[data-pop="x"]` when it re-declares
+ * --pop, else the light value — which is exactly what the cascade does on the page.
+ */
+function presets() {
+  const light = {}, dark = {}
+  for (const m of CSS.matchAll(/(\.dark\s*)?\[data-pop="([\w-]+)"\][^{]*\{([^}]*)\}/g)) {
+    const isDark = Boolean(m[1]), key = m[2]
+    const pop = m[3].match(/--pop\s*:\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/)
+    if (!pop) continue
+    const v = [Number(pop[1]), Number(pop[2]), Number(pop[3])]
+    ;(isDark ? dark : light)[key] = v
+  }
+  const keys = Object.keys(light)
+  if (!keys.length) throw new Error('no [data-pop] presets found in globals.css')
+  return keys.map((k) => ({
+    key: k,
+    name: k[0].toUpperCase() + k.slice(1),
+    light: light[k],
+    dark: dark[k] || light[k],
+  }))
+}
+
+// Hue is chosen by MEASUREMENT, not by taste. A sweep of the whole circle (every hue × every
+// in-gamut L and C that keeps ink readable) says where a pop can actually live:
+//
+//   best   325–335 rose · 105–125 lime · 300–310 orchid · 215 cyan
+//   worst  30–50 — CORAL. Headroom −0.002: there is NO lightness and NO chroma at coral's
+//          hue that clears the floor in dark mode. It is boxed in by `alert` (25) on one
+//          side and `backorder` (50) on the other, and the dark palette lifts every status
+//          into the same bright band, so the gap coral has in light mode closes entirely.
+//
+// AND THERE ARE ONLY TWO. Orchid (310) and Cyan (215) clear the floor in dark ONLY as pale
+// near-white tints (L 0.89, C 0.065) — the washed-out look already rejected once. Every
+// purple was measured again on 2026-09-08 and every one collides in dark: periwinkle 0.069,
+// violet 285 0.135, purple 300 0.132, orchid 310 0.101, against a 0.154 floor. Violet IS
+// `working` and indigo IS `pending`; the accent cannot borrow a status's hue.
+const CANDIDATES = presets()
 
 
 const MIN_CONTRAST = 4.5   // WCAG AA, normal text. The pop always carries words.
