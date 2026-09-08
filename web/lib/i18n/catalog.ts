@@ -99,6 +99,10 @@ const en: Dict = {
   "dash.goodEvening": "Good evening",
   "dash.there": "there",
   "dash.newToday": "new today",
+  // Revenue is what the BUYER paid. A manual order has no such figure by design, so the
+  // panel says how many are uncounted rather than letting $0 read as broken.
+  "dash.noSalePrice": "{n} with no sale price recorded",
+  "dash.arrivedWithinHour": "Arrived in the last hour",
   // The dashboard ticker. Short by design — they run past on one line.
   "dash.revenue": "Revenue",
   "dash.recentOrders": "Recent orders",
@@ -655,6 +659,8 @@ const vi: Dict = {
   "dash.goodEvening": "Chào buổi tối",
   "dash.there": "bạn",
   "dash.newToday": "đơn mới hôm nay",
+  "dash.noSalePrice": "{n} đơn chưa ghi giá bán",
+  "dash.arrivedWithinHour": "Vừa đến trong một giờ qua",
   "dash.revenue": "Doanh thu",
   "dash.recentOrders": "Đơn gần đây",
   "dash.viewAll": "Xem tất cả",

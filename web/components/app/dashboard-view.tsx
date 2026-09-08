@@ -118,7 +118,23 @@ export function DashboardView() {
  const open = list.filter((o) => OPEN_GROUPS.has(sellerStatus(o).group)).length
  const startOfToday = new Date(new Date().toDateString()).getTime()
  const newToday = list.filter((o) => tsOf(o) >= startOfToday).length
- return { count30: in30.length, rev30, open, newToday }
+ /**
+  * HOW MANY OF THOSE ORDERS HAVE NO SALE PRICE ON THEM.
+  *
+  * Revenue here is what the BUYER PAID, which for a marketplace order is the figure the
+  * channel reports. A manual order has no such figure: the create form deliberately stopped
+  * asking for a retail price ("a manual order is raised to get something made, and being
+  * asked for the retail figure first is friction in the way of that"), so it is stored with
+  * total 0 and `retail_set` unclaimed — which is the honest shape, because it keeps "nobody
+  * recorded it" separable from "it sold for nothing".
+  *
+  * The consequence is that a seller whose month is mostly manual sees $0 and no reason for
+  * it, which reads as a broken figure rather than an accurate one. Counting them lets the
+  * panel SAY so, which is the whole of §4's rule: if a thing cannot be read versus does not
+  * exist, say which.
+  */
+ const unpriced = in30.filter((o) => totalOf(o) === 0).length
+ return { count30: in30.length, rev30, open, newToday, unpriced }
   }, [orders, now])
 
   // Time-of-day greeting — client component, so this is the seller's own local clock.
@@ -244,7 +260,11 @@ export function DashboardView() {
       <GmvPanel
         title={cl("kpi", "Revenue")}
         headline={orders === null ? "—" : usd(stats.rev30)}
-        headlineSub={cl("kpisub", "last 30 days")}
+        headlineSub={
+          orders !== null && stats.unpriced > 0
+            ? `${cl("kpisub", "last 30 days")} · ${t("dash.noSalePrice", { n: stats.unpriced })}`
+            : cl("kpisub", "last 30 days")
+        }
         side={[
           { label: cl("kpi", "Orders (30d)"), value: orders === null ? "—" : String(stats.count30) },
           { label: cl("kpi", "Open orders"), value: orders === null ? "—" : String(stats.open) },
@@ -343,10 +363,27 @@ export function DashboardView() {
             {t("dash.errRecent")}
           </div>
         ) : orders === null ? (
-          <div className="space-y-2 p-5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />
-            ))}
+          /* A SKELETON SHAPED LIKE THE TABLE IT IS STANDING IN FOR.
+             It was five identical grey bars, which tells a person only that something is
+             happening — and then the real content snaps in at a completely different shape,
+             which is the jolt that makes a page feel like it reloaded. These are the six
+             columns at their real widths, so the row that arrives lands where the placeholder
+             already was. The stagger stops five bars pulsing in lockstep, which is the tell
+             that they are a loading graphic rather than content. */
+          <div className="p-5">
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-[88px_160px_1fr_120px_104px_84px] items-center gap-3">
+                  {[70, 120, 200, 84, 60, 48].map((w, c) => (
+                    <div
+                      key={c}
+                      className="h-3.5 animate-pulse rounded bg-muted"
+                      style={{ width: w, animationDelay: `${i * 90 + c * 30}ms`, marginLeft: c >= 4 ? "auto" : undefined }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <Table className="table-fixed">
@@ -367,8 +404,28 @@ export function DashboardView() {
                   {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), t("dash.openOrder", { num: numOf(o) }))}
  className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
+                  {/* ONE LIVE SIGNAL, IN ONE COLOUR.
+                      An order that arrived within the hour carries an acid dot; everything
+                      older carries nothing. Not a rainbow of ages — a second tint would start
+                      competing with the status column two cells along, where amber already
+                      means hold and violet means working, and those words are read at speed
+                      on a factory floor (§4: the status palette is reserved).
+
+                      Acid is legal here precisely because it is NOT a status: it says "this
+                      is new since you last looked", which nothing else on the row says. It is
+                      a fill carrying no text, so the 1.19:1 it measures against white never
+                      matters — nothing has to be read off it. */}
                   <TableCell className="truncate">
-                    <OrderNumber order={o} />
+                    <span className="flex items-center gap-2">
+                      {now - tsOf(o) < 60 * 60 * 1000 && (
+                        <span
+                          aria-hidden
+                          title={t("dash.arrivedWithinHour")}
+                          className="size-1.5 shrink-0 rounded-full bg-[var(--mk-acid,#D4F897)] ring-2 ring-[var(--mk-acid,#D4F897)]/25"
+                        />
+                      )}
+                      <OrderNumber order={o} />
+                    </span>
                   </TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
                   <TableCell className="truncate text-muted-foreground">{itemsLabel(o, t("dash.item"))}</TableCell>
