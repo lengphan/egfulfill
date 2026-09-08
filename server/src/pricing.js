@@ -437,6 +437,39 @@ function supplierCostOf(row, item) {
 
 // Print-method surcharge (EMB stitches cost more than DTG ink). Method aliases are
 // normalised exactly as eg-design-tools.js does it.
+/**
+ * THE SURCHARGE FOR EVERY METHOD A PRODUCT OFFERS, keyed the way the client keys them.
+ *
+ * The public product page quoted one price for a garment whatever technique was picked, so an
+ * embroidered item under-quoted by exactly this figure — the charge applies the surcharge, the
+ * page did not. This exposes it per method so the page can add it, rather than publishing a
+ * size-by-method matrix that would double the payload to say the same thing.
+ *
+ * LOWER-CASE KEYS, deliberately: they are the same keys `normTech` produces in
+ * web/lib/print-method.ts, so the page can look one up with the value it already has in hand.
+ * Publishing a surcharge is safe under CLAUDE.md 2.9 — it is what a SELLER pays extra, never
+ * what the blank costs us.
+ */
+export function methodAddOnsFor(row, fees, methods) {
+  const d = (row && row.data) || {};
+  const out = {};
+  for (const raw of Array.isArray(methods) ? methods : []) {
+    // A stored value can be a combination — "DTG printing / Embroidery" — so it is split the
+    // same way the client splits it before each part is normalised.
+    for (const part of String(raw || '').split(/[/,·|+]+/)) {
+      const tech = part.trim();
+      if (!tech) continue;
+      const key = /emb/i.test(tech) ? 'emb' : /dtf/i.test(tech) ? 'dtf' : /appliqu|\bapl\b/i.test(tech) ? 'apl'
+                : /laser|\blsr\b|engrav/i.test(tech) ? 'lsr' : /screen|\bscr\b/i.test(tech) ? 'scr'
+                : /sublim|\bdye\b|\bsub\b/i.test(tech) ? 'sub' : /vinyl|htv|\bvnl\b/i.test(tech) ? 'vnl'
+                : /dtg|direct to garment/i.test(tech) ? 'dtg' : null;
+      if (!key || out[key] != null) continue;
+      out[key] = money(methodAddOn(d, key.toUpperCase(), fees)) || 0;
+    }
+  }
+  return out;
+}
+
 function methodAddOn(d, printType, fees) {
   const tech = String(printType || '').toUpperCase();
   if (!tech) return 0;

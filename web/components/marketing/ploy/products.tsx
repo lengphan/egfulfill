@@ -7,7 +7,10 @@ import { motion } from "motion/react"
 import { HOVER, reveal } from "./motion"
 import { GUTTER, SECTION, TOP } from "./rhythm"
 import type { PublicProduct } from "@/lib/api"
-import { methodsAcross, methodsOf } from "./methods-of"
+/* THE CANONICAL SPLITTER, not a second one. `normalizeMethods` already splits a combined
+   value ("DTG printing / Embroidery") and de-dupes by normalised key — I had re-derived that
+   here as methods-of.ts, which is exactly the private copy §5 warns about. */
+import { normalizeMethods } from "@/lib/print-method"
 import { sizeRangeLabel } from "@/lib/size-order"
 
 /**
@@ -113,14 +116,17 @@ export function PloyProducts({
     () => ["All", ...[...new Set((products ?? []).map((p) => p.category).filter((c): c is string => !!c))].sort()],
     [products],
   )
-  const methodTabs = useMemo(() => ["All", ...methodsAcross(products ?? [])], [products])
+  const methodTabs = useMemo(
+    () => ["All", ...normalizeMethods((products ?? []).flatMap((p) => p.methods ?? [])).map((m) => m.label)],
+    [products],
+  )
 
   const visible = useMemo(
     () =>
       (products ?? []).filter(
         (p) =>
           (cat === "All" || p.category === cat) &&
-          (method === "All" || methodsOf(p).includes(method)),
+          (method === "All" || normalizeMethods(p.methods ?? []).some((m) => m.label === method)),
       ),
     [products, cat, method],
   )

@@ -1396,6 +1396,17 @@ export type PublicProduct = {
   methods: string[]
   colors: PublicColor[]
   sizes: string[]
+  /**
+   * WHAT EACH TECHNIQUE ADDS to the size's price, keyed the way `normTech` keys them
+   * (`emb`, `dtg`, `dtf`, `apl`, `lsr`, `scr`, `sub`, `vnl`).
+   *
+   * The ADD-ON, not a total — the page adds it to the price of the selected size. A product
+   * page that quotes one figure whatever method is picked under-quotes an embroidered garment
+   * by exactly this, because the order charge applies the surcharge and the page did not.
+   * Empty when the fee table could not be read, which the page must treat as "no surcharge
+   * known" rather than "no surcharge".
+   */
+  methodPrices?: Record<string, number>
   /** How the photo is framed — the crop set in the product editor, so the public site shows
    *  the same composition the app does. Null when nobody has framed it. See
    *  lib/product-framing.ts; the server clamps both to the editor's own bounds. */

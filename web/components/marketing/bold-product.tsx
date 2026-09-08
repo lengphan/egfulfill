@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { TShirt, ArrowLeft, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, INK_ON_ACID } from "@/components/marketing/bold-kit"
+import { normTech } from "@/lib/print-method"
 import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
@@ -120,7 +121,25 @@ export function BoldProduct({ product, shipping }: {
    *  the same rule the server prices the order by. */
   const priceOfSize = (s: string | null) =>
     (s ? product.sizePrices?.find((t) => t.size === s)?.price : undefined) ?? product.price
-  const shown = priceOfSize(size)
+
+  /**
+   * THE TECHNIQUE'S SURCHARGE, added to the size's price.
+   *
+   * The page quoted the same figure whether embroidery or DTG was selected, while the order
+   * charge applies a per-method surcharge — so an embroidered garment was under-quoted here,
+   * publicly, before anyone ordered it. `methodPrices` is published as an ADD-ON per method
+   * (server/src/pricing.js, methodAddOnsFor) and keyed the way normTech keys them, so the
+   * selected technique looks up directly.
+   *
+   * ZERO WHEN UNKNOWN, never a guess. A method the table has no entry for adds nothing —
+   * which is what the charge does too, since methodAddOn returns 0 for an unpriced key.
+   */
+  const addOnFor = (m: string | null) => {
+    if (!m) return 0
+    const key = normTech(m)?.key
+    return (key && product.methodPrices?.[key]) || 0
+  }
+  const shown = priceOfSize(size) + addOnFor(method)
   const chosen = colorIdx == null ? null : product.colors[colorIdx] ?? null
   const hero = chosen?.image ?? product.image
   /*

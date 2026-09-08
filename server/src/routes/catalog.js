@@ -11,6 +11,7 @@ import { audit } from '../audit.js';
 import { variantSku, variantLabel, variantPairs, productSizes, productColors } from '../variant-sku.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
 import { readAll as readSettings } from './factory_settings.js';
+import { methodAddOnsFor } from '../pricing.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
 // products, and that is the point — but it should not happen unseen, because a base
@@ -412,6 +413,21 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       sizePrices: (Array.isArray(d.sizePrices) ? d.sizePrices : [])
         .filter((t) => t && typeof t.size === 'string' && Number(t.price) > 0)
         .map((t) => ({ size: t.size, price: Number(t.price) })),
+      /**
+       * WHAT EACH TECHNIQUE ADDS, so a page can quote the combination a person picked.
+       *
+       * The detail page showed one figure whatever method was selected, and the order charge
+       * applies a per-method surcharge — so an embroidered garment was under-quoted by exactly
+       * this amount, on the public page, before anyone ordered it.
+       *
+       * The ADD-ON, not a total: publishing a size-by-method matrix would be a row per
+       * combination to say the same thing, and it would go stale a size at a time. The page
+       * adds this to the size's own price. Keys match `normTech` in web/lib/print-method.ts.
+       *
+       * Safe under 2.9 — a surcharge is what a SELLER pays extra, never what the blank costs
+       * us, and it is already visible to anyone who places an order.
+       */
+      methodPrices: fees ? methodAddOnsFor(row, fees, methods) : {},
       /**
        * HAND-PICKED FOR THE FRONT OF THE CATALOGUE.
        *
