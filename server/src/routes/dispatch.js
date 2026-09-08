@@ -23,6 +23,11 @@
 import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
+// orderLabel was CALLED at two places in this file and imported at none — a ReferenceError
+// that 500'd GET /api/shipments and GET /api/dispatch/history on every request. It is the
+// shared display-number helper (id vs seq — see CLAUDE.md §5: o.id is not o.num), already
+// imported the same way by orders.js, order_refunds.js and audit.js.
+import { orderLabel } from '../order-label.js';
 import { refundOrder } from './order_refunds.js';
 import { aggregatorRefundLabel, aggregatorFetchCost, aggregatorRefundStatus, aggregatorFindByTracking, refreshTrackingFor } from './shipping.js';
 import { ensureShipments, isShipmentId } from '../shipments-store.js';
