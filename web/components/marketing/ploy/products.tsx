@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
+import type { PublicProduct } from "@/lib/api"
 
 /**
  * THE PRODUCTS PAGE — one garment shot large, then every other one shot identically.
@@ -40,15 +41,20 @@ const HEADWEAR = [
 const ALL = [...BLANKS, ...HEADWEAR]
 
 export function PloyProducts({
+  products,
   headline,
   accent,
   lead,
 }: {
+  /** null means the read FAILED. [] means the catalogue is genuinely empty. §4 — those are
+   *  different facts and the block below says which. */
+  products: PublicProduct[] | null
   headline: string
   accent: string
   lead: string
 }) {
   const [method, setMethod] = useState("All")
+  const [pMethod, setPMethod] = useState("All")
   const methods = useMemo(() => {
     const set = new Set<string>()
     for (const b of ALL) for (const m of b.methods) set.add(m)
@@ -56,6 +62,15 @@ export function PloyProducts({
   }, [])
   const blanks = BLANKS.filter((b) => method === "All" || b.methods.includes(method))
   const headwear = HEADWEAR.filter((b) => method === "All" || b.methods.includes(method))
+
+  /* The catalogue's filter is DERIVED from the catalogue, not from the blanks above: the two
+     lists are different data and a tab that matches nothing is worse than no tab. */
+  const pMethods = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of products ?? []) for (const m of p.methods ?? []) set.add(m)
+    return ["All", ...[...set].sort()]
+  }, [products])
+  const visible = (products ?? []).filter((p) => pMethod === "All" || (p.methods ?? []).includes(pMethod))
   return (
     <div className="bg-ploy-ground text-ploy-ink">
       {/* ── ONE GARMENT, LARGE ─────────────────────────────────────────────── */}
@@ -208,16 +223,93 @@ export function PloyProducts({
         </div>
       </section>
 
-      {/* THE LIVE CATALOGUE GRID WAS REMOVED HERE (owner's call, 2026-09-08).
-          It listed the published products straight from /api/public/products, and it worked —
-          but its rows are supplier stock photography on white, next to an art-directed shoot
-          on periwinkle, and the seam between the two halves was the loudest thing on the page.
+      {/* ── THE LIVE CATALOGUE, IN THE SAME CARD ──────────────────────────── */}
+      {/* Restored 2026-09-08 in the new treatment. It came out for a day because its rows are
+          supplier stock photography on white and the seam against the shoot above was the
+          loudest thing on the page — the answer is the SAME CARD, not no catalogue: identical
+          radius, identical 4:5 frame, identical type scale, and the image sitting on the same
+          periwinkle wash the blanks do, so a supplier photo and one of ours differ by their
+          content rather than by their container.
 
-          WHAT THIS COSTS, so it is not rediscovered: /catalog no longer links to any
-          /catalog/[slug] page, so those detail pages are reachable only from the sitemap and
-          have no internal links pointing at them. The route, the fetch and the allow-list are
-          all untouched and the grid is about twenty lines to restore — the right moment is
-          when the catalogue has photography that belongs beside the blanks above. */}
+          Per-product photography needs no code: the product editor already owns the image and
+          its framing (`imgZoom` / `imgFocusY`, see lib/product-framing.ts), and the public
+          shape publishes both — so a better photo uploaded there lands here with the crop it
+          was given. Nothing on this page has to change for that to happen. */}
+      <section id="catalogue" className="px-6 pt-24 md:px-8 md:pt-32">
+        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky px-8 py-16 md:px-14 md:py-20">
+          <h2 className="ploy-display text-[clamp(2rem,4.4vw,3.8rem)]">
+            <motion.span {...reveal(0)} className="block">Published today.</motion.span>
+          </h2>
+          <motion.p {...reveal(0.1)} className="mt-5 max-w-lg text-[17px] leading-relaxed text-ploy-ink/70">
+            Live from the catalogue — every one of these is orderable now, at the price shown.
+          </motion.p>
+
+          {products !== null && products.length > 0 && pMethods.length > 2 && (
+            <motion.div {...reveal(0.15)} className="mt-8 -mb-px flex gap-6 overflow-x-auto border-b border-ploy-ink/15">
+              {pMethods.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPMethod(m)}
+                  aria-pressed={pMethod === m}
+                  className={
+                    "-mb-px shrink-0 border-b-2 pb-3 text-[15px] transition-colors " +
+                    (pMethod === m
+                      ? "border-ploy-ink font-medium text-ploy-ink"
+                      : "border-transparent text-ploy-ink/55 hover:text-ploy-ink")
+                  }
+                >
+                  {m}
+                </button>
+              ))}
+            </motion.div>
+          )}
+
+          {/* THREE OUTCOMES, THREE MESSAGES. A failed read and an empty catalogue must never
+              look the same — that is the defect §4 names, and it once had this page reporting
+              "nothing published" while the API was answering perfectly. */}
+          {products === null ? (
+            <p className="mt-10 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
+              The catalogue could not be loaded just now. This is our end, not yours — the
+              products are still there.{" "}
+              <Link href="/contact" className="underline underline-offset-4">Tell us</Link> if it stays this way.
+            </p>
+          ) : products.length === 0 ? (
+            <p className="mt-10 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
+              Nothing is published to the public catalogue yet. The blanks above are what the
+              factory keeps — <Link href="/signup" className="underline underline-offset-4">start free</Link> and
+              you can order any of them.
+            </p>
+          ) : (
+            <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+              {visible.map((p, i) => (
+                <motion.div key={p.slug} {...reveal(0.04 * Math.min(i, 8))} whileHover={{ y: -4 }} transition={HOVER}>
+                  <Link href={`/catalog/${p.slug}`} className="block overflow-hidden rounded-2xl bg-ploy-paper">
+                    <div className="aspect-[4/5] overflow-hidden bg-ploy-sky">
+                      {/* The image is served from OUR url — the public shape resolves the
+                          supplier's address server-side, so it never reaches this markup
+                          (§2.9). No image is an honest blank tile, never a placeholder that
+                          implies a photo exists. */}
+                      {p.image ? (
+                        <Image src={p.image} alt={p.name} width={600} height={750} loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full" />
+                      )}
+                    </div>
+                    <div className="p-4 md:p-5">
+                      <p className="truncate text-[15px] font-semibold md:text-[17px]">{p.name}</p>
+                      <p className="mt-1 text-[13px] tabular-nums text-ploy-ink/55">
+                        {p.priceVaries ? "from " : ""}${Number.isInteger(p.priceFrom ?? p.price) ? (p.priceFrom ?? p.price) : (p.priceFrom ?? p.price).toFixed(2)}
+                      </p>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </section>
+
     </div>
   )
 }
