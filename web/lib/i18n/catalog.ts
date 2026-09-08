@@ -228,6 +228,7 @@ const vi: Dict = {
   // undetectable key still resolves at runtime, and leaving them out would have meant a
   // panel that stayed English on a Vietnamese board with nothing reporting it.
   "settings.Dashboard announcement": "Thông báo trên bảng điều khiển",
+  "settings.Runs in the strip at the top of every dashboard, after each person's own figures.": "Chạy trong dải phía trên mọi bảng điều khiển, sau các số liệu của từng người.",
   "settings.One line, shown on every dashboard": "Một dòng, hiển thị trên mọi bảng điều khiển",
   "settings.Show it": "Hiển thị",
   "tour.Getting around": "Làm quen với bảng",

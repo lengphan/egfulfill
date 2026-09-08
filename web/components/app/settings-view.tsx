@@ -1121,8 +1121,13 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
  *
  * `on` and the text are separate on purpose. Clearing the box to hide the line would mean
  * retyping it next week; the switch is how you take it down and keep it.
+ *
+ * THIS IS THE BODY, NOT THE FOLD. `FoldGroup` reads `title` off its DIRECT children to build
+ * the section picker, so a component that merely RETURNS a <Fold> is invisible to it — the
+ * option gets `value: undefined` and the section never appears in the list. The <Fold> has to
+ * be written inline in the group; only its children may be a component.
  */
-function AnnouncementFold() {
+function AnnouncementBody() {
   const tl = useLabelT()
   const [text, setText] = useState("")
   const [on, setOn] = useState(false)
@@ -1151,10 +1156,6 @@ function AnnouncementFold() {
   }
 
   return (
-    <Fold
-      title={tl("settings", "Dashboard announcement")}
-      status={!loaded ? "" : on && text.trim() ? "showing" : "off"}
-    >
       <div className="flex flex-col gap-3">
         <Input
           value={text}
@@ -1174,7 +1175,6 @@ function AnnouncementFold() {
           {saved && <span className="text-xs text-shipped">{tl("settings", "Saved")}</span>}
         </div>
       </div>
-    </Fold>
   )
 }
 
@@ -1418,7 +1418,12 @@ function PlatformPanel() {
         />
       </div>
       <FoldGroup>
-      <AnnouncementFold />
+      <Fold title={tl("settings", "Dashboard announcement")}>
+        <p className="mb-3 text-xs text-muted-foreground">
+          {tl("settings", "Runs in the strip at the top of every dashboard, after each person's own figures.")}
+        </p>
+        <AnnouncementBody />
+      </Fold>
       {!isOperator && (
       <Fold title={tl("settings", "Warehouse ship-from address")} status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
