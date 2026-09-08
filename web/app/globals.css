@@ -37,6 +37,25 @@
      */
     --font-display: var(--font-sans);
     --font-title: var(--font-sans);
+
+    /* ── THE PLOY PALETTE — the marketing home's seven colours ───────────────────
+     * Every one is a REFERENCE to a token the skin already owns, never a hex. So the new
+     * homepage re-colours from Settings › Branding exactly like the rest of the public
+     * site, and there is no second place a colour can be changed. Prefixed `ploy-` so
+     * these utilities cannot collide with the app's own `--color-*` names.
+     *
+     * `sky` is the one value with no `--mk-*` of its own — the pale periwinkle wash the
+     * methods block sits on. It is DERIVED rather than declared, so it follows whatever
+     * the skin's brand and surface are, instead of needing a hand-picked value in each of
+     * the four skin blocks and a fifth the day someone adds one. */
+    --color-ploy-ground: var(--mk-surface);
+    --color-ploy-ink: var(--mk-ink);
+    --color-ploy-paper: var(--mk-card);
+    --color-ploy-acid: var(--mk-acid);
+    --color-ploy-slate: var(--mk-accent);
+    --color-ploy-peri: var(--brand);
+    --color-ploy-sky: color-mix(in srgb, var(--brand) 26%, var(--mk-surface));
+
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -1531,3 +1550,66 @@ td[align="right"] {
   --brand: oklch(0.5305 0.2723 283.5);
   --brand-foreground: #FAF8F3;
 }
+
+/* ── THE MARKETING HOME'S OWN PRIMITIVES ──────────────────────────────────────
+ * Ported from the ploy prototype (~/Downloads/ploykit). Everything here is scoped to a
+ * `ploy-` prefix or to `.ploy-home`, so none of it can reach the signed-in app.
+ *
+ * The COLOURS are not here — they are the `--color-ploy-*` tokens in @theme above, which
+ * point at the skin. What lives here is only shape and motion.
+ */
+
+/* Display type: uppercase, tight, set solid. Anton is a display face drawn for capitals,
+   which is why the transform is part of the class rather than left to each call site — set
+   in lower case it looks like a mistake rather than a choice. */
+.ploy-display {
+  font-family: var(--font-anton), "Arial Narrow", sans-serif;
+  text-transform: uppercase;
+  line-height: 0.9;
+  letter-spacing: 0.005em;
+  font-weight: 400;
+}
+
+/* THE NAV TRICK. The bar is transparent and never changes on scroll. The menu is a fully
+   round capsule painted the SAME colour as the page ground, so it is invisible over the
+   ground and becomes a floating pill the moment a coloured section passes beneath it. No
+   scroll listener, no state, no backdrop blur — which is how it satisfies §4's "the header
+   has ONE appearance at every scroll position" while still reading on every band. */
+.ploy-capsule {
+  background: var(--color-ploy-ground);
+  border-radius: 1600px;
+}
+
+/* The logo wall scrolls forever. The list is rendered twice and the track travels exactly
+   half its width, so the seam is invisible. */
+@keyframes ploy-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ploy-marquee { animation: ploy-marquee 38s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ploy-marquee { animation: none; }
+}
+
+/* A coloured block is not a flat fill: a soft lighter bloom rises from the bottom. */
+.ploy-acid-bloom {
+  background:
+    radial-gradient(90% 60% at 50% 100%, rgb(255 255 255 / 0.45) 0%, rgb(255 255 255 / 0) 70%),
+    var(--color-ploy-acid);
+}
+
+/* The hero card: ground, with a faint cool bloom at the top so the inflated garment reads
+   as lit from above. No photograph, no video. */
+.ploy-hero-card {
+  background:
+    radial-gradient(70% 60% at 50% 0%, color-mix(in srgb, var(--color-ploy-peri) 55%, transparent) 0%, transparent 70%),
+    var(--color-ploy-ground);
+}
+
+/* Horizontal card rails hide their scrollbar; the arrows are the control. */
+.ploy-rail {
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+.ploy-rail::-webkit-scrollbar { display: none; }
+.ploy-rail > * { scroll-snap-align: start; }

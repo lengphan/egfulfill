@@ -3,7 +3,6 @@
 import Link from "next/link"
 
 
-import { ACID, INK } from "@/components/marketing/bold-kit"
 
 const nav = [
   { label: "Products", href: "/catalog" },
@@ -44,7 +43,7 @@ export function SiteHeader() {
    * lighter bar with dark ink above a deep plate. One appearance everywhere cannot drift.
    */
   const ink = "text-[var(--mk-ink)]"
-  const muted = "text-[var(--mk-ink)]/65 hover:bg-[var(--mk-ink)]/[0.05] hover:text-[var(--mk-ink)]"
+  const muted = "text-[var(--mk-ink)]/80 hover:text-[var(--mk-ink)]"
   /* TRANSPARENT AND IN FLOW, so a full-bleed hero can run to the top of the viewport with
         the nav standing on it. The bar was `sticky` with a SURFACE fill, which is why every
         photographic hero began 64px down the page behind a grey strip — the thing that stopped
@@ -61,76 +60,51 @@ export function SiteHeader() {
         removed once already. Scrolling away is the only option that keeps one appearance.
    */
   return (
-    <header className="relative z-30">
-      {/* THE HEADER SHARES THE PAGE'S CONTAINER — 88rem with a 40px gutter, the same one every
-          band uses. It was max-w-6xl (72rem), so on a 1440 screen the wordmark sat 136px in
-          while the headline under it started at 48px: the first two things the eye meets on
-          the site were on two different left edges. §4 — a page has one left margin, and it is
-          set once. Read off a screenshot; it is invisible at the widths a container query
-          collapses to. */}
-      <div className="mx-auto flex h-16 max-w-[88rem] items-center gap-8 px-6 sm:px-10">
-        {/* The mark inherits `ink`, which is what makes one file work on every header state.
-            Height-sized so it cannot distort, and it keeps the container's left edge — the
-            note above about the wordmark and the headline sharing one left margin still
-            applies, and artwork obeys it the same way the type did. */}
-        <Link href="/" aria-label="EGFUL home" className={"flex items-center " + ink}>
-          <Wordmark className="h-[30px] w-auto" />
-        </Link>
-        <nav className="hidden items-center gap-6 md:flex">
-          {nav.map((n) => (
-            <Link
-              key={n.label}
-              href={n.href}
-              className={
-                "rounded-md px-2 py-1 text-sm font-medium transition-colors " + muted
-              }
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-        {/* TWO DOORS, AND THEY GO TO DIFFERENT PLACES. "Start free" pointed at /login, so
-            the loudest control on the marketing site asked a first-time visitor for a
-            password they had never set. Log in is for people who have an account; Start
-            free is for people who don't, and it opens the form that makes one. */}
-        <div className="ml-auto flex items-center gap-2">
-                      <>
-              <Link href="/login" className={"rounded-lg px-4 py-2 text-sm font-semibold transition-colors " + muted}>
-                Log in
+    /* FIXED, NOT IN FLOW — the capsule has to travel over the coloured blocks for the trick
+       below to mean anything, and the home page's hero starts at the top of the viewport. */
+    <header className="fixed inset-x-0 top-0 z-50 px-6 py-4 md:px-8">
+      <div className="flex items-center justify-between gap-4">
+        {/* THE CAPSULE, and it is the whole header idea.
+            The bar itself is transparent and never changes at any scroll position. The menu
+            sits in a fully-round capsule painted the SAME colour as the page ground, so it is
+            invisible over the ground and becomes a floating pill the moment a coloured block
+            passes beneath it. No scroll listener, no state, no backdrop blur, and — the point
+            — ONE appearance, which is what §4 requires. The header that swapped background,
+            links and buttons at 24px of scroll was the thing that read as a glitch; this
+            changes nothing and still reads on acid, periwinkle and paper alike. */}
+        <div className="ploy-capsule flex items-center gap-7 py-2.5 pl-5 pr-5 lg:pr-7">
+          <Link href="/" aria-label="EGFUL home" className={"flex items-center " + ink}>
+            <Wordmark className="h-[21px] w-auto" />
+          </Link>
+          {/* PAGES, NEVER ANCHORS. Every item is a route of its own — a menu that scrolls the
+              page you are already on teaches people the menu is decoration, and it cannot work
+              at all from any other page. */}
+          <nav className="hidden items-center gap-6 lg:flex">
+            {nav.map((n) => (
+              <Link key={n.label} href={n.href} className={"text-[15px] transition-colors " + muted}>
+                {n.label}
               </Link>
-              <Link
-                href="/signup"
-                /* INK FILL, PARCHMENT LABEL — settled 2026-08-26.
-                 *
-                 * This went ink → lime → ink inside a day, and the round trip is worth
-                 * recording because the reason changed each time. Ink-with-a-lime-label was
-                 * wrong (the accent was doing lettering). Lime fill was right for LIME, which
-                 * is a light colour and can only ever be a ground carrying ink. Then the
-                 * accent became pink, which is governed by the opposite rule — brand marks
-                 * only, never an interactive state — so the button returns to ink and the
-                 * accent leaves the controls for good.
-                 *
-                 * Parchment on ink is 16.84:1. The old note below is kept because its
-                 * measurement was correct and only its conclusion expired. */
-                /* was: LIME FILL, INK LABEL — inverted 2026-08-26.
-                 *
-                 * It was ink fill with a lime label, and the note under it argued acid could
-                 * not be the fill because "on paper it is 1.05:1 and the button would have no
-                 * shape at all". That was measured against the old white page, and it was
-                 * right then. Two things changed: the page is parchment, and the button now
-                 * carries a 1px ink border, so its shape comes from the border rather than
-                 * from the fill needing to out-contrast the page.
-                 *
-                 * This is the direction's rule, not a preference: lime is a GROUND CARRYING
-                 * INK and never lettering. Ink on lime measures 15.49:1 — louder as a button
-                 * and more readable as a label than the pair it replaces. */
-                className="rounded-full border border-[var(--mk-ink)] px-5 py-2 text-sm font-semibold transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mk-ink)] focus-visible:ring-offset-2"
-                style={{ background: ACID, color: INK }}
-              >
-                Start free
-              </Link>
-            </>
+            ))}
+          </nav>
+        </div>
 
+        {/* TWO DOORS, AND THEY GO TO DIFFERENT PLACES. "Start free" once pointed at /login,
+            so the loudest control on the site asked a first-time visitor for a password they
+            had never set. Log in is for people who have an account; Start free opens the form
+            that makes one. Both are their own capsule, so they read on any band. */}
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/login"
+            className="whitespace-nowrap rounded-full bg-ploy-paper px-4 py-2.5 text-[14px] font-medium text-ploy-ink transition-transform hover:scale-[1.03] sm:px-6 sm:text-[15px]"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/signup"
+            className="whitespace-nowrap rounded-full bg-ploy-ink px-4 py-2.5 text-[14px] font-medium text-ploy-ground transition-transform hover:scale-[1.03] sm:px-6 sm:text-[15px]"
+          >
+            Start free
+          </Link>
         </div>
       </div>
     </header>

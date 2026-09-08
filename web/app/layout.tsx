@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Archivo, Geist_Mono, Inter, Outfit, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
+import { Anton, Archivo, Geist_Mono, Inter, Outfit, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -79,6 +79,21 @@ const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"
  * get it — the same fence the two display faces above sit behind.
  */
 const archivo = Archivo({ subsets: ["latin"], axes: ["wdth"], variable: "--font-archivo" })
+
+/**
+ * ANTON — the marketing home's display face, and the reason that page reads as a poster
+ * rather than as a template. One weight is all it has, which is the point: it is a
+ * condensed grotesque drawn for capitals at size, not a text face.
+ *
+ * It is loaded here so next/font owns the preload and the fallback metrics, but it is
+ * reached ONLY through `.ploy-display` (globals.css) — deliberately not through
+ * `--font-display`, which around a hundred call sites inside the signed-in app resolve.
+ * Anton at 14px in a table header would be unreadable, so the token stays pointed at the
+ * body stack and the poster face stays on the poster.
+ *
+ * No `vietnamese` subset: Anton does not ship one, and asking for it fails the build.
+ */
+const anton = Anton({ subsets: ["latin"], weight: ["400"], variable: "--font-anton", display: "swap" })
 
 /**
  * ONE FACE. Inter, for everything.
@@ -169,6 +184,7 @@ export default function RootLayout({
         outfit.variable,
         grotesk.variable,
         archivo.variable,
+        anton.variable,
       )}
     >
       <body>

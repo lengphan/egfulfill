@@ -21,7 +21,13 @@ export type Stat = { value: string; label: string; note?: string }
  * fallback is honestly blank rather than convincingly wrong.
  */
 export type FeatureCard = { title: string; body: string; shot?: string; shotAlt?: string }
-export type Step = { n: string; title: string; body: string }
+/**
+ * `word` is the one-word display heading the marketing home sets at 100px beside the numeral
+ * — Connect · Design · Publish · Ship. It is OPTIONAL because stored content written before
+ * the home page was redrawn does not have it; where it is missing the home falls back to the
+ * first word of `title`, which is wrong far less often than an empty slot would be.
+ */
+export type Step = { n: string; title: string; body: string; word?: string }
 export type Testimonial = { quote: string; name: string; role: string }
 export type Faq = { q: string; a: string }
 /** A label tied to the hero figure by a hairline. `note` is optional and is the ONE sentence
@@ -310,9 +316,10 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   steps: {
     heading: "Live in three steps.",
     items: [
-      { n: "01", title: "Connect your stores", body: "OAuth into Etsy, Shopify or TikTok Shop in about two minutes." },
-      { n: "02", title: "Upload your designs", body: "Map artwork to products once — we handle placement and print files." },
-      { n: "03", title: "We make it and ship it", body: "Printed or stitched on our own floor, packed, labelled, and the tracking pushed back." },
+      { n: "01", word: "Connect", title: "Plug in the shop you already run.", body: "Sign in to Etsy, Shopify or TikTok Shop. Existing orders import right away; new ones stream into one queue from then on." },
+      { n: "02", word: "Design", title: "Upload once, place once.", body: "Map your artwork to a product. Placement, print files and thread colours are set in the Design Lab and kept for every order after." },
+      { n: "03", word: "Publish", title: "List from here, or keep listing there.", body: "Push the listing to your store from EGFUL, or leave your listings where they are. Either way, the sale lands in the queue." },
+      { n: "04", word: "Ship", title: "We make it, check it, send it.", body: "Printed or stitched on our own machines, checked three times, the cheapest label bought and the tracking pushed back to your shop." },
     ],
   },
   /**

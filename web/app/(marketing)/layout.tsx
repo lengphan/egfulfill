@@ -55,7 +55,11 @@ export default async function MarketingLayout({ children }: { children: React.Re
     >
       <SiteHeader />
 
-      <main className="flex-1">{children}</main>
+      {/* THE HEADER IS FIXED NOW (see site-header.tsx), so it is out of flow and every page
+          would otherwise start underneath it. The gutter is added HERE, once, rather than on
+          each page — and the home page cancels it with `-mt-16`, because its hero is meant to
+          run to the top of the viewport with the capsule floating on it. */}
+      <main className="flex-1 pt-16">{children}</main>
 
       {/* MOST ASKED MOVED INTO THE BUBBLE.
           It was a strip above the footer — the right three questions in the wrong place. The

@@ -1,19 +1,19 @@
 import { getSiteContent } from "@/lib/site-content"
-import { BoldHome } from "@/components/marketing/bold-home"
+import { PloyHome } from "@/components/marketing/ploy/ploy-home"
 
 /**
  * The home page.
  *
- * Adopted from what was /preview: full-bleed accent plate, oversized type, one highlight,
- * the scroll-parallaxed product panel. See CLAUDE.md §4 for the rules, and bold-home.tsx for
- * the implementation.
+ * Redrawn 2026-09-08 from the ploy prototype: one enormous garment and one block of type per
+ * band, the four steps on acid with a scroll-filled pipe, the seven print methods on a rail,
+ * and the three plans. See components/marketing/ploy/ploy-home.tsx.
  *
  * Copy still comes from stored site content (Settings › Site content) — the redesign changed
- * how the words are presented, never where they come from, so an admin edit lands here
- * exactly as before. Every section the old page rendered is still rendered: hero, stats,
- * features, steps, testimonials, FAQ, CTA.
+ * how the words are presented, never where they come from. The previous implementation
+ * (BoldHome) is left in place: the other marketing routes still render the pages it was built
+ * alongside, and §2.7 is "port before deleting".
  */
 export default async function MarketingHome() {
   const content = await getSiteContent()
-  return <BoldHome content={content} />
+  return <PloyHome content={content} />
 }

@@ -230,20 +230,19 @@ export default function ProductDetailPage() {
         {/* info */}
         <div className="space-y-5">
           <div>
-            <div className="flex items-center gap-2">
-              <span
- className={
-                  "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium " +
-                  (status === "Active" ? "bg-shipped/15 text-shipped" : "bg-muted text-muted-foreground")
-                }
-              >
-                <span className={"size-1.5 rounded-full " + (status === "Active" ? "bg-shipped" : "bg-muted-foreground")} />
-                {status}
-              </span>
-              {product.type && (
-                <span className="rounded-md bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">{product.type}</span>
-              )}
-            </div>
+            {/* NO STATUS PILL WHEN THE PRODUCT IS ACTIVE, and the category is not a pill at all.
+                Every product a seller can open is Active, so an "Active" chip on every one of
+                them is a label that never varies — it takes the first line of the page to say
+                nothing. §4 is explicit that a pill must carry meaning (order stage, HTTP
+                method, RUSH/LATE) and is never a tag, which is exactly what a category is.
+
+                The NON-active states are the ones that carry something, so those still speak —
+                as a plain line rather than a chip, because "Staff only" is a fact about this
+                product, not a status moving through a pipeline. Dropping it outright would
+                hide a product that cannot be ordered behind a page that looks ordinary. */}
+            {status !== "Active" && (
+              <div className="text-xs font-medium text-muted-foreground">{status}</div>
+            )}
             {/* THE MAKER, ABOVE THE NAME. The brand split takes "Gildan" off the front of the
                 title and files it as its own field — which is right, and left the fact
                 invisible on the one page that has room to state it properly. An eyebrow is
@@ -254,7 +253,19 @@ export default function ProductDetailPage() {
               <div className="mt-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{product.brand}</div>
             )}
             <h1 className={(product.brand ? "mt-0.5" : "mt-2") + " font-title text-3xl font-semibold tracking-tight"}>{product.name ?? tl("productPage", "Untitled")}</h1>
-            <div className="mt-1 tabular-nums text-sm text-muted-foreground">{product.sku ?? "—"}</div>
+            {/* The category rides beside the sku as WORDS — the same move the card makes with
+                the brand. It was a filled chip above the title, which is the shape §4 reserves
+                for meaning that changes; a category never changes. `tabular-nums` is on the
+                sku's own span so the category is not spaced like a figure. */}
+            <div className="mt-1 flex min-w-0 items-baseline gap-1.5 text-sm text-muted-foreground">
+              <span className="tabular-nums">{product.sku ?? "—"}</span>
+              {product.type && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="truncate">{product.type}</span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* THE NUMBER, THEN WHAT SHIPPING ADDS TO IT.
