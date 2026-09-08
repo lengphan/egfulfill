@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { line, reveal, rise } from "./motion"
+import { END, GUTTER, SECTION } from "./rhythm"
 
 /**
  * THE CLOSING CTA — the headline set as large as the page ever goes, and one field.
@@ -26,7 +27,7 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
     : "clamp(2rem,5.2vw,5rem)"
 
   return (
-    <section className="px-6 pb-28 pt-24 md:px-8 md:pb-36 md:pt-32">
+    <section className={`${GUTTER} ${SECTION} ${END}`}>
       <div className="relative z-10 flex flex-col items-center text-center">
         <h2 className="ploy-display max-w-[16ch]" style={{ fontSize: size }}>
           {heading.map((l, i) => (

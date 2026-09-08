@@ -243,7 +243,13 @@ export function ChatLauncher() {
           The separation the scrim was really solving — a white card lost on a white table —
           moves onto the panel itself as a shadow and a stronger ring, which is what a
           floating popover is entitled to. The no-shadow rule governs elevation INSIDE the
-          page; this is over it. */}
+          page; this is over it.
+
+          THE FIRST SHADOW WAS TOO POLITE. `shadow-2xl` with a 15% ring still let a white
+          panel sit almost flush on a white table — the separation the scrim used to do by
+          darkening everything else now has to be done entirely by this one edge, so it is a
+          deeper, wider drop plus a ring with real contrast. Judged on the app's own screens,
+          not on a blank page. */}
       {open && (
         <div aria-hidden onClick={() => setOpen(false)} className="fixed inset-0 z-30" />
       )}
@@ -251,7 +257,7 @@ export function ChatLauncher() {
         <div
           role="dialog"
           aria-label={tl("chat", "Messages")}
-          className="fixed inset-x-3 bottom-20 z-40 flex max-h-[min(34rem,calc(100svh-7rem))] flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/15 sm:inset-x-auto sm:right-5 sm:w-[22.5rem] dark:ring-foreground/20"
+          className="fixed inset-x-3 bottom-20 z-40 flex max-h-[min(34rem,calc(100svh-7rem))] flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)] ring-1 ring-black/12 sm:inset-x-auto sm:right-5 sm:w-[22.5rem] dark:ring-white/20"
         >
           <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
             {active ? (

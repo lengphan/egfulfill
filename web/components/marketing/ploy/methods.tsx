@@ -5,6 +5,7 @@ import Image from "next/image"
 import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
+import { GUTTER, STACK } from "./rhythm"
 
 /**
  * THE SEVEN DECORATIONS THE FLOOR RUNS — the same seven an order's SKU suffix carries
@@ -53,7 +54,7 @@ export function PloyMethods() {
   }, [])
 
   return (
-    <section id="methods" className="relative px-6 pt-4 md:px-8">
+    <section id="methods" className={`relative ${GUTTER} ${STACK}`}>
       <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky py-16 md:py-20">
         <div className="px-8 md:px-14">
           <h2 className="ploy-display text-[clamp(2.5rem,6.5vw,5.5rem)]">

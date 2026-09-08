@@ -5,6 +5,7 @@ import { motion, useScroll, useSpring, useTransform, type MotionValue } from "mo
 import { reveal, rise } from "./motion"
 import { Num } from "./num"
 import { Straddle } from "./straddle"
+import { GUTTER, STACK } from "./rhythm"
 import { displayWord } from "./step-word"
 import type { Stat, Step } from "@/lib/site-content"
 
@@ -98,7 +99,7 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
   const progress = useSpring(scrollYProgress, { stiffness: 90, damping: 26, restDelta: 0.0005 })
 
   return (
-    <section id="steps" className="relative px-6 md:px-8">
+    <section id="steps" className={`relative ${GUTTER} ${STACK}`}>
       <motion.div {...rise(0)} className="ploy-acid-bloom relative overflow-hidden rounded-[32px] pb-20 pt-10 md:pb-24 md:pt-14">
         {/* The marketplaces run along the top of the block; the hero's garment crosses them,
             so the band under the fold is never empty. */}

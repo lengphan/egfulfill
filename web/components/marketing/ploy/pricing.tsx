@@ -6,6 +6,7 @@ import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
+import { END, GUTTER, SECTION, TOP } from "./rhythm"
 import { PLAN_BLANK_DISCOUNT, PLAN_TIERS, type PlanTier } from "@/lib/plans"
 import type { Faq } from "@/lib/site-content"
 
@@ -70,7 +71,7 @@ export function PloyPricing({
   return (
     <div className="bg-ploy-ground text-ploy-ink">
       {/* ── THE THREE CARDS ────────────────────────────────────────────────── */}
-      <section className="relative px-6 pt-24 md:px-8 md:pt-28">
+      <section className={`relative ${GUTTER} ${TOP}`}>
         <h1 className="ploy-display text-[clamp(2.6rem,7vw,6rem)]">
           <motion.span {...reveal(0)} className="block">{headline}</motion.span>
           <motion.span {...reveal(0.1)} className="block">{accent}</motion.span>
@@ -128,7 +129,7 @@ export function PloyPricing({
       </section>
 
       {/* ── ROW BY ROW ─────────────────────────────────────────────────────── */}
-      <section className="relative px-6 pt-24 md:px-8 md:pt-32">
+      <section className={`relative ${GUTTER} ${SECTION}`}>
         <h2 className="ploy-display text-[clamp(2.2rem,5.4vw,4.4rem)]">
           <motion.span {...reveal(0)} className="block">Line by line.</motion.span>
         </h2>
@@ -176,7 +177,7 @@ export function PloyPricing({
       </section>
 
       {/* ── WHAT EVERY PLAN PAYS ───────────────────────────────────────────── */}
-      <section className="px-6 pt-24 md:px-8 md:pt-32">
+      <section className={`${GUTTER} ${SECTION}`}>
         <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-acid px-8 py-16 md:px-14 md:py-20">
           <h2 className="ploy-display max-w-[16ch] text-[clamp(2rem,5vw,4rem)]">
             <motion.span {...reveal(0)} className="block">The subscription is not the price.</motion.span>
@@ -198,7 +199,7 @@ export function PloyPricing({
 
       {/* ── FAQ ────────────────────────────────────────────────────────────── */}
       {faq.items.length > 0 && (
-        <section className="px-6 pb-8 pt-24 md:px-8 md:pt-32">
+        <section className={`${GUTTER} ${SECTION} ${END}`}>
           <h2 className="ploy-display text-[clamp(2.2rem,5.4vw,4.4rem)]">
             <motion.span {...reveal(0)} className="block">{faq.heading}</motion.span>
           </h2>

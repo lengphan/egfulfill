@@ -222,7 +222,7 @@ export function SetupGuide() {
       initial={reduced ? false : { y: 16, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={spring}
-      className={"fixed inset-x-3 bottom-3 z-40 flex max-h-[min(36rem,calc(100svh-7rem))] w-auto flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/15 sm:inset-x-auto sm:w-[22.5rem] dark:ring-foreground/20 " + PANEL_POS[corner]}
+      className={"fixed inset-x-3 bottom-3 z-40 flex max-h-[min(36rem,calc(100svh-7rem))] w-auto flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)] ring-1 ring-black/12 sm:inset-x-auto sm:w-[22.5rem] dark:ring-white/20 " + PANEL_POS[corner]}
     >
       {/* THE PLATE: the app's brand fill, so it takes the skin — never a colour of its own. */}
       <div className="bg-brand px-4 pb-3.5 pt-3.5 text-brand-foreground">

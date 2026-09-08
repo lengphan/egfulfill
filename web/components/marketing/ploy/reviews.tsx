@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { motion } from "motion/react"
 import { pop, reveal, rise } from "./motion"
+import { GUTTER, SECTION } from "./rhythm"
 import type { Testimonial } from "@/lib/site-content"
 
 /**
@@ -18,7 +19,7 @@ export function PloyReviews({ heading, items }: { heading: string; items: Testim
   if (!items.length) return null
 
   return (
-    <section className="px-6 pt-24 md:px-8 md:pt-32">
+    <section className={`${GUTTER} ${SECTION}`}>
       <motion.div {...rise(0)} className="relative overflow-hidden rounded-[32px] bg-ploy-peri px-8 py-16 md:px-14 md:py-20">
         <div className="flex items-start justify-between gap-6">
           <h2 className="ploy-display max-w-[14ch] text-[clamp(2.25rem,5.5vw,4.5rem)] text-ploy-ink">

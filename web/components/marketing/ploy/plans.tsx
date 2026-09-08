@@ -4,6 +4,7 @@ import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
+import { END, GUTTER, SECTION } from "./rhythm"
 import { PLAN_TIERS } from "@/lib/plans"
 
 /**
@@ -27,7 +28,7 @@ export function PloyPlans() {
        with the cards, and the cloud — which is centred on that edge — came up onto the first
        card's "Start free" button. A straddle is never over text, so the edge it straddles has
        to be empty ground on both sides of it. */
-    <section id="plans" className="relative px-6 pb-28 pt-24 md:px-8 md:pb-32 md:pt-32">
+    <section id="plans" className={`relative ${GUTTER} ${SECTION} ${END}`}>
       <div className="md:px-6">
         <h2 className="ploy-display text-[clamp(2.5rem,7vw,6rem)]">
           <motion.span {...reveal(0)} className="block">

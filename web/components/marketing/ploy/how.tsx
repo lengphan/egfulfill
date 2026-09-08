@@ -1,57 +1,81 @@
 "use client"
 
-import { useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { motion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
+import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
+import { GUTTER, SECTION, STACK, TOP } from "./rhythm"
 import { displayWord } from "./step-word"
 import { FACTORY_STAGES } from "@/lib/factory-status"
 import type { Step } from "@/lib/site-content"
 
 /**
- * HOW IT WORKS — the four steps told as a scroll, then what actually happens to one order.
+ * HOW IT WORKS — one band per step, each a fill, each carrying its own picture.
  *
- * THE STAGES AT THE BOTTOM ARE THE FLOOR'S OWN. `FACTORY_STAGES` is the list the production
- * board writes and the order gate walks, mirrored from `PIPELINE` in
- * server/src/routes/orders.js. Retyping a friendlier version here would put a vocabulary on
- * the marketing site that nothing in the product uses — and the first time a stage is added
- * the two would disagree with nobody noticing. What a visitor sees named here is what a
- * seller will see on their own order.
+ * IT WAS A THIN RULE AND A COLUMN OF TEXT on the page ground, which left the right half of
+ * every screen empty and made the steps read as a list of sentences rather than as a process.
+ * The site's grammar everywhere else is a BAND THAT IS A FILL with media inset in it — the
+ * home's acid block, the methods rail, the plans — so this page uses it: alternating grounds,
+ * the step's word set as large as the page allows, and a real picture opposite. Alternating
+ * which SIDE the picture sits on is what stops four bands reading as one repeated slide.
+ *
+ * THE PICTURES ARE REAL AND EACH ANSWERS ITS OWN STEP: the channels we actually connect, the
+ * methods the machines actually run, and blanks we actually keep. Nothing here is a mockup of
+ * a screen — the fake app panel was deleted from the home page on purpose (§4) and must not
+ * come back through another door.
+ *
+ * The stage names at the bottom read FACTORY_STAGES, the list the production board writes and
+ * the order gate walks. A friendlier set invented for a marketing page would be a vocabulary
+ * no part of the product uses.
  */
 
-function StoryStep({
-  i,
-  total,
-  step,
-  progress,
-}: {
-  i: number
-  total: number
-  step: Step
-  progress: MotionValue<number>
-}) {
-  const at = (i + 0.5) / total
-  const lit = useTransform(progress, [at - 0.05, at], [0, 1])
-  const bg = useTransform(lit, [0, 1], ["var(--color-ploy-ground)", "var(--color-ploy-ink)"])
-  const fg = useTransform(lit, [0, 1], ["var(--color-ploy-ink)", "var(--color-ploy-ground)"])
-  const opacity = useTransform(progress, [at - 0.2, at - 0.02], [0.3, 1])
+/** Alternating grounds, in the order the bands appear. */
+const FILLS = ["bg-ploy-acid", "bg-ploy-sky", "bg-ploy-peri", "bg-ploy-paper"]
 
-  return (
-    <motion.li style={{ opacity }} className="grid grid-cols-[44px_1fr] gap-x-5 py-10 md:gap-x-10 md:py-14">
-      <motion.span
-        style={{ backgroundColor: bg, color: fg }}
-        className="relative z-10 flex h-11 w-11 items-center justify-center self-start rounded-full border-2 border-ploy-ink text-[13px] font-semibold tabular-nums"
-      >
-        {step.n || String(i + 1).padStart(2, "0")}
-      </motion.span>
-      <div>
-        <h3 className="ploy-display text-[clamp(2rem,5vw,3.6rem)]">{displayWord(step)}</h3>
-        <p className="mt-3 max-w-xl text-[19px] font-semibold leading-tight">{step.title}</p>
-        <p className="mt-3 max-w-xl text-[16px] leading-relaxed text-ploy-ink/65">{step.body}</p>
+/** The channels a seller can actually connect today — the same claim the home page makes. */
+const CHANNELS = ["Etsy", "Shopify", "TikTok Shop"]
+/** Four of the seven, because four fit a square grid; /catalog's rail carries all of them. */
+const METHOD_SHOTS = ["emb", "dtg", "dtf", "apl"]
+
+/** One picture per step, chosen to answer that step rather than to fill the space. */
+function Visual({ i }: { i: number }) {
+  if (i === 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        {CHANNELS.map((c, n) => (
+          <motion.p key={c} {...reveal(0.1 + n * 0.08)} className="ploy-display text-[clamp(2rem,5.5vw,4rem)] leading-[1.05]">
+            {c}
+          </motion.p>
+        ))}
+        <motion.p {...reveal(0.34)} className="mt-4 max-w-xs text-[15px] text-ploy-ink/60">
+          Sign in once. Existing orders import, new ones stream in.
+        </motion.p>
       </div>
-    </motion.li>
+    )
+  }
+  if (i === 1) {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {METHOD_SHOTS.map((m, n) => (
+          <motion.div key={m} {...reveal(0.08 * n)} className="aspect-square overflow-hidden rounded-2xl bg-ploy-paper">
+            <Image src={`/ploy/method-${m}.webp`} alt="" width={500} height={500} loading="lazy" className="h-full w-full object-cover" />
+          </motion.div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <motion.div {...rise(0.05)} className="aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-paper">
+      <Image
+        src={i === 2 ? "/ploy/blank/tee.webp" : "/ploy/blank/hoodie.webp"}
+        alt={`A model wearing a blank ${i === 2 ? "tee" : "heavyweight hoodie"}, framed from the collarbone down`}
+        width={960}
+        height={1200}
+        loading="lazy"
+        className="h-full w-full object-cover"
+      />
+    </motion.div>
   )
 }
 
@@ -66,31 +90,10 @@ export function PloyHow({
   lead: string
   steps: Step[]
 }) {
-  const list = useRef<HTMLOListElement>(null)
-  const { scrollYProgress } = useScroll({ target: list, offset: ["start 78%", "end 62%"] })
-  /**
-   * THE PIPE IS SPRUNG, and this is what the prototype was getting from Lenis.
-   *
-   * A native wheel or trackpad scroll arrives in DISCRETE JUMPS, so a MotionValue read
-   * straight off `scrollYProgress` steps with them — the fill and the nodes lighting looked
-   * punchy next to the prototype, which runs a smooth-scroll library that interpolates the
-   * page's scroll position before anything reads it.
-   *
-   * Springing the VALUE gets the same smoothness without the library, and it is the better
-   * trade here: Lenis takes over the page's scrolling for every visitor and every route,
-   * fights Next's scroll restoration, and has to be undone for anyone who wants their own
-   * scrolling back. This smooths one derived number and touches nothing else — the page still
-   * scrolls exactly as the browser says it does.
-   *
-   * `restDelta` is small because the value's whole range is 0→1; the default would settle
-   * visibly early and leave the last node unlit at the bottom of the block.
-   */
-  const progress = useSpring(scrollYProgress, { stiffness: 90, damping: 26, restDelta: 0.0005 })
-
   return (
     <div className="bg-ploy-ground text-ploy-ink">
-      <section className="px-6 pt-24 md:px-8 md:pt-28">
-        <h1 className="ploy-display text-[clamp(2.6rem,7vw,6rem)]">
+      <section className={`${GUTTER} ${TOP}`}>
+        <h1 className="ploy-display text-[clamp(2.4rem,6vw,5rem)]">
           <motion.span {...reveal(0)} className="block">{headline}</motion.span>
           <motion.span {...reveal(0.1)} className="flex items-center gap-3">
             <span>{accent}</span>
@@ -104,29 +107,40 @@ export function PloyHow({
         </motion.p>
       </section>
 
-      {/* ── THE FOUR STEPS, TOLD AS A SCROLL ───────────────────────────────── */}
-      <section className="relative px-6 pt-16 md:px-8 md:pt-20">
-        <div className="relative">
-          {/* The rule runs the height of the list and fills as it passes. Same device as the
-              home page's pipe; here it is the page's spine rather than one block's. */}
-          <div className="absolute bottom-0 left-[21px] top-0 w-0.5 bg-ploy-ink/12">
-            <motion.div style={{ scaleY: progress }} className="h-full w-full origin-top bg-ploy-ink" />
-          </div>
-          <ol ref={list}>
-            {steps.map((s, i) => (
-              <StoryStep key={s.n || i} i={i} total={steps.length} step={s} progress={progress} />
-            ))}
-          </ol>
-        </div>
-      </section>
+      {/* ── ONE BAND PER STEP ──────────────────────────────────────────────── */}
+      {steps.map((s, i) => {
+        const flip = i % 2 === 1
+        return (
+          <section key={s.n || i} className={`${GUTTER} ${STACK}`}>
+            <motion.div
+              {...rise(0)}
+              className={"overflow-hidden rounded-[32px] px-8 py-14 md:px-14 md:py-20 " + (FILLS[i % FILLS.length] ?? "bg-ploy-paper")}
+            >
+              <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14">
+                <div className={flip ? "md:order-2" : ""}>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-ploy-ink text-[13px] font-semibold tabular-nums">
+                    {s.n || String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h2 className="ploy-display mt-6 text-[clamp(3rem,8.5vw,7rem)] leading-[0.88]">{displayWord(s)}</h2>
+                  <p className="mt-6 max-w-md text-[20px] font-semibold leading-tight md:text-[22px]">{s.title}</p>
+                  <p className="mt-3 max-w-md text-[16px] leading-relaxed text-ploy-ink/65">{s.body}</p>
+                </div>
+                <div className={flip ? "md:order-1" : ""}>
+                  <Visual i={i} />
+                </div>
+              </div>
+            </motion.div>
+          </section>
+        )
+      })}
 
       {/* ── WHAT HAPPENS TO ONE ORDER ──────────────────────────────────────── */}
-      <section className="relative px-6 pt-16 md:px-8 md:pt-24">
-        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky px-8 py-16 md:px-14 md:py-20">
+      <section className={`relative ${GUTTER} ${SECTION}`}>
+        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-slate px-8 py-16 text-ploy-ground md:px-14 md:py-20">
           <h2 className="ploy-display max-w-[18ch] text-[clamp(2rem,5vw,4rem)]">
             <motion.span {...reveal(0)} className="block">Then one order moves.</motion.span>
           </h2>
-          <motion.p {...reveal(0.1)} className="mt-5 max-w-xl text-[17px] leading-relaxed text-ploy-ink/70">
+          <motion.p {...reveal(0.1)} className="mt-5 max-w-xl text-[17px] leading-relaxed text-ploy-ground/70">
             These are the stages our factory actually writes — the same words a seller sees on
             their own order, not a friendlier set invented for this page.
           </motion.p>
@@ -136,22 +150,22 @@ export function PloyHow({
               <motion.li
                 key={s.id}
                 {...reveal(0.04 * i)}
-                className="flex items-center gap-2 rounded-full bg-ploy-paper px-4 py-2 text-[14px] font-medium"
+                className="flex items-center gap-2 rounded-full bg-ploy-ground/10 px-4 py-2 text-[14px] font-medium ring-1 ring-ploy-ground/15"
               >
-                <span className="text-[12px] tabular-nums text-ploy-ink/40">{String(i + 1).padStart(2, "0")}</span>
+                <span className="text-[12px] tabular-nums text-ploy-ground/45">{String(i + 1).padStart(2, "0")}</span>
                 {s.label}
               </motion.li>
             ))}
           </ol>
 
-          <motion.div {...reveal(0.2)} className="mt-10 flex flex-wrap items-center gap-3">
+          <motion.div {...reveal(0.2)} className="mt-12 flex flex-wrap items-center gap-3">
             <motion.div whileHover={{ scale: 1.03 }} transition={HOVER}>
-              <Link href="/signup" className="inline-block rounded-full bg-ploy-ink px-7 py-3 text-[15px] font-medium text-ploy-ground">
+              <Link href="/signup" className="inline-block rounded-full bg-ploy-ground px-7 py-3 text-[15px] font-medium text-ploy-ink">
                 Start free
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.03 }} transition={HOVER}>
-              <Link href="/catalog" className="inline-block rounded-full border border-ploy-ink/30 px-7 py-3 text-[15px] font-medium text-ploy-ink">
+              <Link href="/catalog" className="inline-block rounded-full border border-ploy-ground/40 px-7 py-3 text-[15px] font-medium text-ploy-ground">
                 See what we make
               </Link>
             </motion.div>
@@ -160,7 +174,7 @@ export function PloyHow({
         <Straddle src="/ploy/obj-chrome.webp" side="left" inset="8%" width="clamp(110px,10vw,160px)" drop={50} drift={[-10, 6]} dur={7.5} />
       </section>
 
-      <div className="h-16 md:h-24" />
+      <div className="h-20 md:h-28" />
     </div>
   )
 }
