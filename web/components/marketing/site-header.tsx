@@ -4,16 +4,25 @@ import Link from "next/link"
 
 
 
+/**
+ * FOUR ITEMS, AND ONLY THE FOUR THAT HAVE BEEN REDRAWN (2026-09-08).
+ *
+ * Features, API and Contact came out of the bar. Their ROUTES are untouched and still in the
+ * sitemap — this is the menu, not a deletion — and all three are in the footer, which is
+ * where you look when you already know what you want. They come back here as each is
+ * redesigned; a menu that leads from a new page straight into an old one teaches a visitor
+ * that the redesign is skin deep.
+ *
+ * WHAT THIS GIVES UP, so it is a decision rather than an oversight: /contact was in the bar
+ * deliberately, because a published contact route is the one thing a marketplace reviewer
+ * looks for by name. It is on every page in the footer and remains indexed, which covers
+ * that — but if an app review ever asks, this is the line to reconsider first.
+ */
 const nav = [
   { label: "Products", href: "/catalog" },
-  { label: "Features", href: "/features" },
   { label: "How it works", href: "/how-it-works" },
   { label: "Pricing", href: "/pricing" },
   { label: "Integrations", href: "/integrations" },
-  { label: "API", href: "/docs" },
-  // A published contact route has to be reachable from the top of every page, not only from
-  // the footer — it is the one thing a visitor (or a marketplace reviewer) looks for by name.
-  { label: "Contact", href: "/contact" },
 ]
 
 /**
