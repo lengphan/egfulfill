@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { SectionCard } from "@/components/app/section-card"
+import { CountUp } from "@/components/app/count-up"
 import { cn } from "@/lib/utils"
 
 /**
@@ -79,6 +81,25 @@ export function GmvPanel({
   className?: string
 }) {
   const dark = tone === "slate"
+  /**
+   * THE BARS GROW FROM THE BASELINE on first paint.
+   *
+   * They were rendered at their final height, so the chart snapped into existence fully drawn
+   * — which reads as something printed rather than something reporting. Rendering at 0 and
+   * letting a CSS transition take them up costs one boolean and no layout work, and the
+   * per-bar delay makes it a wave rather than a block rising at once.
+   *
+   * The state flip is deferred a tick because setting it straight from an effect is what
+   * `react-hooks/set-state-in-effect` forbids, and setTimeout(fn, 0) is the pattern the rest
+   * of the app pages already use. `motion-reduce:transition-none` on the bar means a person
+   * who asked for less movement gets the finished chart immediately.
+   */
+  const [grown, setGrown] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setGrown(true), 0)
+    return () => clearTimeout(id)
+  }, [])
+
   return (
     <SectionCard
       className={cn(className ?? "h-full", dark && "border-transparent bg-sidebar text-sidebar-foreground")}
@@ -89,8 +110,13 @@ export function GmvPanel({
       <div className="flex min-w-0 flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div>
+          {/* IT COUNTS UP. A figure that simply IS there reads as a screenshot; one that
+              arrives reads as live data. CountUp takes the finished string, so the currency
+              and locale formatting the caller already did is preserved exactly, and anything
+              unparseable — "—" while loading — is rendered verbatim rather than animated to
+              a zero the app does not know (§4). */}
           <div className="font-title text-4xl font-black leading-none tracking-tight tabular-nums sm:text-5xl">
-            {headline}
+            <CountUp text={headline} />
           </div>
           <div className={cn("mt-1.5 eg-label", dark ? "text-sidebar-foreground/60" : "text-muted-foreground")}>{headlineSub}</div>
         </div>
@@ -99,7 +125,7 @@ export function GmvPanel({
             attribute and is not drawn. */}
         {side.map((c) => (
           <div key={c.label} title={c.sub}>
-            <div className="text-xl font-bold tabular-nums">{c.value}</div>
+            <div className="text-xl font-bold tabular-nums"><CountUp text={c.value} /></div>
             <div className={cn("mt-1 eg-label", dark ? "text-sidebar-foreground/60" : "text-muted-foreground")}>{c.label}</div>
           </div>
         ))}
@@ -154,9 +180,9 @@ export function GmvPanel({
                   series would make the panel a chart to study rather than one to glance at. */}
               {barsPrev && barsPrev[i] !== undefined && (
                 <span
-                  className={cn("absolute inset-x-0 bottom-0 rounded-t-md",
+                  className={cn("absolute inset-x-0 bottom-0 rounded-t-md transition-[height] duration-700 ease-out motion-reduce:transition-none",
                     dark ? "bg-brand/30" : "bg-brand/10 dark:bg-brand/25")}
-                  style={{ height: `${Math.max(3, barsPrev[i] * 100)}%` }}
+                  style={{ height: grown ? `${Math.max(3, barsPrev[i] * 100)}%` : "0%", transitionDelay: `${i * 18}ms` }}
                 />
               )}
               <span
@@ -164,9 +190,9 @@ export function GmvPanel({
                    the dark value over a near-black card lands on a dull olive, so only the dark
                    step moves up — on paper 30% is a bar you read the shape of, and taking it up
                    would make the chart shout over the figures it exists to support. */
-                className={cn("absolute inset-x-0 bottom-0 rounded-t-md",
+                className={cn("absolute inset-x-0 bottom-0 rounded-t-md transition-[height] duration-700 ease-out motion-reduce:transition-none",
                   dark ? "bg-brand/80" : "bg-brand/30 dark:bg-brand/70")}
-                style={{ height: `${Math.max(3, h * 100)}%` }}
+                style={{ height: grown ? `${Math.max(3, h * 100)}%` : "0%", transitionDelay: `${i * 18}ms` }}
               />
             </span>
             )
