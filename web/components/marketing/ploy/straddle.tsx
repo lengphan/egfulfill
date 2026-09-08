@@ -64,7 +64,7 @@ export function Straddle({
         transition={{ duration: dur, repeat: Infinity, ease: "easeInOut" }}
         className="pointer-events-none drop-shadow-[0_30px_40px_rgba(33,33,33,0.16)]"
       >
-        <Image src={src} alt={alt} width={700} height={700} draggable={false} className="h-auto w-full" />
+        <Image src={src} alt={alt} width={700} height={700} unoptimized draggable={false} className="h-auto w-full" />
       </motion.div>
     </motion.div>
   )

@@ -46,8 +46,10 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
             const email = String(new FormData(e.currentTarget).get("email") ?? "")
             router.push(email ? `/signup?email=${encodeURIComponent(email)}` : "/signup")
           }}
-          className="relative mt-14 w-full max-w-[590px] rounded-2xl bg-ploy-paper px-6 py-10"
+          className="ploy-pinned relative mt-14 w-full max-w-[590px] rounded-2xl bg-ploy-paper px-6 py-10 text-ploy-ink/30"
         >
+          {/* Carries the two BOTTOM dots; the parent's own pseudo-elements are the top pair. */}
+          <span aria-hidden className="ploy-pin" />
           <div className="flex items-center gap-2 rounded-full border border-ploy-ink/15 p-1.5 pl-5">
             <label htmlFor="ploy-cta-email" className="sr-only">
               Your email address

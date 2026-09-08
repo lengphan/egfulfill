@@ -1,11 +1,10 @@
-import Link from "next/link"
 import { SiteHeader } from "@/components/marketing/site-header"
 import { MotionProvider } from "@/components/marketing/motion-provider"
 import { SupportBubble } from "@/components/marketing/support-bubble"
 import { getSiteContent } from "@/lib/site-content"
 import { getPublicTheme } from "@/lib/public-theme"
 import { EditModeProvider } from "@/components/marketing/edit-mode"
-import { Wordmark } from "@/components/marketing/wordmark"
+import { PloyFooter } from "@/components/marketing/ploy/footer"
 
 /**
  * Async so the motion presets can be read HERE rather than per page.
@@ -73,52 +72,11 @@ export default async function MarketingLayout({ children }: { children: React.Re
           The same three routes remain in the footer nav below, which is where you look when
           you already know what you want. */}
 
-      <footer className="border-t border-[var(--mk-hairline)]">
-        {/* Same container as the header and every band — see the note in site-header.tsx. */}
-        <div className="mx-auto flex max-w-[88rem] flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-10">
-          {/* The identity block. It names the company, the app and the way to reach us.
-              The address itself used to sit here in the clear; it is on /contact now — which
-              is a PAGE a marketplace reviewing us for API access can cite, rather than a
-              mailto in a footer, and it keeps the address off every page for a scraper.
-              KEEP A ROUTE TO A HUMAN HERE. A support widget is not a published contact
-              method, so if this link goes, /contact must still publish the address. */}
-          <div>
-            <Wordmark className="h-[26px] w-auto" />
-            <div className="mt-1 text-sm text-[var(--mk-auth-muted)]">
-              EGFUL — hands-off print-on-demand fulfillment.
-            </div>
-            <Link
-              href="/contact"
-              className="mt-2 inline-block text-sm text-[var(--mk-auth-muted)] underline underline-offset-4 hover:text-[var(--mk-ink)]"
-            >
-              Contact us
-            </Link>
-          </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--mk-auth-muted)]">
-            <Link href="/catalog" className="hover:text-[var(--mk-ink)]">Products</Link>
-            <Link href="/pricing" className="hover:text-[var(--mk-ink)]">Pricing</Link>
-            <Link href="/how-it-works" className="hover:text-[var(--mk-ink)]">How it works</Link>
-            <Link href="/features" className="hover:text-[var(--mk-ink)]">Features</Link>
-            <Link href="/integrations/amazon" className="hover:text-[var(--mk-ink)]">Amazon</Link>
-            <Link href="/docs" className="hover:text-[var(--mk-ink)]">API</Link>
-            <Link href="/contact" className="hover:text-[var(--mk-ink)]">Contact</Link>
-            <Link href="/login" className="hover:text-[var(--mk-ink)]">Log in</Link>
-            <Link href="/privacy" className="hover:text-[var(--mk-ink)]">Privacy</Link>
-            <Link href="/terms" className="hover:text-[var(--mk-ink)]">Terms</Link>
-          </nav>
-        </div>
-        {/* The legal line sits in the SAME container as the block above it. It was outside one
-            entirely (`sm:px-6` and no max-width), so on a wide screen the copyright ran to the
-            window edge while the footer nav above it stopped at the page margin. */}
-        <div className="mx-auto flex max-w-[88rem] flex-col items-center justify-between gap-2 border-t border-[var(--mk-hairline)] px-6 py-4 text-xs text-[var(--mk-auth-muted)] sm:flex-row sm:px-10">
-          <span>© 2026 EGFUL. All rights reserved.</span>
-          <span className="flex gap-4">
-            <Link href="/privacy" className="hover:text-[var(--mk-ink)]">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-[var(--mk-ink)]">Terms of Service</Link>
-          </span>
-        </div>
-      </footer>
-
+      {/* THE PLOY FOOTER, on every marketing route. It carries the same links the old one
+          did — including /contact, which is the PUBLISHED contact page a marketplace
+          reviewing us for API access can cite, and is therefore load-bearing rather than
+          decoration — plus the privacy and terms pair in the legal line. */}
+      <PloyFooter />
 
       {/* THE PUBLIC AI BUBBLE IS OFF.
           It sat on every marketing page and answered visitors with a paid model call on an

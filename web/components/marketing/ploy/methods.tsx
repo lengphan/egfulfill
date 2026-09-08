@@ -63,7 +63,7 @@ export function PloyMethods() {
             <motion.span {...reveal(0.1)} className="flex items-center gap-3">
               <span>to make</span>
               <motion.span {...pop(0.25)} className="inline-block">
-                <Image src="/ploy/obj-chrome.webp" alt="" width={120} height={131} className="h-[0.85em] w-auto" />
+                <Image src="/ploy/obj-chrome.webp" alt="" width={120} height={131} unoptimized className="h-[0.85em] w-auto" />
               </motion.span>
               <span>it.</span>
             </motion.span>

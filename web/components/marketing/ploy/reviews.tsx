@@ -27,7 +27,7 @@ export function PloyReviews({ heading, items }: { heading: string; items: Testim
             </motion.span>
           </h2>
           <motion.span {...pop(0.2)} className="hidden shrink-0 md:block">
-            <Image src="/ploy/obj-green.webp" alt="" width={200} height={204} className="h-auto w-[clamp(90px,9vw,150px)]" />
+            <Image src="/ploy/obj-green.webp" alt="" width={200} height={204} unoptimized className="h-auto w-[clamp(90px,9vw,150px)]" />
           </motion.span>
         </div>
 

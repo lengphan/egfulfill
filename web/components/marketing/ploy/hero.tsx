@@ -93,12 +93,19 @@ export function PloyHero({
             style={{ filter: "hue-rotate(-62deg) saturate(1.35) brightness(1.04)" }}
             className="pointer-events-none h-full w-full drop-shadow-[0_60px_70px_rgba(33,33,33,0.22)]"
           >
+            {/* `unoptimized` — and it is a QUALITY decision, not a performance one.
+                These cut-outs are smooth-gradient 3D renders, the content webp handles worst.
+                They are already encoded here at q93 and already sized for their largest slot,
+                so letting next/image re-encode them at its q75 default was a SECOND lossy pass
+                on top of the first, and the banding showed. Photographs (the method cards)
+                keep the optimiser, because they tolerate it and they are the heavy ones. */}
             <Image
               src="/ploy/obj-hoodie.webp"
               alt="An inflated periwinkle hoodie"
               width={900}
               height={1232}
               priority
+              unoptimized
               draggable={false}
               className="h-auto w-full md:h-full md:w-auto md:max-w-none"
             />

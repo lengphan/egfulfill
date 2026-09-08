@@ -1613,3 +1613,23 @@ td[align="right"] {
 }
 .ploy-rail::-webkit-scrollbar { display: none; }
 .ploy-rail > * { scroll-snap-align: start; }
+
+/* Four corner dots on a card — the prototype's "pinned sheet" mark, on the closing CTA.
+   It is drawn with pseudo-elements rather than four spans because the card is a <form> and
+   the dots are decoration: nothing here should be reachable by a caret or a screen reader. */
+.ploy-pinned::before,
+.ploy-pinned::after,
+.ploy-pinned > .ploy-pin::before,
+.ploy-pinned > .ploy-pin::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.3;
+}
+.ploy-pinned::before { top: 12px; left: 12px; }
+.ploy-pinned::after { top: 12px; right: 12px; }
+.ploy-pinned > .ploy-pin::before { bottom: 12px; left: 12px; }
+.ploy-pinned > .ploy-pin::after { bottom: 12px; right: 12px; }
