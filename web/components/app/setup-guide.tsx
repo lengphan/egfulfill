@@ -207,6 +207,14 @@ export function SetupGuide() {
   }
 
   return (
+    <>
+    {/* CLICK ANYWHERE ELSE TO PUT IT AWAY. Invisible and full-bleed — it paints nothing, so
+        the page is never dimmed for a panel that is not a modal (the same call made for the
+        chat launcher; see the note there). It only has to beat the page, not the panel:
+        z-30 sits under the panel's z-40, so a click INSIDE lands on the panel as before.
+        Minimising rather than dismissing, so the pill stays and the checklist is one press
+        away — clicking off is "not now", never "I am done with this". */}
+    <div aria-hidden onClick={minimise} className="fixed inset-0 z-30" />
     <motion.section
       key={`panel-${corner}`}
       role="dialog"
@@ -214,7 +222,7 @@ export function SetupGuide() {
       initial={reduced ? false : { y: 16, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={spring}
-      className={"fixed inset-x-3 bottom-3 z-40 flex max-h-[min(36rem,calc(100svh-7rem))] w-auto flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground ring-1 ring-foreground/10 sm:inset-x-auto sm:w-[22.5rem] dark:ring-foreground/15 " + PANEL_POS[corner]}
+      className={"fixed inset-x-3 bottom-3 z-40 flex max-h-[min(36rem,calc(100svh-7rem))] w-auto flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/15 sm:inset-x-auto sm:w-[22.5rem] dark:ring-foreground/20 " + PANEL_POS[corner]}
     >
       {/* THE PLATE: the app's brand fill, so it takes the skin — never a colour of its own. */}
       <div className="bg-brand px-4 pb-3.5 pt-3.5 text-brand-foreground">
@@ -267,5 +275,6 @@ export function SetupGuide() {
         ))}
       </ol>
     </motion.section>
+    </>
   )
 }

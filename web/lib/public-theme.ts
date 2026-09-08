@@ -31,7 +31,7 @@
  * but until it is added to the server's own list an admin cannot SELECT it in Settings ›
  * Branding — the picker only offers what the server allows. That is a one-entry backend
  * change and deliberately not made here; the redesign is front-end only. */
-const SKINS = ["workshop", "studio", "press", "balloon"] as const
+const SKINS = ["balloon", "workshop", "studio", "press"] as const
 /** Mirrors FACES in server/src/routes/branding.js.
  *
  * `sans` means "no override" — `font-display` falls through to `--font-display`, which
@@ -48,7 +48,7 @@ export type PublicTheme = { skin: (typeof SKINS)[number]; face: (typeof FACES)[n
  * Both halves moved on 2026-08-26. The skin is the locked direction; the face is `sans` so
  * the public pages set headlines in the same Plus Jakarta Sans the product uses, rather than
  * introducing Outfit as a second alphabet on the five pages a buyer sees first. */
-export const DEFAULT_PUBLIC_THEME: PublicTheme = { skin: "workshop", face: "sans" }
+export const DEFAULT_PUBLIC_THEME: PublicTheme = { skin: "balloon", face: "sans" }
 
 export async function getPublicTheme(): Promise<PublicTheme> {
   const origin = (process.env.API_ORIGIN || "https://egful.store").replace(/\/+$/, "")

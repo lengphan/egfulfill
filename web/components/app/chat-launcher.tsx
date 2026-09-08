@@ -231,24 +231,27 @@ export function ChatLauncher() {
     <>
       {/* The panel. Anchored to the bubble on a desktop; a sheet within the margins on a
           phone, where a 380px card floating over a 390px screen is just a worse page. */}
-      {/* THE SCRIM, the house way to lift a surface (globals.css: shadows are none; a dialog
-          separates from the page with a scrim). Without it this white card sat on a white
-          700-row table with a 10% hairline for an edge, and the eye read one continuous
-          sheet — "the chat is getting lost". Same tint and blur the Dialog backdrop uses,
-          so the panel reads as the one lit thing; a click on it closes, as Escape does. It
-          sits UNDER the bubble (z-30 < z-40), so the bubble still toggles. */}
+      {/* THE CLICK-CATCHER — invisible, 2026-09-08. It WAS a `bg-black/30` scrim, on the
+          reasoning that the house lifts a surface with a scrim because shadows are none.
+          That reasoning holds for a DIALOG, which takes the page over and expects an answer
+          before anything else happens. A chat launcher is the opposite: it floats, you read
+          it with one eye while the page carries on, and dimming seven hundred rows to show
+          a 360px card asserts a modality this thing does not have.
+
+          So the behaviour survives and the paint goes: still full-bleed, still closes on a
+          click anywhere outside, still under the bubble (z-30 < z-40) so the bubble toggles.
+          The separation the scrim was really solving — a white card lost on a white table —
+          moves onto the panel itself as a shadow and a stronger ring, which is what a
+          floating popover is entitled to. The no-shadow rule governs elevation INSIDE the
+          page; this is over it. */}
       {open && (
-        <div
-          aria-hidden
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-30 bg-black/30 supports-backdrop-filter:backdrop-blur-sm"
-        />
+        <div aria-hidden onClick={() => setOpen(false)} className="fixed inset-0 z-30" />
       )}
       {open && (
         <div
           role="dialog"
           aria-label={tl("chat", "Messages")}
-          className="fixed inset-x-3 bottom-20 z-40 flex max-h-[min(34rem,calc(100svh-7rem))] flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground ring-1 ring-foreground/10 sm:inset-x-auto sm:right-5 sm:w-[22.5rem] dark:ring-foreground/15"
+          className="fixed inset-x-3 bottom-20 z-40 flex max-h-[min(34rem,calc(100svh-7rem))] flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/15 sm:inset-x-auto sm:right-5 sm:w-[22.5rem] dark:ring-foreground/20"
         >
           <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
             {active ? (

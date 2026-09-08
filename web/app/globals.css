@@ -1278,7 +1278,6 @@ td[align="right"] {
  *   · No shadow at any level — elevation is parchment → white → dark, nothing else.
  *   · No cool grey. Every neutral here sits at hue ~106.7.
  */
-:root,
 [data-skin="workshop"] {
   /* ── NEBIUS, MEASURED FROM THE LIVE SITE (2026-08-26) ────────────────────────
    * Values pulled from nebius.com's own stylesheet rather than sampled off a screenshot:
@@ -1390,8 +1389,7 @@ td[align="right"] {
  * ΔE 0.183 against a 0.154 floor. The pale end is crowded — dark mode lifts every status into
  * it — so this sits deliberately at the top of the range rather than in the middle of it.
  */
-.dark [data-skin="workshop"],
-.dark:root {
+.dark [data-skin="workshop"] {
   --brand: oklch(0.940 0.030 285);
   --brand-foreground: oklch(0.145 0 0);
 }
@@ -1457,6 +1455,14 @@ td[align="right"] {
  * `--primary` is untouched, as a skin may never move it: it inks a quarter of the app.
  *
  * Measured by tools/check-skins.mjs like every other skin. */
+/* THE DEFAULT SINCE 2026-09-08, which is why `:root` is grouped here.
+   The marketing site and the product had different accents — periwinkle and lime out front,
+   violet inside — and two front doors in two palettes is the thing this was meant to fix.
+   `workshop` is kept and still measured, so an admin goes back in one click.
+   The bare `:root` has to travel WITH the default: it is what paints before any `data-skin`
+   attribute exists, and a default that is only declared under its own attribute renders the
+   previous house style for that first frame. */
+:root,
 [data-skin="balloon"] {
   --mk-surface: #F4F4F4;
   --mk-ink: #212121;
@@ -1479,7 +1485,8 @@ td[align="right"] {
 
 /* Dark: the plate is already dark, so only the page, the card and the rules move; the
    brand lifts a step so a filled button still reads as a fill against a dark ground. */
-.dark [data-skin="balloon"] {
+.dark [data-skin="balloon"],
+.dark:root {
   --mk-surface: #15171B;
   --mk-ink: #ECECF0;
   --mk-card: #1E2127;

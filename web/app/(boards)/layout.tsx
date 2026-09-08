@@ -9,6 +9,7 @@ import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { TopBar } from "@/components/app/topbar"
 import { ChatLauncher } from "@/components/app/chat-launcher"
+import { BoardTour } from "@/components/app/board-tour"
 import { CommandPalette } from "@/components/app/command-palette"
 import { getUser, getToken } from "@/lib/auth"
 import { STAFF_ROLES, staffNav, landingFor } from "@/lib/staff-nav"
@@ -68,6 +69,10 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
           has to be mounted here too — wiring it into app-shell alone left every board
           without it, which is where staff actually spend the day. */}
       <ChatLauncher />
+      {/* The staff half of the setup guide. It mounts HERE and not in app-shell, which is the
+          seller's: the two shells are separate (see the StaffSidebar note above) and the two
+          panels are for different people, so neither role ever sees the other's. */}
+      <BoardTour />
     </div>
     </ConfirmProvider>
   )

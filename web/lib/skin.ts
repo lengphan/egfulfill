@@ -29,10 +29,11 @@
 export type SkinKey = "workshop" | "studio" | "press" | "balloon"
 
 export const SKINS: { key: SkinKey; label: string; what: string }[] = [
-  { key: "workshop", label: "Workshop", what: "Parchment page, white cards, one lime. The house style." },
+  // FIRST because it is the default (2026-09-08) — the picker's order is the house order.
+  { key: "balloon", label: "Balloon", what: "Periwinkle and lime on a slate plate. The marketing site's palette. The default." },
+  { key: "workshop", label: "Workshop", what: "Parchment page, white cards, one lime. The house style until 2026-09-08." },
   { key: "studio", label: "Studio", what: "Ink on white. One bright accent." },
   { key: "press", label: "Press", what: "Violet plate over warm paper." },
-  { key: "balloon", label: "Balloon", what: "Periwinkle and lime on a slate plate. The marketing site's palette." },
 ]
 
 /**

@@ -43,7 +43,7 @@ const KIT = fs.readFileSync(new URL('../web/components/marketing/bold-kit.tsx', 
  * against a palette the site does not use. It passed, and it was checking the wrong thing —
  * the same failure mode as the dead PLATE_ACCENT export this file was written to catch.
  */
-const DEFAULT_SKIN = 'workshop'
+const DEFAULT_SKIN = 'balloon'
 
 /* ── colour maths ─────────────────────────────────────────────────────────────── */
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))

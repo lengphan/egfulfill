@@ -55,8 +55,8 @@ const DEFAULT_ACCENT = 'rose';
 // `workshop` is the house style locked 2026-08-26 — parchment page, white cards, one lime.
 // It is FIRST because it is also DEFAULT_SKIN. `studio` and `press` are kept: both are
 // contrast-checked palettes and a picker with one option is not a picker.
-const SKINS = ['workshop', 'studio', 'press', 'balloon'];
-const DEFAULT_SKIN = 'workshop';
+const SKINS = ['balloon', 'workshop', 'studio', 'press'];
+const DEFAULT_SKIN = 'balloon';
 
 /**
  * THE DISPLAY FACE — on exactly the terms the skin and the accent already run on.

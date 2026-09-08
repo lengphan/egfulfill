@@ -219,11 +219,11 @@ export const CARD = "var(--mk-card)"
  * from it, and it is narrow on purpose — a colour that is merely PAINTED never belongs here.
  */
 export const HEX = {
-  accent: "#33373C",
-  ink: "#121212",
-  acid: "#C0C4FF",
-  surface: "#F3F4F5",
-  paper: "#F3F4F5",
+  accent: "#2B3038",
+  ink: "#212121",
+  acid: "#D4F897",
+  surface: "#F4F4F4",
+  paper: "#FFFFFF",
 } as const
 
 /** The one type ramp. Sections use HEADING, heroes use DISPLAY — pages don't invent sizes. */
