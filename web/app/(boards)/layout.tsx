@@ -10,6 +10,7 @@ import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { TopBar } from "@/components/app/topbar"
 import { ChatLauncher } from "@/components/app/chat-launcher"
 import { BoardTour } from "@/components/app/board-tour"
+import { DashboardTicker } from "@/components/app/dashboard-ticker"
 import { CommandPalette } from "@/components/app/command-palette"
 import { getUser, getToken } from "@/lib/auth"
 import { STAFF_ROLES, staffNav, landingFor } from "@/lib/staff-nav"
@@ -63,7 +64,17 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
         <CommandPalette staff={true} />
         {/* eg-content is THE page container — one width and one gutter for every page,
             no per-page opt-out. See app/globals.css. */}
-        <main className="eg-content mx-auto px-4 py-5 md:px-10 md:py-8">{children}</main>
+        <main className="eg-content mx-auto px-4 py-5 md:px-10 md:py-8">
+          {/* THE ANNOUNCEMENT REACHES EVERY BOARD, not just the dashboard.
+              An admin writes one line for the floor; a person who spends their day on
+              /production or /shipping and never opens /overview would never have seen it.
+
+              It carries NO FIGURES here — those belong to the dashboard, which counts its own
+              and passes them in. /overview renders its own strip WITH figures, so this one
+              stands down there rather than drawing a second bar above it. */}
+          {pathname !== "/overview" && <DashboardTicker items={[]} />}
+          {children}
+        </main>
       </div>
       {/* Boards are their own shell (see the note on StaffSidebar above), so the launcher
           has to be mounted here too — wiring it into app-shell alone left every board

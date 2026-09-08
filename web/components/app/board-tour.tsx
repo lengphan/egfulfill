@@ -4,7 +4,7 @@ import { useCallback, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion, useReducedMotion, type PanInfo } from "motion/react"
-import { ArrowRight, Minus } from "@phosphor-icons/react"
+import { CaretRight, Minus } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { getUser } from "@/lib/auth"
 
@@ -200,25 +200,39 @@ export function BoardTour() {
           can verify; nothing here is checkable — it is a tour, not a checklist (see the note
           at the top). A numeral is the mark instead, so the rows read as an ordered list of
           places rather than as tasks left undone. */}
-      <ol className="flex flex-col p-2">
+      {/* THE SELLER GUIDE'S ROW, EXACTLY — same grid, same border, same 18px circle, same
+          caret. The two panels sit in the same corner of the same product and a staffer may
+          well have seen both; two different row shapes makes them read as two features that
+          happen to look alike, which is worse than either.
+
+          The one deliberate difference is the MARK: the seller's circle carries a tick because
+          each of their steps is a state the product can verify. Nothing in a tour is
+          checkable, so it carries the step's number instead — a tick here would claim a
+          progress that does not exist.
+
+          `where` rides on the end of the sub rather than taking a line of its own, so the row
+          stays two lines like the seller's. */}
+      <ol className="grid gap-2 overflow-y-auto p-2.5">
         {cards.map((c, n) => (
           <li key={c.title}>
             <Link
               href={c.href}
               onClick={minimise}
-              className="flex items-start gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-accent"
+              className="eg-tap grid grid-cols-[20px_1fr_14px] items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:bg-accent"
             >
-              <span className="mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 border-border text-2xs font-semibold tabular-nums text-muted-foreground">
+              <span
+                aria-hidden
+                className="flex size-[18px] items-center justify-center rounded-full border-2 border-border text-2xs font-semibold tabular-nums text-muted-foreground"
+              >
                 {n + 1}
               </span>
-              <span className="min-w-0 flex-1">
+              <span className="min-w-0">
                 <span className="block text-sm font-semibold">{tl("tour", c.title)}</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{tl("tour", c.body)}</span>
-                <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground">
-                  {c.where}
-                  <ArrowRight size={10} weight="bold" />
+                <span className="block text-xs text-muted-foreground">
+                  {tl("tour", c.body)} <span className="text-foreground">{c.where}</span>
                 </span>
               </span>
+              <CaretRight size={12} weight="bold" className="text-muted-foreground" />
             </Link>
           </li>
         ))}

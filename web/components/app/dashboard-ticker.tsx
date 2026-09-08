@@ -70,14 +70,19 @@ export function DashboardTicker({ items }: { items: string[] }) {
     if (half > 0) setDur(half / PX_PER_SEC[speed])
   }, [speed, track.length, note])
 
-  if (!items.length) return null
+  /* THE ANNOUNCEMENT ALONE IS ENOUGH TO DRAW THE STRIP. A board with no figures to show still
+     has to carry what an admin wrote — that is the whole point of an announcement. */
+  if (!items.length && !note) return null
 
   return (
     <div className="eg-marquee-hold overflow-hidden rounded-lg border border-border bg-muted/40 py-2">
       <div
         ref={trackRef}
         className="eg-marquee flex w-max"
-        style={dur ? { animationDuration: `${dur}s` } : undefined}
+        /* A CSS VARIABLE, not the longhand. The stylesheet declares the animation with
+           `var(--eg-marquee-dur, 90s)`, so setting the variable is the whole override and the
+           un-measured first paint falls back to a slow crawl rather than a fixed sprint. */
+        style={dur ? ({ "--eg-marquee-dur": `${dur}s` } as React.CSSProperties) : undefined}
       >
         {track.map((t, i) => (
           <span key={i} className="flex items-center">

@@ -1592,7 +1592,15 @@ td[align="right"] {
    track travels exactly half its width, so there is no seam to catch. One keyframe serves
    both rather than two that can drift apart. It holds on hover, because a line of figures
    someone is trying to read should not walk away from them. */
-.eg-marquee { animation: marquee-x 32s linear infinite; }
+/* THE DURATION IS A VARIABLE WITH A CALM DEFAULT.
+   It was a flat 32s in this rule, which the component then tried to override inline — so
+   until its JS had measured the track, or on any build where that had not shipped, every
+   strip ran at 32 seconds regardless of how long it was. A board with more figures has a
+   longer track, and covering more pixels in the same time is literally faster, which is why
+   the same "slow" setting read fast on one board and slow on another.
+   The component sets `--eg-marquee-dur` from the measured width and the chosen reading speed.
+   The fallback here is deliberately SLOW: an un-measured strip should crawl, never race. */
+.eg-marquee { animation: marquee-x var(--eg-marquee-dur, 90s) linear infinite; }
 .eg-marquee-hold:hover .eg-marquee { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
