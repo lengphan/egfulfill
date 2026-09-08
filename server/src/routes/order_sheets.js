@@ -36,8 +36,14 @@ function ready() {
     order_ids    jsonb not null default '[]'::jsonb,
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now(),
-    completed_at timestamptz
+    completed_at timestamptz,
+    -- HOW WIDE THE ROWS ABOVE WERE WHEN THEY WERE WRITTEN, and it is the reason a column
+    -- can be added to the sheet at all. The rows are positional, so the meaning of cell 14
+    -- depends entirely on which column list was live at the time -- and NULL is the honest
+    -- answer for every sheet stored before this column existed. See migrate() below.
+    cols         int
   )`)
+    .then(() => q('alter table order_sheets add column if not exists cols int'))
     .then(() => q('create index if not exists order_sheets_seller on order_sheets (seller_id, updated_at desc)'))
     .catch(() => {});
   return _ready;
@@ -69,26 +75,73 @@ export function orderSheetsRoutes(app, requireAuth) {
   }
 
   /**
-   * A SHEET SAVED BEFORE THE PRICE COLUMN WAS REMOVED.
+   * A SHEET SAVED UNDER AN OLDER COLUMN LIST.
    *
-   * `rows` is positional — the grid verbatim in CSV_COLUMNS order — so dropping a column
-   * from that list shifts every cell after it on every sheet already stored. Price was index
-   * 18 of 21, which puts Store Name and Internal Notes one place to the right of where the
-   * grid now looks for them: a saved draft would reopen with the store name under Price's
-   * old heading and nobody would know why.
+   * `rows` is positional — the grid verbatim in CSV_COLUMNS order — so adding or dropping a
+   * column shifts every cell after it on every sheet already stored. Two such moves have
+   * happened, and both are undone here on the way out; the next save writes the row back in
+   * today's shape.
    *
-   * So an old-width row is narrowed HERE, on the way out, and the next save writes it back
-   * in the new shape. Length is the only signal there is — the rows carry no header — which
-   * is why the check is exact rather than `>=`: a row of some other width is not a row this
-   * knows how to fix, and guessing at one would corrupt the thing it is trying to rescue.
+   *   21 -> 20   Price was index 18 of 21 and was removed. Left as-is, a saved draft
+   *              reopened with the store name under Price's old heading.
+   *   20 -> 21   Placement was INSERTED at index 14 (2026-09-08). Left as-is, every cell
+   *              from Quantity rightwards reads one column to the left of where it belongs.
    *
-   * DELETE THIS once no 21-wide sheet is left. It is dated, not permanent: 2026-09-07.
+   * WIDTH ALONE CANNOT TELL THEM APART — today's list is 21 wide, which is exactly what a
+   * pre-price sheet is — so `cols` decides and width only picks the step. A row written
+   * before that column existed has NULL, which is the one thing that reliably means "some
+   * older shape"; anything with a number was written by the code below and is left alone.
+   *
+   * NOT A DATE. `updated_at` was the obvious guard and it is wrong twice over: `complete`
+   * bumps it without rewriting a single cell, and `duplicate` copies rows into a brand-new
+   * row whose timestamp is today — so both would have stamped an old-shape sheet as new and
+   * served it one column out. `cols` travels WITH the rows through both.
+   *
+   * Checked against production before shipping: 11 sheets stored 21-wide, every one of them
+   * empty at indexes 18, 19 and 20 — so the price step is provably lossless on the data it
+   * actually runs against, rather than only in principle.
+   *
+   * Nothing is rewritten in the database. A completed sheet is the record of what was
+   * submitted, so it is read forward into today's columns and never edited in place.
+   *
+   * DELETE THIS once no sheet is left with a null `cols`.
    */
-  const OLD_WIDTH = 21;
+  const CURRENT_WIDTH = 21;
   const PRICE_AT = 18;
-  const narrow = (rows) => (Array.isArray(rows) ? rows.map((x) => (
-    Array.isArray(x) && x.length === OLD_WIDTH ? [...x.slice(0, PRICE_AT), ...x.slice(PRICE_AT + 1)] : x
-  )) : []);
+  const PLACEMENT_WIDTH = 20;
+  const PLACEMENT_AT = 14;
+  const blank = (v) => !String(v ?? '').trim();
+  const migrate = (rows, cols) => {
+    if (!Array.isArray(rows)) return [];
+    // `cols < CURRENT_WIDTH` as well as null: a tab left open across the deploy autosaves
+    // 20-wide rows, and those are stamped with their real width rather than left null — so
+    // "has a number" is not the same as "is in today's shape".
+    if (cols != null && cols >= CURRENT_WIDTH) return rows;
+    return rows.map((x) => {
+      if (!Array.isArray(x)) return x;
+      // Length picks the step. Exact rather than `>=`: a row of some other width is not one
+      // this knows how to fix, and guessing at it would corrupt what it is trying to rescue.
+      //
+      // The price step also checks that the last three cells are EMPTY, which is the one
+      // thing that separates an old 21-wide row from a new one: today's list is 21 wide too,
+      // and its cells 18-20 are Size, Store Name and Internal Notes. Every 21-wide row in
+      // production is blank across all three (checked), so this never declines a real old
+      // row — and it can never eat a new row that has a size on it, which is the shape the
+      // web bundle writes if it goes live before the API does.
+      const old21 = x.length === CURRENT_WIDTH && blank(x[18]) && blank(x[19]) && blank(x[20]);
+      const priced = old21 ? [...x.slice(0, PRICE_AT), ...x.slice(PRICE_AT + 1)] : x;
+      return priced.length === PLACEMENT_WIDTH
+        ? [...priced.slice(0, PLACEMENT_AT), '', ...priced.slice(PLACEMENT_AT)]
+        : priced;
+    });
+  };
+
+  /** The width to record for what is about to be written — the widest row in it, and 0 for
+   *  a sheet with nothing in it yet. Never NULL: null is reserved for "written before this
+   *  existed", which is the only claim migrate() acts on. */
+  const widthOf = (rows) => (Array.isArray(rows)
+    ? rows.reduce((n, x) => Math.max(n, Array.isArray(x) ? x.length : 0), 0)
+    : 0);
 
   const shape = (r, withRows) => ({
     id: String(r.id),
@@ -99,7 +152,7 @@ export function orderSheetsRoutes(app, requireAuth) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     completedAt: r.completed_at,
-    ...(withRows ? { rows: narrow(r.rows) } : {}),
+    ...(withRows ? { rows: migrate(r.rows, r.cols) } : {}),
   });
 
   app.get('/api/order_sheets', { preHandler: requireAuth }, async (req) => {
@@ -134,9 +187,10 @@ export function orderSheetsRoutes(app, requireAuth) {
   app.post('/api/order_sheets', { preHandler: requireAuth }, async (req) => {
     await ready();
     const b = req.body || {};
+    const rows = Array.isArray(b.rows) ? b.rows : [];
     const r = await q(
-      'insert into order_sheets (seller_id, name, rows) values ($1, $2, $3::jsonb) returning *',
-      [await owner(req.user), String(b.name || '').slice(0, 120), JSON.stringify(Array.isArray(b.rows) ? b.rows : [])]
+      'insert into order_sheets (seller_id, name, rows, cols) values ($1, $2, $3::jsonb, $4) returning *',
+      [await owner(req.user), String(b.name || '').slice(0, 120), JSON.stringify(rows), widthOf(rows)]
     );
     return { sheet: shape(r.rows[0], true) };
   });
@@ -153,7 +207,13 @@ export function orderSheetsRoutes(app, requireAuth) {
     const sets = [];
     const vals = [];
     if (typeof b.name === 'string') { vals.push(b.name.slice(0, 120)); sets.push(`name = $${vals.length}`); }
-    if (Array.isArray(b.rows)) { vals.push(JSON.stringify(b.rows)); sets.push(`rows = $${vals.length}::jsonb`); }
+    /* The width goes with the cells, in the same statement — a `rows` write that did not
+       record its own shape would be indistinguishable from one made before `cols` existed,
+       and migrate() would then shift it by a column on the next read. */
+    if (Array.isArray(b.rows)) {
+      vals.push(JSON.stringify(b.rows)); sets.push(`rows = $${vals.length}::jsonb`);
+      vals.push(widthOf(b.rows)); sets.push(`cols = $${vals.length}`);
+    }
     if (!sets.length) return { sheet: shape(row, false) };
     vals.push(String(row.id));
     const r = await q(`update order_sheets set ${sets.join(', ')}, updated_at = now() where id = $${vals.length} returning *`, vals);
@@ -174,8 +234,11 @@ export function orderSheetsRoutes(app, requireAuth) {
     if (!row) { reply.code(404); return { error: 'not found' }; }
     const base = String(row.name || 'Sheet').replace(/^Copy of /, '');
     const r = await q(
-      `insert into order_sheets (seller_id, name, rows)
-       select $1, $2, rows from order_sheets where id = $3 returning *`,
+      /* `cols` is copied WITH the rows, not recomputed. A copy of an old-shape sheet is
+         still an old-shape sheet, and stamping today's width onto it would tell migrate()
+         to leave cells it has to move. */
+      `insert into order_sheets (seller_id, name, rows, cols)
+       select $1, $2, rows, cols from order_sheets where id = $3 returning *`,
       [await owner(req.user), `Copy of ${base}`.slice(0, 120), String(row.id)]
     );
     return { sheet: shape(r.rows[0], true) };

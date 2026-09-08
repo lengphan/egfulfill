@@ -89,7 +89,23 @@ export const CSV_COLUMNS: CsvColumn[] = [
    */
   { header: "Blank Product", key: "blank", required: true, section: "product", help: "OUR catalog product — the garment we print on. Pick it and the Print Type, Colour and Size dropdowns narrow to what that product actually comes in. It is what costs, barcodes and produces the line, so a row without one cannot be made." },
   { header: "Template ID", key: "template_id", required: false, section: "product", help: "A SHORTCUT: a saved template already carries the blank, the placement and the artwork, so a row with one ignores Image ID and the variant columns. Leave it blank and the row is built from the columns instead. Type the number — type the number from its card (TPL-12) or its name if that name is unique. It fills in the blank and the artwork for the line. It does NOT set the print method; nothing in the template editor records one. An image reference (IMG-30) is not applied here yet — it names artwork in your library, which is a different thing from a template." },
-  { header: "Image ID", key: "hero_image", required: false, section: "product", help: "THE LINE’S PICTURE — the listing photo, so the order shows what the buyer bought. A URL, not a reference: anything that is not http(s) is dropped. It is NOT the artwork and it does not conflict with a Template ID — a template brings the artwork, its placement and its blank, and this only changes the picture on the line. Fill both, or neither." },
+  /**
+   * THE ARTWORK, BY ADDRESS — headed "Image ID" until 2026-09-08, and the rename is the
+   * point rather than a tidy-up.
+   *
+   * It was documented as the LISTING PHOTO: a picture of what the buyer bought, shown on
+   * the line and printed on nothing. But the column a seller reaches for when they want a
+   * design on a sleeve is this one — sheets.js has described it as "the artwork on its own,
+   * placed at the product’s default print area" for as long as it has existed — and the
+   * grid’s own dropdown for it lists the seller’s DESIGN LIBRARY. Three surfaces already
+   * treated it as the design; only the help text said otherwise.
+   *
+   * So it is the design now, and Placement below says which face it lands on. The KEY is
+   * unchanged (`hero_image`), so the saved sheets, the column order and every alias keep
+   * working — what moved out from under it is the batch of photo-ish spellings, which now
+   * land on `listing_image` and still only ever set the picture (see COL_ALIASES).
+   */
+  { header: "Artwork ID", key: "hero_image", required: false, section: "product", help: "THE DESIGN — the thing we actually print, and what the line then shows as its picture. A URL, not a reference: anything that is not http(s) is dropped. It goes on the face named in Placement, or on the front when that is blank. It does NOT conflict with a Template ID: a template brings its own artwork and placement, and an Artwork ID typed beside one overrides both for this row. Headed “Image ID” on sheets downloaded before today; that spelling still imports." },
   /**
    * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
    * only one that is not artwork.
@@ -104,6 +120,20 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * rather than instead of it. What it replaces is the upload.
    */
   { header: "Machine File ID", key: "machine_file_id", required: false, section: "product", help: "YOUR OWN STITCH FILE, from Design Lab › Machine files. Type the reference off its card (MF-12). It is attached to THIS row’s unit, not to the whole order — so a two-line order can carry two different files. Embroidered lines only: there is no machine to run a stitch file on a DTG line, so a row that names one is rejected rather than charged for a file nothing can use." },
+  /**
+   * WHICH FACE — the one thing a sheet could never say about a design.
+   *
+   * A row is one unit, and until now every design a row named arrived on the FRONT: the
+   * only placement in the pipeline came from a template, drawn by hand in the maker. So a
+   * seller with a logo for the left sleeve and forty orders to raise had no route through
+   * the sheet at all.
+   *
+   * ONE FACE PER ROW, deliberately. A row is one garment and it carries one Artwork ID, so
+   * two faces on one unit is two artworks and a template is what holds those. The extra-side
+   * charge is counted from order_designs (pricing.js), so a row that names a single face
+   * prices exactly as a front-only line does today.
+   */
+  { header: "Placement", key: "print_side", required: false, section: "product", help: "WHERE ON THE GARMENT this row’s design goes — Front, Back, Left sleeve, Hood … Fill in the Blank Product first and the list narrows to the faces that garment actually has. One face per row: whatever the row names as its design lands there. Leave it blank and a template keeps the placement it was drawn with, and a bare Artwork ID goes on the front." },
   { header: "Quantity", key: "item_quantity", required: false, section: "product", help: "Defaults to 1 if blank." },
   { header: "Print Type", key: "print_type", required: false, section: "product", help: "Embroidery, DTG printing, Appliqué … Defaults to DTG printing if blank." },
   { header: "Color", key: "item_color", required: false, section: "product", help: "Garment colour." },
@@ -191,6 +221,59 @@ export const US_STATES = [
   "WV", "WI", "WY",
 ]
 export const ITEM_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "One Size"]
+
+/**
+ * ── WHERE ON THE GARMENT ──────────────────────────────────────────────────────
+ *
+ * The eight faces a design can be placed on. Mirrors ALL_SIDES in
+ * server/src/routes/factory_settings.js, which is the list a product TYPE picks from — so
+ * this is the CEILING, not what any one blank offers. The grid narrows it per product with
+ * typeSidesOf(); the .xlsx and the Google Sheet cannot (Sheets will not evaluate a
+ * dependent list — see the note in sheets.js), so those two offer all eight and the
+ * narrowing happens here on the way in.
+ */
+export const PRINT_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"] as const
+
+/**
+ * THE WORD IN THE CELL, NOT THE KEY WE STORE.
+ *
+ * `left` and `right` are what order_designs holds and what the design maker's face tiles
+ * say — beside a picture of the garment, which is what makes them readable. A spreadsheet
+ * cell has no picture, and "Left" on its own is a question rather than a placement, so the
+ * dropdown spells the sleeve out. Sheets data validation has no label-vs-value (the picked
+ * text IS the cell), so the spelling offered is the spelling that has to import — which is
+ * what normalizeSide is for.
+ */
+export const SIDE_LABEL: Record<string, string> = {
+  front: "Front", back: "Back", left: "Left sleeve", right: "Right sleeve",
+  sleeve: "Sleeve", hood: "Hood", inside: "Inside", wrap: "Wrap",
+}
+export const SIDE_OPTIONS: string[] = PRINT_SIDES.map((s) => SIDE_LABEL[s])
+
+/**
+ * Every spelling that should reach a face, EXACT rather than by substring.
+ *
+ * Substring matching is the trap here: "left chest" is a front placement in every POD
+ * vocabulary there is, and it contains "left", so a contains() check would quietly send a
+ * chest print to the sleeve. Anything not in this table resolves to "" and the row carries
+ * a warning naming what was typed — an unreadable placement must say so, never guess.
+ */
+const SIDE_ALIASES: Record<string, string> = {
+  front: "front", frontside: "front", fullfront: "front", chest: "front",
+  back: "back", backside: "back", rear: "back", fullback: "back",
+  left: "left", leftsleeve: "left", sleeveleft: "left", leftarm: "left", leftside: "left",
+  right: "right", rightsleeve: "right", sleeveright: "right", rightarm: "right", rightside: "right",
+  sleeve: "sleeve", sleeves: "sleeve", arm: "sleeve",
+  hood: "hood", hoodie: "hood",
+  inside: "inside", insidelabel: "inside", innerlabel: "inside", necklabel: "inside", label: "inside", tag: "inside",
+  wrap: "wrap", wraparound: "wrap", allover: "wrap",
+}
+
+/** A typed or picked placement → the face key order_designs stores. "" when unreadable. */
+export function normalizeSide(v: string): string {
+  const k = String(v ?? "").toLowerCase().replace(/[^a-z]/g, "")
+  return SIDE_ALIASES[k] ?? ""
+}
 /**
  * ONLY WHAT THE LABEL SCREEN CAN ACTUALLY BUY.
  *
@@ -226,6 +309,7 @@ export const COLUMN_OPTIONS: Record<string, string[]> = {
    * methodCode() on the server matches it back by regex, so both spellings import.
    */
   print_type: PRODUCT_METHODS.map((m) => m.label),
+  print_side: SIDE_OPTIONS,
   ship_state: US_STATES,
   /**
    * HEADER SPELLINGS, not size values — this was `ITEM_SIZES`, so the aliases for the size
@@ -287,12 +371,32 @@ const COL_ALIASES: Record<string, string[]> = {
   print_type: ["print_type", "print", "method", "technique", "print_method", "decoration"],
   item_color: ["item_color", "color", "colour", "variant_color"],
   item_size: ["item_size", "size", "variant_size"],
-  design_file_url: ["design_file_url", "design", "design_url", "artwork", "art_url", "design_file"],
+  /** The same thing as Artwork ID, under the spellings a seller's own export uses. It has
+   *  no column of its own and never has; when both are filled this one wins, because it is
+   *  the more explicit of the two. "artwork" moved to `hero_image` — that IS our column. */
+  design_file_url: ["design_file_url", "design", "design_url", "art_url", "design_file"],
   // Every spelling somebody might already have in a sheet. "emb"/"emb_file" are here
   // because .EMB is what actually arrives and it is what people call the column.
   machine_file_id: ["machine_file_id", "machine_file", "machine", "mf", "mf_id", "stitch_file",
     "stitch_file_id", "emb", "emb_file", "emb_id", "dst", "pes", "machine_file_ref"],
-  hero_image: ["hero_image", "image_link_id", "image_link", "image_id", "hero", "hero_img", "hero_url", "product_image", "product_img", "product_photo", "listing_image", "listing_img", "main_image", "image", "image_url", "img_url", "photo"],
+  /**
+   * THE DESIGN — and the photo-ish spellings are NOT here any more.
+   *
+   * This key used to swallow "image", "photo", "product_image", "listing_image" and
+   * "main_image" as well, which was harmless while the column only ever set a picture. It
+   * stops being harmless now the column PRINTS: a raw marketplace export whose "Image"
+   * column holds the listing photo would have arrived as forty units with a product
+   * photograph filed as their artwork, and the shape of that mistake is a box of shirts.
+   *
+   * So the spellings that mean "a picture of the thing" moved to `listing_image` below,
+   * which still only ever sets the line's picture. What is left here is our own column and
+   * the spellings that can only mean the design.
+   */
+  hero_image: ["hero_image", "artwork_id", "artwork", "art", "image_link_id", "image_link", "image_id", "hero", "hero_img", "hero_url"],
+  /** A PICTURE OF THE LINE, never printed — the spellings a marketplace export uses. */
+  listing_image: ["listing_image", "listing_img", "product_image", "product_img", "product_photo", "main_image", "image", "image_url", "image_src", "img_url", "photo"],
+  /** WHICH FACE the row's design lands on. Free text in, a face key out — normalizeSide. */
+  print_side: ["print_side", "placement", "side", "surface", "print_location", "print_placement", "design_side", "design_placement", "print_area"],
   internal_notes: ["internal_notes", "notes", "note", "internal_note", "order_note"],
   shipping_service: ["shipping_service", "service", "ship_method", "shipping_method"],
   sales_channel: ["sales_channel", "channel", "source"],
@@ -452,7 +556,28 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
     // Blank order number imports fine — it just can't be grouped, so it becomes its own
     // order under the platform number. Said here so the preview can state it BEFORE the
     // import, which is the only point at which it is still cheap to fix.
-    if (rec._valid && !rec.order_number) rec._warnings = "No Order Number — imports as its own order under a platform number"
+    const warn: string[] = []
+    if (rec._valid && !rec.order_number) warn.push("No Order Number — imports as its own order under a platform number")
+    /**
+     * A PLACEMENT THAT DOES NOTHING, SAID OUT LOUD.
+     *
+     * Both halves of this are warnings rather than errors, because both rows still make a
+     * garment and refusing them would be the harsher mistake. But both are silent failures
+     * otherwise: a misspelt face falls back to the front, and a face named on a row that
+     * carries no design has nothing to place — and in each case the seller finds out from
+     * a finished shirt rather than from this screen.
+     */
+    const placed = S(rec.print_side)
+    if (rec._valid && placed) {
+      if (!normalizeSide(placed)) warn.push(`Placement “${placed}” isn’t a face we print — the design goes on the front`)
+      // The SAME test groupToOrders applies. Reading these for mere emptiness said a row
+      // was fine when it carried `IMG-30` in Artwork ID — a value the parser drops for not
+      // being an address, so nothing would have been placed and nothing would have been said.
+      else if (!/^https?:\/\//i.test(S(rec.design_file_url)) && !/^https?:\/\//i.test(S(rec.hero_image)) && !S(rec.template_id)) {
+        warn.push("Placement with no design on the row — nothing to place there")
+      }
+    }
+    rec._warnings = warn.join("; ")
     return rec
   }).filter((r) => !isSampleRow(r as unknown as Record<string, string>))
   if (!records.length) return { records: [], error: "No order rows found — only a header (and maybe the sample row)." }
@@ -476,6 +601,15 @@ export type ImportItem = {
   name: string; sku: string; img: string; qty: number; unitPrice: number
   color: string; size: string; printType: string; designUrl: string; blank: string
   templateId: string; notes: string
+  /**
+   * WHICH FACE this line's design goes on — "" when the row didn't say.
+   *
+   * A face key (front/back/left/…), never the word the sheet offered: normalizeSide has
+   * already run, so "Left sleeve" and "left" are the same value by the time anything reads
+   * this. Blank means "the row expressed no opinion", which is NOT the same as front — a
+   * template still keeps the placement it was drawn with.
+   */
+  printSide: string
   /** The seller's own stitch file, by library reference (`MF-12`). Resolved and attached
    *  AFTER the order exists, against this line's own id — see the import dialog. */
   machineFileId: string
@@ -526,6 +660,11 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
     const head = rows[0]
     const items: ImportItem[] = rows.map((r) => {
       const hero = S(r.hero_image)
+      const url = (v: string) => (/^https?:\/\//i.test(v) ? v : "")
+      // The row's own design, most explicit spelling first. Both are the artwork now — see
+      // COL_ALIASES — and a value that is not an address is dropped rather than filed as
+      // one, which is the rule Artwork ID has always followed.
+      const artwork = url(S(r.design_file_url)) || url(hero)
       return {
         sku: S(r.item_sku),
         // THE BLANK IS THE FALLBACK NAME, and it sits ahead of the listing SKU because it is
@@ -534,13 +673,20 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
         // than a code. "Item" is what is left when a row has nothing at all, which the
         // required Blank Product now makes unreachable through the template.
         name: S(r.product_title) || S(r.item_name) || blankName(S(r.blank)) || S(r.item_sku) || "Item",
-        img: /^https?:\/\//i.test(hero) ? hero : "",
+        // The picture, which is the artwork unless the row supplied a separate listing photo.
+        img: url(S(r.listing_image)) || artwork,
         qty: Math.max(1, parseInt(S(r.item_quantity)) || 1),
         unitPrice: Number(S(r.item_price).replace(/[^0-9.]/g, "")) || 0,
         printType: S(r.print_type).toUpperCase(),
         color: S(r.item_color),
         size: S(r.item_size),
-        designUrl: S(r.design_file_url),
+        /* THE PRINTABLE ARTWORK, and it is NOT `img` even though one cell usually fills
+           both. `img` is borrowed between lines a few lines below — a parent row with no
+           picture takes a later line's — and doing that to a design would print line 2's
+           artwork on line 1. */
+        designUrl: artwork,
+        // Already a face key, so nothing downstream has to know the sheet's spelling.
+        printSide: normalizeSide(S(r.print_side)),
         // Carried through so the board can resolve production. `blank` is what we make on;
         // `templateId` names a saved design to apply, which fills the rest.
         blank: S(r.blank),

@@ -552,11 +552,28 @@ export function ImportOrdersDialog({
                   else mfAttached++
                 }
               }
-              const faces = (it.templateSides?.length
-                ? it.templateSides
-                : it.designUrl && (it.templatePos || it.templateId)
-                  ? [{ side: "front", artwork: it.designUrl, pos: it.templatePos ?? null }]
-                  : [])
+              /**
+               * WHICH FACES THIS LINE PRINTS ON — and the row's Placement outranks all of it.
+               *
+               * A named placement collapses the line to ONE face, because that is what the
+               * column means: put this design there. It beats a template's own sides for the
+               * same reason the sheet beats a template everywhere else — somebody typed it.
+               * The template's POSITION still applies, since where on the face a design sits
+               * is a different question from which face it is, and the template is the only
+               * thing that ever knew the answer to the first.
+               *
+               * With no placement this is what it always was: the template's faces, else the
+               * front. The one broadening is that a row naming its own artwork now gets a
+               * design row at all — it used to need a template alongside it, so an Artwork ID
+               * on its own reached the line as a picture and was never printed.
+               */
+              const faces = (it.printSide
+                ? (it.designUrl ? [{ side: it.printSide, artwork: it.designUrl, pos: it.templatePos ?? null }] : [])
+                : it.templateSides?.length
+                  ? it.templateSides
+                  : it.designUrl
+                    ? [{ side: "front", artwork: it.designUrl, pos: it.templatePos ?? null }]
+                    : [])
               for (const f of faces) {
                 if (!f.artwork) continue
                 await postOrderDesign(orderId, {

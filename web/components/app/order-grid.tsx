@@ -31,15 +31,17 @@ import {
   ITEM_SIZES,
   US_STATES,
   TEMPLATE_HEADERS,
+  SIDE_LABEL,
+  SIDE_OPTIONS,
   rowsToRecords,
   parsePasted,
   type ImportRecord,
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
-import { resolveProduct, productLabel } from "@/lib/variant-resolve"
+import { resolveProduct, productLabel, setTypeMockups, typeSidesOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
-import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles,
+import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles, getProductTypes,
   getEtsyConnections, getShopifyConnections, getTiktokConnections, type EtsyConnection,
   type CatalogProduct, type ProductTemplate, type LibraryDesign, type MachineFile } from "@/lib/api"
 
@@ -92,6 +94,9 @@ const FIXED_OPTIONS: Record<string, string[]> = {
   item_size: ITEM_SIZES,
   ship_state: US_STATES,
   print_type: COLUMN_OPTIONS.print_type ?? [],
+  /* All eight faces, for a row that has not named a product yet. Once it has, optionsFor
+     narrows this to the faces that garment's TYPE actually has — a beanie has no sleeve. */
+  print_side: SIDE_OPTIONS,
 }
 
 /** Where a viewer's dragged column widths and row heights live. Per BROWSER, not per sheet:
@@ -150,12 +155,23 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
   const [images, setImages] = useState<LibraryDesign[]>([])
   const [machineFiles, setMachineFiles] = useState<MachineFile[]>([])
   const [stores, setStores] = useState<EtsyConnection[]>([])
+  /* Held as well as handed to setTypeMockups, because typeSidesOf cannot say "I have never
+     heard of this type" — it answers ["front"] for a category nobody has configured exactly
+     as it does for one that genuinely prints on the front only. Knowing which types exist is
+     what tells a real answer from a default. */
+  const [productTypes, setProductTypes] = useState<{ name: string }[]>([])
   useEffect(() => {
     let live = true
     getCatalogProducts().then((c) => { if (live) setCatalog(c ?? []) }).catch(() => {})
     getTemplates().then((t) => { if (live) setTemplates(t ?? []) }).catch(() => {})
     getDesignLibrary().then((d) => { if (live) setImages(d ?? []) }).catch(() => {})
     getMachineFiles().then((m) => { if (live) setMachineFiles(m ?? []) }).catch(() => {})
+    /* THE FACES EACH CATEGORY HAS, so the Placement cell can offer a beanie's sides rather
+       than a t-shirt's. Handed to setTypeMockups because typeSidesOf reads that module-level
+       table — the same call design-maker makes, so the two can never disagree about which
+       faces a type prints. A failure here only costs the narrowing: FIXED_OPTIONS still
+       offers all eight. */
+    getProductTypes().then((t) => { if (!live) return; setProductTypes(t ?? []); setTypeMockups(t ?? []) }).catch(() => {})
     /* THE SHOPS THIS ACCOUNT HAS CONNECTED, from all three channels. Settled, not all:
        a seller with Etsy connected and no TikTok must still get their Etsy shop, and a
        platform that errors cannot take the other two down with it. */
@@ -427,7 +443,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * Template ID and Machine File ID take a REFERENCE — `TPL-12`, `MF-12` — so the value is
    * the reference and the label carries the name that tells two of them apart.
    *
-   * Image ID does NOT. The importer reads it as `/^https?:\/\//.test(hero) ? hero : ""`, so
+   * Artwork ID does NOT. The importer reads it as `/^https?:\/\//.test(v) ? v : ""`, so
    * despite the column's name it wants a URL and silently drops anything else. Offering
    * `IMG-12` here would have looked right, matched the other two columns, and quietly
    * imported nothing — so the value is the image's address and the label is its name.
@@ -465,7 +481,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     (colKey: string, row: string[]): Opt[] | null => {
       const refs = refOptions[colKey]
       if (refs) return refs.length ? refs : null
-      const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type"
+      const dependent = colKey === "item_color" || colKey === "item_size" || colKey === "print_type" || colKey === "print_side"
       if (!dependent) return FIXED_OPTIONS[colKey] ?? null
       // resolveProduct, not a private name match — it is the canonical matcher and it is what
       // knows the cell may be "SKU - Name" (CLAUDE.md §5: import, don't re-implement). A
@@ -476,6 +492,15 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
       if (!p) return FIXED_OPTIONS[colKey] ?? null
       if (colKey === "item_color") return productColors(p as never)
       if (colKey === "item_size") return productSizes(p as never)
+      /* The faces this garment's TYPE prints, spelled the way the dropdown spells them —
+         SIDE_LABEL, so the cell holds "Left sleeve" and never the bare "left" that would
+         read as an unfinished sentence in a spreadsheet. normalizeSide reads both back. */
+      if (colKey === "print_side") {
+        const known = productTypes.some((t) => t.name.toLowerCase() === String(p.type ?? "").toLowerCase())
+        return known
+          ? typeSidesOf(p as never).map((sd) => SIDE_LABEL[sd] ?? sd)
+          : FIXED_OPTIONS.print_side ?? null
+      }
       /* BOTH FIELDS, NOT ONE. This read `method` alone, and CatalogProduct's own note on
          `methods` says to read it alongside — "or a product that has both loses half its
          options". A product carrying its techniques as a LIST (which is every imported one)
@@ -486,7 +511,7 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
       const own = normalizeMethods([p.method, ...(p.methods ?? [])]).map((m) => m.label)
       return own.length ? own : FIXED_OPTIONS[colKey] ?? null
     },
-    [catalog, refOptions],
+    [catalog, refOptions, productTypes],
   )
 
   /**
@@ -521,6 +546,10 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
         next[r][IDX.item_color] = ""
         next[r][IDX.item_size] = ""
         next[r][IDX.print_type] = ""
+        /* A face is as much a property of the garment as a size is — a sleeve placement
+           left behind on a row that now names a beanie is a value its dropdown no longer
+           offers, which is the exact thing this block exists to clear. */
+        next[r][IDX.print_side] = ""
       }
       return next
     /* Tagged with the cell, so a burst of typing in one box is ONE undo — see writeRows. */

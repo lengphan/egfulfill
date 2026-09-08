@@ -98,29 +98,39 @@ const T_COLUMNS = [
    * same question two ways.
    *
    * A Template ID already carries the blank, the placement and the artwork, so a row with
-   * one needs nothing else. An Image ID is the artwork on its own, placed at the product's
-   * default print area — which is all a spreadsheet row can express, since there is no way
-   * to type a position into a cell.
+   * one needs nothing else. An Artwork ID is the design on its own, and the Placement column
+   * below says which face it lands on — which is as much of a position as a spreadsheet row
+   * can express, since there is no way to type an x and a y into a cell.
    *
-   * Image ID was four columns further right, past the variant fields, so the two ways of
-   * saying "here is the design" were separated by everything that is not the design. Both
-   * were also longer than they needed to be: "Template/Design ID" and "Image Link/ID" each
-   * spent a column's width on a slash. The importer aliases every old spelling, so a sheet
-   * downloaded before today still reads — see COL_ALIASES in web/lib/order-import.ts.
+   * It was headed 'Image ID' and documented as the listing photo until 2026-09-08; the
+   * rename is in web/lib/order-import.ts with the reasoning. Both spellings still import.
    */
   { h: 'Template ID', g: 'product', duty: '', sample: 'TPL-12' },
-  { h: 'Image ID', g: 'product', duty: '', sample: '' },
+  { h: 'Artwork ID', g: 'product', duty: '', sample: '' },
   /**
    * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
    * only one that is not artwork.
    *
-   * Template ID and Image ID hand us a PICTURE we cut a machine file from. This hands us the
+   * Template ID and Artwork ID hand us a PICTURE we cut a machine file from. This hands us the
    * machine file, which is what actually arrives: sellers send .EMB. It rides beside the
    * other two because it answers the same question, and this list is a HAND-KEPT MIRROR of
    * web/lib/order-import.ts's CSV_COLUMNS — change one and change the other, or the sheet we
    * hand out stops importing itself.
    */
   { h: 'Machine File ID', g: 'product', duty: '', sample: '' },
+  /**
+   * WHICH FACE the row's design goes on — the one thing a sheet could never say.
+   *
+   * A FIXED LIST, not a dependent one, and that is not a shortcut: Sheets will not evaluate
+   * INDIRECT inside a validation rule (see the long note by the rules below), so every
+   * "dependent" column here already degrades to the union of its axis. The union of the
+   * sides axis IS these eight, so a per-product range would build the same dropdown out of
+   * far more machinery. The narrowing lives in the app's own grid, which can do it properly.
+   *
+   * Mirrors CSV_COLUMNS in web/lib/order-import.ts — change one and change the other, or
+   * the sheet we hand out stops importing itself.
+   */
+  { h: 'Placement', g: 'product', duty: '', sample: 'Front', opts: 'sides' },
   { h: 'Quantity', g: 'product', duty: '', sample: '1' },
   // `dep` = this column's dropdown is whatever the chosen Blank Product offers, not a
   // fixed list. See LISTS below for how that is wired.
@@ -141,6 +151,11 @@ const T_OPTS = {
   // Mirrors METHOD_LABELS in server/src/print-route.js — change both.
   methods: ['DTG printing', 'DTF printing', 'Embroidery', 'Appliqué', 'Laser', 'Screen print', 'Sublimation', 'Vinyl'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'One Size'],
+  // THE WORD, NOT THE FACE KEY. order_designs stores 'left'; a spreadsheet cell saying
+  // "Left" on its own is a question, so the dropdown spells the sleeve out and
+  // normalizeSide (web/lib/order-import.ts) reads every spelling back. Mirrors SIDE_LABEL
+  // there, which mirrors ALL_SIDES in factory_settings.js — three copies, one order.
+  sides: ['Front', 'Back', 'Left sleeve', 'Right sleeve', 'Sleeve', 'Hood', 'Inside', 'Wrap'],
   // `services` was here and went with the Shipping Service column (2026-08-21). The label
   // screen picks the class at buy time against the live Shippo account, so a value typed
   // into a spreadsheet days earlier was never consulted — SHIPPING_SERVICES in
@@ -447,7 +462,7 @@ export function buildTemplate(title, lists = null) {
      * WIPE THE OLD RULES BEFORE WRITING THE NEW ONES.
      *
      * Formatting only ever SET validation, so a rule outlived the column it was written for.
-     * Inserting Image ID pushed Print Type one column right, and the dependent rule that used
+     * Inserting Artwork ID pushed Print Type one column right, and the dependent rule that used
      * to live there stayed behind on Item Quantity — a quantity cell offering a broken list of
      * print methods, which is worse than no dropdown because it looks deliberate.
      *
