@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
-import { PageObject, ROLE_OBJECT } from "@/components/app/page-object"
+import { PageBand, ROLE_PHOTO } from "@/components/app/page-band"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf, platformOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
@@ -227,29 +227,18 @@ export function DashboardView() {
           panel directly below, where they can be read rather than watched going past. */}
       <DashboardTicker />
 
-      {/* A GROUND UNDER THE GREETING, AND NOWHERE ELSE.
-          The marketing site's grammar is a band that is a fill; the app had none of it, so the
-          first screen opened on bare canvas. This gives the one block that is not data a
-          ground — `bg-brand`, the app token a skin is allowed to move, and it carries
-          `brand-foreground` so the type is a foreground we control rather than a hue.
-
-          IT STOPS AT THE GREETING. §4 is explicit that the canvas stays white: a tint behind a
-          700-row queue is a sheet you read THROUGH all day. This is a header, not a wash. */}
-      {/* NO GLYPH BESIDE THE NAME. It was an 18px outline icon floating in whitespace, which
-          §4 names exactly: a loose stroke is decoration the eye reads past, and a mark only
-          earns its place in a tile. The greeting is type; the person's name is the mark. */}
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-brand px-5 py-4 text-brand-foreground">
-        <div>
-          <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
-          <p className="text-sm text-brand-foreground/70">
-            {todayLabel}
-            {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-brand-foreground">{stats.newToday}</span> {t("dash.newToday")}</>}
-          </p>
-        </div>
-        {/* The band's right side was empty. One object, and a different one per surface, so a
-            person knows where they are before they read the title. */}
-        <PageObject src={ROLE_OBJECT.seller} />
-      </div>
+      {/* THE BAND IS THE PLATE, AND THE OBJECT ON IT IS A PHOTOGRAPH.
+          Both decisions and their evidence live in page-band.tsx: a full `bg-brand` fill was
+          a pastel plank across the top of a dark page, and the balloon render was the one
+          device here that could never also appear on a product. */}
+      <PageBand
+        photo={ROLE_PHOTO.seller}
+        title={<>{greeting}, {name}</>}
+        sub={<>
+          {todayLabel}
+          {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-[var(--mk-acid)]">{stats.newToday}</span> {t("dash.newToday")}</>}
+        </>}
+      />
 
       {/* ONE money block, where there were four tiles and a chart under them.
        *

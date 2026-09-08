@@ -126,7 +126,6 @@ export function ShortcutsCard({
  grow to meet a taller neighbour instead of the card leaving empty space below. */}
       <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-2 p-3">
         {shown.map((q, i) => {
- const Icon = q.icon
  const dragProps = editing ? {
  draggable: true,
  onDragStart: () => { dragFrom.current = i },
@@ -140,11 +139,17 @@ export function ShortcutsCard({
             (editing ? "cursor-grab bg-card active:cursor-grabbing" : "hover:border-primary/40 hover:bg-accent")
  const inner = (
             <>
-              {/* Bare, monochrome, no tinted plate. Four tiles in a grid each wearing the same
- violet chip meant the eye met four identical coloured squares before it read a
- single word — the icon was slowing recognition down rather than speeding it up.
-                  The accent is kept for things that need you, not for every tile. */}
-              <span className="flex items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground"><Icon size={22} /></span>
+              {/* NO ICON. A tinted chip was tried first and rejected — four tiles each wearing
+ the same violet square meant the eye met four identical marks before it read a
+ single word. The bare 22px outline that replaced it was the other failure §4
+ names: a loose stroke floating in whitespace is decoration the eye reads past,
+ and it was carrying no information the label did not already carry.
+                  What is left is a rule, which is the house's own active mark (a tab is a rule
+ under the live word), and it goes to `--brand` on hover — so the tile says
+ "pick me" with the one token a skin is allowed to move. The icon still exists on
+ the item; it is what the add-menu below is listed with, where a 16px glyph beside
+ a single word IS the difference between two rows. */}
+              <span className="h-1 w-6 rounded-full bg-border transition-colors group-hover:bg-brand" />
               <span className="min-w-0">
                 <span className="block text-base font-semibold leading-tight tracking-tight">{nl("nav", q.label)}</span>
                 {/* NOT truncated. The description is the whole reason the tile isn't just a
