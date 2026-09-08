@@ -230,8 +230,6 @@ const vi: Dict = {
   "tour.Getting around": "Làm quen với bảng",
   "tour.Open the board guide": "Mở hướng dẫn bảng",
   "tour.Minimise": "Thu nhỏ",
-  "tour.Back": "Quay lại",
-  "tour.Next": "Tiếp",
   "tour.Got it": "Đã hiểu",
   "tour.Your queue is Orders": "Hàng chờ của bạn là Sản xuất",
   "tour.Everything the floor is making, by stage.": "Tất cả những gì xưởng đang làm, theo từng công đoạn.",

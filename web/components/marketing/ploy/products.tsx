@@ -4,9 +4,10 @@ import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
-import { HOVER, pop, reveal, rise } from "./motion"
+import { HOVER, pop, reveal } from "./motion"
 import { GUTTER, SECTION, TOP } from "./rhythm"
 import type { PublicProduct } from "@/lib/api"
+import { methodsAcross, methodsOf } from "./methods-of"
 
 /**
  * THE PRODUCTS PAGE — one garment shot large, then every other one shot identically.
@@ -37,9 +38,50 @@ const HEADWEAR = [
   { img: "beanie", name: "Cuffed beanie", methods: ["Embroidery"] },
 ]
 
-/** Every method any blank takes, in the floor's own order — derived from BLANKS/HEADWEAR so
- *  a tab can never be offered that matches nothing. */
+/** The blanks, as one row. */
 const ALL = [...BLANKS, ...HEADWEAR]
+
+/**
+ * ONE FILTER, DRAWN AS A LIST. No pills, no band, no chrome — §4 calls a filter a FIELD, and
+ * the least a field can wear is its own words. The live option is the only one that is ink;
+ * everything else is muted, which is the whole active treatment.
+ */
+function FilterList({
+  head,
+  options,
+  value,
+  onChange,
+  className = "",
+}: {
+  head: string
+  options: string[]
+  value: string
+  onChange: (v: string) => void
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/40">{head}</p>
+      <ul className="mt-4 flex flex-col gap-2.5">
+        {options.map((o) => (
+          <li key={o}>
+            <button
+              type="button"
+              onClick={() => onChange(o)}
+              aria-pressed={value === o}
+              className={
+                "text-left text-[15px] transition-colors " +
+                (value === o ? "font-semibold text-ploy-ink" : "text-ploy-ink/55 hover:text-ploy-ink")
+              }
+            >
+              {o}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 export function PloyProducts({
   products,
@@ -54,16 +96,27 @@ export function PloyProducts({
   accent: string
   lead: string
 }) {
-  const [pMethod, setPMethod] = useState("All")
+  const [cat, setCat] = useState("All")
+  const [method, setMethod] = useState("All")
 
-  /* The catalogue's filter is DERIVED from the catalogue, not from the blanks above: the two
-     lists are different data and a tab that matches nothing is worse than no tab. */
-  const pMethods = useMemo(() => {
-    const set = new Set<string>()
-    for (const p of products ?? []) for (const m of p.methods ?? []) set.add(m)
-    return ["All", ...[...set].sort()]
-  }, [products])
-  const visible = (products ?? []).filter((p) => pMethod === "All" || (p.methods ?? []).includes(pMethod))
+  /* Both lists are DERIVED from what the catalogue actually holds, so neither can offer an
+     option that matches nothing. Methods are split and normalised first — see methods-of.ts. */
+  const categories = useMemo(
+    () => ["All", ...[...new Set((products ?? []).map((p) => p.category).filter((c): c is string => !!c))].sort()],
+    [products],
+  )
+  const methodTabs = useMemo(() => ["All", ...methodsAcross(products ?? [])], [products])
+
+  const visible = useMemo(
+    () =>
+      (products ?? []).filter(
+        (p) =>
+          (cat === "All" || p.category === cat) &&
+          (method === "All" || methodsOf(p).includes(method)),
+      ),
+    [products, cat, method],
+  )
+
   return (
     <div className="bg-ploy-ground text-ploy-ink">
       {/* ── THE OPENER: TYPE ON THE GROUND ────────────────────────────────
@@ -144,91 +197,88 @@ export function PloyProducts({
         </div>
       </section>
 
-      {/* ── THE LIVE CATALOGUE, IN THE SAME CARD ──────────────────────────── */}
-      {/* Restored 2026-09-08 in the new treatment. It came out for a day because its rows are
-          supplier stock photography on white and the seam against the shoot above was the
-          loudest thing on the page — the answer is the SAME CARD, not no catalogue: identical
-          radius, identical 4:5 frame, identical type scale, and the image sitting on the same
-          periwinkle wash the blanks do, so a supplier photo and one of ours differ by their
-          content rather than by their container.
+      {/* ── THE CATALOGUE: A LIST TO FILTER BY, AND THE PRODUCTS ──────────────
+          It was a periwinkle band with a row of tabs across it, and the tabs were built from
+          the raw `methods` entries — which are COMPOUND strings in the live data, so it
+          offered "DTG printing / Embroidery / Appliqué / Laser / DTF printing" as if that
+          were one method, beside a separate tab reading "DTG". See methods-of.ts.
 
-          Per-product photography needs no code: the product editor already owns the image and
-          its framing (`imgZoom` / `imgFocusY`, see lib/product-framing.ts), and the public
-          shape publishes both — so a better photo uploaded there lands here with the crop it
-          was given. Nothing on this page has to change for that to happen. */}
-      <section id="catalogue" className={`${GUTTER} ${SECTION}`}>
-        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky px-8 py-16 md:px-14 md:py-20">
-          <h2 className="ploy-display text-[clamp(2rem,4.4vw,3.8rem)]">
-            <motion.span {...reveal(0)} className="block">Published today.</motion.span>
-          </h2>
-          <motion.p {...reveal(0.1)} className="mt-5 max-w-lg text-[17px] leading-relaxed text-ploy-ink/70">
-            Live from the catalogue — every one of these is orderable now, at the price shown.
-          </motion.p>
+          The filter is a plain list in a column now: no band, no pills, no chrome. It is the
+          shape a catalogue filter has everywhere because it is the one that works — you can
+          see every option at once, the current one is legible, and it costs a click rather
+          than a horizontal scroll. Two lists, ANDed, and a count in the heading so the
+          filter's effect is visible without scrolling the grid. */}
+      <section className={`${GUTTER} ${SECTION}`} id="catalogue">
+        <h2 className="ploy-display text-[clamp(2rem,4.4vw,3.8rem)]">
+          <motion.span {...reveal(0)} className="block">
+            Products{products ? ` (${visible.length})` : ""}
+          </motion.span>
+        </h2>
 
-          {products !== null && products.length > 0 && pMethods.length > 2 && (
-            <motion.div {...reveal(0.15)} className="mt-8 -mb-px flex gap-6 overflow-x-auto border-b border-ploy-ink/15">
-              {pMethods.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setPMethod(m)}
-                  aria-pressed={pMethod === m}
-                  className={
-                    "-mb-px shrink-0 border-b-2 pb-3 text-[15px] transition-colors " +
-                    (pMethod === m
-                      ? "border-ploy-ink font-medium text-ploy-ink"
-                      : "border-transparent text-ploy-ink/55 hover:text-ploy-ink")
-                  }
-                >
-                  {m}
-                </button>
-              ))}
-            </motion.div>
-          )}
+        {products === null ? (
+          <p className="mt-8 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
+            The catalogue could not be loaded just now. This is our end, not yours — the
+            products are still there.{" "}
+            <Link href="/contact" className="underline underline-offset-4">Tell us</Link> if it stays this way.
+          </p>
+        ) : products.length === 0 ? (
+          <p className="mt-8 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
+            Nothing is published to the public catalogue yet. The blanks above are what the
+            factory keeps — <Link href="/signup" className="underline underline-offset-4">start free</Link> and
+            you can order any of them.
+          </p>
+        ) : (
+          <div className="mt-10 grid gap-10 md:grid-cols-[190px_1fr] md:gap-12">
+            {/* The list STICKS, so it is still there when you are six rows down — the whole
+                point of a sidebar over a tab strip. `top-24` clears the fixed header. */}
+            <aside className="md:sticky md:top-24 md:self-start">
+              <FilterList
+                head="Category"
+                options={categories}
+                value={cat}
+                onChange={setCat}
+              />
+              <FilterList
+                head="Print method"
+                options={methodTabs}
+                value={method}
+                onChange={setMethod}
+                className="mt-8 border-t border-ploy-ink/10 pt-8"
+              />
+            </aside>
 
-          {/* THREE OUTCOMES, THREE MESSAGES. A failed read and an empty catalogue must never
-              look the same — that is the defect §4 names, and it once had this page reporting
-              "nothing published" while the API was answering perfectly. */}
-          {products === null ? (
-            <p className="mt-10 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
-              The catalogue could not be loaded just now. This is our end, not yours — the
-              products are still there.{" "}
-              <Link href="/contact" className="underline underline-offset-4">Tell us</Link> if it stays this way.
-            </p>
-          ) : products.length === 0 ? (
-            <p className="mt-10 max-w-md text-[16px] leading-relaxed text-ploy-ink/70">
-              Nothing is published to the public catalogue yet. The blanks above are what the
-              factory keeps — <Link href="/signup" className="underline underline-offset-4">start free</Link> and
-              you can order any of them.
-            </p>
-          ) : (
-            <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-              {visible.map((p, i) => (
-                <motion.div key={p.slug} {...reveal(0.04 * Math.min(i, 8))} whileHover={{ y: -4 }} transition={HOVER}>
-                  <Link href={`/catalog/${p.slug}`} className="block overflow-hidden rounded-2xl bg-ploy-paper">
-                    <div className="aspect-[4/5] overflow-hidden bg-ploy-sky">
-                      {/* The image is served from OUR url — the public shape resolves the
-                          supplier's address server-side, so it never reaches this markup
-                          (§2.9). No image is an honest blank tile, never a placeholder that
-                          implies a photo exists. */}
-                      {p.image ? (
-                        <Image src={p.image} alt={p.name} width={600} height={750} loading="lazy" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="h-full w-full" />
-                      )}
-                    </div>
-                    <div className="p-4 md:p-5">
-                      <p className="truncate text-[15px] font-semibold md:text-[17px]">{p.name}</p>
-                      <p className="mt-1 text-[13px] tabular-nums text-ploy-ink/55">
-                        {p.priceVaries ? "from " : ""}${Number.isInteger(p.priceFrom ?? p.price) ? (p.priceFrom ?? p.price) : (p.priceFrom ?? p.price).toFixed(2)}
-                      </p>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
+            <div>
+              {visible.length === 0 ? (
+                <p className="text-[16px] leading-relaxed text-ploy-ink/70">
+                  Nothing matches that pair yet. <button type="button" onClick={() => { setCat("All"); setMethod("All") }} className="underline underline-offset-4">Clear the filters</button>.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+                  {visible.map((p, i) => (
+                    <motion.div key={p.slug} {...reveal(0.03 * Math.min(i, 8))} whileHover={{ y: -4 }} transition={HOVER}>
+                      <Link href={`/catalog/${p.slug}`} className="block">
+                        <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-paper">
+                          {/* The image is served from OUR url — the public shape resolves the
+                              supplier's address server-side, so it never reaches this markup
+                              (§2.9). No image is an honest blank tile, never a placeholder. */}
+                          {p.image ? (
+                            <Image src={p.image} alt={p.name} width={600} height={750} loading="lazy" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full" />
+                          )}
+                        </div>
+                        <p className="mt-3 truncate text-[15px] font-semibold">{p.name}</p>
+                        <p className="mt-0.5 text-[13px] tabular-nums text-ploy-ink/55">
+                          {p.priceVaries ? "from " : ""}${Number.isInteger(p.priceFrom ?? p.price) ? (p.priceFrom ?? p.price) : (p.priceFrom ?? p.price).toFixed(2)}
+                        </p>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </motion.div>
+          </div>
+        )}
       </section>
 
     </div>

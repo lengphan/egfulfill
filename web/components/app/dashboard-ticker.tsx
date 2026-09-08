@@ -22,7 +22,24 @@ export function DashboardTicker({ items, nudge }: { items: string[]; nudge?: str
 
   // The nudge is last so it never reads as one of the figures.
   const all = nudge ? [...items, nudge] : items
-  const track = [...all, ...all]
+
+  /**
+   * THE SET IS REPEATED UNTIL HALF THE TRACK IS WIDER THAN ANY SCREEN, and that is what makes
+   * the loop look infinite rather than stuttering.
+   *
+   * The animation translates the track by exactly -50%, so the second half has to be sitting
+   * where the first half started at the moment it wraps. With four short figures the whole
+   * track was narrower than the viewport, so -50% moved it a couple of hundred pixels and
+   * then snapped — visible as a jump with empty space behind it. Padding the list out first
+   * costs nothing (they are strings) and removes the case entirely.
+   *
+   * 16 is the floor rather than a measurement: the longest item here is a sentence, so 16 of
+   * them is several thousand pixels, and the alternative — measuring the container and
+   * counting — is a resize listener for a decorative strip.
+   */
+  const padded = [...all]
+  while (padded.length < 16) padded.push(...all)
+  const track = [...padded, ...padded]
 
   return (
     <div className="eg-marquee-hold overflow-hidden rounded-lg border border-border bg-muted/40 py-2">

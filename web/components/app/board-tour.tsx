@@ -106,7 +106,6 @@ export function BoardTour() {
   // Read synchronously, so someone who has seen it never renders the panel for a frame.
   const [done, setDone] = useState<boolean>(() => (role ? read(doneKey(role)) === "1" : true))
   const [open, setOpen] = useState(true)
-  const [i, setI] = useState(0)
   const [corner, setCorner] = useState<Corner>(() => {
     const c = read(CORNER_KEY)
     return CORNERS.includes(c as Corner) ? (c as Corner) : DEFAULT_CORNER
@@ -131,9 +130,7 @@ export function BoardTour() {
   // The chat page owns the whole viewport on phones; the pill would sit on the composer.
   if (pathname === "/chat") return null
 
-  const card = cards[i]
-  const last = i === cards.length - 1
-  const count = `${i + 1}/${cards.length}`
+  const count = String(cards.length)
   const spring = reduced ? { duration: 0 } : { type: "spring" as const, stiffness: 420, damping: 32 }
 
   if (!open) {
@@ -151,7 +148,7 @@ export function BoardTour() {
         animate={{ scale: 1, opacity: 1 }}
         transition={spring}
         aria-label={tl("tour", "Open the board guide")}
-        title={`${tl("tour", "Getting around")} · ${count}`}
+        title={tl("tour", "Getting around")}
         className={"fixed z-40 flex size-12 cursor-grab touch-none select-none items-center justify-center rounded-full bg-primary text-sm font-semibold tabular-nums text-primary-foreground ring-1 ring-foreground/10 active:cursor-grabbing " + PILL_POS[corner]}
       >
         {count}
@@ -192,45 +189,48 @@ export function BoardTour() {
             <Minus size={14} weight="bold" />
           </button>
         </div>
-        {/* One segment per card, filled up to where you are. */}
-        <div className="mt-3 flex gap-1">
-          {cards.map((c, n) => (
-            <span
-              key={c.title}
-              className={"h-1 flex-1 rounded-full " + (n <= i ? "bg-brand-foreground" : "bg-brand-foreground/25")}
-            />
-          ))}
-        </div>
       </div>
 
-      <div className="px-4 py-4">
-        <p className="text-sm font-semibold">{tl("tour", card.title)}</p>
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{tl("tour", card.body)}</p>
-        <Link
-          href={card.href}
-          onClick={minimise}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-foreground underline underline-offset-4"
-        >
-          {card.where}
-          <ArrowRight size={11} weight="bold" />
-        </Link>
-      </div>
+      {/* THE SELLER'S SHAPE, because a staffer may well have seen that one and should not be
+          learning a second object. Every card is on screen at once — it was a one-at-a-time
+          stepper with Back/Next, which makes three short facts feel like a form and hides two
+          thirds of what there is to know behind a button.
 
-      <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
+          NO TICKS. The seller's rows carry a check because each is a real state the product
+          can verify; nothing here is checkable — it is a tour, not a checklist (see the note
+          at the top). A numeral is the mark instead, so the rows read as an ordered list of
+          places rather than as tasks left undone. */}
+      <ol className="flex flex-col p-2">
+        {cards.map((c, n) => (
+          <li key={c.title}>
+            <Link
+              href={c.href}
+              onClick={minimise}
+              className="flex items-start gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-accent"
+            >
+              <span className="mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 border-border text-2xs font-semibold tabular-nums text-muted-foreground">
+                {n + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{tl("tour", c.title)}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{tl("tour", c.body)}</span>
+                <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground">
+                  {c.where}
+                  <ArrowRight size={10} weight="bold" />
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+
+      <div className="flex items-center justify-end border-t border-border px-4 py-3">
         <button
           type="button"
-          onClick={() => setI((n) => n - 1)}
-          disabled={i === 0}
-          className="rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-opacity hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
-        >
-          {tl("tour", "Back")}
-        </button>
-        <button
-          type="button"
-          onClick={() => (last ? finish() : setI((n) => n + 1))}
+          onClick={finish}
           className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground"
         >
-          {last ? tl("tour", "Got it") : tl("tour", "Next")}
+          {tl("tour", "Got it")}
         </button>
       </div>
     </motion.section>

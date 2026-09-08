@@ -162,7 +162,12 @@ export function DashboardView() {
   * `topProducts` carries `img` now — the field the row avatars and the design canvas
   * already read, resolved from `img_ref` at the API boundary. A product that has never
   * carried a thumbnail falls back to Thumb's marked tile rather than a broken image. */
- const blanks = useMemo(() => topProducts(orders ?? [], 4), [orders])
+ /* EIGHT, NOT FOUR. The cap was the limit, not the data: an account selling a dozen
+     different blanks saw a quarter of them. Eight fills two rows of the grid below and is
+     still a shortlist rather than a report. An account with fewer simply shows fewer —
+     nothing is padded to fill the row, because a placeholder tile beside a real product is
+     the invented-data problem §4 forbids. */
+  const blanks = useMemo(() => topProducts(orders ?? [], 8), [orders])
 
  /* WHAT IS WAITING ON THE SELLER, and only then what is recent.
   *
