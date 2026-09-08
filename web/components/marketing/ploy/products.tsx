@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
@@ -25,28 +25,25 @@ import { sizeRangeLabel } from "@/lib/size-order"
  * common scale afterwards rather than trusted — the camera distance varied between them.
  */
 
-/** The garments we keep as blanks. `methods` are the floor's own suffixes (§5). */
-const BLANKS = [
-  { img: "hoodie", name: "Heavyweight hoodie", methods: ["Embroidery", "DTG", "DTF"] },
-  { img: "tee", name: "Classic tee", methods: ["DTG", "DTF", "Screen print"] },
-  { img: "crew", name: "Crewneck sweatshirt", methods: ["Embroidery", "DTG", "Appliqué"] },
-  { img: "longsleeve", name: "Long-sleeve tee", methods: ["DTG", "DTF"] },
-  { img: "zip", name: "Zip hoodie", methods: ["Embroidery", "DTF"] },
-  { img: "varsity", name: "Varsity jacket", methods: ["Appliqué", "Embroidery"] },
-]
-const HEADWEAR = [
-  { img: "cap", name: "Six-panel cap", methods: ["Embroidery", "Laser"] },
-  { img: "beanie", name: "Cuffed beanie", methods: ["Embroidery"] },
-]
-
-/** The blanks, as one row. */
-const ALL = [...BLANKS, ...HEADWEAR]
-
 /**
- * ONE FILTER, DRAWN AS A LIST. No pills, no band, no chrome — §4 calls a filter a FIELD, and
- * the least a field can wear is its own words. The live option is the only one that is ink;
- * everything else is muted, which is the whole active treatment.
+ * THE CATEGORIES THE LIVE CATALOGUE ACTUALLY USES, each with a photograph of its own.
+ *
+ * `key` is matched against `PublicProduct.category` verbatim — these are not labels invented
+ * for the page, they are the four values the published products carry. A category with no
+ * products simply does not draw, so this list going stale shows as an absence rather than as
+ * a tile that filters to nothing.
+ *
+ * The photographs are ours, shot to one direction (periwinkle seamless, one soft key). They
+ * are illustrative of the CATEGORY, not of any product in it — which is why a tile carries a
+ * count and never a price.
  */
+const CATEGORIES: { key: string; img: string }[] = [
+  { key: "Apparel", img: "hoodie" },
+  { key: "Headwear", img: "cap" },
+  { key: "Bags", img: "bag" },
+  { key: "Other", img: "other" },
+]
+
 function FilterList({
   head,
   options,
@@ -97,6 +94,16 @@ export function PloyProducts({
   accent: string
   lead: string
 }) {
+  const railRef = useRef<HTMLDivElement>(null)
+  /* One card plus its gap, read off the DOM rather than assumed — the tile width changes at
+     md and a hardcoded step would overshoot on one of the two. */
+  const nudgeRail = (dir: 1 | -1) => {
+    const el = railRef.current
+    if (!el) return
+    const card = el.firstElementChild as HTMLElement | null
+    el.scrollBy({ left: dir * ((card?.offsetWidth ?? 240) + 16), behavior: "smooth" })
+  }
+
   const [cat, setCat] = useState("All")
   const [method, setMethod] = useState("All")
 
@@ -152,45 +159,63 @@ export function PloyProducts({
         </motion.div>
       </section>
 
-      {/* ── THE SHOOT ──────────────────────────────────────────────────────── */}
+      {/* ── THE CATEGORIES ────────────────────────────────────────────────────
+          It was a rail of eight garments under an eyebrow reading "the blanks we keep". Two
+          problems: the eyebrow was a caption nobody needed, and the row was a scroll with no
+          control on it — the last tile was clipped with no way to reach it. These are the
+          catalogue's OWN four categories now, each a button that sets the filter below, with
+          arrows so the row is navigable rather than merely scrollable. */}
       <section className={`${GUTTER} ${SECTION}`}>
-        {/* AN EYEBROW, NOT A SECOND HEADLINE. This was a display heading the same size as the
-            page's own, directly beneath it — two openers stacked, and the top of the page read
-            as two pages. There is ONE headline here; the rail speaks for itself and needs a
-            label, not a title. */}
-        <motion.div {...reveal(0)} className="flex items-baseline gap-3">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
-            The blanks we keep
-          </p>
-          <p className="text-[14px] text-ploy-ink/55">Same crop, same light, same seamless.</p>
-        </motion.div>
+        <div className="mb-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => nudgeRail(-1)}
+            aria-label="Previous categories"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-ploy-ink/25 text-ploy-ink/70 transition-colors hover:bg-ploy-paper"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => nudgeRail(1)}
+            aria-label="Next categories"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-ploy-ink text-ploy-ground"
+          >
+            ›
+          </button>
+        </div>
 
-        {/* A RAIL, NOT A SECOND GRID.
-            This was a grid of cards with its own method filter, directly above the catalogue's
-            grid of cards with ITS own method filter — two shops on one page, and a visitor
-            asking "what can I get?" has no reason to care which is which. These are not
-            products: they are the PHOTOGRAPHY, the house blanks shot one way. So they read as
-            a filmstrip you scan, and the one grid and the one filter below belong to the
-            things that actually have prices and pages. */}
-        <div className="ploy-rail mt-10 flex gap-3 overflow-x-auto pb-2 md:gap-4">
-          {ALL.map((b, i) => (
-            <motion.figure key={b.img} {...reveal(0.04 * i)} className="w-[210px] shrink-0 md:w-[260px]">
-              <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-sky">
-                <Image
-                  src={`/ploy/blank/${b.img}.webp`}
-                  alt={`A blank ${b.name.toLowerCase()}`}
-                  width={960}
-                  height={1200}
-                  loading="lazy"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <figcaption className="mt-3">
-                <p className="text-[16px] font-semibold">{b.name}</p>
-                <p className="mt-0.5 text-[13px] leading-relaxed text-ploy-ink/55">{b.methods.join(" · ")}</p>
-              </figcaption>
-            </motion.figure>
-          ))}
+        <div ref={railRef} className="ploy-rail flex gap-3 overflow-x-auto pb-2 md:gap-4">
+          {CATEGORIES.map((c, i) => {
+            const n = (products ?? []).filter((p) => p.category === c.key).length
+            if (products && n === 0) return null
+            const live = cat === c.key
+            return (
+              <motion.button
+                key={c.key}
+                type="button"
+                {...reveal(0.05 * i)}
+                onClick={() => { setCat(live ? "All" : c.key); document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" }) }}
+                aria-pressed={live}
+                className="w-[210px] shrink-0 text-left md:w-[260px]"
+              >
+                <div className={"aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-sky ring-2 transition-all " + (live ? "ring-ploy-ink" : "ring-transparent")}>
+                  <Image
+                    src={`/ploy/blank/${c.img}.webp`}
+                    alt={`${c.key} we print on`}
+                    width={960}
+                    height={1200}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <p className="mt-3 text-[16px] font-semibold">{c.key}</p>
+                <p className="mt-0.5 text-[13px] text-ploy-ink/55">
+                  {products === null ? "—" : `${n} ${n === 1 ? "product" : "products"}`}
+                </p>
+              </motion.button>
+            )
+          })}
         </div>
       </section>
 
