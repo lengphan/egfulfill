@@ -1,5 +1,8 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { getAnnouncement } from "@/lib/api"
+
 /**
  * THE RUNNING STRIP — the account's own figures, moving.
  *
@@ -18,10 +21,28 @@
  * they stay legible either way (globals.css).
  */
 export function DashboardTicker({ items, nudge }: { items: string[]; nudge?: string }) {
+  /**
+   * THE ANNOUNCEMENT IS FETCHED HERE rather than by each dashboard, because both would
+   * otherwise make the same tiny read and repeat the same failure handling. It is one row
+   * from `settings`, and a failure means no announcement — never a stale one.
+   *
+   * The effect depends on NOTHING and writes state the condition does not read, so it cannot
+   * re-satisfy itself (§2.8). It runs once per mount.
+   */
+  const [note, setNote] = useState<string>("")
+  useEffect(() => {
+    let live = true
+    getAnnouncement()
+      .then((a) => { if (live && a?.on && a.text) setNote(a.text) })
+      .catch(() => { /* no announcement is the right answer to a failed read */ })
+    return () => { live = false }
+  }, [])
+
   if (!items.length) return null
 
-  // The nudge is last so it never reads as one of the figures.
-  const all = nudge ? [...items, nudge] : items
+  // The announcement sits after the figures and before the nudge — it is the one thing on
+  // this strip a person WROTE, so it should not be buried behind a stock sentence.
+  const all = [...items, ...(note ? [note] : []), ...(nudge ? [nudge] : [])]
 
   /**
    * THE SET IS REPEATED UNTIL HALF THE TRACK IS WIDER THAN ANY SCREEN, and that is what makes

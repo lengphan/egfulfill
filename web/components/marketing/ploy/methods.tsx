@@ -5,7 +5,7 @@ import Image from "next/image"
 import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
-import { GUTTER, STACK } from "./rhythm"
+import { GUTTER, SECTION } from "./rhythm"
 
 /**
  * THE SEVEN DECORATIONS THE FLOOR RUNS — the same seven an order's SKU suffix carries
@@ -53,8 +53,13 @@ export function PloyMethods() {
     return () => window.clearInterval(id)
   }, [])
 
+  /* SECTION, NOT STACK. This sat tight against the block above it because the prototype put
+     the rail directly under the hero, where the two ARE one idea. On the real page the block
+     above is the four steps — a different argument entirely — so a hairline gap jammed an
+     acid block against a periwinkle one and made two sections read as one. STACK is for a
+     sequence; this is not in one. */
   return (
-    <section id="methods" className={`relative ${GUTTER} ${STACK}`}>
+    <section id="methods" className={`relative ${GUTTER} ${SECTION}`}>
       <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-sky py-16 md:py-20">
         <div className="px-8 md:px-14">
           <h2 className="ploy-display text-[clamp(2.5rem,6.5vw,5.5rem)]">

@@ -4157,6 +4157,25 @@ export function putRoleGrants(grants: RoleGrants) {
 }
 
 export type NavVisibilityMap = Partial<Record<string, string[]>>
+/**
+ * THE DASHBOARD ANNOUNCEMENT — one admin-set line, drawn in the ticker on every dashboard.
+ *
+ * `on` is the server's own answer, not the client's: it is false whenever the text is empty,
+ * so a caller never has to decide whether an announcement that is switched on but blank
+ * counts. Readable by any signed-in user because every dashboard draws it; writable by admin.
+ */
+export type Announcement = { text: string; on: boolean }
+
+export function getAnnouncement() {
+  return api<Announcement>(`/api/announcement`)
+}
+export function putAnnouncement(next: Announcement) {
+  return api<{ ok?: boolean; text?: string; on?: boolean; error?: string }>(`/api/announcement`, {
+    method: "PUT",
+    body: JSON.stringify(next),
+  })
+}
+
 export function getNavVisibility() {
   return api<{ hidden: NavVisibilityMap }>(`/api/nav_visibility`)
 }

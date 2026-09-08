@@ -1,4 +1,4 @@
-import { Cards, Sparkle, Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
+import { Cards, Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingCart, ChartBar, Wallet, Code, Package, Megaphone, Truck, EnvelopeSimple, Needle, Compass, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -119,7 +119,14 @@ export const STAFF_TOOLS: StaffNavItem[] = [
    * It spends money per press, so it stays this narrow — and an admin can still hide it in
    * Settings › Permissions, whose rows are built from THIS list.
    */
-  { label: "Studio", href: "/studio", icon: Sparkle, roles: ["operator", "admin"] },
+  /* STUDIO IS OFF THE NAV (owner's call, 2026-09-08) — unreachable rather than deleted.
+     The ROUTE and its components stay because other things point at them: site-content.ts and
+     bold-figure.tsx both document the Studio as the way to produce the hero cut-out ("generate
+     with Backdrop set to a cut-out-ready sweep, press Remove background"), and deleting it
+     would leave that instruction pointing at a 404. Restoring the item is uncommenting this
+     line; deleting the feature properly means removing that workflow too, which is a decision
+     rather than a tidy-up.
+  { label: "Studio", href: "/studio", icon: roles: ["operator", "admin"] }, */
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },

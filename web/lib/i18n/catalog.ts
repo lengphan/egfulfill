@@ -227,6 +227,9 @@ const vi: Dict = {
   // see it and the gate will never ask for it. The cards are listed here anyway — an
   // undetectable key still resolves at runtime, and leaving them out would have meant a
   // panel that stayed English on a Vietnamese board with nothing reporting it.
+  "settings.Dashboard announcement": "Thông báo trên bảng điều khiển",
+  "settings.One line, shown on every dashboard": "Một dòng, hiển thị trên mọi bảng điều khiển",
+  "settings.Show it": "Hiển thị",
   "tour.Getting around": "Làm quen với bảng",
   "tour.Open the board guide": "Mở hướng dẫn bảng",
   "tour.Minimise": "Thu nhỏ",

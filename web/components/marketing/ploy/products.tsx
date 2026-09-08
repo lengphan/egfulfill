@@ -4,10 +4,11 @@ import { useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
-import { HOVER, pop, reveal } from "./motion"
+import { HOVER, reveal } from "./motion"
 import { GUTTER, SECTION, TOP } from "./rhythm"
 import type { PublicProduct } from "@/lib/api"
 import { methodsAcross, methodsOf } from "./methods-of"
+import { sizeRangeLabel } from "@/lib/size-order"
 
 /**
  * THE PRODUCTS PAGE — one garment shot large, then every other one shot identically.
@@ -153,20 +154,16 @@ export function PloyProducts({
 
       {/* ── THE SHOOT ──────────────────────────────────────────────────────── */}
       <section className={`${GUTTER} ${SECTION}`}>
-        <h2 className="ploy-display text-[clamp(2.2rem,5.4vw,4.4rem)]">
-          <motion.span {...reveal(0)} className="block">Every blank,</motion.span>
-          <motion.span {...reveal(0.08)} className="flex items-center gap-3">
-            <span>shot the same</span>
-            <motion.span {...pop(0.2)} className="inline-block">
-              <Image src="/ploy/obj-chrome.webp" alt="" width={120} height={131} unoptimized className="h-[0.85em] w-auto" />
-            </motion.span>
-            <span>way.</span>
-          </motion.span>
-        </h2>
-        <motion.p {...reveal(0.15)} className="mt-5 max-w-lg text-[17px] leading-relaxed text-ploy-ink/70">
-          Same crop, same light, same seamless. What changes between these frames is the garment
-          and nothing else.
-        </motion.p>
+        {/* AN EYEBROW, NOT A SECOND HEADLINE. This was a display heading the same size as the
+            page's own, directly beneath it — two openers stacked, and the top of the page read
+            as two pages. There is ONE headline here; the rail speaks for itself and needs a
+            label, not a title. */}
+        <motion.div {...reveal(0)} className="flex items-baseline gap-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+            The blanks we keep
+          </p>
+          <p className="text-[14px] text-ploy-ink/55">Same crop, same light, same seamless.</p>
+        </motion.div>
 
         {/* A RAIL, NOT A SECOND GRID.
             This was a grid of cards with its own method filter, directly above the catalogue's
@@ -253,22 +250,39 @@ export function PloyProducts({
                   Nothing matches that pair yet. <button type="button" onClick={() => { setCat("All"); setMethod("All") }} className="underline underline-offset-4">Clear the filters</button>.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
                   {visible.map((p, i) => (
                     <motion.div key={p.slug} {...reveal(0.03 * Math.min(i, 8))} whileHover={{ y: -4 }} transition={HOVER}>
                       <Link href={`/catalog/${p.slug}`} className="block">
-                        <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-paper">
+                        {/* SQUARE, NOT 4:5. Three tall frames on a wide screen made one product
+                            fill the fold, so scanning the catalogue meant scrolling it. Four
+                            square ones show a row at a glance, which is what a grid is for. */}
+                        <div className="aspect-square overflow-hidden rounded-2xl bg-ploy-paper">
                           {/* The image is served from OUR url — the public shape resolves the
                               supplier's address server-side, so it never reaches this markup
                               (§2.9). No image is an honest blank tile, never a placeholder. */}
                           {p.image ? (
-                            <Image src={p.image} alt={p.name} width={600} height={750} loading="lazy" className="h-full w-full object-cover" />
+                            <Image src={p.image} alt={p.name} width={600} height={600} loading="lazy" className="h-full w-full object-cover" />
                           ) : (
                             <div className="h-full w-full" />
                           )}
                         </div>
                         <p className="mt-3 truncate text-[15px] font-semibold">{p.name}</p>
-                        <p className="mt-0.5 text-[13px] tabular-nums text-ploy-ink/55">
+                        {/* WHAT YOU NEED TO TELL TWO PRODUCTS APART: how many colourways, what
+                            sizes, and the price. `sizeRangeLabel` is the shared ladder — the
+                            stored order is arbitrary ("S, M, XL, 3XL, 4XL, 2XL" on a live row),
+                            so printing it raw would read as noise.
+
+                            NO SKU, and that is not an omission: a blank's sku maps to supplier
+                            stock, so §2.9 withholds it from every unauthenticated surface. The
+                            public API does not publish it and this page could not show it. */}
+                        <p className="mt-1 text-[13px] text-ploy-ink/55">
+                          {[
+                            p.colors?.length ? `${p.colors.length} ${p.colors.length === 1 ? "colour" : "colours"}` : "",
+                            sizeRangeLabel(p.sizes),
+                          ].filter(Boolean).join(" · ")}
+                        </p>
+                        <p className="mt-0.5 text-[14px] font-medium tabular-nums text-ploy-ink">
                           {p.priceVaries ? "from " : ""}${Number.isInteger(p.priceFrom ?? p.price) ? (p.priceFrom ?? p.price) : (p.priceFrom ?? p.price).toFixed(2)}
                         </p>
                       </Link>

@@ -54,6 +54,7 @@ import { publicSupportRoutes } from './routes/public_support.js';
 import { supportAiRoutes } from './routes/support_ai.js';
 import { factorySettingsRoutes } from './routes/factory_settings.js';
 import { navVisibilityRoutes } from './routes/nav_visibility.js';
+import { announcementRoutes } from './routes/announcement.js';
 import { roleGrantsRoutes } from './routes/role_grants.js';
 import { purchaseRoutes } from './routes/purchase.js';
 import { spydeckRoutes } from './routes/spydeck.js';
@@ -617,6 +618,7 @@ supportAiRoutes(app, requireAuth, requireStaff);
 publicSupportRoutes(app);                              // UNAUTHENTICATED marketing-site chat bubble — rate-limited and identity-gated because every message is a paid model call       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
 factorySettingsRoutes(app, requireAuth, requireStaff, requireAdmin); // staff READ the fee/shipping (the factory needs it); ADMIN writes them — they are pricing levers
 navVisibilityRoutes(app, requireAuth);                 // role → hidden nav pages/tabs (admin-editable, HIDE-only; never grants access)
+announcementRoutes(app, requireAuth);                   // one admin-set line on every dashboard ticker
 roleGrantsRoutes(app, requireAuth);                    // the GRANT half of Permissions — closed registry, fails closed, admin-write only
 purchaseRoutes(app, requireAuth, requireAdmin, requireAdmin, requireStaff);            // ADMIN: purchase orders — commits company money + exposes unit cost across every blank. Receiving stock stays warehouse (inventory.js)
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)

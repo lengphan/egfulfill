@@ -82,6 +82,7 @@ import {
 } from "@/lib/api"
 import { TabLabel } from "@/components/app/tab-label"
 import { getShippoBilling, SHIPPO_BILLING_URL, type ShippoBilling } from "@/lib/api"
+import { getAnnouncement, putAnnouncement } from "@/lib/api"
 import { useLabelT, useT, useDateFormat } from "@/lib/i18n"
 
 function useFmtDate() {
@@ -1110,6 +1111,73 @@ function FoldGroup({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * THE DASHBOARD ANNOUNCEMENT — one line, on every dashboard's ticker.
+ *
+ * IT SAVES ITSELF rather than joining the Platform form's own save, and that is deliberate:
+ * that save posts the whole settings object, so every field it does not know about is a field
+ * a partial load can blank (there is a note about exactly that hazard further up this file).
+ * One field with one read and one write cannot participate in that.
+ *
+ * `on` and the text are separate on purpose. Clearing the box to hide the line would mean
+ * retyping it next week; the switch is how you take it down and keep it.
+ */
+function AnnouncementFold() {
+  const tl = useLabelT()
+  const [text, setText] = useState("")
+  const [on, setOn] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    getAnnouncement()
+      .then((a) => { if (!live) return; setText(a?.text ?? ""); setOn(!!a?.on) })
+      .catch(() => { /* an unreadable setting is an empty box, never a guess */ })
+      .finally(() => { if (live) setLoaded(true) })
+    return () => { live = false }
+  }, [])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await putAnnouncement({ text: text.trim(), on })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Fold
+      title={tl("settings", "Dashboard announcement")}
+      status={!loaded ? "" : on && text.trim() ? "showing" : "off"}
+    >
+      <div className="flex flex-col gap-3">
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, 200))}
+          maxLength={200}
+          placeholder={tl("settings", "One line, shown on every dashboard")}
+          aria-label={tl("settings", "Dashboard announcement")}
+        />
+        <label className="flex w-fit items-center gap-2.5 text-sm">
+          <Switch checked={on} onCheckedChange={setOn} />
+          {tl("settings", "Show it")}
+        </label>
+        <div className="flex items-center gap-3">
+          <Button onClick={save} disabled={saving || !loaded}>
+            {saving ? tl("settings", "Saving…") : tl("settings", "Save")}
+          </Button>
+          {saved && <span className="text-xs text-shipped">{tl("settings", "Saved")}</span>}
+        </div>
+      </div>
+    </Fold>
+  )
+}
+
 function PlatformPanel() {
   const tl = useLabelT()
  const [loaded, setLoaded] = useState<FactorySettings | null>(null)
@@ -1350,6 +1418,7 @@ function PlatformPanel() {
         />
       </div>
       <FoldGroup>
+      <AnnouncementFold />
       {!isOperator && (
       <Fold title={tl("settings", "Warehouse ship-from address")} status={shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip ? "set" : "needs address"} attention={!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip)}>
 
