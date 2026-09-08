@@ -44,6 +44,29 @@ function LogoWall() {
   )
 }
 
+/** The lead paragraph, developing from pale to full ink as it crosses the viewport. */
+function Lead({ lines }: { lines: string[] }) {
+  const ref = useRef<HTMLDivElement>(null)
+  /* Measured on the element itself: pale when its top is still low on the screen, full by the
+     time it has risen into the reading band. `end` before `start` would run it backwards. */
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 90%", "start 45%"] })
+  const opacity = useTransform(scrollYProgress, [0, 1], [0.4, 1])
+
+  return (
+    <div ref={ref} className="mt-8 max-w-xl md:mt-10 md:max-w-[38rem]">
+      {lines.map((p, i) => (
+        <motion.p
+          key={i}
+          style={{ opacity }}
+          className={(i === 0 ? "" : "mt-5 ") + "text-[17px] leading-relaxed text-ploy-ink md:text-[19px]"}
+        >
+          {p}
+        </motion.p>
+      ))}
+    </div>
+  )
+}
+
 function StepRow({ i, total, step, progress }: { i: number; total: number; step: Step; progress: MotionValue<number> }) {
   // The node sits at the row's vertical centre, so it lights when the fill passes
   // (i + 0.5) / total of the pipe.
@@ -125,24 +148,14 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
             ))}
           </h2>
 
-          {/* HOVER BRINGS IT UP TO FULL INK — the move the steps make on scroll, where each
-              waits at 0.32 until the pipe reaches it. Pointer rather than scroll position,
-              because this block is not in the numbered sequence. It is a colour transition,
-              so reduced motion has nothing to suppress and the text is never hidden: 45% ink
-              still reads, it just stops competing with the display line above it. */}
-          <motion.div {...reveal(0.2)} className="group mt-8 max-w-xl md:mt-10 md:max-w-[38rem]">
-            {lead.map((p, i) => (
-              <p
-                key={i}
-                className={
-                  (i === 0 ? "" : "mt-5 ") +
-                  "text-[17px] leading-relaxed text-ploy-ink/45 transition-colors duration-500 group-hover:text-ploy-ink md:text-[19px]"
-                }
-              >
-                {p}
-              </p>
-            ))}
-          </motion.div>
+          {/* SCROLL BRINGS IT UP TO FULL INK, not hover.
+              It was a pointer transition, which meant the sentence only ever resolved for
+              someone who happened to put a cursor on it — and never at all on a phone. The
+              steps below already darken as the pipe reaches them; this now does the same
+              thing off its own position, so reading down the page IS what develops it.
+              It is a colour, so nothing is ever hidden: at 40% ink it still reads, it just
+              stops competing with the display line above it. */}
+          <Lead lines={lead} />
 
           <div className="relative mt-14 md:mt-16">
             {/* THE PIPE. Base rule in pale ink; the fill scales down from the top with scroll.

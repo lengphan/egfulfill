@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { line, reveal, rise } from "./motion"
+import { PloyDrop } from "./drop"
 import { GUTTER, SECTION } from "./rhythm"
 
 /**
@@ -75,6 +76,9 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
           </p>
         </motion.form>
       </div>
+
+      {/* The page's last line: the objects fall in and settle on the floor. */}
+      <PloyDrop />
     </section>
   )
 }

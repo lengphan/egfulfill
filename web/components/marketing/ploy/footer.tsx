@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { BACK, reveal, rise } from "./motion"
+import { Wordmark } from "@/components/marketing/wordmark"
 
 /**
  * THE FOOTER — a slate plate with the word set as five cut-out letters you can throw.
@@ -108,7 +109,11 @@ export function PloyFooter() {
 
         <div className="mt-10 grid gap-12 border-t border-ploy-ground/15 pt-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
-            <p className="ploy-display text-[32px]">EGFUL</p>
+            {/* THE MARK, NOT THE WORD SET IN ANTON. The footer spelled "EGFUL" in the display
+                face, so the site carried two different wordmarks — the real one in the header
+                and a typographic impostor down here. One brand, one mark. The balloon letters
+                above are the toy; this is the signature. */}
+            <Wordmark className="h-[34px] w-auto" />
             <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-ploy-ground/60">
               Print-on-demand fulfilment for Etsy, Shopify and TikTok Shop.
             </p>

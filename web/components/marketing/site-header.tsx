@@ -84,7 +84,10 @@ export function SiteHeader() {
             changes nothing and still reads on acid, periwinkle and paper alike. */}
         <div className="ploy-capsule flex items-center gap-7 py-2.5 pl-5 pr-5 lg:pr-7">
           <Link href="/" aria-label="EGFUL home" className={"flex items-center " + ink}>
-            <Wordmark className="h-[21px] w-auto" />
+            {/* Sized against the nav's 15px links rather than against the old bar: at 21px the mark
+              was the smallest thing in its own capsule, which is the wrong way round for the
+              one element that is the brand. */}
+            <Wordmark className="h-[30px] w-auto" />
           </Link>
           {/* PAGES, NEVER ANCHORS. Every item is a route of its own — a menu that scrolls the
               page you are already on teaches people the menu is decoration, and it cannot work

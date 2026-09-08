@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, reveal, rise } from "./motion"
-import { Straddle } from "./straddle"
 import { GUTTER, SECTION } from "./rhythm"
 import { PLAN_TIERS } from "@/lib/plans"
 
@@ -86,7 +85,10 @@ export function PloyPlans() {
           ))}
         </motion.div>
       </div>
-      <Straddle src="/ploy/obj-cloud.webp" side="left" inset="8%" width="clamp(140px,13vw,200px)" drop={60} drift={[8, 3]} dur={9} />
+      {/* NO STRADDLE ON THIS EDGE. The cloud that sat here kept finding the "Start free"
+          button underneath it, and one object hovering over a join reads as a sticker that
+          got stuck. The objects arrive at the END of the page instead, where they can land
+          on a floor rather than on a control — see ploy/drop.tsx. */}
     </section>
   )
 }
