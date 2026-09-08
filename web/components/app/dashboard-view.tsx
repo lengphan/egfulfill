@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
+import { PageObject, ROLE_OBJECT } from "@/components/app/page-object"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf, platformOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
@@ -206,16 +207,9 @@ export function DashboardView() {
 
  return (
     <div className="space-y-4">
-      {/* THE STRIP, above the name. It is the account's own figures and it is the first thing
-          that moves on the page — which is the whole job of a first impression. It draws
-          nothing until `orders` has actually arrived. */}
-      <DashboardTicker
-        items={orders === null ? [] : [
-          `${orders.length.toLocaleString()} ${t(orders.length === 1 ? "dash.tickerOrder" : "dash.tickerOrders")}`,
-          `${orders.filter((o) => sellerStatus(o).group === "shipped").length.toLocaleString()} ${t("dash.tickerShipped")}`,
-          ...(balance === null ? [] : [`$${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${t("dash.tickerOnAccount")}`]),
-        ]}
-      />
+      {/* The admin's announcement, if there is one. It carries no figures — those are in the
+          panel directly below, where they can be read rather than watched going past. */}
+      <DashboardTicker />
 
       {/* A GROUND UNDER THE GREETING, AND NOWHERE ELSE.
           The marketing site's grammar is a band that is a fill; the app had none of it, so the
@@ -228,7 +222,7 @@ export function DashboardView() {
       {/* NO GLYPH BESIDE THE NAME. It was an 18px outline icon floating in whitespace, which
           §4 names exactly: a loose stroke is decoration the eye reads past, and a mark only
           earns its place in a tile. The greeting is type; the person's name is the mark. */}
-      <div className="flex items-center gap-3 rounded-xl bg-brand px-5 py-4 text-brand-foreground">
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-brand px-5 py-4 text-brand-foreground">
         <div>
           <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
           <p className="text-sm text-brand-foreground/70">
@@ -236,6 +230,9 @@ export function DashboardView() {
             {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-brand-foreground">{stats.newToday}</span> {t("dash.newToday")}</>}
           </p>
         </div>
+        {/* The band's right side was empty. One object, and a different one per surface, so a
+            person knows where they are before they read the title. */}
+        <PageObject src={ROLE_OBJECT.seller} />
       </div>
 
       {/* ONE money block, where there were four tiles and a chart under them.

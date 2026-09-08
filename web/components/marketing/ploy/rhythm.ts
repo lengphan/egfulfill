@@ -26,11 +26,12 @@ export const STACK = "pt-4"
 
 /** A new argument.
  *
- * 80px, not 128. Every band here is a rounded fill on the ground, so this gap is really the
- * GUTTER BETWEEN TWO CARDS rather than the air above a heading — and at 128 the two cards
- * stopped reading as a stack and started reading as two pages that happened to follow each
- * other. It has to be unmistakably larger than STACK (16px) and no larger than that. */
-export const SECTION = "pt-14 md:pt-20"
+ * 48px, down from 128 then 80. Every band here is a rounded fill on the page ground, so this
+ * gap is the GUTTER BETWEEN TWO CARDS, not the air above a heading — and a card gutter is
+ * small. At 128 two bands read as two pages that happened to follow each other; at 80 there
+ * was still a corridor of ground between them. It only has to be unmistakably larger than
+ * STACK (16px), and 48 is. */
+export const SECTION = "pt-8 md:pt-12"
 
 /** The first section on a page — clears the fixed header (h-16) plus a breath. */
 export const TOP = "pt-20 md:pt-24"

@@ -5,7 +5,6 @@ import { useState } from "react"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, reveal, rise } from "./motion"
-import { Straddle } from "./straddle"
 import { GUTTER, SECTION, TOP } from "./rhythm"
 import { PLAN_BLANK_DISCOUNT, PLAN_TIERS, type PlanTier } from "@/lib/plans"
 import type { Faq } from "@/lib/site-content"
@@ -173,7 +172,13 @@ export function PloyPricing({
             </tbody>
           </table>
         </motion.div>
-        <Straddle src="/ploy/obj-cloud.webp" side="right" inset="7%" width="clamp(120px,11vw,170px)" drop={50} drift={[8, 3]} dur={9} />
+      {/* NO OBJECT ON THIS EDGE.
+          Five bands each carried one hovering at a corner, all doing the same thing, none of
+          them tied to anything — which is what makes an object read as random rather than
+          placed. An object earns its place here in exactly two ways, and both are still on
+          the page: set INTO a line of type, where it is part of the sentence, and the pile
+          that falls at the very end, where it is the page finishing. Everything between is
+          the work, and the work does not need ornament. */}
       </section>
 
       {/* ── WHAT EVERY PLAN PAYS ───────────────────────────────────────────── */}

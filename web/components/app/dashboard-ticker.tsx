@@ -4,41 +4,37 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { getAnnouncement, type AnnouncementSpeed } from "@/lib/api"
 
 /**
- * THE RUNNING STRIP — the account's own figures, and one line an admin wrote.
+ * THE RUNNING STRIP — the admin's announcement, and nothing else.
  *
- * IT TAKES FINISHED STRINGS, deliberately: the seller dashboard and the staff boards count
- * entirely different things, and a component deriving both would need to know about orders,
- * stages, roles and the wallet. Each surface counts what it already has and hands over words.
+ * IT USED TO CARRY FIGURES TOO — order counts, shipped, the wallet balance — and they came
+ * out. They were already on the page in the panel directly beneath it, in a form you can
+ * actually read: a number that walks past once every thirty seconds is a number nobody can
+ * check. Repeating them here made the strip a second, worse dashboard and buried the one
+ * thing on it a person had written.
  *
- * IT DRAWS NOTHING UNTIL THE CALLER KNOWS (§4 — unknown is not zero). An empty list while a
- * fetch is in flight or after it fails: a strip scrolling "0 orders · 0 shipped" past someone
- * with a busy month is worse than no strip.
- *
- * THE ONLY PROSE IS THE ADMIN'S. There was a hardcoded nudge appended here — "Connect a store
- * and these keep moving on their own" — which read as a second announcement nobody could edit
- * or remove. Whatever is set in Settings › Platform is now the only sentence on this strip.
+ * So it draws exactly what Settings › Platform holds and NOTHING when that is empty or
+ * switched off. No figures, no nudge, no fallback copy — an empty announcement means no
+ * strip, not a strip with something invented in it.
  */
 
 /**
- * SPEED IS PIXELS PER SECOND, NOT A DURATION, and that is the whole fix for "it is too fast".
+ * SPEED IS PIXELS PER SECOND, NOT A DURATION.
  *
- * The CSS ran a fixed 32s regardless of how long the track was. The track is padded past
- * sixteen items so the -50% wrap has no seam, so a busy account has a track several thousand
- * pixels wide — and covering more pixels in the same 32 seconds is literally faster. Two
- * dashboards on the same setting scrolled at different speeds.
- *
- * Measuring the track and dividing gives one reading speed everywhere, whatever is on it.
+ * The stylesheet used to fix this at 32s whatever the track was, and the text is repeated
+ * until it is wider than any screen — so a long announcement covered far more pixels in the
+ * same 32 seconds and read as faster. Two boards on one setting scrolled at two speeds.
+ * Measuring the track and dividing gives one reading pace, whatever is on it.
  */
 const PX_PER_SEC: Record<AnnouncementSpeed, number> = { slow: 28, normal: 48, fast: 80 }
 
-export function DashboardTicker({ items }: { items: string[] }) {
+export function DashboardTicker() {
   const [note, setNote] = useState("")
   const [speed, setSpeed] = useState<AnnouncementSpeed>("normal")
   const trackRef = useRef<HTMLDivElement>(null)
   const [dur, setDur] = useState<number | null>(null)
 
-  /* One tiny read, done here rather than in each dashboard. The effect depends on nothing and
-     writes state its own condition does not read, so it cannot re-satisfy itself (§2.8). */
+  /* One tiny read. The effect depends on nothing and writes state its own condition does not
+     read, so it cannot re-satisfy itself (§2.8). */
   useEffect(() => {
     let live = true
     getAnnouncement()
@@ -47,46 +43,45 @@ export function DashboardTicker({ items }: { items: string[] }) {
         if (a?.on && a.text) setNote(a.text)
         if (a?.speed) setSpeed(a.speed)
       })
-      .catch(() => { /* no announcement is the right answer to a failed read */ })
+      .catch(() => { /* a failed read means no announcement, never a stale one */ })
     return () => { live = false }
   }, [])
 
-  const all = note ? [...items, note] : items
+  /**
+   * REPEATED UNTIL HALF THE TRACK IS WIDER THAN ANY SCREEN, which is what makes the loop
+   * infinite rather than a jump. The animation moves the track exactly -50%, so the second
+   * half has to be sitting where the first began at the moment it wraps — one short sentence
+   * on its own is narrower than the viewport, so it would shift a little and snap back with
+   * empty space behind it. Twelve copies of a sentence is a few thousand pixels, and they are
+   * strings, so it costs nothing.
+   */
+  const copies = note ? Array.from({ length: 12 }, () => note) : []
+  const track = [...copies, ...copies]
 
-  /* The set is repeated until half the track is wider than any screen. The animation moves it
-     exactly -50%, so the second half has to be sitting where the first began at the wrap —
-     with four short figures the whole track was narrower than the viewport, so it shifted a
-     little and snapped. */
-  const padded = [...all]
-  while (padded.length && padded.length < 16) padded.push(...all)
-  const track = [...padded, ...padded]
-
-  /* Measured AFTER layout, so the number is the real width rather than a guess. useLayoutEffect
-     because a first paint at the wrong duration is a visible lurch. */
+  /* Measured AFTER layout so the number is the real width, not a guess. useLayoutEffect
+     because a first paint at the wrong speed is a visible lurch. */
   useLayoutEffect(() => {
     const el = trackRef.current
     if (!el) return
     const half = el.scrollWidth / 2
     if (half > 0) setDur(half / PX_PER_SEC[speed])
-  }, [speed, track.length, note])
+  }, [speed, note])
 
-  /* THE ANNOUNCEMENT ALONE IS ENOUGH TO DRAW THE STRIP. A board with no figures to show still
-     has to carry what an admin wrote — that is the whole point of an announcement. */
-  if (!items.length && !note) return null
+  if (!note) return null
 
   return (
     <div className="eg-marquee-hold overflow-hidden rounded-lg border border-border bg-muted/40 py-2">
       <div
         ref={trackRef}
         className="eg-marquee flex w-max"
-        /* A CSS VARIABLE, not the longhand. The stylesheet declares the animation with
-           `var(--eg-marquee-dur, 90s)`, so setting the variable is the whole override and the
+        /* A CSS VARIABLE, not the longhand: the stylesheet declares the animation with
+           `var(--eg-marquee-dur, 90s)`, so setting the variable is the whole override and an
            un-measured first paint falls back to a slow crawl rather than a fixed sprint. */
         style={dur ? ({ "--eg-marquee-dur": `${dur}s` } as React.CSSProperties) : undefined}
       >
         {track.map((t, i) => (
           <span key={i} className="flex items-center">
-            <span className="whitespace-nowrap px-4 text-xs font-medium tabular-nums text-muted-foreground">{t}</span>
+            <span className="whitespace-nowrap px-4 text-xs font-medium text-muted-foreground">{t}</span>
             <span aria-hidden className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
           </span>
         ))}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
+import { PageObject, ROLE_OBJECT } from "@/components/app/page-object"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, CircleNotch, Warning } from "@phosphor-icons/react"
@@ -322,16 +323,8 @@ export function StaffDashboard() {
       // flush to the shell edges, and that was never the part doing the damage.
     >
       <div className="space-y-4">
-      {/* The floor's own figures, moving. Counted by the server already (ov.counts), so this
-          costs nothing extra, and it is empty until those counts arrive. */}
-      <DashboardTicker
-        items={!ov ? [] : [
-          `${stats.total.toLocaleString()} ${t("dash.tickerOrders")}`,
-          `${stats.production.toLocaleString()} ${t("dash.tickerInProduction")}`,
-          `${stats.shipped.toLocaleString()} ${t("dash.tickerShipped")}`,
-          ...(stats.attention > 0 ? [`${stats.attention.toLocaleString()} ${t("dash.tickerOnHold")}`] : []),
-        ]}
-      />
+      {/* The admin's announcement, if there is one. */}
+      <DashboardTicker />
 
       {/* A GROUND UNDER THE GREETING, AND NOWHERE ELSE.
           The marketing site's grammar is a band that is a fill; the app had none of it, so the
@@ -356,6 +349,9 @@ export function StaffDashboard() {
                 : todayLabel}
             </p>
           </div>
+          {/* One object, chosen by ROLE, so an operator's board and a warehouse board are
+              recognisable before either title is read. The band's right side was empty. */}
+          <PageObject src={ROLE_OBJECT[role ?? ""] ?? ROLE_OBJECT.admin} />
 
         </div>
         {/* Money window — admin only, since the money cards are. */}

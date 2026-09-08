@@ -4,7 +4,6 @@ import { useRef } from "react"
 import { motion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
 import { reveal, rise } from "./motion"
 import { Num } from "./num"
-import { Straddle } from "./straddle"
 import { GUTTER, STACK } from "./rhythm"
 import { displayWord } from "./step-word"
 import type { Stat, Step } from "@/lib/site-content"
@@ -195,7 +194,13 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
           </motion.div>
         </div>
       </motion.div>
-      <Straddle src="/ploy/obj-chrome.webp" side="right" inset="7%" width="clamp(120px,11vw,170px)" drop={0} drift={[-10, 6]} dur={7.5} />
+      {/* NO OBJECT ON THIS EDGE.
+          Five bands each carried one hovering at a corner, all doing the same thing, none of
+          them tied to anything — which is what makes an object read as random rather than
+          placed. An object earns its place here in exactly two ways, and both are still on
+          the page: set INTO a line of type, where it is part of the sentence, and the pile
+          that falls at the very end, where it is the page finishing. Everything between is
+          the work, and the work does not need ornament. */}
     </section>
   )
 }

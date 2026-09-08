@@ -4,7 +4,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
-import { Straddle } from "./straddle"
 import { GUTTER, SECTION, STACK, TOP } from "./rhythm"
 import { displayWord } from "./step-word"
 import { FACTORY_STAGES } from "@/lib/factory-status"
@@ -33,45 +32,36 @@ import type { Step } from "@/lib/site-content"
 /** Alternating grounds, in the order the bands appear. */
 const FILLS = ["bg-ploy-acid", "bg-ploy-sky", "bg-ploy-peri", "bg-ploy-paper"]
 
-/** The channels a seller can actually connect today — the same claim the home page makes. */
-const CHANNELS = ["Etsy", "Shopify", "TikTok Shop"]
 /** Four of the seven, because four fit a square grid; /catalog's rail carries all of them. */
-const METHOD_SHOTS = ["emb", "dtg", "dtf", "apl"]
 
-/** One picture per step, chosen to answer that step rather than to fill the space. */
+/**
+ * ONE PHOTOGRAPH PER STEP, shot to the same direction as everything else on the site —
+ * periwinkle seamless, one soft key, blank goods, no branding.
+ *
+ * They are OBJECTS, not screens. A picture of our own interface would be a mockup, and §4
+ * deleted the fake app panel from the home page for exactly that reason; a stack of blanks, a
+ * hoop and thread, a tagged garment and a sealed box are the real things each step is about,
+ * and none of them can go out of date the way a screenshot does.
+ *
+ * Indexed by position with the last as the fallback, so a fifth step added in Settings gets a
+ * picture rather than a hole.
+ */
+const STEP_SHOTS = [
+  { img: "step-connect", alt: "A stack of folded blank t-shirts" },
+  { img: "step-design", alt: "Thread cones beside an embroidery hoop holding blank fabric" },
+  { img: "step-publish", alt: "A blank t-shirt on a hanger with a plain swing tag" },
+  { img: "step-ship", alt: "A plain shipping box and a poly mailer" },
+]
+
 function Visual({ i }: { i: number }) {
-  if (i === 0) {
-    return (
-      <div className="flex flex-col gap-1">
-        {CHANNELS.map((c, n) => (
-          <motion.p key={c} {...reveal(0.1 + n * 0.08)} className="ploy-display text-[clamp(2rem,5.5vw,4rem)] leading-[1.05]">
-            {c}
-          </motion.p>
-        ))}
-        <motion.p {...reveal(0.34)} className="mt-4 max-w-xs text-[15px] text-ploy-ink/60">
-          Sign in once. Existing orders import, new ones stream in.
-        </motion.p>
-      </div>
-    )
-  }
-  if (i === 1) {
-    return (
-      <div className="grid grid-cols-2 gap-3">
-        {METHOD_SHOTS.map((m, n) => (
-          <motion.div key={m} {...reveal(0.08 * n)} className="aspect-square overflow-hidden rounded-2xl bg-ploy-paper">
-            <Image src={`/ploy/method-${m}.webp`} alt="" width={500} height={500} loading="lazy" className="h-full w-full object-cover" />
-          </motion.div>
-        ))}
-      </div>
-    )
-  }
+  const shot = STEP_SHOTS[i] ?? STEP_SHOTS[STEP_SHOTS.length - 1]
   return (
-    <motion.div {...rise(0.05)} className="aspect-[4/5] overflow-hidden rounded-2xl bg-ploy-paper">
+    <motion.div {...rise(0.05)} className="aspect-[4/3] overflow-hidden rounded-2xl bg-ploy-paper">
       <Image
-        src={i === 2 ? "/ploy/blank/tee.webp" : "/ploy/blank/hoodie.webp"}
-        alt={`A model wearing a blank ${i === 2 ? "tee" : "heavyweight hoodie"}, framed from the collarbone down`}
-        width={960}
-        height={1200}
+        src={`/ploy/${shot.img}.webp`}
+        alt={shot.alt}
+        width={1200}
+        height={900}
         loading="lazy"
         className="h-full w-full object-cover"
       />
@@ -114,15 +104,15 @@ export function PloyHow({
           <section key={s.n || i} className={`${GUTTER} ${STACK}`}>
             <motion.div
               {...rise(0)}
-              className={"overflow-hidden rounded-[32px] px-8 py-14 md:px-14 md:py-20 " + (FILLS[i % FILLS.length] ?? "bg-ploy-paper")}
+              className={"overflow-hidden rounded-[32px] px-8 py-10 md:px-12 md:py-12 " + (FILLS[i % FILLS.length] ?? "bg-ploy-paper")}
             >
-              <div className="grid items-center gap-10 md:grid-cols-2 md:gap-14">
+              <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
                 <div className={flip ? "md:order-2" : ""}>
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-ploy-ink text-[13px] font-semibold tabular-nums">
                     {s.n || String(i + 1).padStart(2, "0")}
                   </span>
-                  <h2 className="ploy-display mt-6 text-[clamp(3rem,8.5vw,7rem)] leading-[0.88]">{displayWord(s)}</h2>
-                  <p className="mt-6 max-w-md text-[20px] font-semibold leading-tight md:text-[22px]">{s.title}</p>
+                  <h2 className="ploy-display mt-5 text-[clamp(2.3rem,5.6vw,4.4rem)] leading-[0.9]">{displayWord(s)}</h2>
+                  <p className="mt-4 max-w-md text-[18px] font-semibold leading-tight md:text-[20px]">{s.title}</p>
                   <p className="mt-3 max-w-md text-[16px] leading-relaxed text-ploy-ink/65">{s.body}</p>
                 </div>
                 <div className={flip ? "md:order-1" : ""}>
@@ -134,44 +124,42 @@ export function PloyHow({
         )
       })}
 
-      {/* ── WHAT HAPPENS TO ONE ORDER ──────────────────────────────────────── */}
-      <section className={`relative ${GUTTER} ${SECTION}`}>
-        <motion.div {...rise(0)} className="overflow-hidden rounded-[32px] bg-ploy-slate px-8 py-16 text-ploy-ground md:px-14 md:py-20">
-          <h2 className="ploy-display max-w-[18ch] text-[clamp(2rem,5vw,4rem)]">
-            <motion.span {...reveal(0)} className="block">Then one order moves.</motion.span>
-          </h2>
-          <motion.p {...reveal(0.1)} className="mt-5 max-w-xl text-[17px] leading-relaxed text-ploy-ground/70">
-            These are the stages our factory actually writes — the same words a seller sees on
-            their own order, not a friendlier set invented for this page.
-          </motion.p>
+      {/* THE DARK "THEN ONE ORDER MOVES" CARD IS GONE (owner's call). It was a whole
+          section — a heading, a paragraph and a CTA — to introduce a list of four words, and
+          it made the page a step longer than the process it describes.
 
-          <ol className="mt-12 flex flex-wrap gap-2">
-            {FACTORY_STAGES.map((s, i) => (
-              <motion.li
-                key={s.id}
-                {...reveal(0.04 * i)}
-                className="flex items-center gap-2 rounded-full bg-ploy-ground/10 px-4 py-2 text-[14px] font-medium ring-1 ring-ploy-ground/15"
-              >
-                <span className="text-[12px] tabular-nums text-ploy-ground/45">{String(i + 1).padStart(2, "0")}</span>
-                {s.label}
-              </motion.li>
-            ))}
-          </ol>
-
-          <motion.div {...reveal(0.2)} className="mt-12 flex flex-wrap items-center gap-3">
+          The words themselves stay, because they are the honest part: FACTORY_STAGES is the
+          list the production board writes and the order gate walks, so what a visitor reads
+          here is what a seller will see on their own order. They ride under the last step,
+          which is the step they belong to, as a row rather than a section. */}
+      <section className={`${GUTTER} ${SECTION}`}>
+        <motion.div {...reveal(0)} className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-ploy-ink/45">
+              What you will see on the order
+            </p>
+            <ol className="mt-4 flex flex-wrap gap-2">
+              {FACTORY_STAGES.map((st, n) => (
+                <li key={st.id} className="flex items-center gap-2 rounded-full bg-ploy-paper px-3.5 py-1.5 text-[14px] font-medium">
+                  <span className="text-[12px] tabular-nums text-ploy-ink/40">{String(n + 1).padStart(2, "0")}</span>
+                  {st.label}
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
             <motion.div whileHover={{ scale: 1.03 }} transition={HOVER}>
-              <Link href="/signup" className="inline-block rounded-full bg-ploy-ground px-7 py-3 text-[15px] font-medium text-ploy-ink">
+              <Link href="/signup" className="inline-block rounded-full bg-ploy-ink px-7 py-3 text-[15px] font-medium text-ploy-ground">
                 Start free
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.03 }} transition={HOVER}>
-              <Link href="/catalog" className="inline-block rounded-full border border-ploy-ground/40 px-7 py-3 text-[15px] font-medium text-ploy-ground">
+              <Link href="/catalog" className="inline-block rounded-full border border-ploy-ink/30 px-7 py-3 text-[15px] font-medium text-ploy-ink">
                 See what we make
               </Link>
             </motion.div>
-          </motion.div>
+          </div>
         </motion.div>
-        <Straddle src="/ploy/obj-chrome.webp" side="left" inset="8%" width="clamp(110px,10vw,160px)" drop={50} drift={[-10, 6]} dur={7.5} />
       </section>
 
     </div>

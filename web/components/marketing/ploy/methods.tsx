@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react"
 import Image from "next/image"
 import { motion } from "motion/react"
 import { HOVER, pop, reveal, rise } from "./motion"
-import { Straddle } from "./straddle"
 import { GUTTER, SECTION } from "./rhythm"
 
 /**
@@ -137,7 +136,13 @@ export function PloyMethods() {
       </motion.div>
       {/* `drop` is 56, not 0: this block ends in a card rail rather than in padding, and at 0
           the upper half of the star reached back up onto the last card's copy. */}
-      <Straddle src="/ploy/obj-star.webp" side="right" inset="8%" width="clamp(110px,10vw,160px)" drop={56} drift={[12, -8]} dur={6.5} />
+      {/* NO OBJECT ON THIS EDGE.
+          Five bands each carried one hovering at a corner, all doing the same thing, none of
+          them tied to anything — which is what makes an object read as random rather than
+          placed. An object earns its place here in exactly two ways, and both are still on
+          the page: set INTO a line of type, where it is part of the sentence, and the pile
+          that falls at the very end, where it is the page finishing. Everything between is
+          the work, and the work does not need ornament. */}
     </section>
   )
 }
