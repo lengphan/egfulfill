@@ -4164,7 +4164,8 @@ export type NavVisibilityMap = Partial<Record<string, string[]>>
  * so a caller never has to decide whether an announcement that is switched on but blank
  * counts. Readable by any signed-in user because every dashboard draws it; writable by admin.
  */
-export type Announcement = { text: string; on: boolean }
+export type AnnouncementSpeed = "slow" | "normal" | "fast"
+export type Announcement = { text: string; on: boolean; speed: AnnouncementSpeed }
 
 export function getAnnouncement() {
   return api<Announcement>(`/api/announcement`)

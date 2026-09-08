@@ -215,18 +215,25 @@ export function DashboardView() {
           `${orders.filter((o) => sellerStatus(o).group === "shipped").length.toLocaleString()} ${t("dash.tickerShipped")}`,
           ...(balance === null ? [] : [`$${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${t("dash.tickerOnAccount")}`]),
         ]}
-        nudge={t("dash.tickerNudge")}
       />
 
+      {/* A GROUND UNDER THE GREETING, AND NOWHERE ELSE.
+          The marketing site's grammar is a band that is a fill; the app had none of it, so the
+          first screen opened on bare canvas. This gives the one block that is not data a
+          ground — `bg-brand`, the app token a skin is allowed to move, and it carries
+          `brand-foreground` so the type is a foreground we control rather than a hue.
+
+          IT STOPS AT THE GREETING. §4 is explicit that the canvas stays white: a tint behind a
+          700-row queue is a sheet you read THROUGH all day. This is a header, not a wash. */}
       {/* NO GLYPH BESIDE THE NAME. It was an 18px outline icon floating in whitespace, which
           §4 names exactly: a loose stroke is decoration the eye reads past, and a mark only
           earns its place in a tile. The greeting is type; the person's name is the mark. */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 rounded-xl bg-brand px-5 py-4 text-brand-foreground">
         <div>
           <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-brand-foreground/70">
             {todayLabel}
-            {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-foreground">{stats.newToday}</span> {t("dash.newToday")}</>}
+            {orders !== null && stats.newToday > 0 && <> · <span className="font-medium text-brand-foreground">{stats.newToday}</span> {t("dash.newToday")}</>}
           </p>
         </div>
       </div>

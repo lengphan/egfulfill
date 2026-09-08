@@ -230,7 +230,6 @@ export function PloyIntegrations({ headline, accent, lead }: { headline: string;
         </motion.div>
       </section>
 
-      <div className="h-20 md:h-28" />
     </div>
   )
 }

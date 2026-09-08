@@ -333,18 +333,26 @@ export function StaffDashboard() {
         ]}
       />
 
+      {/* A GROUND UNDER THE GREETING, AND NOWHERE ELSE.
+          The marketing site's grammar is a band that is a fill; the app had none of it, so the
+          first screen opened on bare canvas. This gives the one block that is not data a
+          ground — `bg-brand`, the app token a skin is allowed to move, and it carries
+          `brand-foreground` so the type is a foreground we control rather than a hue.
+
+          IT STOPS AT THE GREETING. §4 is explicit that the canvas stays white: a tint behind a
+          700-row queue is a sheet you read THROUGH all day. This is a header, not a wash. */}
       {/* No loose glyph beside the name — see the note in dashboard-view.tsx. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand px-5 py-4 text-brand-foreground">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-brand-foreground/70">
               {/* The full weekday and date went. Anyone reading this knows what day it is,
                   and it was the widest thing under their own name. What arrived today is the
                   half that is actually news, so it stands alone — and when nothing has, the
                   line is dropped rather than padded back out with a date. */}
               {stats.createdToday > 0
-                ? <><span className="font-medium text-foreground">{stats.createdToday}</span> {t("dash.newToday")}</>
+                ? <><span className="font-medium text-brand-foreground">{stats.createdToday}</span> {t("dash.newToday")}</>
                 : todayLabel}
             </p>
           </div>

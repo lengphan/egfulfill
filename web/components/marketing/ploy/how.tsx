@@ -174,7 +174,6 @@ export function PloyHow({
         <Straddle src="/ploy/obj-chrome.webp" side="left" inset="8%" width="clamp(110px,10vw,160px)" drop={50} drift={[-10, 6]} dur={7.5} />
       </section>
 
-      <div className="h-20 md:h-28" />
     </div>
   )
 }

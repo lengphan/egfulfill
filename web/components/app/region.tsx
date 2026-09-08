@@ -32,9 +32,36 @@ import { cn } from "@/lib/utils"
 
 /** Part 1. The tile. `sm` inside a card's own section, `md` for a region that owns a panel. */
 export function RegionMark({
-  icon, busy = false, size = "md", className,
-}: { icon: Icon; busy?: boolean; size?: "sm" | "md"; className?: string }) {
+  icon, busy = false, size = "md", className, art,
+}: { icon: Icon; busy?: boolean; size?: "sm" | "md"; className?: string; art?: string }) {
   const I = icon
+
+  /**
+   * `art` — AN OBJECT INSTEAD OF A TILE, for the regions a person meets FIRST.
+   *
+   * A new account is mostly empty regions, so that is where a first impression is actually
+   * won, and a row of identical grey tiles is not one. Passing `art` swaps the tile for one
+   * of the site's balloon renders — the same objects the marketing pages use, so the two
+   * halves of the product look like one thing.
+   *
+   * IT IS OPT-IN AND IT STAYS RARE. The tile is still the default and still right for the
+   * fiftieth empty list in a settings panel; one object per screen is what keeps an object
+   * meaning anything (§4). No `alt`: the line underneath already says what the region is, and
+   * a screen reader announcing "balloon star" adds nothing.
+   */
+  if (art) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- a decorative cut-out, already
+      // sized and encoded; the optimiser would re-encode it for no gain (see ploy/hero.tsx).
+      <img
+        src={art}
+        alt=""
+        aria-hidden
+        className={cn("h-auto w-[72px] select-none", size === "sm" && "w-14", className)}
+        draggable={false}
+      />
+    )
+  }
   const box = size === "sm" ? "size-12" : "size-14"
   const glyph = size === "sm" ? 20 : 24
   return (

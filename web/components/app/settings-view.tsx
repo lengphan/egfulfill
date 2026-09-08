@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState, useContext, createContext, isValidElement, Children } from "react"
+import { useCallback, useEffect, useRef, useState, useContext, createContext, isValidElement, Children } from "react"
 import { setActivePalette } from "@/lib/thread-match"
 import { nearestColorName } from "@/lib/color-name"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -82,7 +82,7 @@ import {
 } from "@/lib/api"
 import { TabLabel } from "@/components/app/tab-label"
 import { getShippoBilling, SHIPPO_BILLING_URL, type ShippoBilling } from "@/lib/api"
-import { getAnnouncement, putAnnouncement } from "@/lib/api"
+import { getAnnouncement, putAnnouncement, type AnnouncementSpeed } from "@/lib/api"
 import { useLabelT, useT, useDateFormat } from "@/lib/i18n"
 
 function useFmtDate() {
@@ -1131,6 +1131,7 @@ function AnnouncementBody() {
   const tl = useLabelT()
   const [text, setText] = useState("")
   const [on, setOn] = useState(false)
+  const [speed, setSpeed] = useState<AnnouncementSpeed>("normal")
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -1138,16 +1139,38 @@ function AnnouncementBody() {
   useEffect(() => {
     let live = true
     getAnnouncement()
-      .then((a) => { if (!live) return; setText(a?.text ?? ""); setOn(!!a?.on) })
+      .then((a) => {
+        if (!live) return
+        setText(a?.text ?? "")
+        setOn(!!a?.on)
+        setSpeed(a?.speed ?? "normal")
+        lastSaved.current = JSON.stringify({ text: (a?.text ?? "").trim(), on: !!a?.on, speed: a?.speed ?? "normal" })
+      })
       .catch(() => { /* an unreadable setting is an empty box, never a guess */ })
       .finally(() => { if (live) setLoaded(true) })
     return () => { live = false }
   }, [])
 
-  const save = async () => {
+  /**
+   * IT SAVES ITSELF ON BLUR, and has no Save button of its own.
+   *
+   * It had one, and the Platform panel has its own Save at the foot of the section — so the
+   * screen carried two identical buttons about sixty pixels apart, and neither said which
+   * field it governed. One field does not need a button: leaving the box, or flipping the
+   * switch, is the commit. Clicking the panel's Save blurs this input first, so the obvious
+   * thing still works even for someone who assumes that button owns everything.
+   *
+   * Nothing is written unless something changed, so tabbing through the section is not a
+   * stream of writes.
+   */
+  const lastSaved = useRef<string>("")
+  const save = async (nextOn = on, nextText = text, nextSpeed = speed) => {
+    const payload = JSON.stringify({ text: nextText.trim(), on: nextOn, speed: nextSpeed })
+    if (!loaded || payload === lastSaved.current) return
     setSaving(true)
     try {
-      await putAnnouncement({ text: text.trim(), on })
+      await putAnnouncement({ text: nextText.trim(), on: nextOn, speed: nextSpeed })
+      lastSaved.current = payload
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } finally {
@@ -1160,19 +1183,32 @@ function AnnouncementBody() {
         <Input
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 200))}
+          onBlur={() => save()}
           maxLength={200}
           placeholder={tl("settings", "One line, shown on every dashboard")}
           aria-label={tl("settings", "Dashboard announcement")}
         />
-        <label className="flex w-fit items-center gap-2.5 text-sm">
-          <Switch checked={on} onCheckedChange={setOn} />
-          {tl("settings", "Show it")}
-        </label>
         <div className="flex items-center gap-3">
-          <Button onClick={save} disabled={saving || !loaded}>
-            {saving ? tl("settings", "Saving…") : tl("settings", "Save")}
-          </Button>
-          {saved && <span className="text-xs text-shipped">{tl("settings", "Saved")}</span>}
+          <label className="flex w-fit items-center gap-2.5 text-sm">
+            <Switch checked={on} onCheckedChange={(v) => { setOn(v); save(v) }} />
+            {tl("settings", "Show it")}
+          </label>
+          {/* SPEED IS A READING SPEED, not a duration — the strip measures its own track and
+              divides, so the same setting reads at the same pace on a busy dashboard and a
+              quiet one. It was a fixed 32 seconds for any track length, which is why a full
+              strip raced. */}
+          <select
+            value={speed}
+            onChange={(e) => { const v = e.target.value as AnnouncementSpeed; setSpeed(v); save(on, text, v) }}
+            aria-label={tl("settings", "Scroll speed")}
+            className="eg-control h-8 px-2 text-xs"
+          >
+            <option value="slow">{tl("settings", "Slow")}</option>
+            <option value="normal">{tl("settings", "Normal")}</option>
+            <option value="fast">{tl("settings", "Fast")}</option>
+          </select>
+          {saving && <span className="text-xs text-muted-foreground">{tl("settings", "Saving…")}</span>}
+          {saved && !saving && <span className="text-xs text-shipped">{tl("settings", "Saved")}</span>}
         </div>
       </div>
   )

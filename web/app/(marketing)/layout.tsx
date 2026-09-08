@@ -58,7 +58,20 @@ export default async function MarketingLayout({ children }: { children: React.Re
           would otherwise start underneath it. The gutter is added HERE, once, rather than on
           each page — and the home page cancels it with `-mt-16`, because its hero is meant to
           run to the top of the viewport with the capsule floating on it. */}
-      <main className="flex-1 pt-16">{children}</main>
+      {/* THE CLEARANCE ABOVE THE FOOTER IS THE LAYOUT'S, not each page's.
+          Measured across all twelve marketing routes it ranged from -28px (the catalogue
+          overlapped the footer) through 0 (pricing sat flush against it) to 192px, because
+          only the three converted components carried a bottom gap and the older pages —
+          /features, /docs, /privacy, the product detail page — never had one at all. A page
+          may still add its own space; this only guarantees the floor, on every route,
+          including the ones nobody has redrawn yet.
+
+          IT IS A FLOOR, SO IT IS SMALL. The pages that still carry their own trailing
+          padding — /features, /contact, /privacy, /terms, the Amazon page — end up with both
+          and run longer than the redrawn ones. That is the right way round: those pages are
+          being replaced, and the alternative is editing five files that are about to go. The
+          converted pages, which add none of their own, land where this says. */}
+      <main className="flex-1 pb-14 pt-16 md:pb-20">{children}</main>
 
       {/* MOST ASKED MOVED INTO THE BUBBLE.
           It was a strip above the footer — the right three questions in the wrong place. The

@@ -18,6 +18,12 @@ const KEY = 'dashboard_announcement';
 // past someone's order queue. The ticker gives it ONE line and never wraps.
 const MAX = 200;
 
+// A KEY, not a number of seconds. The strip's duration is computed from how WIDE the track
+// actually is, so a raw duration would mean something different on every dashboard — a busy
+// account with more figures would scroll faster for the same setting. These are reading
+// speeds in pixels per second, resolved client-side.
+const SPEEDS = ['slow', 'normal', 'fast'];
+
 let _ready = null;
 function ensure() {
   if (_ready) return _ready;
@@ -37,10 +43,11 @@ const readVal = (row) => {
 /** { text, on } — always both, so a client never has to guess what a missing field meant. */
 function shape(v) {
   const text = typeof v.text === 'string' ? v.text.trim().slice(0, MAX) : '';
+  const speed = SPEEDS.includes(v.speed) ? v.speed : 'normal';
   // OFF unless explicitly on AND there is something to say. An announcement switched on with
   // an empty box is not an announcement, and a strip that draws an empty slot for it looks
   // broken rather than blank.
-  return { text, on: v.on === true && text.length > 0 };
+  return { text, on: v.on === true && text.length > 0, speed };
 }
 
 export function announcementRoutes(app, requireAuth) {
@@ -52,7 +59,7 @@ export function announcementRoutes(app, requireAuth) {
     } catch {
       // A failed read means NO announcement, never a stale or half one — the dashboard has
       // to render regardless, and a blank strip is the honest answer.
-      return { text: '', on: false };
+      return { text: '', on: false, speed: 'normal' };
     }
   });
 
@@ -63,7 +70,7 @@ export function announcementRoutes(app, requireAuth) {
     if (body.text != null && typeof body.text !== 'string') {
       reply.code(400); return { error: 'text must be a string' };
     }
-    const next = shape({ text: body.text ?? '', on: body.on === true });
+    const next = shape({ text: body.text ?? '', on: body.on === true, speed: body.speed });
     await ensure();
     await q(
       'insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()',

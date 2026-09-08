@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
+
 import Link from "next/link"
 import { motion } from "motion/react"
 import { HOVER, reveal, rise } from "./motion"
 import { Straddle } from "./straddle"
-import { END, GUTTER, SECTION, TOP } from "./rhythm"
+import { GUTTER, SECTION, TOP } from "./rhythm"
 import { PLAN_BLANK_DISCOUNT, PLAN_TIERS, type PlanTier } from "@/lib/plans"
 import type { Faq } from "@/lib/site-content"
 
@@ -199,7 +199,7 @@ export function PloyPricing({
 
       {/* ── FAQ ────────────────────────────────────────────────────────────── */}
       {faq.items.length > 0 && (
-        <section className={`${GUTTER} ${SECTION} ${END}`}>
+        <section className={`${GUTTER} ${SECTION}`}>
           <h2 className="ploy-display text-[clamp(2.2rem,5.4vw,4.4rem)]">
             <motion.span {...reveal(0)} className="block">{faq.heading}</motion.span>
           </h2>
@@ -226,17 +226,6 @@ export function PloyPricing({
         </section>
       )}
 
-      {/* One object closes the page, the way the home does. */}
-      <div className="relative">
-        <Image
-          src="/ploy/obj-chrome.webp"
-          alt=""
-          width={200}
-          height={218}
-          unoptimized
-          className="mx-auto h-auto w-[clamp(80px,8vw,120px)] opacity-90"
-        />
-      </div>
     </div>
   )
 }
