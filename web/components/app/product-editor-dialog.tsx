@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
-import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
+import { setTypeMockups, typeMockupOf, ALL_SIDES } from "@/lib/variant-resolve"
 import { getFactorySettings, setFactorySettings, getInventory, saveVariantStock, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { prettyColorName } from "@/lib/color-name"
@@ -414,6 +414,16 @@ export function ProductEditorDialog({
    * everything that never disagreed with it.
    */
  const [sideMockups, setSideMockups] = useState<Record<string, string>>({})
+  /**
+   * WHICH FACES THIS BLANK HAS — empty means "inherit the type's", which is what every
+   * product did before this existed and what most of them should keep doing.
+   *
+   * Separate from sideMockups above, and the distinction is the whole point: a mockup
+   * override says "the back of THIS blank looks different", while this says "this blank
+   * HAS a back". A duffel filed under Apparel had no way to say the second, so the import
+   * sheet offered it a hood and two sleeves and the design maker gave it six faces.
+   */
+ const [sides, setSides] = useState<string[]>([])
   /** The dashed print area per side, 0–100% of the mockup. Empty = follow the garment-type
    * fallback in print-zone.ts, which is what every product did before this could be set. */
  const [printAreas, setPrintAreas] = useState<Record<string, PrintArea>>({})
@@ -455,6 +465,10 @@ export function ProductEditorDialog({
   /** The category's stand-in mockup, used when this product has none of its own. */
  const typeMockup = types.find((t) => t.name === type)?.mockup ?? null
  const typeSides = types.find((t) => t.name === type)?.sides ?? []
+  /* What this blank actually prints on: its own faces when it has said, else its type's.
+     The same rule sidesOf() applies everywhere else — the editor cannot be the one place
+     that disagrees about which faces a product has. */
+ const shownSides = sides.length ? sides : typeSides
  const [method, setMethod] = useState("DTG")
   // Product cost = what the blank costs US from the supplier (COGS). Base cost = what we
   // charge the seller. Shipping = the fee. There is no separate "retail price" here — the
@@ -580,6 +594,7 @@ export function ProductEditorDialog({
  setSupplier(String(p?.supplier ?? ""))
  setSupplierUrl(String((p as { supplierUrl?: string } | null)?.supplierUrl ?? ""))
  setType(p?.type ?? "Apparel")
+ setSides(Array.isArray(p?.sides) ? p.sides.filter((x) => ALL_SIDES.includes(String(x))) : [])
  setMethod(p?.method ?? "DTG")
  setProductCost(p?.productCost != null ? String(p.productCost) : "")
  setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
@@ -1045,6 +1060,10 @@ export function ProductEditorDialog({
       // Only send overrides that exist. An empty map means "inherit the type", and
       // writing {} explicitly is how a product goes back to following settings.
  side_mockups: Object.fromEntries(Object.entries(sideMockups).filter(([, v]) => !!v)),
+      /* Only when this blank DISAGREES with its category. Writing the type's own list back
+         would freeze today's category into the product, so a later change to the type would
+         stop reaching it — the same rule side_mockups and printAreas already follow. */
+ sides: sides.length && sides.join() !== typeSides.join() ? sides : undefined,
       // Same rule as side_mockups: only what this product actually overrides. An absent
       // side keeps following the type's fallback zone.
  printAreas,
@@ -1962,7 +1981,44 @@ export function ProductEditorDialog({
  with one of this product's own images — for the blank whose back really does
  look different. Clearing an override returns that side to following settings,
  rather than leaving it stuck on whatever it was overridden to. */}
-          {typeSides.length > 0 && (
+          {/* WHICH FACES THIS BLANK HAS — a field, not a set of buttons: you are SETTING
+              something here, and §4 reserves a button's chrome for actions. Unticked means
+              this blank does not have that face at all, so it disappears from the tiles
+              below, from Placement on the import sheet and from the design maker's stage.
+              Untouched, it follows the type and shows exactly what it always did. */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{tl("product", "Faces")}</span>
+              {sides.length > 0 && (
+                <button type="button" onClick={() => setSides([])}
+                  className="text-xs text-muted-foreground underline-offset-2 hover:underline">
+                  {tl("product", "Follow the type")}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {ALL_SIDES.map((sd) => (
+                <label key={sd} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={shownSides.includes(sd)}
+                    onChange={(e) => {
+                      /* The first tick writes the WHOLE list, seeded from what is on screen
+                         — otherwise ticking one face would silently drop the other five the
+                         product was inheriting. From then on it is this product's own. */
+                      const base = sides.length ? sides : shownSides
+                      const next = e.target.checked ? [...base, sd] : base.filter((x) => x !== sd)
+                      setSides(ALL_SIDES.filter((x) => next.includes(x)))
+                    }}
+                    className="size-4 accent-primary"
+                  />
+                  <span className="capitalize">{tl("sides", sd)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {shownSides.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{tl("product", "Print sides")}</span>
@@ -1979,7 +2035,7 @@ export function ProductEditorDialog({
  side returns it to that.
               </p>
               <div className="flex flex-wrap gap-2">
-                {typeSides.map((sd) => {
+                {shownSides.map((sd) => {
  const override = sideMockups[sd] || ""
  const inherited = typeMockupOf({ type } as CatalogProduct, sd)
  const shown = override || inherited

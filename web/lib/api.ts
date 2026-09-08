@@ -1087,6 +1087,11 @@ export type CatalogProduct = {
    *  lets anyone buy the same blank without us (§2.8). Matched as an ALIAS when resolving
    *  older order lines, never published. */
   supplierSku?: string
+  /** THE FACES THIS BLANK HAS, when it disagrees with its category. Absent or empty means
+   *  "inherit the type's" — see sidesOf in lib/variant-resolve.ts, which is the only thing
+   *  that should read this. Set per product because a type is coarser than a garment: a
+   *  duffel bag filed under Apparel would otherwise be offered a hood and two sleeves. */
+  sides?: string[]
   type?: string
   method?: string
   /** Some products carry their techniques as a LIST rather than a joined `method` string —

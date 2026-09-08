@@ -245,10 +245,37 @@ export function typeMockupOf(p: CatalogProduct | null, side = "front"): string {
   const key = String(p?.type ?? "").toLowerCase()
   return BUNDLED_MOCKUPS[key]?.[side] ?? ""
 }
-/** Sides this product can be designed on — its own faces, else its category's. */
+/** The faces the category prints on. "" for a type nobody has configured, which is not the
+ *  same answer as ["front"] — see sidesOf, which is the one anything narrowing should call. */
 export function typeSidesOf(p: CatalogProduct | null): string[] {
   return specFor(p)?.sides ?? ["front"]
 }
+
+/**
+ * THE FACES THIS BLANK ACTUALLY HAS — the product's own answer, then its category's.
+ *
+ * A TYPE IS COARSER THAN A GARMENT, and the gap is not cosmetic. "Transfer Duffel" sits in
+ * Apparel, and Apparel is configured front/back/left/right/sleeve/hood — so the import
+ * sheet offered a duffel bag a hood and two sleeves, and the design maker gave it six faces
+ * to place artwork on. Splitting the categories finely enough to fix that means a type per
+ * silhouette, and then a tee and a hoodie still disagree about the hood.
+ *
+ * So a product may carry its own `sides`, and when it does they WIN outright — this is a
+ * statement about one garment, and a category cannot know better than the person holding
+ * it. Absent or empty means "inherit", so the 29 products that have never said anything
+ * keep following their type exactly as before and changing a category still reaches them.
+ *
+ * Filtered to known faces, because an unknown one has no mockup, no print area and no
+ * meaning to order_designs — it would render as a face you cannot actually place on.
+ */
+export function sidesOf(p: CatalogProduct | null): string[] {
+  const own = (Array.isArray(p?.sides) ? p.sides : []).filter((s) => ALL_SIDES.includes(String(s)))
+  return own.length ? own : typeSidesOf(p)
+}
+
+/** Every face the system knows. Mirrors ALL_SIDES in server/src/routes/factory_settings.js,
+ *  which is the list a product type is built from. */
+export const ALL_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"]
 
 /**
  * EVERY SIDE THIS PRODUCT CAN BE DESIGNED ON — the product's own photo per side, and the
@@ -284,7 +311,7 @@ export function designFaces(p: CatalogProduct | null): MockupFace[] {
   if (!p) return []
   const own = new Map(mockupFaces(p, null).map((f) => [f.side, f.url]))
   const out: MockupFace[] = []
-  for (const side of typeSidesOf(p)) {
+  for (const side of sidesOf(p)) {
     const url = own.get(side) || typeMockupOf(p, side)
     if (url) out.push({ side, url })
   }

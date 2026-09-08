@@ -38,7 +38,7 @@ import {
   type ImportRecord,
 } from "@/lib/order-import"
 import { productColors, productSizes } from "@/lib/variant-sku"
-import { resolveProduct, productLabel, setTypeMockups, typeSidesOf } from "@/lib/variant-resolve"
+import { resolveProduct, productLabel, setTypeMockups, sidesOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { platformName } from "@/shared/order-rules"
 import { getCatalogProducts, getTemplates, getDesignLibrary, getMachineFiles, getProductTypes,
@@ -496,9 +496,18 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
          SIDE_LABEL, so the cell holds "Left sleeve" and never the bare "left" that would
          read as an unfinished sentence in a spreadsheet. normalizeSide reads both back. */
       if (colKey === "print_side") {
-        const known = productTypes.some((t) => t.name.toLowerCase() === String(p.type ?? "").toLowerCase())
+        /* THE PRODUCT'S OWN FACES FIRST, its category's after — sidesOf is that rule, and
+           it is the same one the design maker's stage follows, so a blank cannot offer a
+           face here that you then cannot place artwork on there.
+           The fallback to all eight is for a type nobody has configured: sidesOf answers
+           ["front"] for that, which is indistinguishable from a genuinely front-only
+           category, and offering one face when the truth is "we don't know" is worse than
+           offering all of them. A product that states its own sides is never in doubt. */
+        const own = (p as { sides?: string[] }).sides ?? []
+        const known = own.length > 0
+          || productTypes.some((t) => t.name.toLowerCase() === String(p.type ?? "").toLowerCase())
         return known
-          ? typeSidesOf(p as never).map((sd) => SIDE_LABEL[sd] ?? sd)
+          ? sidesOf(p as never).map((sd) => SIDE_LABEL[sd] ?? sd)
           : FIXED_OPTIONS.print_side ?? null
       }
       /* BOTH FIELDS, NOT ONE. This read `method` alone, and CatalogProduct's own note on

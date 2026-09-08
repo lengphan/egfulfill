@@ -1897,6 +1897,8 @@ const vi: Dict = {
   "product.Reset framing": "Đặt lại khung hình",
   "product.Real size": "Kích thước thật",
   "product.Print sides": "Các mặt in",
+  "product.Faces": "Các mặt",
+  "product.Follow the type": "Theo loại sản phẩm",
   "product.No photo for this side": "Chưa có ảnh cho mặt này",
   "product.Upload a photo for this side": "Tải ảnh lên cho mặt này",
   "product.Use one of this product's photos for this side": "Dùng một ảnh sẵn có của sản phẩm cho mặt này",
