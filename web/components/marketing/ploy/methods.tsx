@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react"
 import Image from "next/image"
 import { motion } from "motion/react"
-import { HOVER, pop, reveal, rise } from "./motion"
+import { HOVER, reveal, rise } from "./motion"
 import { GUTTER, SECTION } from "./rhythm"
 
 /**
@@ -65,13 +65,11 @@ export function PloyMethods() {
             <motion.span {...reveal(0)} className="block">
               Seven ways
             </motion.span>
-            <motion.span {...reveal(0.1)} className="flex items-center gap-3">
-              <span>to make</span>
-              <motion.span {...pop(0.25)} className="inline-block">
-                <Image src="/ploy/obj-chrome.webp" alt="" width={120} height={131} unoptimized className="h-[0.85em] w-auto" />
-              </motion.span>
-              <span>it.</span>
-            </motion.span>
+            {/* NO OBJECT INSIDE THE WORDS. A blob set between "make" and "it." sits in the
+                middle of a sentence a person is reading, and at display size it is a hole in
+                the line rather than a flourish — the eye stops on it and has to resume. The
+                objects belong where they are the subject: the mountain at the page's end. */}
+            <motion.span {...reveal(0.1)} className="block">to make it.</motion.span>
           </h2>
 
           <div className="mt-10 flex flex-col gap-6 md:ml-auto md:mt-4 md:max-w-xl">
