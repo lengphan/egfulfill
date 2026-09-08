@@ -1582,13 +1582,21 @@ td[align="right"] {
 
 /* The logo wall scrolls forever. The list is rendered twice and the track travels exactly
    half its width, so the seam is invisible. */
-@keyframes ploy-marquee {
+@keyframes marquee-x {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
-.ploy-marquee { animation: ploy-marquee 38s linear infinite; }
+.ploy-marquee { animation: marquee-x 38s linear infinite; }
+
+/* THE APP'S TICKER uses the same seamless-loop trick — the list is rendered twice and the
+   track travels exactly half its width, so there is no seam to catch. One keyframe serves
+   both rather than two that can drift apart. It holds on hover, because a line of figures
+   someone is trying to read should not walk away from them. */
+.eg-marquee { animation: marquee-x 32s linear infinite; }
+.eg-marquee-hold:hover .eg-marquee { animation-play-state: paused; }
+
 @media (prefers-reduced-motion: reduce) {
-  .ploy-marquee { animation: none; }
+  .ploy-marquee, .eg-marquee { animation: none; }
 }
 
 /* A coloured block is not a flat fill: a soft lighter bloom rises from the bottom. */

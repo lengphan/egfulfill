@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Sparkle, Warning, House } from "@phosphor-icons/react"
+import { Sparkle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { GmvPanel } from "@/components/app/gmv-panel"
@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
+import { DashboardTicker } from "@/components/app/dashboard-ticker"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf, platformOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
@@ -200,8 +201,22 @@ export function DashboardView() {
 
  return (
     <div className="space-y-4">
+      {/* THE STRIP, above the name. It is the account's own figures and it is the first thing
+          that moves on the page — which is the whole job of a first impression. It draws
+          nothing until `orders` has actually arrived. */}
+      <DashboardTicker
+        items={orders === null ? [] : [
+          `${orders.length.toLocaleString()} ${t(orders.length === 1 ? "dash.tickerOrder" : "dash.tickerOrders")}`,
+          `${orders.filter((o) => sellerStatus(o).group === "shipped").length.toLocaleString()} ${t("dash.tickerShipped")}`,
+          ...(balance === null ? [] : [`$${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${t("dash.tickerOnAccount")}`]),
+        ]}
+        nudge={t("dash.tickerNudge")}
+      />
+
+      {/* NO GLYPH BESIDE THE NAME. It was an 18px outline icon floating in whitespace, which
+          §4 names exactly: a loose stroke is decoration the eye reads past, and a mark only
+          earns its place in a tile. The greeting is type; the person's name is the mark. */}
       <div className="flex items-center gap-3">
-        <House size={18} weight="regular" className="shrink-0 text-primary" />
         <div>
           <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
           <p className="text-sm text-muted-foreground">

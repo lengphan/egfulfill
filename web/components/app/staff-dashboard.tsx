@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { DashboardTicker } from "@/components/app/dashboard-ticker"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { SquaresFour, ArrowRight, CircleNotch, Warning } from "@phosphor-icons/react"
+import { ArrowRight, CircleNotch, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { TabBar } from "@/components/app/tab-bar"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -321,9 +322,20 @@ export function StaffDashboard() {
       // flush to the shell edges, and that was never the part doing the damage.
     >
       <div className="space-y-4">
+      {/* The floor's own figures, moving. Counted by the server already (ov.counts), so this
+          costs nothing extra, and it is empty until those counts arrive. */}
+      <DashboardTicker
+        items={!ov ? [] : [
+          `${stats.total.toLocaleString()} ${t("dash.tickerOrders")}`,
+          `${stats.production.toLocaleString()} ${t("dash.tickerInProduction")}`,
+          `${stats.shipped.toLocaleString()} ${t("dash.tickerShipped")}`,
+          ...(stats.attention > 0 ? [`${stats.attention.toLocaleString()} ${t("dash.tickerOnHold")}`] : []),
+        ]}
+      />
+
+      {/* No loose glyph beside the name — see the note in dashboard-view.tsx. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <SquaresFour size={18} weight="regular" className="shrink-0 text-primary" />
           <div>
             <h1 className="font-title text-2xl font-semibold tracking-tight">{greeting}, {name}</h1>
             <p className="text-sm text-muted-foreground">
