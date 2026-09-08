@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Sparkle, Warning, House } from "@phosphor-icons/react"
-import { GetStarted } from "@/components/app/get-started"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { GmvPanel } from "@/components/app/gmv-panel"
@@ -211,8 +210,6 @@ export function DashboardView() {
           </p>
         </div>
       </div>
-
-      <GetStarted orders={orders === null ? null : orders.length} balance={balance} />
 
       {/* ONE money block, where there were four tiles and a chart under them.
        *

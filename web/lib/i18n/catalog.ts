@@ -199,6 +199,21 @@ const en: Dict = {
 
 // AI-drafted Vietnamese — pending human review before it's treated as final.
 const vi: Dict = {
+  "setup.Seller": "Người bán",
+  "setup.Set up your shop": "Thiết lập cửa hàng",
+  "setup.of": "trên",
+  "setup.Minimise": "Thu nhỏ",
+  "setup.Open the setup guide": "Mở hướng dẫn thiết lập",
+  "setup.Connect a store": "Kết nối cửa hàng",
+  "setup.Etsy, Shopify or TikTok Shop": "Etsy, Shopify hoặc TikTok Shop",
+  "setup.Fund the wallet": "Nạp tiền vào ví",
+  "setup.Charged on submit, refunded on cancel": "Trừ khi gửi đơn, hoàn lại khi huỷ",
+  "setup.Upload a design": "Tải thiết kế lên",
+  "setup.Map it to a product once": "Gán vào sản phẩm một lần",
+  "setup.Send your first order": "Gửi đơn hàng đầu tiên",
+  "setup.Pick a blank, place the artwork": "Chọn phôi, đặt thiết kế lên",
+  "setup.Invite a teammate": "Mời thành viên",
+  "setup.Optional · under your wallet": "Tuỳ chọn · dùng chung ví của bạn",
   "apiEndpoint.Quote an order": "Báo giá đơn hàng",
   "apiEndpoint.Cancel order": "Huỷ đơn hàng",
   "apiEndpointDesc.What a basket costs, before there is an order. Same items array as Create order; the shipping address is not needed. It runs the SAME pricing the charge runs — the per-size cost ladder, the print-method surcharge, the dearest line setting postage, the extra-item rate and your own discount — so the figure here is the figure you are billed. Shipping is our fulfilment charge for the basket, not a live carrier rate. Nothing is created and nothing is charged.": "Chi phí của một giỏ hàng, trước khi có đơn. Dùng đúng mảng items như Tạo đơn hàng; không cần địa chỉ giao. Nó chạy CÙNG cách tính giá mà hệ thống dùng khi thu tiền — bảng giá theo size, phụ phí theo kỹ thuật in, dòng đắt nhất quyết định cước, mức cộng thêm mỗi sản phẩm, và mức giảm giá của chính bạn — nên con số ở đây chính là con số bạn bị tính. Cước là phí hoàn tất đơn của chúng tôi cho giỏ hàng này, không phải giá hãng vận chuyển theo thời gian thực. Không tạo gì và không thu gì.",

@@ -46,6 +46,7 @@ const DEFAULT_ACCENT = 'rose';
  *
  *   studio  ink on white, one bright accent — the default
  *   press   electric violet plate over warm paper — what the site was before
+ *   balloon periwinkle and lime on a slate plate — the marketing site's palette
  *
  * A skin CANNOT reach --primary (it inks ~247 pieces of text as well as filling buttons),
  * the floor's status vocabulary, or --pop. Adding one means adding it to globals.css AND
@@ -54,7 +55,7 @@ const DEFAULT_ACCENT = 'rose';
 // `workshop` is the house style locked 2026-08-26 — parchment page, white cards, one lime.
 // It is FIRST because it is also DEFAULT_SKIN. `studio` and `press` are kept: both are
 // contrast-checked palettes and a picker with one option is not a picker.
-const SKINS = ['workshop', 'studio', 'press'];
+const SKINS = ['workshop', 'studio', 'press', 'balloon'];
 const DEFAULT_SKIN = 'workshop';
 
 /**

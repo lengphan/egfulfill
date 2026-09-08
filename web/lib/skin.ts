@@ -26,12 +26,13 @@
  *
  * Gate: `node tools/check-skins.mjs`.
  */
-export type SkinKey = "workshop" | "studio" | "press"
+export type SkinKey = "workshop" | "studio" | "press" | "balloon"
 
 export const SKINS: { key: SkinKey; label: string; what: string }[] = [
   { key: "workshop", label: "Workshop", what: "Parchment page, white cards, one lime. The house style." },
   { key: "studio", label: "Studio", what: "Ink on white. One bright accent." },
   { key: "press", label: "Press", what: "Violet plate over warm paper." },
+  { key: "balloon", label: "Balloon", what: "Periwinkle and lime on a slate plate. The marketing site's palette." },
 ]
 
 /**

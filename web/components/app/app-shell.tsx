@@ -10,6 +10,7 @@ import { CommandPalette } from "@/components/app/command-palette"
 import { PageTransition } from "@/components/motion/page-transition"
 import { useAccent } from "@/components/app/accent-boot"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
+import { SetupGuide } from "@/components/app/setup-guide"
 import { getUser, getToken } from "@/lib/auth"
 import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
@@ -127,6 +128,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
+      {/* The seller setup checklist, on every page rather than one — see setup-guide.tsx.
+          It renders nothing once the account is set up, and nothing for staff. */}
+      <SetupGuide />
       <ChatLauncher />
     </div>
     </ConfirmProvider>

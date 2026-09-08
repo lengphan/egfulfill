@@ -31,7 +31,7 @@
  * but until it is added to the server's own list an admin cannot SELECT it in Settings ›
  * Branding — the picker only offers what the server allows. That is a one-entry backend
  * change and deliberately not made here; the redesign is front-end only. */
-const SKINS = ["workshop", "studio", "press"] as const
+const SKINS = ["workshop", "studio", "press", "balloon"] as const
 /** Mirrors FACES in server/src/routes/branding.js.
  *
  * `sans` means "no override" — `font-display` falls through to `--font-display`, which

@@ -1445,6 +1445,62 @@ td[align="right"] {
  * and the contrast between the two was the whole look.
  *   ink on paper 18.5:1 · paper on plate 5.68:1 · acid on plate 5.07:1 · edge on paper 3.26:1
  */
+/* ── BALLOON · the palette the marketing site settled on 2026-09-08 ────────────
+ *
+ * Periwinkle, lime, slate and chrome — the colours of the inflated objects the site is
+ * built out of, so the two front doors are one product rather than two. The plate is the
+ * site's footer slate; the accent word on it is the same lime the site fills with.
+ *
+ * WHY --brand IS THE LIGHT PERIWINKLE AND ITS FOREGROUND IS INK. Everywhere the site uses
+ * #C0C4FF it carries ink type — the reviews block, the pills, the sidebar's active item.
+ * A deepened periwinkle carrying white would be a colour this palette does not contain.
+ * `--primary` is untouched, as a skin may never move it: it inks a quarter of the app.
+ *
+ * Measured by tools/check-skins.mjs like every other skin. */
+[data-skin="balloon"] {
+  --mk-surface: #F4F4F4;
+  --mk-ink: #212121;
+  /* The plate: the site's footer slate, not near-black — the app's sidebar is this value,
+     so a marketing plate and the product's own chrome are the same surface. */
+  --mk-accent: #2B3038;
+  --mk-accent-ink: #FFFFFF;
+  /* The accent word ON the plate is the lime, which is the site's one bright thing. */
+  --mk-plate-accent: #D4F897;
+  --mk-acid: #D4F897;
+  --mk-auth-field: #FFFFFF;
+  --mk-auth-edge: #8A8A8A;
+  --mk-auth-muted: #5C5C5C;
+  --mk-hairline: #E2E2E6;
+  --mk-card: #FFFFFF;
+  /* Periwinkle #C0C4FF, carrying ink — see the note above. */
+  --brand: oklch(0.8376 0.0825 281.4);
+  --brand-foreground: oklch(0.205 0 0);
+}
+
+/* Dark: the plate is already dark, so only the page, the card and the rules move; the
+   brand lifts a step so a filled button still reads as a fill against a dark ground. */
+.dark [data-skin="balloon"] {
+  --mk-surface: #15171B;
+  --mk-ink: #ECECF0;
+  --mk-card: #1E2127;
+  --mk-hairline: #383C46;
+  --mk-auth-field: #1E2127;
+  --mk-auth-edge: #8F939E;
+  --mk-auth-muted: #A9ADB8;
+  /* LIGHTER AND LESS SATURATED THAN THE LIGHT VALUE, and not by taste: at #C0C4FF the gate
+     measured this 0.103 from the dark `pending` indigo against a 0.154 floor — a filled
+     brand button and an order waiting to be accepted would have been the same colour on a
+     factory floor. Lifting the lightness and dropping the chroma moves it clear while
+     staying recognisably the site's periwinkle — same hue, lifted and saturated.
+     THE VALUE WAS SWEPT, NOT CHOSEN. Three guesses each landed inside a different status:
+     #C0C4FF sat 0.103 from `pending`, lifting it to #D9DBFA put it 0.148 from `packed`, and
+     turning it violet put it 0.139 from `draft`. A pastel in dark mode is crowded on every
+     side; the clear ground is BRIGHTER and MORE saturated at the same hue, which is where
+     this sits — 0.174 from the nearest status against a 0.154 floor. */
+  --brand: oklch(0.9100 0.1200 282.0);
+  --brand-foreground: oklch(0.205 0 0);
+}
+
 [data-skin="press"] {
   --mk-surface: #F2F1EC;
   --mk-ink: #0B0B0C;
