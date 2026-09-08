@@ -1,10 +1,20 @@
 /**
  * THE ACCENT — the one colour in an otherwise chroma-0 grey system.
  *
- * It carries exactly one meaning: "this is new, and it is for you". The unread badge, the
- * unread dot, the unread row. Nothing else takes it, because an accent used for two things
- * is not an accent — it is a second UI colour, and the app already learned what happens when
+ * It carries TWO meanings, and the second was added deliberately (2026-09-08): "this is new,
+ * and it is for you" — the unread badge, the unread dot, the unread row — and "you are here",
+ * the selected item in the sidebar. Nothing else takes it. An accent spent on three things is
+ * not an accent, it is a second UI colour, and the app already learned what happens when
  * every label is a capsule.
+ *
+ * WHY THE SECOND ONE. Under the one-meaning rule this token painted SEVEN elements in the
+ * whole product, all of them unread markers — so an admin could choose an accent, have it
+ * saved and applied, and never once see it on a board with nothing unread. A setting that
+ * cannot be observed is indistinguishable from a broken one. The sidebar's selected item is
+ * where it goes because globals.css had ALREADY reserved that slot for it in writing and
+ * three times set a periwinkle underneath; pointing --sidebar-primary at --pop is what makes
+ * the sentence and the value the same fact. Both meanings are "the eye's next stop", which is
+ * the only pair worth sharing one colour between.
  *
  * THE COLOURS ARE NOT HERE. globals.css declares them under [data-pop="…"], the server
  * stores a key, and this module only moves the key onto <html>. That means the settings

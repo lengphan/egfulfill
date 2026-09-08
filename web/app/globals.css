@@ -507,13 +507,30 @@
    * one. Every pair below is measured; none is eyeballed. */
     --sidebar: oklch(0.335 0.010 250);
     --sidebar-foreground: oklch(0.905 0.005 250);
-  /* SELECTED IS THE LIME, and this is the one place in the app it fills something. §4
+  /* SELECTED IS THE ACCENT, and this is the one place in the app it fills something. §4
      reserves it as the single bright thing and forbids it as a text colour — a filled block
      with ink on it is exactly the shape that rule permits, and "you are here" is the one
-     marker worth spending it on. Ink on lime is 14.87:1; the block is 14.21:1 against the
-     panel, so it reads across a room. */
-    --sidebar-primary: oklch(0.845 0.110 282);
-    --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
+     marker worth spending it on.
+
+     THIS IS THE THIRD TIME THIS BLOCK HAS SAID LIME OVER A VALUE THAT WASN'T. The two notes
+     below in .dark each record catching it once; the sentence above went on promising lime
+     while hue 282 — periwinkle — sat underneath, and the figures it quoted (ink 14.87:1,
+     block 14.21:1) reproduce for no colour in this system: measured, the old periwinkle was
+     ink 11.19:1 and 7.15:1 against the panel. A claim in a comment is not a measurement
+     (§4), and a hardcoded value is what let the two drift apart twice more.
+
+     So it is `var(--pop)` now — the accent an admin actually picked, which cannot fall out
+     of step with itself. Measured on the stored lime: ink on the block 13.80:1, block
+     against this panel 8.82:1. On rose: 7.39:1 and 4.73:1, both comfortable for a fill.
+
+     THE COST, ON THE RECORD: accent.ts said --pop "carries exactly one meaning: this is new,
+     and it is for you… nothing else takes it". It takes this too now. The reason is that the
+     one-meaning rule had made the accent invisible — 7 paint sites, all of them unread
+     badges, so an admin could pick a colour and never see it anywhere. "New, for you" and
+     "you are here" are both the eye's next stop, which is the one pair worth sharing it
+     with. Nothing else may. */
+    --sidebar-primary: var(--pop);
+    --sidebar-primary-foreground: var(--pop-foreground);
   /* Hover is a real step: 1.34:1 against the panel, where ink could only reach 1.23. */
     --sidebar-accent: oklch(0.407 0.011 250);
     --sidebar-accent-foreground: oklch(0.985 0 0);
@@ -620,8 +637,11 @@
   /* THE COMMENT ABOVE FINALLY MATCHES THE VALUE. It described "the acid block with ink on
    * it" as dark mode's one reserved use of lime, and then set white — so the thing the
    * paragraph promised had never once rendered. Light and dark now select the same way. */
-    --sidebar-primary: oklch(0.790 0.115 282);
-    --sidebar-primary-foreground: oklch(0.1822 0.0000 89.88);
+  /* And the third catch is the one above, in light. Same value, same fix: the accent itself,
+     so there is nothing left to drift. Measured on the stored lime against this panel:
+     block 11.95:1, ink on it 13.80:1. */
+    --sidebar-primary: var(--pop);
+    --sidebar-primary-foreground: var(--pop-foreground);
     --sidebar-accent: oklch(0.320 0.011 250);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.330 0.011 250);

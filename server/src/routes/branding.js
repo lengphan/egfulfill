@@ -19,6 +19,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { q } from '../db.js';
 import { putObject, getObject, storageEnabled } from '../storage.js';
+import { audit } from '../audit.js';
 
 const KEY = 'branding';
 
@@ -207,6 +208,29 @@ export function brandingRoutes(app, requireAuth, requireAdmin) {
     } catch (e) {
       reply.code(502);
       return { error: 'Could not save: ' + ((e && e.message) || 'database error') };
+    }
+    /**
+     * WHO CHANGED THE LOOK OF THE PRODUCT, AND FROM WHAT.
+     *
+     * This route had no audit at all, so the palette, the accent and the app's own NAME
+     * could change for every user of the platform and leave nothing behind but a bumped
+     * `updated_at` on one settings row — which covers the whole row, so it cannot even say
+     * WHICH field moved. Asked "who set this and when", the honest answer was that we did
+     * not keep it. CLAUDE.md: a settled record that changes silently is the thing the audit
+     * log exists to prevent.
+     *
+     * ONLY WHAT ACTUALLY MOVED. A full before/after of the row would file an entry every
+     * time an admin re-picked the skin already selected, and a log that records non-events
+     * is one nobody reads. If nothing changed, nothing is written.
+     */
+    const moved = ['appName', 'logoUrl', 'accent', 'skin', 'face'].filter((k) => cur[k] !== next[k]);
+    if (moved.length) {
+      audit(req, 'branding.save', {
+        entityType: 'settings', entityId: KEY,
+        before: Object.fromEntries(moved.map((k) => [k, cur[k]])),
+        after: Object.fromEntries(moved.map((k) => [k, next[k]])),
+        note: moved.join(', '),
+      });
     }
     return { ok: true, appName: next.appName, logoUrl: next.logoUrl, faviconUrl: next.faviconUrl, accent: next.accent, accents: ACCENTS, skin: next.skin, skins: SKINS, face: next.face, faces: FACES };
   });
