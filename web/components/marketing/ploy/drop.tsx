@@ -1,32 +1,31 @@
 "use client"
 
 import Image from "next/image"
-import { motion, useReducedMotion } from "motion/react"
+import { useRef } from "react"
+import { motion, useInView, useReducedMotion } from "motion/react"
 
 /**
- * THE PAGE ENDS BY DROPPING ITS OBJECTS ON THE FLOOR.
+ * THE PAGE ENDS BY PILING ITS OBJECTS UP EITHER SIDE OF THE SIGN-UP CARD.
  *
- * WHY IT IS A PILE AND NOT A ROW. The first version put six objects at even intervals along
- * the bottom edge, and evenly spaced is the one arrangement that cannot read as fallen — it
- * reads as a shelf of ornaments, which is the "objects look random rather than placed"
- * problem in a different costume. Things that fall CLUSTER: they collect where they land,
- * they lean on each other, and the gaps between heaps are uneven. So these are four heaps at
- * uneven intervals, each with its own pieces overlapping at different heights and angles.
+ * WHERE THEY GO. They were a strip along the bottom, which added height to a page that did
+ * not need more and left the real empty space — the wide margins either side of a 590px form
+ * — untouched. Two heaps flanking the card fill exactly that space and FRAME the one control
+ * the page is asking a person to use, rather than sitting below it as a separate band.
  *
- * THEY FALL FROM ABOVE THE FOLD, from behind the plan cards, so what a person sees is objects
- * entering the page rather than appearing in it. `-z-0` under the CTA's own `z-10` keeps them
- * BEHIND the headline on the way past: a chrome blob crossing "Stop touching orders" would be
- * the one moment the effect fought the sentence it is celebrating.
+ * WHY THEY ARE DENSE. A few pieces spaced out reads as things placed next to each other. A
+ * heap is a SILHOUETTE — a wide base of the heaviest pieces, a packed middle resting between
+ * them, and something small on top — so `sit` climbs while `w` shrinks and `dx` narrows up
+ * each list, and the pieces overlap hard rather than clearing each other.
  *
- * THEY LAND ON A FLOOR, NEVER ON THE COPY. Every piece rests inside this strip, which sits
- * below the CTA and above the footer. Nothing is ever underneath one at rest.
+ * THEY NEVER TOUCH THE CARD. Each heap is anchored to its own side and capped in width, and
+ * the CTA's content sits at `z-10` above this layer, so a piece can pass BEHIND the headline
+ * on the way down but nothing rests on top of a word or the email field.
  *
- * THEY STAY DRAGGABLE, which is the point of the whole device: an object you can pick up and
- * throw is the difference between a picture of a toy and a toy. `dragSnapToOrigin` returns
- * each to its heap, so one visitor cannot leave the pile dismantled for the next.
+ * BELOW md THEY ARE NOT DRAWN AT ALL. On a phone the form is the full width of the page and
+ * there are no margins to fill; the heaps would be behind the thing they exist to frame.
  *
- * REDUCED MOTION GETS THE PILE, NOT THE FALL. The objects are this band's content, so they
- * stay; it is the stagger and the bounce that would read as broken rather than absent.
+ * REDUCED MOTION GETS THE PILES, NOT THE FALL. They are this band's content, so they stay —
+ * it is the stagger and the settle that would read as broken rather than absent.
  */
 
 const CHROME = "/ploy/obj-chrome.webp"
@@ -34,98 +33,103 @@ const STAR = "/ploy/obj-star.webp"
 const CLOUD = "/ploy/obj-cloud.webp"
 const GREEN = "/ploy/obj-green.webp"
 
-/**
- * Four heaps at UNEVEN intervals — 9 / 31 / 58 / 84 rather than quarters, because equal gaps
- * are what made the first attempt look measured out. Within a heap, `dx` overlaps the pieces,
- * `sit` stacks them at different heights, and `z` decides what leans in front of what.
- */
 type Piece = { src: string; dx: number; w: number; sit: number; rot: number; delay: number; z: number }
-const HEAPS: { at: number; pieces: Piece[] }[] = [
-  {
-    at: 9,
-    pieces: [
-      { src: CHROME, dx: -26, w: 118, sit: -4, rot: -16, delay: 0.02, z: 2 },
-      { src: STAR, dx: 24, w: 72, sit: 6, rot: 24, delay: 0.16, z: 3 },
-      { src: CLOUD, dx: 4, w: 96, sit: 34, rot: -6, delay: 0.3, z: 1 },
-    ],
-  },
-  {
-    at: 31,
-    pieces: [
-      { src: GREEN, dx: -18, w: 104, sit: -2, rot: 12, delay: 0.08, z: 2 },
-      { src: CHROME, dx: 30, w: 66, sit: 10, rot: -22, delay: 0.24, z: 3 },
-    ],
-  },
-  {
-    at: 58,
-    pieces: [
-      { src: CLOUD, dx: -34, w: 132, sit: -6, rot: 7, delay: 0, z: 1 },
-      { src: STAR, dx: 12, w: 88, sit: 4, rot: -18, delay: 0.19, z: 3 },
-      { src: GREEN, dx: 44, w: 62, sit: 26, rot: 15, delay: 0.34, z: 2 },
-    ],
-  },
-  {
-    at: 84,
-    pieces: [
-      { src: CHROME, dx: -22, w: 92, sit: -3, rot: 19, delay: 0.11, z: 2 },
-      { src: STAR, dx: 18, w: 58, sit: 14, rot: -11, delay: 0.27, z: 3 },
-      { src: CLOUD, dx: 42, w: 74, sit: 30, rot: 9, delay: 0.4, z: 1 },
-    ],
-  },
+
+/** Base lands first and the apex last, because that is the order a heap is built and the
+ *  order gravity would deliver it. `z` rises with the stack so it reads toward the viewer. */
+const LEFT: Piece[] = [
+  { src: CHROME, dx: 10, w: 132, sit: 0, rot: -12, delay: 0, z: 1 },
+  { src: CLOUD, dx: 96, w: 140, sit: 4, rot: 7, delay: 0.08, z: 1 },
+  { src: GREEN, dx: 176, w: 118, sit: 0, rot: 16, delay: 0.16, z: 1 },
+  { src: STAR, dx: 54, w: 96, sit: 62, rot: 19, delay: 0.3, z: 2 },
+  { src: CHROME, dx: 140, w: 104, sit: 70, rot: -17, delay: 0.4, z: 2 },
+  { src: CLOUD, dx: 8, w: 88, sit: 96, rot: 11, delay: 0.5, z: 2 },
+  { src: GREEN, dx: 104, w: 78, sit: 132, rot: -9, delay: 0.62, z: 3 },
+  { src: STAR, dx: 58, w: 60, sit: 178, rot: 14, delay: 0.76, z: 3 },
 ]
 
-export function PloyDrop() {
-  const reduced = useReducedMotion()
+const RIGHT: Piece[] = [
+  { src: CLOUD, dx: -186, w: 126, sit: 0, rot: 9, delay: 0.05, z: 1 },
+  { src: CHROME, dx: -100, w: 144, sit: 2, rot: -14, delay: 0.13, z: 1 },
+  { src: GREEN, dx: -16, w: 112, sit: 0, rot: 12, delay: 0.21, z: 1 },
+  { src: STAR, dx: -142, w: 92, sit: 64, rot: -21, delay: 0.34, z: 2 },
+  { src: CLOUD, dx: -54, w: 100, sit: 72, rot: 15, delay: 0.45, z: 2 },
+  { src: CHROME, dx: -118, w: 82, sit: 120, rot: 8, delay: 0.58, z: 3 },
+  { src: STAR, dx: -34, w: 74, sit: 128, rot: -11, delay: 0.68, z: 3 },
+  { src: GREEN, dx: -84, w: 58, sit: 176, rot: 17, delay: 0.82, z: 3 },
+]
 
+function Heap({ pieces, side }: { pieces: Piece[]; side: "left" | "right" }) {
+  const reduced = useReducedMotion()
+  /**
+   * THE HEAP WATCHES, NOT THE PIECES.
+   *
+   * Each piece used to carry its own `whileInView`, and none of them ever fired: a piece
+   * starts 820px ABOVE where it lands, so its box at mount is off the top of the section and
+   * the observer never saw it enter. They sat transparent and high, which is why the page
+   * rendered nineteen objects and showed none.
+   *
+   * One observer on the container — which is where it belongs anyway, because a heap should
+   * begin falling as a heap rather than each piece deciding for itself.
+   */
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, { once: true, margin: "-80px" })
   return (
-    // The strip is decorative and must not swallow a click meant for the page; each piece
-    // restores its own pointer events so it is still grabbable.
     <div
+      ref={ref}
       aria-hidden
-      className="pointer-events-none relative z-0 mt-6 h-[clamp(120px,15vw,210px)] w-full overflow-visible"
+      className={
+        "pointer-events-none absolute bottom-0 hidden h-full w-[clamp(300px,30vw,440px)] md:block " +
+        (side === "left" ? "left-0" : "right-0")
+      }
     >
-      {HEAPS.flatMap((heap, hi) =>
-        heap.pieces.map((p, pi) => (
-          <motion.div
-            key={`${hi}-${pi}`}
-            drag
-            dragSnapToOrigin
-            dragElastic={0.5}
-            dragTransition={{ bounceStiffness: 300, bounceDamping: 18 }}
-            whileHover={{ scale: 1.06 }}
-            whileDrag={{ scale: 1.12, cursor: "grabbing", zIndex: 30 }}
-            /* -760 starts them above the plan cards, so they enter the page rather than
-               appearing in it. */
-            initial={reduced ? { opacity: 1, y: 0, rotate: p.rot } : { opacity: 0, y: -760, rotate: p.rot * 2.2 }}
-            whileInView={{ opacity: 1, y: 0, rotate: p.rot }}
-            viewport={{ once: true, margin: "-30px" }}
-            transition={
-              reduced
-                ? { duration: 0 }
-                : // A spring, because a fall is not an ease; low damping IS the bounce on
-                  // landing, and the per-piece delay is what stops a heap arriving as a block.
-                  { type: "spring", stiffness: 115, damping: 9.5, mass: 0.95, delay: p.delay }
-            }
-            style={{
-              left: `calc(${heap.at}% + ${p.dx}px)`,
-              width: p.w,
-              bottom: p.sit,
-              zIndex: p.z,
-            }}
-            className="pointer-events-auto absolute -translate-x-1/2 cursor-grab touch-none select-none"
-          >
-            <Image
-              src={p.src}
-              alt=""
-              width={700}
-              height={700}
-              unoptimized
-              draggable={false}
-              className="h-auto w-full drop-shadow-[0_16px_24px_rgba(33,33,33,0.20)]"
-            />
-          </motion.div>
-        )),
-      )}
+      {pieces.map((p, i) => (
+        <motion.div
+          key={i}
+          drag
+          dragSnapToOrigin
+          dragElastic={0.5}
+          dragTransition={{ bounceStiffness: 260, bounceDamping: 20 }}
+          whileHover={{ scale: 1.06 }}
+          whileDrag={{ scale: 1.12, cursor: "grabbing", zIndex: 30 }}
+          /* Starts above the fold so a piece ENTERS the page rather than appearing in it. */
+          initial={reduced ? { opacity: 1, y: 0, rotate: p.rot } : { opacity: 0, y: -820, rotate: p.rot * 2 }}
+          animate={inView || reduced ? { opacity: 1, y: 0, rotate: p.rot } : undefined}
+          transition={
+            reduced
+              ? { duration: 0 }
+              : /**
+                 * SLOW AND SOFT. It was stiffness 115 / damping 9.5 — a drop with a hard
+                 * bounce, and sixteen of those read as things thrown at the page rather than
+                 * settling onto it. A weak spring with real mass takes roughly twice as long
+                 * and lands with one small give. The long delays let a heap assemble piece by
+                 * piece while you watch, which is the part that reads as graceful.
+                 */
+                { type: "spring", stiffness: 30, damping: 14, mass: 1.8, delay: p.delay }
+          }
+          style={{ [side]: p.dx, width: p.w, bottom: p.sit, zIndex: p.z }}
+          className="pointer-events-auto absolute cursor-grab touch-none select-none"
+        >
+          <Image
+            src={p.src}
+            alt=""
+            width={700}
+            height={700}
+            unoptimized
+            draggable={false}
+            className="h-auto w-full drop-shadow-[0_14px_22px_rgba(33,33,33,0.20)]"
+          />
+        </motion.div>
+      ))}
     </div>
+  )
+}
+
+export function PloyDrop() {
+  return (
+    <>
+      <Heap pieces={LEFT} side="left" />
+      <Heap pieces={RIGHT} side="right" />
+    </>
   )
 }

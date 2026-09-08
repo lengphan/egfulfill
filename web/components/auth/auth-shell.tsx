@@ -120,7 +120,11 @@ export function AuthShell({ subtitle, children }: { subtitle: string; children: 
               className="mb-8 block w-fit"
               style={{ color: INK }}
             >
-              <Wordmark className="h-[21px] w-auto" />
+              {/* Matched to the site header's 30px. Sign-in is often the FIRST page a person sees —
+                  a link from an email, a bookmark — so the mark being smaller here than
+                  anywhere else made the one page that has to establish trust the one place the
+                  brand was quietest. */}
+              <Wordmark className="h-[30px] w-auto" />
             </Link>
 
             {/* NO CARD HERE. The card exists because a form alone on white has no shape; the

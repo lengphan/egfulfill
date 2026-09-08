@@ -18,30 +18,6 @@ import type { Stat, Step } from "@/lib/site-content"
  * so the sequence reads as a sequence rather than as four paragraphs.
  */
 
-/** The marketplaces orders arrive from. NOT customers — we do not print names we have not
- *  been given, and these are a claim the product can stand behind. */
-const CHANNELS = ["Etsy", "Shopify", "TikTok Shop"]
-
-function LogoWall() {
-  // Three names would leave the track short of the viewport, so the set is repeated enough
-  // times that half the track is always wider than the screen — which is what makes the
-  // 50% translate seamless.
-  const list = Array.from({ length: 8 }, () => CHANNELS).flat()
-  return (
-    <div className="overflow-hidden">
-      <div className="flex w-max">
-        <div className="ploy-marquee flex items-center">
-          {list.map((name, i) => (
-            <span key={i} className="flex items-center">
-              <span className="ploy-display whitespace-nowrap px-10 py-3 text-[36px] text-ploy-ink/45">{name}</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-ploy-ink/25" />
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 /** The lead paragraph, developing from pale to full ink as it crosses the viewport. */
 function Lead({ lines }: { lines: string[] }) {
@@ -123,9 +99,11 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
   return (
     <section id="steps" className={`relative ${GUTTER} ${STACK}`}>
       <motion.div {...rise(0)} className="ploy-acid-bloom relative overflow-hidden rounded-[32px] pb-20 pt-10 md:pb-24 md:pt-14">
-        {/* The marketplaces run along the top of the block; the hero's garment crosses them,
-            so the band under the fold is never empty. */}
-        <LogoWall />
+        {/* NO MARQUEE HERE. A strip of marketplace names scrolling across the top of this
+            block was the prototype's device for filling the band under the hero — but the
+            names are already a claim the page makes in words, and a second, moving copy of
+            them above the section's own headline competed with it. The block opens on its
+            title now. */}
 
         <div className="px-8 md:px-14">
           {/* THE HEADLINE SITS DIRECTLY UNDER THE MARQUEE.

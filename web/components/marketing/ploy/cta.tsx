@@ -28,7 +28,10 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
     : "clamp(2rem,5.2vw,5rem)"
 
   return (
-    <section className={`${GUTTER} ${SECTION}`}>
+    /* `relative` so the heaps can anchor to this section's own corners, and `overflow-hidden`
+       so a piece thrown hard cannot widen the page. The content below keeps z-10, so objects
+       pass BEHIND the headline as they fall and never rest on a word. */
+    <section className={`relative overflow-hidden ${GUTTER} ${SECTION}`}>
       <div className="relative z-10 flex flex-col items-center text-center">
         <h2 className="ploy-display max-w-[16ch]" style={{ fontSize: size }}>
           {heading.map((l, i) => (
@@ -77,7 +80,7 @@ export function PloyCta({ heading, subhead, button }: { heading: string[]; subhe
         </motion.form>
       </div>
 
-      {/* The page's last line: the objects fall in and settle on the floor. */}
+      {/* Two heaps, filling the margins either side of the sign-up card. */}
       <PloyDrop />
     </section>
   )
