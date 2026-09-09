@@ -818,6 +818,15 @@ export type PayoutRequest = {
   status: "pending" | "paid" | "rejected" | string
   created_at: string
   resolved_at?: string | null
+  /** What money ACTUALLY went out on, recorded at approval — often not `method`. */
+  paid_method?: PayoutMethod | null
+  /** The transfer confirmation, as a data URL. The mirror of a top-up's attachment. */
+  proof?: string | null
+  paid_note?: string | null
+  /** Raised by the monthly run rather than typed by the recipient. */
+  auto?: boolean
+  /** The calendar month an automatic request settles, '2026-09'. */
+  period?: string | null
 }
 export function getPayoutMethod() {
   // `methods` is keyed by method type (pingpong | lianlian | bank) — each remembers its own
@@ -833,11 +842,41 @@ export function getPayoutRequests(status?: string) {
 export function createPayoutRequest(amount: number, note: string | undefined, method: PayoutMethod) {
   return api<PayoutRequest & { error?: string }>(`/api/payout/requests`, { method: "POST", body: JSON.stringify({ amount, note, method }) })
 }
-export function payPayout(id: string) {
-  return api<PayoutRequest & { error?: string }>(`/api/payout/requests/${encodeURIComponent(id)}/pay`, { method: "POST" })
+/** Marking it paid RECORDS what we did: the rail used, the confirmation, an optional note. */
+export function payPayout(id: string, done?: { paid_method?: PayoutMethod; proof?: string; paid_note?: string }) {
+  return api<PayoutRequest & { error?: string }>(`/api/payout/requests/${encodeURIComponent(id)}/pay`, {
+    method: "POST",
+    body: JSON.stringify(done || {}),
+  })
+}
+/** Raise this month's automatic requests by hand — idempotent, safe to press twice. */
+export function runMonthlyPayouts(period?: string) {
+  return api<{ period: string; raised: number; error?: string }>(`/api/payout/run-monthly`, {
+    method: "POST",
+    body: JSON.stringify(period ? { period } : {}),
+  })
 }
 export function rejectPayout(id: string) {
   return api<PayoutRequest & { error?: string }>(`/api/payout/requests/${encodeURIComponent(id)}/reject`, { method: "POST" })
+}
+
+// ─────────────────── Designer earnings (per card, not a raw ledger) ───────────────────
+/** One row per design payout TO THE CALLER, joined back to the card it paid for. */
+export type DesignerEarning = {
+  id: string
+  at: string
+  amount: number
+  cardId: string | null
+  title: string | null
+  orderId: string | null
+  sku: string | null
+  /** The card's lane — `approved` for anything credited the normal way. */
+  lane: string | null
+  payStatus: string | null
+  outsourced: boolean
+}
+export function getDesignerEarnings() {
+  return api<DesignerEarning[]>(`/api/design_cards/earnings`)
 }
 
 // ─────────────────────────── Catalog ───────────────────────────
@@ -1436,6 +1475,20 @@ export type PublicProduct = {
    * known" rather than "no surcharge".
    */
   methodPrices?: Record<string, number>
+  /**
+   * THE FACES THIS BLANK PRINTS ON — resolved server-side from the product's own `sides`,
+   * else its category's (mirrors sidesOf in lib/variant-resolve.ts). Keys, not labels:
+   * `front`, `back`, `left`, `right`, `sleeve`, `hood`, `inside`, `wrap`.
+   *
+   * Where a decoration can go is a fact about OUR machines, not the supplier's garment, so
+   * it is safe on a public page — and it is what makes placement a priced variant rather
+   * than a list of capabilities further down the page.
+   */
+  sides?: string[]
+  /** What each ADDITIONAL printed face adds per unit. The first print is inside the base
+   *  price; faces 2, 3, 4 each add this — the same arithmetic sideAddOn() bills the order
+   *  by (server/src/pricing.js). 0 means extra faces are free, which is the default. */
+  sideFee?: number
   /** How the photo is framed — the crop set in the product editor, so the public site shows
    *  the same composition the app does. Null when nobody has framed it. See
    *  lib/product-framing.ts; the server clamps both to the editor's own bounds. */
@@ -3395,7 +3448,7 @@ export function getFactorySettings() {
  *  billed nothing while every product page printed it. `shipExtra` is each additional unit
  *  in the same parcel. */
 export type ShipBands = { cap: number; heavy: number; garment: number }
-export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number; /** Platform per-unit surcharge by method key (emb, dtf…) — the fallback when a product sets none. */ methods?: Record<string, number> }
+export type DesignFees = { standard: number; complex: number; check: number; shipBands?: ShipBands; shipExtra?: number; /** Platform per-unit surcharge by method key (emb, dtf…) — the fallback when a product sets none. */ methods?: Record<string, number>; /** Per ADDITIONAL printed face (settings `method_side`). The first print is inside the blank's base cost — see sideAddOn in server/src/pricing.js, which is what the order is billed on. 0 keeps extra faces free. */ sideFee?: number }
 export function getDesignFees() {
   return api<DesignFees>(`/api/design_fees`)
 }
@@ -3508,6 +3561,11 @@ export type DesignCard = {
   order_id?: string | null
   col?: string | null
   claimed_by?: string | null
+  /** The claimer's USER ID, stamped at claim time. `claimed_by` is a display name and can
+   *  fail to resolve back to a person (two same names, a rename, a blank name row) — which
+   *  is how a design payout ends up in the unattributed pool instead of with whoever cut
+   *  the file. The credit route prefers this and falls back to the name. */
+  claimed_id?: string | null
   /** The claimer's resolved role (server-side, from the list query). Only a 'designer' is
    *  actually credited on approval, so the card uses this to avoid implying a payout that
    *  won't happen for an operator/warehouse/admin claim. */
@@ -3604,7 +3662,7 @@ export function deleteDesignLane(id: string) {
 /** Credit the designer who claimed a card. The SERVER decides who (and whether) —
  *  staff uploads aren't billable, and a shared board pays the claimer, not a pool. */
 export function creditDesignCard(id: string | number, amount: number) {
-  return api<{ ok?: boolean; credited?: boolean; account?: string; reason?: string; error?: string }>(
+  return api<{ ok?: boolean; credited?: boolean; already?: boolean; account?: string; reason?: string; vendor?: string; error?: string }>(
     `/api/design_cards/${encodeURIComponent(String(id))}/credit`,
     { method: "POST", body: JSON.stringify({ amount }) })
 }

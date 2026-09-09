@@ -7,19 +7,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getPayoutMethod, savePayoutMethod, createPayoutRequest, type PayoutMethod } from "@/lib/api"
+import { PAYOUT_RAILS } from "@/lib/payment-method"
 
 const usd = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-// Three channels. PingPong/LianLian each take a single account id (email/id). "Bank QR" is
-// the richer one — account fields plus an optional uploaded bank QR image.
-const METHODS = [
-  { id: "pingpong", label: "PingPong" },
-  { id: "lianlian", label: "LianLian" },
-  { id: "bank", label: "Bank QR" },
-]
+/**
+ * THE RAILS COME FROM THE SHARED LIST, not a copy of it.
+ *
+ * This was three hard-coded entries while the admin side had its own idea of what a payout
+ * method is — so a rail could exist on one screen and not the other, and the nominated
+ * method and the recorded one could never be compared. PAYOUT_RAILS is the one list both
+ * read. "Cash" is dropped here because it is something WE do, never something a recipient
+ * nominates; everything else takes either an account number (bank) or a single id.
+ */
+const METHODS = PAYOUT_RAILS.filter((r) => r.id !== "cash").map((r) => ({
+  id: r.id,
+  label: r.id === "bank" ? "Bank QR" : r.label,
+  hint: r.hint,
+}))
 const blankFor = (type: string): PayoutMethod => ({ type, account_name: "", account_id: "", account_number: "", bank_name: "", note: "", qr: "" })
 const BLANK = blankFor("bank")
 // Prefer Bank QR when picking which saved method to open on.
-const firstSavedType = (m: Record<string, PayoutMethod>) => ["bank", "pingpong", "lianlian"].find((t) => m[t]) || "bank"
+const firstSavedType = (m: Record<string, PayoutMethod>) => METHODS.map((x) => x.id).find((t) => m[t]) || "bank"
 
 /**
  * Seller withdrawal. No bank API — the seller saves their payout details (which channel +
@@ -167,7 +175,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                   </div>
                 </>
               ) : (
-                <Input placeholder={type === "pingpong" ? tl("payout", "PingPong email or ID") : tl("payout", "LianLian email or ID")} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
+                <Input placeholder={tl("payout", METHODS.find((m) => m.id === type)?.hint || "Account email or ID")} value={info.account_id || ""} onChange={(e) => set("account_id", e.target.value)} className="h-9" />
               )}
 
               <Input placeholder={tl("payout", "Note (optional)")} value={info.note || ""} onChange={(e) => set("note", e.target.value)} className="h-9" />

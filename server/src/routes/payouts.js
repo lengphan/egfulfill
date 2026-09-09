@@ -72,6 +72,39 @@ export function payoutsRoutes(app, requireAuth) {
   // seller, snapshotted into each request.
   q(`alter table users add column if not exists payout_info jsonb`).catch(() => {});
 
+  /**
+   * WHAT THEY ASKED FOR vs WHAT WE ACTUALLY DID.
+   *
+   * `method` is the destination the recipient nominated, snapshotted at request time.
+   * `paid_method` is the rail the money genuinely went out on, recorded at approval — and
+   * they are frequently not the same: a designer nominates PayPal, we settle by bank
+   * transfer that month because the PayPal balance is short. Overwriting `method` to match
+   * would erase what they asked for; leaving only `method` would have the record claim a
+   * payment we never made that way. Both, or the row is a guess.
+   *
+   * `proof` is the transfer confirmation — the mirror of topup_requests.attachment, which
+   * is how a SELLER proves an incoming transfer. The same evidence in the other direction
+   * is what lets a designer see their money left and by which route, instead of taking
+   * "marked paid" on faith.
+   */
+  q(`alter table payout_requests add column if not exists paid_method jsonb`).catch(() => {});
+  q(`alter table payout_requests add column if not exists proof text`).catch(() => {});
+  q(`alter table payout_requests add column if not exists paid_note text`).catch(() => {});
+
+  /**
+   * THE MONTHLY RUN, AND WHY IT NEEDS A PERIOD RATHER THAN A TIMESTAMP.
+   *
+   * `auto` marks a request nobody typed; `period` is the calendar month it settles ('2026-09').
+   * The unique index is the actual guarantee — two app instances, a restart mid-run, or an
+   * admin pressing the manual trigger twice all collide on it instead of raising a second
+   * request for the same month. Time-based "did this run recently" checks cannot promise
+   * that, and the failure they permit is paying somebody twice.
+   */
+  q(`alter table payout_requests add column if not exists auto boolean not null default false`).catch(() => {});
+  q(`alter table payout_requests add column if not exists period text`).catch(() => {});
+  q(`create unique index if not exists payout_requests_period_uidx
+       on payout_requests (seller_id, period) where period is not null`).catch(() => {});
+
   // Seller reads / saves their payout profile. Bounds ride along so the withdraw dialog
   // knows the limits without a second call.
   app.get('/api/payout/method', { preHandler: requireAuth }, async (req) => {
@@ -151,8 +184,22 @@ export function payoutsRoutes(app, requireAuth) {
   });
 
   // List: staff see all (optional ?status=); a seller sees only their own.
+  /**
+   * WHO SEES WHOSE PAYOUTS.
+   *
+   * The queue is for whoever can PAY it. This read `role !== 'seller'`, which is every staff
+   * role — so an operator, a warehouse hand and, now that designers are paid through here,
+   * every designer could list all 200 most recent payouts: other people's amounts, names,
+   * emails and the bank account numbers snapshotted into `method`. What one designer is paid
+   * is not information the next designer is owed, and a colleague's account number is not
+   * information anybody here needs.
+   *
+   * This is the same mistake wallet.js's canAccess was narrowed to fix ("isStaff was too
+   * wide: it admits operator, warehouse AND designer"), in a second file that kept the old
+   * shape. The predicate is now the same one that decides who may resolve a payout.
+   */
   app.get('/api/payout/requests', { preHandler: requireAuth }, async (req) => {
-    if (canPay(req.user) || String(req.user.role) !== 'seller') {
+    if (canPay(req.user)) {
       const st = req.query && req.query.status;
       const r = st
         ? await q('select * from payout_requests where status=$1 order by created_at desc limit 200', [st])
@@ -162,6 +209,107 @@ export function payoutsRoutes(app, requireAuth) {
     const r = await q('select * from payout_requests where seller_id=$1 order by created_at desc limit 100', [req.user.sub]);
     return r.rows;
   });
+
+  /**
+   * THE MONTHLY RUN.
+   *
+   * A designer should not have to remember to ask for money they have already earned. Once a
+   * month every account with a withdrawable balance gets a request raised FOR them, sitting
+   * in the same pending queue an admin already works — so the automatic path and the "I want
+   * it now" path resolve through one screen and one approval, rather than a second mechanism
+   * that pays by itself.
+   *
+   * IT RAISES A REQUEST; IT NEVER MOVES MONEY. Nothing here touches the ledger. The debit
+   * still happens where it always has: an admin marks it paid, having actually sent it.
+   * That is the whole reason this is safe to run unattended.
+   *
+   * The amount is the WHOLE available balance, capped by payout_max if one is set — a
+   * monthly settlement, not an instalment. Below payout_min it is skipped rather than raised
+   * for a few cents somebody has to transfer by hand.
+   *
+   * Anyone with a pending request is skipped: they have already asked, and a second row for
+   * the same money is how a double payment starts.
+   */
+  async function runMonthlyPayouts({ period, by = null } = {}) {
+    const p = period || new Date().toISOString().slice(0, 7);   // '2026-09'
+    const { min, max } = await payoutBounds();
+    /* Designers with a positive balance. `wallet_ledger.account` holds a user id as TEXT
+       (it also holds 'factory'/'designer'), so the join casts rather than comparing uuid to
+       text. The pooled 'designer' account is deliberately NOT included — it is money whose
+       owner we could not resolve, and raising a payout against it would ask an admin to pay
+       an account rather than a person. */
+    const rows = await q(
+      `select u.id, u.name, u.email, u.payout_info, sum(l.delta)::numeric as bal
+         from users u
+         join wallet_ledger l on l.account = u.id::text
+        where u.role = 'designer'
+        group by u.id, u.name, u.email, u.payout_info
+       having sum(l.delta) >= $1`,
+      [min]
+    ).then((r) => r.rows).catch(() => []);
+
+    const made = [];
+    for (const d of rows) {
+      const bal = Number(d.bal) || 0;
+      const amount = max > 0 ? Math.min(bal, max) : bal;
+      if (amount < min) continue;
+      const open = await q("select 1 from payout_requests where seller_id=$1 and status='pending' limit 1", [d.id])
+        .then((r) => r.rows.length).catch(() => 1);
+      if (open) continue;
+      /* The unique index on (seller_id, period) is what actually prevents a second request
+         for the same month, so a conflict here is the expected outcome of a re-run, not an
+         error. `do nothing` + no returned row means "already raised". */
+      const ins = await q(
+        `insert into payout_requests (seller_id, seller_name, seller_email, amount_usd, method, note, status, auto, period)
+         values ($1,$2,$3,$4,$5,$6,'pending',true,$7)
+         on conflict do nothing
+         returning *`,
+        [d.id, d.name || null, d.email || null, amount,
+         JSON.stringify(firstMethod(methodsMap(d.payout_info)) || null),
+         `Automatic monthly payout · ${p}`, p]
+      ).then((r) => r.rows[0]).catch(() => null);
+      if (!ins) continue;
+      made.push(ins);
+      notify({
+        roles: ['admin'],
+        type: 'payout-requested',
+        title: `Monthly payout · $${amount.toFixed(2)}`,
+        body: `${d.name || d.email || 'A designer'} is owed $${amount.toFixed(2)} for ${p}.`,
+        href: '/finance',
+        entityId: String(ins.id),
+        excludeUserId: by,
+      });
+    }
+    return { period: p, raised: made.length, requests: made };
+  }
+
+  /* Admin can run it by hand — for a first month, or after fixing a payout profile. The
+     unique index makes a manual run on a month that already ran a no-op rather than a
+     duplicate, so the button is safe to press twice. */
+  app.post('/api/payout/run-monthly', { preHandler: requireAuth }, async (req, reply) => {
+    if (!canPay(req.user)) { reply.code(403); return { error: 'Admin only' }; }
+    const period = String((req.body || {}).period || '').match(/^\d{4}-\d{2}$/) ? req.body.period : null;
+    return runMonthlyPayouts({ period, by: req.user.sub });
+  });
+
+  /**
+   * THE TIMER, shaped like backup.js's: a check shortly after boot, then hourly, each one
+   * cheap and idempotent. Hourly rather than monthly because a process that must stay alive
+   * for 30 days to do its job will miss months — every restart, deploy and crash silently
+   * skips one. This asks "has THIS month been raised yet" every hour instead, so a box that
+   * was down on the 1st raises it on the 2nd rather than never.
+   */
+  const MONTHLY_EVERY_MS = 60 * 60 * 1000;
+  let _payoutSchedStarted = false;
+  function startPayoutScheduler() {
+    if (_payoutSchedStarted) return;
+    _payoutSchedStarted = true;
+    const tick = () => { runMonthlyPayouts().catch(() => { /* swallow, so the timer survives */ }); };
+    setTimeout(tick, 90 * 1000);
+    const t = setInterval(tick, MONTHLY_EVERY_MS);
+    if (t.unref) t.unref();
+  }
+  startPayoutScheduler();
 
   // Admin/warehouse mark a payout Paid → DEBIT the seller's wallet. Balance is re-checked
   // here (it may have moved since the request), and the ledger row is idempotent by
@@ -176,19 +324,62 @@ export function payoutsRoutes(app, requireAuth) {
       const bal = await balanceOf(pre.seller_id);
       if (amount > bal) { reply.code(409); return { error: `Seller's balance is only $${bal.toFixed(2)} — can't pay out $${amount.toFixed(2)}.` }; }
     }
+    /**
+     * WHAT WE ACTUALLY PAID ON, AND THE PROOF OF IT.
+     *
+     * We do not always settle on the rail the designer nominated — a month where the PayPal
+     * balance is short goes out by bank transfer or Remitly instead. So the admin records the
+     * rail they really used and attaches the confirmation, and the request keeps BOTH: the
+     * nominated `method` and the actual `paid_method`. The designer then sees which route
+     * their money took and the receipt for it, rather than the word "Paid" and nothing else.
+     *
+     * The proof is a data URL, same shape as topup_requests.attachment. Capped here as well
+     * as in the UI: the body limit is 60MB and a phone screenshot pasted straight in would
+     * otherwise put megabytes of base64 into a row read on every payout list.
+     */
+    const b = req.body || {};
+    const paidMethod = b.paid_method && typeof b.paid_method === 'object' ? b.paid_method : null;
+    let proof = typeof b.proof === 'string' && b.proof.startsWith('data:') ? b.proof : null;
+    if (proof && proof.length > 8 * 1024 * 1024) { reply.code(400); return { error: 'That screenshot is over 8 MB — please attach a smaller one.' }; }
+    const paidNote = typeof b.paid_note === 'string' && b.paid_note.trim() ? b.paid_note.trim().slice(0, 500) : null;
+
     const r = await q(
-      "update payout_requests set status='paid', resolved_at=now(), resolved_by=$2 where id=$1 and status='pending' returning *",
-      [req.params.id, req.user.sub]
+      `update payout_requests
+          set status='paid', resolved_at=now(), resolved_by=$2,
+              paid_method = coalesce($3::jsonb, paid_method),
+              proof       = coalesce($4, proof),
+              paid_note   = coalesce($5, paid_note)
+        where id=$1 and status='pending'
+        returning *`,
+      [req.params.id, req.user.sub, paidMethod ? JSON.stringify(paidMethod) : null, proof, paidNote]
     );
     const rec = r.rows[0];
     if (!rec) { reply.code(409); return { error: 'Already processed' }; }
     if (rec.seller_id) {
-      const label = (rec.method && (rec.method.type || rec.method.method)) ? `Payout · ${rec.method.type || rec.method.method}` : 'Payout';
+      /* The ledger line names the rail the money ACTUALLY went out on, falling back to the
+         nominated one only when the admin recorded nothing. A ledger that says "PayPal" for
+         a bank transfer is worse than one that just says "Payout". */
+      const rail = (rec.paid_method && (rec.paid_method.type || rec.paid_method.method))
+        || (rec.method && (rec.method.type || rec.method.method));
+      const label = rail ? `Payout · ${rail}` : 'Payout';
       await q(
         `insert into wallet_ledger (account, delta, type, ref, note, created_by)
          values ($1,$2,'withdrawal',$3,$4,$5) on conflict do nothing`,
         [rec.seller_id, -Math.abs(amount), String(rec.id), label, req.user.sub]
       ).catch(() => {});
+    }
+    /* THE RECIPIENT IS TOLD. A monthly request they never made, resolved silently, would
+       have money leave their balance with nothing on screen explaining when or how. */
+    if (rec.seller_id) {
+      const rail = (rec.paid_method && (rec.paid_method.type || rec.paid_method.method)) || null;
+      notify({
+        userIds: [rec.seller_id],
+        type: 'payout-paid',
+        title: `Payout sent — $${amount.toFixed(2)}`,
+        body: rail ? `Paid via ${rail}. The confirmation is on the request.` : 'Your payout has been sent.',
+        href: '/earnings',
+        entityId: String(rec.id),
+      });
     }
     return rec;
   });

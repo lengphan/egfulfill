@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { SearchField } from "@/components/app/search-field"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
 import { shortOrderRef } from "@/lib/order-format"
 import { ActivityFeed } from "@/components/app/activity-feed"
@@ -503,8 +503,10 @@ export function DesignerBoard() {
  const u = getUser()
  let own: Partial<DesignCard> | null = null
  if (!card.vendor && u?.name) {
- if (to === fallback) { if (card.claimed_by) own = { claimed_by: null, claimed_role: null } }
- else if (!card.claimed_by) { own = { claimed_by: u.name, claimed_role: u.role ?? null } }
+ if (to === fallback) { if (card.claimed_by) own = { claimed_by: null, claimed_id: null, claimed_role: null } }
+      // claimed_id is what the credit resolves against; the name stays because it is what
+      // the board shows. A name alone is what put payouts in the unattributed pool.
+ else if (!card.claimed_by) { own = { claimed_by: u.name, claimed_id: u.id ?? null, claimed_role: u.role ?? null } }
     }
  patch(card.id, { col: to, ...(own || {}), ...extra })
     // Credit on approval — use the card's payout, or the platform Design fee as the default.
@@ -516,7 +518,7 @@ export function DesignerBoard() {
  creditDesignCard(card.id, amount)
         .then((r) => {
  if (r?.error) return
- if (r?.credited) patch(card.id, { credited: true, pay_status: "paid", payment: amount })
+ if (r?.credited) patch(card.id, { credited: true, pay_status: "credited", payment: amount })
         })
         .catch(() => {})
     }
@@ -1206,14 +1208,37 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
 
   // Fallback credit for a card approved before a payout was set (auto-credit needs an
   // amount at approval time). Idempotent by DSN-<id> so it can never double-pay.
+  /**
+   * IT GOES THROUGH THE CREDIT ROUTE, not a raw wallet transfer.
+   *
+   * This called walletTransfer(factory → "designer") directly, and that destination is the
+   * shared UNATTRIBUTED pool — so every card credited with this button paid nobody in
+   * particular, however clearly it was claimed. That is where the pooled balance came from.
+   *
+   * It also skipped every rule the route enforces: an OUTSOURCED card would be paid twice
+   * (the partner invoices for it AND an internal payout goes out), and a card claimed by an
+   * operator would be paid for work that isn't billable design work.
+   *
+   * The route answers `credited:false` with a reason rather than throwing, so a refusal is
+   * shown instead of leaving the button looking like it worked.
+   */
  const creditNow = async () => {
  const amount = Number(pay) || 0
  if (amount <= 0) { setErr("Set a payout amount first."); return }
  setBusy(true); setErr(null)
  try {
- const r = await walletTransfer({ fromAccount: "factory", toAccount: "designer", amount, ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
- if (r.error) throw new Error(r.error)
- patch(card.id, { credited: true, pay_status: "paid", payment: amount })
+ const r = await creditDesignCard(card.id, amount)
+ if (r?.error) throw new Error(r.error)
+ if (!r?.credited && !r?.already) {
+ setErr(
+ r?.reason === "outsourced" ? `This card went to ${r.vendor || "a partner"}, who invoices for it — crediting here would pay twice.`
+ : r?.reason === "not-a-designer" ? "Whoever claimed this card isn't a designer, so there's no design payout to make."
+ : r?.reason === "admin-only" ? "Only an admin can release a design payout."
+ : "That card wasn't credited."
+          )
+ return
+      }
+ patch(card.id, { credited: true, pay_status: "credited", payment: amount })
     } catch (e) {
  setErr(e instanceof Error ? e.message : "Couldn't credit the designer.")
     } finally { setBusy(false) }

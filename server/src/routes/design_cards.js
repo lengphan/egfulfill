@@ -134,6 +134,33 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // bytes go to object storage under the SAME namespace order designs use — identical
   // content whichever door it came in by — so assigning the card to an order later is a
   // key copy rather than a re-upload.
+  /**
+   * WHO CLAIMED IT, BY ID.
+   *
+   * `claimed_by` is a NAME, stamped from the browser, and the credit route resolves it by
+   * matching that text against users.name / users.email. That match is the difference
+   * between a designer being paid and the money landing in the unattributed pool: two people
+   * with one name, a name edited after the claim, or a claim stamped before the user row had
+   * a name at all, and the resolution silently fails. The id cannot drift. `claimed_by` stays
+   * because it is what the board DISPLAYS and what every existing row has.
+   */
+  q('alter table design_cards add column if not exists claimed_id uuid').catch(() => {});
+  /**
+   * APPROVAL CREDITS; IT DOES NOT PAY.
+   *
+   * pay_status was set to 'paid' the moment a card was approved — but approval only moves
+   * money into the designer's WALLET. Nobody has sent them anything at that point, and they
+   * still have to request a withdrawal an admin pays by hand. A card reading "paid" while
+   * the designer is owed every cent of it is the kind of label somebody eventually reports
+   * off. The card's ladder ends at `credited`; whether that money has actually left is a
+   * question only the wallet can answer, because a withdrawal is a lump sum against a
+   * balance and cannot honestly be attributed back to individual cards.
+   *
+   * The backfill is narrow on purpose — only rows this code itself wrote, identified by
+   * `credited`. It relabels our own bookkeeping to say what actually happened; no amount,
+   * no ledger row and no external record is touched.
+   */
+  q("update design_cards set pay_status='credited' where credited = true and pay_status = 'paid'").catch(() => {});
   q('alter table design_cards add column if not exists art_key text').catch(() => {});
   q('alter table design_cards add column if not exists art_hash text').catch(() => {});
   q('alter table design_cards add column if not exists art_data text').catch(() => {});
@@ -598,6 +625,50 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
    * Falls back to the shared 'designer' account only when the claimer can't be resolved
    * to a real designer — better a pooled credit than a silently dropped one.
    */
+  /**
+   * A DESIGNER'S OWN EARNINGS, PER CARD.
+   *
+   * The earnings page was a raw wallet ledger, and a ledger row can only carry a note — which
+   * here was `Design payout · <card title>`, and a card title is a marketplace listing name
+   * ("Custom Apron with Name, Personalized Kitchen Apron with Pocket, Cafe Barista Uniform
+   * Apron, …"). Five products in one line, no card, no order, no status: everything a
+   * designer wants to check about a payment was the one thing the row could not say.
+   *
+   * So join the two. The credit's ref is `DSN-<card id>` by construction, which is the link
+   * back to the card the money was for — its lane, its order, its own recorded payout.
+   *
+   * SCOPED TO THE CALLER, always. It reads `req.user.sub` and never takes an account from the
+   * query, so this cannot become a way for one designer to read another's earnings.
+   */
+  app.get('/api/design_cards/earnings', { preHandler: requireAuth }, async (req) => {
+    const rows = await q(
+      `select l.id, l.created_at, l.delta, l.ref, l.note,
+              c.id as card_id, c.title, c.order_id, c.sku, c.col, c.pay_status, c.vendor
+         from wallet_ledger l
+         left join design_cards c
+                on l.ref like 'DSN-%'
+               and c.id = nullif(regexp_replace(l.ref, '^DSN-', ''), '')::bigint
+        where l.account = $1 and l.type = 'design-pay-in'
+        order by l.created_at desc
+        limit 500`,
+      [String(req.user.sub)]
+    ).then((r) => r.rows).catch(() => []);
+    return rows.map((r) => ({
+      id: String(r.id),
+      at: r.created_at,
+      amount: Number(r.delta) || 0,
+      cardId: r.card_id != null ? String(r.card_id) : null,
+      // The card may have been deleted since; the ledger row is the record either way, so
+      // fall back to what the note preserved rather than dropping the row.
+      title: r.title || String(r.note || '').replace(/^Design payout · /, '') || null,
+      orderId: r.order_id || null,
+      sku: r.sku || null,
+      lane: r.col || null,
+      payStatus: r.pay_status || null,
+      outsourced: !!r.vendor,
+    }));
+  });
+
   app.post('/api/design_cards/:id/credit', { preHandler: requireStaff }, async (req, reply) => {
     // Releasing the designer's payout is an ADMIN act — the same gate as moving a card into
     // Approved. Soft-return (not 403) so the board's optimistic call from a non-admin just
@@ -605,7 +676,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     if (!req.user || req.user.role !== 'admin') { return { ok: true, credited: false, reason: 'admin-only' }; }
     const amount = Math.max(0, Number((req.body || {}).amount) || 0);
     if (!amount) { reply.code(400); return { error: 'amount required' }; }
-    const card = await q('select id, title, claimed_by, credited, vendor from design_cards where id=$1::bigint', [String(req.params.id)])
+    const card = await q('select id, title, claimed_by, claimed_id, credited, vendor from design_cards where id=$1::bigint', [String(req.params.id)])
       .then((r) => r.rows[0]).catch(() => null);
     if (!card) { reply.code(404); return { error: 'Card not found' }; }
     if (card.credited) return { ok: true, already: true };
@@ -616,10 +687,23 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       return { ok: true, credited: false, reason: 'outsourced', vendor: card.vendor };
     }
 
-    // Resolve the claimer by name or email — the board records whichever it has.
-    const who = String(card.claimed_by || '').trim();
+    /**
+     * Resolve the claimer — BY ID FIRST.
+     *
+     * The name match below is what this route had, and it is the reason money ends up in the
+     * unattributed pool: `claimed_by` is free text stamped from a browser, so two designers
+     * sharing a first name, a name edited after the claim, or a user row with no name at all
+     * all resolve to nothing and the payout pools. Cards claimed since `claimed_id` exists
+     * carry the id and cannot miss. The name path stays for every card claimed before it.
+     */
     let target = null, role = null;
-    if (who) {
+    if (card.claimed_id) {
+      const u = await q('select id, role from users where id=$1', [card.claimed_id])
+        .then((r) => r.rows[0]).catch(() => null);
+      if (u) { target = u.id; role = u.role; }
+    }
+    const who = String(card.claimed_by || '').trim();
+    if (!target && who) {
       const u = await q(
         "select id, role from users where lower(email)=lower($1) or lower(name)=lower($1) limit 1", [who]
       ).then((r) => r.rows[0]).catch(() => null);
@@ -636,8 +720,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       type: 'design-pay', ref: `DSN-${card.id}`,
       note: `Design payout · ${card.title || card.id}`,
     });
+    /* 'credited', NOT 'paid' — see the note beside the backfill at the top of this file.
+       The money is in their wallet; sending it is a payout an admin still has to make. */
     await q('update design_cards set credited=true, pay_status=$2, payment=$3 where id=$1::bigint',
-      [String(card.id), 'paid', amount]).catch(() => {});
+      [String(card.id), 'credited', amount]).catch(() => {});
     audit(req, 'design.credited', { entityType: 'design_card', entityId: String(card.id), after: { account, amount } });
     return { ok: true, credited: true, account };
   });
@@ -714,8 +800,9 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
         `insert into design_cards
            (id, order_id, sku, design_id, title, col, type, product, priority, due,
             assignee, claimed_by, payment, pay_status, is_emb, emb_file_name, thumb,
-            thumb_ref, files, specs, notes, history, checklist, vendor, vendor_ref, line_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+            thumb_ref, files, specs, notes, history, checklist, vendor, vendor_ref, line_id,
+            claimed_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
          on conflict (id) do update set
            order_id=excluded.order_id, sku=excluded.sku, design_id=excluded.design_id,
            title=excluded.title, col=excluded.col, type=excluded.type, product=excluded.product,
@@ -725,6 +812,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            thumb_ref=excluded.thumb_ref, files=excluded.files, specs=excluded.specs,
            notes=excluded.notes, history=excluded.history, checklist=excluded.checklist,
            vendor=excluded.vendor, vendor_ref=excluded.vendor_ref, line_id=excluded.line_id,
+           claimed_id=excluded.claimed_id,
            updated_at=now()`,
         [c.id, c.order_id || null, c.sku || null, c.design_id || null, c.title || null,
          c.col || 'incoming', c.type || null, c.product || null, c.priority || 'normal', c.due || null,
@@ -732,7 +820,9 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
          !!c.is_emb, c.emb_file_name || null, c.thumb || null, c.thumb_ref || null,
          JSON.stringify(c.files || []), JSON.stringify(c.specs || {}), JSON.stringify(c.notes || []),
          JSON.stringify(c.history || []), JSON.stringify(c.checklist || []),
-         c.vendor || null, c.vendor_ref || null, c.line_id || null]
+         c.vendor || null, c.vendor_ref || null, c.line_id || null,
+         /* A blank string is not a uuid — Postgres rejects it, and the whole save fails. */
+         c.claimed_id || null]
       );
     }
     // Cast explicitly. design_cards.id is bigint, but node-pg returns bigint as a STRING,

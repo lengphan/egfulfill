@@ -2,7 +2,7 @@
 
 import { useLabelT, useDateFormat } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { labelRail } from "@/lib/payment-method"
+import { labelRail, PAYOUT_RAILS } from "@/lib/payment-method"
 import { Plus, DownloadSimple, X } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
 import { PayoutDialog } from "@/components/app/payout-dialog"
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -182,6 +183,106 @@ function AdminTopups({ onReviewed }: { onReviewed?: () => void }) {
 
 // Admin/warehouse review of pending seller payouts — the debit side of the top-up panel.
 // They pay the seller off-platform using the details shown, then Mark paid to debit the
+/**
+ * RECORDING A PAYOUT, rather than just asserting one.
+ *
+ * "Mark paid" used to be one click that set a status and debited a wallet. It said money had
+ * gone and carried no evidence of where, and the recipient saw the word "Paid" and nothing
+ * else. Two things were missing and both matter monthly:
+ *
+ *   WHICH RAIL. We do not always settle on the one that was nominated — a month where the
+ *   PayPal balance is short goes out by bank transfer or Remitly instead. The request keeps
+ *   the nominated `method` AND this, so neither erases the other.
+ *
+ *   THE CONFIRMATION. The mirror of the receipt a seller attaches to an incoming transfer.
+ *   It is what lets a designer see their money left, by which route, rather than taking a
+ *   status flip on faith.
+ *
+ * The rail defaults to whatever was nominated, because most months that IS what we used.
+ */
+function SettlePayoutDialog({ req, busy, onCancel, onConfirm }: {
+  req: PayoutRequest | null
+  busy: boolean
+  onCancel: () => void
+  onConfirm: (done: { paid_method: { type: string }; proof?: string; paid_note?: string }) => void
+}) {
+  const tl = useLabelT()
+  const [rail, setRail] = useState("")
+  const [note, setNote] = useState("")
+  const [shot, setShot] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  // Remount per request (key on the row) would be cleaner, but the dialog is a singleton
+  // here — so reset when a new request arrives, deferred per this codebase's lint rule.
+  useEffect(() => {
+    if (!req) return
+    const t = setTimeout(() => {
+      setRail(req.method?.type || PAYOUT_RAILS[0].id)
+      setNote(""); setShot(null); setErr(null)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [req])
+
+  const take = (f?: File | null) => {
+    if (!f) return
+    if (!f.type.startsWith("image/")) { setErr("Please attach an image (PNG/JPG)."); return }
+    if (f.size > 8 * 1024 * 1024) { setErr("That screenshot is over 8 MB — please compress it."); return }
+    const r = new FileReader()
+    r.onload = () => { setErr(null); setShot(String(r.result || "")) }
+    r.readAsDataURL(f)
+  }
+
+  return (
+    <Dialog open={!!req} onOpenChange={(o) => { if (!o) onCancel() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>{tl("wallet", "Record this payout")}</DialogTitle></DialogHeader>
+        {req && (
+          <div className="space-y-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">{req.seller_name || req.seller_email || "—"}</span>
+              <span className="font-semibold tabular-nums">{usd2(Number(req.amount_usd) || 0)}</span>
+            </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-2xs text-muted-foreground">{tl("wallet", "Paid via")}</span>
+              <select value={rail} onChange={(e) => setRail(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                {PAYOUT_RAILS.map((r) => (
+                  <option key={r.id} value={r.id}>{r.label}{req.method?.type === r.id ? tl("wallet", " · requested") : ""}</option>
+                ))}
+              </select>
+            </label>
+            <Input placeholder={tl("wallet", "Reference or note (optional)")} value={note} onChange={(e) => setNote(e.target.value)} className="h-9" />
+            <div>
+              <div className="mb-1 text-2xs text-muted-foreground">{tl("wallet", "Transfer confirmation")}</div>
+              {shot ? (
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={shot} alt={tl("wallet", "Transfer confirmation")} className="size-20 rounded-lg border border-border object-cover" />
+                  <Button size="sm" variant="ghost" onClick={() => setShot(null)}>{tl("wallet", "Remove")}</Button>
+                </div>
+              ) : (
+                <label className="eg-tap flex h-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:bg-accent/40">
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => take(e.target.files?.[0])} />
+                  {tl("wallet", "Attach a screenshot")}
+                </label>
+              )}
+            </div>
+            {err && <div className="text-sm text-destructive">{err}</div>}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onCancel} disabled={busy}>{tl("wallet", "Cancel")}</Button>
+              <Button
+                disabled={busy}
+                onClick={() => onConfirm({ paid_method: { type: rail }, proof: shot || undefined, paid_note: note.trim() || undefined })}
+              >
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> {tl("wallet", "Mark paid")}</>}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // wallet. Gated to admin/warehouse because it moves money OUT (the server enforces it too).
 function AdminPayouts({ onPaid }: { onPaid: () => void }) {
   const tl = useLabelT()
@@ -189,15 +290,26 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
  const [rows, setRows] = useState<PayoutRequest[] | null>(null)
  const [busy, setBusy] = useState<string | null>(null)
  const [err, setErr] = useState<string | null>(null)
+  // The request being settled — paying now asks WHICH RAIL and for the confirmation first.
+ const [settling, setSettling] = useState<PayoutRequest | null>(null)
  const load = useCallback(() => { if (canPay) getPayoutRequests("pending").then((r) => setRows(r ?? [])).catch(() => setRows([])) }, [canPay])
  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
- const act = async (p: PayoutRequest, action: "pay" | "reject") => {
+ const settle = async (p: PayoutRequest, done: { paid_method: { type: string }; proof?: string; paid_note?: string }) => {
  setBusy(p.id); setErr(null)
  try {
- const r = await (action === "pay" ? payPayout(p.id) : rejectPayout(p.id))
+ const r = await payPayout(p.id, done)
+ if (r.error) { setErr(r.error); load(); return }
+ setSettling(null)
+ setRows((prev) => (prev ?? []).filter((x) => x.id !== p.id))
+ onPaid()
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't update that payout."); load() } finally { setBusy(null) }
+  }
+ const reject = async (p: PayoutRequest) => {
+ setBusy(p.id); setErr(null)
+ try {
+ const r = await rejectPayout(p.id)
  if (r.error) { setErr(r.error); load(); return }
  setRows((prev) => (prev ?? []).filter((x) => x.id !== p.id))
- if (action === "pay") onPaid()
     } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't update that payout."); load() } finally { setBusy(null) }
   }
  if (!canPay || rows === null || rows.length === 0) return null
@@ -211,7 +323,13 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
             <div key={p.id} className="flex flex-wrap items-start justify-between gap-3 p-4">
               <div className="min-w-0 space-y-1">
                 <div className="font-semibold tabular-nums">{usd2(Number(p.amount_usd) || 0)} <span className="text-sm font-normal text-muted-foreground">· {p.seller_name || p.seller_email || "seller"}</span></div>
-                <div className="text-xs text-muted-foreground">{fmtDT2(p.created_at)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {fmtDT2(p.created_at)}
+                  {/* Raised BY the monthly run, not typed by the recipient — worth saying,
+                      because it changes whether a missing payout method is their oversight
+                      or simply a profile nobody has filled in yet. */}
+                  {p.auto && <span> · {tl("wallet", "automatic")}{p.period ? ` ${p.period}` : ""}</span>}
+                </div>
                 <div className="mt-1 space-y-0.5 rounded-lg bg-muted/50 px-2.5 py-2 text-xs">
                   <div className="font-medium capitalize">{labelRail(m.type || "payout")}{m.account_name ? ` · ${m.account_name}` : ""}</div>
                   {(m.account_id || m.account_number) && <div className="text-muted-foreground">{m.account_id || m.account_number}{m.bank_name ? ` · ${m.bank_name}` : ""}</div>}
@@ -221,13 +339,19 @@ function AdminPayouts({ onPaid }: { onPaid: () => void }) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => act(p, "reject")} disabled={busy === p.id} className="text-alert hover:text-alert">{tl("wallet", "Reject")}</Button>
-                <Button size="sm" onClick={() => act(p, "pay")} disabled={busy === p.id}>{busy === p.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> {tl("wallet", "Mark paid")}</>}</Button>
+                <Button size="sm" variant="outline" onClick={() => reject(p)} disabled={busy === p.id} className="text-alert hover:text-alert">{tl("wallet", "Reject")}</Button>
+                <Button size="sm" onClick={() => setSettling(p)} disabled={busy === p.id}><CheckCircle size={14} weight="bold" /> {tl("wallet", "Mark paid")}</Button>
               </div>
             </div>
           )
         })}
       </div>
+      <SettlePayoutDialog
+        req={settling}
+        busy={!!settling && busy === settling.id}
+        onCancel={() => setSettling(null)}
+        onConfirm={(done) => { if (settling) settle(settling, done) }}
+      />
     </SectionCard>
   )
 }
