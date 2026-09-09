@@ -23,7 +23,18 @@ function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () =
  onError("")
  const { error, paymentIntent } = await stripe.confirmPayment({ elements, redirect: "if_required" })
  if (error) {
- onError(error.message || "Payment failed.")
+      /**
+       * SAID ONCE. The Payment Element prints card and validation errors under the card row
+       * itself — that is its job and it does it in Stripe's own wording — so passing those
+       * up printed "Your card has insufficient funds" twice, once inside the element and
+       * once under the button, which reads as two problems rather than one.
+       *
+       * Only those two types. An api_error or a network failure has NO inline home in the
+       * element, and swallowing one would leave the button falling silent with nothing said
+       * anywhere — the exact defect the note further down guards against.
+       */
+ const shown = error.type === "card_error" || error.type === "validation_error"
+ onError(shown ? "" : error.message || "Payment failed.")
  setBusy(false)
  return
     }

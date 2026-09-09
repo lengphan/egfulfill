@@ -22,6 +22,27 @@ const secKey = () => (process.env.PAYPAL_SECRET || '').trim();
  * apply immediately (cidKey/secKey are functions), while the host stays sandbox, so real keys
  * get sent to the test API and every call fails authentication for no visible reason.
  */
+/**
+ * WHERE PAYPAL SENDS THE PAYER BACK — required, but only when vaulting.
+ *
+ * A plain order in the JS SDK's popup needs no return url; asking PayPal to VAULT the source
+ * makes one mandatory ("The return url is required when attempting to vault this source"),
+ * because a payer who gets bounced out of the popup — which happens on mobile, and on any
+ * funding source that needs its own bank's approval — has to land somewhere afterwards.
+ *
+ * DERIVED HERE, NEVER TAKEN ON TRUST. It would be easier to let the browser send its own
+ * origin, but `Origin` is a header and a header is whatever the caller typed: a forged one
+ * would have PayPal deliver a paying customer to somebody else's site, with our order id in
+ * the URL. So the caller's origin is honoured only when it is already an allowed one, and
+ * anything else falls back to the configured app.
+ */
+const APP_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((x) => x.trim()).filter((x) => x && x !== '*');
+function appOrigin(req) {
+  const o = String((req.headers && req.headers.origin) || '').trim().replace(/\/$/, '');
+  if (o && APP_ORIGINS.includes(o)) return o;
+  return APP_ORIGINS[0] || 'https://app.egful.store';
+}
+
 const ENV = () => (process.env.PAYPAL_ENV || 'sandbox').trim().toLowerCase();
 const BASE = () => (ENV() === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com');
 
@@ -228,16 +249,30 @@ export function paypalRoutes(app, requireAuth) {
         }]
       };
       if (remember) {
+        const back = appOrigin(req) + '/wallet';
         order.payment_source = {
           paypal: {
             attributes: {
               customer: { id: customerId },
               vault: { store_in_vault: 'ON_SUCCESS', usage_type: 'MERCHANT', permit_multiple_payment_tokens: false },
             },
+            /* Mandatory for a vault, and the modern home for the fields application_context
+               used to carry — PayPal deprecated that object in favour of this one. Both at
+               once is why the two paths stay mutually exclusive below. */
+            experience_context: {
+              brand_name: 'EGFUL',
+              shipping_preference: 'NO_SHIPPING',
+              user_action: 'PAY_NOW',
+              return_url: back + '?paypal=done',
+              cancel_url: back + '?paypal=cancelled',
+            },
           },
         };
       }
-      if (body.returnUrl && body.cancelUrl) {
+      /* The legacy static wallet page's full-page redirect flow. Skipped when vaulting: the
+         experience_context above already carries these, and PayPal rejects an order that
+         sets both application_context and payment_source experience_context. */
+      if (!remember && body.returnUrl && body.cancelUrl) {
         order.application_context = {
           brand_name: 'EGFUL', user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING',
           return_url: String(body.returnUrl), cancel_url: String(body.cancelUrl)
