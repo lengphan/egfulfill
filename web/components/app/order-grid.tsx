@@ -117,6 +117,8 @@ export type OrderGridProps = {
   /** Rendered as "Back" beside Complete. Present when the grid owns the whole screen and
    *  there is no other way out — a full-page surface with no exit is a trap. */
   onBack?: () => void
+  /** What the back control says — the sheet page's is "Back to import" when it came from there. */
+  backLabel?: string
   /** Let the table take the height it is given instead of capping at half the viewport.
    *  On the full page the cap is what made a 21-column sheet feel like a peephole. */
   fill?: boolean
@@ -132,7 +134,7 @@ export type OrderGridProps = {
   onRowsChange?: (rows: string[][]) => void
 }
 
-export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsChange }: OrderGridProps) {
+export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRows, onRowsChange }: OrderGridProps) {
   const tl = useLabelT()
   /**
    * ONE FETCH, ON MOUNT. Deliberately not keyed to anything the fetch itself writes — see
@@ -297,7 +299,19 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
    * `position: fixed` rather than absolute so the table's overflow cannot clip it — a menu
    * on the last visible row was otherwise cut in half by the scroll container.
    */
-  const [menu, setMenu] = useState<{ key: string; left: number; top: number; width: number } | null>(null)
+  /**
+   * `typed` is the difference between "I am picking" and "I am narrowing", and without it
+   * the list narrows itself to the answer you already gave.
+   *
+   * Focusing a cell SELECTS its whole value (see the input's onFocus) — the spreadsheet
+   * rule that what you type replaces what is there. So the text in a filled cell is not
+   * something the person typed at this menu; it is the thing they are about to overwrite.
+   * Filtering by it meant clicking back into a cell reading "Navy" offered exactly one
+   * option, Navy, and the only way to see the other colours was to delete the value first.
+   * Opened by focus, the menu shows everything the cell allows; it filters once a key is
+   * actually pressed.
+   */
+  const [menu, setMenu] = useState<{ key: string; left: number; top: number; width: number; typed: boolean } | null>(null)
   /** The popup's own node, so the close-on-scroll listener can tell the sheet scrolling
    *  (which must close it) from the LIST scrolling (which must not). */
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -644,9 +658,9 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) setEditing(key)
   }, [editing, undo, redo, setCell])
 
-  const openMenu = useCallback((el: HTMLElement, key: string) => {
+  const openMenu = useCallback((el: HTMLElement, key: string, typed = false) => {
     const r = el.getBoundingClientRect()
-    setMenu({ key, left: r.left, top: r.bottom, width: r.width })
+    setMenu({ key, left: r.left, top: r.bottom, width: r.width, typed })
   }, [setMenu])
 
   /* The menu is fixed, so it does not travel with the cell — anything that MOVES the cell
@@ -726,8 +740,54 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
     await onComplete(filled)
   }
 
+  /**
+   * THE CONTROLS SIT ABOVE THE SHEET, not below it.
+   *
+   * They were under the grid, which on a full-height sheet is under a scroll — so Complete,
+   * the one thing this whole screen is for, was off-screen until you scrolled past every
+   * row, and Undo was somewhere you had to go looking for while editing. A toolbar belongs
+   * where the eye starts, and Back is already there.
+   *
+   * Undo and Redo are icon-only: they are the two controls here whose glyph IS the word,
+   * they have the keystroke as the real control, and their labels were the widest part of a
+   * row that had to fit Complete, Add rows and a sentence. The title carries the name and
+   * the shortcut for anyone who needs it (§4: a control explains itself in its label or its
+   * title — not in a line of prose underneath).
+   */
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      {onBack && (
+        <Button variant="outline" onClick={onBack} disabled={busy}>
+          {backLabel || tl("orderGrid", "Back")}
+        </Button>
+      )}
+      <Button onClick={complete} disabled={!validCount || busy}>
+        {busy ? tl("orderGrid", "Working…") : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
+      </Button>
+      <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
+      {/* THE KEYSTROKE IS THE REAL CONTROL; these say it exists. Ghost, not outline: they
+          are minor next to Add rows and Complete, and a disabled one is the honest way to
+          say there is nothing to go back to (§4's variant hierarchy). */}
+      <Button variant="ghost" size="icon-sm" onClick={undo} disabled={busy || !canUndo}
+        aria-label={tl("orderGrid", "Undo")} title={tl("orderGrid", "Undo the last change (⌘Z)")}>
+        <ArrowCounterClockwise size={15} weight="bold" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" onClick={redo} disabled={busy || !canRedo}
+        aria-label={tl("orderGrid", "Redo")} title={tl("orderGrid", "Redo (⇧⌘Z)")}>
+        <ArrowClockwise size={15} weight="bold" />
+      </Button>
+      {/* THE ONLY SENTENCE ON THIS SCREEN, and it is here because the state is not
+          otherwise readable: a draft and a submitted order look the same from a grid that
+          has just emptied. §4 allows a warning to carry its reason. */}
+      <span className="text-xs text-muted-foreground">
+        {tl("orderGrid", "Complete creates drafts — nothing is charged until you submit them from Orders.")}
+      </span>
+    </div>
+  )
+
   return (
     <div className={fill ? "flex min-h-0 flex-1 flex-col gap-3" : "space-y-3"}>
+      {toolbar}
       <div
         ref={gridRef}
         /* A SHEET IS WHITE. This inherited the page's muted ground, so every cell was grey
@@ -883,13 +943,13 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
                           onFocus={(e) => {
                             setSel(null)
                             if (editing !== `${r}-${c}`) e.currentTarget.select()
-                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`)
+                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`, false)
                           }}
                           onClick={(e) => { if (editing !== `${r}-${c}`) e.currentTarget.select() }}
                           onChange={(e) => {
                             setEditing(`${r}-${c}`)
                             setCell(r, c, e.target.value)
-                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`)
+                            if (list?.length) openMenu(e.currentTarget, `${r}-${c}`, true)
                           }}
                           onPaste={(e) => onPaste(e, r, c)}
                           onKeyDown={(e) => onKeyDown(e, r, c)}
@@ -950,7 +1010,8 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
         const [mr, mc] = menu.key.split("-").map(Number)
         const col = CSV_COLUMNS[mc]
         const all = col.key === "blank" ? productNames : optionsFor(col.key, rows[mr] ?? [])
-        const typed = (rows[mr]?.[mc] ?? "").trim().toLowerCase()
+        // Only a real keystroke narrows the list — see the note on `menu.typed`.
+        const typed = menu.typed ? (rows[mr]?.[mc] ?? "").trim().toLowerCase() : ""
         /* Matched on BOTH halves: a machine file is found by its reference (MF-12) and by
            its name (logo.emb), and which of the two you remember is not ours to decide. */
         const matched = (all ?? []).filter((o) =>
@@ -990,34 +1051,6 @@ export function OrderGrid({ onComplete, busy, onBack, fill, initialRows, onRowsC
         )
       })()}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {onBack && (
-          <Button variant="outline" onClick={onBack} disabled={busy}>
-            {tl("orderGrid", "Back")}
-          </Button>
-        )}
-        <Button onClick={complete} disabled={!validCount || busy}>
-          {busy ? tl("orderGrid", "Working…") : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
-        </Button>
-        <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
-        {/* THE KEYSTROKE IS THE REAL CONTROL; these say it exists. Ghost, not outline: they
-            are minor next to Add rows and Complete, and a disabled one is the honest way to
-            say there is nothing to go back to (§4's variant hierarchy). */}
-        <Button variant="ghost" size="sm" onClick={undo} disabled={busy || !canUndo}
-          title={tl("orderGrid", "Undo the last change (⌘Z)")}>
-          <ArrowCounterClockwise size={14} weight="bold" /> {tl("orderGrid", "Undo")}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={redo} disabled={busy || !canRedo}
-          title={tl("orderGrid", "Redo (⇧⌘Z)")}>
-          <ArrowClockwise size={14} weight="bold" /> {tl("orderGrid", "Redo")}
-        </Button>
-        {/* THE ONLY SENTENCE ON THIS SCREEN, and it is here because the state is not
-            otherwise readable: a draft and a submitted order look the same from a grid that
-            has just emptied. §4 allows a warning to carry its reason. */}
-        <span className="text-xs text-muted-foreground">
-          {tl("orderGrid", "Complete creates drafts — nothing is charged until you submit them from Orders.")}
-        </span>
-      </div>
     </div>
   )
 }

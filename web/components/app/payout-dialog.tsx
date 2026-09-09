@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getPayoutMethod, savePayoutMethod, createPayoutRequest, type PayoutMethod } from "@/lib/api"
-import { PAYOUT_RAILS } from "@/lib/payment-method"
+import { NOMINABLE_RAILS } from "@/lib/payment-method"
 
 const usd = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 /**
@@ -16,10 +16,12 @@ const usd = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimu
  * This was three hard-coded entries while the admin side had its own idea of what a payout
  * method is — so a rail could exist on one screen and not the other, and the nominated
  * method and the recorded one could never be compared. PAYOUT_RAILS is the one list both
- * read. "Cash" is dropped here because it is something WE do, never something a recipient
- * nominates; everything else takes either an account number (bank) or a single id.
+ * read. NOMINABLE_RAILS is the recipient's half of it: Remitly and cash are things WE do,
+ * not accounts anybody holds, so asking someone for their "Remitly account" asks for a thing
+ * that does not exist. They stay on the admin's side, where the question is what we actually
+ * used. Everything here takes either an account number (bank) or a single id.
  */
-const METHODS = PAYOUT_RAILS.filter((r) => r.id !== "cash").map((r) => ({
+const METHODS = NOMINABLE_RAILS.map((r) => ({
   id: r.id,
   label: r.id === "bank" ? "Bank QR" : r.label,
   hint: r.hint,

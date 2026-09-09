@@ -96,7 +96,24 @@ export function VariantPicker({
   // `keep` puts a value the list doesn't contain at the front rather than dropping it —
   // the same rule blankOptions uses, so an imported "Light Blue" survives a product that
   // has never heard of it.
-  const keep = (value: string, opts: string[]) => (value && !opts.includes(value) ? [value, ...opts] : opts)
+  /**
+   * A VALUE THAT DIFFERS ONLY IN CASE IS NOT A DIFFERENT VALUE.
+   *
+   * `keep` exists so a line never silently loses a value the catalogue no longer lists — it
+   * prepends the stored one. But it compared with `includes`, which is exact and
+   * case-sensitive, so a line importing "DTG PRINTING" against the canonical "DTG printing"
+   * was treated as an unknown value and the menu showed the same technique twice, one of
+   * them ticked. The sheet's own dropdown offers the canonical spelling, so this only ever
+   * appeared on rows typed or pasted in a different case — which is most of them.
+   *
+   * `canon` is the display half: the field ticks by exact string equality, so once the
+   * duplicate is gone the stored "DTG PRINTING" would match no option and nothing would be
+   * ticked. It shows the LIST's spelling instead. Display only — no stored value is
+   * rewritten, and nothing is saved unless the person picks something.
+   */
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+  const keep = (value: string, opts: string[]) => (value && !opts.some((o) => same(o, value)) ? [value, ...opts] : opts)
+  const canon = (value: string, opts: string[]) => (value ? opts.find((o) => same(o, value)) ?? value : value)
   const colorList = keep(item.color || "", colorOpts.length ? colorOpts : catalogColors)
   const sizeList = keep(item.size || "", sizeOpts.length ? sizeOpts : FALLBACK_SIZES)
   /**
@@ -156,7 +173,12 @@ export function VariantPicker({
     // so the row kept for a blank the catalogue no longer lists — which is whatever string
     // the line already carried — still finds its product if one exists.
     const p = catalog.find((x) => productLabel(x) === name) ?? catalog.find((x) => String(x.name) === name)
-    const keep = (v: string | undefined, opts: string[]) => (v && opts.includes(v) ? v : "")
+    /* Case-insensitive for the same reason as above, and it matters more here: an exact
+       compare CLEARS a colour the new blank does in fact offer, just spelled differently. */
+    const keep = (v: string | undefined, opts: string[]) => {
+      const hit = v ? opts.find((o) => o.trim().toLowerCase() === v.trim().toLowerCase()) : null
+      return hit ?? ""
+    }
     save({
       blank: name,
       color: keep(item.color, colorsOf(p ?? null)),
@@ -184,11 +206,11 @@ export function VariantPicker({
           disabled={busy === "blank"} onChange={pickBlank}
         />
         <VariantField
-          label={tl("variantPicker", "Colour")} value={item.color || ""} options={colorList} swatches
+          label={tl("variantPicker", "Colour")} value={canon(item.color || "", colorList)} options={colorList} swatches
           disabled={busy === "color"} onChange={(v) => save({ color: v }, "color")}
         />
         <VariantField
-          label={tl("variantPicker", "Size")} value={item.size || ""} options={sizeList}
+          label={tl("variantPicker", "Size")} value={canon(item.size || "", sizeList)} options={sizeList}
           disabled={busy === "size"} onChange={(v) => save({ size: v }, "size")}
         />
         {/* Says WHY it is empty rather than just being dead. ONE WORD, not the sentence
@@ -196,7 +218,7 @@ export function VariantPicker({
             "Method · None on this blank" truncated to "Method · …" — which says less than
             nothing, since the reason was the part that got cut. "Method · none" fits. */}
         <VariantField
-          label={tl("variantPicker", "Method")} value={item.print_type || ""} options={methodList}
+          label={tl("variantPicker", "Method")} value={canon(item.print_type || "", methodList)} options={methodList}
           emptyLabel="none"
           disabled={busy === "printType"} onChange={(v) => save({ printType: v }, "printType")}
         />

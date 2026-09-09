@@ -162,10 +162,18 @@ export default function SheetPage() {
           </span>
         )}
 
-        <div className="ms-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={goBack}>{fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "Back")}</Button>
-          {done && <Button size="sm" onClick={copy} disabled={busy}>{tl("sheet_[id]", "Duplicate to edit")}</Button>}
-        </div>
+        {/* ONE ROW OF CONTROLS, and it is the grid's. Back used to live up here on its own
+            while Complete, Add rows and Undo sat at the BOTTOM of the sheet — under a
+            full-height scroll, so the one thing this screen is for was off-screen until you
+            scrolled past every row. The grid's toolbar carries Back now (see OrderGrid), so
+            they are together and they are all above the data. A completed sheet has no grid
+            to carry it, so there it stays here. */}
+        {done && (
+          <div className="ms-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={goBack}>{fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "Back")}</Button>
+            <Button size="sm" onClick={copy} disabled={busy}>{tl("sheet_[id]", "Duplicate to edit")}</Button>
+          </div>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
@@ -177,6 +185,8 @@ export default function SheetPage() {
             initialRows={sheet.rows && sheet.rows.length ? sheet.rows : undefined}
             onRowsChange={(rows) => push({ rows })}
             onComplete={complete}
+            onBack={goBack}
+            backLabel={fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "Back")}
           />
         )}
       </div>

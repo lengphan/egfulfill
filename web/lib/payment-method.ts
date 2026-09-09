@@ -50,16 +50,29 @@ export function labelRail(type?: string | null): string {
  * the others — and if Remitly ever approves a partnership, the API slots in behind this same
  * id without the data model moving.
  */
-export type PayoutRail = { id: string; label: string; account: "id" | "number" | "none"; hint?: string }
+/**
+ * `nominate: false` is a rail only WE send on — never one a recipient holds an account with.
+ *
+ * The distinction is real, not a permission: PayPal, PingPong, LianLian and a bank account
+ * are all things the recipient HAS, and nominating one tells us where to send. Remitly and
+ * cash are things we DO — Remitly is a remittance service we push money through to whatever
+ * account or phone number the recipient already gave us, so offering it in their picker asks
+ * them for a "Remitly account" that is not a thing they have. It belongs only where an admin
+ * records what actually happened.
+ */
+export type PayoutRail = { id: string; label: string; account: "id" | "number" | "none"; hint?: string; nominate: boolean }
 
 export const PAYOUT_RAILS: PayoutRail[] = [
-  { id: "bank", label: "Bank transfer", account: "number" },
-  { id: "paypal", label: "PayPal", account: "id", hint: "PayPal email" },
-  { id: "pingpong", label: "PingPong", account: "id", hint: "PingPong email or ID" },
-  { id: "lianlian", label: "LianLian", account: "id", hint: "LianLian email or ID" },
-  { id: "remitly", label: "Remitly", account: "id", hint: "Phone or account the transfer went to" },
-  { id: "cash", label: "Cash", account: "none" },
+  { id: "bank", label: "Bank transfer", account: "number", nominate: true },
+  { id: "paypal", label: "PayPal", account: "id", hint: "PayPal email", nominate: true },
+  { id: "pingpong", label: "PingPong", account: "id", hint: "PingPong email or ID", nominate: true },
+  { id: "lianlian", label: "LianLian", account: "id", hint: "LianLian email or ID", nominate: true },
+  { id: "remitly", label: "Remitly", account: "id", nominate: false },
+  { id: "cash", label: "Cash", account: "none", nominate: false },
 ]
+
+/** What a RECIPIENT may nominate. An admin recording a payment picks from the full list. */
+export const NOMINABLE_RAILS = PAYOUT_RAILS.filter((r) => r.nominate)
 
 const RAIL_BY_ID = new Map(PAYOUT_RAILS.map((r) => [r.id, r]))
 

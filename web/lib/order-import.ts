@@ -5,7 +5,7 @@
 // exports work unrenamed), required-field validation, template-sample skipping,
 // and grouping multiple line rows into one order by Order Number.
 
-import { PRODUCT_METHODS } from "@/lib/print-method"
+import { PRODUCT_METHODS, normalizeMethods } from "@/lib/print-method"
 
 // Required columns — a row missing any of these is flagged invalid.
 //
@@ -677,7 +677,21 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
         img: url(S(r.listing_image)) || artwork,
         qty: Math.max(1, parseInt(S(r.item_quantity)) || 1),
         unitPrice: Number(S(r.item_price).replace(/[^0-9.]/g, "")) || 0,
-        printType: S(r.print_type).toUpperCase(),
+        /**
+         * THE CANONICAL LABEL, not an upper-cased one.
+         *
+         * This was `.toUpperCase()`, so the sheet's own dropdown value "DTG printing" was
+         * stored as "DTG PRINTING" — a string that matches no option anywhere else, because
+         * every other surface reads methods through normalizeMethods and gets the label.
+         * The line's variant picker then showed the technique TWICE: its canonical option,
+         * plus the imported spelling prepended as an unknown value it must not lose.
+         *
+         * normTech matches on a pattern (/dtg|direct to garment/), so it reads the sheet's
+         * label, a bare code, a supplier's phrasing and any casing of them, and answers with
+         * the one spelling the catalogue uses. Anything it cannot place is kept verbatim
+         * rather than dropped — an uncatalogued technique still has to be sayable.
+         */
+        printType: normalizeMethods([S(r.print_type)])[0]?.label ?? S(r.print_type),
         color: S(r.item_color),
         size: S(r.item_size),
         /* THE PRINTABLE ARTWORK, and it is NOT `img` even though one cell usually fills
