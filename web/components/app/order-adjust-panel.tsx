@@ -6,9 +6,21 @@ import { CircleNotch, CheckCircle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderCharges, chargeOrderFee } from "@/lib/api"
+import { getOrderCharges, chargeOrderFee, ApiError } from "@/lib/api"
 
 const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
+
+/** The shape the fee route refuses with — same fields whether it is returned or thrown. */
+type FeeRefusal = { error?: string; shortfall?: number; sellerTold?: boolean }
+
+/** One wording for a refusal, so the returned and the thrown path cannot drift apart. */
+function refusal(r: FeeRefusal): string {
+  const base = r.error || "Couldn't charge the adjustment — nothing was taken."
+  if (!r.shortfall) return base
+  return `${base} They need ${usd(r.shortfall)} more in the wallet${
+    r.sellerTold ? " — they've been asked in chat to top up; press Charge again once it lands" : ""
+  }.`
+}
 const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 /**
@@ -55,19 +67,34 @@ export function OrderAdjustPanel({ orderId, onCharged }: { orderId: string; onCh
     setBusy(true); setMsg(null)
     try {
       const r = await chargeOrderFee(orderId, { amount: amt, note: note.trim(), clientId: newClientId() })
-      if (r.error) {
-        // A shortfall is the seller's to fix, and the server has already asked them — in
-        // their support chat and on the bell — so the operator is told that, not left to.
-        setMsg({ ok: false, text: r.shortfall
-          ? `${r.error} They need ${usd(r.shortfall)} more in the wallet${r.sellerTold ? " — they've been asked in chat to top up; press Charge again once it lands" : ""}.`
-          : r.error })
-        return
-      }
+      if (r.error) { setMsg({ ok: false, text: refusal(r) }); return }
       setMsg({ ok: true, text: `Charged ${usd(r.charged || amt)} to the seller's wallet.` })
       setAmount(""); setNote("")
       onCharged?.()
-    } catch {
-      setMsg({ ok: false, text: "Couldn't charge the adjustment — nothing was taken." })
+    } catch (e) {
+      /**
+       * THE REASON IS IN THE THROWN ERROR, not in a returned object.
+       *
+       * The branch above could never run. The server refuses with `reply.code(400)` and a
+       * body carrying the reason — a wallet shortfall, a missing note, an order it will not
+       * adjust — and `api()` turns any non-2xx into a thrown ApiError. So every refusal, every
+       * one of them explained, arrived here and was replaced with "Couldn't charge the
+       * adjustment — nothing was taken": true, useless, and identical for a $2 shortfall and
+       * a server that is down.
+       *
+       * ApiError carries the parsed body for exactly this. The shortfall wording is worth
+       * recovering on its own: the seller has ALREADY been asked to top up, in their support
+       * chat and on the bell, so the operator needs to know to wait rather than to chase.
+       */
+      const body = e instanceof ApiError ? (e.body as FeeRefusal | undefined) : undefined
+      setMsg({
+        ok: false,
+        text: body?.error
+          ? refusal(body)
+          : e instanceof Error && e.message
+            ? e.message
+            : "Couldn't charge the adjustment — nothing was taken.",
+      })
     } finally { sending.current = false; setBusy(false) }
   }
 
