@@ -3595,7 +3595,7 @@ export function DesignCanvasDialog({
                   they say what they are and what they cost, and a caption above them was a
                   word naming something that already names itself (§4). Full size, not the
                   small variant: this is a decision about money, not a filter chip. */}
-              <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} />
+              <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} stretch />
               {/* THE ONLY SEND BUTTON. There were two — this one and an embroidery-only one
                   further down that opened this same tab, which on an embroidered line meant
                   two buttons stacked saying nearly the same thing. That one is gone; this is

@@ -76,6 +76,7 @@ export function BandPills({
   rates,
   flat,
   size = "md",
+  stretch,
   className,
 }: {
   value?: Band | null
@@ -83,12 +84,21 @@ export function BandPills({
   rates: BandRates
   flat?: number
   size?: "sm" | "md"
+  /** Fill the row, three even columns, instead of sitting at their natural widths.
+   *  For a panel where the pills sit under full-width rows and a ragged right edge reads
+   *  as a mistake rather than as a set. */
+  stretch?: boolean
   className?: string
 }) {
   const tl = useLabelT()
   const sm = size === "sm"
   return (
-    <div className={"flex flex-wrap items-center gap-1.5 " + (className ?? "")}>
+    <div
+      className={
+        (stretch ? "flex items-stretch gap-1.5 " : "flex flex-wrap items-center gap-1.5 ") +
+        (className ?? "")
+      }
+    >
       {BANDS.map((b) => {
         const on = value === b.id
         const rate = rates[b.id] || flat || 0
@@ -103,6 +113,10 @@ export function BandPills({
               (sm
                 ? "inline-flex h-6 items-center gap-1 rounded-lg border px-2 text-xs transition-colors "
                 : "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors ") +
+              /* Even thirds, and CENTRED — left-aligned labels in stretched pills leave the
+                 prices at three different distances from their words, which reads as three
+                 sizes of button rather than one row. */
+              (stretch ? "min-w-0 flex-1 justify-center " : "") +
               (on
                 ? "border-foreground bg-foreground font-medium text-background"
                 : "border-input hover:border-foreground/40")
