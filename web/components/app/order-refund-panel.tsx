@@ -307,21 +307,11 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
         )}
       </div>
 
-      {state.refunds.length > 0 && (
-        <div className="border-t border-border px-5 py-3">
-          <div className="mb-1.5 text-xs font-medium text-muted-foreground">{tl("orderRefund", "Already refunded")}</div>
-          <div className="space-y-1">
-            {state.refunds.map((r, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="tabular-nums text-success">{usd(r.amount)}</span>
-                {r.part && <span>· {parts.find((p) => p.key === r.part)?.label ?? r.part}</span>}
-                {r.note && <span className="truncate">· {r.note}</span>}
-                <span className="ml-auto shrink-0">{new Date(r.at).toLocaleDateString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* "ALREADY REFUNDED" IS GONE (owner's call). It listed every refund a third time: the
+          Summary above now strikes the adjustment each one cancelled and shows what is left,
+          and Order history carries the same movements with who pressed it and when — which
+          this list could not say. Three renderings of one set of facts, and the one with the
+          least in it was sitting under the control that makes more of them. */}
     </SectionCard>
   )
 }

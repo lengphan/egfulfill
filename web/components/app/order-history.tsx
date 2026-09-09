@@ -120,7 +120,12 @@ export function OrderHistory({ orderId, items = [], startOpen = false }: {
       }
     >
       {!open ? null : (
-      <div className="max-h-72 overflow-y-auto p-3">
+      /* TALLER, because the card was not the constraint — the page had room under it and the
+         list was cut at 288px, so five refunds filled it and everything before them sat below
+         a scroll nobody could see the top of. An order's history is read to answer "what
+         happened to this", and the answer is usually further back than five rows. Still
+         capped: an order with 200 entries must not push the page to a metre long. */
+      <div className="max-h-[32rem] overflow-y-auto p-3">
         {/* BARE, because this is already inside a SectionCard. `variant="card"` gave the
             feed its own rounded border, so the panel drew a box, and the list drew another
             box just inside it — two frames around one list, which is what makes a page of

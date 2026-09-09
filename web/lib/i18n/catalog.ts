@@ -4113,7 +4113,6 @@ const vi: Dict = {
   "orderGrid.Complete creates drafts — nothing is charged until you submit them from Orders.": "Hoàn tất sẽ tạo các bản nháp — không có khoản nào bị tính phí cho tới khi bạn gửi chúng đi từ mục Đơn hàng.",
   "orderRefund.Refund": "Hoàn tiền",
   "orderRefund.Full refund": "Hoàn toàn bộ",
-  "orderRefund.Already refunded": "Đã hoàn",
   "orderRefund.fully refunded": "đã hoàn toàn bộ",
   "orderRefund.Charge an adjustment": "Tính một khoản điều chỉnh",
   "orderRefund.Adjustment to charge": "Khoản điều chỉnh cần tính",

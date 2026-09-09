@@ -38,6 +38,13 @@ const REGISTRY: Record<string, { label: string; verb: string; icon: ActionMeta["
   "shipping.label_bought":    { label: "Label bought",      verb: "bought a shipping label",            icon: Truck },
   // Buyer-data retention — who changed the policy, and when.
   "pii.retention.configured": { label: "Retention changed", verb: "changed the buyer-data retention policy", icon: ShieldCheck },
+  /* MONEY MOVED ON THIS ORDER. Both fell through to the humaniser — "Fee" and "Refund" —
+     which is the right default and the wrong words here: "Fee" reads as one of OUR costs
+     rather than something charged to the seller, and a reversal is not the same act as
+     giving a seller their money back, though both are refunds underneath. Naming them is
+     what makes the log answer "who added $9 to this order, and who took it off again". */
+  "order.fee":     { label: "Price adjustment", verb: "charged a price adjustment", icon: CurrencyDollar },
+  "order.refund":  { label: "Refund",           verb: "refunded the order",         icon: ArrowUUpLeft },
   // Dispatch / labels / scanning
   "label.printed":       { label: "Label printed", verb: "printed the label",        icon: Printer },
   "label.unprinted":     { label: "Print undone",  verb: "reverted the label print", icon: ArrowUUpLeft },
