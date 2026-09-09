@@ -122,7 +122,7 @@ export function DesignFeeAmount({ orderId, fee, onChanged }: {
         </span>
         {/* The baseline it is departing from, so an override is made against a known number
             rather than from memory. Only while editing — it is noise the rest of the time. */}
-        {listed != null && <span className="text-2xs font-normal text-muted-foreground">list {usd(listed)} · empty = list price</span>}
+        {listed != null && <span className="text-xs font-normal text-muted-foreground">list {usd(listed)} · empty = list price</span>}
         {err && <span className="text-2xs font-normal text-destructive">{err}</span>}
       </dd>
     )

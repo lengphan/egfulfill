@@ -102,7 +102,7 @@ export function LabelActionButton({ order, onOpenLabel, onChanged, onError }: {
             <>
               <div className="px-2 py-1.5">
                 <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{tl("labelActionButton", "Tracking")}</div>
-                <div className="truncate tabular-nums text-xs">{order.tracking}</div>
+                <div className="truncate tabular-nums text-sm">{order.tracking}</div>
               </div>
               <DropdownMenuSeparator />
             </>

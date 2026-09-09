@@ -161,7 +161,7 @@ export function QuickOrderDialog({
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium">{s.size}</div>
                 {s.sku
-                  ? <div className="truncate tabular-nums text-2xs text-muted-foreground">{s.sku}</div>
+                  ? <div className="truncate tabular-nums text-xs text-muted-foreground">{s.sku}</div>
  : <div className="truncate text-2xs text-hold">{tl("quickOrder", "no supplier sku — can’t be ordered")}</div>}
               </div>
               <Input

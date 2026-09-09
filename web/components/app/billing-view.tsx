@@ -222,7 +222,7 @@ export function BillingView() {
                     </td>
                     <td className="px-3 py-2">{r.partner ? label(r.partner) : "—"}</td>
                     <td className="px-3 py-2 tabular-nums text-xs text-muted-foreground">{r.type}</td>
-                    <td className="px-3 py-2 tabular-nums text-xs text-muted-foreground">{r.ref || "—"}</td>
+                    <td className="px-3 py-2 tabular-nums text-sm text-muted-foreground">{r.ref || "—"}</td>
                     <td className="max-w-xs truncate px-3 py-2 text-muted-foreground">{r.note || "—"}</td>
                     <td className={"whitespace-nowrap px-5 py-2 text-right font-semibold tabular-nums " + (r.delta < 0 ? "text-destructive" : "text-success")}>
                       {usd(r.delta)}

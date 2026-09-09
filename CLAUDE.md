@@ -477,6 +477,32 @@ typed by hand and each removable only by hand.
 Applies to this file's own habits too: several of this session's UI additions put a
 sentence under a control and had to be removed again.
 
+### A value is not a caption (2026-09-09)
+
+The scale is six steps — 11 · 12 · 14 · 18 · 24 · 36 — and the steps are fine. What goes
+wrong is which one a piece of text gets, and it goes wrong in one direction: **a figure
+somebody has to READ ends up at the size of the word that names it.**
+
+The top-up dialog printed `Account  1231255899` with the label and the account number both
+at 12px. That number is typed into a banking app a digit at a time. The only way to read it
+was the zoom control — which magnifies the whole page, header included, so the fix for one
+unreadable number makes four other things wrong.
+
+- **A VALUE is at least `text-sm` (14px).** Something read, copied or transcribed: an account
+  number, a tracking number, a reference, a total, an order number.
+- **A LABEL may be `text-xs` (12px).** It is read once and then ignored.
+- **A MARK may be `text-2xs` (11px)** — a count badge, a chip. It is recognised, not read.
+  **Never an identifier.** 11px is not small, it is illegible, and there is no screen where a
+  tracking number belongs there.
+- **Size by what the text IS, never by where it sits.** A SKU as a second line under a product
+  name is a fine 12px; the same SKU alone in a cell is not. The row's density is not an
+  argument about the value in it.
+
+`node tools/check-type-scale.mjs` is the gate, in two tiers: **FLOOR** (a value at 11px) fails
+`--strict` and is at zero; **WATCH** (a value at 12px) is a standing count, because whether
+12px is wrong depends on what the row is for and a gate cannot see that. If WATCH climbs,
+someone is sizing by position again.
+
 ### Alignment is set once, not per cell (2026-08-21)
 
 - **Right-alignment implies tabular figures** and globals.css now does that for every

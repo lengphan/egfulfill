@@ -174,7 +174,7 @@ function BrowseTab() {
                 </div>
                 <div className="p-2.5">
                   <div className="truncate text-sm font-medium">{it.name}</div>
-                  {it.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{orderRefLabel(it.ref)}</div>}
+                  {it.ref && <div className="truncate tabular-nums text-xs text-muted-foreground">{orderRefLabel(it.ref)}</div>}
                 </div>
               </button>
             ))}
@@ -312,7 +312,7 @@ function DigitizeModal({ item, palette, onClose, onGenerated }: { item: ArtItem;
         <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{item.name}</div>
-            {item.ref && <div className="truncate tabular-nums text-2xs text-muted-foreground">{orderRefLabel(item.ref)}</div>}
+            {item.ref && <div className="truncate tabular-nums text-xs text-muted-foreground">{orderRefLabel(item.ref)}</div>}
           </div>
           <button onClick={onClose} className="ml-auto grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent"><X size={16} /></button>
         </div>

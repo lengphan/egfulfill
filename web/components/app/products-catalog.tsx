@@ -484,7 +484,7 @@ export function ProductsCatalog() {
  if (net == null) return <div className="shrink-0 font-semibold tabular-nums">{usd(list)}</div>
  return (
                         <div className="shrink-0 text-right">
-                          <div className="text-2xs tabular-nums text-muted-foreground line-through">{usd(list)}</div>
+                          <div className="text-xs tabular-nums text-muted-foreground line-through">{usd(list)}</div>
                           <div className="font-semibold tabular-nums">{usd(net)}</div>
                         </div>
                       )

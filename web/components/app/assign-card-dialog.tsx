@@ -138,7 +138,7 @@ export function AssignCardDialog({ card, open, onOpenChange, onDone }: {
                           >
                             <span className="min-w-0 flex-1 truncate">{it.name ?? it.sku ?? tl("assignCard", "Line")}</span>
                             <span className="shrink-0 text-xs text-muted-foreground">{variantOf(it)}</span>
-                            <span className="shrink-0 tabular-nums text-2xs text-muted-foreground">{it.sku}</span>
+                            <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{it.sku}</span>
                           </button>
                         )
                       })}

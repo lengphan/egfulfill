@@ -234,9 +234,13 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
                 * The full string stays on the row's title for support, and the QR is
                 * untouched — a scan still sends exactly what VietQR generated.
                 */}
-              <div className="flex items-start justify-between gap-3 py-1" title={payment.content || undefined}>
-                <dt className="shrink-0 text-xs text-muted-foreground">{tl("topup", "Description")}</dt>
-                <dd className="min-w-0 break-all text-right text-xs font-medium">
+              <div className="flex items-start justify-between gap-3 py-1.5" title={payment.content || undefined}>
+                <dt className="shrink-0 pt-px text-xs text-muted-foreground">{tl("topup", "Description")}</dt>
+                {/* Sized like the Detail rows above it — this is the reference a payer types
+                    into the transfer, and in simple mode it is the ONLY thing tying their
+                    money to their wallet. It is the last value on this screen that should be
+                    set at caption size. */}
+                <dd className="min-w-0 break-all text-right text-sm font-medium">
                   {/* EXACTLY WHAT TO TYPE, and the two shapes differ. On the simple QR the
                       description IS the identifier, so it is printed verbatim; on a virtual
                       account it is ours plus VietQR's routing code, and only ours is worth
@@ -334,12 +338,24 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  * these come from VIETQR_* env vars with hardcoded fallbacks on the server, so a
  * silent gap here could show someone the wrong account to pay.
  */
+/**
+ * THE LABEL AND THE VALUE ARE NOT THE SAME SIZE, and this row is why the rule exists.
+ *
+ * Both halves were `text-xs`. The right-hand one is an account number somebody types into
+ * their banking app a digit at a time, and it was set at the size of the word "Account" —
+ * so reading it meant reaching for the zoom control, which magnifies the whole page,
+ * header included. One number is unreadable; the fix for it makes four other things wrong.
+ *
+ * The value goes to `text-sm` (14px) and the label stays at 12px. A label is read once and
+ * then ignored; a value is read carefully, and on this row it is copied. See
+ * tools/check-type-scale.mjs, which holds the line across the rest of the app.
+ */
 function Detail({ label, value, mono, missing }: { label: string; value?: string | null; mono?: boolean; missing: string }) {
  const ok = !!(value && String(value).trim())
  return (
-    <div className="flex items-start justify-between gap-3 py-1">
-      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-      <dd className={"min-w-0 break-all text-right text-xs font-medium " + (ok ? (mono ? "tabular-nums" : "") : "text-hold")}>
+    <div className="flex items-start justify-between gap-3 py-1.5">
+      <dt className="shrink-0 pt-px text-xs text-muted-foreground">{label}</dt>
+      <dd className={"min-w-0 break-all text-right text-sm font-medium " + (ok ? (mono ? "tabular-nums" : "") : "text-hold")}>
         {ok ? value : missing}
       </dd>
     </div>

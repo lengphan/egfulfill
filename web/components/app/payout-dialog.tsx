@@ -198,7 +198,7 @@ export function PayoutDialog({ open, onOpenChange, onDone }: { open: boolean; on
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                 <Input type="number" min={bounds.min} max={ceiling || undefined} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-10 pl-6 text-lg font-semibold tabular-nums" />
               </div>
-              <p className="text-2xs text-muted-foreground">Balance {usd(bounds.balance)} · min {usd(bounds.min)}{bounds.max > 0 ? ` · max ${usd(bounds.max)}` : ""}</p>
+              <p className="text-xs text-muted-foreground">Balance {usd(bounds.balance)} · min {usd(bounds.min)}{bounds.max > 0 ? ` · max ${usd(bounds.max)}` : ""}</p>
               {amountErr && <p className="text-2xs font-medium text-hold">{amountErr}</p>}
             </div>
 

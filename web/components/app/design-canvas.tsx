@@ -3105,7 +3105,7 @@ export function DesignCanvasDialog({
                   </p>
                 ) : machineLib.slice(0, 5).map((m) => (
                   <div key={m.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5">
-                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs font-medium tabular-nums text-muted-foreground">{m.ref}</span>
+                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">{m.ref}</span>
                     <span className="min-w-0 flex-1 truncate text-xs" title={m.fileName || m.name}>{m.name || m.fileName}</span>
                     <Button
                       size="sm" variant="outline" className="h-7 shrink-0 px-2 text-2xs"

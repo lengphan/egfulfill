@@ -91,7 +91,7 @@ function ColourGroups({ variants, name, picked, onToggle, onQty }: {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {pickedHere.map((r) => (
                     <span key={r.sku} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1">
-                      <span className="text-2xs text-muted-foreground">{r.size || r.sku}</span>
+                      <span className="text-xs text-muted-foreground">{r.size || r.sku}</span>
                       <input
  type="number" min={1}
  value={picked[r.sku]?.qty ?? 1}

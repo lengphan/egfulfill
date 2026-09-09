@@ -98,7 +98,7 @@ function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
     )
  case "status": return <SellerStatusBadge order={o} />
  case "tracking": return o.tracking
-      ? <span className="truncate text-xs tabular-nums text-muted-foreground">{o.tracking}</span>
+      ? <span className="truncate text-sm tabular-nums text-muted-foreground">{o.tracking}</span>
  : <span className="text-xs text-muted-foreground/60">—</span>
  case "cost": {
       /* WHAT IT COSTS YOU. Two different claims share this cell and they must not read the
