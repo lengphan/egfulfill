@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
+import { VerifyCode } from "@/components/auth/verify-code"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
@@ -66,6 +67,11 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  /* SIGNING UP IS TWO PAGES OF ONE WINDOW: the details, then the code from the email. Held as
+     state rather than as a route so the shell, the branding and the sense of being mid-task
+     all survive the step. `landTo` is where both of its exits go. */
+  const [stage, setStage] = useState<"form" | "code">("form")
+  const [landTo, setLandTo] = useState<string>("/dashboard")
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -97,12 +103,14 @@ export default function SignupPage() {
       if (r.token) {
         setSession(r.token, r.user ?? {})
         const role = (r.user as { role?: string } | undefined)?.role
-        /* STRAIGHT TO THE CODE. A confirmation email that arrives while someone is being shown
-           a dashboard is an email nobody opens — the moment they will act on it is the moment
-           they were told to expect it. Where they were going is carried through, so the skip
-           link and the confirm button both land in the same place. */
-        const land = next ?? landingFor(typeof role === "string" ? role : null)
-        router.push(`/verify-email?next=${encodeURIComponent(land)}`)
+        /* THE SECOND PAGE OF THIS WINDOW, not a route change. A confirmation email that
+           arrives while someone is being shown a dashboard is an email nobody opens — the
+           moment they will act on it is the moment they were told to expect it. Keeping it
+           in the same card is what makes it read as the next step of one thing rather than
+           as having been handed off somewhere else.
+           Where they were going is remembered, so Confirm and Skip both land in one place. */
+        setLandTo(next ?? landingFor(typeof role === "string" ? role : null))
+        setStage("code")
       } else {
         router.push(next ? `/login?next=${encodeURIComponent(next)}` : "/login")
       }
@@ -116,6 +124,18 @@ export default function SignupPage() {
   // Nothing until we know. Rendering the shell but not the form would still flash a
   // heading at someone who is on their way to the app.
   if (!sessionChecked) return null
+
+  if (stage === "code") {
+    return (
+      <AuthShell subtitle="Confirm your email">
+        <VerifyCode
+          email={email.trim()}
+          onDone={() => router.push(landTo)}
+          onSkip={() => router.push(landTo)}
+        />
+      </AuthShell>
+    )
+  }
 
   return (
     <AuthShell subtitle="Create your seller account">
