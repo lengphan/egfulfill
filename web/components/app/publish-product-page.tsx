@@ -1526,24 +1526,48 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                 ? PUBLISH_OK
  : tl("publish", "Finished — with one shop that sent nothing")}
             </div>
-            {/* Said ONCE when every shop said the same thing, which is the usual run. Three
- rows each reading "Draft listing created" is one fact printed three times, and
- it was the widest column on the panel. */}
+            {/**
+              * NO LIST WHEN THERE IS NOTHING TO TELL APART.
+              *
+              * This screen only appears when every ticked shop finished, and the shops were
+              * named on the way in — the picker, then the live results, then a third list
+              * here saying the same shops succeeded. When they ALL succeeded the heading has
+              * already said it, and a column of green ticks beside names you chose two
+              * screens ago is the same fact for the third time.
+              *
+              * It survives for the case it was written for: outcomes that DIFFER. A dry run
+              * among real publishes, or one shop that took a draft while another went live —
+              * there the per-shop row is the only place that difference exists, and "View →"
+              * is how you reach the listing.
+              */}
             {(() => {
- const texts = pickedDests.map((d) => outcomes[d.connection_id]?.text).filter(Boolean)
+ const outs = pickedDests.map((d) => outcomes[d.connection_id])
+ const allOk = outs.every((o) => o?.state === "ok")
+ const texts = outs.map((o) => o?.text).filter(Boolean)
  const same = texts.length === pickedDests.length && new Set(texts).size === 1
+                /* All the same, all good: the heading has said what happened and the shops
+                   were named twice on the way here. What is left that ONLY this screen has is
+                   the way to the listings — so keep the links and drop the column of ticks,
+                   names and repeated status around them. */
+ if (allOk && same) {
+ const links = pickedDests
+                  .map((d) => ({ d, url: outcomes[d.connection_id]?.url }))
+                  .filter((x) => x.url)
+ if (!links.length) return null
  return (
-                <>
-                  {/* "Draft listing created" is gone. The tick already says it — a green
- check beside a shop name is not ambiguous about what happened, and
- spelling it out underneath was the same fact a third time (the heading
- above says it too). Only a row that DIFFERS still carries words, which
- is the case where you actually need them: a dry run, or a refusal among
- successes. */}
-                  <div className="w-full max-w-sm divide-y divide-border/60 px-6 text-left">
-                    {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} sameForAll={same} />)}
+                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-6 text-sm">
+                    {links.map(({ d, url }) => (
+                      <a key={d.connection_id} href={url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
+                        {d.shop_name || d.platform} →
+                      </a>
+                    ))}
                   </div>
-                </>
+                )
+              }
+ return (
+                <div className="w-full max-w-sm divide-y divide-border/60 px-6 text-left">
+                  {pickedDests.map((d) => <OutcomeLine key={d.connection_id} dest={d} outcome={outcomes[d.connection_id]} sameForAll={same} />)}
+                </div>
               )
             })()}
             <Button onClick={leave}>{returnLabel}</Button>
