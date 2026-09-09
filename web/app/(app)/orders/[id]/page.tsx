@@ -1,7 +1,7 @@
 "use client"
 
 import { useLabelT } from "@/lib/i18n"
-import { useEffect, useMemo, useState, useCallback, useRef } from "react"
+import { Fragment, useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf, platformOf, shipAddressOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
@@ -1114,7 +1114,8 @@ export default function OrderDetailPage() {
     <>
                     {(charges?.lines ?? []).map((l, i) => (
                       reversedLines.marked.has(i) ? null : (
-                      <div key={`${l.part}-${i}`} className="flex justify-between">
+                      <Fragment key={`${l.part}-${i}`}>
+                      <div className="flex justify-between">
                         <dt className="text-muted-foreground">
                           {l.label}
                           {l.note && <span className="opacity-70"> · {l.note}</span>}
@@ -1154,6 +1155,26 @@ export default function OrderDetailPage() {
                           )}
                         </dd>
                       </div>
+                      {/**
+                        * A DEDUCTION BELONGS IN THE DEDUCTION COLUMN.
+                        *
+                        * This was a note on the label — "Base cost · $89.28 refunded" — with
+                        * nothing in the amount column, so the column read $111.60 + $6.99 −
+                        * $22.32 while announcing $6.99 underneath it. A list of figures that
+                        * does not add up to the total beneath it is unreadable however correct
+                        * that total is; the owner's word was "very confusing".
+                        *
+                        * Its own row, negative, in the same green Discount already uses, and
+                        * indented under the charge it came off — so the column adds up on the
+                        * page and the deduction stays attached to the thing it reduced.
+                        */}
+                      {refundByPart.onLine.has(i) && (
+                        <div className="flex justify-between">
+                          <dt className="pl-3 text-muted-foreground">Refunded</dt>
+                          <dd className="tabular-nums text-success">−{usd(refundByPart.onLine.get(i) ?? 0)}</dd>
+                        </div>
+                      )}
+                      </Fragment>
                       )
                     ))}
                     {/* EVERYTHING ELSE SENT BACK. Reversals are already shown on the rows
