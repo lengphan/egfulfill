@@ -841,7 +841,16 @@ export function DesignerBoard() {
                             const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
                             return (
                               <span
-                                className="absolute left-1.5 top-1.5 rounded bg-background/70 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-foreground backdrop-blur-[2px]"
+                                /* OPAQUE, AND INVERTED. This was `bg-background/70` with a 2px
+                                   blur — a near-white chip, 70% transparent, over artwork that
+                                   is usually also near-white. On a line drawing it disappeared.
+                                   A blur cannot rescue a chip whose ground is the same colour
+                                   as what is behind it; only opacity and contrast can, and the
+                                   artwork underneath is not ours to predict. Solid ink with
+                                   inverted text reads on white, on black and on a photograph,
+                                   and it inverts correctly in dark mode because both halves are
+                                   tokens. */
+                                className="absolute left-1.5 top-1.5 rounded bg-foreground px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-background shadow-sm"
                                 title={c.vendor ? tl("designer", "Outsourced — partner cost") : c.credited ? tl("designer", "Credited to the designer") : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : tl("designer", "Designer payout on approval"))}
                               >
                                 {money(payout)}{suffix}
@@ -854,11 +863,13 @@ export function DesignerBoard() {
                               (secondary) when it's factory (operator/warehouse/admin, e.g. Linh) —
  so at a glance you see who's on the job. */}
                           {c.vendor ? (
-                            <span className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-pink-500/90 px-1.5 py-0.5 text-2xs font-medium text-white">{vendorLabel(c.vendor)}</span>
+                            <span className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-pink-500 px-1.5 py-0.5 text-2xs font-semibold text-white shadow-sm">{vendorLabel(c.vendor)}</span>
                           ) : c.claimed_by ? (
                             <span
  title={`Claimed by ${c.claimed_by}${c.claimed_role ? ` (${c.claimed_role})` : ""}`}
- className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-2xs font-medium text-white " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary/90" : "bg-draft/90")}
+ /* Opaque for the same reason as the payout chip on the other corner: 90% of a
+                                 colour over an unknown picture is a guess about the picture. */
+ className={"absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center rounded px-1.5 py-0.5 text-2xs font-semibold text-white shadow-sm " + (String(c.claimed_role || "").toLowerCase() === "designer" ? "bg-primary" : "bg-draft")}
                             >
                               <span className="truncate">{String(c.claimed_by)}</span>
                             </span>
@@ -872,7 +883,7 @@ export function DesignerBoard() {
  only the tooltip said otherwise. Two different facts cannot
  share one appearance; the icon is the cheapest way to say
  which of the two you are looking at. */
-                            <span title={`Seller · ${c.seller_name}${c.created_by_name ? ` · sent by ${c.created_by_name}` : ""}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-draft/90 px-1.5 py-0.5 text-2xs font-medium text-white">
+                            <span title={`Seller · ${c.seller_name}${c.created_by_name ? ` · sent by ${c.created_by_name}` : ""}`} className="absolute right-1.5 top-1.5 inline-flex max-w-[75%] items-center gap-0.5 rounded bg-draft px-1.5 py-0.5 text-2xs font-semibold text-white shadow-sm">
                               <Storefront size={9} weight="fill" className="shrink-0 opacity-80" />
                               <span className="truncate">{String(c.seller_name)}</span>
                             </span>
