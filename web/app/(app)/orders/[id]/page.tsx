@@ -1041,6 +1041,38 @@ export default function OrderDetailPage() {
  return { marked, claimed }
   })()
 
+  /**
+   * WHAT CAME BACK, ON THE ROW IT CAME BACK FROM.
+   *
+   * Refunding the base cost showed "Base cost $111.60" and a lone "Refunded −$50.00" at the
+   * bottom — the money right, and WHICH part was sent back nowhere on the card. Same gap the
+   * reversed adjustments had, for every other part: shipping, express, design, files.
+   *
+   * The ledger records a refund against a PART, not a line, so a part's refund is attributed
+   * to the first line carrying that part — which for base cost, shipping and the rest is the
+   * only line there is. Fees are excluded because a fully reversed adjustment already leaves
+   * the card entirely, and counting it here as well would show the same money twice.
+   */
+ const refundByPart = (() => {
+ const left = new Map<string, number>()
+ for (const p of charges?.parts ?? []) {
+ const shownElsewhere = p.key === "fee" ? reversedLines.claimed : 0
+ const amt = (p.refunded ?? 0) - shownElsewhere
+ if (amt > 0.005) left.set(p.key, amt)
+    }
+ const onLine = new Map<number, number>()
+    ;(charges?.lines ?? []).forEach((l, i) => {
+ if (reversedLines.marked.has(i)) return
+ const amt = left.get(l.part)
+ if (amt == null) return
+ onLine.set(i, amt)
+ left.delete(l.part)
+    })
+ let attributed = 0
+ onLine.forEach((v) => { attributed += v })
+ return { onLine, attributed }
+  })()
+
  const chargedRows = (
     <>
                     {(charges?.lines ?? []).map((l, i) => (
@@ -1049,6 +1081,11 @@ export default function OrderDetailPage() {
                         <dt className="text-muted-foreground">
                           {l.label}
                           {l.note && <span className="opacity-70"> · {l.note}</span>}
+                          {/* On the row, not in a total at the bottom: "which part did I send
+                              back" is the question, and a lone Refunded line cannot answer it. */}
+                          {refundByPart.onLine.has(i) && (
+                            <span className="text-success"> · {usd(refundByPart.onLine.get(i) ?? 0)} refunded</span>
+                          )}
                         </dt>
                         {/* A deduction reads as one: same minus and same green as the quote,
                             so the row a seller checks looks identical either side of the
@@ -1086,10 +1123,14 @@ export default function OrderDetailPage() {
                         they cancelled, so counting them here too would report the same money
                         twice — once struck through and once as a refund. What is left is a
                         genuine refund to the seller, which is a different act. */}
-                    {refundedTotal - reversedLines.claimed > 0.005 && (
+                    {/* WHATEVER IS LEFT OVER. Reversed adjustments left the card with their
+                        refund, and every other part now carries its own on its row — so this
+                        only appears for money that belongs to no visible line, which is the
+                        one case a bare total is the honest answer to. */}
+                    {refundedTotal - reversedLines.claimed - refundByPart.attributed > 0.005 && (
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">Refunded</dt>
-                        <dd className="tabular-nums text-success">−{usd(refundedTotal - reversedLines.claimed)}</dd>
+                        <dd className="tabular-nums text-success">−{usd(refundedTotal - reversedLines.claimed - refundByPart.attributed)}</dd>
                       </div>
                     )}
     </>

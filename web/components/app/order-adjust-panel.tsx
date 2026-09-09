@@ -58,6 +58,23 @@ export function OrderAdjustPanel({ orderId, onCharged }: { orderId: string; onCh
     return () => clearTimeout(t)
   }, [orderId])
 
+  /**
+   * A SUCCESS IS NEWS, AND NEWS GOES STALE.
+   *
+   * "Charged $2.00 to the seller's wallet" sat there until the panel was unmounted — through
+   * the reversal of that very charge, still claiming it as the latest thing that happened.
+   * A confirmation is about the press that caused it; once it outlives the state it describes
+   * it is just a sentence on the screen, and a wrong one.
+   *
+   * Successes only. A refusal stays until something is done about it: it names a shortfall or
+   * a reason, and timing that out would hide the one message the operator has to act on.
+   */
+  useEffect(() => {
+    if (!msg?.ok) return
+    const t = setTimeout(() => setMsg((m) => (m?.ok ? null : m)), 6000)
+    return () => clearTimeout(t)
+  }, [msg])
+
   if (!allowed) return null
 
   const amt = Math.max(0, Number(amount) || 0)
