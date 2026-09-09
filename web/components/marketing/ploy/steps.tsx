@@ -1,7 +1,7 @@
 "use client"
 
-import { useRef } from "react"
-import { motion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
+import { useMemo, useRef } from "react"
+import { motion, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
 import { reveal, rise } from "./motion"
 import { Num } from "./num"
 import { GUTTER, STACK } from "./rhythm"
@@ -20,38 +20,75 @@ import type { Stat, Step } from "@/lib/site-content"
 
 
 /**
- * THE LEAD, AS SOMETHING SAID RATHER THAN SOMETHING SET.
+ * ONE WORD AT A TIME.
  *
- * It was body copy at 17px — the same size as the step descriptions below it — so the one
- * passage on this page that speaks straight to the reader read as an introduction to a list.
- * It is the argument the whole section makes, and it now looks like it: display-scale,
- * tightened leading, and the ink it always had.
+ * The whole block used to fade together, 40% ink to full, as it crossed the reading band —
+ * which is a paragraph appearing, not a paragraph being read. Every word was already at its
+ * final weight the instant the first one was, so there was nothing to follow: the effect
+ * happened TO the passage rather than along it.
  *
- * The pale-to-full scroll is UNCHANGED and is the point of it. The words arrive at 40% and
- * develop as they rise into the reading band, so the sentence resolves as you reach it rather
- * than being there before you looked — the same behaviour the step rows use for their
- * numbers, which is why the two halves of the section feel like one movement.
+ * Each word now owns a slice of the same scroll. They overlap by design — the bands are wider
+ * than the step between them — so what travels down the sentence is a soft edge rather than a
+ * cursor ticking word by word, which is the difference between reading and being read to.
  *
- * NO QUOTE MARKS. Nobody said this; it is the brand speaking, and punctuation that implies a
- * source is the same fabrication the testimonials block refuses to make up.
+ * PALE IS STILL LEGIBLE. The floor is 18% ink on acid, not zero: nothing here is hidden, and a
+ * reader who lands mid-section or never scrolls at all still has the whole paragraph. Motion
+ * that withholds the words is a paragraph that does not work without JavaScript.
+ */
+function LeadWord({ word, progress, from, to }: { word: string; progress: MotionValue<number>; from: number; to: number }) {
+  const opacity = useTransform(progress, [from, to], [0.18, 1])
+  return (
+    <>
+      <motion.span style={{ opacity }}>{word}</motion.span>{" "}
+    </>
+  )
+}
+
+/**
+ * THE LEAD IS THE SECTION — there is no display headline over it any more.
+ *
+ * A bold line then a paragraph made two things competing to be the first thing read, and the
+ * headline won by weight every time (owner, 2026-09-09: "no bold — it's just a paragraph").
+ * The stored heading is not lost; it opens the passage as its first sentence, which is what
+ * it always was.
+ *
+ * Bigger, too. This is the argument the whole section makes and it is now the only type in
+ * the column, so it carries at display scale instead of reading as an introduction to a list.
  */
 function Lead({ lines }: { lines: string[] }) {
   const ref = useRef<HTMLDivElement>(null)
-  /* Measured on the element itself: pale when its top is still low on the screen, full by the
-     time it has risen into the reading band. `end` before `start` would run it backwards. */
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 90%", "start 45%"] })
-  const opacity = useTransform(scrollYProgress, [0, 1], [0.4, 1])
+  const still = useReducedMotion()
+  /* Across the WHOLE passage, not its top edge: `end` in the offset is what lets the last
+     word finish later than the first. A start-to-start range would give every word the same
+     window, which is the effect this replaces. */
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 85%", "end 55%"] })
 
+  /* Numbered once, across every paragraph, so the sweep does not restart at each break — and
+     numbered HERE rather than by a counter incremented during render, which is a write to a
+     value the render depends on (react-hooks/immutability, and it is right: the same paragraph
+     re-rendered twice would keep counting). */
+  const paras = useMemo(() => {
+    let n = 0
+    return lines.map((l) => l.split(/\s+/).filter(Boolean).map((w) => ({ w, i: n++ })))
+  }, [lines])
+  const total = paras.reduce((n, p) => n + p.length, 0)
   return (
-    <div ref={ref} className="mt-8 max-w-xl md:mt-10 md:max-w-[38rem]">
-      {lines.map((p, i) => (
-        <motion.p
+    <div ref={ref} className="mt-8 max-w-2xl md:mt-10 md:max-w-[46rem]">
+      {paras.map((ws, i) => (
+        <p
           key={i}
-          style={{ opacity }}
-          className={(i === 0 ? "" : "mt-6 ") + "text-[clamp(1.35rem,2.6vw,1.95rem)] leading-[1.25] tracking-[-0.01em] text-ploy-ink"}
+          className={(i === 0 ? "" : "mt-7 ") + "text-[clamp(1.7rem,3.5vw,2.7rem)] leading-[1.2] tracking-[-0.015em] text-ploy-ink"}
         >
-          {p}
-        </motion.p>
+          {ws.map(({ w, i: n }) => {
+            /* A BAND WIDER THAN THE STEP. At 1/total each the words would light strictly one
+               after another with a hard edge; at four times that they overlap, and the front
+               of the sweep is soft. */
+            const from = total > 1 ? (n / total) * 0.72 : 0
+            return still
+              ? <span key={n}>{w}{" "}</span>
+              : <LeadWord key={n} word={w} progress={scrollYProgress} from={from} to={Math.min(1, from + 4 / total)} />
+          })}
+        </p>
       ))}
     </div>
   )
@@ -135,22 +172,17 @@ export function PloySteps({ heading, lead, steps, stats }: { heading: string[]; 
               The size came down with it. At 6.5vw this ran the full width of the block and
               crowded the strip above; smaller, it reads as the section's title rather than
               as a second hero, and it leaves the steps below room to be the loud thing. */}
-          <h2 className="ploy-display mt-10 text-[clamp(2.1rem,4.9vw,4.1rem)] md:mt-14">
-            {heading.map((l, i) => (
-              <motion.span key={l} {...reveal(i * 0.1)} className="block">
-                {l}
-              </motion.span>
-            ))}
-          </h2>
+          {/* NO DISPLAY HEADLINE HERE (owner, 2026-09-09: "no bold — it's just a paragraph").
+              A bold line above a paragraph is two openings competing, and weight wins every
+              time: the eye took the headline and skipped the argument underneath it, which is
+              the half that does the persuading. The stored heading still renders — as the
+              paragraph's first sentence, in the same ink as the rest, which is where a section
+              this short was always going to read best.
+              The steps below are the loud thing now, and they have the whole block to be it. */}
 
-          {/* SCROLL BRINGS IT UP TO FULL INK, not hover.
-              It was a pointer transition, which meant the sentence only ever resolved for
-              someone who happened to put a cursor on it — and never at all on a phone. The
-              steps below already darken as the pipe reaches them; this now does the same
-              thing off its own position, so reading down the page IS what develops it.
-              It is a colour, so nothing is ever hidden: at 40% ink it still reads, it just
-              stops competing with the display line above it. */}
-          <Lead lines={lead} />
+          {/* The heading OPENS the paragraph rather than sitting over it, so the stored
+              content still renders and the section still says what it is — in one voice. */}
+          <Lead lines={[[...heading, lead[0]].filter(Boolean).join(" "), ...lead.slice(1)]} />
 
           <div className="relative mt-14 md:mt-16">
             {/* THE PIPE. Base rule in pale ink; the fill scales down from the top with scroll.
