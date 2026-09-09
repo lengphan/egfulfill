@@ -631,7 +631,7 @@ export function chargeSavedPaypal(amount: number, savedId: number) {
 /** `amount` is what was credited; `charged` and `fee` are what actually left the payer —
  *  `fee` being PayPal's own reported figure, not our estimate of it. */
 export function capturePaypalOrder(orderID: string) {
-  return api<{ ok?: boolean; amount?: number; charged?: number; fee?: number; captureId?: string; status?: string; ref?: string; saved?: string | null; error?: string }>(`/api/paypal/capture-order`, {
+  return api<{ ok?: boolean; amount?: number; charged?: number; fee?: number; captureId?: string; status?: string; ref?: string; saved?: string | null; savePending?: boolean; error?: string }>(`/api/paypal/capture-order`, {
     method: "POST",
     body: JSON.stringify({ orderID }),
   })

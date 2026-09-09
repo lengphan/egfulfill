@@ -953,7 +953,10 @@ export function WalletDashboard({ partnerHistory = false }: { partnerHistory?: b
                 )
               })}
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">{tl("wallet", "Pending top-ups credit your balance once confirmed (BIDV auto-confirms on payment; manual transfers are reviewed by our team).")}</div>
+            {/* NO SENTENCE HERE. The heading already says NOT IN YOUR BALANCE YET and every
+                row carries an "Awaiting payment" chip — a line explaining that pending
+                top-ups are pending is §4's prose-under-a-control, in the one place the
+                state was already legible. */}
           </div>
         )}
         <Table>

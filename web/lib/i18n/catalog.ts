@@ -1245,8 +1245,6 @@ const vi: Dict = {
   "wallet.— unassigned": "— chưa gán",
   "wallet.What the transfer itself cost. The seller is still credited the full amount — this is recorded as a separate charge they can see.":
     "Chi phí của chính giao dịch chuyển tiền. Người bán vẫn được cộng đủ số tiền — khoản này được ghi nhận thành một khoản phí riêng mà họ nhìn thấy được.",
-  "wallet.Pending top-ups credit your balance once confirmed (BIDV auto-confirms on payment; manual transfers are reviewed by our team).":
-    "Các lệnh nạp đang chờ sẽ được cộng vào số dư sau khi xác nhận (BIDV tự xác nhận khi thanh toán; chuyển khoản thủ công do đội ngũ của chúng tôi duyệt).",
 
   // ── Top-up dialog ─────────────────────────────────────────────────────────
   // VietQR is the one place an amount is genuinely converted, so "You'll pay" carries VND.
@@ -1257,6 +1255,7 @@ const vi: Dict = {
   "topup.QR Code": "Mã QR",
   "topup.Card": "Thẻ",
   "topup.PayPal": "PayPal",
+  "topup.Credited. PayPal is finishing saving this account — it should be ready by your next top-up.": "Đã cộng tiền. PayPal đang hoàn tất việc lưu tài khoản này — dự kiến sẵn sàng cho lần nạp sau.",
   "topup.Credited. PayPal is remembered as": "Đã cộng tiền. PayPal được ghi nhớ là",
   "topup.next time is one press, with no sign-in.": "lần sau chỉ cần một lần nhấn, không phải đăng nhập.",
   "topup.Credited. This account couldn't be remembered, so next time will ask you to sign in again.": "Đã cộng tiền. Không ghi nhớ được tài khoản này, nên lần sau bạn sẽ phải đăng nhập lại.",

@@ -469,7 +469,7 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  if (r.error || !r.orderID) throw new Error(r.error || "PayPal wouldn't start that payment.")
  const c = await capturePaypalOrder(r.orderID)
  if (!c.ok) throw new Error(c.error || "PayPal didn't confirm the payment.")
- setSavedNow(null); setPhase("paid"); onFunded()
+ setSavedNow(null); setSavePending(false); setPhase("paid"); onFunded()
     } catch (e) {
  setError(e instanceof Error ? e.message : "Couldn't take that payment.")
     } finally { setBusy(false) }
@@ -493,7 +493,10 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
    * read versus doesn't exist, say which.
    */
  const [savedNow, setSavedNow] = useState<string | null>(null)
- const paid = useCallback((saved: string | null) => { setSavedNow(saved); setPhase("paid"); onFunded() }, [onFunded])
+ const [savePending, setSavePending] = useState(false)
+ const paid = useCallback((saved: string | null, pending: boolean) => {
+ setSavedNow(saved); setSavePending(pending); setPhase("paid"); onFunded()
+  }, [onFunded])
  const failed = useCallback((m: string) => setError(m || null), [])
 
  if (phase === "paid")
@@ -504,6 +507,10 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
            charge time, so naming one here would describe something we do not control. */
  sub={savedNow
           ? `${tl("topup", "Credited. PayPal is remembered as")} ${savedNow} — ${tl("topup", "next time is one press, with no sign-in.")}`
+ : savePending
+            /* PayPal is still minting the token. Saying "saved" would be a promise we
+               cannot yet keep, and "couldn't" would be wrong — so say what is true. */
+ ? tl("topup", "Credited. PayPal is finishing saving this account — it should be ready by your next top-up.")
           : remember && !account
  ? tl("topup", "Credited. This account couldn't be remembered, so next time will ask you to sign in again.")
  : tl("topup", "Your PayPal top-up has been credited.")}

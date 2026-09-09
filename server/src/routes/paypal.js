@@ -124,15 +124,34 @@ export function paypalRoutes(app, requireAuth) {
        label       text,
        created_at  timestamptz default now())`).catch(() => {});
   q('create index if not exists paypal_vault_seller_idx on paypal_vault(seller_id)').catch(() => {});
+  /* The seller behind a PayPal customer id. The vault webhook carries only that id, so
+     without this row an arriving token belongs to nobody and is dropped. */
+  q(`create table if not exists paypal_customers (
+       seller_id   uuid primary key references users(id) on delete cascade,
+       customer_id text not null unique,
+       created_at  timestamptz default now())`).catch(() => {});
 
-  /** The seller's PayPal customer id — minted once, then read forever. */
+  /**
+   * The seller's PayPal customer id — minted once, then read forever.
+   *
+   * PERSISTED, NOT DERIVED, and it has to be: the vault webhook identifies a seller ONLY by
+   * this string, and a truncated user id cannot be reversed back into one. It is also what
+   * PayPal keys the vault to, so it must never change once a token exists — a different one
+   * orphans every account that seller has saved.
+   *
+   * TWENTY-TWO CHARACTERS, TOTAL. PayPal caps customer.id at 22 and rejects the whole order
+   * with INVALID_STRING_LENGTH otherwise, which is exactly what `eg-` plus 22 hex did on the
+   * first real attempt. Two for the prefix and twenty of the uuid's hex is 80 bits, which
+   * does not collide at any number of sellers this will ever have — and the unique index
+   * turns a collision into a loud failure rather than two sellers sharing a vault.
+   */
   async function customerFor(user) {
-    const ex = await q('select customer_id from paypal_vault where seller_id=$1 limit 1', [user.sub])
+    const ex = await q('select customer_id from paypal_customers where seller_id=$1', [user.sub])
       .then((r) => r.rows[0]).catch(() => null);
     if (ex && ex.customer_id) return ex.customer_id;
-    /* Derived from the user id rather than random, so a seller whose only vault row was
-       deleted comes back to the SAME customer at PayPal instead of a second one. */
-    return 'eg-' + String(user.sub).replace(/-/g, '').slice(0, 22);
+    const id = ('eg' + String(user.sub).replace(/[^0-9a-zA-Z]/g, '')).slice(0, 22);
+    await q('insert into paypal_customers (seller_id, customer_id) values ($1,$2) on conflict (seller_id) do nothing', [user.sub, id]).catch(() => {});
+    return id;
   }
 
   // The client-id is public (it goes in the PayPal JS SDK URL); the frontend fetches it.
@@ -221,7 +240,17 @@ export function paypalRoutes(app, requireAuth) {
       });
       const d = await r.json().catch(() => ({}));
       recordUsage('paypal', { endpoint: 'create-order', ok: r.ok });
-      if (!r.ok || !d.id) { reply.code(400); return { error: 'PayPal create failed: ' + JSON.stringify(d).slice(0, 300) }; }
+      if (!r.ok || !d.id) {
+        /* THE WHOLE THING IN THE LOG, A SENTENCE ON THE SCREEN. A seller was shown a wall of
+           raw PayPal JSON — schema paths, a debug_id, an issue code — none of which they can
+           act on and all of which they now have to scroll past to find the Remember box.
+           The detail is what we need to fix it, so it goes where we read it. */
+        app.log.error('paypal create-order refused: ' + JSON.stringify(d));
+        const det = (d.details && d.details[0]) || {};
+        const why = det.description || d.message || ('HTTP ' + r.status);
+        reply.code(400);
+        return { error: 'PayPal wouldn\u2019t start that payment: ' + why, debugId: d.debug_id || null };
+      }
       const approve = (d.links || []).find(l => l.rel === 'approve' || l.rel === 'payer-action');
       // The three figures the dialog shows before the button. The client must never compute
       // a charge it is about to make somebody agree to.
@@ -276,18 +305,30 @@ export function paypalRoutes(app, requireAuth) {
        * bookkeeping for a convenience feature did.
        */
       let savedLabel = null;
+      let savePending = false;
       try {
-        const vaulted = d.payment_source && d.payment_source.paypal && d.payment_source.paypal.attributes
-          && d.payment_source.paypal.attributes.vault;
-        const custId = d.payment_source && d.payment_source.paypal && d.payment_source.paypal.attributes
-          && d.payment_source.paypal.attributes.customer && d.payment_source.paypal.attributes.customer.id;
-        if (vaulted && vaulted.id && String(vaulted.status || '').toUpperCase() === 'VAULTED') {
+        const attrs = (d.payment_source && d.payment_source.paypal && d.payment_source.paypal.attributes) || {};
+        const vaulted = attrs.vault;
+        const custId = (attrs.customer && attrs.customer.id) || null;
+        const status = String((vaulted && vaulted.status) || '').toUpperCase();
+        if (vaulted && vaulted.id && status === 'VAULTED') {
           savedLabel = payerEmail || 'PayPal account';
           await q(
             `insert into paypal_vault (seller_id, customer_id, token_id, label)
              values ($1,$2,$3,$4) on conflict (token_id) do nothing`,
             [req.user.sub, custId || await customerFor(req.user), vaulted.id, savedLabel]
           );
+        } else if (status === 'APPROVED') {
+          /**
+           * APPROVED IS NOT FAILURE, and treating it as one is the trap here.
+           *
+           * PayPal's own docs: when the vault status comes back APPROVED there is no
+           * vault.id yet — the token is minted afterwards and announced on the
+           * VAULT.PAYMENT-TOKEN.CREATED webhook. Requiring VAULTED at this moment would
+           * have told a seller their account could not be remembered at the exact instant
+           * PayPal was busy remembering it, and then remembered it anyway.
+           */
+          savePending = true;
         }
       } catch (e) { app.log.error('paypal vault record failed: ' + e.message); }
 
@@ -341,6 +382,9 @@ export function paypalRoutes(app, requireAuth) {
         captureId: cap.id, status: d.status, ref, txnId: cap.id,
         // Null when nothing was saved — which the dialog must not report as "saved".
         saved: savedLabel,
+        // PayPal is minting the token; it lands on the webhook. A third state, because
+        // "saved" and "not saved" are both wrong answers to it.
+        savePending,
       };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
@@ -362,6 +406,74 @@ export function paypalRoutes(app, requireAuth) {
     const cfg = await feeCfg();
     const charge = grossUp(amt, cfg);
     return { credit: amt, charge, fee: Number((charge - amt).toFixed(2)), feeCfg: cfg };
+  });
+
+  /**
+   * THE VAULT WEBHOOK — where an APPROVED save actually finishes.
+   *
+   * PayPal mints the token after the capture responds and announces it here. Without this
+   * endpoint the APPROVED path never completes: the seller consented, PayPal saved the
+   * account, and we would never learn the id to charge it with.
+   *
+   * IT VERIFIES, OR IT DOES NOTHING. The body claims a token belongs to a customer, and
+   * anyone can POST that. Unverified, a stranger could attach a token id of their choosing
+   * to somebody else's seller row. So verification is required, not best-effort: with no
+   * PAYPAL_WEBHOOK_ID configured this refuses every call rather than trusting it. That means
+   * an unconfigured deployment simply never completes an APPROVED save — visible, and the
+   * safe direction to fail in.
+   *
+   * PUBLIC BY NECESSITY (PayPal has no bearer token of ours), which is exactly why the
+   * signature check is the whole gate.
+   */
+  app.post('/api/webhooks/paypal', async (req, reply) => {
+    const webhookId = (process.env.PAYPAL_WEBHOOK_ID || '').trim();
+    if (!webhookId) {
+      app.log.error('paypal webhook received but PAYPAL_WEBHOOK_ID is not set — refusing');
+      reply.code(503); return { error: 'not configured' };
+    }
+    const h = req.headers || {};
+    let ok = false;
+    try {
+      const tok = await ppToken();
+      const v = await fetch(BASE + '/v1/notifications/verify-webhook-signature', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_algo: h['paypal-auth-algo'],
+          cert_url: h['paypal-cert-url'],
+          transmission_id: h['paypal-transmission-id'],
+          transmission_sig: h['paypal-transmission-sig'],
+          transmission_time: h['paypal-transmission-time'],
+          webhook_id: webhookId,
+          webhook_event: req.body,
+        }),
+      });
+      const vd = await v.json().catch(() => ({}));
+      ok = v.ok && String(vd.verification_status || '').toUpperCase() === 'SUCCESS';
+    } catch (e) { app.log.error('paypal webhook verify failed: ' + e.message); }
+    if (!ok) { reply.code(401); return { error: 'bad signature' }; }
+
+    const ev = req.body || {};
+    recordUsage('paypal', { endpoint: 'webhook:' + (ev.event_type || '?'), ok: true });
+    if (String(ev.event_type || '') !== 'VAULT.PAYMENT-TOKEN.CREATED') return { ok: true, ignored: true };
+
+    const res = ev.resource || {};
+    const tokenId = res.id;
+    const custId = res.customer && res.customer.id;
+    if (!tokenId || !custId) return { ok: true, ignored: true };
+    /* The customer id is the ONLY thing tying this to a seller — see paypal_customers. An
+       id we never issued belongs to nobody here, and inventing a row for it would be worse
+       than dropping it. */
+    const owner = await q('select seller_id from paypal_customers where customer_id=$1', [String(custId)])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!owner) { app.log.error('paypal vault token for unknown customer ' + custId); return { ok: true, ignored: true }; }
+    const label = (res.payment_source && res.payment_source.paypal && res.payment_source.paypal.email_address) || 'PayPal account';
+    await q(
+      `insert into paypal_vault (seller_id, customer_id, token_id, label)
+       values ($1,$2,$3,$4) on conflict (token_id) do nothing`,
+      [owner.seller_id, String(custId), String(tokenId), label]
+    ).catch((e) => app.log.error('paypal vault insert failed: ' + e.message));
+    return { ok: true };
   });
 
   // ── Saved PayPal accounts — the popup happens once, then this ───────────────

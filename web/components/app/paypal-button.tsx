@@ -81,9 +81,11 @@ export function PaypalButton({
   /** Ask PayPal to vault the account during its approval window, so the NEXT top-up needs
    *  no window at all. Consent has to be given there; it cannot be given on our page. */
   remember?: boolean
-  /** `saved` is the label of the account PayPal actually vaulted, or null if it did not —
-   *  which is how the caller can tell "remembered" from "asked to remember and it didn't". */
-  onPaid: (saved: string | null) => void
+  /** How the save went: the account's label once PayPal has vaulted it, "pending" while
+   *  PayPal is still minting the token (it arrives on the webhook), or null for no save at
+   *  all. Three states, because "saved" and "not saved" are both wrong answers to the middle
+   *  one — see the note in paypal.js's capture. */
+  onPaid: (saved: string | null, savePending: boolean) => void
   onError: (m: string) => void
 }) {
   const tl = useLabelT()
@@ -124,7 +126,7 @@ export function PaypalButton({
           createOrder: async () => order.id!,
           onApprove: async (data) => {
             const r = await capturePaypalOrder(data.orderID)
-            if (r.ok) onPaid(r.saved ?? null)
+            if (r.ok) onPaid(r.saved ?? null, r.savePending === true)
             else onError(r.error || "PayPal didn't confirm the payment — nothing was charged.")
           },
           onCancel: () => onError(""),
