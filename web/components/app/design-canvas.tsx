@@ -19,7 +19,7 @@ import { designSrc } from "@/lib/order-image"
 import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-picker"
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
-import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups } from "@/lib/variant-resolve"
+import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
 import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { useIsNarrow } from "@/lib/use-narrow"
@@ -1039,9 +1039,8 @@ export function DesignCanvasDialog({
     /* Nothing stated anywhere — keep the four almost anything has. Padded even with NO
        picture at all: a line with no blank picked yet has none, and that is exactly the line
        someone opens to set up. FaceTile draws a blank tile for an empty url. */
- const STANDARD = ["front", "back", "left", "right"]
  const have = new Set(base.map((x) => (x.side || "front").toLowerCase()))
- return [...base, ...STANDARD.filter((k) => !have.has(k)).map((k) => ({ side: k, url: frontUrl }))]
+ return [...base, ...FALLBACK_SIDES.filter((k) => !have.has(k)).map((k) => ({ side: k, url: frontUrl }))]
   }, [product, liveItem.color, liveItem.img, typesLoaded])
  const [side, setSide] = useState(0)
   /**

@@ -477,6 +477,41 @@ typed by hand and each removable only by hand.
 Applies to this file's own habits too: several of this session's UI additions put a
 sentence under a control and had to be removed again.
 
+### One question, one function — the faces case (2026-09-09)
+
+"Which faces does this blank print on" was answered in four places, four different ways, and
+every one of them was behaving exactly as written:
+
+| surface | answered with | for one duffel |
+|---|---|---|
+| product page | `sidesOf` | Front, Back |
+| import sheet | its own inline copy of that rule | the same, re-derived |
+| mini designer | a padded `["front","back","left","right"]`, product ignored | four |
+| design maker | `designFaces`, which DROPPED any face with no picture | three |
+
+So artwork could be placed on a face the price never charged for, and a face a product
+genuinely had could vanish for want of a photograph nobody had uploaded.
+
+- **`offeredSides` is the one definition.** The product's own ticks, else its configured type,
+  else **null** — because "we have not been told" is not "front only", and each surface's
+  fallback for that is its own business.
+- **A TICK IS A STATEMENT.** The editor used to store `sides` only when they DISAGREED with
+  the category, so a product that ticked exactly its type's faces stored nothing and went
+  back to inheriting — add a face to the category later and it silently appeared on that
+  product. Absent still means inherit; ticked always means ticked.
+- **Which faces EXIST and whether we have a PICTURE of each are different questions.**
+  Conflating them produced three of the four wrong answers. A declared face with no photo
+  borrows the front's; it is never dropped. A photo for an unticked face is stale data, not
+  a surface — it stays on the row, so re-ticking brings it back.
+- **A fallback belongs in the module that owns the rule** (`FALLBACK_SIDES`). The same array
+  in a screen is a second opinion, which is exactly how the mini designer stopped reading
+  products at all.
+
+`node tools/check-faces.mjs` is the gate, and its second half is the one that prevents
+recurrence: it EXECUTES the rule against the products that actually broke, then greps the app
+for a surface computing faces for itself. Legitimate readers are allow-listed **with a stated
+reason** — a blanket skip would make it decorative.
+
 ### A value is not a caption (2026-09-09)
 
 The scale is six steps — 11 · 12 · 14 · 18 · 24 · 36 — and the steps are fine. What goes

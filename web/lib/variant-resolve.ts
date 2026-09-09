@@ -273,6 +273,16 @@ export function sidesOf(p: CatalogProduct | null): string[] {
   return own.length ? own : typeSidesOf(p)
 }
 
+/**
+ * THE FALLBACK WHEN NOTHING HAS BEEN STATED — four faces almost anything has.
+ *
+ * Lives here rather than in the surface that needs it, because that is precisely how the
+ * mini designer came to ignore products entirely: it held its own `["front","back","left",
+ * "right"]` and padded every line with it. A fallback in the module that owns the rule is a
+ * fallback; the same array in a screen is a second opinion.
+ */
+export const FALLBACK_SIDES = ["front", "back", "left", "right"]
+
 /** Every face the system knows. Mirrors ALL_SIDES in server/src/routes/factory_settings.js,
  *  which is the list a product type is built from. */
 export const ALL_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"]
@@ -341,8 +351,23 @@ export function designFaces(p: CatalogProduct | null): MockupFace[] {
   if (!p) return []
   const own = new Map(mockupFaces(p, null).map((f) => [f.side, f.url]))
   const out: MockupFace[] = []
+  /**
+   * A DECLARED FACE DOES NOT NEED ITS OWN PHOTOGRAPH.
+   *
+   * This pushed a face only `if (url)` — the product's picture for that side, else the
+   * category's outline — so a face nobody had photographed silently vanished. A duffel
+   * ticked Front and Back with a single front shot came out with ONE face, and the design
+   * maker hides its strip below two: the product page said "Placement (2)" while the maker
+   * showed no positions at all, for the same garment.
+   *
+   * Whether a face EXISTS and whether we have a picture of it are different questions. The
+   * front's photo stands in, which is what the mini designer already does — a borrowed
+   * backdrop is a real position: it stores, it costs, it reaches the floor. Only a product
+   * with no imagery whatsoever still yields nothing, and there is genuinely nothing to draw.
+   */
+  const front = own.get("front") || typeMockupOf(p, "front") || ""
   for (const side of sidesOf(p)) {
-    const url = own.get(side) || typeMockupOf(p, side)
+    const url = own.get(side) || typeMockupOf(p, side) || front
     if (url) out.push({ side, url })
   }
   /*

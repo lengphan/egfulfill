@@ -6,6 +6,7 @@
 // and grouping multiple line rows into one order by Order Number.
 
 import { PRODUCT_METHODS, normalizeMethods } from "@/lib/print-method"
+import { ALL_SIDES } from "@/lib/variant-resolve"
 
 // Required columns — a row missing any of these is flagged invalid.
 //
@@ -232,7 +233,10 @@ export const ITEM_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"
  * dependent list — see the note in sheets.js), so those two offer all eight and the
  * narrowing happens here on the way in.
  */
-export const PRINT_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"] as const
+/* THE SAME EIGHT, not a second list of them. This was written out again here and drifted
+   from `ALL_SIDES` by nothing so far — but it is one edit away, and a face the sheet accepts
+   that the app has never heard of is a placement nobody can print. */
+export const PRINT_SIDES = ALL_SIDES
 
 /**
  * THE WORD IN THE CELL, NOT THE KEY WE STORE.
