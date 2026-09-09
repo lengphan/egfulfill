@@ -1032,15 +1032,23 @@ td[align="right"] {
    REDUCED MOTION STOPS IT COMPLETELY. Continuous ambient movement with no
    finishing moment is close to the definition of what that setting asks us not
    to do. Dragging still works: that is the person's own hand, not decoration. */
+/* AMPLITUDE IS THE WHOLE POINT, and the first pass got it wrong: ±13% of the
+   object over a 9s cycle measures 8.2px of vertical travel on a 56px object,
+   which is animating and not moving. "playState: running" is not the same claim
+   as "you can see it". Measure the bounding box across a cycle, not the timeline.
+   These numbers are ~34% of the object's height and a full turn in 4.5–7s, which
+   comes out around 20px on a small object and 33px on the big cloud — a drift you
+   notice without it reading as a fidget. */
 @keyframes eg-band-float {
   0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
-  22%  { transform: translate3d(2.5%, -8%, 0) rotate(2.4deg); }
-  45%  { transform: translate3d(-2%, -13%, 0) rotate(-1.8deg); }
-  68%  { transform: translate3d(-4.5%, -4%, 0) rotate(1.2deg); }
+  20%  { transform: translate3d(6%, -19%, 0) rotate(4deg); }
+  42%  { transform: translate3d(-5%, -34%, 0) rotate(-3deg); }
+  65%  { transform: translate3d(-12%, -16%, 0) rotate(2.6deg); }
+  84%  { transform: translate3d(4%, -7%, 0) rotate(-1.4deg); }
   100% { transform: translate3d(0, 0, 0) rotate(0deg); }
 }
 .eg-band-float {
-  animation: eg-band-float var(--float-dur, 9s) ease-in-out infinite;
+  animation: eg-band-float var(--float-dur, 6s) ease-in-out infinite;
   animation-delay: var(--float-delay, 0s);
   will-change: transform;
 }
