@@ -2249,8 +2249,14 @@ export function ordersRoutes(app, requireAuth) {
         if (dueFees.length) {
           const feeCfg = await readAll().catch(() => ({}));
           for (const f of dueFees) {
+            /* THE NUMBER THE SELLER JUST CONFIRMED, not a re-derived one.
+               This passed the amount only when staff had TYPED one, and let chargeDesign
+               work the rest out from the tier's list price — one design's worth. A line with
+               a front and a back is quoted two and would have been billed one. The estimate
+               is the agreement; the charge has to be the same figure, and any settled amount
+               here is one the Summary has already shown. */
             const got = await chargeDesign(req, req.params.id, f.line_id, f.sku, f.tier, feeCfg,
-                                           f.overridden ? f.amount : undefined)
+                                           f.amount != null ? f.amount : undefined)
               .catch(() => ({ charged: 0 }));
             if (got.charged > 0) {
               _charged += got.charged;
@@ -3599,11 +3605,30 @@ export function ordersRoutes(app, requireAuth) {
                    and (f.line_id = i.line_id
                         or (f.line_id is null and coalesce(f.sku,'') = coalesce(i.sku,'')))
                  order by (f.line_id is not null) desc, f.created_at desc limit 1) as machine_key,
-              (select coalesce(d.art_hash, d.storage_key, left(d.data, 64)) from order_designs d
-                 where d.order_id = i.order_id
-                   and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
-                   and (d.data is not null or d.storage_key is not null)
-                 order by (d.line_id is not null) desc limit 1) as image_key
+              /**
+               * EVERY DESIGN ON THE LINE, NOT THE FIRST ONE.
+               *
+               * This was "limit 1", so a line with a front AND a back showed ONE design fee.
+               * Artwork is per FACE — that is the whole point of order_designs carrying a
+               * side — and digitising a second picture is a second job, done by a second
+               * person, paid a second time. The Summary charged for one of them.
+               *
+               * An ARRAY, deliberately, rather than a row per face: the fee is not per face
+               * either. The same picture on the front and the back is digitised once, and
+               * "distinct" is what says so — two faces carrying one art_hash collapse to one
+               * entry and one fee, which is the rule the grouping below already states for
+               * lines and had never been applied within one.
+               *
+               * Ordered, because the array IS the group key downstream and {X,Y} and {Y,X}
+               * are the same set of work.
+               */
+              coalesce((select array_agg(distinct k order by k) from (
+                 select coalesce(d.art_hash, d.storage_key, left(d.data, 64)) as k
+                   from order_designs d
+                  where d.order_id = i.order_id
+                    and (d.line_id = i.line_id or (d.line_id is null and d.sku = i.sku))
+                    and (d.data is not null or d.storage_key is not null)
+               ) ks), '{}') as image_keys
          from order_items i where i.order_id = $1`,
       [orderId]).then((r) => r.rows).catch(() => []);
   }
@@ -3623,15 +3648,23 @@ export function ordersRoutes(app, requireAuth) {
   function tierOf(r) {
     if (r.design_tier) return r.design_tier;
     if (!/emb/i.test(String(r.print_type || ''))) return null;
-    return r.machine_key ? 'supplied' : r.image_key ? 'standard' : null;
+    return r.machine_key ? 'supplied' : imageKeysOf(r).length ? 'standard' : null;
   }
 
   /** What makes two lines the SAME job: the same file, or the same artwork. A line with
    *  neither (a staff-set tier on an empty line) is only ever itself. */
+  /** The identity of the WORK on a line: its stitch file if the seller supplied one, else
+   *  the set of pictures on it. Two lines carrying the same set are one job. */
   function designKeyOf(r, tier) {
     const own = `L:${r.line_id || r.sku || ''}`;
     if (tier === 'supplied') return r.machine_key || own;
-    return r.image_key || r.machine_key || own;
+    const keys = imageKeysOf(r);
+    return keys.length ? keys.join('|') : (r.machine_key || own);
+  }
+  /** The line's designs, always an array — node-pg hands back a real array for text[], but a
+   *  row that predates the column, or a failed query's `[]` fallback, hands back nothing. */
+  function imageKeysOf(r) {
+    return Array.isArray(r.image_keys) ? r.image_keys.filter(Boolean) : [];
   }
 
   async function computeDesignFees(orderId) {
@@ -3662,9 +3695,23 @@ export function ordersRoutes(app, requireAuth) {
       const key = `${tier}|${designKeyOf(r, tier)}`;
       const g = groups.get(key);
       if (g) { g.lines.push(r); if (r.design_charged_at) g.charged = true; continue; }
-      groups.set(key, { tier, lines: [r], charged: !!r.design_charged_at, quote: r.design_quote_status });
+      groups.set(key, { tier, lines: [r], charged: !!r.design_charged_at, quote: r.design_quote_status,
+                        keys: imageKeysOf(r) });
     }
     const items = []; let total = 0;
+    /**
+     * A DESIGN IS PAID FOR ONCE PER ORDER, wherever it turns up.
+     *
+     * The grouping above folds lines carrying the SAME set of designs into one fee. It cannot
+     * see a design shared between two DIFFERENT sets — line A with {X} and line B with {X,Y}
+     * are two groups, and billing both by size would charge for X twice. So each key is
+     * counted the first time it is seen and skipped afterwards: A pays for X, B pays for Y,
+     * and the order pays $2 a picture however the pictures are spread over the lines.
+     *
+     * A group whose designs have all been counted elsewhere bills NOTHING and prints no row —
+     * there is no work left in it to charge for.
+     */
+    const seen = new Set();
     for (const g of groups.values()) {
       const first = g.lines[0];
       /*
@@ -3681,7 +3728,17 @@ export function ordersRoutes(app, requireAuth) {
         label = 'Complex design fee';
         // Fixed only once accepted or charged; otherwise under review → To Be Determined.
         amount = (g.charged || g.quote === 'accepted') ? CPX : null;
-      } else { label = 'Design fee'; amount = STD; }
+      } else {
+        /* HOW MANY PICTURES, not how many lines. A front and a back are two digitising jobs;
+           the same picture on both is one. `billable` is what this group adds that no earlier
+           group has already been charged for. */
+        const billable = g.keys.filter((k) => !seen.has(k));
+        billable.forEach((k) => seen.add(k));
+        const n = g.keys.length ? billable.length : 1;
+        if (!n) continue;
+        label = n > 1 ? `Design fee · ${n} designs` : 'Design fee';
+        amount = STD * n;
+      }
       /*
        * AN OVERRIDE WINS THE NUMBER — because the charge obeys it, and an estimate that
        * disagrees with what will actually be billed is worse than no estimate.
