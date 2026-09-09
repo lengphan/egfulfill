@@ -121,6 +121,7 @@ const NOTES: Record<string, string> = {
 const FIGURE_NOTES: Record<string, string> = {
   field: "an array of soft modules, rim-lit, a wave passing through on the diagonal",
   pool: "liquid chrome and lime — one body, merging and pulling apart",
+  aura: "lime light only — no body, no outline, additive",
 }
 
 const MOTION_NOTES: Record<string, string> = {

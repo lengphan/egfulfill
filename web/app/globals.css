@@ -1974,3 +1974,69 @@ td[align="right"] {
 @media (prefers-reduced-motion: reduce) {
   html:not([data-force-motion]) .eg-pool-drop { animation: none; }
 }
+
+/* TWO HUES, AND THEY NEED THEIR OWN TOKENS. `--mk-acid` is not a colour, it is a ROLE, and
+   it resolves to lime under studio/balloon and to periwinkle under workshop — so building a
+   lime-and-purple aura out of it would produce a periwinkle-and-periwinkle one on a skin
+   nobody was thinking about. These are declared here, defaulted to the two brand materials,
+   and a skin can move them the same way it moves everything else. */
+:root {
+  --band-aura-a: #D4F897;
+  --band-aura-b: #C0C4FF;
+}
+
+/* ── THE BAND'S AURA — light with no body ──────────────────────────────────────
+   The pool with its chrome removed: only emission, no outline, so there is no
+   shape for the eye to read as an object beside the greeting. `screen` makes the
+   layers ADD where they overlap, which is what separates a glow from a flat green
+   film — light adds, paint covers.
+
+   The travel is on margins and the swell on transform, for the reason every other
+   figure in this file splits them: one property, one owner, or two animations
+   fight and neither arrives. */
+.eg-aura-wrap {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow: hidden;
+  container-type: size;
+  /* The light dissolves into the plate on its left. This is NOT the fade §4 rejected for the
+     crew photograph: that gradient was apologising for a join between two GROUNDS, and there
+     is no second ground here — only light, which has to end somewhere, and a light that stops
+     on a straight vertical line is the one thing that would give it a body. The ramp sits
+     across the leftmost lamp (44%→74%), not at the band's edge, because that is where the
+     onset actually is — a fade in empty slate fades nothing. */
+  -webkit-mask-image: linear-gradient(to right, transparent 44%, #000 74%);
+  mask-image: linear-gradient(to right, transparent 44%, #000 74%);
+}
+@media (min-width: 640px) { .eg-aura-wrap { display: block; } }
+.eg-aura-layer {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  /* PLUS-LIGHTER IS REAL ADDITION; screen only approximates it, and against a SLATE plate
+     rather than true black it lifts the whole region toward grey — six lights turned into one
+     grey-green film with bright spots in it. plus-lighter adds channel by channel, so the
+     lights stay their own colour and only their overlaps get brighter. screen stays as the
+     fallback for anything that does not know the newer value. */
+  mix-blend-mode: screen;
+  mix-blend-mode: plus-lighter;
+  pointer-events: none;
+  animation:
+    eg-aura-x var(--ax, 19s) var(--ad, 0s) ease-in-out infinite alternate,
+    eg-aura-y var(--ay, 13s) var(--ad, 0s) ease-in-out infinite alternate,
+    eg-aura-s calc(var(--ax, 19s) * 0.63) var(--ad, 0s) ease-in-out infinite alternate,
+    /* THE FADE, on a fourth clock. Without it the two hues sit at fixed strengths and the
+       thing is a static gradient that happens to drift; with it each light swells and dims on
+       its own schedule, so lime leads for a while, then violet does, and neither ever quite
+       repeats the handover. Opacity is a fourth property, so it does not fight the other
+       three — same rule as everywhere else in this file. */
+    eg-aura-o calc(var(--ay, 13s) * 0.81) var(--ad, 0s) ease-in-out infinite alternate;
+}
+@keyframes eg-aura-x { to { margin-left: 7cqw; } }
+@keyframes eg-aura-y { to { margin-top: 6cqh; } }
+@keyframes eg-aura-s { to { transform: translate(-50%, -50%) scale(1.18); } }
+@keyframes eg-aura-o { from { opacity: var(--o-min, 0.35); } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-force-motion]) .eg-aura-layer { animation: none; }
+}

@@ -4,6 +4,7 @@ import { useRef, type ReactNode } from "react"
 import { motion } from "motion/react"
 import { BandArray } from "@/components/app/band-array"
 import { BandLiquid } from "@/components/app/band-liquid"
+import { BandAura } from "@/components/app/band-aura"
 
 /**
  * THE HEADER BAND, AND THE THINGS FLOATING IN IT.
@@ -179,8 +180,8 @@ export const DEFAULT_MOTION = "swim"
  * distance between things. A field and a pool are each ONE body: one composition, one motion,
  * and the whole half of the band is used rather than dotted.
  */
-export const FIGURES = ["objects", "field", "pool"] as const
-export const DEFAULT_FIGURE = "objects"
+export const FIGURES = ["objects", "field", "pool", "aura"] as const
+export const DEFAULT_FIGURE = "aura"
 
 /**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
@@ -331,7 +332,7 @@ export function PageBand({
       </div>
       {children}
 
-      {figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : (
+      {figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "aura" ? <BandAura /> : (
       /*
         * THE LAYER IS THE WHOLE BAND, not the right 40%.
         *
