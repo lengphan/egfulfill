@@ -139,6 +139,20 @@ export function actionDetail(r: AuditRow, resolveLine?: (key: string) => string 
     case "design.saved":
       return [str("name") || str("kind"), on].filter(Boolean).join(" · ")
     case "shipping.label_bought":
+    /**
+     * THE REASON, because two money rows otherwise look identical.
+     *
+     * "Refund $5.00" and "Refund $5.00" are the same line whether one sent a buyer's postage
+     * back and the other undid an adjustment somebody mistyped — and the log is where that
+     * question gets asked. The note carries "Reversed price adjustment — <reason>" for a
+     * reversal and whatever was typed for a real refund, so the row says which it was.
+     *
+     * The adjustment's own reason likewise: it is the sentence the seller reads on their
+     * statement, and the log should show the same words.
+     */
+    case "order.fee":
+    case "order.refund":
+      return str("note")
     case "order.tracking":
       return str("tracking")
     case "shipping.label_detached":

@@ -674,6 +674,9 @@ export function orderRefundRoutes(app, requireAuth) {
       // What THIS press moved and where it went — not the order's running totals, which is
       // what `out.refunded` / `out.parts` are. See the note on refundOrder's return.
       after: { refunded: out.refundedNow, parts: out.alloc, note: b.note || null, refundableLeft: out.refundable },
+      // `note` carries "Reversed price adjustment — <reason>" for a reversal, which is what
+      // tells the two log rows apart: a refund to the seller and the undoing of a charge look
+      // identical at a glance, and only the note says which this was.
     });
 
     /**
@@ -766,9 +769,21 @@ export function orderRefundRoutes(app, requireAuth) {
       orderId: req.params.id, amount: b.amount, note: b.note, by: req.user.sub, clientId: b.clientId,
     });
     if (out.error) { reply.code(400); return out; }
+    /**
+     * `chargedNow`, NOT `charged` — the same collision, one layer down.
+     *
+     * chargeOrderFee spreads the recomputed order state into its return, so `out.charged` is
+     * everything this order has ever been charged. The panel's confirmation was fixed to read
+     * chargedNow; this audit was left reading the total, so the log recorded a $2 adjustment
+     * as "$24.98" — a number the person who typed 2 has never seen and cannot place.
+     *
+     * A log that reports a figure nobody recognises is worse than one that reports none: it
+     * is the record you reach for when the money is in question, and it was inventing an
+     * amount at exactly that moment.
+     */
     audit(req, 'order.fee', {
       entityType: 'order', entityId: String(req.params.id),
-      after: { charged: out.charged, note: String(b.note || '').trim() || null },
+      after: { charged: out.chargedNow, note: String(b.note || '').trim() || null },
     });
     return out;
   });
