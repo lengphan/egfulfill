@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { motion, useReducedMotion, type PanInfo } from "motion/react"
+import { motion, useReducedMotion } from "motion/react"
 import { CaretRight, Check, Minus } from "@phosphor-icons/react"
 import { useLabelT } from "@/lib/i18n"
 import { getUser } from "@/lib/auth"
+import { SETUP_OPEN_KEY } from "@/lib/setup-guide-state"
 import {
   getDesignLibrary, getEtsyConnections, getOrders, getShopifyConnections, getTeam,
   getTiktokConnections, getWallet,
@@ -31,51 +32,38 @@ import { sellerStatus } from "@/lib/order-status"
  *   and the lookups stop running. No dismiss, no state to explain.
  *
  * What is new is that it follows the person: it mounts once in the seller shell, so it is
- * on every page rather than one. Open, it is a panel docked to a corner. Minimised, it is a
- * pill carrying the count, which can be dragged to any corner — the corner is remembered.
- * It opens by itself exactly once, on the first visit; after that it is the person's call.
+ * on every page rather than one. Open, it is a panel above the chat launcher. Minimised, it
+ * is a pill carrying the count, in that same spot — see the dock note below for why it no
+ * longer moves. It opens on every sign-in, and minimising it lasts until the next one.
  *
  * THE EFFECT CANNOT LOOP (§2.8). It fires on mount, and depends on nothing it writes:
  * `done` is read before it runs and the fetch's result lands in state it does not read.
  */
 
 const DONE_KEY = "eg_setup_done"
-const OPEN_KEY = "eg_setup_open"
-const CORNER_KEY = "eg_setup_corner"
-
-type Corner = "tl" | "tr" | "bl" | "br"
-const CORNERS: Corner[] = ["tl", "tr", "bl", "br"]
 
 const read = (k: string) => { try { return localStorage.getItem(k) } catch { return null } }
 const write = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } }
 
-/* Bottom-LEFT by default: the chat launcher owns bottom-right on every page. */
-const DEFAULT_CORNER: Corner = "bl"
-
 /**
- * WHERE EACH CORNER PUTS THE THING — one complete class string per corner, never a base
- * string plus an override.
+ * ONE DOCK: DIRECTLY ABOVE THE CHAT LAUNCHER (owner's call, 2026-09-09).
  *
- * Two things bit here and both are invisible in the markup. Tailwind resolves conflicting
- * utilities by their order in the STYLESHEET, not in the class attribute, so a base
- * `sm:bottom-auto` and a corner's `sm:bottom-5` is a coin toss — the panel rendered anchored
- * to a corner it was not assigned and ran off the bottom of the viewport. And `fixed` is
- * relative to the viewport, not to the shell's padded column, so a left-hand corner at
- * `left-5` sits ON the sidebar rail. Left corners clear the expanded rail from md up.
+ * This was four corners and a draggable pill, defaulting to bottom-LEFT specifically to
+ * stay off the chat button. Two floating controls that each own a different corner is two
+ * things to find; stacked, they are one column in the corner where a page's persistent
+ * controls already live, and the guide never turns up somewhere the eye has to hunt for it.
+ *
+ * THE NUMBERS ARE THE LAUNCHER'S. chat-launcher.tsx is `bottom-5 right-5 size-12` — 20px
+ * up, 48px tall — so 20 + 48 + 12px of gap puts this at `bottom-20`, and the same `right-5`
+ * keeps the two on one axis. If the launcher ever moves, this moves with it.
+ *
+ * ONE COMPLETE CLASS STRING, never a base plus an override: Tailwind resolves conflicting
+ * utilities by their order in the STYLESHEET rather than in the class attribute, so a base
+ * `bottom-auto` beside a `bottom-20` is a coin toss — which is how the panel once rendered
+ * anchored to a corner it had not been assigned and ran off the bottom of the viewport.
  */
-const PILL_POS: Record<Corner, string> = {
-  tl: "left-5 top-20 md:left-64",
-  tr: "right-5 top-20",
-  bl: "left-5 bottom-5 md:left-64",
-  // The chat launcher is bottom-right on every page: sit above it, not on it.
-  br: "right-5 bottom-20",
-}
-const PANEL_POS: Record<Corner, string> = {
-  tl: "sm:left-5 sm:top-20 sm:bottom-auto md:left-64",
-  tr: "sm:right-5 sm:top-20 sm:bottom-auto",
-  bl: "sm:left-5 sm:bottom-5 sm:top-auto md:left-64",
-  br: "sm:right-5 sm:bottom-20 sm:top-auto",
-}
+const PILL_POS = "right-5 bottom-20"
+const PANEL_POS = "sm:right-5 sm:bottom-20 sm:top-auto"
 
 type Check = boolean | "unknown" | null
 
@@ -86,11 +74,9 @@ export function SetupGuide() {
 
   // Read once, synchronously, so a finished account never even schedules the lookups.
   const [done, setDone] = useState<boolean>(() => read(DONE_KEY) === "1")
-  const [open, setOpen] = useState<boolean>(() => read(OPEN_KEY) !== "0")
-  const [corner, setCorner] = useState<Corner>(() => {
-    const c = read(CORNER_KEY)
-    return CORNERS.includes(c as Corner) ? (c as Corner) : DEFAULT_CORNER
-  })
+  /* Open unless this person minimised it. setSession() clears the key on every sign-in
+     (lib/setup-guide-state.ts), so "minimised" lasts a session rather than forever. */
+  const [open, setOpen] = useState<boolean>(() => read(SETUP_OPEN_KEY) !== "0")
 
   const [stores, setStores] = useState<Check>(null)
   const [funds, setFunds] = useState<Check>(null)
@@ -144,17 +130,8 @@ export function SetupGuide() {
     return () => clearTimeout(id)
   }, [allDone, done])
 
-  const minimise = useCallback(() => { write(OPEN_KEY, "0"); setOpen(false) }, [])
-  const expand = useCallback(() => { write(OPEN_KEY, "1"); setOpen(true) }, [])
-
-  /* The pill lands in whichever corner is nearest to where it was let go. The element is
-     keyed by corner, so it remounts at the new position with no leftover transform. */
-  const onDragEnd = useCallback((_: unknown, info: PanInfo) => {
-    const x = info.point.x, y = info.point.y
-    const c: Corner = `${y < window.innerHeight / 2 ? "t" : "b"}${x < window.innerWidth / 2 ? "l" : "r"}` as Corner
-    write(CORNER_KEY, c)
-    setCorner(c)
-  }, [])
+  const minimise = useCallback(() => { write(SETUP_OPEN_KEY, "0"); setOpen(false) }, [])
+  const expand = useCallback(() => { write(SETUP_OPEN_KEY, "1"); setOpen(true) }, [])
 
   // Sellers only; staff have their own boards and, for now, no guide.
   const role = getUser()?.role
@@ -186,20 +163,15 @@ export function SetupGuide() {
   if (!open) {
     return (
       <motion.button
-        key={corner}
         type="button"
         onClick={expand}
-        drag
-        dragMomentum={false}
-        dragElastic={0.2}
-        onDragEnd={onDragEnd}
         whileTap={{ scale: 0.96 }}
         initial={reduced ? false : { scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={spring}
         aria-label={tl("setup", "Open the setup guide")}
         title={`${tl("setup", "Set up your shop")} · ${count}`}
-        className={"fixed z-40 flex size-12 cursor-grab touch-none select-none items-center justify-center rounded-full bg-primary text-sm font-semibold tabular-nums text-primary-foreground ring-1 ring-foreground/10 active:cursor-grabbing " + PILL_POS[corner]}
+        className={"fixed z-40 flex size-12 select-none items-center justify-center rounded-full bg-primary text-sm font-semibold tabular-nums text-primary-foreground ring-1 ring-foreground/10 " + PILL_POS}
       >
         {count}
       </motion.button>
@@ -216,13 +188,12 @@ export function SetupGuide() {
         away — clicking off is "not now", never "I am done with this". */}
     <div aria-hidden onClick={minimise} className="fixed inset-0 z-30" />
     <motion.section
-      key={`panel-${corner}`}
       role="dialog"
       aria-label={tl("setup", "Set up your shop")}
       initial={reduced ? false : { y: 16, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={spring}
-      className={"fixed inset-x-3 bottom-3 z-40 flex max-h-[min(36rem,calc(100svh-7rem))] w-auto flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)] ring-1 ring-black/12 sm:inset-x-auto sm:w-[22.5rem] dark:ring-white/20 " + PANEL_POS[corner]}
+      className={"fixed inset-x-3 bottom-3 z-40 flex max-h-[min(36rem,calc(100svh-7rem))] w-auto flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-[0_28px_70px_-14px_rgb(0_0_0/0.45)] ring-1 ring-black/12 sm:inset-x-auto sm:w-[22.5rem] dark:ring-white/20 " + PANEL_POS}
     >
       {/* THE PLATE: the app's brand fill, so it takes the skin — never a colour of its own. */}
       <div className="bg-brand px-4 pb-3.5 pt-3.5 text-brand-foreground">

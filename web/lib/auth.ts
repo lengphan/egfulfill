@@ -1,5 +1,7 @@
 // Auth session — reuses the existing static-site localStorage keys so the Next
 // app and the current site share one login (JWT issued by /api/auth).
+import { openSetupGuideOnNextLoad } from "./setup-guide-state"
+
 const TOKEN_KEY = "eg_token"
 const USER_KEY = "eg_user"
 // The identifier only — never a password. The browser's own password manager is better at
@@ -101,6 +103,12 @@ export function setToken(token: string) {
 export function setSession(token: string, user: User, remember = true) {
   const [session, local] = stores()
   if (!session || !local) return
+  /* THE SETUP CHECKLIST OPENS ON EVERY LOGIN, not once per browser (owner's call,
+     2026-09-09). "Minimised" is a within-session preference, and signing in starts a new
+     one — somebody who put the guide away last week and still has two steps open should
+     be shown them rather than a circle. This is the only sign-in path in the app (login,
+     signup and Google all land here), which is why it is the one place that clears it. */
+  openSetupGuideOnNextLoad()
   const keep = remember ? local : session
   const drop = remember ? session : local
   try {
