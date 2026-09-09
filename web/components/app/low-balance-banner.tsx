@@ -2,12 +2,28 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
+import dynamic from "next/dynamic"
 import { Warning } from "@phosphor-icons/react"
 import { getWallet } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
+
+/**
+ * LAZY, and that is what makes opening it from here affordable.
+ *
+ * This banner mounts in the app SHELL, so it is on every page. The top-up dialog carries
+ * Stripe, PayPal and the QR flow behind it; importing it normally would put all of that in
+ * the first load of the orders queue, the designer board and everywhere else — for a dialog
+ * most sessions never open. `next/dynamic` fetches it on the press instead.
+ *
+ * `ssr: false` because it is only ever reached by a click, and rendering a closed dialog on
+ * the server buys nothing.
+ */
+const TopUpDialog = dynamic(
+  () => import("@/components/app/topup-dialog").then((m) => m.TopUpDialog),
+  { ssr: false },
+)
 
 /**
  * Warns a seller their wallet is running out, before it stops them.
@@ -32,6 +48,14 @@ const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
 export function LowBalanceBanner() {
   const tl = useLabelT()
  const [w, setW] = useState<{ balance: number; low?: boolean; lowBelow?: number | null } | null>(null)
+  /* TOP UP OPENS THE DIALOG, IT DOES NOT GO TO A PAGE (owner, 2026-09-09).
+     This was a link to /wallet, so the answer to "your balance is low" was a page change: the
+     queue they were reading disappears, the wallet dashboard loads, and the thing they came
+     for is still one more press away behind Add Funds. Two navigations and a full screen of
+     unrelated figures between a warning and the action that answers it is where people go and
+     do something else. The dialog is self-contained and already controlled from outside, so
+     it opens here over whatever they were doing and closes back onto it. */
+ const [topUpOpen, setTopUpOpen] = useState(false)
 
  const load = useCallback(() => {
  if (!getToken()) return
@@ -78,7 +102,27 @@ export function LowBalanceBanner() {
           <>{tl("lowBalanceBanner", "Your balance is")} <strong className={blocking ? "text-destructive" : "text-hold"}>{usd(w.balance)}</strong>{tl("lowBalanceBanner", ". Submitting an order charges it — top up before it runs out.")}</>
         )}
       </span>
-      <Link href="/wallet" className="shrink-0 font-medium underline">{tl("lowBalanceBanner", "Top up")}</Link>
+      <button
+        type="button"
+        onClick={() => setTopUpOpen(true)}
+        className="shrink-0 font-medium underline underline-offset-2"
+      >
+        {tl("lowBalanceBanner", "Top up")}
+      </button>
+      {/* Mounted only once opened, so the chunk is fetched on the press rather than with the
+          shell — and unmounted after, which resets the dialog's own state without a `key`. */}
+      {topUpOpen && (
+        <TopUpDialog
+          open={topUpOpen}
+          onOpenChange={setTopUpOpen}
+          onFunded={() => {
+            // The same event the wallet page fires: the topbar and this banner both read the
+            // balance once and would otherwise hold the pre-top-up figure until a reload.
+            load()
+            window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
+          }}
+        />
+      )}
     </div>
   )
 }

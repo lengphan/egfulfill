@@ -254,14 +254,32 @@ export function stripeRoutes(app, requireAuth) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
-  // Remove a saved card (detach the payment method from the customer).
+  /**
+   * Remove a saved card — AFTER CHECKING IT IS THEIRS.
+   *
+   * This detached whatever `pm_…` id it was handed, with no check at all. Every OTHER route
+   * on this page is scoped by the caller's Stripe customer, and this one was not: any signed-
+   * in seller who came by another seller's payment-method id could detach their card, and
+   * the victim's next saved-card top-up simply fails with no explanation. Not a disclosure —
+   * nothing is returned — but a cross-account WRITE, which is the half of an IDOR people
+   * forget to look for because the response is just `{ ok: true }`.
+   *
+   * Stripe scopes payment-method reads, so this also fails closed: an id belonging to nobody,
+   * or to a customer we cannot see, throws and is refused rather than being detached.
+   *
+   * The refusal is deliberately the same for "no such card" and "not yours". Telling them
+   * apart would confirm which `pm_…` ids exist.
+   */
   app.delete('/api/stripe/cards/:id', { preHandler: requireAuth }, async (req, reply) => {
     try {
       const id = req.params.id;
       if (!id) { reply.code(400); return { error: 'card id required' }; }
+      const customer = await customerFor(req.user);
+      const pm = await stripe('/payment_methods/' + encodeURIComponent(id), null);
+      if (!pm || pm.customer !== customer) { reply.code(404); return { error: 'No such card on this account.' }; }
       await stripe('/payment_methods/' + encodeURIComponent(id) + '/detach', {});
       return { ok: true };
-    } catch (e) { reply.code(400); return { error: e.message }; }
+    } catch { reply.code(404); return { error: 'No such card on this account.' }; }
   });
 
   // ── Charge a SAVED card for the entered amount → credit the wallet on success.
@@ -275,6 +293,12 @@ export function stripeRoutes(app, requireAuth) {
       const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
       if (!pmId) { reply.code(400); return { error: 'paymentMethodId required' }; }
       const customer = await customerFor(req.user);
+      /* AND CHECK THE CARD IS THEIRS BEFORE CHARGING IT. Stripe refuses a payment_method
+         attached to a different customer, so this was already safe — but safe BECAUSE THE
+         VENDOR HAPPENS TO CHECK is not the same as safe, and it is the identical check the
+         detach route above needed. Two routes, one rule, written down once. */
+      const own = await stripe('/payment_methods/' + encodeURIComponent(pmId), null).catch(() => null);
+      if (!own || own.customer !== customer) { reply.code(404); return { error: 'No such card on this account.' }; }
       const cfg = await feeCfg();
       const charge = grossUp(amt, cfg);
       const pi = await stripe('/payment_intents', {
