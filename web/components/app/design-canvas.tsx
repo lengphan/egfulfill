@@ -6,6 +6,7 @@ import { Plus, Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowC
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { ImageLightbox } from "@/components/app/image-lightbox"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
@@ -1648,6 +1649,21 @@ export function DesignCanvasDialog({
  face,
     ].filter(Boolean).join(" · ")
   }
+  /**
+   * THE TITLE OF EACH CARD ABOUT TO BE MADE, editable before it is made.
+   *
+   * `titleFor` has always composed these — "#48-D2 · Front" — and nothing on this panel
+   * showed them, so the first sight of a card's title was on the board, where fixing one
+   * means opening the card. The rows carried the artwork's FILE name instead, which is the
+   * one string here nobody chose and nobody reads.
+   *
+   * Keyed by side and seeded lazily, so a face left untouched still follows the composed
+   * default — including the printed width a person may have overruled on the canvas, which
+   * titleFor already reads back from the prefix field.
+   */
+ const [rowTitles, setRowTitles] = useState<Record<string, string>>({})
+ const titleOf = (side: string, index: number) => rowTitles[side] ?? titleFor(side, index)
+
   /** Click the artwork to see it big. The shared lightbox, never a seventh hand-rolled one. */
  const [zoom, setZoom] = useState<string | null>(null)
   /**
@@ -1720,7 +1736,7 @@ export function DesignCanvasDialog({
  try {
  for (const row of going) {
  const card = await createDesignCard({
- title: titleFor(row.side, going.indexOf(row)),
+ title: titleOf(row.side, going.indexOf(row)),
  description: cardNote.trim() || undefined,
  band: cardBand ?? undefined,
  data: row.art.data,
@@ -3600,7 +3616,21 @@ export function DesignCanvasDialog({
                       <img src={row.art.data} alt="" className="size-9 shrink-0 rounded object-contain" />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium capitalize">{tl("sides", row.side)}</div>
-                        <div className="truncate text-xs text-muted-foreground">{row.art.name || tl("canvas", "Artwork")}</div>
+                        {/* THE TITLE, not the file name. What was here was `row.art.name` —
+                            "3b5c36f2.png" — the one string on this row nobody chose and
+                            nobody reads. This is what the designer sees first, and the only
+                            moment it is cheap to fix is before the card exists. */}
+                        <Input
+                          {...{}/* A SKIPPED ROW IS NOT IN `going`, so indexOf answers -1 and the
+                                    D-number would count backwards. Excluding a face is reversible
+                                    and its title has to survive the round trip, so a row outside
+                                    the batch falls back to its own position in the list. */}
+                          value={titleOf(row.side, going.indexOf(row) >= 0 ? going.indexOf(row) : sendable.indexOf(row))}
+                          onChange={(e) => setRowTitles((m) => ({ ...m, [row.side]: e.target.value }))}
+                          disabled={off || sending}
+                          aria-label={tl("canvas", "Card title")}
+                          className="mt-1 h-7 w-full text-xs"
+                        />
                       </div>
                       {/* THE X EXCLUDES, IT DOES NOT DELETE. The artwork stays on the line and
                           is still saved — this only decides what becomes a card. Toggling back
