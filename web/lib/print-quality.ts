@@ -64,13 +64,15 @@ export function dpiVerdict(dpi: number | null): { tone: "ok" | "warn" | "bad" | 
  */
 export function dpiWarning(dpi: number | null): { label: string; hint: string } | null {
   if (dpiVerdict(dpi).tone !== "bad") return null
-  /* THE ADVICE HAS TO NAME WHAT IT IS ABOUT. "Low resolution — scale it down" reads as a
-     contradiction: the file is too small, so make it smaller? What is scaled down is the
-     PRINT, not the file, and saying "at this size" is what makes the sentence hold together
-     — resolution is pixels over inches, and there are two ways to raise it. */
+  /* TWO WORDS ON THE STRIP, THE SENTENCE IN THE TOOLTIP. The label was "Low resolution at
+     this size" — a careful phrase, because "low resolution, scale it down" reads as a
+     contradiction (the file is too small, so make it smaller?). What is scaled is the PRINT,
+     not the file. But the qualifier was carrying that argument in a row of measurements,
+     beside a DPI figure that already says "as placed". Simple label, and the hint still makes
+     the distinction for anyone who hovers. */
   return {
-    label: "Low resolution at this size",
-    hint: "Print it smaller on the garment, or upload a higher-resolution file — as placed, this will look soft.",
+    label: "Low resolution",
+    hint: "Print it smaller on the garment, or upload a higher-resolution file — at this size it will look soft.",
   }
 }
 

@@ -20,7 +20,7 @@ import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-pic
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
-import { printZoneOf, printSizeOf, outsideZone, fitToZone } from "@/lib/print-zone"
+import { printZoneOf, printSizeOf, outsideZone } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { useIsNarrow } from "@/lib/use-narrow"
 import { layerDpi, dpiWarning, printedInches, useNaturalSizes } from "@/lib/print-quality"
@@ -2851,23 +2851,16 @@ export function DesignCanvasDialog({
                 {Math.round(stageZoom * 100)}% · {tl("canvas", "reset")}
               </button>
             )}
+            {/* TWO READINGS, NO CONTROLS. This strip reports what the canvas measures — the
+                resolution and whether the art is inside the zone — and a "Fit" button among
+                them made it a toolbar that also happened to warn. Owner's call: the warnings
+                stay, the action goes. Dragging and the handles already resize; a second way
+                to do it, sitting inside the warning, was the only thing here you could press
+                by accident while reading. */}
             {artOutside && (
-                <span className="inline-flex items-center gap-1.5">
-                  {/* Same reasoning as the DPI reading above: the colour is the warning, the
-                      fill was decoration. Two tinted capsules side by side in one strip is
-                      what made this row read as chrome rather than as measurements. */}
-                  <span className="inline-flex items-center gap-1.5 font-medium text-hold">
-                    <span aria-hidden className="size-1.5 rounded-full bg-current" />
-                    {tl("canvas", "Outside the print area")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPos((p) => fitToZone(zone, artNat, p.r))}
-                    title={tl("canvas", "Make it as large as it goes inside the printable area, centred, keeping any rotation")}
-                    className="rounded-lg px-2 py-0.5 font-medium text-primary transition-colors hover:bg-accent"
-                  >
-                    {tl("canvas", "Fit")}
-                  </button>
+                <span className="inline-flex items-center gap-1.5 font-medium text-hold">
+                  <span aria-hidden className="size-1.5 rounded-full bg-current" />
+                  {tl("canvas", "Outside print area")}
                 </span>
               )}
             </div>
