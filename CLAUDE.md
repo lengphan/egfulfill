@@ -612,6 +612,25 @@ await page.evaluateOnNewDocument(() => {
   localStorage.setItem('eg_user', JSON.stringify({ name:'Dev', role:'admin' }))
 })
 ```
+**That is no longer enough on its own.** `lib/api.ts` now bounces ANY 401 to `/login` —
+`clearSession()` then `location.replace`, so a fake token gets you one render and then the
+login page, and `evaluateOnNewDocument` re-seeds the token on the way there, which makes
+localStorage look correct while you stare at a sign-in form. Stub the API too:
+
+```js
+await page.setRequestInterception(true)
+page.on('request', (r) => {
+  const path = new URL(r.url(), 'http://x').pathname
+  if (!path.startsWith('/api/')) return r.continue()
+  if (path === '/api/events') return r.abort()          // EventSource; JSON aborts it anyway
+  const body = OBJECT_ROUTES.includes(path) ? {...} : []  // a component that maps over {} throws
+  r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+})
+```
+
+Default the stub to `[]`, not `{}` — the blank page with "This page couldn't load" is an
+error boundary catching `.map` on an object, not a routing problem.
+
 Screenshots go in `screenshots/` (gitignored, and `@hidden` in Caddy).
 
 ---
