@@ -823,6 +823,31 @@ export function DesignerBoard() {
                         >
                           <CardArt key={String(c.thumb ?? c.id)} card={c} imgClass="size-full object-cover" iconSize={26} />
                           {isEmbCard(c) && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-pending/90 px-1.5 py-0.5 text-2xs font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                          {/* THE PAYOUT SITS ON THE ARTWORK (owner's call, 2026-09-09).
+                              It had a row of its own at the foot of the card — a full line of
+                              vertical space, on a board whose whole job is fitting a queue on
+                              one screen, to carry four characters. It is a badge on the image
+                              now, top-left, where the EMB mark already lives (the two never
+                              appear together: an EMB check is a factory job and carries no
+                              designer payout).
+                              LESS OPAQUE than the claim badges opposite. Those name a person
+                              and have to win against the artwork; this is a figure you glance
+                              at, and a solid chip in the corner of every card is a second grid
+                              laid over the one you are trying to read. */}
+                          {!isDesigner && !isEmbCard(c) && (() => {
+                            const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by || !!c.band
+                            if (!determined) return null
+                            const payout = c.vendor ? partnerCost : (amt(c.payment) || bandRates[c.band as "easy"] || designFee)
+                            const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
+                            return (
+                              <span
+                                className="absolute left-1.5 top-1.5 rounded bg-background/70 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-foreground backdrop-blur-[2px]"
+                                title={c.vendor ? tl("designer", "Outsourced — partner cost") : c.credited ? tl("designer", "Credited to the designer") : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : tl("designer", "Designer payout on approval"))}
+                              >
+                                {money(payout)}{suffix}
+                              </span>
+                            )
+                          })()}
                           {/* Top-right tag = WHO owns this card's queue. A partner card shows the
  partner (pink). Otherwise, if someone on OUR side has claimed it, their
                               NAME shows here — VIOLET when a designer claimed it (e.g. Abdul), SLATE
@@ -911,7 +936,11 @@ export function DesignerBoard() {
                               queue is looking for a piece of artwork, and neither of those
                               tells them which one this is. They are still one click away in
                               the card, which is where an order belongs. */}
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1 text-2xs text-muted-foreground">
+                          {/* mt-AUTO, inherited from the payout row that used to sit under it:
+                              this is the last thing in the card now, and it is what has to be
+                              pushed to the bottom so the badges line up across a lane whatever
+                              length the titles above them run to. */}
+                          <div className="mt-auto flex flex-wrap items-center gap-1 pt-1.5 text-2xs text-muted-foreground">
                             {/* THE ARTWORK'S NUMBER, in the spelling the order page uses. The
                                 card stores it BARE — `1143` — because that column is a key,
                                 joined against wilcom_previews and passed to EmbPreview as a
@@ -926,13 +955,11 @@ export function DesignerBoard() {
                               <Paperclip size={9} weight="bold" />{c.file_count ?? 0}
                             </span>
                           </div>
-                          {/* Docked to the bottom: DSN id (left) + what the design pays (right).
-                              The amount is FACTORY-ONLY — a designer never sees it (their earnings
- live in their wallet), on internal AND partner cards. Internal = the
- designer payout (the card's own, or the platform default); partner =
- what the outsourced task costs us. Neutral text, NO colour — " · paid"
- once actually credited, " · partner" for an outsourced card, else the
- plain rate. */}
+                          {/* THE PAYOUT ROW WAS HERE. It is a badge on the artwork now — a
+                              whole line of a card, on a board built to fit a queue on one
+                              screen, was carrying four characters. It stays FACTORY-ONLY: a
+                              designer never sees it, on internal and partner cards alike,
+                              because their own earnings are in their wallet. */}
                           {/* NO PILLS ON THE TILE (owner's call, 2026-09-09).
                               They were here so an unbanded card could be priced in one click
                               without opening anything — and three of them under every unpriced
@@ -943,38 +970,6 @@ export function DesignerBoard() {
                               unpriced, so one can still reach approval and pay the flat fallback
                               silently. The figure below is the tell — it shows the band's rate
                               once there is one. */}
-                          <div className="mt-auto flex items-center justify-end gap-1.5 pt-1.5 text-xs text-muted-foreground">
-                            {/* NO `DSN-{c.id}` HERE ANY MORE. That was the card ROW's key wearing
-                                the artwork prefix — `DSN-1787136256067`, a millisecond timestamp —
-                                sitting under a badge that says `DSN-1042` and means something
-                                else entirely. One prefix, two different things, and the longer,
-                                louder one was the one that meant nothing to a designer. The
-                                number that identifies the work is the badge above. */}
-                            {/* EMB-check cards carry no payout (factory check, not designer
- work), so the footer figure is suppressed for them. */}
-                            {!isDesigner && !isEmbCard(c) && (() => {
-                              // Only show a figure once the card has a DESTINATION — sent to a partner
-                              // (partner cost), claimed by a designer, or given an explicit payout. Until
-                              // then the number is just the platform-default guess, which reads as more
-                              // settled than it is, so the price stays blank (only correct once routed).
- const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by || !!c.band
- if (!determined) return null
-                              /* A BANDED CARD KNOWS ITS RATE before anyone claims it — that is the
-                                 point of banding at the door. `payment` still wins where it exists,
-                                 because once credited it is what was actually paid rather than what
-                                 the card would pay. */
- const payout = c.vendor ? partnerCost : (amt(c.payment) || bandRates[c.band as "easy"] || designFee)
- const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
- return (
-                                <span
- className="shrink-0 font-medium tabular-nums text-foreground"
- title={c.vendor ? tl("designer", "Outsourced — partner cost") : c.credited ? tl("designer", "Credited to the designer") : (c.claimed_by ? `Payout to ${c.claimed_by} on approval` : tl("designer", "Designer payout on approval"))}
-                                >
-                                  {money(payout)}{suffix}
-                                </span>
-                              )
-                            })()}
-                          </div>
                         </div>
                       </div>
                     ))
