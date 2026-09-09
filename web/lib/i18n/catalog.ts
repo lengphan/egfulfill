@@ -3048,6 +3048,7 @@ const vi: Dict = {
   "label.Done": "Xong",
   "label.Checking…": "Đang kiểm tra…",
   "label.Validated": "Đã xác thực",
+  "label.Not validated": "Chưa xác minh",
   "label.Not found": "Không tìm thấy",
   "label.Couldn't verify": "Không xác thực được",
   "label.Address couldn't be verified": "Không xác thực được địa chỉ",

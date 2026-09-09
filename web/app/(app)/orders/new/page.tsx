@@ -15,6 +15,9 @@ import { parseBlock } from "@/lib/address-paste"
 import { ProductCombobox } from "@/components/app/product-combobox"
 import { createOrder, getOrders, validateAddress, type CatalogProduct, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
+/* One definition of "we could not check" vs "the carrier said no" — shared with the
+   new-label dialog, which had the same two states collapsed the other way. */
+import { cannotCheck, friendlyValidationError } from "@/lib/address-check"
 
 // Best-effort parse of a pasted US address block → structured fields.
 // Last non-empty line is expected as "City, ST 12345" (comma optional).
@@ -23,15 +26,15 @@ const zip5 = (z: string) => z.split("-")[0].trim() // USPS ZIPCode wants 5 digit
 // USPS's Addresses API now gates access behind an approval ("not authorized for
 // access to Addresses API"). Validation is optional here — the order saves the
 // address as entered — so turn that (and other USPS errors) into a calm note.
-function friendlyValidationError(raw?: string): string {
- const s = (raw || "").toLowerCase()
- if (s.includes("addresses api") || s.includes("not authorized") || s.includes("access control")) {
- return "Address check is unavailable right now — you can still save the order as entered."
-  }
- return raw || "Couldn't verify this address — you can still save it as entered."
-}
-
-type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: ValidatedAddress } | { kind: "bad"; msg: string }
+type Valid =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "ok"; addr: ValidatedAddress }
+  /** The carrier answered and rejected it. Amber — there is something to fix. */
+  | { kind: "bad"; msg: string }
+  /** Nobody could check. Grey and quiet: nothing is wrong that the seller can act on, and
+   *  the order saves the address exactly as typed either way. */
+  | { kind: "unknown"; msg: string }
 
 // colors/sizes are the OPTIONS the picked catalog product offers. Empty (a blank
 // item, or a product that defines no variants) → the field stays free text, so you
@@ -94,8 +97,15 @@ export default function NewOrderPage() {
  state: p.state,
         ZIPCode: zip5(p.zip),
       })
-        .then((r) => { if (!alive) return; if (r.ok && r.address) setValid({ kind: "ok", addr: r.address }); else setValid({ kind: "bad", msg: friendlyValidationError(r.error) }) })
-        .catch((e) => { if (alive) setValid({ kind: "bad", msg: friendlyValidationError(e instanceof Error ? e.message : "") }) })
+        .then((r) => {
+ if (!alive) return
+ if (r.ok && r.address) { setValid({ kind: "ok", addr: r.address }); return }
+ const msg = friendlyValidationError(r.error)
+ setValid(cannotCheck(r.error) ? { kind: "unknown", msg } : { kind: "bad", msg })
+        })
+        /* A THROW IS ALWAYS "cannot check" — the request did not come back, so nothing has
+           an opinion about this address. */
+        .catch((e) => { if (alive) setValid({ kind: "unknown", msg: friendlyValidationError(e instanceof Error ? e.message : "") }) })
     }, 600)
  return () => { alive = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -235,6 +245,16 @@ export default function NewOrderPage() {
                 {valid.kind === "bad" && (
                   <span className="inline-flex items-center gap-1 rounded-lg bg-background/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={valid.msg}>
                     <WarningCircle size={12} weight="fill" /> {tl("newOrder", "Not validated")}
+                  </span>
+                )}
+                {/* GREY, AND NO ICON. This is the state where nobody could check — not a
+                    warning, because there is nothing for the seller to fix and the address may
+                    be perfectly good. An amber badge with a warning glyph said "your address
+                    is wrong" for what was actually our credential being unavailable. The
+                    reason is on hover; the order saves the address as typed either way. */}
+                {valid.kind === "unknown" && (
+                  <span className="rounded-lg bg-background/90 px-1.5 py-0.5 text-xs text-muted-foreground" title={valid.msg}>
+                    {tl("newOrder", "Not validated")}
                   </span>
                 )}
               </div>

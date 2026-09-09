@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { CircleNotch, ArrowSquareOut, CheckCircle, Warning, Truck, Package, Printer } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { cannotCheck, friendlyValidationError } from "@/lib/address-check"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { parseBlock } from "@/lib/address-paste"
@@ -101,7 +102,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
   }, [open, order?.id])
 
   // Live recipient validation — visible ✓/⚠ before spending. Debounced, warn-not-block.
- const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid"; msg?: string }>({ status: "idle" })
+  /** `unknown` = nobody could check — see lib/address-check.ts. It used to fall to `idle`,
+   *  which made a failed check look exactly like an address nobody had typed yet. */
+ const [addrCheck, setAddrCheck] = useState<{ status: "idle" | "checking" | "valid" | "invalid" | "unknown"; msg?: string }>({ status: "idle" })
  useEffect(() => {
  const complete = addrComplete(to)
  let alive = true
@@ -110,8 +113,17 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
  if (!complete) { setAddrCheck({ status: "idle" }); return }
  setAddrCheck({ status: "checking" })
  validateAddress({ streetAddress: to.street || "", secondaryAddress: to.street2, city: to.city || "", state: to.state || "", ZIPCode: to.zip || "" })
-        .then((v) => { if (alive) setAddrCheck(v && v.ok ? { status: "valid" } : { status: "invalid", msg: v?.error }) })
-        .catch(() => { if (alive) setAddrCheck({ status: "idle" }) })
+        .then((v) => {
+ if (!alive) return
+ if (v && v.ok) { setAddrCheck({ status: "valid" }); return }
+          /* An availability error is not a verdict on the address — grey, not amber. */
+ setAddrCheck(cannotCheck(v?.error)
+            ? { status: "unknown", msg: friendlyValidationError(v?.error) }
+            : { status: "invalid", msg: v?.error })
+        })
+        /* A throw means nothing answered. This set `idle`, so the badge disappeared and a
+           failed check was indistinguishable from an address nobody had entered. */
+        .catch((e) => { if (alive) setAddrCheck({ status: "unknown", msg: friendlyValidationError(e instanceof Error ? e.message : "") }) })
     }, 600)
  return () => { alive = false; clearTimeout(t) }
   }, [to.street, to.street2, to.city, to.state, to.zip])
@@ -467,6 +479,9 @@ export function NewLabelDialog({ open, onOpenChange, onCreated, order }: {
                   {addrCheck.status === "checking" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground"><CircleNotch size={12} className="animate-spin" /> {tl("label", "Checking…")}</span>}
                   {addrCheck.status === "valid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-success"><CheckCircle size={12} weight="fill" /> {tl("label", "Validated")}</span>}
                   {addrCheck.status === "invalid" && <span className="inline-flex items-center gap-1 rounded-lg bg-card/90 px-1.5 py-0.5 text-xs font-medium text-hold" title={addrCheck.msg || undefined}><Warning size={12} weight="fill" /> {addrCheck.msg ? tl("label", "Couldn't verify") : tl("label", "Not found")}</span>}
+                  {/* GREY, NO ICON. Nobody could check — there is nothing to fix, and the
+                      label buys against the address as typed either way. */}
+                  {addrCheck.status === "unknown" && <span className="rounded-lg bg-card/90 px-1.5 py-0.5 text-xs text-muted-foreground" title={addrCheck.msg || undefined}>{tl("label", "Not validated")}</span>}
                 </div>
               </div>
               <p className="text-2xs text-muted-foreground">{tl("label", "Name, street, then City, ST ZIP — the label uses exactly this. Ship-from is your saved warehouse address (Settings › Platform).")}</p>
