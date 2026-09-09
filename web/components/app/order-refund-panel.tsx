@@ -155,8 +155,14 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
  title={tl("orderRefund", "Refund")}
  actions={<span className="text-xs text-muted-foreground">{usd(state.refundable)} refundable</span>}
     >
+      {/* A PART WITH NOTHING LEFT IS NOT A CHOICE. A fully refunded row sat here greyed, with
+          a disabled box and a tick reading "fully refunded" — in a panel whose whole job is
+          picking what to send back. It could not be acted on, and on an order where price
+          adjustments have been charged and reversed it is the row that fills the list.
+          Where a refund WENT is answered by the Summary and by Order history; this panel
+          only has to say what can still go. */}
       <div className="divide-y divide-border">
-        {parts.map((p) => {
+        {parts.filter((p) => p.refundable > 0).map((p) => {
  const spent = p.refundable <= 0
  return (
             <label

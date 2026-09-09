@@ -1095,9 +1095,23 @@ export default function OrderDetailPage() {
     </>
   )
 
+  /**
+   * REVERSING AN ADJUSTMENT DOES NOT REFUND THE ORDER.
+   *
+   * This read `refundedTotal`, which counts every refund on the order including the ones that
+   * only undo a price adjustment. So an order approved a minute ago, whose seller has had
+   * nothing back, wore "Partly refunded" because $32 of adjustments had been charged and
+   * reversed. The chip is the first thing read on this card and it was describing a
+   * transaction that never happened.
+   *
+   * A reversed adjustment nets to zero: charged and sent back, and neither the order's cost
+   * nor the seller's position moved. What counts here is what came back BEYOND that, which is
+   * the same residual the refunded row shows.
+   */
+ const refundedToSeller = refundedTotal - reversedLines.claimed
  const moneyState: { label: string; tone: string } = isFactory
     ? { label: "Internal", tone: "bg-muted text-muted-foreground" }
- : refundedTotal > 0.005
+ : refundedToSeller > 0.005
       ? { label: netCost != null && netCost <= 0.005 ? "Refunded" : "Partly refunded",
           tone: "bg-success/10 text-success" }
  : cost != null
