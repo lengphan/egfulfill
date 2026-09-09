@@ -6,7 +6,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { getStripeConfig, createStripeIntent, verifyStripeIntent } from "@/lib/api"
+import { getStripeConfig, createStripeIntent, verifyStripeIntent, chargeSavedCard, quoteStripe } from "@/lib/api"
 
 const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 
@@ -66,7 +66,7 @@ function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () =
   )
 }
 
-export function StripeCardForm({ amount, onPaid, onError }: { amount: number; onPaid: () => void; onError: (m: string) => void }) {
+export function StripeCardForm({ amount, save, onPaid, onError }: { amount: number; save?: boolean; onPaid: () => void; onError: (m: string) => void }) {
   const tl = useLabelT()
  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
  const [clientSecret, setClientSecret] = useState("")
@@ -105,7 +105,7 @@ export function StripeCardForm({ amount, onPaid, onError }: { amount: number; on
  return () => {
  alive = false
     }
-  }, [amount])
+  }, [amount, save])
 
  if (loading) {
  return (
@@ -151,5 +151,95 @@ export function StripeCardForm({ amount, onPaid, onError }: { amount: number; on
       )}
       <PayForm intentId={intentId} onPaid={onPaid} onError={onError} />
     </Elements>
+  )
+}
+
+/**
+ * PAYING WITH A CARD ALREADY ON FILE — no Payment Element, no typing.
+ *
+ * The server confirms the charge itself, so the happy path never touches Stripe.js at all.
+ * What this component exists for is the OTHER path: a card whose bank wants 3-D Secure comes
+ * back `requires_action` with a client secret, and that challenge can only be run in the
+ * browser. Skipping it would make saved-card payments fail silently for exactly the cards
+ * that are most protected — and the failure would look like a decline rather than an
+ * unfinished step.
+ *
+ * Crediting stays where it already was: the server credits on a straight success, and
+ * verify-intent credits after a challenge. The wallet is never moved from here.
+ */
+export function SavedCardPay({ amount, cardId, onPaid, onError }: {
+  amount: number
+  cardId: string
+  onPaid: () => void
+  onError: (m: string) => void
+}) {
+  const tl = useLabelT()
+  const [busy, setBusy] = useState(false)
+  /* The same three figures the Payment Element path shows, from the SERVER. One press is not
+     a reason to collect a fee somebody has not seen, and the client must never work out a
+     charge it is about to make. */
+  const [cost, setCost] = useState<{ credit: number; charge: number; fee: number; pct: number; fixed: number } | null>(null)
+  useEffect(() => {
+    let live = true
+    const t = setTimeout(() => {
+      quoteStripe(amount)
+        .then((q) => {
+          if (!live || q.error || q.charge == null || q.credit == null) return
+          setCost({ credit: q.credit, charge: q.charge, fee: q.fee ?? Number((q.charge - q.credit).toFixed(2)), pct: q.feeCfg?.pct ?? 0, fixed: q.feeCfg?.fixed ?? 0 })
+        })
+        .catch(() => {})
+    }, 0)
+    return () => { live = false; clearTimeout(t) }
+  }, [amount])
+
+  const pay = async () => {
+    setBusy(true)
+    onError("")
+    try {
+      const r = await chargeSavedCard(amount, cardId)
+      if (r.ok) { onPaid(); return }
+      if (r.error) throw new Error(r.error)
+      if (!r.clientSecret || !r.id) throw new Error(`Payment ${r.status || "not confirmed"} — nothing was charged.`)
+
+      const cfg = await getStripeConfig()
+      const stripe = cfg.publishableKey ? await loadStripe(cfg.publishableKey) : null
+      if (!stripe) throw new Error("Couldn't reach Stripe to finish the check.")
+      const { error } = await stripe.handleNextAction({ clientSecret: r.clientSecret })
+      if (error) throw new Error(error.message || "That check wasn't completed.")
+
+      const v = await verifyStripeIntent(r.id)
+      if (v.ok) onPaid()
+      else throw new Error(v.error || `Payment ${v.status || "not confirmed"} — nothing was charged.`)
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Couldn't take that payment.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {cost && (
+        <dl className="space-y-1.5 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">{tl("stripeCardForm", "Wallet credit")}</dt>
+            <dd className="tabular-nums">{usd(cost.credit)}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">
+              {tl("stripeCardForm", "Card fee")}<span className="opacity-70"> · {cost.pct}% + {usd(cost.fixed)}</span>
+            </dt>
+            <dd className="tabular-nums">{usd(cost.fee)}</dd>
+          </div>
+          <div className="flex justify-between border-t border-border pt-1.5 font-semibold">
+            <dt>{tl("stripeCardForm", "You pay")}</dt>
+            <dd className="tabular-nums">{usd(cost.charge)}</dd>
+          </div>
+        </dl>
+      )}
+      <Button className="w-full" onClick={pay} disabled={busy || !cost}>
+        {busy ? <CircleNotch size={16} className="animate-spin" /> : `${tl("stripeCardForm", "Pay")} ${usd(cost?.charge ?? amount)}`}
+      </Button>
+    </div>
   )
 }

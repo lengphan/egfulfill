@@ -575,10 +575,35 @@ export function getStripeConfig() {
 }
 /** `credit` is what the wallet gets, `charge` is what the card is billed; the difference is
  *  the processor's cut, which the server computes — never the client. */
-export function createStripeIntent(amount: number) {
+/** `save` asks Stripe to keep the card on file for this seller — opt-in, never assumed. */
+export function createStripeIntent(amount: number, save = false) {
   return api<{ clientSecret?: string; id?: string; error?: string; credit?: number; charge?: number; fee?: number; feeCfg?: { pct: number; fixed: number } }>(`/api/stripe/create-intent`, {
     method: "POST",
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ amount, save }),
+  })
+}
+
+/** What a card top-up would cost, WITHOUT creating an intent — for the saved-card path,
+ *  which must show the same three figures before its one-press button. Server-computed. */
+export function quoteStripe(amount: number) {
+  return api<{ credit?: number; charge?: number; fee?: number; feeCfg?: { pct: number; fixed: number }; error?: string }>(`/api/stripe/quote?amount=${encodeURIComponent(String(amount))}`)
+}
+
+/** A card kept on file for this seller. Stripe holds the number; this is what it will tell
+ *  us about it — enough to recognise a card, never enough to be a card. */
+export type SavedCard = { id: string; brand: string; last4: string; exp: string; name: string }
+export function getStripeCards() {
+  return api<{ cards?: SavedCard[]; error?: string }>(`/api/stripe/cards`)
+}
+export function deleteStripeCard(id: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/stripe/cards/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+/** Charge a saved card. `ok` means done and credited; otherwise `clientSecret` is a 3-D
+ *  Secure step the browser has to finish before verify-intent will credit anything. */
+export function chargeSavedCard(amount: number, paymentMethodId: string) {
+  return api<{ ok?: boolean; amount?: number; charge?: number; fee?: number; status?: string; ref?: string; clientSecret?: string; id?: string; error?: string }>(`/api/stripe/charge-saved`, {
+    method: "POST",
+    body: JSON.stringify({ amount, paymentMethodId }),
   })
 }
 export function verifyStripeIntent(id: string) {

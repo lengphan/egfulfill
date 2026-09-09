@@ -8,9 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { StripeCardForm } from "@/components/app/stripe-card-form"
+import { StripeCardForm, SavedCardPay } from "@/components/app/stripe-card-form"
 import { PaypalButton } from "@/components/app/paypal-button"
-import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, getSavedPaypal, getPaypalConfig, quotePaypal, chargeSavedPaypal, capturePaypalOrder, deleteSavedPaypal, VN_BANK_NAMES, type VietqrPayment, type TopupConfig, type SavedPaypal } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, getStripeCards, deleteStripeCard, type SavedCard, getSavedPaypal, getPaypalConfig, quotePaypal, chargeSavedPaypal, capturePaypalOrder, deleteSavedPaypal, VN_BANK_NAMES, type VietqrPayment, type TopupConfig, type SavedPaypal } from "@/lib/api"
 import { Dropzone } from "@/components/app/dropzone"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
@@ -381,6 +381,43 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
  const [error, setError] = useState<string | null>(null)
  const { minUsd, small: smallPresets } = amountOptions(cfg)
  useSeedAmount(cfg, amount, setAmount)
+  /**
+   * CARDS WE HOLD, not cards Stripe Link happens to know about.
+   *
+   * The list a seller used to see here was Link — Stripe's own consumer wallet, keyed to
+   * their email — so it appeared on one browser and was empty on the next, and neither we
+   * nor they could act on it. These are cards saved against OUR customer: same four facts a
+   * Netflix or an Uber shows (brand, last four, expiry, name), never a card number, because
+   * Stripe holds the number and hands us only enough to recognise one.
+   *
+   * `"new"` is a real selection rather than the absence of one — "use a different card" has
+   * to be a thing you can pick, not a thing you get by unpicking everything.
+   */
+ const [cards, setCards] = useState<SavedCard[] | null>(null)
+ const [pick, setPick] = useState<string>("new")
+ const [remember, setRemember] = useState(true)
+ useEffect(() => {
+ const t = setTimeout(() => {
+ getStripeCards()
+        .then((r) => {
+ const list = r.cards ?? []
+ setCards(list)
+          // Open on the first saved card when there is one: the common case is paying with
+          // the card you paid with last time.
+ if (list.length) setPick(list[0].id)
+        })
+        .catch(() => setCards([]))
+    }, 0)
+ return () => clearTimeout(t)
+  }, [])
+ const forget = async (id: string) => {
+ await deleteStripeCard(id).catch(() => {})
+ setCards((p) => {
+ const left = (p ?? []).filter((c) => c.id !== id)
+ setPick(left.length ? left[0].id : "new")
+ return left
+    })
+  }
  const proceed = () => {
  if (Number(amount) < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
  setError(null); setPhase("pay")
@@ -394,7 +431,50 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
           <span className="text-muted-foreground">{tl("topup", "Topping up")}</span>
           <span className="font-semibold tabular-nums">{usd(Number(amount) || 0)}</span>
         </div>
-        <StripeCardForm amount={Number(amount) || 0} onPaid={() => { setPhase("paid"); onFunded() }} onError={(m) => setError(m || null)} />
+
+        {(cards ?? []).length > 0 && (
+          <div className="space-y-1.5">
+            {(cards ?? []).map((c) => (
+              <label key={c.id} className={"flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors " + (pick === c.id ? "border-selected eg-selected" : "border-border hover:bg-accent/40")}>
+                <input type="radio" name="eg-card" checked={pick === c.id} onChange={() => setPick(c.id)} className="size-3.5 accent-primary" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium capitalize">{c.brand} •••• {c.last4}</span>
+                  {(c.exp || c.name) && <span className="block text-xs text-muted-foreground">{[c.exp, c.name].filter(Boolean).join(" · ")}</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); forget(c.id) }}
+                  className="eg-tap text-xs text-muted-foreground hover:text-destructive"
+                >{tl("topup", "Remove")}</button>
+              </label>
+            ))}
+            <label className={"flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors " + (pick === "new" ? "border-selected eg-selected" : "border-border hover:bg-accent/40")}>
+              <input type="radio" name="eg-card" checked={pick === "new"} onChange={() => setPick("new")} className="size-3.5 accent-primary" />
+              <span className="font-medium">{tl("topup", "Use a new card")}</span>
+            </label>
+          </div>
+        )}
+
+        {pick === "new" ? (
+          <>
+            <StripeCardForm amount={Number(amount) || 0} save={remember} onPaid={() => { setPhase("paid"); onFunded() }} onError={(m) => setError(m || null)} />
+            {/* A checkbox, because it toggles. Same opt-in the PayPal tab asks for, and the
+                same reason: keeping somebody's card on file is a decision, not a side effect
+                of paying once. */}
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="size-3.5 accent-primary" />
+              {tl("topup", "Save this card for next time")}
+            </label>
+          </>
+        ) : (
+          <SavedCardPay
+            amount={Number(amount) || 0}
+            cardId={pick}
+            onPaid={() => { setPhase("paid"); onFunded() }}
+            onError={(m) => setError(m || null)}
+          />
+        )}
+
         {error && <div className="text-sm text-destructive">{error}</div>}
         <button onClick={() => setPhase("amount")} className="text-xs text-muted-foreground hover:text-foreground">{tl("topup", "← Change amount")}</button>
       </div>

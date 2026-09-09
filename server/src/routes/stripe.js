@@ -143,6 +143,25 @@ export function stripeRoutes(app, requireAuth) {
     catch (e) { return { ok: false, mode: stripeMode(), error: e.message }; }
   });
 
+  /**
+   * WHAT A TOP-UP WOULD COST, without creating an intent.
+   *
+   * The Payment Element path gets its three figures back from create-intent, because it has
+   * to create one anyway. Paying with a card already on file must not: an intent per glance
+   * would leave abandoned PaymentIntents behind every time somebody opens the tab and changes
+   * their mind. The figures still have to be on screen before the button — that rule does not
+   * soften because the payment is one press — and the client must never compute a charge it
+   * is about to collect. Same shape as /api/paypal/quote, and for the same reasons.
+   */
+  app.get('/api/stripe/quote', { preHandler: requireAuth }, async (req, reply) => {
+    const amt = Number((req.query || {}).amount) || 0;
+    if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
+    const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
+    const cfg = await feeCfg();
+    const charge = grossUp(amt, cfg);
+    return { credit: amt, charge, fee: Number((charge - amt).toFixed(2)), feeCfg: cfg };
+  });
+
   // Create a PaymentIntent for the entered amount (USD).
   app.post('/api/stripe/create-intent', { preHandler: requireAuth }, async (req, reply) => {
     try {
@@ -151,9 +170,26 @@ export function stripeRoutes(app, requireAuth) {
       const floor = await belowMin(amt); if (floor != null) { reply.code(400); return { error: `Minimum top-up is $${floor}.` }; }
       const cfg = await feeCfg();
       const charge = grossUp(amt, cfg);
+      /**
+       * SAVED ONLY WHEN ASKED, and that is why the customer is attached conditionally.
+       *
+       * This intent carried no `customer` at all, so a card used to top up was filed against
+       * nobody: /api/stripe/cards has always worked and has always come back empty, because
+       * nothing was ever put in it. The card list a seller saw on this tab was Stripe LINK —
+       * their own wallet, keyed to their email — which is why it appears on one browser and
+       * not the next, and why we could neither show nor charge a card ourselves.
+       *
+       * Attaching the customer unconditionally would have fixed the list and silently started
+       * keeping people's cards on file, which is a consent question rather than a
+       * convenience. `setup_future_usage` is what actually authorises a later off-session
+       * charge, so both ride on the same opt-in the seller ticks.
+       */
+      const save = (req.body || {}).save === true;
+      const customer = save ? await customerFor(req.user) : null;
       const pi = await stripe('/payment_intents', {
         amount: String(Math.round(charge * 100)),
         currency: 'usd',
+        ...(customer ? { customer, setup_future_usage: 'off_session' } : {}),
         /**
          * CARD ONLY. `automatic_payment_methods` offered whatever the account has enabled —
          * Cash App Pay and Amazon Pay turned up in the element, and both are REDIRECT
