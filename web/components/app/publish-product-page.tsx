@@ -4,6 +4,7 @@ import { useLabelT } from "@/lib/i18n"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { thumbnail } from "@/lib/thumbnail"
 import { useRouter } from "next/navigation"
+
 import { CircleNotch, Trash, Package, CaretLeft, CaretRight, Plus, Check, CheckCircle, Warning, XCircle, Sparkle, X } from "@phosphor-icons/react"
 import { detectTrademarks } from "@/lib/trademarks"
 import { rewriteListingCopy } from "@/lib/api"
@@ -689,6 +690,18 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
      `publish` is called with and nothing has to remember it.) */
   /** Per-shop TikTok fields, keyed by connection_id — see TtFields. */
  const [tt, setTt] = useState<Record<string, TtFields>>({})
+  /**
+   * WHETHER EACH SHOP'S PANEL IS OPEN, held here rather than left to CSS.
+   *
+   * The caret was `group-open:rotate-90`, which emitted no rule at all in this build — the
+   * stylesheet came back with zero `[open]` selectors, so the mark sat still while the panel
+   * opened and shut underneath it. Reading the state in React is one line and cannot silently
+   * stop working the way an unemitted variant did.
+   *
+   * Undefined means "nobody has touched it", so the default still follows completeness: open
+   * while something is missing, shut once it is all set.
+   */
+ const [ttOpen, setTtOpen] = useState<Record<string, boolean>>({})
   /** What happened at each shop, keyed by connection_id. Survives a retry so a shop that
    * already published keeps its link and cannot be sent twice. */
  const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
@@ -2151,8 +2164,27 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                         {on && d.platform === "tiktok" && (() => {
                           const missing = missingFor(d)
                           return (
-                            <details open={missing.length > 0} className="px-2 pb-2">
-                              <summary className="cursor-pointer list-none text-xs text-muted-foreground marker:content-none">
+                            <details
+ open={ttOpen[d.connection_id] ?? missing.length > 0}
+ onToggle={(e) => setTtOpen((m) => ({ ...m, [d.connection_id]: (e.currentTarget as HTMLDetailsElement).open }))}
+ className="px-2 pb-2"
+                            >
+                              {/* A CARET, BECAUSE THIS OPENS. `list-none marker:content-none`
+                                  strips the native triangle — correctly, it is ugly and
+                                  unstyleable — but nothing replaced it, so the one line that
+                                  hides an entire form read as a sentence. A hover underline is
+                                  not an affordance: it appears only once the pointer is
+                                  already there, which is after you have decided there is
+                                  nothing to click.
+                                  It rotates rather than swapping glyphs, so the same mark
+                                  points along the row when closed and down at the fields when
+                                  open — the direction IS the state. */}
+                              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs text-muted-foreground marker:content-none hover:text-foreground">
+                                <CaretRight
+                                  size={11}
+                                  weight="bold"
+                                  className={"shrink-0 transition-transform duration-150 " + ((ttOpen[d.connection_id] ?? missing.length > 0) ? "rotate-90" : "")}
+                                />
                                 <span className="underline-offset-2 hover:underline">
                                   {missing.length
                                     ? `Needs ${missing.join(", ")}`
