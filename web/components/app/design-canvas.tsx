@@ -3023,7 +3023,13 @@ export function DesignCanvasDialog({
           <TabBar
             spacing="none" className="sticky top-0 z-10 -mt-1 border-b-0 bg-popover pt-1"
             ariaLabel="Line panels"
-            value={ctxTab} onChange={(v: string) => setCtxTab(v as CtxTab)}
+            value={ctxTab}
+            /* Arriving at Board RE-SEEDS the send — the title, the note, the band and which
+               faces are ticked. It matters because a width changed on the canvas since last
+               time has to be reflected rather than the last edit being remembered as if it
+               were the measurement, and because a face excluded on a previous visit should
+               not still be excluded on this one. */
+            onChange={(v: string) => { if (v === "board") openSendPanel(); else setCtxTab(v as CtxTab) }}
             items={[
               { id: "design", label: tl("canvas", "Design") },
               { id: "artwork", label: tl("canvas", "Artwork") },
@@ -3585,13 +3591,21 @@ export function DesignCanvasDialog({
                   )
                 })}
               </div>
-              {/* The band rides with them — one choice for this send; each card can be
-                  re-banded on the board if one face turns out harder than the others. */}
-              <div>
-                <div className="mb-1.5 text-xs font-medium text-muted-foreground">{tl("canvas", "Payout band")}</div>
-                <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} size="sm" />
-              </div>
-              <Button size="sm" disabled={sending || !going.length} onClick={() => void sendSelected()}>
+              {/* NO "Payout band" HEADING. The pills read Easy $2.50 · Standard $2.50 —
+                  they say what they are and what they cost, and a caption above them was a
+                  word naming something that already names itself (§4). Full size, not the
+                  small variant: this is a decision about money, not a filter chip. */}
+              <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} />
+              {/* THE ONLY SEND BUTTON. There were two — this one and an embroidery-only one
+                  further down that opened this same tab, which on an embroidered line meant
+                  two buttons stacked saying nearly the same thing. That one is gone; this is
+                  the one that works on every line and knows which faces are actually going. */}
+              <Button
+                className="w-full"
+                disabled={sending || !going.length}
+                onClick={() => void sendSelected()}
+                title={boardCard ? tl("canvas", "Already on the design board") : undefined}
+              >
                 {sending
                   ? tl("canvas", "Sending…")
                   : going.length === 1
@@ -3696,17 +3710,11 @@ export function DesignCanvasDialog({
                 {/* SENT IS A STATE, NOT AN ABSENCE. The button used to disappear once a
  card existed, so the only difference between "I sent it" and "the button
  was never there" was memory. It stays, disabled, saying what happened. */}
-                {isStaff && !hasMachineFile && (
-                  <Button
- size="sm"
- variant={boardCard ? "outline" : "default"}
- disabled={sending || !designUrl || !!boardCard}
- title={boardCard ? tl("canvas", "Already on the design board") : designUrl ? undefined : tl("canvas", "Add an image first — a designer needs something to work from")}
- onClick={openSendPanel}
-                  >
-                    {boardCard ? tl("canvas", "Sent") : sending ? tl("canvas", "Sending…") : tl("canvas", "Send to Board")}
-                  </Button>
-                )}
+                {/* THE SECOND "Send to Board" WAS HERE (2026-09-09). It opened this tab, so
+                    on an embroidered line you got two buttons an inch apart, one of which
+                    only navigated. The send lives once, above, beside the list of what is
+                    being sent — and unlike this one it was never gated to embroidery, which
+                    is why a DTG line had no way to send at all. */}
 </div>
               {/* BESIDE THE FILE IT COPIES. This was in the action bar next to "Apply All",
  two buttons inches apart doing different things to different objects, in
