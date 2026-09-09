@@ -338,12 +338,18 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     const description = String(b.description || '').trim();
     const specs = description ? JSON.stringify({ description }) : null;
     const r = await q(
-      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id, specs)
-       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9,$11::jsonb)
+      /* THE BAND IS SET AT THE DOOR when the sender knows it — they are looking at the
+         artwork as they send it, which is the one moment somebody can judge the work without
+         opening anything. Only the three known values; anything else is stored as NULL, which
+         means "not priced yet" and pays the flat fallback rather than a band nobody chose. */
+      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by, design_id, specs, band)
+       values ($1,$2,$10,$3,null,null,$4,$5,$6,$7,$8,$9,$11::jsonb,$12)
        returning *`,
       [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
        artKey, artHash, artData, artKey ? null : (artData || thumbUrl), String((req.user && req.user.sub) || ''),
-       designNo == null ? null : String(designNo), col, specs]
+       designNo == null ? null : String(designNo), col, specs,
+       ['easy', 'standard', 'complex'].includes(String(b.band || '').toLowerCase())
+         ? String(b.band).toLowerCase() : null]
     ).catch((e) => { reply.code(500); return { error: e.message }; });
     if (!r || r.error) return r || { error: 'Could not create the card.' };
 

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createDesignCard, assignDesignCard, getDesignFiles, filesForLine, type DesignFileRow } from "@/lib/api"
+import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { useLabelT } from "@/lib/i18n"
 
 /**
@@ -42,6 +43,10 @@ export function SendToBoardDialog({
   const tl = useLabelT()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+  /** What this design pays. Chosen HERE because the sender is looking at the artwork — the
+   *  one moment somebody can judge the work without opening anything. */
+  const [band, setBand] = useState<Band | null>(null)
+  const { rates, flat } = useBandRates()
   const [files, setFiles] = useState<DesignFileRow[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -63,6 +68,7 @@ export function SendToBoardDialog({
       setDescription("")
       setErr(null)
       setFiles(null)
+      setBand(null)
     })
     getDesignFiles(orderId)
       .then((rows) => { if (alive) setFiles(filesForLine(rows ?? [], { line_id: lineId, sku })) })
@@ -83,6 +89,10 @@ export function SendToBoardDialog({
         data: image || undefined,
         sku: sku || undefined,
         col: "incoming",
+        /* Undefined when nobody picked, NOT a default band: a card priced by omission is how
+           someone gets paid Standard for a digitise. Unbanded pays the flat fallback and the
+           board shows it as unpriced until a human says otherwise. */
+        band: band ?? undefined,
       })
       if (card.error) throw new Error(card.error)
       if (card.id) {
@@ -139,6 +149,16 @@ export function SendToBoardDialog({
               disabled={busy}
               placeholder={tl("sendBoard", "Thread colours, placement, anything the artwork doesn't say on its own")}
             />
+          </div>
+
+          {/* WHAT IT PAYS, decided by whoever is looking at the artwork.
+              Optional on purpose — leaving it unset is a real answer ("I can't judge this"),
+              and the card arrives on the board wearing the same pills so the next person can.
+              What is NOT allowed is a silent default: a card priced by omission is how a
+              digitise gets paid at the Easy rate. */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium">{tl("sendBoard", "Payout band")}</label>
+            <BandPills value={band} onPick={setBand} rates={rates} flat={flat} />
           </div>
 
           {/* WHAT IS ALREADY ON THE LINE. A card sent without its stitch file is the trip to

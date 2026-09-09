@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { SearchField } from "@/components/app/search-field"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, getFactorySettings, createDesignCard, pinkRequestFix, getDesignBoardHistory, getDesignLanes, createDesignLane, renameDesignLane, deleteDesignLane, uploadPinkAttachment, getEmbPreview, type DesignCard, type AuditRow, type DesignLane } from "@/lib/api"
 import { designLabel } from "@/lib/design-id"
 import { shortOrderRef } from "@/lib/order-format"
@@ -932,6 +933,25 @@ export function DesignerBoard() {
  what the outsourced task costs us. Neutral text, NO colour — " · paid"
  once actually credited, " · partner" for an outsourced card, else the
  plain rate. */}
+                          {/* PILLS ONLY WHILE IT IS UNPRICED (owner's call, 2026-09-09).
+                              A card dropped on the board or sent without a band arrives with no
+                              rate, and nothing forced anyone to give it one — it would simply pay
+                              the old flat fallback at approval, silently. So an unbanded card asks
+                              here, in one click, without opening anything.
+                              They go the moment it is priced: once a band is chosen the figure
+                              below says what it pays, and the band itself is in the card. A control
+                              that has done its job is clutter. */}
+                          {!isDesigner && !isEmbCard(c) && !c.vendor && !c.band && canDeleteCard() && (
+                            <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                              <BandPills
+                                value={null}
+                                size="sm"
+                                rates={bandRates}
+                                flat={designFee}
+                                onPick={(b) => patch(c.id, { band: b })}
+                              />
+                            </div>
+                          )}
                           <div className="mt-auto flex items-center justify-end gap-1.5 pt-1.5 text-xs text-muted-foreground">
                             {/* NO `DSN-{c.id}` HERE ANY MORE. That was the card ROW's key wearing
                                 the artwork prefix — `DSN-1787136256067`, a millisecond timestamp —
@@ -946,9 +966,13 @@ export function DesignerBoard() {
                               // (partner cost), claimed by a designer, or given an explicit payout. Until
                               // then the number is just the platform-default guess, which reads as more
                               // settled than it is, so the price stays blank (only correct once routed).
- const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by
+ const determined = !!c.vendor || amt(c.payment) > 0 || !!c.claimed_by || !!c.band
  if (!determined) return null
- const payout = c.vendor ? partnerCost : (amt(c.payment) || designFee)
+                              /* A BANDED CARD KNOWS ITS RATE before anyone claims it — that is the
+                                 point of banding at the door. `payment` still wins where it exists,
+                                 because once credited it is what was actually paid rather than what
+                                 the card would pay. */
+ const payout = c.vendor ? partnerCost : (amt(c.payment) || bandRates[c.band as "easy"] || designFee)
  const suffix = c.credited ? " · paid" : c.vendor ? " · partner" : ""
  return (
                                 <span
@@ -1032,16 +1056,6 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center rounded-md px-2 py-0.5 font-medium " + lanePill(col.accent)}>{col.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
-/**
- * THE THREE BANDS. The hint is what an admin and a designer have to agree means the same
- * thing — the rates are only as fair as the words, so they are written once, here.
- */
-const BANDS: { id: "easy" | "standard" | "complex"; label: string; hint: string }[] = [
-  { id: "easy", label: "Easy", hint: "Text or a supplied vector, one colour, no redraw." },
-  { id: "standard", label: "Standard", hint: "A redraw, two to four colours, ordinary cleanup." },
-  { id: "complex", label: "Complex", hint: "Digitising, a photo trace, five or more colours." },
-]
-
 const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
@@ -1565,26 +1579,7 @@ function CardDialog({ card, me, designFee, bandRates, onClose, patch, onMove, re
  return canFee ? (
             <div>
               <div className="mb-1.5 text-sm font-medium">{tl("designer", "Payout band")}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {BANDS.map((b) => {
- const on = band === b.id
- const rate = bandRates[b.id] || designFee
- return (
-                    <button
- key={b.id}
- type="button"
- aria-pressed={on}
- onClick={() => patch(card.id, { band: b.id })}
- title={b.hint}
- className={"inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors " +
-                        (on ? "border-foreground bg-foreground font-medium text-background" : "border-input hover:border-foreground/40")}
-                    >
-                      {tl("designer", b.label)}
-                      {rate > 0 && <span className="tabular-nums opacity-70">{money(rate)}</span>}
-                    </button>
-                  )
-                })}
-              </div>
+              <BandPills value={band || null} onPick={(b) => patch(card.id, { band: b })} rates={bandRates} flat={designFee} />
               {/* An unbanded card is not "Easy" — it is every card made before bands, and it
                   pays what it always would have. Said once, where the choice is. */}
               {!band && designFee > 0 && (

@@ -3545,6 +3545,10 @@ export function updateProfile(patch: { name?: string; username?: string | null; 
  */
 export function createDesignCard(body: {
   title: string; data?: string; type?: string; sku?: string
+  /** Which payout band this design is, chosen by whoever sends it — they are looking at the
+   *  artwork, which is the one moment it can be judged without opening anything. Omitted
+   *  means "not priced yet": the card pays the flat fallback until someone bands it. */
+  band?: "easy" | "standard" | "complex"
   /** The designer's brief, written when the card is SENT rather than after it lands. Stored
    *  at `specs.description` — the same field the board's card editor patches, so the two are
    *  one field rather than two that agree by luck. */
