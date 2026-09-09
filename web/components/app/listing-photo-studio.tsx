@@ -767,7 +767,12 @@ export function ListingPhotoStudio({
                       {busy ? (
                         <span className="flex flex-col items-center gap-2 text-xs font-medium text-primary">
                           <CircleNotch size={26} className="animate-spin" />
-                          Rendering {count > 1 ? `${count} photos` : tl("photoStudio", "a photo")}…
+                          {/* "Generating", not "Rendering a photo". Rendering is what a
+                              graphics pipeline does; generating is what the model does, and
+                              it is the word the button beside it uses. The COUNT stays —
+                              waiting for four is a different wait from waiting for one, and
+                              that is the only thing this line has to add to a spinner. */}
+                          {tl("photoStudio", "Generating")}{count > 1 ? ` ${count}` : ""}…
                         </span>
                       ) : null}
                       {/* The violet itself, not --brand-foreground. That token is the LIME half of the
@@ -1039,7 +1044,7 @@ export function ListingPhotoStudio({
                       </span>
                       <Button size="sm" className="h-8" onClick={generate} disabled={busy || !prompt.trim()}>
                         {busy && <CircleNotch size={14} className="animate-spin" />}
-                        {busy ? tl("photoStudio", "Rendering…") : tl("photoStudio", "Generate")}
+                        {busy ? tl("photoStudio", "Generating…") : tl("photoStudio", "Generate")}
                       </Button>
                     </div>
                   </div>

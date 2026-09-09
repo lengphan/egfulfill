@@ -343,7 +343,13 @@ function TiktokFields({ dest, fields, onChange }: {
         <span className="text-xs font-medium">{tl("publish", "Warehouse")}</span>
         <select value={fields.warehouse} onChange={(e) => onChange({ warehouse: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
           {!fields.warehouses.length && <option value="">{tl("publish", "No warehouse found")}</option>}
-          {fields.warehouses.map((w) => <option key={w.id} value={w.id}>{w.name || w.id}</option>)}
+          {/* Labelled, not hidden. A return warehouse is the wrong answer here and TikTok
+              refuses the product over it — but the classification is a guess (see tiktok.js),
+              so it is marked and sorted last rather than removed, and a seller whose shop
+              names things unusually can still pick it. */}
+          {fields.warehouses.map((w) => (
+            <option key={w.id} value={w.id}>{w.name || w.id}{w.is_return ? " · return" : ""}</option>
+          ))}
         </select>
       </label>
 
@@ -802,7 +808,11 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
           .then((r) => setTt((m) => {
  const ws = r.warehouses ?? []
  const cur = m[cid] ?? TT_EMPTY
- return { ...m, [cid]: { ...cur, warehouses: ws, warehouse: cur.warehouse || (ws[0] ? String(ws[0].id) : "") } }
+            /* Default to one that can actually hold stock. This took ws[0], and on a real
+               shop that was the RETURN warehouse — a real id, belonging to the right shop,
+               that TikTok rejects the entire product over. */
+ const first = ws.find((w) => !w.is_return) ?? ws[0]
+ return { ...m, [cid]: { ...cur, warehouses: ws, warehouse: cur.warehouse || (first ? String(first.id) : "") } }
           }))
           .catch(() => {})
       }
@@ -2182,7 +2192,17 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   the words still change with the state — publishing again over a shop that
                   already took the listing creates a DUPLICATE, which is not something to
                   discover afterwards. */}
-              <div className="flex flex-wrap justify-end gap-2">
+              {/* WRAPPING ORPHANED THE PRIMARY. `flex-wrap justify-end` dropped "Publish live"
+                  onto a line of its own, right-aligned under the other two, which reads as a
+                  layout that broke rather than a decision — and it is the button the screen
+                  exists for.
+                  A CONTAINER QUERY, not a breakpoint. This footer's width comes from the
+                  panel it sits in, not from the viewport, so `sm:` would keep it in a row on
+                  a wide screen while the panel beside it stayed narrow. Below the panel's own
+                  threshold all three stack full-width, primary first; above it they are one
+                  right-aligned row. Either way nothing is left hanging on its own. */}
+              <div className="@container">
+              <div className="flex flex-col-reverse gap-2 @sm:flex-row @sm:flex-wrap @sm:justify-end">
                 <Button variant="ghost" onClick={leave}>{tl("publish", "Cancel")}</Button>
                 <Button variant="outline" onClick={() => publish(false)} disabled={busy || !dests?.length}>
                   {tl("publish", "Save as draft")}
@@ -2203,6 +2223,7 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
                   {busy && <CircleNotch size={15} className="animate-spin" />}
                   {anyFailed ? tl("publish", "Retry live") : anyPublished ? tl("publish", "Reupload live") : tl("publish", "Publish live")}
                 </Button>
+              </div>
               </div>
               {/* THE STANDING PARAGRAPH IS GONE.
                   Four sentences of documentation sat under the button on every visit, and

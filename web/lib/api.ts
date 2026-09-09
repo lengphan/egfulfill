@@ -4109,7 +4109,9 @@ export function getEtsyConnections() {
 // per-SKU inventory, and a package weight. The publish route is DRY-RUN until the server's
 // TIKTOK_PUBLISH_LIVE flag is set — a dry run returns the assembled `payload` for review.
 export type TiktokCategory = { id: string; local_name?: string; is_leaf?: boolean; parent_id?: string; permission_statuses?: string[] }
-export type TiktokWarehouse = { id: string; name?: string; type?: string; sub_type?: string }
+/** `is_return` is the server's classification — a return warehouse cannot hold sale stock,
+ *  and TikTok rejects the whole product if one is used. See the note in tiktok.js. */
+export type TiktokWarehouse = { id: string; name?: string; type?: string; sub_type?: string; is_return?: boolean }
 /**
  * WHERE A PRODUCT CAN BE PUBLISHED — one row per connected SHOP, not per platform.
  *

@@ -905,6 +905,29 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
+  /**
+   * A RETURN WAREHOUSE IS NOT A PLACE TO HOLD STOCK, and TikTok says so by refusing the
+   * whole product: "warehouse_id must identify a warehouse available to the current shop.
+   * Use a warehouse_id returned by Get Warehouse List and retry."
+   *
+   * Every shop gets both kinds, and the picker was defaulting to whichever came back FIRST —
+   * which on a real shop was "U.S Return Warehouse". The id was real and belonged to the
+   * shop, so nothing here could see it was wrong; only TikTok could, and only at publish.
+   *
+   * THE CLASSIFIER IS DELIBERATELY LOOSE, because the enum is not confirmed. TikTok's
+   * Get Warehouse List doc needs JavaScript to read and could not be checked, and the field
+   * has been seen as both a string and a number in the wild. So it tests type, sub_type AND
+   * the name for "return", and treats a numeric 2 as return — any one of them is enough.
+   * Being wrong in this direction only sorts a warehouse lower and labels it; nothing is
+   * hidden or blocked, so a misclassified warehouse is still selectable and the seller is not
+   * stuck behind a guess of ours.
+   */
+  const isReturnWarehouse = (w) => {
+    const blob = [w && w.type, w && w.sub_type, w && w.name].map((x) => String(x == null ? '' : x)).join(' ').toUpperCase();
+    if (/RETURN/.test(blob)) return true;
+    return Number(w && w.type) === 2;
+  };
+
   // Warehouses — each SKU's inventory is booked against a warehouse_id.
   app.get('/api/tiktok/warehouses', { preHandler: requireAuth }, async (req, reply) => {
     try {
@@ -915,7 +938,12 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       if (!conn) { reply.code(400); return { error: 'No TikTok shop connected' }; }
       const cipher = await getShopCipher(conn);
       const d = await ttSignedRequest(conn, 'GET', '/logistics/202309/warehouses', { query: { shop_cipher: cipher } });
-      return { warehouses: d.warehouses || d.warehouse_list || [] };
+      const raw = d.warehouses || d.warehouse_list || [];
+      /* Sales first, so "the first one" — which is what the picker defaults to — is a
+         warehouse that can actually hold the stock this listing is booking. */
+      const list = raw.map((w) => ({ ...w, is_return: isReturnWarehouse(w) }));
+      list.sort((a, b) => Number(a.is_return) - Number(b.is_return));
+      return { warehouses: list };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
