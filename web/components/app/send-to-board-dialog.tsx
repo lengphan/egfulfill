@@ -98,6 +98,15 @@ export function SendToBoardDialog({
       if (card.id) {
         const a = await assignDesignCard(String(card.id), { orderId, sku, lineId: lineId || undefined })
         if ((a as { error?: string })?.error) throw new Error(String((a as { error?: string }).error))
+        /* THE CARD LANDED AND THE FEE DID NOT — two outcomes, and only one of them failed.
+           Sending it back through the catch would say "couldn't send this line to the board"
+           about a line that is on the board, and the next press would make a second card.
+           So the dialog stays open saying which half is outstanding. */
+        if (a?.designFee && !a.designFee.charged) {
+          onSent?.()
+          setErr(tl("sendBoard", "Sent — but the design fee couldn't be taken:") + " " + (a.designFee.error || ""))
+          return
+        }
       }
       onSent?.()
       onOpenChange(false)

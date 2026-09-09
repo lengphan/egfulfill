@@ -3575,7 +3575,16 @@ export function createDesignCard(body: {
  * was done, with both tables honestly reporting their own contents.
  */
 export function assignDesignCard(id: string, body: { orderId: string; sku: string; lineId?: string }) {
-  return api<{ ok?: boolean; orderId?: string; sku?: string; error?: string }>(
+  return api<{
+    ok?: boolean; orderId?: string; sku?: string; error?: string
+    /** How many lines this press classified as our design work. 0 means the tier was already
+     *  settled — quoted, charged, or a machine file the seller supplied. */
+    tiered?: number
+    /** Present only on an order already past submit, where the fee is taken at the press
+     *  rather than waiting for a submit that has been and gone. `charged: 0` with an `error`
+     *  is a wallet that would not cover it — the artwork landed, the fee did not. */
+    designFee?: { charged: number; error?: string } | null
+  }>(
     `/api/design_cards/${encodeURIComponent(id)}/assign`,
     { method: "POST", body: JSON.stringify(body) })
 }

@@ -414,7 +414,8 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     if (!card) { reply.code(404); return { error: 'Card not found.' }; }
     if (card.order_id) { reply.code(409); return { error: `Already assigned to order ${card.order_id}. Detach it there first — silently moving a design between orders is how one seller's artwork ends up on another's job.` }; }
 
-    const order = await q('select id from orders where id=$1', [orderId]).then((r) => r.rows[0]).catch(() => null);
+    const order = await q('select id, num, seller_id, factory_status from orders where id=$1', [orderId])
+      .then((r) => r.rows[0]).catch(() => null);
     if (!order) { reply.code(404); return { error: 'No such order.' }; }
 
     // The artwork has to exist, or this "assignment" attaches nothing and the order's
@@ -464,6 +465,95 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     await q('update design_cards set order_id=$2, line_id=$3, sku=$4 where id=$1::bigint',
       [String(card.id), orderId, lineId || null, sku || null]);
 
+    /**
+     * WE MADE THIS DESIGN, SO THE DESIGN FEE IS OURS TO CHARGE — and until now nobody was.
+     *
+     * `tierOf` in orders.js only INFERS a tier on embroidery. So a seller who sent in a blank
+     * garment with no artwork, and had a design put on it here at their request, was billed
+     * for the blank, the print and the shipping and never for the work — on DTG, DTF, transfer
+     * or anything else. The one case the fee exists for was the one case it missed.
+     *
+     * A staff member pressing Send to Board IS the classification. Somebody has looked at the
+     * job and decided we are drawing it, which is exactly what `design_tier` records; that
+     * column is checked FIRST by tierOf, so stamping it here makes the fee appear on every
+     * print method rather than only on embroidery.
+     *
+     * Three guards, each of them a fee somebody would otherwise be charged twice for:
+     *   - `design_tier is null` — a staff judgement already made is never overwritten. A line
+     *     called `complex` goes through the quote flow, where the seller sees the number and
+     *     accepts it; silently flattening it to `standard` would undercharge us and, worse,
+     *     bypass the one flow that exists so nobody is billed a figure they never saw.
+     *   - `design_charged_at is null` — the fee has been taken; the tier is settled history.
+     *   - no machine file on the line — the seller brought their own stitch file. That is
+     *     `supplied`, whose price is zero since 2026-08-24, and we did not draw it.
+     */
+    const feeLines = await q(
+      `update order_items set design_tier='standard', design_tier_at=now(), design_tier_by=$4
+        where order_id=$1
+          and (line_id = $2 or ($2::text is null and coalesce(sku,'') = coalesce($3,'')))
+          and design_tier is null
+          and design_charged_at is null
+          and not exists (
+            select 1 from design_file_data f
+             where f.order_id = order_items.order_id
+               and (f.line_id = order_items.line_id
+                    or (f.line_id is null and coalesce(f.sku,'') = coalesce(order_items.sku,''))))
+        returning line_id, sku, name`,
+      [orderId, lineId || null, sku || null, String((req.user && req.user.sub) || '')]
+    ).then((r) => r.rows).catch(() => []);
+
+    /**
+     * WHEN THE MONEY MOVES: at submit, with everything else (owner's call, 2026-09-09).
+     *
+     * A draft is stamped and nothing is taken — `chargeForSubmit` reads computeDesignFees and
+     * bills every `estimated` fee alongside the blank and the postage, so the seller sees one
+     * number and confirms it. That is the whole reason this does not charge on the press.
+     *
+     * An order PAST submit has already had that moment, so a fee stamped now would sit in the
+     * Summary as `estimated` for ever and never be taken — the precise failure the comment on
+     * chargeForSubmit was written about ("shown in the Summary, added into the Total the
+     * seller confirmed, and never taken"). So there it charges here, at the press.
+     *
+     * The ref is `design-<order>-<line>` and the type `design-work` — BYTE FOR BYTE what
+     * chargeDesign in orders.js uses. wallet_ledger is idempotent on (account, type, ref), so
+     * whichever of the two paths runs second moves nothing. That shared key is not a
+     * coincidence to be tidied away later; it is what makes two writers safe.
+     */
+    let designFee = null;
+    const submitted = !['', 'new', 'draft'].includes(String(order.factory_status || '').toLowerCase());
+    if (feeLines.length && submitted && order.seller_id) {
+      const amount = await readAll().then((f) => Number(f.design_fee_standard) || 0).catch(() => 0);
+      if (amount > 0) {
+        const first = feeLines[0];
+        const ref = `design-${orderId}-${first.line_id || first.sku}`;
+        try {
+          await moveFunds({
+            from: order.seller_id, to: 'factory', amount,
+            type: 'design-work', ref,
+            note: `Design work · ${card.title || first.name || first.sku || 'Item'} · ${order.num || orderId}`,
+            by: req.user && req.user.sub,
+          });
+          // Every line the one design covers, so the next card on a sibling can't bill it again.
+          await q(
+            `update order_items set design_charged_at=now()
+              where order_id=$1 and (line_id = any($2::text[]) or (line_id is null and sku = any($3::text[])))`,
+            [orderId, feeLines.map((l) => l.line_id).filter(Boolean),
+             feeLines.filter((l) => !l.line_id).map((l) => l.sku).filter(Boolean)]).catch(() => {});
+          designFee = { charged: amount };
+          audit(req, 'design.charged', {
+            entityType: 'order', entityId: orderId,
+            after: { tier: 'standard', amount, line_id: first.line_id || null, sku: first.sku || null, via: 'send-to-board' },
+          });
+        } catch (e) {
+          /* A WALL, NOT A ROLLBACK. The artwork is on the order either way — that write is
+             already done and undoing it would throw away the designer's work over a wallet
+             balance. The fee stays `estimated` and is taken at the next charge; the caller is
+             told so the board can say the seller is short rather than claim it was billed. */
+          designFee = { charged: 0, error: e.message };
+        }
+      }
+    }
+
     audit(req, 'design.card.assigned', {
       entityType: 'design_card', entityId: String(card.id),
       after: { orderId, sku, lineId: b.lineId || null },
@@ -471,7 +561,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // Audited against the ORDER too. Someone auditing an order should not have to know a
     // design board exists to find out where its artwork came from.
     audit(req, 'design.saved', { entityType: 'order', entityId: orderId, after: { sku, via: 'design-card', cardId: String(card.id) } });
-    return { ok: true, orderId, sku };
+    return { ok: true, orderId, sku, designFee, tiered: feeLines.length };
   });
 
 

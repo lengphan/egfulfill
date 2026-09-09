@@ -380,6 +380,7 @@ const vi: Dict = {
   "range.Date range": "Khoảng thời gian",
   "samples.Booked to the factory wallet at place time — it shows as spent even if the sample never arrives. Appears in Finance under Sample.": "Được ghi vào ví xưởng ngay khi đặt — vẫn tính là đã chi kể cả khi mẫu không về. Hiển thị trong Tài chính, mục Mẫu.",
   "samples.Record one from a supplier’s row.": "Ghi nhận một mẫu từ dòng của nhà cung cấp.",
+  "sendBoard.Sent — but the design fee couldn't be taken:": "Đã gửi — nhưng chưa thu được phí thiết kế:",
   "sendBoard.Brief for the designer": "Yêu cầu cho nhà thiết kế",
   "sendBoard.Payout": "Trả công",
   "sendBoard.Cancel": "Huỷ",
