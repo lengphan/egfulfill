@@ -19,7 +19,19 @@ const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLo
 // is just noise. Kept separate from usd() so real/typed amounts still show cents.
 const usd0 = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
 
-function Success({ title, sub, onDone }: { title: string; sub: string; onDone: () => void }) {
+/**
+ * `sub` IS OPTIONAL, and most of the time there should not be one.
+ *
+ * Every success box carried a line that restated its own title — "Payment received" over
+ * "Your card top-up has been credited", "Payment received" over "Your wallet balance has
+ * been updated". A caption that paraphrases the heading above it is the prose-under-a-
+ * control defect in its purest form: it adds a second sentence to read and no second fact.
+ *
+ * What survives is the sub that says something the title cannot: money that has NOT landed
+ * yet and what will make it land, or a save that did not happen. Those are outcomes, not
+ * captions.
+ */
+function Success({ title, sub, onDone }: { title: string; sub?: string; onDone: () => void }) {
   const tl = useLabelT()
  return (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -27,7 +39,7 @@ function Success({ title, sub, onDone }: { title: string; sub: string; onDone: (
         <CheckCircle size={30} weight="fill" />
       </span>
       <div className="font-semibold">{title}</div>
-      <div className="text-sm text-muted-foreground">{sub}</div>
+      {sub ? <div className="text-sm text-muted-foreground">{sub}</div> : null}
       <Button className="w-full" onClick={onDone}>{tl("topup", "Done")}</Button>
     </div>
   )
@@ -166,7 +178,7 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
     }
   }
 
- if (phase === "paid") return <Success title={tl("topup", "Payment received")} sub={tl("topup", "Your wallet balance has been updated.")} onDone={onClose} />
+ if (phase === "paid") return <Success title={tl("topup", "Payment received")} onDone={onClose} />
  if (phase === "error")
  return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -374,7 +386,7 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
  setError(null); setPhase("pay")
   }
 
- if (phase === "paid") return <Success title={tl("topup", "Payment received")} sub={tl("topup", "Your card top-up has been credited.")} onDone={onClose} />
+ if (phase === "paid") return <Success title={tl("topup", "Payment received")} onDone={onClose} />
  if (phase === "pay")
  return (
       <div className="space-y-3">
@@ -522,17 +534,24 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  return (
       <Success
  title={tl("topup", "Payment received")}
-        /* The account, never a card: PayPal keeps the funding source and chooses it at
-           charge time, so naming one here would describe something we do not control. */
- sub={savedNow
-          ? `${tl("topup", "Credited. PayPal is remembered as")} ${savedNow} — ${tl("topup", "next time is one press, with no sign-in.")}`
- : savePending
-            /* PayPal is still minting the token. Saying "saved" would be a promise we
-               cannot yet keep, and "couldn't" would be wrong — so say what is true. */
- ? tl("topup", "Credited. PayPal is finishing saving this account — it should be ready by your next top-up.")
-          : remember && !account
- ? tl("topup", "Credited. This account couldn't be remembered, so next time will ask you to sign in again.")
- : tl("topup", "Your PayPal top-up has been credited.")}
+        /**
+          * NOTHING UNDER IT WHEN IT WORKED.
+          *
+          * A saved account announced itself in a sentence here — and then announced itself
+          * again, properly, the next time the tab is opened, by BEING there with a Pay
+          * button. The screen that proves it is the one you use it on; a line of prose on
+          * the way out is the third telling.
+          *
+          * The other two states keep their line, and the difference is not cosmetic: "PayPal
+          * is still saving this" and "this could not be saved" are facts nothing else on any
+          * screen will ever tell you. A refusal carries its reason (§4); a success that
+          * demonstrates itself does not need a caption.
+          */
+ sub={savePending
+ ? tl("topup", "PayPal is still saving this account — it should be ready by your next top-up.")
+          : remember && !savedNow && !account
+ ? tl("topup", "This account couldn't be remembered, so next time will ask you to sign in again.")
+ : ""}
  onDone={onClose}
       />
     )

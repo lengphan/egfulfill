@@ -7,6 +7,7 @@
 // into process.env live, but a boot-time `const` would pin the old value until a redeploy.
 import { notify } from './notifications.js';
 import { nextTopupRef } from '../topup-ref.js';
+import { randomUUID } from 'node:crypto';
 import { q } from '../db.js';
 import { recordUsage } from '../usage.js';
 
@@ -601,9 +602,29 @@ export function paypalRoutes(app, requireAuth) {
       const cfg = await feeCfg();
       const charge = grossUp(amt, cfg);
       const tok = await ppToken();
+      /**
+       * PayPal-Request-Id IS MANDATORY HERE, and only here.
+       *
+       * PayPal's own words on refusing this: "A PayPal-Request-Id is required if you are
+       * trying to process payment for an Order. Please specify a PayPal-Request-Id or Create
+       * the Order without a 'payment_source' specified." An order carrying a payment_source
+       * is asking to be CHARGED at creation rather than approved in a window, so PayPal
+       * insists on an idempotency key before it will do that — which is the right demand to
+       * make of a call that can move money without anybody watching.
+       *
+       * Fresh per attempt rather than derived from the order, because there is no order yet
+       * — this call is what mints one. That means a retry creates a new order rather than
+       * replaying the old one, which is safe here: an order is not a charge, an unapproved
+       * one expires on PayPal's side, and the money only moves at capture, which our ledger
+       * already dedupes on the capture id.
+       */
       const create = await fetch(BASE() + '/v2/checkout/orders', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: 'Bearer ' + tok,
+          'Content-Type': 'application/json',
+          'PayPal-Request-Id': randomUUID(),
+        },
         body: JSON.stringify({
           intent: 'CAPTURE',
           purchase_units: [{
