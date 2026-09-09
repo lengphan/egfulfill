@@ -34,51 +34,31 @@ import { motion } from "motion/react"
  * admin's date range) is laid out beside the objects rather than underneath them.
  */
 
-/**
- * THE ARRANGEMENTS.
- *
- * Positions are percentages of the BAND, not of a slot, because a dragged object does not
- * stay in its slot — the constraint is the whole band. `h` is a percentage of the band's
- * height, so the objects keep their relation to each other whatever the band grows to.
- *
- * These are compositions, not seven objects placed one at a time. The first attempt spaced
- * them evenly across the right third at four sizes, which is the arrangement with no idea in
- * it: even spacing reads as scatter, because nothing in it is a decision the eye can follow.
- * Each of these has one rule instead — a line, a curve, a mass, a gap, a climb — and the
- * sizes serve that rule rather than varying for the sake of it.
- *
- * A few objects are cropped by the right edge on purpose: an object that ends before the
- * frame does reads as a sticker, and one that runs off it reads as a thing that carried on.
- */
-type BandSlot = { x: number; y: number; h: number; dur: number; delay: number }
-type BandObject = BandSlot & { src: string; swim: string }
-
 /** The family, one framing each — see tools/import-objects.py. */
 const O = (n: string) => `/ploy/obj/${n}.webp`
 
 /**
- * WHAT the objects are, held apart from WHERE they sit.
+ * WHAT the objects are, held apart from WHERE they sit and HOW they move.
  *
- * An arrangement is six positions and six sizes; a set is what fills them. Keeping the two
- * separate is the difference between "try the garments in an arc" being a one-word change and
- * being six lines of coordinates retyped — and it is the same reason the arrangements are
- * named at all.
+ * An arrangement is five positions and five sizes; a set is what fills them; a motion is what
+ * they then do. Keeping the three separate is the difference between "try the garments in an
+ * arc, orbiting" being three words and being a rewrite.
  *
  * NO OBJECT APPEARS TWICE IN A SET (owner's call). The first cut used two clouds and two
- * stars at different sizes on the argument that they read as two objects; they do not. They
+ * stars at different sizes, on the argument that they read as two objects; they do not. They
  * read as one object the page ran out of ideas for, and at band height the size difference is
  * the only thing telling them apart. Fifteen distinct shapes exist, so a repeat is a choice
  * not to use one of them.
  *
- * There is no wordmark set. Spelling the company name in balloons was tried and dropped:
- * the band already carries the name in the sidebar and the tab title, and a logo that has to
- * be reassembled out of six draggable pieces is a logo you can break.
+ * There is no wordmark set. Spelling the company name in balloons was tried and dropped: the
+ * band already carries the name in the sidebar and the tab title, and a logo that has to be
+ * reassembled out of five draggable pieces is a logo you can break.
  */
 export const SETS: Record<string, string[]> = {
+  /** What we make, inflated: the set that says what this company does. */
+  garments: [O("tee"), O("cap"), O("beanie"), O("shorts"), O("varsity"), O("hoodie")],
   /** The abstract family — six forms, one language, nothing repeated. */
   shapes: [O("star"), O("torus"), O("squiggle"), O("cloud"), O("blob-peri"), O("blob-lime")],
-  /** What we make, in the same inflated language: the set that says what this company does. */
-  garments: [O("tee"), O("cap"), O("beanie"), O("shorts"), O("varsity"), O("hoodie")],
   /** A garment and an abstract, alternating — the product with room around it. */
   mixed: [O("tee"), O("torus"), O("cap"), O("squiggle"), O("socks"), O("blob-lime")],
   /** Real blanks, photographed and cut off the studio sweep (tools/cut-blank.py). The quiet
@@ -88,76 +68,122 @@ export const SETS: Record<string, string[]> = {
 
 export const DEFAULT_SET = "garments"
 
+/**
+ * THE ARRANGEMENTS.
+ *
+ * Positions are percentages of the BAND, not of a slot, because a dragged object does not
+ * stay in its slot — the constraint is the whole band. `h` is a percentage of the band's
+ * height, so the objects keep their relation to each other whatever the band grows to.
+ *
+ * These are compositions, not objects placed one at a time. The first attempt spaced them
+ * evenly at four sizes across the right third, which is the arrangement with no idea in it:
+ * even spacing reads as scatter because nothing in it is a decision the eye can follow. Each
+ * of these has one rule — a line, a curve, a mass, a gap, a climb — and where the sizes vary,
+ * they vary to serve that rule.
+ *
+ * FEWER SLOTS THAN THE SET IS FINE. `slots.slice(0, objects.length)` caps a long set to the
+ * arrangement, and a short set to itself; nothing wraps, nothing repeats.
+ */
+type BandSlot = { x: number; y: number; h: number }
+type BandObject = BandSlot & { src: string; swim: SwimPath }
+
 export const LAYOUTS: Record<string, BandSlot[]> = {
-  /** SHELF — every object standing on one line. The sizes do the varying, not the baseline. */
+  /** EVEN — one size for every object, evenly spaced (owner's call). Sized to sit INSIDE the
+   *  band with air top and bottom: at 104% they were cropped, and a garment with its shoulders
+   *  cut off by the frame is not a bigger garment, it is a broken one. Five rather than six,
+   *  because six at this size have to overlap to fit and a row of garments piled on each
+   *  other is a rack, not a set. */
+  even: [
+    { x: 60.0, y: 9, h: 82 },
+    { x: 68.5, y: 9, h: 82 },
+    { x: 77.0, y: 9, h: 82 },
+    { x: 85.5, y: 9, h: 82 },
+    { x: 94.0, y: 9, h: 82 },
+  ],
+  /** SHELF — every object standing on one line. Here the sizes do the varying. */
   shelf: [
-    { x: 60.0, y: 34, h: 62, dur: 13.0, delay: -0.5 },
-    { x: 67.0, y: 44, h: 52, dur: 16.5, delay: -3.0 },
-    { x: 75.0, y: 22, h: 74, dur: 11.5, delay: -1.8 },
-    { x: 82.0, y: 50, h: 46, dur: 14.5, delay: -4.2 },
-    { x: 86.5, y: 16, h: 80, dur: 12.5, delay: -2.2 },
-    { x: 95.5, y: 38, h: 58, dur: 12.5, delay: -5.5 },
+    { x: 60.0, y: 34, h: 62 },
+    { x: 67.0, y: 44, h: 52 },
+    { x: 75.0, y: 22, h: 74 },
+    { x: 82.0, y: 50, h: 46 },
+    { x: 86.5, y: 16, h: 80 },
+    { x: 95.5, y: 38, h: 58 },
   ],
   /** ARC — a curve lifting toward the edge, the last of it already out of the frame. */
   arc: [
-    { x: 60.0, y: 54, h: 42, dur: 14.5, delay: -4.2 },
-    { x: 65.5, y: 36, h: 56, dur: 13.0, delay: -0.5 },
-    { x: 72.0, y: 20, h: 64, dur: 16.5, delay: -3.0 },
-    { x: 81.0, y: 6,  h: 70, dur: 11.5, delay: -1.8 },
-    { x: 87.5, y: -10, h: 76, dur: 12.5, delay: -2.2 },
-    { x: 96.0, y: -22, h: 58, dur: 12.5, delay: -5.5 },
+    { x: 60.0, y: 54, h: 42 },
+    { x: 65.5, y: 36, h: 56 },
+    { x: 72.0, y: 20, h: 64 },
+    { x: 81.0, y: 6, h: 70 },
+    { x: 87.5, y: -10, h: 76 },
+    { x: 96.0, y: -22, h: 58 },
   ],
   /** BUNCH — one mass in the corner, overlapping, the way balloons are actually held. */
   bunch: [
-    { x: 75.0, y: 18, h: 72, dur: 16.5, delay: -3.0 },
-    { x: 82.5, y: -6, h: 60, dur: 13.0, delay: -0.5 },
-    { x: 81.5, y: 46, h: 56, dur: 11.5, delay: -1.8 },
-    { x: 88.0, y: 38, h: 44, dur: 14.5, delay: -4.2 },
-    { x: 89.5, y: 2,  h: 66, dur: 12.5, delay: -2.2 },
-    { x: 95.5, y: 48, h: 50, dur: 12.5, delay: -5.5 },
+    { x: 75.0, y: 18, h: 72 },
+    { x: 82.5, y: -6, h: 60 },
+    { x: 81.5, y: 46, h: 56 },
+    { x: 88.0, y: 38, h: 44 },
+    { x: 89.5, y: 2, h: 66 },
+    { x: 95.5, y: 48, h: 50 },
   ],
   /** PAIRS — a trio and a pair with real air between them. Rhythm instead of a queue. */
   pairs: [
-    { x: 61.0, y: 30, h: 58, dur: 13.0, delay: -0.5 },
-    { x: 67.0, y: 10, h: 62, dur: 16.5, delay: -3.0 },
-    { x: 69.5, y: 52, h: 40, dur: 14.5, delay: -4.2 },
-    { x: 85.0, y: 20, h: 60, dur: 11.5, delay: -1.8 },
-    { x: 90.5, y: 0,  h: 70, dur: 12.5, delay: -2.2 },
-    { x: 94.0, y: 48, h: 46, dur: 12.5, delay: -5.5 },
+    { x: 61.0, y: 30, h: 58 },
+    { x: 67.0, y: 10, h: 62 },
+    { x: 69.5, y: 52, h: 40 },
+    { x: 85.0, y: 20, h: 60 },
+    { x: 90.5, y: 0, h: 70 },
+    { x: 94.0, y: 48, h: 46 },
   ],
   /** HERO — one object big enough to be the subject, three small ones in orbit. */
   hero: [
-    { x: 71.0, y: -4, h: 106, dur: 16.5, delay: -3.0 },
-    { x: 63.0, y: 40, h: 50, dur: 13.0, delay: -0.5 },
-    { x: 88.5, y: 6,  h: 46, dur: 11.5, delay: -1.8 },
-    { x: 92.5, y: 52, h: 38, dur: 14.5, delay: -4.2 },
-  ],
-  /** SCATTER — what shipped first, at the same weight, so a comparison is a comparison. */
-  scatter: [
-    { x: 59.0, y: 8,  h: 60, dur: 13.0, delay: -0.5 },
-    { x: 65.5, y: 40, h: 54, dur: 16.5, delay: -3.0 },
-    { x: 72.5, y: 0,  h: 48, dur: 11.5, delay: -1.8 },
-    { x: 78.0, y: 48, h: 44, dur: 14.5, delay: -4.2 },
-    { x: 83.5, y: 4,  h: 68, dur: 12.5, delay: -2.2 },
-    { x: 91.0, y: 42, h: 52, dur: 12.5, delay: -5.5 },
-    { x: 94.5, y: -4, h: 54, dur: 15.5, delay: -0.9 },
+    { x: 71.0, y: -4, h: 106 },
+    { x: 63.0, y: 40, h: 50 },
+    { x: 88.5, y: 6, h: 46 },
+    { x: 92.5, y: 52, h: 38 },
   ],
 }
 
-/** The four routes, dealt round the cluster in order. */
-const SWIM = ["a", "b", "c", "d"]
-
 /** The arrangement every band uses unless it is being compared against another. */
-export const DEFAULT_LAYOUT = "shelf"
+export const DEFAULT_LAYOUT = "even"
 
 /**
- * One object: a draggable FRAME with a floating PICTURE inside it.
+ * HOW THE OBJECTS MOVE. Each is a pair of CSS rules in globals.css.
  *
- * The two halves are not decoration — they are the fix for the one motion bug this codebase
- * has already paid for. Drag writes `x`/`y` on the element it is attached to, and so does a
- * bob loop; give both to one element and they fight over the same transform, which is how an
- * animated thing ends up never appearing at all. So the outer div owns the DRAG and the inner
- * image owns the BOB, and neither can touch the other's property.
+ *   swim      two axes on unequal periods — suspended in water, never repeating
+ *   bob       one axis, in place, out of phase
+ *   orbit     a true circle, the picture counter-rotating so it never tips
+ *   sway      a pendulum hung from the top edge, the way a garment on a rail moves
+ *   breathe   inflating and letting go, no travel at all
+ */
+export const MOTIONS = ["swim", "bob", "orbit", "sway", "breathe"] as const
+export const DEFAULT_MOTION = "swim"
+
+/**
+ * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
+ *
+ * The two periods are never a simple ratio of each other. 2:1 or 3:2 closes the figure
+ * quickly and visibly; 17 against 11 takes 187 seconds to repeat, which is longer than
+ * anyone looks at a header. That is the whole difference between a wander and a bounce, and
+ * the previous version — one track carrying both axes — could only ever be the second.
+ *
+ * The SIGNS alternate down the row. An object on the left swims right, one on the right
+ * swims left, so the cluster breathes about its own centre instead of migrating toward one
+ * edge — and nothing ever heads for the greeting.
+ */
+type SwimPath = { sx: string; sy: string; r: string; dx: number; dy: number; ex: number; ey: number }
+const SWIM: SwimPath[] = [
+  { sx: "58%", sy: "-38%", r: "4deg", dx: 17, dy: 11, ex: -3, ey: -7 },
+  { sx: "-46%", sy: "-50%", r: "-3.5deg", dx: 21, dy: 13, ex: -9, ey: -2 },
+  { sx: "52%", sy: "-30%", r: "5deg", dx: 15, dy: 9.5, ex: -6, ey: -11 },
+  { sx: "-56%", sy: "-44%", r: "-5deg", dx: 19, dy: 12.5, ex: -12, ey: -4 },
+  { sx: "42%", sy: "-54%", r: "3deg", dx: 23, dy: 10.5, ex: -1, ey: -8 },
+]
+
+/**
+ * One object: a draggable FRAME, a span that carries one axis, a picture that carries the
+ * other. See the note inside for why it is three elements and not one.
  */
 function FloatingObject({
   o,
@@ -180,26 +206,41 @@ function FloatingObject({
       /* pointer-events-auto against the layer's `none`: the objects are grabbable, the space
          between them is not, so a click anywhere else in the band still reaches the band. */
       className="eg-band-object pointer-events-auto absolute cursor-grab touch-none active:cursor-grabbing"
-      style={{ left: `${o.x}%`, top: `${o.y}%`, height: `${o.h}%` }}
+      style={{ left: `${o.x}%`, top: `${o.y}%`, height: `${o.h}%`, aspectRatio: "1 / 1" }}
     >
-      {/* The drift is CSS (see globals.css, .eg-band-float) and it stops while the pointer is
-          on this object — reaching for a thing is what selects it, so nothing else has to say
-          so. next/image would gain nothing on a fixed-size decorative asset.
-          eslint-disable-next-line @next/next/no-img-element */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={o.src}
-        alt=""
-        aria-hidden
-        draggable={false}
-        className="eg-band-float h-full w-auto max-w-none select-none drop-shadow-[0_10px_16px_rgba(0,0,0,0.32)]"
+      {/*
+        * THREE ELEMENTS, ONE PER PROPERTY. The frame drags (motion writes x/y), this span
+        * carries one axis of the ambient motion, the picture carries the other. §4's rule
+        * that no element may own the same property twice is why they cannot be collapsed —
+        * and it is also what makes the two axes run on different clocks, which is the whole
+        * difference between drifting and bouncing.
+        */}
+      <span
+        className="eg-band-swim block size-full"
         style={{
-          "--float-dur": `${o.dur}s`,
-          "--float-delay": `${o.delay}s`,
-          // One of four routes, so no two objects trace the same shape. See globals.css.
-          "--swim": `eg-swim-${o.swim}`,
+          "--swim-x": o.swim.sx,
+          "--swim-x-dur": `${o.swim.dx}s`,
+          "--swim-x-delay": `${o.swim.ex}s`,
         } as React.CSSProperties}
-      />
+      >
+        {/* The ambient motion is CSS (globals.css) and it stops while the pointer is on this
+            object — reaching for a thing is what selects it, so nothing else has to say so.
+            next/image would gain nothing on a fixed-size decorative asset. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={o.src}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="eg-band-float size-full select-none object-contain drop-shadow-[0_10px_16px_rgba(0,0,0,0.32)]"
+          style={{
+            "--swim-y": o.swim.sy,
+            "--swim-r": o.swim.r,
+            "--swim-y-dur": `${o.swim.dy}s`,
+            "--swim-y-delay": `${o.swim.ey}s`,
+          } as React.CSSProperties}
+        />
+      </span>
     </motion.div>
   )
 }
@@ -210,6 +251,7 @@ export function PageBand({
   children,
   layout = DEFAULT_LAYOUT,
   set = DEFAULT_SET,
+  motionStyle = DEFAULT_MOTION,
 }: {
   title: ReactNode
   sub?: ReactNode
@@ -220,6 +262,8 @@ export function PageBand({
   layout?: keyof typeof LAYOUTS
   /** Which objects fill the arrangement. Same rule as `layout`: only /lab/band passes it. */
   set?: keyof typeof SETS
+  /** How the objects move. Same rule again — the app takes the default. */
+  motionStyle?: (typeof MOTIONS)[number]
 }) {
   const band = useRef<HTMLDivElement>(null)
   /*
@@ -265,6 +309,7 @@ export function PageBand({
         */}
       <div
         aria-hidden
+        data-motion={motionStyle}
         className="pointer-events-none absolute inset-0 -z-10 hidden select-none sm:block"
       >
         {slots.map((slot, i) => (

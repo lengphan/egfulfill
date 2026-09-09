@@ -7,7 +7,7 @@
  * Sits beside /lab/decor, which does the same job for the band and tile pairing.
  */
 
-import { PageBand, LAYOUTS, SETS, DEFAULT_LAYOUT } from "@/components/app/page-band"
+import { PageBand, LAYOUTS, SETS, MOTIONS, DEFAULT_LAYOUT } from "@/components/app/page-band"
 
 const NOTES: Record<string, string> = {
   shelf: "one baseline, sizes vary",
@@ -16,6 +16,14 @@ const NOTES: Record<string, string> = {
   pairs: "a trio and a pair, with air between",
   hero: "one big object, three in orbit",
   scatter: "what shipped first",
+}
+
+const MOTION_NOTES: Record<string, string> = {
+  swim: "two axes on unequal clocks — suspended in water, never repeats",
+  bob: "one axis, in place, out of phase",
+  orbit: "a true circle; the object counter-rotates so it never tips",
+  sway: "a pendulum hung from the top edge, like a garment on a rail",
+  breathe: "inflating and letting go — no travel at all",
 }
 
 const SET_NOTES: Record<string, string> = {
@@ -32,7 +40,21 @@ function Column({ dark }: { dark: boolean }) {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {dark ? "Dark" : "Light"}
         </p>
-        <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sets — in the default arrangement</p>
+        <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Motion — same objects, same arrangement</p>
+        {MOTIONS.map((m) => (
+          <div key={m} className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              <span className="font-semibold text-foreground">{m}</span> — {MOTION_NOTES[m]}
+            </p>
+            <PageBand
+              motionStyle={m}
+              title="Good afternoon, Linh"
+              sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}
+            />
+          </div>
+        ))}
+
+        <p className="pt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sets — in the default arrangement</p>
         {Object.keys(SETS).map((key) => (
           <div key={key} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">
@@ -68,11 +90,13 @@ function Column({ dark }: { dark: boolean }) {
 export default function BandLayoutLab() {
   return (
     <div className="min-h-svh">
-      <p className="px-6 py-4 text-sm font-semibold">Band arrangements — the real component</p>
-      <div className="grid md:grid-cols-2">
-        <Column dark={false} />
-        <Column dark />
-      </div>
+      {/* ONE COLUMN, FULL WIDTH. Side-by-side themes halved the band, and the band's objects
+          are sized off its HEIGHT while their positions are percentages of its WIDTH — so a
+          628px band crowded them into each other and a 1150px one spread them out. Comparing
+          a layout at the wrong width is comparing the wrong layout. */}
+      <p className="px-6 py-4 text-sm font-semibold">Band motion, sets and arrangements — the real component, at real width</p>
+      <Column dark={false} />
+      <Column dark />
     </div>
   )
 }

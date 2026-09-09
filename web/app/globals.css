@@ -20,7 +20,29 @@
  times, and at 10px Inter's counters close up on a laptop screen.
        NOTE: the print components (label sheets, catalog print, QR captions) size text in
  millimetres of paper and keep their own arbitrary values on purpose. */
-    --text-2xs: 0.6875rem;   /* 11px — the smallest step */
+    /**
+     * THE SCALE MOVED UP ONE STEP (2026-09-09), because it was measured and it was too small.
+     *
+     * Counted across every .tsx in the app: 436 elements at 11px, 1,209 at 12px, 1,077 at
+     * 14px, and 65 at 16px or above. So 59% of all text was 12px or smaller and 2% was 16px
+     * or larger — the most common size on screen was 12px. A consumer site sets body at 16
+     * (Nike, and the browser default); dense operational tools — Stripe's dashboard, Linear,
+     * Notion — sit at 13–14. This app was a step below the dense tools and using, as its
+     * body size, what a shop uses for legal fine print. The owner's words were "very very
+     * small, or thin, I can't read at all".
+     *
+     * Moving the TOKENS moves all 2,787 call sites at once, which is the entire reason a
+     * scale is a scale: not one component is edited, and the whole thing reverts in one line
+     * each if a screen turns out to depend on the old density.
+     *
+     * 11px is gone as a value. `text-2xs` survives as a NAME — retiring it means rewriting
+     * 436 call sites across ~110 files, and globals.css is being edited by another session
+     * right now — but nothing renders at 11 any more. The rename is a follow-up, and a
+     * mechanical one.
+     */
+    --text-2xs: 0.75rem;     /* was 11px — the smallest step, and nothing is below it */
+    --text-xs: 0.8125rem;    /* 13px. Tailwind's default is 12; this was the body size. */
+    --text-sm: 0.9375rem;    /* 15px — the primary reading size */
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     /* ONE FACE. Both heading tokens resolve to the body stack.
@@ -1048,43 +1070,88 @@ td[align="right"] {
    REDUCED MOTION STOPS IT COMPLETELY. Continuous ambient movement with no finishing
    moment is close to the definition of what that setting asks us not to do. Dragging
    still works: that is the person's own hand, not decoration. */
-@keyframes eg-swim-a {
-  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
-  27%  { transform: translate3d(16%, -22%, 0) rotate(4deg); }
-  52%  { transform: translate3d(36%, 2%, 0) rotate(-2.5deg); }
-  78%  { transform: translate3d(13%, 21%, 0) rotate(2deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+/* ONE AXIS EACH, ON DIFFERENT CLOCKS.
+   The first swim was one keyframe track per object carrying both axes, and it
+   read as "bouncing slightly up and down" — correctly, because a single track
+   returns to its start on a fixed beat, and four eased stops on that beat is an
+   oscillation however the path is drawn. Two elements instead, one owning X and
+   one owning Y, on deliberately unequal periods: the composite is a Lissajous
+   figure that takes the lowest common multiple of the two to repeat, so at 17s
+   against 11s nobody watching a header ever sees it close.
+
+   That is also why the periods are never a simple ratio of each other — 2:1 or
+   3:2 closes fast and visibly, and the whole point is a path with no beat in it.
+
+   ALTERNATE, not a four-stop loop. Each axis is a single from/to eased at both
+   ends, so a turnaround is a slow reversal rather than a corner. Corners are what
+   made the old one look mechanical. */
+@keyframes eg-swim-x { to { transform: translate3d(var(--swim-x, 58%), 0, 0); } }
+@keyframes eg-swim-y { to { transform: translate3d(0, var(--swim-y, -38%), 0) rotate(var(--swim-r, 4deg)); } }
+/* BOB — the classic: one axis, in place, out of phase with its neighbours. */
+@keyframes eg-band-bob { to { transform: translate3d(0, -24%, 0); } }
+/* ORBIT — a true circle, made by rotating about a point BELOW the object and letting the
+   picture counter-rotate so it never tips. Four translate stops would draw a diamond; this
+   draws a circle with two declarations. */
+@keyframes eg-band-orbit { to { transform: rotate(360deg); } }
+@keyframes eg-band-orbit-rev { to { transform: rotate(-360deg); } }
+/* SWAY — a pendulum hung from the top edge, the way a garment on a rail moves. */
+@keyframes eg-band-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+/* BREATHE — inflating and letting go. No travel at all. */
+@keyframes eg-band-breathe { to { transform: scale(1.13) rotate(2.5deg); } }
+
+/* SWIM (default) — two axes, unequal periods, described above. */
+[data-motion="swim"] .eg-band-swim {
+  animation: eg-swim-x var(--swim-x-dur, 17s) ease-in-out infinite alternate;
+  animation-delay: var(--swim-x-delay, 0s);
 }
-@keyframes eg-swim-b {
-  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
-  24%  { transform: translate3d(21%, 19%, 0) rotate(-3.5deg); }
-  55%  { transform: translate3d(31%, -14%, 0) rotate(3deg); }
-  80%  { transform: translate3d(8%, -26%, 0) rotate(-1.5deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+[data-motion="swim"] .eg-band-float {
+  animation: eg-swim-y var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation-delay: var(--swim-y-delay, 0s);
 }
-@keyframes eg-swim-c {
-  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
-  30%  { transform: translate3d(-7%, -25%, 0) rotate(3deg); }
-  58%  { transform: translate3d(24%, -33%, 0) rotate(-4deg); }
-  82%  { transform: translate3d(29%, -9%, 0) rotate(1.8deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+[data-motion="bob"] .eg-band-float {
+  animation: eg-band-bob var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation-delay: var(--swim-y-delay, 0s);
 }
-@keyframes eg-swim-d {
-  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
-  22%  { transform: translate3d(27%, 8%, 0) rotate(2.6deg); }
-  49%  { transform: translate3d(9%, 28%, 0) rotate(-3deg); }
-  74%  { transform: translate3d(-6%, 11%, 0) rotate(1.4deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+[data-motion="orbit"] .eg-band-swim {
+  animation: eg-band-orbit var(--swim-x-dur, 17s) linear infinite;
+  animation-delay: var(--swim-x-delay, 0s);
+  /* The origin is the CENTRE of the circle, so its distance from the object's own centre is
+     the RADIUS. 155% put that radius at 105% of the object's height — a circle wider than the
+     band, which threw three of the five objects clean out of frame; 118% still made it 68%.
+     70% leaves 20% of the height, a circle about 15px across on a 75px object: an orbit you
+     read as drifting rather than as a fairground ride. */
+  transform-origin: 50% 70%;
 }
-.eg-band-float {
-  animation: var(--swim, eg-swim-a) var(--float-dur, 13s) ease-in-out infinite;
-  animation-delay: var(--float-delay, 0s);
-  will-change: transform;
+[data-motion="orbit"] .eg-band-float {
+  animation: eg-band-orbit-rev var(--swim-x-dur, 17s) linear infinite;
+  animation-delay: var(--swim-x-delay, 0s);
 }
+[data-motion="sway"] .eg-band-float {
+  animation: eg-band-sway var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation-delay: var(--swim-y-delay, 0s);
+  transform-origin: 50% 0%;
+}
+[data-motion="breathe"] .eg-band-float {
+  animation: eg-band-breathe var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation-delay: var(--swim-y-delay, 0s);
+}
+.eg-band-swim, .eg-band-float { will-change: transform; }
+
+/* Both halves stop, or an orbiting object keeps circling under a pointer that is holding it
+   still — which is worse than not pausing at all. */
+.eg-band-object:hover .eg-band-swim,
 .eg-band-object:hover .eg-band-float,
+.eg-band-object:focus-visible .eg-band-swim,
 .eg-band-object:focus-visible .eg-band-float { animation-play-state: paused; }
+/* SPECIFICITY, NOT GOOD INTENTIONS. `.eg-band-swim` is one class; every motion rule above is
+   `[data-motion="…"] .eg-band-swim`, which is two — so a bare reduced-motion reset LOST to
+   them and the objects kept orbiting for exactly the people who asked them not to. It was
+   invisible in review because the screenshots were TAKEN with reduced motion emulated, and
+   the row that gave it away only did so by rendering mid-rotation. Match the specificity and
+   say !important, because a fifth motion added later must not be able to outrank this. */
 @media (prefers-reduced-motion: reduce) {
-  .eg-band-float { animation: none; }
+  [data-motion] .eg-band-swim,
+  [data-motion] .eg-band-float { animation: none !important; }
 }
 
 /* ── THE PRESS — the decorated garment shows through under the pointer ─────────
