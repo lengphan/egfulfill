@@ -966,14 +966,32 @@ export default function OrderDetailPage() {
    * partner's invoice, the goods), and giving those a one-press undo would be offering to
    * un-buy a label that has already been bought.
    */
- const reverseFee = async (line: { amount: number; note?: string | null }, key: string) => {
+ const reverseFee = async (line: { part: string; label: string; amount: number; note?: string | null }, key: string) => {
+    /**
+     * A FEE GOES BACK ON ONE PRESS; THE GOODS DO NOT.
+     *
+     * Reversing an adjustment undoes a number somebody typed a moment ago — small, recent,
+     * and usually a correction of their own mistake. Sending back the base cost or the
+     * postage is a decision about the order, often for a buyer, and at a size worth pausing
+     * over. Same control, same result, one question first.
+     */
+ if (line.part !== "fee") {
+ const ok = await confirm({
+ title: `Send back ${usd(line.amount)}?`,
+ body: `${line.label} goes back to the seller's wallet. It stays on the order's history, and the line comes off this card.`,
+ confirmLabel: `Refund ${usd(line.amount)}`,
+      })
+ if (!ok) return
+    }
  setReversing(key)
  try {
       /* Named part and exact amount, so it comes off the adjustment and not off the goods —
          an unallocated refund is consumed top-down and would have taken the product cost. */
  const r = await refundOrder(String(id), {
- amount: { fee: Math.abs(line.amount) },
- note: `Reversed price adjustment${line.note ? ` — ${line.note}` : ""}`,
+ amount: { [line.part]: Math.abs(line.amount) },
+ note: line.part === "fee"
+          ? `Reversed price adjustment${line.note ? ` — ${line.note}` : ""}`
+          : `Refunded ${line.label}${line.note ? ` — ${line.note}` : ""}`,
  clientId: `revfee-${id}-${key}`,
       })
  if (!r?.error) {
@@ -1028,17 +1046,35 @@ export default function OrderDetailPage() {
    * shown charges minus shown refunds equals charged minus refunded, which is netCost.
    */
  const reversedLines = (() => {
- let left = (charges?.parts ?? []).find((p) => p.key === "fee")?.refunded ?? 0
+    /* Per PART, because that is what a refund names. Started fee-only; every part behaves the
+       same way, and shipping sent back in full is as settled as an adjustment sent back in
+       full. Owner's call: a line fully refunded leaves the card, anything less stays. */
+ const left = new Map<string, number>()
+ for (const p of charges?.parts ?? []) left.set(p.key, p.refunded ?? 0)
  const marked = new Set<number>()
+ const byPart = new Map<string, number>()
  let claimed = 0
     ;(charges?.lines ?? []).forEach((l, i) => {
- if (l.part !== "fee" || l.amount <= 0) return
- if (left + 0.005 < l.amount) return
- left -= l.amount
+ if (l.amount <= 0) return
+ const room = left.get(l.part) ?? 0
+      /* FULLY covered, or not at all. A partly refunded line is still owed something and has
+         to keep saying so — that is the "don't disappear them" half of the rule. */
+ if (room + 0.005 < l.amount) return
+ left.set(l.part, room - l.amount)
  marked.add(i)
  claimed += l.amount
+ byPart.set(l.part, (byPart.get(l.part) ?? 0) + l.amount)
     })
- return { marked, claimed }
+    /**
+     * `claimed` and `claimedFee` ARE DIFFERENT QUESTIONS, and one number cannot answer both.
+     *
+     * `claimed` is money already accounted for by a hidden row — it keeps the visible figures
+     * summing to Seller paid. `claimedFee` is the part of that which was a reversed
+     * ADJUSTMENT, and only that is "not really a refund": undoing a charge nobody should have
+     * made leaves the seller where they started, while sending back the base cost genuinely
+     * returns their money. The status chip has to count the second and ignore the first.
+     */
+ return { marked, claimed, claimedFee: byPart.get("fee") ?? 0, byPart }
   })()
 
   /**
@@ -1056,7 +1092,8 @@ export default function OrderDetailPage() {
  const refundByPart = (() => {
  const left = new Map<string, number>()
  for (const p of charges?.parts ?? []) {
- const shownElsewhere = p.key === "fee" ? reversedLines.claimed : 0
+      /* Per part: what a hidden row already shows for THIS part, not the total across all. */
+ const shownElsewhere = reversedLines.byPart.get(p.key) ?? 0
  const amt = (p.refunded ?? 0) - shownElsewhere
  if (amt > 0.005) left.set(p.key, amt)
     }
@@ -1101,13 +1138,13 @@ export default function OrderDetailPage() {
                               up and the action reads as belonging to the row it is on.
                               Staff only, adjustments only, and only while that part still has
                               room to send back — so it cannot be pressed twice. */}
-                          {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
+                          {isStaff && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === l.part && p.refundable >= l.amount - 0.005) && (
                             <button
                               type="button"
                               onClick={() => void reverseFee(l, `${l.part}-${i}`)}
                               disabled={reversing === `${l.part}-${i}`}
-                              aria-label={`Reverse this ${usd(l.amount)} adjustment`}
-                              title="Send this adjustment back. The charge and the reversal both stay on the statement."
+                              aria-label={`Send back this ${usd(l.amount)} ${l.label.toLowerCase()}`}
+                              title="Send this back to the seller. The charge and the refund both stay in the order's history."
                               className="eg-tap -my-1 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive disabled:opacity-50"
                             >
                               {reversing === `${l.part}-${i}`
@@ -1149,7 +1186,7 @@ export default function OrderDetailPage() {
    * nor the seller's position moved. What counts here is what came back BEYOND that, which is
    * the same residual the refunded row shows.
    */
- const refundedToSeller = refundedTotal - reversedLines.claimed
+ const refundedToSeller = refundedTotal - reversedLines.claimedFee
  const moneyState: { label: string; tone: string } = isFactory
     ? { label: "Internal", tone: "bg-muted text-muted-foreground" }
  : refundedToSeller > 0.005
