@@ -827,13 +827,31 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
            and the rules between them were the only lighter thing on it — the data sat in
            the dimmest layer of the screen, on the one surface where reading it IS the task.
            Card ground, hairline rules, and the grey stays outside as the page. */
+        /* IT STOPS AT THE LAST ROW.
+         *
+         * `fill` used to mean `flex-1`, so the box grew to the bottom of the page whatever
+         * it held — a sheet with 23 rows drew them, then a hand's depth of empty card, and
+         * only then the horizontal scrollbar, which is the control you reach for CONSTANTLY
+         * on a 21-column sheet. Pinning it to the bottom of the viewport put it as far from
+         * the data as the screen allows.
+         *
+         * `max-h-full` instead: the box is as tall as its rows and no taller, and it still
+         * shrinks and scrolls once they outgrow the page (the flex default is shrink 1, and
+         * min-h-0 is what lets it actually shrink). The scrollbar rides under Add rows. */
         className={
           fill
-            ? "min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-card"
+            ? "min-h-0 max-h-full overflow-auto rounded-xl border border-border bg-card"
             : "max-h-[52vh] overflow-auto rounded-xl border border-border bg-card"
         }
       >
-        <table className="w-max min-w-full border-collapse text-xs">
+        {/* THE SIZE THE ORDERS LIST USES, because this is the same kind of reading.
+            text-xs at weight 400 is what this app uses for captions and hints — glanced at,
+            never studied — and it was carrying the primary content of a spreadsheet, where
+            every value is a name, an address or a code and one wrong character matters:
+            "02719-1201", "RD" against "BD". The owner's words were "impossible unless zoomed
+            in, even with normal eyes". Values are 14px medium like the order rows they will
+            become; the header drops to 12px muted, because it IS the caption. */}
+        <table className="w-max min-w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-muted">
             <tr>
               <th className="w-10 border-b border-border px-2 py-1.5 text-left font-medium text-muted-foreground">#</th>
@@ -844,7 +862,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                     key={col.key}
                     title={col.help}
                     style={w ? { width: w, minWidth: w, maxWidth: w } : undefined}
-                    className={`${w ? "" : widthFor(col.key)} relative overflow-hidden border-b border-l border-border px-2 py-1.5 text-left font-medium text-ellipsis whitespace-nowrap`}
+                    className={`${w ? "" : widthFor(col.key)} relative overflow-hidden border-b border-l border-border px-2 py-1.5 text-left text-xs font-medium text-muted-foreground text-ellipsis whitespace-nowrap`}
                   >
                     {col.header}
                     {col.required && <span className="ms-1 text-destructive">*</span>}
@@ -1010,7 +1028,10 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
                              (~20 characters), and a table column cannot be narrower than the
                              box inside it — so without this the resize stops dead at ~170px
                              and reads as broken. */
-                          className="h-full w-full min-w-0 bg-transparent px-2 py-1 outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
+                          /* medium, not normal: a 14px value at 400 on a white sheet is
+                             still the lightest thing on screen, and these are codes read
+                             character by character. */
+                          className="h-full w-full min-w-0 bg-transparent px-2 py-1 font-medium outline-none focus:bg-accent focus:ring-1 focus:ring-ring"
                         />
                       </td>
                     )
@@ -1084,7 +1105,11 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
           <div
             ref={menuRef}
             style={{ position: "fixed", left: menu.left, top: menu.top, minWidth: Math.max(menu.width, 180), maxWidth: 320 }}
-            className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-xs "
+            /* Matches the cells it writes into: a menu whose options are smaller than the
+               value they become is a size change on selection. */
+            /* Matches the cells it writes into — a menu whose options are smaller than the
+               value they become is a size change on selection. */
+            className="z-50 max-h-60 overflow-auto rounded-lg border border-border bg-popover py-1 text-sm "
           >
             {shown.map((o) => (
               <button
