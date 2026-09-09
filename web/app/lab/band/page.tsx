@@ -155,6 +155,31 @@ function Column({ dark }: { dark: boolean }) {
           {dark ? "Dark" : "Light"}
         </p>
         <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Chrome webs — thin strands, then fat tubes
+        </p>
+        {[
+          ["web-a", "thin strands — the first one"],
+          ["web-b", "thin — braided, dense"],
+          ["web-c", "thin — open loops, fine tapers"],
+          ["web-d", "thin — one sweeping wave"],
+          ["round-a", "fat tubes — a braided rope, edge to edge"],
+          ["round-b", "fat tubes — big open loops with swells"],
+          ["round-c", "fat tubes — heavy coils, weight on the left"],
+        ].map(([f, note]) => (
+          <div key={f} className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              <span className="font-semibold text-foreground">{f}</span> — {note}
+            </p>
+            <PageBand
+              figure="web"
+              webSrc={`/ploy/obj/${f}.webp`}
+              title="Good afternoon, Linh"
+              sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}
+            />
+          </div>
+        ))}
+
+        <p className="pt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Rendered liquids — generated, not drawn
         </p>
         {["balloon", "balloonperi", "chrome", "pearl"].map((key) => (

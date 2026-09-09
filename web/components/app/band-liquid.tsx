@@ -64,34 +64,43 @@ const BEADS = Array.from({ length: 22 }, (_, i) => {
 
 export function BandLiquid({ dense = false }: { dense?: boolean }) {
   const drops = dense ? BEADS : DROPS
+  /*
+   * ITS OWN FILTER, and not only to avoid a duplicate id (two `#eg-goo`s in one document
+   * resolve to the first, so both bands would have silently shared one). The blur has to
+   * scale with the DROPS: what fuses 120px lobes obliterates 40px beads, because the ramp
+   * cuts anything whose blurred alpha falls under about 0.4 and a wide blur takes a small
+   * drop under that on its own.
+   */
+  const id = dense ? "eg-goo-fine" : "eg-goo"
+  const blur = dense ? 6 : 10
+  const ramp = dense ? "14 -5" : "18 -7"
   return (
     <div aria-hidden className="eg-pool-wrap">
-      {/* The filter lives with the thing it filters. One per band is fine — ids repeat across
-          bands only in the lab, and a duplicate id resolves to the first, which is identical. */}
+      {/* The filter lives with the thing it filters, under an id that says which grain it is. */}
       <svg width="0" height="0" className="absolute" aria-hidden focusable="false">
         <defs>
-          <filter id="eg-goo">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="blur" />
+          <filter id={id}>
+            <feGaussianBlur in="SourceGraphic" stdDeviation={blur} result="blur" />
             {/* The alpha ramp is what turns a blur back into an edge: multiply alpha hard,
                 then subtract, so mid-blur pixels fall off and only the merged core survives. */}
             <feColorMatrix
               in="blur"
               mode="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11"
+              values={`1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 ${ramp}`}
               result="goo"
             />
           </filter>
         </defs>
       </svg>
-      <div className="eg-pool">
+      <div className="eg-pool" style={{ filter: `url(#${id})` }}>
         {drops.map((d, i) => (
           /* Three elements, three transforms, one owner each: the slot takes the pointer's
              shove, the drop swells, and the travel is on margins. Collapse any two of them
              and one animation silently wins. */
           <span
             key={i}
-            className="eg-repel eg-pool-slot"
-            style={{ left: `${d.x}%`, top: `${d.y}%`, height: `${d.s}%` } as React.CSSProperties}
+            className="eg-pool-slot"
+            style={{ left: `${d.x}%`, top: `${d.y}%`, "--s": `${d.s}cqh` } as React.CSSProperties}
           >
             <span
               className="eg-pool-drop"

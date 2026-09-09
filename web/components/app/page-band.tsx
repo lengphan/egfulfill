@@ -3,6 +3,7 @@
 import { useRef, type ReactNode } from "react"
 import { motion } from "motion/react"
 import { BandChrome } from "@/components/app/band-chrome"
+import { BandWeb } from "@/components/app/band-web"
 import { BandArray } from "@/components/app/band-array"
 import { BandLiquid } from "@/components/app/band-liquid"
 import { BandAura } from "@/components/app/band-aura"
@@ -217,8 +218,8 @@ export const DEFAULT_MOTION = "swim"
  * distance between things. A field and a pool are each ONE body: one composition, one motion,
  * and the whole half of the band is used rather than dotted.
  */
-export const FIGURES = ["chromefield", "pool", "beads", "objects", "field", "aura"] as const
-export const DEFAULT_FIGURE = "objects"
+export const FIGURES = ["web", "chromefield", "pool", "beads", "objects", "field", "aura"] as const
+export const DEFAULT_FIGURE = "web"
 
 /**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
@@ -336,6 +337,7 @@ export function PageBand({
   set = DEFAULT_SET,
   motionStyle = DEFAULT_MOTION,
   figure = DEFAULT_FIGURE,
+  webSrc,
 }: {
   title: ReactNode
   sub?: ReactNode
@@ -350,6 +352,8 @@ export function PageBand({
   motionStyle?: (typeof MOTIONS)[number]
   /** What fills the empty half: the objects, or one of the two abstract figures. */
   figure?: (typeof FIGURES)[number]
+  /** Which chrome web render, when `figure` is "web". Only the lab passes this. */
+  webSrc?: string
 }) {
   const band = useRef<HTMLDivElement>(null)
   /*
@@ -384,7 +388,7 @@ export function PageBand({
       </div>
       {children}
 
-      {figure === "chromefield" ? <BandChrome /> : figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
+      {figure === "web" ? <BandWeb src={webSrc} /> : figure === "chromefield" ? <BandChrome /> : figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
       /*
         * THE LAYER IS THE WHOLE BAND, not the right 40%.
         *
