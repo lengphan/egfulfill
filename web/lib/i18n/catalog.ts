@@ -2561,7 +2561,6 @@ const vi: Dict = {
   "canvas.Title": "Tiêu đề",
   "canvas.Template name": "Tên mẫu",
   "canvas.Description / notes": "Mô tả / ghi chú",
-  "canvas.Payout band": "Bậc trả công",
   "canvas.With": "Đang ở chỗ",
   "canvas.Nothing new to send — add artwork or a face and this comes back": "Không có gì mới để gửi — thêm thiết kế hoặc mặt in thì nút này hiện lại",
   "canvas.Include this face": "Đưa mặt này vào",
