@@ -1271,11 +1271,8 @@ const vi: Dict = {
   "topup.BIDV payment code": "Mã thanh toán BIDV",
   "topup.Loading exchange rate…": "Đang tải tỷ giá…",
   "topup.Waiting for payment…": "Đang chờ thanh toán…",
-  "topup.Pay the VND amount with any VN banking app. Your USD balance updates automatically once paid.":
-    "Thanh toán số tiền VND bằng bất kỳ ứng dụng ngân hàng Việt Nam nào. Số dư USD của bạn sẽ tự cập nhật sau khi thanh toán.",
   "topup.Continue to card": "Tiếp tục với thẻ",
   "topup.Continue to PayPal": "Tiếp tục với PayPal",
-  "topup.Secured by Stripe. Balance updates on success.": "Bảo mật bởi Stripe. Số dư cập nhật khi thanh toán thành công.",
   "topup.Payment received": "Đã nhận thanh toán",
   "topup.Request submitted": "Đã gửi yêu cầu",
   "topup.Submitting…": "Đang gửi…",

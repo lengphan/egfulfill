@@ -328,7 +328,6 @@ function VietqrTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
       </div>
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={start} disabled={!rate || usdAmt < minUsd}>{tl("topup", "Generate QR Code")}</Button>
-      <p className="text-center text-xs text-muted-foreground">{tl("topup", "Pay the VND amount with any VN banking app. Your USD balance updates automatically once paid.")}</p>
     </div>
   )
 }
@@ -406,7 +405,6 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
       </label>
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>{tl("topup", "Continue to card")}</Button>
-      <p className="text-center text-xs text-muted-foreground">{tl("topup", "Secured by Stripe. Balance updates on success.")}</p>
     </div>
   )
 }
@@ -602,8 +600,8 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
    real login and the fee priced in. PingPong and LianLian stay manual because they genuinely
    are: we have no API with either. */
 const PROVIDERS = [
-  { key: "PingPong", to: "helennguyen958@gmail.com", hint: "Send to this PingPong account, attach your receipt, then submit." },
-  { key: "LianLian", to: "phanmylinh0410@gmail.com", hint: "Send to this LianLian account, attach your receipt, then submit." },
+  { key: "PingPong", to: "helennguyen958@gmail.com" },
+  { key: "LianLian", to: "phanmylinh0410@gmail.com" },
 ]
 function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
   const tl = useLabelT()
@@ -727,7 +725,6 @@ function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClo
 
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={submit} disabled={saving}>{saving ? tl("topup", "Submitting…") : tl("topup", "I've sent it — submit request")}</Button>
-      <p className="text-center text-xs text-muted-foreground">{provider.hint}</p>
     </div>
   )
 }
@@ -752,6 +749,12 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
         <DialogHeader>
           <DialogTitle>{tl("topup", "Add funds")}</DialogTitle>
         </DialogHeader>
+        {/* NO SENTENCE UNDER ANY OF THESE TABS. Each method used to end in a centred line
+            under its button — "Secured by Stripe. Balance updates on success.", "Pay the VND
+            amount with any VN banking app…", "Send to this PingPong account, attach your
+            receipt, then submit." Every one described the control directly above it, which
+            §4 calls a defect: the button says Generate QR Code, the address is on screen
+            with a Copy beside it, and the receipt field is labelled. Removed on request. */}
         <Tabs defaultValue="transfer">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="transfer">{tl("topup", "Transfer")}</TabsTrigger>
