@@ -519,7 +519,21 @@ export async function chargeOrderFee({ orderId, amount, note, by, clientId }) {
              body: why, href: `/orders/${encodeURIComponent(id)}`, entityId: id }).catch(() => {});
 
     const after = await orderCharges(id);
-    return { ok: true, charged: amt, ...after, balance: await balanceOf(row.seller_id).catch(() => null) };
+    /**
+     * `chargedNow` IS A SEPARATE KEY, for the same reason `refundedNow` is — and this is the
+     * lesson from twenty lines up, unlearned.
+     *
+     * This read `{ ok: true, charged: amt, ...after, … }`. The spread comes LAST, so
+     * `after.charged` — everything this order has ever been charged — landed on top of the
+     * adjustment's own amount. The panel reported it faithfully: a $2 adjustment confirmed as
+     * "Charged $128.27 to the seller's wallet". The money moved was always right; only the
+     * sentence was wrong, which is the kind of wrong somebody acts on.
+     *
+     * `charged` keeps its OrderCharges meaning (the order's running total), because every
+     * other reader of this shape expects that, and the amount this press moved gets a name of
+     * its own that nothing can shadow.
+     */
+    return { ok: true, ...after, chargedNow: amt, balance: await balanceOf(row.seller_id).catch(() => null) };
   });
 }
 

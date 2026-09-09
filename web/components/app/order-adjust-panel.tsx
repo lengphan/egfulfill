@@ -68,7 +68,9 @@ export function OrderAdjustPanel({ orderId, onCharged }: { orderId: string; onCh
     try {
       const r = await chargeOrderFee(orderId, { amount: amt, note: note.trim(), clientId: newClientId() })
       if (r.error) { setMsg({ ok: false, text: refusal(r) }); return }
-      setMsg({ ok: true, text: `Charged ${usd(r.charged || amt)} to the seller's wallet.` })
+      /* `chargedNow`, never `charged` — the latter is the order's running total, and reading
+         it here is what confirmed a $2 adjustment as "Charged $128.27". */
+      setMsg({ ok: true, text: `Charged ${usd(r.chargedNow ?? amt)} to the seller's wallet.` })
       setAmount(""); setNote("")
       onCharged?.()
     } catch (e) {

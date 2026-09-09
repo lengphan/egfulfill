@@ -5219,7 +5219,9 @@ export function chargeOrderFee(
   id: string,
   body: { amount: number; note: string; clientId?: string }
 ) {
-  return api<OrderCharges & { ok?: boolean; charged?: number; error?: string; shortfall?: number; balance?: number | null; sellerTold?: boolean }>(
+  /** `chargedNow` is what THIS press moved. `charged` is the order's running total and is
+   *  the wrong number to report back — see the note on the return in order_refunds.js. */
+  return api<OrderCharges & { ok?: boolean; chargedNow?: number; error?: string; shortfall?: number; balance?: number | null; sellerTold?: boolean }>(
     `/api/orders/${encodeURIComponent(id)}/fee`,
     { method: "POST", body: JSON.stringify(body) }
   )
