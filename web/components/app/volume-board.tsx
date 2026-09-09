@@ -131,29 +131,39 @@ export function VolumeRail({ data }: { data: PlanUsage }) {
         </div>
       </div>
 
-      {/* THE SENTENCE — the one thing this card exists to say. */}
+      {/**
+       * ONE SENTENCE, AND ONLY WHAT THE PICTURE ABOVE CANNOT SAY.
+       *
+       * It read: "You've shipped 0 units in September. 100 more earns 3% off in October." —
+       * and the rail directly above already carries the marker "0 units", while the rungs
+       * already read "3% · 100 units". So two thirds of the sentence was captioning a
+       * diagram, in a card whose whole job is one fact.
+       *
+       * What is left is the part nothing else can show: HOW MANY MORE, and WHEN it lands.
+       * The month matters because the discount is earned in one month and applied in the
+       * next, which is the single thing about this scheme people get wrong.
+       */}
       <p className="mt-5 text-sm leading-relaxed">
-        You&apos;ve shipped <span className="font-semibold tabular-nums">{units.toLocaleString()}</span>{" "}
-        {units === 1 ? "unit" : "units"} in {running ? monthShort(running.period) : tl("volumeBoard", "this month")}.{" "}
         {running?.next && running.unitsToNext != null ? (
           <>
             <span className="font-semibold tabular-nums">{running.unitsToNext.toLocaleString()}</span> more
-            {" "}earns <span className="font-semibold">{running.next.pct}% off</span> in{" "}
+            {" "}{tl("volumeBoard", "this month earns")} <span className="font-semibold">{running.next.pct}% off</span> in{" "}
             {monthShort(running.appliesTo)}.
           </>
         ) : running && running.pct > 0 ? (
-          <>That&apos;s the top tier — <span className="font-semibold">{running.pct}% off</span> in {monthShort(running.appliesTo)}.</>
+          <>{tl("volumeBoard", "Top tier —")} <span className="font-semibold">{running.pct}% off</span> in {monthShort(running.appliesTo)}.</>
         ) : null}
       </p>
 
-      {/* Last month, kept quiet. It is a receipt: true, occasionally useful, and nothing the
-          reader can act on. */}
-      {earned && (
+      {/* LAST MONTH ONLY WHEN IT EARNED SOMETHING. "August: 0 units — no tier reached" is a
+          receipt for nothing happening, under a card that has already said where you are: a
+          third line of type to tell somebody a thing did not occur. A month that DID earn a
+          tier is different — it is the discount running on this month's orders, which is
+          money and belongs on screen. */}
+      {earned && earned.pct > 0 && (
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {monthShort(earned.period)}: {earned.units.toLocaleString()} units
-          {earned.pct > 0
-            ? <> — {earned.pct}% {data.applied ? "off" : tl("volumeBoard", "would apply")} this month.</>
-            : <> {tl("volumeBoard", "— no tier reached.")}</>}
+          {monthShort(earned.period)}: {earned.units.toLocaleString()} units — {earned.pct}%{" "}
+          {data.applied ? "off" : tl("volumeBoard", "would apply")} this month.
         </p>
       )}
     </>

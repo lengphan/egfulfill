@@ -2598,6 +2598,8 @@ const vi: Dict = {
   "canvas.Add your design or a machine file, then save.": "Thêm thiết kế hoặc tệp máy của bạn, rồi lưu lại.",
   "verifyEmailBanner.Your email isn’t confirmed yet. Top-ups, payouts and connecting a shop need it.": "Email của bạn chưa được xác nhận. Nạp tiền, rút tiền và kết nối cửa hàng đều cần điều này.",
   "verifyEmailBanner.Confirm now": "Xác nhận ngay",
+  "volumeBoard.this month earns": "trong tháng này được",
+  "volumeBoard.Top tier —": "Bậc cao nhất —",
   "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",

@@ -322,10 +322,15 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
        someone adds a step. */
     heading: "From sold to shipped.",
     items: [
-      { n: "01", word: "Connect", title: "Plug in the shop you already run.", body: "Sign in to Etsy, Shopify or TikTok Shop. Existing orders import right away; new ones stream into one queue from then on." },
-      { n: "02", word: "Design", title: "Upload once, place once.", body: "Map your artwork to a product. Placement, print files and thread colours are set in the Design Lab and kept for every order after." },
-      { n: "03", word: "Publish", title: "List from here, or keep listing there.", body: "Push the listing to your store from EGFUL, or leave your listings where they are. Either way, the sale lands in the queue." },
-      { n: "04", word: "Ship", title: "We make it, check it, send it.", body: "Printed or stitched on our own machines, checked three times, the cheapest label bought and the tracking pushed back to your shop." },
+      /* ONE LINE EACH (owner, 2026-09-09: "too much wording"). Every body ran to two full
+         lines under a title that had already made the point, so the section was four
+         paragraphs where it needed four labels — and a numbered ladder is scanned, not read.
+         What survives is the fact the title cannot carry: which shops, what gets set, where
+         the sale arrives, what happens to the parcel. */
+      { n: "01", word: "Connect", title: "Plug in the shop you already run.", body: "Etsy, Shopify or TikTok Shop. Every order lands in one queue." },
+      { n: "02", word: "Design", title: "Upload once, place once.", body: "Placement, print files and thread colours — set once, reused after." },
+      { n: "03", word: "Publish", title: "List from here, or keep listing there.", body: "Push listings from EGFUL or keep your own. The sale arrives either way." },
+      { n: "04", word: "Ship", title: "We make it, check it, send it.", body: "Made on our machines, checked, shipped. Tracking goes back to your shop." },
     ],
   },
   /**
