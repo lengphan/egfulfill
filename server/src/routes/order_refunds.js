@@ -17,6 +17,18 @@ import { canMoveMoney, canAdjustPrice, canSeeMoney, resolveSeller, canSurface } 
 import { notify } from './notifications.js';
 import { egBroadcast } from '../events.js';
 import { notifyChannelStillOpen } from './orders.js';
+/**
+ * NEVER IMPORTED, AND CALLED TWICE. Both `orderLabelOf(...)` sites in this file threw
+ * ReferenceError, and one of them sits AFTER moveFunds has already taken the money: the
+ * seller was charged, the route then 500'd on the notification, and the operator was shown
+ * "Internal Server Error" for a charge that had gone through. Pressing Charge again mints a
+ * fresh idempotency key, so the second press charged again — which is how one order came to
+ * carry two $9.00 adjustments with near-identical reasons.
+ *
+ * The other site is the INSUFFICIENT_FUNDS branch, so the shortfall message — the one that
+ * says how much to top up and that the seller has been told — could never be returned either.
+ */
+import { orderLabelOf } from '../order-label.js';
 
 // Which part of an order a refund row paid back. Added idempotently at load, like the
 // other late columns in this codebase — schema.sql only runs on a first DB init, so an
