@@ -12,6 +12,9 @@ import type { PublicProduct } from "@/lib/api"
    here as methods-of.ts, which is exactly the private copy §5 warns about. */
 import { normalizeMethods } from "@/lib/print-method"
 import { sizeRangeLabel } from "@/lib/size-order"
+/* The canonical swatch resolver — the same one the catalogue grid and the app product page
+   read, so one colour name cannot render three ways across the product (§5). */
+import { swatchChipStyle } from "@/lib/color-swatch"
 
 /**
  * THE PRODUCTS PAGE — one garment shot large, then every other one shot identically.
@@ -298,6 +301,32 @@ export function PloyProducts({
                             <div className="h-full w-full" />
                           )}
                         </div>
+                        {/* THE COLOURWAYS, DIRECTLY UNDER THE PHOTO (owner's call, 2026-09-09).
+                            The line below already said "10 colours", which is a COUNT — it
+                            tells you how many there are and nothing about which, so a buyer
+                            deciding between two garments had to open both. The swatches are
+                            the same object the app's product page uses (swatchChipStyle),
+                            at the size that reads without becoming a second control: this is
+                            a card, not a picker, so nothing here is clickable and the whole
+                            card stays one link.
+                            EIGHT, then a count. A supplier style carries forty-plus, and a
+                            wall of dots under every tile is the grid's shape gone. */}
+                        {p.colors?.length ? (
+                          <div className="mt-3 flex items-center gap-1.5">
+                            {p.colors.slice(0, 8).map((c) => (
+                              <span
+                                key={c.name}
+                                title={c.name}
+                                aria-hidden
+                                className="size-3.5 shrink-0 rounded-full border border-ploy-ink/15"
+                                style={swatchChipStyle(c.name, c.image)}
+                              />
+                            ))}
+                            {p.colors.length > 8 && (
+                              <span className="text-[12px] font-medium tabular-nums text-ploy-ink/45">+{p.colors.length - 8}</span>
+                            )}
+                          </div>
+                        ) : null}
                         <p className="mt-3 truncate text-[15px] font-semibold">{p.name}</p>
                         {/* WHAT YOU NEED TO TELL TWO PRODUCTS APART: how many colourways, what
                             sizes, and the price. `sizeRangeLabel` is the shared ladder — the
@@ -307,12 +336,11 @@ export function PloyProducts({
                             NO SKU, and that is not an omission: a blank's sku maps to supplier
                             stock, so §2.9 withholds it from every unauthenticated surface. The
                             public API does not publish it and this page could not show it. */}
-                        <p className="mt-1 text-[13px] text-ploy-ink/55">
-                          {[
-                            p.colors?.length ? `${p.colors.length} ${p.colors.length === 1 ? "colour" : "colours"}` : "",
-                            sizeRangeLabel(p.sizes),
-                          ].filter(Boolean).join(" · ")}
-                        </p>
+                        {/* THE COUNT WENT WITH THE SWATCHES ARRIVING. "10 colours" above a
+                            row of ten dots is the same fact twice, and the overflow chip
+                            already says how many did not fit. Sizes stay: there is no
+                            swatch for a size range. */}
+                        <p className="mt-1 text-[13px] text-ploy-ink/55">{sizeRangeLabel(p.sizes)}</p>
                         <p className="mt-0.5 text-[14px] font-medium tabular-nums text-ploy-ink">
                           {p.priceVaries ? "from " : ""}${Number.isInteger(p.priceFrom ?? p.price) ? (p.priceFrom ?? p.price) : (p.priceFrom ?? p.price).toFixed(2)}
                         </p>
