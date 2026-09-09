@@ -16,6 +16,21 @@ const KEYS = [
   // seller-facing design charge is now being added: two "design fees" meaning opposite
   // directions is a mistake waiting to be made in a money path.
   'designer_payout', 'ship_extra', 'emb_price',
+  /**
+   * WHAT A DESIGNER EARNS, BY BAND (2026-09-09).
+   *
+   * `designer_payout` was one flat rate for every design, which priced a one-colour DTG
+   * redraw and a five-colour digitise the same — so the hard jobs were the ones nobody
+   * wanted to claim. Three bands, set here, and the band is chosen on the card.
+   *
+   * THEY DEFAULT TO THE FLAT RATE, deliberately: until an admin sets a spread, every band
+   * pays exactly what the flat rate paid, so turning this on re-prices nothing. Migrating a
+   * money path should be a no-op on day one and a decision on day two.
+   *
+   * `designer_payout` stays as the FALLBACK for a band nobody has priced, and for cards
+   * created before bands existed.
+   */
+  'design_band_easy', 'design_band_standard', 'design_band_complex',
   // SELLER-FACING design charges. Three mutually exclusive outcomes for one embroidered
   // line, and which one applies is decided by where the machine file comes from:
   //   we digitise it, ordinary          -> design_fee_standard
@@ -122,6 +137,11 @@ export const SETTING_DEFAULTS = {
   // parcel is now two settings: which band the garment falls in, and each extra unit.
   ship_extra: 2,       // every additional UNIT in that same parcel
   designer_payout: 2.5, // paid TO a designer per approved design (legacy eg_designer_fee_rate)
+  /* 0 means "not priced" and falls back to designer_payout — see the note in KEYS. A real
+     zero would be a design that pays nothing, which is not a thing anyone means to set. */
+  design_band_easy: 0,
+  design_band_standard: 0,
+  design_band_complex: 0,
   overdue_days: 10,    // an open order older than this is flagged on the boards
   emb_price: 0,        // what a SELLER pays to download an embroidery file; per-file overrides
   // Placeholders, not policy. Every one of these is a real charge to a real seller, so

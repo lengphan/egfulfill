@@ -1218,6 +1218,10 @@ function PlatformPanel() {
   const tl = useLabelT()
  const [loaded, setLoaded] = useState<FactorySettings | null>(null)
  const [designFee, setDesignFee] = useState("")
+  /** What each design band pays. Blank = not priced, and the card falls back to designFee. */
+ const [bandEasy, setBandEasy] = useState("")
+ const [bandStd, setBandStd] = useState("")
+ const [bandCx, setBandCx] = useState("")
  const [designStd, setDesignStd] = useState("")
  const [designCx, setDesignCx] = useState("")
  const [embCx, setEmbCx] = useState("")
@@ -1303,6 +1307,9 @@ function PlatformPanel() {
  getFactorySettings().then((r) => {
  setLoaded(r)
  setDesignFee(r.designer_payout != null ? String(r.designer_payout) : "")
+ setBandEasy(r.design_band_easy ? String(r.design_band_easy) : "")
+ setBandStd(r.design_band_standard ? String(r.design_band_standard) : "")
+ setBandCx(r.design_band_complex ? String(r.design_band_complex) : "")
  setDesignStd(r.design_fee_standard != null ? String(r.design_fee_standard) : "")
  setDesignCx(r.design_fee_complex != null ? String(r.design_fee_complex) : "")
  setEmbCx(r.emb_price_complex != null ? String(r.emb_price_complex) : "")
@@ -1384,6 +1391,9 @@ function PlatformPanel() {
       }
  const r = await setFactorySettings({
  designer_payout: designFee === "" ? undefined : Number(designFee),
+ design_band_easy: bandEasy === "" ? undefined : Number(bandEasy),
+ design_band_standard: bandStd === "" ? undefined : Number(bandStd),
+ design_band_complex: bandCx === "" ? undefined : Number(bandCx),
  design_fee_standard: designStd === "" ? undefined : Number(designStd),
  design_fee_complex: designCx === "" ? undefined : Number(designCx),
  emb_price_complex: embCx === "" ? undefined : Number(embCx),
@@ -1571,6 +1581,16 @@ function PlatformPanel() {
         <FeeGroup
  title={tl("settings", "What we pay out")}
         >
+          {/* THE BAND RATES, and the flat fee they grew out of.
+              One rate for every design paid a one-colour redraw the same as a five-colour
+              digitise, so the hard jobs were the ones nobody claimed. The band is chosen on
+              the card; these are what each one pays.
+              "Designer payout" stays and is not legacy clutter: it is what an UNBANDED card
+              pays — every card made before bands existed — and what a band nobody has priced
+              falls back to. Leave the three blank and nothing re-prices. */}
+          <MoneyField label={tl("settings", "Easy")} value={bandEasy} onChange={setBandEasy} />
+          <MoneyField label={tl("settings", "Standard")} value={bandStd} onChange={setBandStd} />
+          <MoneyField label={tl("settings", "Complex design")} value={bandCx} onChange={setBandCx} />
           <MoneyField label={tl("settings", "Designer payout")} value={designFee} onChange={setDesignFee} />
         </FeeGroup>
         <FeeGroup

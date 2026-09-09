@@ -9,6 +9,8 @@ import { audit } from '../audit.js';
 import { notify } from './notifications.js';
 import { bookDesignCost } from './pinkdesign.js';
 import { storageEnabled, fromDataUrl, designUrlTtlDays, presignGet, publicUrl } from '../storage.js';
+// The band rates live with every other fee an admin sets.
+import { readAll } from './factory_settings.js';
 import { putObject, getObject } from '../storage.js';
 import { hashOf } from '../fingerprint.js';
 
@@ -165,6 +167,14 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   q('alter table design_cards add column if not exists art_hash text').catch(() => {});
   q('alter table design_cards add column if not exists art_data text').catch(() => {});
   // Who made it and when — a manual card has no order to inherit provenance from.
+  /**
+   * WHICH BAND THIS DESIGN IS, and therefore what it pays.
+   *
+   * 'easy' | 'standard' | 'complex'. NULL is the honest state for every card that existed
+   * before bands did, and it is not the same as 'standard': an unbanded card falls back to
+   * the old flat `designer_payout`, so nothing that was already in flight silently re-prices.
+   */
+  q('alter table design_cards add column if not exists band text').catch(() => {});
   q('alter table design_cards add column if not exists created_by text').catch(() => {});
   q('alter table design_cards add column if not exists created_at timestamptz default now()').catch(() => {});
   // The table had NO index but its primary key, while GET /api/orders runs TWO correlated
@@ -674,11 +684,35 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // Approved. Soft-return (not 403) so the board's optimistic call from a non-admin just
     // does nothing, matching the other "credited:false" outcomes below.
     if (!req.user || req.user.role !== 'admin') { return { ok: true, credited: false, reason: 'admin-only' }; }
-    const amount = Math.max(0, Number((req.body || {}).amount) || 0);
-    if (!amount) { reply.code(400); return { error: 'amount required' }; }
-    const card = await q('select id, title, claimed_by, claimed_id, credited, vendor from design_cards where id=$1::bigint', [String(req.params.id)])
+    const card = await q('select id, title, claimed_by, claimed_id, credited, vendor, band, payment from design_cards where id=$1::bigint', [String(req.params.id)])
       .then((r) => r.rows[0]).catch(() => null);
     if (!card) { reply.code(404); return { error: 'Card not found' }; }
+    /**
+     * THE SERVER DECIDES WHAT A DESIGN PAYS.
+     *
+     * This read `req.body.amount` — the number the board happened to be holding. The route
+     * already refused to let a client decide WHO gets paid ("a client must not"), resolving
+     * the claimer here; it took HOW MUCH on trust in the same breath. An admin-only route,
+     * so not a seller-facing hole, but the same class as the one that made
+     * POST /api/wallet/ledger staff-only, and the configured rate was advisory in the
+     * meantime: nothing stopped a hand-made request crediting any figure at all.
+     *
+     * The BAND on the card decides it now, priced from settings. An unbanded card — every
+     * card that predates bands — falls back to the flat `designer_payout` it would always
+     * have paid, and a band nobody has priced does the same, so a half-configured install
+     * pays the old rate rather than nothing.
+     */
+    const fees = await readAll().catch(() => ({}));
+    const bandKey = { easy: 'design_band_easy', standard: 'design_band_standard', complex: 'design_band_complex' }[
+      String(card.band || '').toLowerCase()
+    ];
+    const flat = Number(fees.designer_payout) || 0;
+    const banded = bandKey ? Number(fees[bandKey]) || 0 : 0;
+    const amount = Math.round((banded > 0 ? banded : flat) * 100) / 100;
+    if (!amount) {
+      reply.code(400);
+      return { error: 'No rate is set for this design. Set the band rates in Settings › Platform, or a designer payout, before crediting.' };
+    }
     if (card.credited) return { ok: true, already: true };
     // Rule 0 — an OUTSOURCED card was worked by a partner we pay by invoice. Crediting a
     // designer here would pay twice for one job: their invoice plus an internal payout to
@@ -724,8 +758,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
        The money is in their wallet; sending it is a payout an admin still has to make. */
     await q('update design_cards set credited=true, pay_status=$2, payment=$3 where id=$1::bigint',
       [String(card.id), 'credited', amount]).catch(() => {});
-    audit(req, 'design.credited', { entityType: 'design_card', entityId: String(card.id), after: { account, amount } });
-    return { ok: true, credited: true, account };
+    audit(req, 'design.credited', { entityType: 'design_card', entityId: String(card.id), after: { account, amount, band: card.band || 'flat' } });
+    /* The AMOUNT comes back because the board no longer knows it — it is decided here now,
+       and a card that says "credited" without saying how much is a receipt with no figure. */
+    return { ok: true, credited: true, account, amount, band: card.band || null };
   });
 
   app.post('/api/design_cards', { preHandler: requireStaff }, async (req) => {

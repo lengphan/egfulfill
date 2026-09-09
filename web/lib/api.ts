@@ -3416,6 +3416,8 @@ export function aiDraft(threadId: string) {
  *  the method_* keys addressable by name from the settings form. */
 export type FactorySettings = {
   designer_payout?: number; ship_extra?: number; emb_price?: number
+  /** What each design BAND pays. 0 means "not priced" and falls back to designer_payout. */
+  design_band_easy?: number; design_band_standard?: number; design_band_complex?: number
   /** Seller payout guardrails. payout_max = 0 means "no fixed ceiling — balance is the cap". */
   payout_min?: number; payout_max?: number
   /** Seller-facing design charges. Exactly ONE of the three applies to a line, decided by
@@ -3632,6 +3634,17 @@ export type DesignCard = {
    *  won't happen for an operator/warehouse/admin claim. */
   claimed_role?: string | null
   payment?: number | string | null
+  /**
+   * WHICH BAND THIS DESIGN IS — 'easy' | 'standard' | 'complex' — and therefore what it pays.
+   *
+   * The RATE is not here on purpose. It lives in settings and is read by the server when the
+   * card is credited, so the board can never be the thing that decides what a designer earns;
+   * `payment` records what was actually paid once that has happened.
+   *
+   * Null is not 'standard'. It is every card that existed before bands did, and it falls
+   * back to the old flat `designer_payout` rather than being re-priced without anyone asking.
+   */
+  band?: "easy" | "standard" | "complex" | null
   pay_status?: string | null
   credited?: boolean // designer paid once on approval — guards against double-credit
   priority?: string | null
@@ -3722,10 +3735,16 @@ export function deleteDesignLane(id: string) {
 }
 /** Credit the designer who claimed a card. The SERVER decides who (and whether) —
  *  staff uploads aren't billable, and a shared board pays the claimer, not a pool. */
-export function creditDesignCard(id: string | number, amount: number) {
-  return api<{ ok?: boolean; credited?: boolean; already?: boolean; account?: string; reason?: string; vendor?: string; error?: string }>(
+/**
+ * Release the designer's payout. The AMOUNT IS NOT SENT: the server reads the card's band
+ * and prices it from settings, because a client deciding what someone earns is the shape of
+ * hole that made POST /api/wallet/ledger staff-only. Kept as a no-argument call so nothing
+ * can pass a figure by habit.
+ */
+export function creditDesignCard(id: string | number) {
+  return api<{ ok?: boolean; credited?: boolean; already?: boolean; account?: string; amount?: number; band?: string | null; reason?: string; vendor?: string; error?: string }>(
     `/api/design_cards/${encodeURIComponent(String(id))}/credit`,
-    { method: "POST", body: JSON.stringify({ amount }) })
+    { method: "POST" })
 }
 export function saveDesignCards(cards: DesignCard[]) {
   return api<{ ok?: boolean; count?: number; error?: string }>(`/api/design_cards`, { method: "POST", body: JSON.stringify(cards) })

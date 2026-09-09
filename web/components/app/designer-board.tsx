@@ -259,6 +259,8 @@ export function DesignerBoard() {
  const canSeeHistory = canDeleteCard()
  const [query, setQuery] = useState("")
  const [designFee, setDesignFee] = useState(0) // platform default payout per design
+  /** What each band pays, for DISPLAY on the band buttons. The server prices the credit. */
+ const [bandRates, setBandRates] = useState<Record<"easy" | "standard" | "complex", number>>({ easy: 0, standard: 0, complex: 0 })
  const [partnerCost, setPartnerCost] = useState(0) // what an outsourced design partner costs per task
  const [delErr, setDelErr] = useState<string | null>(null)
  const me = getUser()?.name || "Designer"
@@ -298,7 +300,17 @@ export function DesignerBoard() {
  useEffect(() => {
  const id = setTimeout(() => {
  load()
- getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
+ getFactorySettings().then((s) => {
+ setDesignFee(Number(s.designer_payout) || 0)
+ setPartnerCost(Number(s.design_partner_cost) || 0)
+      /* Shown on the band buttons so the choice states its own price. The SERVER still
+         prices the credit — these are for reading, never for sending. */
+ setBandRates({
+ easy: Number(s.design_band_easy) || 0,
+ standard: Number(s.design_band_standard) || 0,
+ complex: Number(s.design_band_complex) || 0,
+      })
+    }).catch(() => {})
     }, 0)
  return () => clearTimeout(id)
   }, [load])
@@ -311,7 +323,17 @@ export function DesignerBoard() {
  useEffect(() => {
  const refresh = () => {
  if (typeof document !== "undefined" && document.hidden) return
- getFactorySettings().then((s) => { setDesignFee(Number(s.designer_payout) || 0); setPartnerCost(Number(s.design_partner_cost) || 0) }).catch(() => {})
+ getFactorySettings().then((s) => {
+ setDesignFee(Number(s.designer_payout) || 0)
+ setPartnerCost(Number(s.design_partner_cost) || 0)
+      /* Shown on the band buttons so the choice states its own price. The SERVER still
+         prices the credit — these are for reading, never for sending. */
+ setBandRates({
+ easy: Number(s.design_band_easy) || 0,
+ standard: Number(s.design_band_standard) || 0,
+ complex: Number(s.design_band_complex) || 0,
+      })
+    }).catch(() => {})
     }
  window.addEventListener("focus", refresh)
  document.addEventListener("visibilitychange", refresh)
@@ -509,16 +531,17 @@ export function DesignerBoard() {
  else if (!card.claimed_by) { own = { claimed_by: u.name, claimed_id: u.id ?? null, claimed_role: u.role ?? null } }
     }
  patch(card.id, { col: to, ...(own || {}), ...extra })
-    // Credit on approval — use the card's payout, or the platform Design fee as the default.
- const amount = amt(card.payment) || designFee
- if (to === "approved" && !card.credited && amount > 0) {
-      // The SERVER decides who gets paid: only a designer earns a payout (staff upload
-      // files too, and that isn't billable design work), and on a shared board the credit
-      // follows whoever claimed the card rather than a common pool.
- creditDesignCard(card.id, amount)
+ if (to === "approved" && !card.credited) {
+      /* The SERVER decides BOTH halves now. Who: only a designer earns a payout (staff
+         upload files too, and that isn't billable), and on a shared board the credit follows
+         whoever claimed the card. How much: the card's BAND, priced from settings — this
+         used to send `card.payment || designFee`, so the board was naming the figure.
+         `payment` is written from what came BACK, which makes it a receipt rather than a
+         second opinion. */
+ creditDesignCard(card.id)
         .then((r) => {
  if (r?.error) return
- if (r?.credited) patch(card.id, { credited: true, pay_status: "credited", payment: amount })
+ if (r?.credited) patch(card.id, { credited: true, pay_status: "credited", payment: r.amount ?? card.payment })
         })
         .catch(() => {})
     }
@@ -966,7 +989,7 @@ export function DesignerBoard() {
           <button onClick={() => setDelErr(null)} className="ml-2 underline">dismiss</button>
         </div>
       )}
-      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)}
+      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} bandRates={bandRates} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)}
  onAssign={() => { setAssignCard(openCard); setOpenId(null) }}
  onPushed={() => { setOpenId(null); load() }} canPush={showPartner} lanes={lanes} />}
     </div>
@@ -1009,6 +1032,16 @@ const makeListCols = (lanes: DesignLane[]): ListCol[] => [
   { id: "lane", label: "Status", cell: (c) => { const col = laneMeta(laneOf(c, lanes), lanes); return <span className={"inline-flex items-center rounded-md px-2 py-0.5 font-medium " + lanePill(col.accent)}>{col.label}</span> } },
   { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
 ]
+/**
+ * THE THREE BANDS. The hint is what an admin and a designer have to agree means the same
+ * thing — the rates are only as fair as the words, so they are written once, here.
+ */
+const BANDS: { id: "easy" | "standard" | "complex"; label: string; hint: string }[] = [
+  { id: "easy", label: "Easy", hint: "Text or a supplied vector, one colour, no redraw." },
+  { id: "standard", label: "Standard", hint: "A redraw, two to four colours, ordinary cleanup." },
+  { id: "complex", label: "Complex", hint: "Digitising, a photo trace, five or more colours." },
+]
+
 const DEFAULT_LIST_COLS = ["design", "order", "product", "claimed", "files", "lane", "payout"]
 
 // List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
@@ -1138,10 +1171,13 @@ function DesignerList({ cards, onOpen, lanes }: { cards: DesignCard[]; onOpen: (
 }
 
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
-function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPushed, canPush, lanes }: { card: DesignCard; me: string; designFee: number; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPushed: () => void; canPush: boolean }) {
+function CardDialog({ card, me, designFee, bandRates, onClose, patch, onMove, remove, onAssign, onPushed, canPush, lanes }: { card: DesignCard; me: string; designFee: number; bandRates: Record<"easy" | "standard" | "complex", number>; lanes: DesignLane[]; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPushed: () => void; canPush: boolean }) {
   const tl = useLabelT()
-  // Default the payout to the platform Design fee when the card hasn't set one.
- const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
+  /* THE BAND, NOT A FIGURE. This was a free-text payout box seeded from the flat design
+     fee, which is what made every design cost the same however hard it was — and it let the
+     board name the number the server then paid out. The rate belongs to the band, the band
+     belongs to the card, and the money is worked out where the money lives. */
+ const band = (card.band ?? "") as "" | "easy" | "standard" | "complex"
  const [busy, setBusy] = useState(false)
  const [err, setErr] = useState<string | null>(null)
  const prompt = usePrompt()
@@ -1223,11 +1259,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
    * shown instead of leaving the button looking like it worked.
    */
  const creditNow = async () => {
- const amount = Number(pay) || 0
- if (amount <= 0) { setErr("Set a payout amount first."); return }
  setBusy(true); setErr(null)
  try {
- const r = await creditDesignCard(card.id, amount)
+ const r = await creditDesignCard(card.id)
  if (r?.error) throw new Error(r.error)
  if (!r?.credited && !r?.already) {
  setErr(
@@ -1238,7 +1272,9 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
           )
  return
       }
- patch(card.id, { credited: true, pay_status: "credited", payment: amount })
+      /* What the SERVER paid, not what this screen guessed — same reason the amount stopped
+         being sent at all. */
+ patch(card.id, { credited: true, pay_status: "credited", payment: r.amount ?? card.payment })
     } catch (e) {
  setErr(e instanceof Error ? e.message : "Couldn't credit the designer.")
     } finally { setBusy(false) }
@@ -1520,14 +1556,43 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               </div>
             )
           }
+          /* THE BAND IS THE CONTROL; the figure beside it is the consequence.
+             A rate typed per card is how a flat fee became a hundred different flat fees —
+             and it made the board the thing that decided what somebody earned. Three bands,
+             priced once in Settings › Platform, chosen here. The label carries the rate so
+             nobody has to open Settings to know what they are agreeing to (§4: a control
+             explains itself in its label). */
  return canFee ? (
-            <label className="flex items-center gap-2">
-              <span className="text-sm font-medium">{tl("designer", "Payout")}</span>
-              <div className="relative w-32">
-                <CurrencyDollar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input value={pay} onChange={(e) => setPay(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="h-9 pl-7" inputMode="decimal" onBlur={() => patch(card.id, { payment: Number(pay) || 0 })} />
+            <div>
+              <div className="mb-1.5 text-sm font-medium">{tl("designer", "Payout band")}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {BANDS.map((b) => {
+ const on = band === b.id
+ const rate = bandRates[b.id] || designFee
+ return (
+                    <button
+ key={b.id}
+ type="button"
+ aria-pressed={on}
+ onClick={() => patch(card.id, { band: b.id })}
+ title={b.hint}
+ className={"inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors " +
+                        (on ? "border-foreground bg-foreground font-medium text-background" : "border-input hover:border-foreground/40")}
+                    >
+                      {tl("designer", b.label)}
+                      {rate > 0 && <span className="tabular-nums opacity-70">{money(rate)}</span>}
+                    </button>
+                  )
+                })}
               </div>
-            </label>
+              {/* An unbanded card is not "Easy" — it is every card made before bands, and it
+                  pays what it always would have. Said once, where the choice is. */}
+              {!band && designFee > 0 && (
+                <div className="mt-1.5 text-xs text-muted-foreground">
+                  {tl("designer", "No band yet — pays the old flat rate")} {money(designFee)}
+                </div>
+              )}
+            </div>
           ) : (
  amt(card.payment) > 0 ? <div className="text-sm text-muted-foreground">{tl("designer", "Payout")} <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div> : null
           )
@@ -1603,7 +1668,7 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAss
               {col === "approved" && (
  card.credited
                   ? <span className="inline-flex items-center gap-1 text-sm font-medium text-success"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
- : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
+ : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(bandRates[band as "easy"] || designFee)}</>}</Button>
               )}
             </>
           )}
