@@ -2562,6 +2562,7 @@ const vi: Dict = {
   "canvas.Title": "Tiêu đề",
   "canvas.Template name": "Tên mẫu",
   "canvas.Description / notes": "Mô tả / ghi chú",
+  "canvas.Payout band": "Bậc trả công",
   "canvas.Save": "Lưu",
   "canvas.Save as template": "Lưu thành mẫu",
   "canvas.Cancel": "Huỷ",

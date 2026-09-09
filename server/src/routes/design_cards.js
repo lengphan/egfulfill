@@ -843,8 +843,8 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            (id, order_id, sku, design_id, title, col, type, product, priority, due,
             assignee, claimed_by, payment, pay_status, is_emb, emb_file_name, thumb,
             thumb_ref, files, specs, notes, history, checklist, vendor, vendor_ref, line_id,
-            claimed_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+            claimed_id, band)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
          on conflict (id) do update set
            order_id=excluded.order_id, sku=excluded.sku, design_id=excluded.design_id,
            title=excluded.title, col=excluded.col, type=excluded.type, product=excluded.product,
@@ -854,7 +854,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
            thumb_ref=excluded.thumb_ref, files=excluded.files, specs=excluded.specs,
            notes=excluded.notes, history=excluded.history, checklist=excluded.checklist,
            vendor=excluded.vendor, vendor_ref=excluded.vendor_ref, line_id=excluded.line_id,
-           claimed_id=excluded.claimed_id,
+           claimed_id=excluded.claimed_id, band=excluded.band,
            updated_at=now()`,
         [c.id, c.order_id || null, c.sku || null, c.design_id || null, c.title || null,
          c.col || 'incoming', c.type || null, c.product || null, c.priority || 'normal', c.due || null,
@@ -864,7 +864,14 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
          JSON.stringify(c.history || []), JSON.stringify(c.checklist || []),
          c.vendor || null, c.vendor_ref || null, c.line_id || null,
          /* A blank string is not a uuid — Postgres rejects it, and the whole save fails. */
-         c.claimed_id || null]
+         c.claimed_id || null,
+         /* THE BAND HAD TO BE ADDED HERE TOO, and forgetting it is silent.
+            This statement names its columns, so a card property missing from the list is
+            simply not saved — the board would set a band, the tile would repaint from local
+            state, and the next load would show it unbanded again with nothing having failed.
+            Only the three known values; anything else is NULL, which means "not priced". */
+         ['easy', 'standard', 'complex'].includes(String(c.band || '').toLowerCase())
+           ? String(c.band).toLowerCase() : null]
       );
     }
     // Cast explicitly. design_cards.id is bigint, but node-pg returns bigint as a STRING,

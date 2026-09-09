@@ -20,6 +20,7 @@ import { VariantPicker, type ItemSetupPatch } from "@/components/app/variant-pic
 import { deleteOrderDesign, getProductTypes, getOrderDesigns, designsBySide, sidesForLine, scopeDesignFile, getOrderDesignCards, cardForLine, createDesignCard, assignDesignCard, deleteDesignFile, type OrderDesignCard, uploadDesignFile, downloadDesignFile, filesForLine, postOrderDesign, postOrderThreads, setDesignTier, saveTemplate, setItemMockup, uploadChatAttachment, getDesignFiles, getMachineFiles, attachMachineFile as attachLibraryFile, type MachineFile, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces, isEmbroidery, offeredSides, setTypeMockups, FALLBACK_SIDES } from "@/lib/variant-resolve"
+import { BandPills, useBandRates, type Band } from "@/components/app/band-pills"
 import { printZoneOf, printSizeOf, outsideZone } from "@/lib/print-zone"
 import { useStageZoom } from "@/lib/stage-zoom"
 import { useIsNarrow } from "@/lib/use-narrow"
@@ -1624,6 +1625,11 @@ export function DesignCanvasDialog({
    * names the parts now instead of leaving them to be inferred.
    */
  const [cardPrefixText, setCardPrefixText] = useState("")
+  /** WHAT THIS DESIGN PAYS, chosen here because this is the moment somebody is looking at the
+   *  artwork. The second of the two send-to-board doors — see send-to-board-dialog.tsx, which
+   *  asks the same question the same way. */
+ const [cardBand, setCardBand] = useState<Band | null>(null)
+ const { rates: bandRates, flat: bandFlat } = useBandRates()
  const fullCardTitle = (name: string) => {
  const pre = cardPrefixText.trim()
  const rest = name.trim() || item.name || item.sku || "Design"
@@ -1637,6 +1643,7 @@ export function DesignCanvasDialog({
  setCardPrefixText(cardPrefix)
  setCardTitle(item.name || item.sku || "Design")
  setCardNote("")
+ setCardBand(null)
  setErr(null)
  setConfirmSend(true)
   }
@@ -1647,6 +1654,9 @@ export function DesignCanvasDialog({
  const card = await createDesignCard({
  title: fullCardTitle(cardTitle),
  description: cardNote.trim() || undefined,
+      /* Undefined when nobody picked, never a default: a card priced by omission is how a
+         digitise gets paid at the Easy rate. It arrives on the board wearing the pills. */
+ band: cardBand ?? undefined,
  data: designUrl || undefined,
  sku: item.sku || undefined,
         /**
@@ -3791,6 +3801,14 @@ export function DesignCanvasDialog({
                   />
                 </div>
               </div>
+            </div>
+            {/* WHAT IT PAYS. Asked here because this is the moment somebody is looking at the
+                artwork — the one point it can be judged without opening anything. Optional:
+                leaving it unset is an honest answer, and the card lands on the board wearing
+                the same pills so the next person can price it. */}
+            <div>
+              <div className="mb-1.5 text-sm font-medium">{tl("canvas", "Payout band")}</div>
+              <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setConfirmSend(false)}>{tl("canvas", "Cancel")}</Button>
