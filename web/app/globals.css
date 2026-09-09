@@ -1150,8 +1150,11 @@ td[align="right"] {
    the row that gave it away only did so by rendering mid-rotation. Match the specificity and
    say !important, because a fifth motion added later must not be able to outrank this. */
 @media (prefers-reduced-motion: reduce) {
-  [data-motion] .eg-band-swim,
-  [data-motion] .eg-band-float { animation: none !important; }
+  /* `html[data-force-motion]` is /lab/band's override and nothing else sets it. It exists
+     because "no motion is showing" and "this machine asks for no motion" look identical from
+     the outside, and the only way to tell them apart is to switch one off and look again. */
+  html:not([data-force-motion]) [data-motion] .eg-band-swim,
+  html:not([data-force-motion]) [data-motion] .eg-band-float { animation: none !important; }
 }
 
 /* ── THE PRESS — the decorated garment shows through under the pointer ─────────

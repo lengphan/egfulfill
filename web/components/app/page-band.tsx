@@ -89,16 +89,19 @@ type BandObject = BandSlot & { src: string; swim: SwimPath }
 
 export const LAYOUTS: Record<string, BandSlot[]> = {
   /** EVEN — one size for every object, evenly spaced (owner's call). Sized to sit INSIDE the
-   *  band with air top and bottom: at 104% they were cropped, and a garment with its shoulders
-   *  cut off by the frame is not a bigger garment, it is a broken one. Five rather than six,
+   *  band: 98% of its height, which is as large as they go before the frame starts eating
+   *  shoulders — a garment cropped by the band is not a bigger garment, it is a broken one.
+   *  The objects sit on a SQUARE canvas (tools/import-objects.py), so a wide one like the cap
+   *  fills that square's width and leaves air above and below; that is the shape of the cap,
+   *  not the box being too small. Five rather than six,
    *  because six at this size have to overlap to fit and a row of garments piled on each
    *  other is a rack, not a set. */
   even: [
-    { x: 60.0, y: 9, h: 82 },
-    { x: 68.5, y: 9, h: 82 },
-    { x: 77.0, y: 9, h: 82 },
-    { x: 85.5, y: 9, h: 82 },
-    { x: 94.0, y: 9, h: 82 },
+    { x: 58.5, y: 1, h: 98 },
+    { x: 67.5, y: 1, h: 98 },
+    { x: 76.5, y: 1, h: 98 },
+    { x: 85.5, y: 1, h: 98 },
+    { x: 94.5, y: 1, h: 98 },
   ],
   /** SHELF — every object standing on one line. Here the sizes do the varying. */
   shelf: [

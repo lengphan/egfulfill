@@ -7,7 +7,57 @@
  * Sits beside /lab/decor, which does the same job for the band and tile pairing.
  */
 
+import { useEffect, useState } from "react"
 import { PageBand, LAYOUTS, SETS, MOTIONS, DEFAULT_LAYOUT } from "@/components/app/page-band"
+
+/**
+ * WHY THIS BANNER EXISTS: "no motion is showing" and "this machine has asked for no motion"
+ * look exactly the same from the outside, and every one of these animations is switched off
+ * by prefers-reduced-motion on purpose. So the lab says which of the two it is, out loud, and
+ * offers the override — because being told the setting is on is not as convincing as watching
+ * the objects start moving when you turn it off.
+ */
+function MotionState() {
+  const [reduced, setReduced] = useState<boolean | null>(null)
+  const [forced, setForced] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const read = () => setReduced(mq.matches)
+    const id = setTimeout(read, 0)
+    mq.addEventListener("change", read)
+    return () => { clearTimeout(id); mq.removeEventListener("change", read) }
+  }, [])
+
+  useEffect(() => {
+    const el = document.documentElement
+    if (forced) el.setAttribute("data-force-motion", "1")
+    else el.removeAttribute("data-force-motion")
+    return () => el.removeAttribute("data-force-motion")
+  }, [forced])
+
+  if (reduced === null) return null
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+      <span>
+        This browser reports{" "}
+        <span className="font-semibold">prefers-reduced-motion: {reduced ? "reduce" : "no-preference"}</span>
+      </span>
+      {reduced && (
+        <>
+          <span className="text-muted-foreground">
+            — every animation below is switched off for it, which is the intended behaviour.
+            macOS: System Settings › Accessibility › Display › Reduce motion.
+          </span>
+          <label className="flex cursor-pointer items-center gap-2 font-medium">
+            <input type="checkbox" checked={forced} onChange={(e) => setForced(e.target.checked)} />
+            Show me the motion anyway
+          </label>
+        </>
+      )}
+    </div>
+  )
+}
 
 const NOTES: Record<string, string> = {
   shelf: "one baseline, sizes vary",
@@ -94,7 +144,10 @@ export default function BandLayoutLab() {
           are sized off its HEIGHT while their positions are percentages of its WIDTH — so a
           628px band crowded them into each other and a 1150px one spread them out. Comparing
           a layout at the wrong width is comparing the wrong layout. */}
-      <p className="px-6 py-4 text-sm font-semibold">Band motion, sets and arrangements — the real component, at real width</p>
+      <div className="space-y-3 px-6 py-4">
+        <p className="text-sm font-semibold">Band motion, sets and arrangements — the real component, at real width</p>
+        <MotionState />
+      </div>
       <Column dark={false} />
       <Column dark />
     </div>
