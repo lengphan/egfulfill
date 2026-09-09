@@ -8,7 +8,7 @@ import { Stack, X, PencilSimple, CircleNotch, Plus } from "@phosphor-icons/react
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getTemplates, deleteTemplate, getCatalogProducts, type ProductTemplate, type CatalogProduct } from "@/lib/api"
-import { productImage } from "@/components/app/product-picker-dialog"
+import { bestMockup } from "@/lib/variant-resolve"
 import { EmptyState } from "@/components/app/empty-state"
 
 /**
@@ -41,11 +41,17 @@ export function TemplatesPanel() {
     return () => clearTimeout(id)
   }, [])
 
-  /** The blank a template was built on, matched on the sku it saved. */
+  /**
+   * The blank a template was built on, matched on the sku it saved — then the name, for a
+   * template written before blankSku existed. Same order the maker restores in: a sku is
+   * the identity, a name is a label somebody edits.
+   */
   const blankOf = (t: ProductTemplate) => {
     const d = (t.data ?? {}) as { blankSku?: string | null; blank?: string | null }
     const sku = String(d.blankSku ?? "").trim()
-    const found = sku ? catalog.find((p) => String(p.sku ?? "").trim() === sku) : undefined
+    const name = String(d.blank ?? "").trim()
+    const found = (sku ? catalog.find((p) => String(p.sku ?? "").trim() === sku) : undefined)
+      ?? (name ? catalog.find((p) => String(p.name ?? "").trim() === name) : undefined)
     return { product: found, name: found?.name ?? d.blank ?? null }
   }
 
@@ -86,24 +92,46 @@ export function TemplatesPanel() {
         <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-4">
           {list.map((t) => {
             const { product, name: blankName } = blankOf(t)
-            const blankImg = product ? productImage(product) : null
+            /*
+             * bestMockup, NOT the listing photo.
+             *
+             * `productImage` is the hero shot and stops at the product's own imagery, so a
+             * blank that has none — which is most of them, including every cap — resolved
+             * to "" and the card drew the artwork on nothing while still printing the
+             * garment's name underneath. bestMockup falls through to the CATEGORY outline,
+             * which is the same picture the maker put under the design when it was placed.
+             */
+            const blankImg = product ? bestMockup(product, null) : null
             // Fall back to the key only for a row saved before `seq` existed and not yet
             // re-listed — better an ugly reference than a blank one.
             const ref = t.seq != null ? `TPL-${t.seq}` : t.id
             return (
             <div key={t.id} className="group overflow-hidden rounded-xl border border-border">
               <div className="relative aspect-square bg-muted/40">
-                {/* THE BLANK UNDERNEATH. Two layers, deliberately: the garment fills the
-                    frame (cover) so every tile is uniform, and the artwork sits over it
-                    CONTAINED so it keeps its own proportions and its placement reads. A
-                    single flattened image can't do both, and the composite has no garment
-                    in it to flatten with. */}
+                {/*
+                  * THE STAGE, REBUILT — the full blank underneath, the design over it.
+                  *
+                  * A template's composite is composeDesign(artwork + text): the layers
+                  * painted at their percentages of the SQUARE STAGE, with no garment in it
+                  * at all. So the two are not independent pictures to be arranged nicely,
+                  * they are the two halves of one frame, and the card only tells the truth
+                  * about a placement if it reproduces that frame exactly:
+                  *
+                  *   the blank      object-contain p-[1%]   — as design-canvas draws it
+                  *   the composite  object-contain, edge to edge, NO padding
+                  *
+                  * It was object-cover under object-contain p-[18%], which is two different
+                  * frames: the garment was cropped to fill and the design was shrunk into
+                  * the middle, so a chest print rendered somewhere around the navel and a
+                  * portrait blank lost its shoulders. The 18% was doing the job the blank
+                  * was supposed to do — standing in for a garment that never loaded.
+                  */}
                 {blankImg && (
                   // data/remote urls from the catalogue; next/image adds nothing over a
                   // 4-up thumbnail grid. (The directive must sit on the line IMMEDIATELY
                   // before the element — above an explanation it disables nothing.)
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={blankImg} alt="" aria-hidden className="absolute inset-0 size-full object-cover" />
+                  <img src={blankImg} alt="" aria-hidden className="absolute inset-0 size-full object-contain p-[1%]" />
                 )}
                 {t.composite ? (
                   <Image
@@ -111,7 +139,8 @@ export function TemplatesPanel() {
                     alt={t.name ?? tl("templates", "Template")}
                     fill
                     unoptimized
-                    className={blankImg ? "object-contain p-[18%]" : "object-cover"}
+                    // Square composite, square tile: contain is 1:1 with the stage.
+                    className="object-contain"
                   />
                 ) : !blankImg ? (
                   <div className="flex size-full items-center justify-center text-muted-foreground/40">

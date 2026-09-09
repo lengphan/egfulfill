@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/app/empty-state"
 import { useLightbox } from "@/components/app/image-lightbox"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, uploadSellerImage, type CatalogProduct, type ProductTemplate } from "@/lib/api"
+import { trimTransparent } from "@/lib/image-trim"
 import { canvasReadableSrc } from "@/lib/thread-match"
 // The tile is shared with the order dialog — it takes props only, so it was always shared
 // code that happened to live in this one screen's file.
@@ -778,7 +779,17 @@ export function DesignMaker() {
  if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
  setSaving(true); setMsg(null)
  try {
- const composed = await composeDesign(images, texts, 640)
+ /**
+       * SAVED TIGHT, not as a picture of the stage.
+       *
+       * composeDesign paints the layers at their percentages of the square, so a design
+       * placed on a chest is a small thing in the middle of a mostly transparent 640px
+       * frame. The library is not showing a garment — that is what a TEMPLATE is — so the
+       * emptiness is not information, and it compounds: place that thumbnail back on the
+       * stage and the padded square gets placed, shrinking the artwork again every round
+       * trip. Trimmed to its own alpha box, the row holds the artwork itself.
+       */
+ const composed = await trimTransparent(await composeDesign(images, texts, 640))
  const r = await saveDesignLibrary({ name: name.trim() || "Untitled artwork", data: composed, thumb: composed })
  if (r.error) throw new Error(r.error)
  setMsg({ tone: "ok", text: "Saved to Artwork." })

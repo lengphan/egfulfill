@@ -16,6 +16,7 @@ import { downscale } from "@/components/app/design-studio"
 import { readImageFile } from "@/components/app/design-canvas"
 import { getDesignLibrary, deleteDesignLibrary, renameDesignLibrary, saveDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { proxiedImageSrc } from "@/lib/order-image"
+import { useTrimmedSrc } from "@/lib/image-trim"
 import { Thumb } from "@/components/app/thumb"
 import { useLightbox } from "@/components/app/image-lightbox"
 import { getToken } from "@/lib/auth"
@@ -38,10 +39,32 @@ import { getToken } from "@/lib/auth"
  * nothing else; see components/app/thumb.tsx for why a fifth hand-rolled onError was the
  * wrong shape.
  */
+/**
+ * ONE SAVED DESIGN, FILLING ITS TILE.
+ *
+ * A maker-saved thumb is a flattened STAGE, not a picture of the artwork: the design sits
+ * wherever it was placed on the garment and the rest of the square is transparent, so the
+ * grid rendered stamps in grey bands. `useTrimmedSrc` crops that emptiness away (new saves
+ * arrive tight already — see design-maker's saveToLibrary), and an imported file, which is
+ * opaque and already fills its frame, comes back untouched.
+ *
+ * This is the ARTWORK tab, so what shows is the artwork alone. The garment belongs on a
+ * template card, where the blank is half of what was saved.
+ */
 function LibraryThumb({ thumb, name }: { thumb?: string | null; name?: string | null }) {
+  const src = useTrimmedSrc(thumb ? proxiedImageSrc(thumb) : "")
   return (
     <Thumb
-      src={thumb ? proxiedImageSrc(thumb) : ""}
+      src={src}
+      /* CONTAIN, now that the thumb is the artwork.
+       *
+       * Cover was the right call while these were flattened STAGES — every one the same
+       * square, so cover and contain agreed, and cover saved the tile from the grey bands a
+       * mixed library used to sit in. Trimmed, they are their own shapes again, and cover
+       * crops them: a wide lockup lost its first and last letters, which on a card whose
+       * whole job is to let you recognise a design is the one thing it must not do. Contain
+       * costs a band on an odd aspect and keeps the picture whole. */
+      fit="contain"
       // Empty on purpose: the name is already printed under the tile, and a screen reader
       // does not need it twice.
       alt=""
@@ -186,8 +209,8 @@ function DesignLab() {
           }
         >
           {designs === null ? (
-            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 animate-pulse rounded-xl bg-muted" />)}
+            <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-square animate-pulse rounded-xl bg-muted" />)}
             </div>
           ) : (
             <div className="space-y-4 p-5">
@@ -210,15 +233,18 @@ function DesignLab() {
                 />
               )}
               {upErr && <p className="text-sm text-alert">{upErr}</p>}
+              {/* THE SAME TILE AS A TEMPLATE CARD. The two tabs are one library at two
+                  sizes — three columns here against four next door made switching tabs feel
+                  like changing pages, and the bigger frame did not show more artwork, only
+                  more of the ground around it. */}
               {list.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {list.map((d) => (
                 <Card key={String(d.id)} className="group flex flex-col gap-0 overflow-hidden p-0">
                   <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
-                    {/* object-COVER, not contain — see LibraryThumb. A design library holds
-                        artwork of every shape, and contain sat each one at a different visual
-                        size inside the square, floating in grey bands, so a tidy grid read as
-                        crooked even though the frames were identical. */}
+                    {/* The tile is a fixed square and the picture is contained in it — see
+                        LibraryThumb for why that flipped once the thumbs started arriving
+                        trimmed to their own content. */}
                     <LibraryThumb thumb={d.thumb} name={d.name} />
                     {/* THE PICTURE IS THE POINT OF THIS CARD, and it was the one thing you
                         could not look at. The tile is 200-odd pixels of artwork somebody is
