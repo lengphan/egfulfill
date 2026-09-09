@@ -480,11 +480,24 @@ export function vietqrRoutes(app, requireAuth) {
       .then((r) => String(r.rows[0]?.value ?? '').replace(/"/g, '').trim().toLowerCase())
       .catch(() => '');
     if (qrMode === 'simple') {
+      /**
+       * `qr_only` — THE CODE, AND NOTHING PRINTED AROUND IT (owner's call, 2026-09-09).
+       *
+       * This asked for `compact2`, which is VietQR's framed template: their logo across the
+       * top, and napas/BIDV, the account name, the account number and the amount printed
+       * underneath. Every one of those lines is already a row in the top-up dialog, three
+       * centimetres below — the same fact twice, which §4 treats as a defect wherever it
+       * shows up.
+       *
+       * SAFE BECAUSE THE TEMPLATE IS ONLY THE PICTURE. Decoded, both images carry the same
+       * EMVCo payload byte for byte — 970418/1231255899, the amount, the addInfo and the
+       * same CRC — so a payer's app pre-fills exactly as before. `accountName` goes with the
+       * frame: it was only ever drawn on it, and it is not in the payload either way.
+       */
       const qrLink = 'https://img.vietqr.io/image/' + encodeURIComponent(bankCode) + '-'
-        + encodeURIComponent(account) + '-compact2.png'
+        + encodeURIComponent(account) + '-qr_only.png'
         + '?amount=' + encodeURIComponent(String(amount))
-        + '&addInfo=' + encodeURIComponent(note)
-        + '&accountName=' + encodeURIComponent(name);
+        + '&addInfo=' + encodeURIComponent(note);
       try {
         await q(
           `insert into topup_requests
