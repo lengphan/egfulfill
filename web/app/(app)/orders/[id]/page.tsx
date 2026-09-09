@@ -1970,6 +1970,15 @@ export default function OrderDetailPage() {
  return seller ? ` · ${seller}` : ""
                   })()}
                 </div>
+                {/* THE ACCOUNT, spelled out. The line above carries a display NAME, which two
+                    accounts can share and which says nothing about which login placed this —
+                    the question someone reading a manual order is actually asking. Its own
+                    line rather than appended, because an address and a name run together read
+                    as one long word at this size. Staff only: the server strips it for the
+                    seller, who would be reading their own address back. */}
+                {!order.factory_order && order.seller_email && order.seller_email !== order.seller_name && (
+                  <div className="mt-0.5 text-xs text-muted-foreground/80">{order.seller_email}</div>
+                )}
               </div>
             </div>
           </SectionCard>

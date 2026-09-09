@@ -2359,6 +2359,10 @@ export type OrderRow = {
    *  orders would only ever see themselves. Distinct from created_by_name (who uploaded it)
    *  and from `store` (which storefront it came from — one seller can run three). */
   seller_name?: string | null
+  /** The seller ACCOUNT's email — staff only, stripped for a seller like seller_name. A
+   *  display name can be shared or blank; this is the thing that identifies the login the
+   *  order belongs to, which is what a manual order gets asked about. */
+  seller_email?: string | null
   tracking?: string | null
   /**
    * THE MARKETPLACE'S OWN SHIP-BY DATE — a promise, not an inference.

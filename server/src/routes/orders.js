@@ -1507,7 +1507,7 @@ export function ordersRoutes(app, requireAuth) {
     if (!row) return row;
     // seller_name goes too: it is only ever the reader's own name, and shipping a field
     // that names an account is not something to do by accident on a seller-facing route.
-    const { internal_note, seller_name, ...rest } = row;   // eslint-disable-line no-unused-vars
+    const { internal_note, seller_name, seller_email, ...rest } = row;   // eslint-disable-line no-unused-vars
     return rest;
   }
 
@@ -1550,8 +1550,21 @@ export function ordersRoutes(app, requireAuth) {
     // sellers by stripStaffOnly, rather than branching the query: one statement, and the
     // redaction sits in the one function that already owns "what a seller may not read".
     const sellerName = `(select coalesce(nullif(su.name,''), su.email) from users su where su.id = o.seller_id) as seller_name`;
+    /**
+     * THE EMAIL AS ITS OWN FIELD, not as a fallback inside the name.
+     *
+     * seller_name coalesces to the email only when the account has no name, so an order
+     * placed by an account WITH one showed "Leng" and the address was nowhere on the page —
+     * and the email is the half that identifies the account, which is what somebody looking
+     * at a manual order actually needs. Both, and let the card decide how to read them.
+     *
+     * Stripped for a seller alongside the name (see stripStaffOnly): their own address read
+     * back to them is noise, and a field that names an account is not one to ship on a
+     * seller-facing route by accident.
+     */
+    const sellerEmail = `(select su.email from users su where su.id = o.seller_id) as seller_email`;
     const r = await q(
-      `select o.*, ${placedPO}, ${sellerName}, ${agg} from orders o left join order_items i on i.order_id = o.id
+      `select o.*, ${placedPO}, ${sellerName}, ${sellerEmail}, ${agg} from orders o left join order_items i on i.order_id = o.id
         where o.id = $1 group by o.id`, [req.params.id]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Order not found' }; }
