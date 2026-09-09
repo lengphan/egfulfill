@@ -498,6 +498,12 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff, requireAdm
       methods: Object.fromEntries(
         ['emb', 'dtg', 'dtf', 'apl', 'lsr', 'scr', 'sub', 'vnl'].map((k) => [k, Number(nums[`method_${k}`]) || 0])
       ),
+      // PER ADDITIONAL PRINTED FACE, for the same reason the method surcharges are here:
+      // the product page prices a chosen variant, and placement is part of that variant —
+      // a front and a back is two prints and the second one is charged. sideAddOn() in
+      // pricing.js is what actually bills it; this is the seller-facing read of the same
+      // number, so the page and the invoice cannot quote different figures.
+      sideFee: Number(nums.method_side) || 0,
     };
   });
 

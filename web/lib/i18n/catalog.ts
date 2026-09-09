@@ -3766,6 +3766,8 @@ const vi: Dict = {
   "productPage.Start designing": "Bắt đầu thiết kế",
   "productPage.Printing methods": "Phương pháp in",
   "productPage.Print methods": "Phương pháp in",
+  "productPage.Placement": "Vị trí in",
+  "productPage.per extra side": "mỗi mặt in thêm",
   "productPage.File guidelines": "Yêu cầu tệp",
   "productPage.Embroidery": "Thêu",
   "productPage.Print · DTG / DTF": "In · DTG / DTF",

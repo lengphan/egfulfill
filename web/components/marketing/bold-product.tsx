@@ -6,6 +6,10 @@ import Link from "next/link"
 import { TShirt, ArrowLeft, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { ACCENT, ACCENT_INK, ACID, HEADING, SURFACE, Pill, Rise, INK_ON_ACID } from "@/components/marketing/bold-kit"
 import { normTech } from "@/lib/print-method"
+// ONE VOCABULARY FOR A FACE. `left` is "Left sleeve" everywhere in the product — on the
+// import sheet, on the boards and here — and a second spelling on the public page is how
+// two words for one placement start (CLAUDE.md §5).
+import { SIDE_LABEL } from "@/lib/order-import"
 import { swatchChipStyle } from "@/lib/color-swatch"
 import { ShippingFees } from "@/components/shipping-fees"
 import type { PublicProduct } from "@/lib/api"
@@ -36,18 +40,6 @@ import { framingStyle } from "@/lib/product-framing"
  * shop needs to receive. `methods: []` means it applies to every method. Kept deliberately
  * short: this is the answer to "what do I send you", not a prepress manual.
  */
-/**
- * Where a decoration can physically go, by method. OURS — a supplier feed describes the
- * garment, not our machines. Embroidery is shorter than print because a hoop has to reach
- * the area: a hooped chest or cuff is routine, a full back on a finished garment is not.
- */
-const PLACEMENTS: Record<string, string[]> = {
-  EMB: ["Left chest", "Right chest", "Centre chest", "Left sleeve", "Right sleeve", "Cap front"],
-  DTG: ["Front print", "Back print", "Left sleeve", "Right sleeve", "Inside label"],
-  DTF: ["Front print", "Back print", "Left sleeve", "Right sleeve", "Inside label"],
-  SUB: ["All-over print", "Front print", "Back print"],
-  DEFAULT: ["Front print", "Back print"],
-}
 
 const FILE_GUIDES: { label: string; body: string; methods: string[] }[] = [
   { label: "File type", methods: [], body: "PNG with a transparent background, or a vector PDF/SVG/AI. JPGs work but cannot hold transparency." },
@@ -71,9 +63,11 @@ const COLOR_FOLD = 24
  *
  * `methods` arrives as ONE STRING PER ROW — "DTG printing / Embroidery / DTF printing" — because
  * that is how the catalogue import wrote it, and every reader here has to take it apart before
- * it means anything. Nothing did, and it was already wrong on the page: `PLACEMENTS` is matched
- * with `includes`, and its first key is EMB, so a garment we both print and embroider matched
- * EMB and only ever showed the hooped placements. It also made one pill out of three techniques.
+ * it means anything. Nothing did, and it was already wrong on the page: the placement table
+ * that used to live here was matched with `includes` and led with EMB, so a garment we both
+ * print and embroider matched EMB and only ever showed the hooped placements. (That table is
+ * gone — placement is a variant now — but the split is still what stops one pill being made
+ * out of three techniques.)
  *
  * Split, trimmed, de-duplicated, order kept — the first one named is the one the factory leads
  * with, and re-sorting it would quietly re-rank them.
@@ -115,6 +109,19 @@ export function BoldProduct({ product, shipping }: {
    * Null means "all of them", which is the honest default: nobody has chosen yet.
    */
   const [method, setMethod] = useState<string | null>(null)
+  /**
+   * WHERE THE ARTWORK GOES — a variant, not a capability list (owner's call, 2026-09-09).
+   *
+   * This page carried a "Where we can print" section under the fold: every placement we
+   * can do, per method, as read-only pills. It answered a question nobody was asking at
+   * that point in the page, and it left the one that matters unanswered — a front AND a
+   * back is two prints, and the second one is charged.
+   *
+   * So it moves up beside the other picks and joins the price. MULTI-SELECT, because
+   * unlike colour, size and method this is not a choice BETWEEN faces: a garment can
+   * carry both. Empty means one print, which is what the base price already buys.
+   */
+  const [sides, setSides] = useState<string[]>([])
   /** How many colourways are shown before the row is folded. See the swatch grid. */
   const [allColors, setAllColors] = useState(false)
   /** What one costs in a given size. A size with no tier of its own is charged the base —
@@ -139,7 +146,21 @@ export function BoldProduct({ product, shipping }: {
     const key = normTech(m)?.key
     return (key && product.methodPrices?.[key]) || 0
   }
-  const shown = priceOfSize(size) + addOnFor(method)
+  /**
+   * WHAT THE EXTRA FACES ADD.
+   *
+   * Mirrors sideAddOn() in server/src/pricing.js exactly: the blank's base cost pays for
+   * ONE printed face, so only faces 2, 3, 4 are charged, and an unset fee adds nothing
+   * rather than being guessed at. Nothing here is discounted or tiered — this page quotes
+   * the list price every customer starts from, which is the same number the order charge
+   * is built from before any plan discount applies.
+   */
+  /** The faces this blank prints on, in the server's order. Empty for a product published
+   *  before the field existed, which simply means no placement picker. */
+  const placements = product.sides ?? []
+  const sideFee = Number(product.sideFee ?? 0) || 0
+  const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, sides.length - 1) : 0
+  const shown = priceOfSize(size) + addOnFor(method) + sidesAdd
   const chosen = colorIdx == null ? null : product.colors[colorIdx] ?? null
   const hero = chosen?.image ?? product.image
   /*
@@ -329,7 +350,15 @@ export function BoldProduct({ product, shipping }: {
                 {product.priceVaries && !size && (
                   <span className="text-[13px] font-bold uppercase tracking-[0.14em] text-[var(--mk-ink)]/50">from</span>
                 )}
-                <span className="text-4xl font-semibold tracking-tight tabular-nums">{usd(size ? shown : (product.priceFrom ?? product.price))}</span>
+                {/* THE SURCHARGES APPLY WITH OR WITHOUT A SIZE. This read `size ? shown :
+                    priceFrom`, so picking embroidery — or a second placement — moved nothing
+                    until a size had also been chosen, and the page quoted a figure it knew
+                    was too low. The BASE is what the size decides; the method's add-on and
+                    the extra faces sit on top of it either way, exactly as the order charge
+                    stacks them. */}
+                <span className="text-4xl font-semibold tracking-tight tabular-nums">
+                  {usd(size ? shown : (product.priceFrom ?? product.price) + addOnFor(method) + sidesAdd)}
+                </span>
                 {size && <span className="text-sm font-semibold text-[var(--mk-ink)]/60">for {size}</span>}
               </div>
               {/* Say WHOSE price this is. It's what a seller pays us to make and ship one —
@@ -488,6 +517,55 @@ export function BoldProduct({ product, shipping }: {
                     })}
                   </div>
                 </div>
+
+                {/**
+                  * PLACEMENT — the fourth thing that moves the price, under the third.
+                  *
+                  * The faces come from the product (its own `sides`, else its category's),
+                  * resolved server-side, so this offers what the blank actually has rather
+                  * than a fixed list: a duffel bag is not offered a hood.
+                  *
+                  * MULTI-SELECT, and the only one on this page. Colour, size and technique
+                  * are choices between options; placement is not — a garment can carry a
+                  * front and a back, and that is precisely why it has a price.
+                  *
+                  * The FIRST face is free of charge and says so on the heading rather than
+                  * under it: §4 forbids a sentence under a control, and "+$2.00 per extra
+                  * placement" beside the count is the label doing its own explaining.
+                  */}
+                {placements.length > 1 && (
+                  <div className="mt-6">
+                    <div className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mk-ink)]/50">
+                      <span>Placement <span className="text-[var(--mk-ink)]/35">· {placements.length}</span></span>
+                      {sideFee > 0 && (
+                        <span className="normal-case tracking-normal text-[var(--mk-ink)]/45">
+                          {usd(sideFee)} per extra placement
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {placements.map((sd) => {
+                        const on = sides.includes(sd)
+                        return (
+                          <button
+                            key={sd}
+                            type="button"
+                            onClick={() => setSides(on ? sides.filter((x) => x !== sd) : [...sides, sd])}
+                            aria-pressed={on}
+                            className={
+                              "rounded-[var(--radius-control)] border px-3.5 py-1.5 text-sm font-semibold transition-colors " +
+                              (on
+                                ? "border-[var(--mk-ink)] bg-[var(--mk-ink)] text-[var(--mk-accent-ink)]"
+                                : "border-[var(--mk-auth-edge)] text-[var(--mk-ink)]/70 hover:border-[var(--mk-ink)] hover:text-[var(--mk-ink)]")
+                            }
+                          >
+                            {SIDE_LABEL[sd] ?? sd}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 {/**
                   * THE SIZE CHART, WHERE SIZES ARE.
                   *
@@ -570,47 +648,13 @@ export function BoldProduct({ product, shipping }: {
             </Rise>
             )}
 
-            {methods.length > 0 && (
-              <Rise preset="cut" index={1}>
-                <h2 className="font-display text-2xl font-semibold tracking-tight">Where we can print</h2>
-                <p className="mt-1.5 text-sm text-[var(--mk-ink)]/55">
-                  Placements available on this garment.
-                </p>
-                {/* OURS, not the supplier's. A manufacturer's feed describes the blank; where
-                    a decoration can go is a fact about OUR machines and jigs, so it is stated
-                    per method here rather than pulled from anywhere. */}
-                <div className="mt-5 space-y-5">
-                  {inPlay.map((m) => {
-                    const key = Object.keys(PLACEMENTS).find((k) => m.toUpperCase().includes(k))
-                    const spots = key ? PLACEMENTS[key] : PLACEMENTS.DEFAULT
-                    return (
-                      <div key={m}>
-                        <div className="text-sm font-bold">{m}</div>
-                        {/**
-                          * PILLS, not a row of ticks.
-                          *
-                          * Six ✓ items on one line gave the section six small marks, six
-                          * gaps and no edges — a thin ragged strip that read as clutter
-                          * rather than as a set. Every OTHER list of facts on this page is
-                          * already a pill (see Spec: sizes, methods), so this was also the
-                          * one place inventing its own.
-                          *
-                          * The tick goes with them: a list titled "where we can print" is
-                          * affirmative by definition, so a ✓ on every item marks nothing.
-                          */}
-                        <ul className="mt-2.5 flex flex-wrap gap-1.5">
-                          {spots.map((sp) => (
-                            <li key={sp} className="rounded-[var(--radius-control)] border border-[var(--mk-auth-edge)] px-3 py-1 text-sm text-[var(--mk-ink)]/70">
-                              {sp}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )
-                  })}
-                </div>
-              </Rise>
-            )}
+            {/* "WHERE WE CAN PRINT" WAS HERE, and it is now a variant (2026-09-09).
+                It listed every placement per method as read-only pills, under the fold —
+                capabilities, at the point in the page where a reader has already decided
+                what they want. The same facts now sit beside colour, size and technique as
+                the Placement picker, where they change the price instead of describing it,
+                and they come from the product's own faces rather than a table keyed by
+                method. PLACEMENTS went with it: nothing read it once this moved. */}
 
           </div>
         )}

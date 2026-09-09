@@ -10,7 +10,7 @@ import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { variantSku, variantLabel, variantPairs, productSizes, productColors } from '../variant-sku.js';
 import { ssImgUrl, ssStyleDescriptions, ssSpecs, ssImgSize } from './ss.js';
-import { readAll as readSettings } from './factory_settings.js';
+import { readAll as readSettings, readProductTypes, ALL_SIDES } from './factory_settings.js';
 import { methodAddOnsFor } from '../pricing.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
@@ -309,7 +309,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * which is exactly what a detail page is for. Colour images are filtered to renderable
    * URLs so a storage key can never ride out inside the colour map.
    */
-  const publicShape = (row, slug, fees) => {
+  const publicShape = (row, slug, fees, types) => {
     const d = row.data;
     /**
      * THE PRICE A VISITOR SEES IS THE SELLER PRICE — never catalog_price.
@@ -467,6 +467,34 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
        */
       imgZoom: clampNum(d.imgZoom, 100, 300),
       imgFocusY: clampNum(d.imgFocusY, 0, 100),
+      /**
+       * THE FACES THIS BLANK PRINTS ON — its own answer, else its category's.
+       *
+       * Mirrors sidesOf() in web/lib/variant-resolve.ts exactly, including the filter to
+       * known faces: an unknown one has no mockup, no print area and no meaning to
+       * order_designs, so publishing it would offer a placement nobody can order.
+       *
+       * Safe under 2.9. Where a decoration can go is a fact about OUR machines and jigs —
+       * it is not the supplier's, it is not a cost, and it is already visible to anyone who
+       * opens the design maker.
+       */
+      sides: (() => {
+        const own = (Array.isArray(d.sides) ? d.sides : []).filter((x) => ALL_SIDES.includes(x));
+        if (own.length) return own;
+        const type = String(d.type ?? '').toLowerCase();
+        const spec = (types ?? []).find((t) => String(t.name ?? '').toLowerCase() === type);
+        return spec && spec.sides && spec.sides.length ? spec.sides : ['front'];
+      })(),
+      /**
+       * WHAT A SECOND PRINT COSTS, per unit.
+       *
+       * The page can price front-and-back only if it knows this, and the alternative — a
+       * public page quoting one print for a garment someone means to decorate on two sides
+       * — is the same under-quoting the method surcharge was added to fix. sideAddOn() in
+       * pricing.js is what bills it; this is the same number, so the quote and the invoice
+       * agree. 0 means extra faces are free, which is the shipped default.
+       */
+      sideFee: fees ? money(Number(fees.method_side) || 0) : 0,
     };
   };
 
@@ -478,7 +506,12 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
    * a link from the grid ends up 404ing on a name that merely looks similar.
    */
   const publicProducts = async () => {
-    const fees = await feeSettings().catch(() => null);
+    // Both reads are settings, both are needed by every row, and neither depends on the
+    // other — so they go together rather than one after the next.
+    const [fees, types] = await Promise.all([
+      feeSettings().catch(() => null),
+      readProductTypes().catch(() => []),
+    ]);
     const r = await q(
       `select data, catalog_price, base_price from catalog_products
         where ${PUBLIC_STATUS_SQL}
@@ -493,7 +526,7 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
         if (!base) return null;
         const n = (seen.get(base) ?? 0) + 1;
         seen.set(base, n);
-        return publicShape(row, n === 1 ? base : `${base}-${n}`, fees);
+        return publicShape(row, n === 1 ? base : `${base}-${n}`, fees, types);
       })
       .filter(Boolean)
       .filter((p) => Number.isFinite(p.price) && p.price > 0);

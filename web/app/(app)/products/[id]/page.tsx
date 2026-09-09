@@ -7,15 +7,32 @@ import Image from "next/image"
 import { Package, CaretLeft } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
-import { getCatalogProducts, getDesignFees, type CatalogProduct, type DesignFees } from "@/lib/api"
+import { getCatalogProducts, getDesignFees, getProductTypes, type CatalogProduct, type DesignFees } from "@/lib/api"
 import { ShippingFees } from "@/components/shipping-fees"
 import { shipFirstFee } from "@/lib/ship-band"
-import { sizesOf, methodsOf } from "@/lib/variant-resolve"
+import { sizesOf, methodsOf, sidesOf, setTypeMockups } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 import { framingStyle } from "@/lib/product-framing"
 import { swatchBg } from "@/lib/color-swatch"
 import { discounted } from "@/lib/plans"
+
+/**
+ * A VARIANT CHIP IS A FIELD, so it has a field's metrics.
+ *
+ * These were `text-xs` (12px) in a `py-1` box — smaller than every other control in the app
+ * and, on the dark theme, genuinely hard to read (owner, 2026-09-09). `.eg-control` is the
+ * house field (globals.css): 32px tall, 14px, normal weight, on the `--input` edge. The
+ * chips take the same three numbers rather than a new set, because §4's rule is that a
+ * field is a field — the only thing that separates these from a `<select>` is that they
+ * are pressed rather than opened.
+ *
+ * WEIGHT CARRIES SELECTION, not size: the chosen one fills and goes medium, so the row
+ * never reflows as you click along it.
+ */
+const CHIP = "inline-flex h-8 items-center rounded-lg border px-3 text-sm transition-colors "
+const CHIP_ON = "border-foreground bg-foreground font-medium text-background"
+const CHIP_OFF = "border-input hover:border-foreground/40"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
@@ -94,6 +111,37 @@ export default function ProductDetailPage() {
  const [pickColor, setPickColor] = useState<string | null>(null)
  const [pickSize, setPickSize] = useState<string | null>(null)
  const [pickMethod, setPickMethod] = useState<string | null>(null)
+  /**
+   * PLACEMENT IS THE FOURTH INPUT TO THE PRICE, and the only one that is not a choice
+   * BETWEEN options: a garment can carry a front AND a back, so this is a multi-select
+   * where the other three are radios.
+   *
+   * The blank's base cost pays for ONE printed face; every face after the first adds the
+   * `method_side` fee. That is not a rule invented here — it is sideAddOn() in
+   * server/src/pricing.js, which is what the order is actually billed on, and this page
+   * mirrors it the same way methodFee mirrors methodAddOn.
+   *
+   * Null means "the first face", so the page opens priced at one print, which is what a
+   * product costs until a seller asks for a second one.
+   */
+ const [pickSides, setPickSides] = useState<string[] | null>(null)
+  /**
+   * The faces a blank prints on come from its own `sides`, else its CATEGORY's — and the
+   * category specs live in platform settings, so sidesOf() answers "front" and nothing else
+   * until they are loaded into the module map (setTypeMockups writes a module variable,
+   * which React cannot see on its own).
+   *
+   * The picker is GATED on this rather than merely re-rendered by it: before the specs
+   * land, "front" is a default and not the product's answer, and a placement row that
+   * appears with one chip and then grows to four reads as a page correcting itself.
+   */
+ const [typesLoaded, setTypesLoaded] = useState(false)
+ useEffect(() => {
+ const t = setTimeout(() => {
+ getProductTypes().then((rows) => { setTypeMockups(rows ?? []); setTypesLoaded(true) }).catch(() => {})
+    }, 0)
+ return () => clearTimeout(t)
+  }, [])
   // The platform's shipping fees — the other half of what a seller pays. Seller-safe read,
   // so this page shows the same two numbers a board or the public site does.
  const [fees, setFees] = useState<DesignFees | null>(null)
@@ -170,7 +218,15 @@ export default function ProductDetailPage() {
  const plat = fees?.methods?.[key.toLowerCase()]
  return typeof plat === "number" && plat > 0 ? plat : 0
   }
- const unitList = (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label)
+  /** The faces this blank can be printed on, and the ones being priced. */
+ const sides = sidesOf(product)
+ const selSides = (pickSides ?? []).filter((s) => sides.includes(s))
+ const pricedSides = selSides.length ? selSides : sides.slice(0, 1)
+  /** What each ADDITIONAL face adds. Mirrors sideAddOn in server/src/pricing.js — the first
+   *  print is inside the base cost, so only faces 2, 3, 4 are charged. */
+ const sideFee = Number(fees?.sideFee ?? 0) || 0
+ const sidesAdd = sideFee > 0 ? sideFee * Math.max(0, pricedSides.length - 1) : 0
+ const unitList = (selSize ? priceOfSize(selSize) : priceOf(product)) + methodFee(selMethod?.key, selMethod?.label) + sidesAdd
 
  return (
     <div className="space-y-5">
@@ -293,7 +349,11 @@ export default function ProductDetailPage() {
               move it, and a price with no variant named beside it is the ambiguity this
               replaced. */}
           <div className="text-sm text-muted-foreground">
-            {[selColor, selSize, selMethod?.label].filter(Boolean).join(" · ")}
+            {[selColor, selSize, selMethod?.label,
+              // The faces only when there is more than one — "Front" beside every product
+              // is a word that never varies, and the price only moves at two.
+              pricedSides.length > 1 ? pricedSides.map((sd) => tl("sides", sd)).join(" + ") : null,
+            ].filter(Boolean).join(" · ")}
           </div>
           <ShippingFees
  first={shipFee || shipFirstFee(product, fees?.shipBands)}
@@ -340,7 +400,7 @@ export default function ProductDetailPage() {
                       // Neither a photo nor a colour we can name in hex: say the word. It
                       // is wider than a dot, and it is the only honest thing to draw.
  if (!img && !hex) return (
-                        <span key={c} className="rounded-lg border border-border px-2 py-1 text-xs">{c}</span>
+                        <span key={c} className="inline-flex h-8 items-center rounded-lg border border-input px-3 text-sm">{c}</span>
                       )
  return (
                         <button
@@ -386,7 +446,7 @@ export default function ProductDetailPage() {
  key={s}
  aria-pressed={s === selSize}
  onClick={() => setPickSize(s)}
- className={"rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " + (s === selSize ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/40")}
+ className={CHIP + (s === selSize ? CHIP_ON : CHIP_OFF)}
                       >
                         {s}
                       </button>
@@ -410,13 +470,56 @@ export default function ProductDetailPage() {
  key={t.key}
  aria-pressed={t.key === selMethod?.key}
  onClick={() => setPickMethod(t.key)}
- className={"rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " + (t.key === selMethod?.key ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/40")}
+ className={CHIP + (t.key === selMethod?.key ? CHIP_ON : CHIP_OFF)}
                     >
                       {t.label}
                     </button>
                   ))}
                 </div>
               </div>
+              {/* PLACEMENT — the fourth input to the price, and the only multi-select here.
+                  Colour, size and method are choices BETWEEN options; a garment can carry a
+                  front AND a back, and the second face is what costs. Shown only when the
+                  blank has more than one: a single-face product has nothing to choose, and
+                  an inert row of one chip is a control that cannot be used.
+                  The fee lives ON the heading, never under the chips — §4: a control
+                  explains itself in its label, and prose under a control is a defect. */}
+              {typesLoaded && sides.length > 1 && (
+                <div>
+                  <div className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span>{tl("productPage", "Placement")} ({sides.length})</span>
+                    {sideFee > 0 && (
+                      <span className="normal-case tracking-normal text-foreground">
+                        {usd(sideFee)} {tl("productPage", "per extra side")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sides.map((sd) => {
+                      const on = pricedSides.includes(sd)
+                      return (
+                        <button
+                          type="button"
+                          key={sd}
+                          aria-pressed={on}
+                          onClick={() => {
+                            const now = pricedSides.includes(sd)
+                              ? pricedSides.filter((x) => x !== sd)
+                              : [...pricedSides, sd]
+                            // NEVER EMPTY. A garment is printed somewhere — clearing the last
+                            // face would quote a blank nobody ordered, so the press is simply
+                            // refused rather than silently re-adding a different one.
+                            if (now.length) setPickSides(now)
+                          }}
+                          className={CHIP + (on ? CHIP_ON : CHIP_OFF) + " capitalize"}
+                        >
+                          {tl("sides", sd)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </SectionCard>
 
