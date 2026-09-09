@@ -343,12 +343,12 @@ function TiktokFields({ dest, fields, onChange }: {
         <span className="text-xs font-medium">{tl("publish", "Warehouse")}</span>
         <select value={fields.warehouse} onChange={(e) => onChange({ warehouse: e.target.value })} className="eg-select h-8 rounded-md border border-border bg-card px-2 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
           {!fields.warehouses.length && <option value="">{tl("publish", "No warehouse found")}</option>}
-          {/* Labelled, not hidden. A return warehouse is the wrong answer here and TikTok
-              refuses the product over it — but the classification is a guess (see tiktok.js),
-              so it is marked and sorted last rather than removed, and a seller whose shop
-              names things unusually can still pick it. */}
+          {/* Labelled, not hidden. A return warehouse — or one on holiday mode — cannot hold
+              sale stock and TikTok refuses the whole product over it, but hiding those would
+              leave a shop whose only warehouse is currently restricted staring at an empty
+              picker with no reason given. Sorted last, and the reason is on the row. */}
           {fields.warehouses.map((w) => (
-            <option key={w.id} value={w.id}>{w.name || w.id}{w.is_return ? " · return" : ""}</option>
+            <option key={w.id} value={w.id}>{w.name || w.id}{w.why ? ` · ${w.why}` : ""}</option>
           ))}
         </select>
       </label>
@@ -810,8 +810,9 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
  const cur = m[cid] ?? TT_EMPTY
             /* Default to one that can actually hold stock. This took ws[0], and on a real
                shop that was the RETURN warehouse — a real id, belonging to the right shop,
-               that TikTok rejects the entire product over. */
- const first = ws.find((w) => !w.is_return) ?? ws[0]
+               that TikTok rejects the entire product over. The server sorts usable first, so
+               ws[0] is now usually right; this states the intent rather than trusting order. */
+ const first = ws.find((w) => w.usable) ?? ws[0]
  return { ...m, [cid]: { ...cur, warehouses: ws, warehouse: cur.warehouse || (first ? String(first.id) : "") } }
           }))
           .catch(() => {})
@@ -1158,9 +1159,21 @@ export function PublishProductPage({ draftId }: { draftId: string | null }) {
         // Say when photos didn't all land. The product exists either way — the server
         // deliberately doesn't fail a publish over an image — so silence here would leave a
         // draft with missing photos and no hint why.
- note: r.images_uploaded != null && r.images_uploaded < images.length
-          ? `${r.images_uploaded} of ${images.length} photos uploaded — add the rest in Shopify.`
- : undefined,
+        /* TWO THINGS CAN BE INCOMPLETE, and a row that reports only the first would hide
+           the one that makes the product invisible. Joined, because both can be true. */
+ note: [
+ r.images_uploaded != null && r.images_uploaded < images.length
+            ? `${r.images_uploaded} of ${images.length} photos uploaded — add the rest in Shopify.`
+ : null,
+          /* ACTIVE IS NOT ON THE SHOP. A Shopify product can be active and on no sales
+             channel at all, which is what "the publish said yes and my store shows nothing"
+             was. The server tries to publish it to the Online Store and tells us whether it
+             landed; a store connected before we asked for that permission cannot, and the
+             fix is a reconnect rather than another publish. */
+ r.storefront && r.storefront.ok === false
+            ? "Created, but not on your storefront yet — reconnect the store in Settings to grant the sales-channel permission, then publish again."
+ : null,
+        ].filter(Boolean).join(" ") || undefined,
       }
     } catch (e) {
  return { state: "fail", text: e instanceof Error ? e.message : "Publish failed." }

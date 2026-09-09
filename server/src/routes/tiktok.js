@@ -906,26 +906,41 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   });
 
   /**
-   * A RETURN WAREHOUSE IS NOT A PLACE TO HOLD STOCK, and TikTok says so by refusing the
-   * whole product: "warehouse_id must identify a warehouse available to the current shop.
-   * Use a warehouse_id returned by Get Warehouse List and retry."
+   * WHICH WAREHOUSE CAN ACTUALLY HOLD THE STOCK — from the spec, not from the name.
    *
-   * Every shop gets both kinds, and the picker was defaulting to whichever came back FIRST —
-   * which on a real shop was "U.S Return Warehouse". The id was real and belonged to the
-   * shop, so nothing here could see it was wrong; only TikTok could, and only at publish.
+   * The first real TikTok publish was refused with "warehouse_id must identify a warehouse
+   * available to the current shop". The id WAS the shop's; it was a return warehouse. The
+   * picker defaulted to whichever came back first, and on that shop it was "U.S Return
+   * Warehouse" — a real id nothing here could tell was wrong, because only TikTok knows.
    *
-   * THE CLASSIFIER IS DELIBERATELY LOOSE, because the enum is not confirmed. TikTok's
-   * Get Warehouse List doc needs JavaScript to read and could not be checked, and the field
-   * has been seen as both a string and a number in the wild. So it tests type, sub_type AND
-   * the name for "return", and treats a numeric 2 as return — any one of them is enough.
-   * Being wrong in this direction only sorts a warehouse lower and labels it; nothing is
-   * hidden or blocked, so a misclassified warehouse is still selectable and the seller is not
-   * stuck behind a guess of ours.
+   * Get Warehouse List (/logistics/202309/warehouses) settles all three fields this needs:
+   *
+   *   type          SALES_WAREHOUSE ships products · RETURN_WAREHOUSE receives returns.
+   *                 Inventory belongs to the first; the second is what was being sent.
+   *   effect_status ENABLED · DISABLED · RESTRICTED, and the doc is explicit that under the
+   *                 latter two "all products in stock are unavailable for sale" — holiday
+   *                 mode, or an order limit after a policy violation. Booking stock into one
+   *                 is the same silent wrong answer as a return warehouse, one step later.
+   *   is_default    TikTok's own answer to "which one if none is named", so it breaks the
+   *                 tie rather than us picking by list order again.
+   *
+   * An earlier pass guessed at this — sniffing the NAME for "return" and treating a numeric
+   * 2 as one — because the doc could not be read at the time. Both were wrong: `type` is a
+   * string enum and the name is free text a seller chooses. Guesses removed.
    */
-  const isReturnWarehouse = (w) => {
-    const blob = [w && w.type, w && w.sub_type, w && w.name].map((x) => String(x == null ? '' : x)).join(' ').toUpperCase();
-    if (/RETURN/.test(blob)) return true;
-    return Number(w && w.type) === 2;
+  const warehouseFacts = (w) => {
+    const type = String((w && w.type) || '').toUpperCase();
+    const status = String((w && w.effect_status) || '').toUpperCase();
+    const isReturn = type === 'RETURN_WAREHOUSE';
+    // Unknown status is treated as usable: the field is documented, but refusing a warehouse
+    // over a value we did not expect would block a publish for a shape TikTok added later.
+    const blocked = status === 'DISABLED' || status === 'RESTRICTED';
+    return {
+      is_return: isReturn,
+      usable: type === 'SALES_WAREHOUSE' && !blocked,
+      // What to append to the option, so a seller can see WHY one is sorted to the bottom.
+      why: isReturn ? 'return' : status === 'DISABLED' ? 'disabled' : status === 'RESTRICTED' ? 'restricted' : '',
+    };
   };
 
   // Warehouses — each SKU's inventory is booked against a warehouse_id.
@@ -939,10 +954,15 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
       const cipher = await getShopCipher(conn);
       const d = await ttSignedRequest(conn, 'GET', '/logistics/202309/warehouses', { query: { shop_cipher: cipher } });
       const raw = d.warehouses || d.warehouse_list || [];
-      /* Sales first, so "the first one" — which is what the picker defaults to — is a
-         warehouse that can actually hold the stock this listing is booking. */
-      const list = raw.map((w) => ({ ...w, is_return: isReturnWarehouse(w) }));
-      list.sort((a, b) => Number(a.is_return) - Number(b.is_return));
+      /* Usable first, and TikTok's own default first among those — so "the first one", which
+         is what the picker takes, is a warehouse that can hold the stock this listing books.
+         NOTHING IS DROPPED: an unusable warehouse is sorted last and labelled, never hidden,
+         so a shop whose only warehouse is on holiday mode still shows the reason rather than
+         an empty picker. */
+      const list = raw.map((w) => ({ ...w, ...warehouseFacts(w) }));
+      list.sort((a, b) =>
+        Number(b.usable) - Number(a.usable)
+        || Number(!!b.is_default) - Number(!!a.is_default));
       return { warehouses: list };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });

@@ -4115,7 +4115,15 @@ export function getEtsyConnections() {
 export type TiktokCategory = { id: string; local_name?: string; is_leaf?: boolean; parent_id?: string; permission_statuses?: string[] }
 /** `is_return` is the server's classification — a return warehouse cannot hold sale stock,
  *  and TikTok rejects the whole product if one is used. See the note in tiktok.js. */
-export type TiktokWarehouse = { id: string; name?: string; type?: string; sub_type?: string; is_return?: boolean }
+export type TiktokWarehouse = {
+  id: string; name?: string; type?: string; sub_type?: string
+  effect_status?: string; is_default?: boolean
+  /** Server-classified from the documented fields: a SALES_WAREHOUSE that is ENABLED. Stock
+   *  cannot be booked anywhere else — TikTok refuses the whole product. See tiktok.js. */
+  usable?: boolean; is_return?: boolean
+  /** Why it is not usable — "return" / "disabled" / "restricted" — for the option label. */
+  why?: string
+}
 /**
  * WHERE A PRODUCT CAN BE PUBLISHED — one row per connected SHOP, not per platform.
  *
@@ -4484,6 +4492,10 @@ export function publishShopify(body: {
     listing_id?: string; state?: string; url?: string
     images_uploaded?: number; primary_image?: string | null
     variants_applied?: number; variant_skus?: string[]
+    /** Whether it reached the Online Store. `null` when it was never tried (a draft);
+     *  `{ok:false}` when the product exists but no shopper can see it — usually a store
+     *  connected before we asked for the sales-channel permission. */
+    storefront?: { ok: boolean; reason?: string } | null
   }>(`/api/shopify/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 

@@ -24,7 +24,19 @@ const API_SECRET  = process.env.SHOPIFY_API_SECRET || '';
 // from now on: OAuth scopes are fixed at grant time, so every already-connected shop must
 // RECONNECT before publishing works for it. That is unavoidable rather than a design
 // choice, and the publish route says so by name when Shopify rejects it.
-const SCOPES      = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders,read_products,write_products,write_merchant_managed_fulfillment_orders,read_merchant_managed_fulfillment_orders';
+/**
+ * `write_publications` IS WHY A PUBLISHED PRODUCT WAS NOWHERE TO BE SEEN.
+ *
+ * Creating a product with status ACTIVE only means "not a draft". It does NOT put it on a
+ * sales channel — a product can be active and on no storefront at all, which is exactly what
+ * happened: the publish reported success, the product sat in Admin › Products, and the shop
+ * showed nothing. Publishing to the Online Store needs this scope and its own call.
+ *
+ * ADDING A SCOPE NEEDS A RECONNECT. Shopify grants scopes at authorisation, so an existing
+ * connection keeps the ones it was given — a store connected before today will still fail the
+ * publication step until it is reconnected, which is why that step reports rather than throws.
+ */
+const SCOPES      = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders,read_products,write_products,write_publications,write_merchant_managed_fulfillment_orders,read_merchant_managed_fulfillment_orders';
 // Force canonical (non-www) so the authorize redirect_uri matches the popup origin.
 const REDIRECT_URI = (process.env.SHOPIFY_REDIRECT_URI || 'https://egful.store/oauth-callback.html').replace('://www.', '://');
 const API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-07';
@@ -849,6 +861,39 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
        conn.id, conn.shop_id || null]
     ).catch(() => {});
 
+    /**
+     * ONTO THE STOREFRONT, which the create does not do by itself.
+     *
+     * Best-effort on purpose: the product EXISTS by now, and a failure here is "it is not on
+     * the shop yet", not "the publish failed". Throwing would discard a created product and
+     * send the seller round again to make a second one. So it is reported instead — the
+     * caller turns `storefront` into the words on the row.
+     */
+    let storefront = null;
+    if (product.status === 'active') {
+      try {
+        /* orThrow is for a mutation's userErrors; a query has none, so this reads the nodes
+           directly and lets gql's own error handling cover a failed request. */
+        const pubs = await gql(`query { publications(first: 20) { nodes { id name } } }`);
+        const online = (pubs.publications?.nodes || []).find((n) => /online store/i.test(String(n.name || '')));
+        if (!online) storefront = { ok: false, reason: 'no-online-store' };
+        else {
+          const res = await gql(
+            `mutation EgPublish($id: ID!, $input: [PublicationInput!]!) {
+               publishablePublish(id: $id, input: $input) { userErrors { field message } }
+             }`,
+            { id: `gid://shopify/Product/${p.id}`, input: [{ publicationId: online.id }] },
+          );
+          const errs = res.publishablePublish?.userErrors || [];
+          storefront = errs.length ? { ok: false, reason: errs[0].message } : { ok: true };
+        }
+      } catch (e) {
+        /* Almost always the missing scope on a store connected before it was requested.
+           Named rather than swallowed, so the row can say what to do about it. */
+        storefront = { ok: false, reason: String(e && e.message || e).slice(0, 200) };
+      }
+    }
+
     audit(req, 'shopify.publish', {
       entityType: 'listing', entityId: String(p.id),
       after: { title, variants: variants.length, images: uploaded, blank: b.blank_sku || null },
@@ -857,6 +902,10 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
 
     return {
       ok: true, listing_id: String(p.id), state: p.status || 'draft',
+      /* null when it was never attempted (a draft), {ok:true} when it reached the shop, and
+         {ok:false, reason} when the product exists but nobody can see it yet. Three states,
+         because "published" and "on the storefront" turned out to be different facts. */
+      storefront,
       images_uploaded: uploaded, primary_image: primaryImage,
       variants_applied: variants.length,
       variant_skus: variants.map((v) => v.sku).filter(Boolean),
