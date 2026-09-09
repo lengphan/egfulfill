@@ -1465,7 +1465,39 @@ export function DesignCanvasDialog({
    */
   const hasArtHere = !!designUrl
   const artUnsaved = hasArtHere && !savedFaces[sideName]
-  const fileCount = lineFiles.length + (hasArtHere ? 1 : 0)
+  /**
+   * THE COUNT IS THE LINE'S, NOT THE FACE'S — and the two were being added together.
+   *
+   * It was `lineFiles.length + (hasArtHere ? 1 : 0)`: a per-LINE list of stitch files plus a
+   * per-FACE piece of artwork, summed into one badge sitting above tabs that read as
+   * belonging to the face you are looking at. So the same .EMB appeared on the front and on
+   * the back — correctly, a stitch file belongs to the line — while the number beside "Files"
+   * moved by one as you flipped between them, which is the contradiction: a badge that
+   * changes with the face, on a list that mostly does not.
+   *
+   * Design and Artwork are the face. Files is the LINE — every picture on it, whichever face
+   * carries it, and every file attached to it — so the number holds still and each row says
+   * which face it is on.
+   */
+  /**
+   * EVERY FACE THAT HAS ARTWORK, in the product's own order — ONE definition, read by the
+   * Files list, the count above it and the send list at the bottom of the panel.
+   *
+   * Built from the two places Save reads: what is on screen for the face you are looking at,
+   * plus `faceArt` for the rest. The send list used to derive this for itself; two readers
+   * of one question is how the four faces answers in §4 happened, and this is the same
+   * question asked twice on one screen.
+   */
+  const artFaces = useMemo(() => {
+    const all: Record<string, FaceArt | null> = {
+      ...(faceArt ?? {}),
+      [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null,
+    }
+    return faces
+      .map((f) => ({ side: f.side, art: all[f.side] }))
+      .filter((r): r is { side: string; art: FaceArt } => !!r.art?.data)
+  }, [faceArt, sideName, designUrl, pos, designName, faces])
+  const fileCount = lineFiles.length + artFaces.length
   // The NEWEST machine file for this line, by name — so slot ② can show which fixed file is
   // current after a revision, instead of a bare "added".
  const [latestMachine, setLatestMachine] = useState<{ designId: string; name: string } | null>(null)
@@ -1626,7 +1658,20 @@ export function DesignCanvasDialog({
   /** WHAT THIS DESIGN PAYS, chosen here because this is the moment somebody is looking at the
    *  artwork. The second of the two send-to-board doors — see send-to-board-dialog.tsx, which
    *  asks the same question the same way. */
- const [cardBand, setCardBand] = useState<Band | null>(null)
+  /**
+   * A BAND PER FACE, because a card is per face.
+   *
+   * One picker sat under the whole list and its value went onto every card the send made —
+   * while the comment on sendSelected already said the opposite in as many words: "a front
+   * and a back are two jobs: each needs its own stitch file, each is claimed and paid
+   * separately". A simple back and an intricate front went to the board at one price, so
+   * whichever way it was set, one of the two designers was mispaid.
+   *
+   * Keyed by face. Unset stays unset — a card priced by omission is how someone gets paid
+   * Standard for a digitise, so an unbanded card pays the flat fallback and the board shows
+   * it as unpriced until a human says otherwise.
+   */
+ const [rowBands, setRowBands] = useState<Record<string, Band | null>>({})
  const { rates: bandRates, flat: bandFlat } = useBandRates()
   /**
    * THE TITLE IS THE PREFIX, and nothing after it (owner's call, 2026-09-09).
@@ -1679,7 +1724,7 @@ export function DesignCanvasDialog({
  const openSendPanel = () => {
  setCardPrefixText(cardPrefix)
  setCardNote("")
- setCardBand(null)
+ setRowBands({})
  setSkip({})
  setErr(null)
  setCtxTab("board")
@@ -1692,17 +1737,9 @@ export function DesignCanvasDialog({
    * be saved. `skip` is the X: excluded faces stay on the line, they simply do not become
    * cards, because sending a front for digitising does not mean sending the back too.
    */
- const sendable = useMemo(() => {
- const all: Record<string, FaceArt | null> = {
-      ...(faceArt ?? {}),
- [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null,
-    }
- return faces
-      .map((f) => ({ side: f.side, art: all[f.side] }))
-      .filter((r): r is { side: string; art: FaceArt } => !!r.art?.data)
-    // faces is the product's own order, so the list reads front, back, sleeve — not
-    // whatever order the drops happened in.
-  }, [faceArt, sideName, designUrl, pos, designName, faces])
+  // faces is the product's own order, so the list reads front, back, sleeve — not whatever
+  // order the drops happened in. Same list the Files tab prints, by construction.
+ const sendable = artFaces
  const [skip, setSkip] = useState<Record<string, boolean>>({})
   /**
    * FACES ALREADY ON THE BOARD, so the button cannot offer to send them twice.
@@ -1738,7 +1775,7 @@ export function DesignCanvasDialog({
  const card = await createDesignCard({
  title: titleOf(row.side, going.indexOf(row)),
  description: cardNote.trim() || undefined,
- band: cardBand ?? undefined,
+ band: rowBands[row.side] ?? undefined,
  data: row.art.data,
  sku: item.sku || undefined,
  col: "incoming",
@@ -2240,10 +2277,26 @@ export function DesignCanvasDialog({
 
  readImageFile(art, (u) => { settle(); setDesignUrl(u); setDesignName(art.name); setDesignSize(art.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
   }
- const removeArtwork = async () => {
+  /**
+   * WHICH FACE, because the Files list names all of them.
+   *
+   * This only ever removed the face you were LOOKING at, which was right while the only ✕
+   * was on the stage. The Files tab lists every face the line carries, and a row that names
+   * the back has to be able to take the back off — otherwise the way to remove it is to go
+   * and find it, which is the round trip that list exists to save.
+   *
+   * Defaults to the current face, so both older callers are unchanged.
+   */
+ const removeArtwork = async (target?: string) => {
  if (removing) return   // a second click would open a second confirm over the first
- const saved = !!artAtOpen && !!designUrl
- if (!saved) { setDesignUrl(""); setDesignName(null); setDesignSize(null); setFaceArt((prev) => ({ ...(prev ?? {}), [sideName]: null })); return }
+ const sd = String(target || sideName).toLowerCase()
+ const here = sd === sideName
+ const saved = here ? (!!artAtOpen && !!designUrl) : !!savedFaces[sd]
+ if (!saved) {
+ if (here) { setDesignUrl(""); setDesignName(null); setDesignSize(null) }
+ setFaceArt((prev) => ({ ...(prev ?? {}), [sd]: null }))
+ return
+    }
  if (!(await confirm({
  title: tl("canvas", "Take this artwork off the item?"),
  body: "It comes off this line. Any design charge already made stays — ask us if it needs reversing.",
@@ -2252,12 +2305,12 @@ export function DesignCanvasDialog({
     }))) return
  setRemoving(true); setErr(null)
  try {
-      // THIS FACE ONLY. Removing the front must not take the back off with it.
- const r = await deleteOrderDesign(orderId, { line_id: item.line_id ?? undefined, sku: item.sku ?? undefined, side: sideName })
+      // ONE FACE ONLY. Removing the front must not take the back off with it.
+ const r = await deleteOrderDesign(orderId, { line_id: item.line_id ?? undefined, sku: item.sku ?? undefined, side: sd })
  if (r?.error) throw new Error(r.error)
- setDesignUrl(""); setDesignName(null); setDesignSize(null)
- setFaceArt((prev) => ({ ...(prev ?? {}), [sideName]: null }))
- setSavedFaces((prev) => { const n = { ...prev }; delete n[sideName]; return n })
+ if (here) { setDesignUrl(""); setDesignName(null); setDesignSize(null) }
+ setFaceArt((prev) => ({ ...(prev ?? {}), [sd]: null }))
+ setSavedFaces((prev) => { const n = { ...prev }; delete n[sd]; return n })
  onSaved?.()
     } catch (e) {
  setErr(e instanceof Error ? e.message : "Couldn't remove the artwork.")
@@ -3324,25 +3377,39 @@ export function DesignCanvasDialog({
         {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
             <div className="mb-1.5 text-xs font-medium text-foreground">{tl("canvas", "Files")}</div>
-            {/* THE ARTWORK ON THIS FACE, first, whether it is saved or not — it is in NO
-                server list either way (artwork is an order_designs row, and this list is
-                design_file_data), so dropping it once saved left the picture named nowhere.
-                What changes on save is the note, which is the one thing that was ever
-                about being saved. */}
-            {hasArtHere && (
-              <div className="mb-1">
-                <FileRow
-                  file={{
-                    name: designName || fileNameFrom(designUrl) || "Untitled artwork",
-                    size: designSize,
-                    thumb: designUrl,
-                    status: saving ? "uploading" : "done",
-                    note: artUnsaved ? "Not saved yet" : fileRoleLabel("image"),
-                    onRemove: () => void removeArtwork(),
-                  }}
-                />
-              </div>
-            )}
+            {/* EVERY FACE'S ARTWORK, NOT JUST THIS ONE — whether it is saved or not, because
+                it is in NO server list either way (artwork is an order_designs row, and this
+                list is design_file_data), so dropping it once saved left the picture named
+                nowhere.
+
+                This showed the face you were LOOKING at, which is what made the tab read as
+                per-surface — and then a stitch file, which belongs to the LINE, appeared
+                under it on the front and again on the back. Two scopes in one list with
+                nothing saying so. The face is on the row now, so "Front" and "Back" are two
+                rows of one drawer rather than the same drawer seen twice.
+
+                The ✕ takes THAT face off, not the one on screen. A row that names the back
+                and removes the front would be worse than no row. */}
+            {artFaces.map((r) => {
+              const here = r.side === sideName
+              const unsaved = here ? artUnsaved : !savedFaces[r.side]
+              return (
+                <div key={r.side} className="mb-1">
+                  <FileRow
+                    file={{
+                      name: (here ? designName || fileNameFrom(designUrl) : r.art.name) || "Untitled artwork",
+                      size: here ? designSize : undefined,
+                      thumb: r.art.data,
+                      status: here && saving ? "uploading" : "done",
+                      /* THE FACE FIRST, because that is the fact this row was missing.
+                         "Front · Not saved yet" answers both questions a glance has. */
+                      note: [tl("sides", r.side), unsaved ? "Not saved yet" : null].filter(Boolean).join(" · "),
+                      onRemove: () => void removeArtwork(r.side),
+                    }}
+                  />
+                </div>
+              )
+            })}
             {/* ONE ROW SHAPE for every file on the line, whatever it is and wherever it came
                 from — the same FileRow the drop zones and the order page print. The artwork
                 above and a stitch file below were two different rows for two files doing the
@@ -3355,7 +3422,14 @@ export function DesignCanvasDialog({
                     name: f.name || "Untitled file",
                     /* The format, or what is happening to the row — the sub-line carries
                        FACTS, and "Downloading…" is one while it is true. */
-                    note: dlBusy === f.designId ? "Working…" : fileRoleLabel(f.kind),
+                    /* "· every face" on a MACHINE row, because that is what looked like a
+                       bug: one .EMB seen on the front and again on the back. It is one file
+                       on the line — a stitch file is not a per-face thing — and saying so is
+                       cheaper than a list that leaves you to work it out. */
+                    note: dlBusy === f.designId
+                      ? "Working…"
+                      : [fileRoleLabel(f.kind), artFaces.length > 1 ? tl("canvas", "every face") : null]
+                          .filter(Boolean).join(" · "),
                     /* NO status here. FileRow's "uploading" prints "Uploading…" under the
                        name, and this row is DOWNLOADING — the same spinner would be saying
                        the opposite of what is happening. */
@@ -3608,17 +3682,23 @@ export function DesignCanvasDialog({
           {sendable.length > 0 && (
             <div className="flex flex-col gap-2 pb-2">
               <div className="text-sm font-medium">{tl("canvas", "Send to the design board")}</div>
-              <div className="flex flex-col gap-1.5">
+              {/* HAIRLINES, NOT BOXES. Each row was an outlined, rounded card holding an
+                  outlined field — and `border-input` is a CONTROL's border, held to a 3:1
+                  floor precisely so it reads strongly. Three of them stacked under a heading,
+                  above three more outlined pills and a filled button, is the 490-outlined-
+                  boxes problem (§4) on one 380px panel: everything shouting, so the field you
+                  are meant to type in shouts no louder than the box around it.
+                  The rows are a list. A list is separated by a rule. */}
+              <div className="flex flex-col divide-y divide-border">
                 {sendable.map((row) => {
  const off = !!skip[row.side]
  return (
                     <div
  key={row.side}
- className={"flex items-center gap-2.5 rounded-lg border px-2.5 py-2 transition-colors " +
-                        (off ? "border-border bg-muted/40 opacity-55" : "border-input")}
+ className={"flex items-start gap-2.5 py-2 transition-opacity first:pt-0 " + (off ? "opacity-55" : "")}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={row.art.data} alt="" className="size-9 shrink-0 rounded object-contain" />
+                      <img src={row.art.data} alt="" className="mt-0.5 size-9 shrink-0 rounded object-contain" />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium capitalize">{tl("sides", row.side)}</div>
                         {/* THE TITLE, not the file name. What was here was `row.art.name` —
@@ -3635,6 +3715,17 @@ export function DesignCanvasDialog({
                           disabled={off || sending}
                           aria-label={tl("canvas", "Card title")}
                           className="mt-1 h-7 w-full text-xs"
+                        />
+                        {/* THIS FACE'S PRICE, under this face's title. Small, because the row
+                            is 380px wide and the pills are one of three things in it; the
+                            figure is still on every pill, which is what makes it a decision
+                            about money rather than a filter. */}
+                        <BandPills
+                          className="mt-1.5"
+                          size="sm" stretch
+                          value={rowBands[row.side] ?? null}
+                          onPick={(b) => setRowBands((m) => ({ ...m, [row.side]: b }))}
+                          rates={bandRates} flat={bandFlat}
                         />
                       </div>
                       {/* THE X EXCLUDES, IT DOES NOT DELETE. The artwork stays on the line and
@@ -3653,11 +3744,6 @@ export function DesignCanvasDialog({
                   )
                 })}
               </div>
-              {/* NO "Payout band" HEADING. The pills read Easy $2.50 · Standard $2.50 —
-                  they say what they are and what they cost, and a caption above them was a
-                  word naming something that already names itself (§4). Full size, not the
-                  small variant: this is a decision about money, not a filter chip. */}
-              <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} stretch />
               {/* THE ONLY SEND BUTTON. There were two — this one and an embroidery-only one
                   further down that opened this same tab, which on an embroidered line meant
                   two buttons stacked saying nearly the same thing. That one is gone; this is

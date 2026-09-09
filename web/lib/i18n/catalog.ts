@@ -2596,6 +2596,7 @@ const vi: Dict = {
   "canvas.Drop your files, or click to browse": "Thả tệp của bạn vào đây, hoặc bấm để chọn",
   "canvas.Add artwork — drop a file here or click to browse": "Thêm thiết kế — thả tệp vào đây hoặc bấm để chọn",
   "canvas.Add your design or a machine file, then save.": "Thêm thiết kế hoặc tệp máy của bạn, rồi lưu lại.",
+  "canvas.every face": "mọi mặt",
   "canvas.Recent files": "Tệp gần đây",
   "canvas.Pick a blank to start designing.": "Chọn một phôi để bắt đầu thiết kế.",
   "canvas.Add a colour": "Thêm một màu",
