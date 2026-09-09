@@ -1610,10 +1610,31 @@ export function DesignCanvasDialog({
  sideName.charAt(0).toUpperCase() + sideName.slice(1),
  artIn ? `${artIn.toFixed(1)}"` : "",
   ].filter(Boolean).join(" · ")
- const fullCardTitle = (name: string) => `${cardPrefix} · ${name.trim() || item.name || item.sku || "Design"}`
+  /**
+   * THE PREFIX IS A SUGGESTION NOW, not a fixed label.
+   *
+   * It was rendered as chrome — a grey block ahead of the caret — on the reasoning that a
+   * machine measures these better than a person types them. Mostly true, and the default is
+   * unchanged. But the PRINTED WIDTH is the one part a person genuinely overrules: the canvas
+   * measures what is placed, and "actually print it at 10 inches" is a decision, not a
+   * measurement. There was no way to say it without retyping the whole title by hand.
+   *
+   * It also read as one opaque token. `#48-D1` is order 48, design 1 — the owner read the 48
+   * as a design id, which is a fair reading of a string nothing on screen explains. The label
+   * names the parts now instead of leaving them to be inferred.
+   */
+ const [cardPrefixText, setCardPrefixText] = useState("")
+ const fullCardTitle = (name: string) => {
+ const pre = cardPrefixText.trim()
+ const rest = name.trim() || item.name || item.sku || "Design"
+ return pre ? `${pre} · ${rest}` : rest
+  }
   /** Click the artwork to see it big. The shared lightbox, never a seventh hand-rolled one. */
  const [zoom, setZoom] = useState<string | null>(null)
  const openSendPanel = () => {
+    // Re-seeded on every open, so a width changed on the canvas since last time is reflected
+    // rather than the last edit being remembered as if it were the measurement.
+ setCardPrefixText(cardPrefix)
  setCardTitle(item.name || item.sku || "Design")
  setCardNote("")
  setErr(null)
@@ -3734,13 +3755,17 @@ export function DesignCanvasDialog({
             <div className="space-y-3">
               <div>
                 <label htmlFor="send-card-title" className="mb-1 block text-sm font-medium">{tl("canvas", "Title")}</label>
-                {/* The prefix is SHOWN, not typed: it sits in the field's chrome ahead of
-                    the caret, so what is saved is exactly what is on screen and the only
-                    thing to enter is the name. */}
+                {/* BOTH HALVES ARE FIELDS. The left one is filled in for you and is usually
+                    right; the printed width is the part worth overruling, and it used to be
+                    chrome you could not reach. */}
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 whitespace-nowrap rounded-lg border border-input bg-muted px-2.5 py-1.5 text-sm tabular-nums text-muted-foreground" title={tl("canvas", "Order · design · side · printed width — set for you")}>
-                    {cardPrefix}
-                  </span>
+                  <Input
+                    aria-label={tl("canvas", "Order, design number, side and printed width")}
+                    title={tl("canvas", "Order number · design number on this order · side · printed width. Filled in for you — change the width if you are printing it at a different size.")}
+                    value={cardPrefixText}
+                    onChange={(e) => setCardPrefixText(e.target.value)}
+                    className="w-[14rem] shrink-0 tabular-nums"
+                  />
                   <Input
                     id="send-card-title"
                     value={cardTitle}
