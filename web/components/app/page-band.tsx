@@ -89,19 +89,21 @@ type BandObject = BandSlot & { src: string; swim: SwimPath }
 
 export const LAYOUTS: Record<string, BandSlot[]> = {
   /** EVEN — one size for every object, evenly spaced (owner's call). Sized to sit INSIDE the
-   *  band: 98% of its height, which is as large as they go before the frame starts eating
-   *  shoulders — a garment cropped by the band is not a bigger garment, it is a broken one.
+   *  band: 91% of its height, sat 5% down. That is as large as they go AND STILL SWIM — at
+   *  98% they fitted the band exactly at rest, so the first 12px of the vertical drift put
+   *  their shoulders through the top edge. The size has to leave room for the motion, or the
+   *  motion crops the thing it is moving — a garment cropped by the band is not a bigger garment, it is a broken one.
    *  The objects sit on a SQUARE canvas (tools/import-objects.py), so a wide one like the cap
    *  fills that square's width and leaves air above and below; that is the shape of the cap,
    *  not the box being too small. Five rather than six,
    *  because six at this size have to overlap to fit and a row of garments piled on each
    *  other is a rack, not a set. */
   even: [
-    { x: 58.5, y: 1, h: 98 },
-    { x: 67.5, y: 1, h: 98 },
-    { x: 76.5, y: 1, h: 98 },
-    { x: 85.5, y: 1, h: 98 },
-    { x: 94.5, y: 1, h: 98 },
+    { x: 58.5, y: 5, h: 91 },
+    { x: 67.5, y: 5, h: 91 },
+    { x: 76.5, y: 5, h: 91 },
+    { x: 85.5, y: 5, h: 91 },
+    { x: 92.0, y: 5, h: 91 },
   ],
   /** SHELF — every object standing on one line. Here the sizes do the varying. */
   shelf: [
@@ -166,6 +168,16 @@ export const DEFAULT_MOTION = "swim"
 /**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
  *
+ * `sx` is in `cqw`, a percentage of the BAND, so an object crosses the stripe rather than
+ * fidgeting around its own spot; `sy` is a percentage of the OBJECT, because the band has no
+ * vertical room to give and a fish crossing a tank barely changes depth.
+ *
+ * THE SIGNS ARE CHOSEN AGAINST EACH SLOT'S POSITION, not alternated for variety. The two
+ * objects nearest the type swim RIGHT and the three beyond them swim LEFT, so they cross
+ * through each other in the empty half and nothing ever heads for the greeting: slot 1 at
+ * 58.5% + 30cqw lands at 88.5%, slot 5 at 92% − 34cqw lands at 58%. The shoal breathes about
+ * the middle of the stripe instead of migrating to an edge.
+ *
  * The two periods are never a simple ratio of each other. 2:1 or 3:2 closes the figure
  * quickly and visibly; 17 against 11 takes 187 seconds to repeat, which is longer than
  * anyone looks at a header. That is the whole difference between a wander and a bounce, and
@@ -177,11 +189,11 @@ export const DEFAULT_MOTION = "swim"
  */
 type SwimPath = { sx: string; sy: string; r: string; dx: number; dy: number; ex: number; ey: number }
 const SWIM: SwimPath[] = [
-  { sx: "104%", sy: "-62%", r: "7deg", dx: 9.5, dy: 6.0, ex: -3, ey: -4 },
-  { sx: "-88%", sy: "-74%", r: "-6deg", dx: 11.5, dy: 7.5, ex: -7, ey: -1.5 },
-  { sx: "96%", sy: "-52%", r: "8deg", dx: 8.5, dy: 5.5, ex: -5, ey: -6 },
-  { sx: "-100%", sy: "-68%", r: "-8deg", dx: 10.5, dy: 6.5, ex: -9, ey: -3 },
-  { sx: "84%", sy: "-80%", r: "6deg", dx: 12.5, dy: 8.0, ex: -1, ey: -5 },
+  { sx: "30cqw", sy: "-9%", r: "6deg", dx: 9.0, dy: 5.0, ex: -3, ey: -4 },
+  { sx: "23cqw", sy: "-11%", r: "-5deg", dx: 11.0, dy: 6.5, ex: -7, ey: -1.5 },
+  { sx: "-19cqw", sy: "-8%", r: "7deg", dx: 8.0, dy: 4.5, ex: -5, ey: -6 },
+  { sx: "-27cqw", sy: "-10%", r: "-6deg", dx: 10.0, dy: 5.5, ex: -9, ey: -3 },
+  { sx: "-34cqw", sy: "-9%", r: "5deg", dx: 12.0, dy: 7.0, ex: -1, ey: -5 },
 ]
 
 /**

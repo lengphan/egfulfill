@@ -1089,9 +1089,21 @@ td[align="right"] {
    11–17s cycles every one of these motions read as the same slight float, because nobody
    watches a header for a whole cycle — in the five seconds someone actually looks, a 17s
    path has moved a tenth of itself. Each motion is now large enough and quick enough to be
-   RECOGNISED in that window: you should be able to name which one you are looking at. */
-@keyframes eg-swim-x { to { transform: translate3d(var(--swim-x, 100%), 0, 0); } }
-@keyframes eg-swim-y { to { transform: translate3d(0, var(--swim-y, -60%), 0) rotate(var(--swim-r, 7deg)); } }
+   RECOGNISED in that window: you should be able to name which one you are looking at.
+
+   THE HORIZONTAL TRAVEL IS MEASURED IN THE BAND, NOT IN THE OBJECT. A percentage inside
+   `translate` resolves against the element, so "100%" is one cap-width — which is why the
+   swim read as a fidget around each object's own spot however large the number got. `cqw` is
+   a percentage of the CONTAINER, so 30cqw is 30% of the band whatever the sidebar is doing,
+   and an object actually crosses the stripe. (The layer declares `container-type` for this;
+   without it cqw silently falls back to the viewport and the objects fly off the page.)
+
+   VERTICAL STAYS SMALL, and that is not timidity. The objects are 98% of the band's height,
+   so the band has no vertical room to give: 60% of the object was 55px of travel in a 92px
+   frame, which does not read as swimming up and down, it reads as garments being guillotined
+   by the top and bottom edges. A fish crossing a tank barely changes depth. */
+@keyframes eg-swim-x { to { transform: translate3d(var(--swim-x, 26cqw), 0, 0); } }
+@keyframes eg-swim-y { to { transform: translate3d(0, var(--swim-y, -13%), 0) rotate(var(--swim-r, 5deg)); } }
 /* BOB — the classic: one axis, in place, out of phase with its neighbours. */
 @keyframes eg-band-bob { to { transform: translate3d(0, -46%, 0); } }
 /* ORBIT — a true circle, made by rotating about a point BELOW the object and letting the
@@ -1141,6 +1153,9 @@ td[align="right"] {
   animation-delay: var(--swim-y-delay, 0s);
 }
 .eg-band-swim, .eg-band-float { will-change: transform; }
+/* The measuring stick for cqw above. Without it the unit resolves against the small
+   viewport, which is a different number on every screen and none of them the band. */
+[data-motion] { container-type: inline-size; }
 
 /* Both halves stop, or an orbiting object keeps circling under a pointer that is holding it
    still — which is worse than not pausing at all. */
