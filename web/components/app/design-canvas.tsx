@@ -1674,7 +1674,19 @@ export function DesignCanvasDialog({
     // whatever order the drops happened in.
   }, [faceArt, sideName, designUrl, pos, designName, faces])
  const [skip, setSkip] = useState<Record<string, boolean>>({})
- const going = sendable.filter((r) => !skip[r.side])
+  /**
+   * FACES ALREADY ON THE BOARD, so the button cannot offer to send them twice.
+   *
+   * Held here rather than derived from `boardCard`, which is ONE card — the line's most
+   * recent — and cannot say which faces it covers.
+   *
+   * It stores WHAT WAS SENT, not merely that something was: swap the artwork on a face that
+   * has already gone and it becomes sendable again, because that is a new design for the
+   * same position and the old card is about the old picture. A boolean would have made
+   * "sent" a property of the face rather than of the work.
+   */
+ const [sentSides, setSentSides] = useState<Record<string, string>>({})
+ const going = sendable.filter((r) => !skip[r.side] && sentSides[r.side] !== r.art.data)
 
   /**
    * ONE CARD PER FACE (owner's call, 2026-09-09).
@@ -1711,6 +1723,9 @@ export function DesignCanvasDialog({
  if (a && (a as { error?: string }).error) throw new Error(`${row.side}: ${(a as { error?: string }).error}`)
         }
       }
+      /* Marked AFTER the loop, so a send that failed half way leaves the faces that did not
+         make it still offered — the error names which one stopped it. */
+ setSentSides((m) => ({ ...m, ...Object.fromEntries(going.map((r) => [r.side, r.art.data])) }))
  const cards = await getOrderDesignCards(orderId).catch(() => null)
  if (cards) setBoardCard(cardForLine(cards, { line_id: item.line_id, sku: item.sku }) ?? null)
     } catch (e) {
@@ -3600,17 +3615,34 @@ export function DesignCanvasDialog({
                   further down that opened this same tab, which on an embroidered line meant
                   two buttons stacked saying nearly the same thing. That one is gone; this is
                   the one that works on every line and knows which faces are actually going. */}
+              {/* THE BUTTON IS THE STATUS (owner's call, 2026-09-09).
+                  "Sent · Incoming" was a line of 11px grey under the button — the answer to
+                  "did that do anything" set in the smallest type on the panel, below the
+                  control that had done it. It reads in the button now, and the button greys
+                  out, which is the same fact said once instead of twice.
+                  It comes BACK on its own the moment there is something new to send: a face
+                  that has not gone yet, or artwork dropped after the last send. Disabled is
+                  a statement about right now, never a dead end. */}
               <Button
                 className="w-full"
+                variant={going.length ? "default" : "outline"}
                 disabled={sending || !going.length}
                 onClick={() => void sendSelected()}
-                title={boardCard ? tl("canvas", "Already on the design board") : undefined}
+                title={going.length
+                  ? undefined
+                  : boardCard?.claimed_by
+                    ? `${tl("canvas", "With")} ${boardCard.claimed_by}`
+                    : tl("canvas", "Nothing new to send — add artwork or a face and this comes back")}
               >
                 {sending
                   ? tl("canvas", "Sending…")
-                  : going.length === 1
-                    ? tl("canvas", "Send 1 design to the board")
-                    : `${tl("canvas", "Send")} ${going.length} ${tl("canvas", "designs to the board")}`}
+                  : !going.length
+                    ? (boardCard
+                        ? `${tl("canvas", "Sent")} · ${boardCard.lane_label || boardCard.col || tl("canvas", "Incoming")}`
+                        : tl("canvas", "Sent"))
+                    : going.length === 1
+                      ? tl("canvas", "Send 1 design to the board")
+                      : `${tl("canvas", "Send")} ${going.length} ${tl("canvas", "designs to the board")}`}
               </Button>
             </div>
           )}
@@ -3687,11 +3719,13 @@ export function DesignCanvasDialog({
  heading — the drawer summary carries it — but "Sent · Incoming · Hai Anh"
  is a fact about somebody else's queue that nothing else on this screen
  reports, and it is the answer to "did that button do anything". */}
-                {!hasMachineFile && boardCard && (
+                {/* "Sent · Incoming · Hai Anh" WAS HERE. It is in the send button now — the
+                    same fact, in the control that produced it, rather than in 11px underneath
+                    it. A seller sees the plain version, since a lane and a claimer are our
+                    queue's business. */}
+                {!hasMachineFile && boardCard && !isStaff && (
                   <span className="truncate text-2xs text-muted-foreground">
-                    {isStaff
-                      ? `Sent · ${boardCard.lane_label || boardCard.col || tl("canvas", "Incoming")}${boardCard.claimed_by ? ` · ${boardCard.claimed_by}` : ""}`
- : tl("canvas", "Sent — with our team")}
+                    {tl("canvas", "Sent — with our team")}
                   </span>
                 )}
               </div>
