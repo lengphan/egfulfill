@@ -3628,18 +3628,21 @@ export function DesignCanvasDialog({
                 variant={going.length ? "default" : "outline"}
                 disabled={sending || !going.length}
                 onClick={() => void sendSelected()}
+                /* WHERE it went and WHO has it move to the tooltip. On the button they were
+                   noise — "Sent" is the whole of what the control has to report, and a lane
+                   name is our queue's internal vocabulary showing up in a label. Still one
+                   hover away for anyone chasing a card. */
                 title={going.length
                   ? undefined
-                  : boardCard?.claimed_by
-                    ? `${tl("canvas", "With")} ${boardCard.claimed_by}`
+                  : boardCard
+                    ? [tl("canvas", "Sent"), boardCard.lane_label || boardCard.col, boardCard.claimed_by]
+                        .filter(Boolean).join(" · ")
                     : tl("canvas", "Nothing new to send — add artwork or a face and this comes back")}
               >
                 {sending
                   ? tl("canvas", "Sending…")
                   : !going.length
-                    ? (boardCard
-                        ? `${tl("canvas", "Sent")} · ${boardCard.lane_label || boardCard.col || tl("canvas", "Incoming")}`
-                        : tl("canvas", "Sent"))
+                    ? tl("canvas", "Sent")
                     : going.length === 1
                       ? tl("canvas", "Send 1 design to the board")
                       : `${tl("canvas", "Send")} ${going.length} ${tl("canvas", "designs to the board")}`}
