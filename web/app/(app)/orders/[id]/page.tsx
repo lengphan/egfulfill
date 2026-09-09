@@ -8,7 +8,7 @@ import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { useParams, useRouter } from "next/navigation"
-import { Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash } from "@phosphor-icons/react"
+import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
@@ -1277,11 +1277,11 @@ export default function OrderDetailPage() {
  className="rounded-none"
  onEdit={() => setCustomize(it)}
                         />
-                        {artwork && (
-                          <span className="pointer-events-none absolute bottom-0 right-0 flex size-4 items-center justify-center rounded-tl bg-primary text-primary-foreground" title={design?.name || "Design attached"}>
-                            <PenNib size={9} weight="fill" />
-                          </span>
-                        )}
+                        {/* THE "DESIGN ATTACHED" PIP IS GONE (owner's call, 2026-09-09).
+                            A filled square with a nib in it, in the corner of a tile that was
+                            already showing the design. It marked a fact the picture beside it
+                            states more plainly than any glyph can — the same thing said twice,
+                            and the second telling was the one nobody could read at 16px. */}
                       </div>
                       </div>
                       {/* One column holding three stacked zones — identity+price, then
