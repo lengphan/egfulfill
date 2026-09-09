@@ -177,11 +177,11 @@ export const DEFAULT_MOTION = "swim"
  */
 type SwimPath = { sx: string; sy: string; r: string; dx: number; dy: number; ex: number; ey: number }
 const SWIM: SwimPath[] = [
-  { sx: "58%", sy: "-38%", r: "4deg", dx: 17, dy: 11, ex: -3, ey: -7 },
-  { sx: "-46%", sy: "-50%", r: "-3.5deg", dx: 21, dy: 13, ex: -9, ey: -2 },
-  { sx: "52%", sy: "-30%", r: "5deg", dx: 15, dy: 9.5, ex: -6, ey: -11 },
-  { sx: "-56%", sy: "-44%", r: "-5deg", dx: 19, dy: 12.5, ex: -12, ey: -4 },
-  { sx: "42%", sy: "-54%", r: "3deg", dx: 23, dy: 10.5, ex: -1, ey: -8 },
+  { sx: "104%", sy: "-62%", r: "7deg", dx: 9.5, dy: 6.0, ex: -3, ey: -4 },
+  { sx: "-88%", sy: "-74%", r: "-6deg", dx: 11.5, dy: 7.5, ex: -7, ey: -1.5 },
+  { sx: "96%", sy: "-52%", r: "8deg", dx: 8.5, dy: 5.5, ex: -5, ey: -6 },
+  { sx: "-100%", sy: "-68%", r: "-8deg", dx: 10.5, dy: 6.5, ex: -9, ey: -3 },
+  { sx: "84%", sy: "-80%", r: "6deg", dx: 12.5, dy: 8.0, ex: -1, ey: -5 },
 ]
 
 /**

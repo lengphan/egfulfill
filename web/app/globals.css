@@ -1085,19 +1085,24 @@ td[align="right"] {
    ALTERNATE, not a four-stop loop. Each axis is a single from/to eased at both
    ends, so a turnaround is a slow reversal rather than a corner. Corners are what
    made the old one look mechanical. */
-@keyframes eg-swim-x { to { transform: translate3d(var(--swim-x, 58%), 0, 0); } }
-@keyframes eg-swim-y { to { transform: translate3d(0, var(--swim-y, -38%), 0) rotate(var(--swim-r, 4deg)); } }
+/* AMPLITUDE AND PERIOD ARE THE DESIGN, not decoration on top of it. At 20–30px paths on
+   11–17s cycles every one of these motions read as the same slight float, because nobody
+   watches a header for a whole cycle — in the five seconds someone actually looks, a 17s
+   path has moved a tenth of itself. Each motion is now large enough and quick enough to be
+   RECOGNISED in that window: you should be able to name which one you are looking at. */
+@keyframes eg-swim-x { to { transform: translate3d(var(--swim-x, 100%), 0, 0); } }
+@keyframes eg-swim-y { to { transform: translate3d(0, var(--swim-y, -60%), 0) rotate(var(--swim-r, 7deg)); } }
 /* BOB — the classic: one axis, in place, out of phase with its neighbours. */
-@keyframes eg-band-bob { to { transform: translate3d(0, -24%, 0); } }
+@keyframes eg-band-bob { to { transform: translate3d(0, -46%, 0); } }
 /* ORBIT — a true circle, made by rotating about a point BELOW the object and letting the
    picture counter-rotate so it never tips. Four translate stops would draw a diamond; this
    draws a circle with two declarations. */
 @keyframes eg-band-orbit { to { transform: rotate(360deg); } }
 @keyframes eg-band-orbit-rev { to { transform: rotate(-360deg); } }
 /* SWAY — a pendulum hung from the top edge, the way a garment on a rail moves. */
-@keyframes eg-band-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+@keyframes eg-band-sway { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 /* BREATHE — inflating and letting go. No travel at all. */
-@keyframes eg-band-breathe { to { transform: scale(1.13) rotate(2.5deg); } }
+@keyframes eg-band-breathe { to { transform: scale(1.22) rotate(4deg); } }
 
 /* SWIM (default) — two axes, unequal periods, described above. */
 [data-motion="swim"] .eg-band-swim {
@@ -1109,30 +1114,30 @@ td[align="right"] {
   animation-delay: var(--swim-y-delay, 0s);
 }
 [data-motion="bob"] .eg-band-float {
-  animation: eg-band-bob var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation: eg-band-bob calc(var(--swim-y-dur, 11s) * 0.34) ease-in-out infinite alternate;
   animation-delay: var(--swim-y-delay, 0s);
 }
 [data-motion="orbit"] .eg-band-swim {
-  animation: eg-band-orbit var(--swim-x-dur, 17s) linear infinite;
+  animation: eg-band-orbit calc(var(--swim-x-dur, 17s) * 0.42) linear infinite;
   animation-delay: var(--swim-x-delay, 0s);
   /* The origin is the CENTRE of the circle, so its distance from the object's own centre is
-     the RADIUS. 155% put that radius at 105% of the object's height — a circle wider than the
-     band, which threw three of the five objects clean out of frame; 118% still made it 68%.
-     70% leaves 20% of the height, a circle about 15px across on a 75px object: an orbit you
-     read as drifting rather than as a fairground ride. */
-  transform-origin: 50% 70%;
+     the RADIUS. 155% made that 105% of the object's height and threw three of five objects
+     out of frame; 70% made it 20%, a 15px circle nobody could see was a circle. 82% is 32% of
+     the height — around 30px on a 90px object, which reads as an orbit at a glance without
+     leaving the band. */
+  transform-origin: 50% 82%;
 }
 [data-motion="orbit"] .eg-band-float {
-  animation: eg-band-orbit-rev var(--swim-x-dur, 17s) linear infinite;
+  animation: eg-band-orbit-rev calc(var(--swim-x-dur, 17s) * 0.42) linear infinite;
   animation-delay: var(--swim-x-delay, 0s);
 }
 [data-motion="sway"] .eg-band-float {
-  animation: eg-band-sway var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation: eg-band-sway calc(var(--swim-y-dur, 11s) * 0.32) ease-in-out infinite alternate;
   animation-delay: var(--swim-y-delay, 0s);
   transform-origin: 50% 0%;
 }
 [data-motion="breathe"] .eg-band-float {
-  animation: eg-band-breathe var(--swim-y-dur, 11s) ease-in-out infinite alternate;
+  animation: eg-band-breathe calc(var(--swim-y-dur, 11s) * 0.26) ease-in-out infinite alternate;
   animation-delay: var(--swim-y-delay, 0s);
 }
 .eg-band-swim, .eg-band-float { will-change: transform; }

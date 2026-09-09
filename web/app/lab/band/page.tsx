@@ -20,6 +20,10 @@ import { PageBand, LAYOUTS, SETS, MOTIONS, DEFAULT_LAYOUT } from "@/components/a
 function MotionState() {
   const [reduced, setReduced] = useState<boolean | null>(null)
   const [forced, setForced] = useState(false)
+  /** What the first object's two animated elements are actually doing, sampled live. */
+  const [probe, setProbe] = useState<{
+    name: string; state: string; x: number; y: number; movedX: number; movedY: number
+  } | null>(null)
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -36,36 +40,82 @@ function MotionState() {
     return () => el.removeAttribute("data-force-motion")
   }, [forced])
 
+  /*
+   * THE PAGE MEASURES ITSELF, because "it is moving" and "it is not" is not a claim either of
+   * us should be settling by staring. It reads the two transforms every 400ms and reports the
+   * live offsets plus how far they have travelled since this panel mounted.
+   *
+   * A screenshot cannot answer this: capturing one RESETS css animations, so every still of
+   * this band — including the ones in review — is frozen at t=0 and looks like proof that
+   * nothing moves.
+   */
+  useEffect(() => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    const tick = () => {
+      const layer = document.querySelector('[data-motion="swim"]')
+      const span = layer?.querySelector<HTMLElement>(".eg-band-swim")
+      const img = layer?.querySelector<HTMLElement>(".eg-band-float")
+      if (!span || !img) return
+      const at = (el: HTMLElement, i: number) => new DOMMatrixReadOnly(getComputedStyle(el).transform)[i === 0 ? "m41" : "m42"]
+      const x = at(span, 0), y = at(img, 1)
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x)
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y)
+      const a = img.getAnimations()[0]
+      setProbe({
+        name: getComputedStyle(img).animationName,
+        state: a?.playState ?? "none",
+        x: Math.round(x), y: Math.round(y),
+        movedX: Math.round(maxX - minX), movedY: Math.round(maxY - minY),
+      })
+    }
+    const id = window.setInterval(tick, 400)
+    return () => window.clearInterval(id)
+  }, [])
+
   if (reduced === null) return null
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
-      <span>
-        This browser reports{" "}
-        <span className="font-semibold">prefers-reduced-motion: {reduced ? "reduce" : "no-preference"}</span>
-      </span>
-      {reduced && (
-        <>
-          <span className="text-muted-foreground">
-            — every animation below is switched off for it, which is the intended behaviour.
-            macOS: System Settings › Accessibility › Display › Reduce motion.
-          </span>
-          <label className="flex cursor-pointer items-center gap-2 font-medium">
-            <input type="checkbox" checked={forced} onChange={(e) => setForced(e.target.checked)} />
-            Show me the motion anyway
-          </label>
-        </>
+    <div className="space-y-2 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <span>
+          This browser reports{" "}
+          <span className="font-semibold">prefers-reduced-motion: {reduced ? "reduce" : "no-preference"}</span>
+        </span>
+        {reduced && (
+          <>
+            <span className="text-muted-foreground">
+              — every animation below is switched off for it, which is the intended behaviour.
+              macOS: System Settings › Accessibility › Display › Reduce motion.
+            </span>
+            <label className="flex cursor-pointer items-center gap-2 font-medium">
+              <input type="checkbox" checked={forced} onChange={(e) => setForced(e.target.checked)} />
+              Show me the motion anyway
+            </label>
+          </>
+        )}
+      </div>
+      {probe && (
+        <p className="tabular-nums text-muted-foreground">
+          First object · <span className="font-medium text-foreground">{probe.name}</span> ·{" "}
+          <span className="font-medium text-foreground">{probe.state}</span> · now at x{" "}
+          <span className="font-medium text-foreground">{probe.x}px</span>, y{" "}
+          <span className="font-medium text-foreground">{probe.y}px</span> · travelled{" "}
+          <span className="font-medium text-foreground">{probe.movedX}px</span> across and{" "}
+          <span className="font-medium text-foreground">{probe.movedY}px</span> down since this panel loaded.
+          {probe.movedX + probe.movedY === 0 && " — if these stay at 0, the animation genuinely is not running."}
+        </p>
       )}
     </div>
   )
 }
 
 const NOTES: Record<string, string> = {
+  even: "one size, evenly spaced — the default",
   shelf: "one baseline, sizes vary",
   arc: "a curve lifting off the right edge",
   bunch: "one mass in the corner, overlapping",
   pairs: "a trio and a pair, with air between",
   hero: "one big object, three in orbit",
-  scatter: "what shipped first",
+  scatter: "the first attempt, kept for comparison",
 }
 
 const MOTION_NOTES: Record<string, string> = {
