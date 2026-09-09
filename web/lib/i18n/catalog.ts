@@ -1324,6 +1324,7 @@ const vi: Dict = {
   "import.Nothing in your library matches": "Không có gì trong thư viện của bạn khớp với",
   "import.— check the number on the template card.": "— hãy kiểm tra số trên thẻ mẫu.",
   "import.— check the reference on the file’s card in Design Lab.": "— hãy kiểm tra mã tham chiếu trên thẻ tệp trong Xưởng thiết kế.",
+  "import.— check the reference on the design’s card in Design Lab.": "— kiểm tra mã tham chiếu trên thẻ của thiết kế trong Design Lab.",
   "import., so those lines were left alone — use the TPL- number instead.": ", nên các dòng đó được giữ nguyên — hãy dùng số TPL- thay thế.",
   "import.row has": "dòng có",
   "import.rows have": "dòng có",

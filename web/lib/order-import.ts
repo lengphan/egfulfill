@@ -105,7 +105,7 @@ export const CSV_COLUMNS: CsvColumn[] = [
    * working — what moved out from under it is the batch of photo-ish spellings, which now
    * land on `listing_image` and still only ever set the picture (see COL_ALIASES).
    */
-  { header: "Artwork ID", key: "hero_image", required: false, section: "product", help: "THE DESIGN — the thing we actually print, and what the line then shows as its picture. A URL, not a reference: anything that is not http(s) is dropped. It goes on the face named in Placement, or on the front when that is blank. It does NOT conflict with a Template ID: a template brings its own artwork and placement, and an Artwork ID typed beside one overrides both for this row. Headed “Image ID” on sheets downloaded before today; that spelling still imports." },
+  { header: "Artwork ID", key: "hero_image", required: false, section: "product", help: "THE DESIGN — the thing we actually print, and what the line then shows as its picture. Either the reference off your library card (IMG-30) or a URL. It goes on the face named in Placement, or on the front when that is blank. It does NOT conflict with a Template ID: a template brings its own artwork and placement, and an Artwork ID typed beside one overrides both for this row. Headed “Image ID” on sheets downloaded before today; that spelling still imports." },
   /**
    * THE STITCH FILE, BY REFERENCE — the third way of saying "here is the design", and the
    * only one that is not artwork.
@@ -524,6 +524,42 @@ function findHeaderRow(rows: string[][]): number {
 }
 
 // Canonicalize headers, apply sensible defaults, validate, and drop the sample row.
+/**
+ * `IMG-30` IS AN ARTWORK REFERENCE, and until now the sheet dropped it on the floor.
+ *
+ * Artwork ID was the odd one out of the three ID columns: Template ID takes `TPL-12` and
+ * Machine File ID takes `MF-12`, but this wanted a raw URL — so the reference a seller reads
+ * off their own library card, the thing the column is NAMED after, was silently discarded
+ * for not looking like an address. Two of the three columns spoke references and the third
+ * quietly did not, which is a difference nobody can see until an order arrives blank.
+ *
+ * A URL still works and always will: an artwork that lives somewhere else has no reference.
+ */
+const ARTWORK_REF = /^IMG-([A-Za-z0-9_-]+)$/i
+
+/** Maps `IMG-30` to the image's address. Supplied by whoever holds the seller's library. */
+export type ArtworkResolver = (ref: string) => string
+
+/** The row's artwork as an ADDRESS: a URL as-is, a reference through the resolver, else "". */
+export function artworkUrl(v: string, resolve?: ArtworkResolver): string {
+  const s = String(v ?? "").trim()
+  if (!s) return ""
+  if (/^https?:\/\//i.test(s)) return s
+  const m = s.match(ARTWORK_REF)
+  if (m && resolve) {
+    const hit = resolve(s)
+    return /^https?:\/\//i.test(hit) ? hit : ""
+  }
+  return ""
+}
+
+/** Is this at least SHAPED like something that could name a design? Used by validation,
+ *  which runs without a library and must not warn "no design" at a well-formed reference. */
+export const looksLikeArtwork = (v: string): boolean => {
+  const s = String(v ?? "").trim()
+  return /^https?:\/\//i.test(s) || ARTWORK_REF.test(s)
+}
+
 export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; error?: string } {
   if (!rows || rows.length < 2) return { records: [], error: "File must have a header row and at least one data row." }
   const hdrIdx = findHeaderRow(rows)
@@ -573,7 +609,7 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
       // The SAME test groupToOrders applies. Reading these for mere emptiness said a row
       // was fine when it carried `IMG-30` in Artwork ID — a value the parser drops for not
       // being an address, so nothing would have been placed and nothing would have been said.
-      else if (!/^https?:\/\//i.test(S(rec.design_file_url)) && !/^https?:\/\//i.test(S(rec.hero_image)) && !S(rec.template_id)) {
+      else if (!looksLikeArtwork(S(rec.design_file_url)) && !looksLikeArtwork(S(rec.hero_image)) && !S(rec.template_id)) {
         warn.push("Placement with no design on the row — nothing to place there")
       }
     }
@@ -646,7 +682,7 @@ const AUTO_KEY = " AUTO-"
 // become one order with several lines; a row without one can only ever be its own order,
 // because there is nothing to group it by. That is why a multi-line order must carry the
 // number even though the column is otherwise skippable.
-export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
+export function groupToOrders(records: ImportRecord[], resolveArtwork?: ArtworkResolver): ImportOrder[] {
   const valid = records.filter((r) => r._valid)
   const groups: Record<string, ImportRecord[]> = {}
   const order: string[] = []
@@ -660,10 +696,10 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
     const head = rows[0]
     const items: ImportItem[] = rows.map((r) => {
       const hero = S(r.hero_image)
-      const url = (v: string) => (/^https?:\/\//i.test(v) ? v : "")
+      const url = (v: string) => artworkUrl(v, resolveArtwork)
       // The row's own design, most explicit spelling first. Both are the artwork now — see
-      // COL_ALIASES — and a value that is not an address is dropped rather than filed as
-      // one, which is the rule Artwork ID has always followed.
+      // COL_ALIASES. A URL passes through, an `IMG-30` is looked up in the seller's library,
+      // and anything that resolves to neither is dropped rather than filed as an address.
       const artwork = url(S(r.design_file_url)) || url(hero)
       return {
         sku: S(r.item_sku),

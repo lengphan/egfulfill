@@ -1,7 +1,7 @@
 "use client"
 
 import { useLabelT } from "@/lib/i18n"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { markCameFromImport } from "@/lib/sheet-return"
 import { useRouter } from "next/navigation"
 import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table } from "@phosphor-icons/react"
@@ -27,7 +27,7 @@ import {
   columnBands,
   type ImportRecord,
 } from "@/lib/order-import"
-import { createOrder, getOrders, getTemplates, getCatalogProducts, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile } from "@/lib/api"
+import { createOrder, getOrders, getTemplates, getCatalogProducts, getDesignLibrary, postOrderDesign, uploadDesignFile, resolveMachineFiles, attachMachineFile, type DesignPos, type MachineFile, type LibraryDesign } from "@/lib/api"
 import { productSizes, productColors } from "@/lib/variant-sku"
 import { productLabel } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
@@ -228,6 +228,15 @@ export function ImportOrdersDialog({
    *  covers "no such file" and "not yours" identically and on purpose. */
   const [machineFiles, setMachineFiles] = useState<Record<string, MachineFile | null> | null>(null)
   const [machineLookupFailed, setMachineLookupFailed] = useState(false)
+  /**
+   * THE SELLER'S ARTWORK LIBRARY, so `IMG-30` in the Artwork ID column can become an address.
+   *
+   * Fetched here as well as in the grid because the two entry points are separate: rows typed
+   * into the sheet and a .xlsx dropped straight onto this dialog both end up in the same
+   * parser, and only one of them has ever been near the grid. Names and thumbs only — the
+   * design bytes are not in this response.
+   */
+  const [library, setLibrary] = useState<LibraryDesign[] | null>(null)
 
 
   useEffect(() => {
@@ -236,17 +245,30 @@ export function ImportOrdersDialog({
     const id = setTimeout(() => {
       setRecords(null); setError(null); setPaste(""); setDone(null)
       setNotice(null); setCopyFallback(null); setTemplates(null); setTemplatesFailed(false)
+      // A failure leaves it null, and resolveArtwork then treats every reference as
+      // unresolved — the pre-existing behaviour, not a blank import that looks fine.
+      getDesignLibrary().then(setLibrary).catch(() => setLibrary([]))
     }, 0)
     return () => clearTimeout(id)
   }, [open])
+
+  /** `IMG-30` → the image's address, from the library above. Empty until it lands. */
+  const resolveArtwork = useCallback(
+    (ref: string) => {
+      const id = String(ref).replace(/^IMG-/i, "")
+      const hit = (library ?? []).find((d) => String(d.id) === id)
+      return String(hit?.thumb ?? "")
+    },
+    [library],
+  )
 
   const summary = useMemo(() => {
     const list = records ?? []
     const valid = list.filter((r) => r._valid).length
     // Rows that will import but split, because they carry no Order Number to group by.
     const ungrouped = list.filter((r) => r._valid && !r.order_number).length
-    return { total: list.length, valid, invalid: list.length - valid, ungrouped, orders: valid ? groupToOrders(list).length : 0 }
-  }, [records])
+    return { total: list.length, valid, invalid: list.length - valid, ungrouped, orders: valid ? groupToOrders(list, resolveArtwork).length : 0 }
+  }, [records, resolveArtwork])
 
   const ingest = (rows: string[][]) => {
     const { records, error } = rowsToRecords(rows)
@@ -374,13 +396,41 @@ export function ImportOrdersDialog({
     return { typed, ok, unknown: [...unknown], wrongMethod: [...wrongMethod], failed: false }
   }, [records, machineFiles, machineLookupFailed])
 
+  /**
+   * THE SAME QUESTION FOR ARTWORK: does every `IMG-…` on the sheet resolve to a real design?
+   *
+   * A reference that does not is the exact failure the column used to have for EVERY
+   * reference — silently no artwork, discovered from a finished shirt. Validation cannot
+   * answer it (it runs with no library and only checks the SHAPE), so the answer belongs
+   * here, while the sheet is still on screen and the reference is still editable.
+   *
+   * Only references are counted. A URL either loads or it does not, and that is not a
+   * question this dialog can answer for a stranger's CDN.
+   */
+  const artworkOutcome = useMemo(() => {
+    if (!records) return null
+    const refs = records
+      .filter((r) => r._valid)
+      .map((r) => String(r.hero_image || "").trim())
+      .filter((v) => /^IMG-/i.test(v))
+    if (!refs.length) return null
+    if (!library) return { typed: refs.length, ok: 0, unknown: [] as string[], pending: true }
+    const unknown = new Set<string>()
+    let ok = 0
+    for (const ref of refs) {
+      if (resolveArtwork(ref)) ok++
+      else unknown.add(ref)
+    }
+    return { typed: refs.length, ok, unknown: [...unknown], pending: false }
+  }, [records, library, resolveArtwork])
+
   const templateOutcome = useMemo(() => {
     if (!records || !templates) return null
     const typed = records.filter((r) => r._valid && String(r.template_id || "").trim()).length
     if (!typed) return null
-    const r = applyTemplates(groupToOrders(records), templates)
+    const r = applyTemplates(groupToOrders(records, resolveArtwork), templates)
     return { typed, applied: r.applied, unmatched: r.unmatched, ambiguous: r.ambiguous }
-  }, [records, templates])
+  }, [records, templates, resolveArtwork])
 
   const takeFile = (file?: File | null) => {
     if (!file) return
@@ -430,7 +480,7 @@ export function ImportOrdersDialog({
     try {
       // Templates fill the blank and the artwork the row left empty. Applied here, once,
       // on the same resolver the preview used — so what was shown is what is created.
-      const orders = templates ? applyTemplates(groupToOrders(records), templates).orders : groupToOrders(records)
+      const orders = templates ? applyTemplates(groupToOrders(records, resolveArtwork), templates).orders : groupToOrders(records, resolveArtwork)
       const existing = await getOrders().catch(() => [])
       const baseSeq = nextSellerSeq(existing ?? [])
       /* One seed per RUN, so two imports of the same sheet cannot mint the same line ids —
@@ -830,6 +880,23 @@ export function ImportOrdersDialog({
                             {templateOutcome.unmatched.length > 0 && <> {tl("import", "No template matches")} <span className="tabular-nums">{templateOutcome.unmatched.join(", ")}</span> {tl("import", "— check the number on the template card.")}</>}
                             {templateOutcome.ambiguous.length > 0 && <> {tl("import", "More than one template is called")} <span className="tabular-nums">{templateOutcome.ambiguous.join(", ")}</span>{tl("import", ", so those lines were left alone — use the TPL- number instead.")}</>}
                           </>}
+                    </span>
+                  </div>
+                )}
+                {/* AND FOR THE ARTWORK REFERENCES, its own row for the same reason as the
+                    stitch files below: a different library, a different column to go and fix. */}
+                {artworkOutcome && !artworkOutcome.pending && (
+                  <div className={"flex items-start gap-2 border-b border-border px-4 py-2 text-xs "
+                    + (artworkOutcome.unknown.length
+                      ? "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                      : "text-muted-foreground")}>
+                    {artworkOutcome.unknown.length
+                      ? <WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />
+                      : <CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0 text-success" />}
+                    <span>
+                      {artworkOutcome.ok} of {artworkOutcome.typed} {artworkOutcome.typed === 1 ? "line" : "lines"} will get
+                      their artwork from your library.
+                      {artworkOutcome.unknown.length > 0 && <> {tl("import", "Nothing in your library matches")} <span className="tabular-nums">{artworkOutcome.unknown.join(", ")}</span> {tl("import", "— check the reference on the design’s card in Design Lab.")}</>}
                     </span>
                   </div>
                 )}

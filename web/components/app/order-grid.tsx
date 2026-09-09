@@ -457,11 +457,16 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
    * Template ID and Machine File ID take a REFERENCE — `TPL-12`, `MF-12` — so the value is
    * the reference and the label carries the name that tells two of them apart.
    *
-   * Artwork ID does NOT. The importer reads it as `/^https?:\/\//.test(v) ? v : ""`, so
-   * despite the column's name it wants a URL and silently drops anything else. Offering
-   * `IMG-12` here would have looked right, matched the other two columns, and quietly
-   * imported nothing — so the value is the image's address and the label is its name.
-   * Entries without an http(s) address are left out rather than offered and dropped.
+   * Artwork ID now does too. It used to be the odd one out — the importer read it as
+   * `/^https?:\/\//.test(v) ? v : ""`, so despite the column's NAME it wanted a URL and
+   * dropped a reference silently. Offering `IMG-12` then would have looked right and
+   * imported nothing, so the value was the address and the label was the name; the reference
+   * the seller reads off their own library card was the one thing the column would not take.
+   * The parser resolves references now (order-import.ts), so all three ID columns speak the
+   * same language and the cell says what the library card says.
+   *
+   * Entries with no http(s) address are still left out: a reference that resolves to nothing
+   * printable is worse than not offering it.
    */
   const refOptions = useMemo<Record<string, Opt[]>>(() => ({
     template_id: templates
@@ -488,7 +493,7 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
     ).sort((a, b) => a.value.localeCompare(b.value)),
     hero_image: images
       .filter((d) => /^https?:\/\//i.test(String(d.thumb ?? "")))
-      .map((d) => ({ value: String(d.thumb), label: String(d.name || `Image ${d.id}`) })),
+      .map((d) => ({ value: `IMG-${d.id}`, label: `IMG-${d.id}${d.name ? ` · ${d.name}` : ""}` })),
   }), [templates, machineFiles, images, stores])
 
   const optionsFor = useCallback(
