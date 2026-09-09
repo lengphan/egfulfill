@@ -82,8 +82,26 @@ export function PloyHero({
           {/* The idle float is its OWN element, under the entrance. Two animations owning
               `scale` and `y` on one node fight and the object never appears (§4). */}
           <motion.div
-            animate={{ y: [0, -14, 0], rotate: [0, 1.5, 0] }}
-            transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            /**
+             * A LIVELIER FLOAT (owner's call). It was 14px over 9 seconds, which on a garment
+             * this size is about one percent of its height — slow enough that the eye reads
+             * the hero as static and only notices the drift if it stares.
+             *
+             * 28px over 6.5s, and the tilt doubled to 3deg. Still eased at both ends, so it
+             * is a drift rather than a bob: what makes an idle float look mechanical is a
+             * constant speed and a hard turnaround, not the distance travelled.
+             *
+             * THE TWO TRACKS RUN ON DIFFERENT CLOCKS. Rotation takes 8.3s against the rise's
+             * 6.5, so the pair only lines up every ~54 seconds instead of repeating a
+             * recognisable loop every cycle — the same reasoning as the band objects in
+             * globals.css, where a shared period was what made four objects look like one
+             * mechanism.
+             */
+            animate={{ y: [0, -28, 0], rotate: [0, 3, 0] }}
+            transition={{
+              y: { duration: 6.5, repeat: Infinity, ease: "easeInOut", delay: 1 },
+              rotate: { duration: 8.3, repeat: Infinity, ease: "easeInOut", delay: 1 },
+            }}
             /* THE SOURCE RENDER IS PINK. The filter is what makes it the site's periwinkle,
                and it is here rather than baked into the file so the one asset can be
                re-tinted if the palette moves — the same reason no colour on this page is a

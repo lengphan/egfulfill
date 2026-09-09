@@ -19,7 +19,22 @@ import type { Stat, Step } from "@/lib/site-content"
  */
 
 
-/** The lead paragraph, developing from pale to full ink as it crosses the viewport. */
+/**
+ * THE LEAD, AS SOMETHING SAID RATHER THAN SOMETHING SET.
+ *
+ * It was body copy at 17px — the same size as the step descriptions below it — so the one
+ * passage on this page that speaks straight to the reader read as an introduction to a list.
+ * It is the argument the whole section makes, and it now looks like it: display-scale,
+ * tightened leading, and the ink it always had.
+ *
+ * The pale-to-full scroll is UNCHANGED and is the point of it. The words arrive at 40% and
+ * develop as they rise into the reading band, so the sentence resolves as you reach it rather
+ * than being there before you looked — the same behaviour the step rows use for their
+ * numbers, which is why the two halves of the section feel like one movement.
+ *
+ * NO QUOTE MARKS. Nobody said this; it is the brand speaking, and punctuation that implies a
+ * source is the same fabrication the testimonials block refuses to make up.
+ */
 function Lead({ lines }: { lines: string[] }) {
   const ref = useRef<HTMLDivElement>(null)
   /* Measured on the element itself: pale when its top is still low on the screen, full by the
@@ -33,7 +48,7 @@ function Lead({ lines }: { lines: string[] }) {
         <motion.p
           key={i}
           style={{ opacity }}
-          className={(i === 0 ? "" : "mt-5 ") + "text-[17px] leading-relaxed text-ploy-ink md:text-[19px]"}
+          className={(i === 0 ? "" : "mt-6 ") + "text-[clamp(1.35rem,2.6vw,1.95rem)] leading-[1.25] tracking-[-0.01em] text-ploy-ink"}
         >
           {p}
         </motion.p>
@@ -67,7 +82,10 @@ function StepRow({ i, total, step, progress }: { i: number; total: number; step:
         {displayWord(step)}
       </h3>
       <div className="col-span-2 max-w-[34rem] md:order-3 md:col-span-1 md:self-center">
-        <p className="text-[22px] font-semibold leading-tight">{step.title}</p>
+        {/* NOT BOLD. The word beside it is already display-scale — CONNECT, DESIGN, PUBLISH —
+            so a semibold line under it was a second thing shouting in a row that had already
+            said which step this is. Weight was doing the work size and position already do. */}
+        <p className="text-[22px] leading-tight">{step.title}</p>
         <p className="mt-3 text-[16px] leading-relaxed text-ploy-ink/65">{step.body}</p>
       </div>
     </motion.li>
