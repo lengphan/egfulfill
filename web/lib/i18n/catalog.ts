@@ -1530,7 +1530,7 @@ const vi: Dict = {
   "settings.Play a chime when something needs you": "Phát âm báo khi có việc cần bạn",
   "settings.Sign in to see your account details.": "Đăng nhập để xem thông tin tài khoản của bạn.",
   "settings.Not signed in": "Chưa đăng nhập",
-  "settings.12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.": "12–30 ký tự: chữ, số, dấu chấm, gạch ngang hoặc gạch dưới. Đăng nhập bằng tên này hoặc email của bạn.",
+  "settings.3–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.": "3–30 ký tự: chữ, số, dấu chấm, gạch ngang hoặc gạch dưới. Đăng nhập bằng tên này hoặc email của bạn.",
   "settings.— optional, for signing in": "— không bắt buộc, dùng để đăng nhập",
   "settings.Save": "Lưu",
   "settings.Save changes": "Lưu thay đổi",

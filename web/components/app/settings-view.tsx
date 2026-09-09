@@ -173,8 +173,8 @@ function ProfilePanel() {
     // with the old identifier, which predates the floor. Blocking that would leave the person
     // unable to save the very repair this page exists to offer.
  const keepingOld = needsEmail && !!storedEmail && uname.trim().toLowerCase() === storedEmail.toLowerCase()
- if (!keepingOld && uname.trim() && uname.trim().length < 12) {
- setErr("Username must be at least 12 characters — it's a way to sign in, so it holds the same floor as the password.")
+ if (!keepingOld && uname.trim() && uname.trim().length < 3) {
+ setErr("Usernames are 3–30 characters.")
  return
     }
  setSaving(true); setErr(null); setSaved(false)
@@ -246,7 +246,7 @@ function ProfilePanel() {
  onChange={(e) => { setUname(e.target.value); setSaved(false) }}
  onKeyDown={(e) => { if (e.key === "Enter") save() }}
  placeholder="yourstorename2026"
- title={tl("settings", "12–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.")}
+ title={tl("settings", "3–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.")}
  disabled={!user}
  className="max-w-sm"
           />

@@ -26,22 +26,33 @@ const SECRET = (() => {
 // is decidable from the string alone and nobody can squat an address they don't own.
 // Stored lower-case; matched lower-case.
 //
-// TWELVE characters, the same floor as passwordProblem() — a username is half of a
-// credential pair here (sign-in accepts it in place of the email), so a three-character
-// one narrows the guessing space for every account that has one. The floor was 3, which
-// is why this had to move.
-const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{11,29}$/;
-// Only for an identifier that ALREADY EXISTS and is being moved, not chosen — see the
-// email repair in index.js, where an account whose "email" was really a username gets it
-// migrated into the username column. Rejecting a short one there doesn't enforce anything;
-// it just deletes the string the person signs in with. Never reachable from user input.
-const LEGACY_USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+// THREE characters. This was raised to twelve to match passwordProblem(), on the reasoning
+// that a username is half of a credential pair because sign-in accepts it in place of the
+// email — and that is a category error. A username is an IDENTIFIER, not a secret. It is
+// printed on the account, it is how people are addressed, and it is chosen to be recognised;
+// an email is equally a way in and nobody has ever required a twelve-character local part.
+// What protects the pair is the password's floor and complexity, which are untouched.
+//
+// It also cost the thing usernames are FOR. A seller signing up as their shop — "babygoods"
+// — was refused and told to pad it, which produces babygoods1234: worse to read, no harder
+// to guess, and no longer their name.
+//
+// The load-bearing rules are the other two and they stay: no "@", so a username can never be
+// shaped like someone else's email and the two namespaces stay decidable from the string
+// alone; and the charset, so it is typeable.
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+// Kept as its own name because the CALLERS mean different things — this one is for an
+// identifier that already exists and is being moved rather than chosen (the email repair in
+// index.js, where an account whose "email" was really a username gets migrated into the
+// username column). Identical to the above now that the floors agree; it stops being a
+// no-op the moment either rule moves again.
+const LEGACY_USERNAME_RE = USERNAME_RE;
 export function normalizeUsername(raw, { grandfather = false } = {}) {
   const u = String(raw || '').trim().toLowerCase();
   if (!u) return null;
   if (u.includes('@')) throw new Error('Usernames cannot contain @ — that looks like an email address');
   if (!(grandfather ? LEGACY_USERNAME_RE : USERNAME_RE).test(u)) {
-    throw new Error('Username must be 12–30 characters: letters, numbers, dot, dash or underscore');
+    throw new Error('Usernames are 3–30 characters: letters, numbers, dot, dash or underscore');
   }
   return u;
 }

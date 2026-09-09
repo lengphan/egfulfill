@@ -74,10 +74,10 @@ export default function SignupPage() {
       setError("Password must be at least 12 characters, with upper and lower case, a number and a symbol.")
       return
     }
-    // The username is optional, but if they chose one it is a way IN to the account — so it
-    // carries the same 12-character floor the password does (server: normalizeUsername).
-    if (username.trim() && username.trim().length < 12) {
-      setError("Username must be at least 12 characters — it's a way to sign in, so it holds the same floor as the password.")
+    // Optional, and short is fine — a username is an identifier, not a secret (server:
+    // normalizeUsername). The floor is 3 and the message says the rule, not the reasoning.
+    if (username.trim() && username.trim().length < 3) {
+      setError("Usernames are 3–30 characters.")
       return
     }
     setLoading(true)
@@ -131,7 +131,7 @@ export default function SignupPage() {
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Username <span className="font-normal text-muted-foreground">— optional</span></span>
           <Input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="yourstorename2026" autoComplete="username" />
-          <span className="text-xs text-muted-foreground">12–30 characters: letters, numbers, dot, dash or underscore.</span>
+          <span className="text-xs text-muted-foreground">3–30 characters: letters, numbers, dot, dash or underscore.</span>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Password</span>
