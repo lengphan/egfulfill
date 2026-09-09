@@ -153,15 +153,21 @@ export function ItemDesignActions({
         {/* WHO HAS IT, once anyone does. Named differently for the two destinations because
             they are chased differently: one is a lane on a board down the hall, the other is
             an invoice and an email. */}
-        {(onBoard || withVendor) && (
+        {/* THE DESIGN-BOARD CHIP IS GONE (owner's call). "Design board · Queued" said a card
+            exists and which lane it sits in — on a row where the menu beside it already opens
+            the board, and where the lane is the board's own business rather than the order's.
+            It rode on every line that had ever been sent, permanently, to report a state
+            nobody acts on from here.
+            THE PARTNER CHIP STAYS. That one names an outside company holding the job, chased
+            by invoice and email rather than by walking down the hall — it is the case this
+            row cannot answer without saying so. */}
+        {withVendor && (
           <span
  className={"inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-medium " + (lane?.tone ?? "bg-muted text-muted-foreground")}
- title={withVendor
-              ? `${vendorLabel(state?.vendor)}${state?.vendorRef ? ` · task ${state.vendorRef}` : ""}`
- : tl("itemDesignActions", "On our design board")}
+ title={`${vendorLabel(state?.vendor)}${state?.vendorRef ? ` · task ${state.vendorRef}` : ""}`}
           >
             {Icon && <Icon size={11} weight="fill" />}
-            {withVendor ? vendorLabel(state?.vendor) : tl("itemDesignActions", "Design board")}{lane ? ` · ${lane.label}` : ""}
+            {vendorLabel(state?.vendor)}
           </span>
         )}
         {/* Tucked away, not on the row. The overwhelming majority of lines never need

@@ -967,22 +967,9 @@ export default function OrderDetailPage() {
    * un-buy a label that has already been bought.
    */
  const reverseFee = async (line: { part: string; label: string; amount: number; note?: string | null }, key: string) => {
-    /**
-     * A FEE GOES BACK ON ONE PRESS; THE GOODS DO NOT.
-     *
-     * Reversing an adjustment undoes a number somebody typed a moment ago — small, recent,
-     * and usually a correction of their own mistake. Sending back the base cost or the
-     * postage is a decision about the order, often for a buyer, and at a size worth pausing
-     * over. Same control, same result, one question first.
-     */
- if (line.part !== "fee") {
- const ok = await confirm({
- title: `Send back ${usd(line.amount)}?`,
- body: `${line.label} goes back to the seller's wallet. It stays on the order's history, and the line comes off this card.`,
- confirmLabel: `Refund ${usd(line.amount)}`,
-      })
- if (!ok) return
-    }
+    /* Only adjustments reach this — see the note on the control. The guard stays because the
+       function takes a part and would happily refund any of them if a caller passed one. */
+ if (line.part !== "fee") return
  setReversing(key)
  try {
       /* Named part and exact amount, so it comes off the adjustment and not off the goods —
@@ -1139,7 +1126,16 @@ export default function OrderDetailPage() {
                               up and the action reads as belonging to the row it is on.
                               Staff only, adjustments only, and only while that part still has
                               room to send back — so it cannot be pressed twice. */}
-                          {isStaff && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === l.part && p.refundable >= l.amount - 0.005) && (
+                          {/* ADJUSTMENTS ONLY. This briefly appeared on every line, and on an
+                              untouched shipping charge a U-turn arrow reads as "undo what was
+                              done here" when nothing has been done — it was offering to START
+                              a refund while looking like it was reversing one.
+                              An adjustment is different in kind: it is a number somebody typed
+                              onto this order, and taking it back off is undoing their own act.
+                              Refunding the goods or the postage is a decision about the order,
+                              it wants a reason and often a partial amount, and the Refund panel
+                              below is built for exactly that. */}
+                          {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === l.part && p.refundable >= l.amount - 0.005) && (
                             <button
                               type="button"
                               onClick={() => void reverseFee(l, `${l.part}-${i}`)}

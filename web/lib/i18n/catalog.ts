@@ -4334,8 +4334,6 @@ const vi: Dict = {
   "itemDesignActions.Design": "Thiết kế",
   "itemDesignActions.Send to Board": "Gửi lên Bảng",
   "itemDesignActions.Send to Pink Design": "Gửi sang Pink Design",
-  "itemDesignActions.Design board": "Bảng thiết kế",
-  "itemDesignActions.On our design board": "Đang trên bảng thiết kế của chúng tôi",
   "newOrder.Add item": "Thêm sản phẩm",
   "itemDesignActions.Design actions": "Thao tác thiết kế",
   "itemDesignActions.Send to design partner": "Gửi cho đối tác thiết kế",
