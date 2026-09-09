@@ -3,6 +3,7 @@
 // list (DB-shaped) on change → upsert all + drop removed (staff only).
 import { q } from '../db.js';
 import { designNoFor } from '../design-id.js';
+import { orderLabel } from '../order-label.js';
 import { isStaff } from '../auth.js';
 import { moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
@@ -414,7 +415,11 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     if (!card) { reply.code(404); return { error: 'Card not found.' }; }
     if (card.order_id) { reply.code(409); return { error: `Already assigned to order ${card.order_id}. Detach it there first — silently moving a design between orders is how one seller's artwork ends up on another's job.` }; }
 
-    const order = await q('select id, num, seller_id, factory_status from orders where id=$1', [orderId])
+    /* `seq`, NOT `num` — there is no such column, and the .catch below eats the error.
+       Adding `num` here made every send report "No such order." on an order that plainly
+       existed: the query threw, the catch turned it into null, and the 404 below said the
+       one thing that could not be true. `orderLabel(id, seq)` is the number a human reads. */
+    const order = await q('select id, seq, seller_id, factory_status from orders where id=$1', [orderId])
       .then((r) => r.rows[0]).catch(() => null);
     if (!order) { reply.code(404); return { error: 'No such order.' }; }
 
@@ -530,7 +535,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
           await moveFunds({
             from: order.seller_id, to: 'factory', amount,
             type: 'design-work', ref,
-            note: `Design work · ${card.title || first.name || first.sku || 'Item'} · ${order.num || orderId}`,
+            note: `Design work · ${card.title || first.name || first.sku || 'Item'} · ${orderLabel(orderId, order.seq)}`,
             by: req.user && req.user.sub,
           });
           // Every line the one design covers, so the next card on a sibling can't bill it again.
