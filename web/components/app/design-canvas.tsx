@@ -3247,6 +3247,22 @@ export function DesignCanvasDialog({
               onFiles={(f) => void takeFiles(f)}
               onPick={() => uploadRef.current?.click()}
             />
+            {/* Saving a template is not ADDING a file, so it sits under the zone rather than
+                inside it — and only with artwork on the line, because there is otherwise
+                nothing to save. ABOVE the recent files, not below them: a row of Attach
+                buttons is a list you scan down, and a control parked under the last one
+                reads as belonging to it. */}
+            {designUrl && (
+              <button
+                type="button"
+                onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
+                disabled={tplBusy}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+              >
+                {tplBusy ? <CircleNotch size={13} className="animate-spin" /> : <BookmarkSimple size={13} weight="bold" />}
+                {tl("canvas", "Save as template")}
+              </button>
+            )}
             {/**
               * ATTACH ONE YOU ALREADY OWN, instead of finding the file again.
               *
@@ -3256,18 +3272,21 @@ export function DesignCanvasDialog({
               */}
             {isEmb && (
               <div className="flex flex-col gap-1.5">
-                {/* FIVE, AND THE HEADING SAYS SO WHEN THERE ARE MORE.
-                    This is a shortcut, not the library — the newest handful covers the case
+                {/* TWO, AND THE HEADING SAYS SO WHEN THERE ARE MORE.
+                    This is a shortcut, not the library — the newest couple covers the case
                     it exists for (the file you just uploaded, going onto the line you are
-                    looking at). Everything older is still reachable: by its MF- ref in the
-                    import sheet's Machine File ID column, and in full in Design Lab.
-                    The count is in the heading rather than a sentence under the rows: "5 of
-                    23" is a fact about the list, and a populated region does not get prose. */}
+                    looking at). Five rows ran the panel past the artwork beside it and left
+                    a column of blank canvas at the bottom left, which is a lot of screen for
+                    a list nobody browses. Everything older is still reachable: by its MF-
+                    ref in the import sheet's Machine File ID column, and in full in Design
+                    Lab. The count is in the heading rather than a sentence under the rows:
+                    "2 of 9" is a fact about the list, and a populated region does not get
+                    prose. */}
                 <div className="text-xs font-medium text-foreground">
                   {tl("canvas", "Recent files")}
-                  {machineLib && machineLib.length > 5 && (
+                  {machineLib && machineLib.length > 2 && (
                     <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">
-                      5 / {machineLib.length}
+                      2 / {machineLib.length}
                     </span>
                   )}
                 </div>
@@ -3278,7 +3297,7 @@ export function DesignCanvasDialog({
                   <p className="px-1 text-2xs text-muted-foreground">
                     {tl("canvas", "Stitch files you upload are filed here and can be put on any line.")}
                   </p>
-                ) : machineLib.slice(0, 5).map((m) => (
+                ) : machineLib.slice(0, 2).map((m) => (
                   <div key={m.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5">
                     <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">{m.ref}</span>
                     <span className="min-w-0 flex-1 truncate text-xs" title={m.fileName || m.name}>{m.name || m.fileName}</span>
@@ -3301,20 +3320,6 @@ export function DesignCanvasDialog({
                   </div>
                 ))}
               </div>
-            )}
-            {/* Saving a template is not ADDING a file, so it sits under the zone rather than
-                inside it — and only with artwork on the line, because there is otherwise
-                nothing to save. */}
-            {designUrl && (
-              <button
-                type="button"
-                onClick={() => setTplName((v) => (v === null ? defaultTplName : null))}
-                disabled={tplBusy}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
-              >
-                {tplBusy ? <CircleNotch size={13} className="animate-spin" /> : <BookmarkSimple size={13} weight="bold" />}
-                {tl("canvas", "Save as template")}
-              </button>
             )}
         {fileCount > 0 && (
           <div className="order-last rounded-lg border border-border bg-muted/30 p-2.5">
