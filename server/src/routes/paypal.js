@@ -464,11 +464,34 @@ export function paypalRoutes(app, requireAuth) {
     if (!ok) { reply.code(401); return { error: 'bad signature' }; }
 
     const ev = req.body || {};
-    recordUsage('paypal', { endpoint: 'webhook:' + (ev.event_type || '?'), ok: true });
-    if (String(ev.event_type || '') !== 'VAULT.PAYMENT-TOKEN.CREATED') return { ok: true, ignored: true };
-
+    const kind = String(ev.event_type || '');
+    recordUsage('paypal', { endpoint: 'webhook:' + (kind || '?'), ok: true });
     const res = ev.resource || {};
     const tokenId = res.id;
+
+    /**
+     * REVOKED AT PAYPAL IS REVOKED HERE.
+     *
+     * A saved account can be removed from inside PayPal — their account page lists the
+     * merchants they have agreed to, and taking us off it is their right and needs no visit
+     * to us. Without this the row survives, so the top-up dialog keeps offering an account
+     * that no longer exists and the one-press payment fails at the till for a reason nobody
+     * on this side can explain. Deleting our row turns that into the honest outcome: the
+     * saved account is gone, so the tab asks them to sign in again.
+     *
+     * DELETED only, never DELETION-INITIATED — the latter announces an intent that can still
+     * fail, and forgetting an account that then survives is the same defect pointing the
+     * other way.
+     */
+    if (kind === 'VAULT.PAYMENT-TOKEN.DELETED') {
+      if (!tokenId) return { ok: true, ignored: true };
+      const gone = await q('delete from paypal_vault where token_id=$1 returning seller_id', [String(tokenId)])
+        .then((r) => r.rows.length).catch(() => 0);
+      return { ok: true, forgotten: gone };
+    }
+
+    if (kind !== 'VAULT.PAYMENT-TOKEN.CREATED') return { ok: true, ignored: true };
+
     const custId = res.customer && res.customer.id;
     if (!tokenId || !custId) return { ok: true, ignored: true };
     /* The customer id is the ONLY thing tying this to a seller — see paypal_customers. An
