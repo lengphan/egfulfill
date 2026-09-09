@@ -345,9 +345,21 @@ export function designFaces(p: CatalogProduct | null): MockupFace[] {
     const url = own.get(side) || typeMockupOf(p, side)
     if (url) out.push({ side, url })
   }
-  for (const [side, url] of own) {
-    if (url && !out.some((f) => f.side === side)) out.push({ side, url })
-  }
+  /*
+   * A LEFTOVER PHOTO IS NOT A SURFACE (owner's call, 2026-09-09).
+   *
+   * This used to append every side the product had a picture for, declared or not, on the
+   * argument that such a face "is a printable surface and must not be hidden just because
+   * the category was defined without it". That was true when a product had NO way to state
+   * its own faces — the photo was the only evidence. The editor's Faces checkboxes are that
+   * way now, so the evidence has a better source and the appending has become a bug: a
+   * duffel filed under Apparel, then corrected to Bags and ticked Front + Back, still
+   * carried side_mockups for a sleeve and a hood, and so was offered a sleeve and a hood.
+   *
+   * The ticks win. A photo for a face the product does not claim is stale data, not an
+   * eighth surface — and it stays on the row, so re-ticking that face brings it straight
+   * back with its picture intact.
+   */
   return out
 }
 

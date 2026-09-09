@@ -1060,10 +1060,25 @@ export function ProductEditorDialog({
       // Only send overrides that exist. An empty map means "inherit the type", and
       // writing {} explicitly is how a product goes back to following settings.
  side_mockups: Object.fromEntries(Object.entries(sideMockups).filter(([, v]) => !!v)),
-      /* Only when this blank DISAGREES with its category. Writing the type's own list back
-         would freeze today's category into the product, so a later change to the type would
-         stop reaching it — the same rule side_mockups and printAreas already follow. */
- sides: sides.length && sides.join() !== typeSides.join() ? sides : undefined,
+      /**
+       * A TICK IS A STATEMENT, even when it agrees with the category (owner's call,
+       * 2026-09-09).
+       *
+       * This only stored the list when it DISAGREED with the type, so that a later change to
+       * the category would still reach the product. That is the right instinct for
+       * side_mockups and printAreas — an absent override means "use the category's" — but it
+       * is the wrong one here, because these boxes are not overrides. They are the answer to
+       * "what does this garment print on", and a person who ticked Front and Back has said
+       * so whether or not Bags happens to say the same thing today.
+       *
+       * Under the old rule that answer was thrown away as redundant, and the product went
+       * back to inheriting — so adding Sleeve to a category later would silently give a
+       * duffel a sleeve, which is exactly the class of thing this screen exists to prevent.
+       *
+       * Products nobody has opened still inherit: `sides` stays absent for them, and an
+       * empty selection still means "follow the type".
+       */
+ sides: sides.length ? sides : undefined,
       // Same rule as side_mockups: only what this product actually overrides. An absent
       // side keeps following the type's fallback zone.
  printAreas,
