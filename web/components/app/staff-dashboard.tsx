@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
-import { PageBand, ROLE_PHOTO } from "@/components/app/page-band"
+import { PageBand } from "@/components/app/page-band"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, CircleNotch, Warning } from "@phosphor-icons/react"
@@ -338,12 +338,11 @@ export function StaffDashboard() {
       {/* The admin's announcement, if there is one. */}
       <DashboardTicker />
 
-      {/* THE BAND IS THE PLATE, AND THE PHOTOGRAPH IS CHOSEN BY ROLE — see page-band.tsx
-          for why it is neither `bg-brand` nor a render any more. Admin carries no photo: its
-          band holds the date range, and that control is the one thing that would have to sit
-          under the image. */}
+      {/* THE BAND IS THE PLATE, AND THE CLUSTER IS THE SAME ON EVERY ROLE — see page-band.tsx
+          for why it is neither `bg-brand` nor a photograph any more. Nothing is reserved per
+          role now: the objects have no ground, so the admin's date range lays out beside them
+          exactly as every other role's band lays out around nothing. */}
       <PageBand
-        photo={ROLE_PHOTO[role ?? ""]}
         title={<>{greeting}, {name}</>}
         sub={
           /* The full weekday and date went. Anyone reading this knows what day it is, and it

@@ -1,12 +1,13 @@
 "use client"
 
 /**
- * THE PICKED PAIR, DRAWN WITH THE REAL COMPONENTS — band 5 (plate + photograph) and
+ * THE PICKED PAIR, DRAWN WITH THE REAL COMPONENTS — band 5 (plate + object cluster) and
  * tile B (no icon, a rule). This is a crop check: the band is `PageBand` itself, at true
- * height, in both themes and for every role that carries a photo. noindex.
+ * height, in both themes. The cluster no longer varies by role, so the four rows below are
+ * now a check on the TYPE at four name lengths. noindex.
  */
 
-import { PageBand, ROLE_PHOTO } from "@/components/app/page-band"
+import { PageBand } from "@/components/app/page-band"
 
 const ROLES = [
   ["seller", "Good afternoon, uyen"],
@@ -32,7 +33,6 @@ function Column({ dark }: { dark: boolean }) {
           <div key={role} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">{role}</p>
             <PageBand
-              photo={ROLE_PHOTO[role]}
               title={greet}
               sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}
             />
@@ -40,7 +40,7 @@ function Column({ dark }: { dark: boolean }) {
         ))}
 
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">admin — no photo, the range control lives here</p>
+          <p className="text-xs font-medium text-muted-foreground">admin — the range control lives here</p>
           <PageBand title="Good afternoon, Linh" sub="Mon 8 Sep">
             <div className="flex gap-1 rounded-lg bg-sidebar-accent p-0.5 text-xs">
               {["Today", "7 days", "30 days", "All"].map((r, i) => (

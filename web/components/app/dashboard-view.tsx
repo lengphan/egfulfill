@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { DashboardTicker } from "@/components/app/dashboard-ticker"
-import { PageBand, ROLE_PHOTO } from "@/components/app/page-band"
+import { PageBand } from "@/components/app/page-band"
 import { useT, useLabelT, useDateFormat } from "@/lib/i18n"
 import { numOf, platformOf } from "@/lib/order-format"
 import { OrderNumber } from "@/components/app/order-number"
@@ -227,12 +227,11 @@ export function DashboardView() {
           panel directly below, where they can be read rather than watched going past. */}
       <DashboardTicker />
 
-      {/* THE BAND IS THE PLATE, AND THE OBJECT ON IT IS A PHOTOGRAPH.
+      {/* THE BAND IS THE PLATE, AND THE THINGS ON IT ARE DRAGGABLE.
           Both decisions and their evidence live in page-band.tsx: a full `bg-brand` fill was
-          a pastel plank across the top of a dark page, and the balloon render was the one
-          device here that could never also appear on a product. */}
+          a pastel plank across the top of a dark page, and the crew photograph brought a
+          second bright ground with it. The cluster carries no ground at all. */}
       <PageBand
-        photo={ROLE_PHOTO.seller}
         title={<>{greeting}, {name}</>}
         sub={<>
           {todayLabel}
