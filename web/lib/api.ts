@@ -3724,7 +3724,10 @@ export function walletTransfer(body: { fromAccount?: string; toAccount?: string;
 }
 
 // Seller design library ("my designs") — reusable artwork the seller creates/uploads.
-export type LibraryDesign = { id: number | string; name?: string | null; thumb?: string | null; created_at?: string }
+/** `content_hash` is the sha256 of the image bytes, and the key to its addressable URL:
+ *  `/api/design_library/art/<hash>`. Present on every row the server has hashed — which is
+ *  all of them since the backfill, but an older row can still answer null. */
+export type LibraryDesign = { id: number | string; name?: string | null; thumb?: string | null; content_hash?: string | null; created_at?: string }
 export function getDesignLibrary() {
   return api<LibraryDesign[]>(`/api/design_library`)
 }

@@ -43,10 +43,44 @@ export function designLibraryRoutes(app, requireAuth, requireStaff) {
   // load). The full image is fetched on demand from GET /:id when re-added.
   app.get('/api/design_library', { preHandler: requireAuth }, async (req) => {
     const r = await q(
-      'select id, name, coalesce(thumb, left(data, 0)) as thumb, created_at from design_library where seller_id=$1 order by created_at desc limit $2',
+      // `content_hash` rides along so the client can address the full image without holding
+      // it: it is the key to /art/:hash below. Not sensitive — these are the caller's own
+      // designs, and the hash was already computed for duplicate detection.
+      'select id, name, coalesce(thumb, left(data, 0)) as thumb, content_hash, created_at from design_library where seller_id=$1 order by created_at desc limit $2',
       [req.user.sub, CAP]
     );
     return r.rows;
+  });
+
+  /**
+   * THE IMAGE AT AN ADDRESS, so nothing has to carry the bytes.
+   *
+   * An `IMG-27` typed into the import sheet used to resolve to the row's THUMB — a
+   * multi-hundred-kilobyte `data:` URL — which order-import then discarded outright,
+   * because it only accepted http(s). So the artwork never reached the line at all: no
+   * design row on any face, and the order fell back to showing the blank's catalogue photo.
+   *
+   * Letting the data URL through would have fixed the symptom and put base64 on
+   * `order_items.img`, which travels in EVERY /api/orders response — already 2.3MB for 890
+   * orders. A URL is forty bytes.
+   *
+   * CONTENT-ADDRESSED AND UNAUTHENTICATED, exactly like /api/design_cards/art/:hash, and
+   * for the same two reasons: an `<img src>` cannot send a Bearer header, and the id is
+   * SEQUENTIAL — an unauthenticated /art/27 would let anyone walk every seller's library a
+   * number at a time. A sha256 of the bytes is unguessable, and it makes the URL immutable,
+   * so it can be cached for a day.
+   */
+  app.get('/api/design_library/art/:hash', async (req, reply) => {
+    const hash = String(req.params.hash || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(hash)) { reply.code(404); return { error: 'not found' }; }
+    const row = (await q('select data from design_library where content_hash=$1 limit 1', [hash])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!row || !row.data) { reply.code(404); return { error: 'not found' }; }
+    const m = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(String(row.data));
+    if (!m) { reply.code(404); return { error: 'not found' }; }
+    reply.header('Cache-Control', 'public, max-age=86400');
+    reply.header('Content-Type', m[1] || 'application/octet-stream');
+    return reply.send(Buffer.from(m[3], m[2] ? 'base64' : 'utf8'));
   });
 
   // Cross-seller DUPLICATE detection — FACTORY/STAFF ONLY (sellers never call this). Given

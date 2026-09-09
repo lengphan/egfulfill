@@ -541,14 +541,24 @@ const ARTWORK_REF = /^IMG-([A-Za-z0-9_-]+)$/i
 export type ArtworkResolver = (ref: string) => string
 
 /** The row's artwork as an ADDRESS: a URL as-is, a reference through the resolver, else "". */
+/** An address the browser can load: an absolute http(s) one, or one of OUR routes.
+ *
+ *  The root-relative form is what a resolved library reference now answers with
+ *  (`/api/design_library/art/<hash>`), and it is deliberately narrow — `/api/` only, so a
+ *  stray cell containing "/etc/passwd" or a bare word is still nothing. A `data:` URL is
+ *  NOT addressable by this definition even though a browser would render it: it would ride
+ *  on `order_items.img` into every /api/orders response, which is the bloat this route
+ *  exists to avoid. */
+const ADDRESSABLE = /^(https?:\/\/|\/api\/)/i
+
 export function artworkUrl(v: string, resolve?: ArtworkResolver): string {
   const s = String(v ?? "").trim()
   if (!s) return ""
-  if (/^https?:\/\//i.test(s)) return s
+  if (ADDRESSABLE.test(s)) return s
   const m = s.match(ARTWORK_REF)
   if (m && resolve) {
     const hit = resolve(s)
-    return /^https?:\/\//i.test(hit) ? hit : ""
+    return ADDRESSABLE.test(hit) ? hit : ""
   }
   return ""
 }

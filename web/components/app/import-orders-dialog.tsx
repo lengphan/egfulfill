@@ -252,12 +252,27 @@ export function ImportOrdersDialog({
     return () => clearTimeout(id)
   }, [open])
 
-  /** `IMG-30` → the image's address, from the library above. Empty until it lands. */
+  /**
+   * `IMG-30` → the image's ADDRESS, not its bytes. Empty until the library lands.
+   *
+   * This returned the row's `thumb`, which is a `data:` URL — and artworkUrl drops anything
+   * that is not addressable, so the reference resolved to nothing, no design row was written
+   * for the line, and the order showed the blank's catalogue photo instead of the artwork.
+   *
+   * The fix is not to let base64 through: this value ends up on `order_items.img`, which
+   * travels in every /api/orders response (2.3MB for 890 orders before adding anything to
+   * it). `/api/design_library/art/<hash>` is forty bytes, is cached for a day, and is the
+   * same content-addressed shape design cards already use.
+   *
+   * A row with no hash falls back to the thumb, which behaves exactly as it did before —
+   * badly, but not worse — rather than resolving to nothing at all.
+   */
   const resolveArtwork = useCallback(
     (ref: string) => {
       const id = String(ref).replace(/^IMG-/i, "")
       const hit = (library ?? []).find((d) => String(d.id) === id)
-      return String(hit?.thumb ?? "")
+      if (!hit) return ""
+      return hit.content_hash ? `/api/design_library/art/${hit.content_hash}` : String(hit.thumb ?? "")
     },
     [library],
   )
