@@ -8,7 +8,7 @@ import { OrderNumber } from "@/components/app/order-number"
 import { getUser, canSeeMoney } from "@/lib/auth"
 import { GRANT_OPERATOR_EDIT_AFTER_APPROVAL, isGrantOn, useRoleGrants } from "@/lib/role-grants"
 import { useParams, useRouter } from "next/navigation"
-import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash } from "@phosphor-icons/react"
+import { Package, MapPin, Truck, Clock, PaperPlaneTilt, FileArrowDown, CircleNotch, CaretLeft, Paperclip, FileText, X, Trash, ArrowUUpLeft } from "@phosphor-icons/react"
 import { canFetchTiktokLabel, openTiktokLabelFor, tiktokShippingOf } from "@/lib/tiktok-label"
 import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
@@ -990,22 +990,30 @@ export default function OrderDetailPage() {
                             so the row a seller checks looks identical either side of the
                             charge. */}
                         <dd className="flex items-center gap-2">
-                          {/* Staff only, adjustments only, and only while there is something
-                              left on that part to send back. */}
+                          <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
+                            {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
+                          </span>
+                          {/* AFTER THE FIGURE, and a mark rather than a word. "Reverse" ahead
+                              of the amount put a verb where the eye is scanning a column of
+                              money, and pushed the numbers out of alignment row by row. The
+                              glyph sits past the end of that column, so the figures still line
+                              up and the action reads as belonging to the row it is on.
+                              Staff only, adjustments only, and only while that part still has
+                              room to send back — so it cannot be pressed twice. */}
                           {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
                             <button
                               type="button"
                               onClick={() => void reverseFee(l, `${l.part}-${i}`)}
                               disabled={reversing === `${l.part}-${i}`}
+                              aria-label={`Reverse this ${usd(l.amount)} adjustment`}
                               title="Send this adjustment back. The charge and the reversal both stay on the statement."
-                              className="eg-tap text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50"
+                              className="eg-tap -my-1 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive disabled:opacity-50"
                             >
-                              {reversing === `${l.part}-${i}` ? "…" : "Reverse"}
+                              {reversing === `${l.part}-${i}`
+                                ? <CircleNotch size={13} className="animate-spin" />
+                                : <ArrowUUpLeft size={13} weight="bold" />}
                             </button>
                           )}
-                          <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
-                            {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
-                          </span>
                         </dd>
                       </div>
                     ))}
