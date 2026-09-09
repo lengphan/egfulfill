@@ -1004,51 +1004,80 @@ td[align="right"] {
   .eg-sway { animation: none; }
 }
 
-/* ── THE BAND'S OBJECTS — adrift, until you reach for one ──────────────────────
-   The header band's balloons are never still. That is the point: a cluster that
-   holds position reads as a picture pasted into the corner, and a cluster that
-   drifts reads as objects in a space you could reach into — which is exactly what
-   you can then do, because each one is draggable.
+/* ── THE BAND'S OBJECTS — swimming, until you reach for one ────────────────────
+   The header band's objects are never still. That is the point: a cluster that
+   holds position reads as a picture pasted into the corner, and one that wanders
+   reads as objects in a space you could reach into — which is exactly what you
+   can then do, because each one is draggable.
+
+   FOUR PATHS, NOT ONE. A single keyframe with per-object durations still moves
+   everything along the same route at different speeds, and the eye reads that as
+   a mechanism rather than as drift. Each object takes one of four routes through
+   `--swim`, so no two trace the same shape even when they share a duration.
+
+   THEY SWIM RIGHTWARD, AWAY FROM THE TYPE. Every path is biased to positive x —
+   the leftward excursions are small — because the empty slate is to the RIGHT of
+   the greeting, and an object wandering left ends up behind the one thing on this
+   band anybody actually has to read. The layer is behind the type, so it would
+   pass under the words rather than over them, but "it is technically legible" is
+   not the same as leaving the words alone.
+
+   SLOW AND WIDE, not fast and small. 11–17s for a path around 40% of the object's
+   own size. The first attempt was ±13% over 9s, which measured 8px of travel on a
+   56px object: animating, but not moving. Measure the bounding box across a cycle,
+   never the timeline — "playState: running" is not the claim being made.
 
    PAUSE ON THE OBJECT, not on the band. This is the opposite call to `.eg-rail`
    above, and the reason is what you are aiming at. On the rail you are picking a
-   garment OUT OF A ROW, so the neighbour has to hold still too. Here you are
-   picking up ONE THING; freezing the whole cluster because the pointer crossed a
-   corner would kill the only motion on the page for a gesture aimed at a single
-   object. So the one under the pointer stops — which is also what "selected"
-   means here, with no ring, no chip, and nothing else added to say it.
+   garment OUT OF A ROW, so its neighbour has to hold still too. Here you are
+   picking up ONE THING, and freezing the whole cluster because the pointer crossed
+   a corner would kill the only motion on the page for a gesture aimed at a single
+   object. So the one under the pointer stops — which is also what "selected" means
+   here, with no ring, no chip, and nothing else added to say it.
 
-   TRANSFORM ONLY, and no JavaScript in the loop: a composited property, no
-   layout, no paint, no React render. The drag is motion's, on the element
-   ABOVE this one — §4's rule that no element may own the same property twice is
-   the whole reason for that split, and it applies just as hard to a CSS
-   animation as to a second MotionValue.
+   TRANSFORM ONLY, and no JavaScript in the loop: a composited property, no layout,
+   no paint, no React render. The drag is motion's, on the element ABOVE this one —
+   §4's rule that no element may own the same property twice is the whole reason for
+   that split, and it applies just as hard to a CSS animation as to a MotionValue.
 
-   Percentages in the translate resolve against the OBJECT, so a big cloud and a
-   small chrome bead drift by the same proportion of themselves rather than the
-   same number of pixels — which is what keeps a cluster of mixed sizes from
-   looking like the small ones are in a hurry.
+   Percentages resolve against the OBJECT, so a big cloud and a small chrome bead
+   drift by the same proportion of themselves rather than the same number of pixels,
+   which is what keeps a cluster of mixed sizes from looking like the small ones are
+   in a hurry.
 
-   REDUCED MOTION STOPS IT COMPLETELY. Continuous ambient movement with no
-   finishing moment is close to the definition of what that setting asks us not
-   to do. Dragging still works: that is the person's own hand, not decoration. */
-/* AMPLITUDE IS THE WHOLE POINT, and the first pass got it wrong: ±13% of the
-   object over a 9s cycle measures 8.2px of vertical travel on a 56px object,
-   which is animating and not moving. "playState: running" is not the same claim
-   as "you can see it". Measure the bounding box across a cycle, not the timeline.
-   These numbers are ~34% of the object's height and a full turn in 4.5–7s, which
-   comes out around 20px on a small object and 33px on the big cloud — a drift you
-   notice without it reading as a fidget. */
-@keyframes eg-band-float {
+   REDUCED MOTION STOPS IT COMPLETELY. Continuous ambient movement with no finishing
+   moment is close to the definition of what that setting asks us not to do. Dragging
+   still works: that is the person's own hand, not decoration. */
+@keyframes eg-swim-a {
   0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
-  20%  { transform: translate3d(6%, -19%, 0) rotate(4deg); }
-  42%  { transform: translate3d(-5%, -34%, 0) rotate(-3deg); }
-  65%  { transform: translate3d(-12%, -16%, 0) rotate(2.6deg); }
-  84%  { transform: translate3d(4%, -7%, 0) rotate(-1.4deg); }
+  27%  { transform: translate3d(16%, -22%, 0) rotate(4deg); }
+  52%  { transform: translate3d(36%, 2%, 0) rotate(-2.5deg); }
+  78%  { transform: translate3d(13%, 21%, 0) rotate(2deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+@keyframes eg-swim-b {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  24%  { transform: translate3d(21%, 19%, 0) rotate(-3.5deg); }
+  55%  { transform: translate3d(31%, -14%, 0) rotate(3deg); }
+  80%  { transform: translate3d(8%, -26%, 0) rotate(-1.5deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+@keyframes eg-swim-c {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  30%  { transform: translate3d(-7%, -25%, 0) rotate(3deg); }
+  58%  { transform: translate3d(24%, -33%, 0) rotate(-4deg); }
+  82%  { transform: translate3d(29%, -9%, 0) rotate(1.8deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+@keyframes eg-swim-d {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  22%  { transform: translate3d(27%, 8%, 0) rotate(2.6deg); }
+  49%  { transform: translate3d(9%, 28%, 0) rotate(-3deg); }
+  74%  { transform: translate3d(-6%, 11%, 0) rotate(1.4deg); }
   100% { transform: translate3d(0, 0, 0) rotate(0deg); }
 }
 .eg-band-float {
-  animation: eg-band-float var(--float-dur, 6s) ease-in-out infinite;
+  animation: var(--swim, eg-swim-a) var(--float-dur, 13s) ease-in-out infinite;
   animation-delay: var(--float-delay, 0s);
   will-change: transform;
 }

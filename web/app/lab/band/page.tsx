@@ -19,10 +19,10 @@ const NOTES: Record<string, string> = {
 }
 
 const SET_NOTES: Record<string, string> = {
-  balloons: "the inflated abstract family",
-  letters: "E G F U L — the name, inflated",
-  blanks: "real blanks, cut off the seamless",
-  mixed: "a puffer in the balloon language, plus the family",
+  shapes: "six abstract forms, nothing repeated",
+  garments: "what we make, inflated — tee, cap, beanie, shorts, varsity, hoodie",
+  mixed: "a garment and an abstract, alternating",
+  blanks: "real blanks, photographed and cut off the seamless",
 }
 
 function Column({ dark }: { dark: boolean }) {
@@ -40,8 +40,7 @@ function Column({ dark }: { dark: boolean }) {
             </p>
             <PageBand
               set={key}
-              /* A word gets the arrangement built for a word; everything else gets the default. */
-              layout={key === "letters" ? "word" : DEFAULT_LAYOUT}
+              layout={DEFAULT_LAYOUT}
               title="Good afternoon, Linh"
               sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}
             />

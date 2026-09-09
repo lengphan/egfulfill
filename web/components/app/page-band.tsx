@@ -51,106 +51,101 @@ import { motion } from "motion/react"
  * frame does reads as a sticker, and one that runs off it reads as a thing that carried on.
  */
 type BandSlot = { x: number; y: number; h: number; dur: number; delay: number }
-type BandObject = BandSlot & { src: string }
+type BandObject = BandSlot & { src: string; swim: string }
 
-const STAR = "/ploy/obj-star.webp"
-const CLOUD = "/ploy/obj-cloud.webp"
-const CUBE = "/ploy/obj-green.webp"
-const CHROME = "/ploy/obj-chrome.webp"
+/** The family, one framing each — see tools/import-objects.py. */
+const O = (n: string) => `/ploy/obj/${n}.webp`
 
 /**
  * WHAT the objects are, held apart from WHERE they sit.
  *
  * An arrangement is six positions and six sizes; a set is what fills them. Keeping the two
- * separate is the difference between "try the balloons in an arc" being a one-word change and
+ * separate is the difference between "try the garments in an arc" being a one-word change and
  * being six lines of coordinates retyped — and it is the same reason the arrangements are
  * named at all.
  *
- * Order matters inside a set: position 1 is the biggest slot in most arrangements, so a set
- * leads with whatever can carry it. A set shorter than the arrangement repeats, which is on
- * purpose — two clouds at different sizes read as two clouds, not as a shortage.
+ * NO OBJECT APPEARS TWICE IN A SET (owner's call). The first cut used two clouds and two
+ * stars at different sizes on the argument that they read as two objects; they do not. They
+ * read as one object the page ran out of ideas for, and at band height the size difference is
+ * the only thing telling them apart. Fifteen distinct shapes exist, so a repeat is a choice
+ * not to use one of them.
+ *
+ * There is no wordmark set. Spelling the company name in balloons was tried and dropped:
+ * the band already carries the name in the sidebar and the tab title, and a logo that has to
+ * be reassembled out of six draggable pieces is a logo you can break.
  */
 export const SETS: Record<string, string[]> = {
-  /** The inflated abstract family. Loud, brand-coloured, reads at any size. */
-  balloons: [STAR, CLOUD, CUBE, CHROME, CLOUD, STAR],
-  /** The name, inflated — E G F U L. The one set that says something. */
-  letters: ["/ploy/letter-e.webp", "/ploy/letter-g.webp", "/ploy/letter-f.webp",
-            "/ploy/letter-u.webp", "/ploy/letter-l.webp"],
-  /** What we actually make: real blanks, shot on the seamless and cut off it (tools/cut-blank.py).
-   *  Quiet, and the only set that is a photograph of a product rather than a render. */
+  /** The abstract family — six forms, one language, nothing repeated. */
+  shapes: [O("star"), O("torus"), O("squiggle"), O("cloud"), O("blob-peri"), O("blob-lime")],
+  /** What we make, in the same inflated language: the set that says what this company does. */
+  garments: [O("tee"), O("cap"), O("beanie"), O("shorts"), O("varsity"), O("hoodie")],
+  /** A garment and an abstract, alternating — the product with room around it. */
+  mixed: [O("tee"), O("torus"), O("cap"), O("squiggle"), O("socks"), O("blob-lime")],
+  /** Real blanks, photographed and cut off the studio sweep (tools/cut-blank.py). The quiet
+   *  option, and the only set that is a product rather than a render. */
   blanks: ["/ploy/cut/cap.webp", "/ploy/cut/bag.webp", "/ploy/cut/beanie.webp"],
-  /** A garment in the balloon language, with the abstract family around it. */
-  mixed: ["/ploy/obj-hoodie.webp", CLOUD, STAR, CHROME, CUBE, CLOUD],
 }
 
-export const DEFAULT_SET = "balloons"
+export const DEFAULT_SET = "garments"
 
 export const LAYOUTS: Record<string, BandSlot[]> = {
   /** SHELF — every object standing on one line. The sizes do the varying, not the baseline. */
   shelf: [
-    { x: 60.0, y: 34, h: 62, dur: 5.2, delay: -0.5 },
-    { x: 67.0, y: 44, h: 52, dur: 6.4, delay: -3.0 },
-    { x: 75.0, y: 22, h: 74, dur: 4.6, delay: -1.8 },
-    { x: 82.0, y: 50, h: 46, dur: 5.8, delay: -4.2 },
-    { x: 86.5, y: 16, h: 80, dur: 4.9, delay: -2.2 },
-    { x: 95.5, y: 38, h: 58, dur: 4.9, delay: -5.5 },
+    { x: 60.0, y: 34, h: 62, dur: 13.0, delay: -0.5 },
+    { x: 67.0, y: 44, h: 52, dur: 16.5, delay: -3.0 },
+    { x: 75.0, y: 22, h: 74, dur: 11.5, delay: -1.8 },
+    { x: 82.0, y: 50, h: 46, dur: 14.5, delay: -4.2 },
+    { x: 86.5, y: 16, h: 80, dur: 12.5, delay: -2.2 },
+    { x: 95.5, y: 38, h: 58, dur: 12.5, delay: -5.5 },
   ],
   /** ARC — a curve lifting toward the edge, the last of it already out of the frame. */
   arc: [
-    { x: 60.0, y: 54, h: 42, dur: 5.8, delay: -4.2 },
-    { x: 65.5, y: 36, h: 56, dur: 5.2, delay: -0.5 },
-    { x: 72.0, y: 20, h: 64, dur: 6.4, delay: -3.0 },
-    { x: 81.0, y: 6,  h: 70, dur: 4.6, delay: -1.8 },
-    { x: 87.5, y: -10, h: 76, dur: 4.9, delay: -2.2 },
-    { x: 96.0, y: -22, h: 58, dur: 4.9, delay: -5.5 },
+    { x: 60.0, y: 54, h: 42, dur: 14.5, delay: -4.2 },
+    { x: 65.5, y: 36, h: 56, dur: 13.0, delay: -0.5 },
+    { x: 72.0, y: 20, h: 64, dur: 16.5, delay: -3.0 },
+    { x: 81.0, y: 6,  h: 70, dur: 11.5, delay: -1.8 },
+    { x: 87.5, y: -10, h: 76, dur: 12.5, delay: -2.2 },
+    { x: 96.0, y: -22, h: 58, dur: 12.5, delay: -5.5 },
   ],
   /** BUNCH — one mass in the corner, overlapping, the way balloons are actually held. */
   bunch: [
-    { x: 75.0, y: 18, h: 72, dur: 6.4, delay: -3.0 },
-    { x: 82.5, y: -6, h: 60, dur: 5.2, delay: -0.5 },
-    { x: 81.5, y: 46, h: 56, dur: 4.6, delay: -1.8 },
-    { x: 88.0, y: 38, h: 44, dur: 5.8, delay: -4.2 },
-    { x: 89.5, y: 2,  h: 66, dur: 4.9, delay: -2.2 },
-    { x: 95.5, y: 48, h: 50, dur: 4.9, delay: -5.5 },
+    { x: 75.0, y: 18, h: 72, dur: 16.5, delay: -3.0 },
+    { x: 82.5, y: -6, h: 60, dur: 13.0, delay: -0.5 },
+    { x: 81.5, y: 46, h: 56, dur: 11.5, delay: -1.8 },
+    { x: 88.0, y: 38, h: 44, dur: 14.5, delay: -4.2 },
+    { x: 89.5, y: 2,  h: 66, dur: 12.5, delay: -2.2 },
+    { x: 95.5, y: 48, h: 50, dur: 12.5, delay: -5.5 },
   ],
   /** PAIRS — a trio and a pair with real air between them. Rhythm instead of a queue. */
   pairs: [
-    { x: 61.0, y: 30, h: 58, dur: 5.2, delay: -0.5 },
-    { x: 67.0, y: 10, h: 62, dur: 6.4, delay: -3.0 },
-    { x: 69.5, y: 52, h: 40, dur: 5.8, delay: -4.2 },
-    { x: 85.0, y: 20, h: 60, dur: 4.6, delay: -1.8 },
-    { x: 90.5, y: 0,  h: 70, dur: 4.9, delay: -2.2 },
-    { x: 94.0, y: 48, h: 46, dur: 4.9, delay: -5.5 },
+    { x: 61.0, y: 30, h: 58, dur: 13.0, delay: -0.5 },
+    { x: 67.0, y: 10, h: 62, dur: 16.5, delay: -3.0 },
+    { x: 69.5, y: 52, h: 40, dur: 14.5, delay: -4.2 },
+    { x: 85.0, y: 20, h: 60, dur: 11.5, delay: -1.8 },
+    { x: 90.5, y: 0,  h: 70, dur: 12.5, delay: -2.2 },
+    { x: 94.0, y: 48, h: 46, dur: 12.5, delay: -5.5 },
   ],
   /** HERO — one object big enough to be the subject, three small ones in orbit. */
   hero: [
-    { x: 71.0, y: -4, h: 106, dur: 6.4, delay: -3.0 },
-    { x: 63.0, y: 40, h: 50, dur: 5.2, delay: -0.5 },
-    { x: 88.5, y: 6,  h: 46, dur: 4.6, delay: -1.8 },
-    { x: 92.5, y: 52, h: 38, dur: 5.8, delay: -4.2 },
-  ],
-  /** WORD — for a set that spells something: one size, even spacing, and only enough vertical
-   *  play to keep it from looking typeset. A word whose letters are six different heights is
-   *  a ransom note. */
-  word: [
-    { x: 60.0, y: 26, h: 56, dur: 5.2, delay: -0.5 },
-    { x: 67.5, y: 34, h: 56, dur: 6.4, delay: -3.0 },
-    { x: 75.0, y: 24, h: 56, dur: 4.6, delay: -1.8 },
-    { x: 82.5, y: 33, h: 56, dur: 5.8, delay: -4.2 },
-    { x: 90.0, y: 25, h: 56, dur: 4.9, delay: -2.2 },
-    { x: 97.0, y: 34, h: 56, dur: 6.1, delay: -5.5 },
+    { x: 71.0, y: -4, h: 106, dur: 16.5, delay: -3.0 },
+    { x: 63.0, y: 40, h: 50, dur: 13.0, delay: -0.5 },
+    { x: 88.5, y: 6,  h: 46, dur: 11.5, delay: -1.8 },
+    { x: 92.5, y: 52, h: 38, dur: 14.5, delay: -4.2 },
   ],
   /** SCATTER — what shipped first, at the same weight, so a comparison is a comparison. */
   scatter: [
-    { x: 59.0, y: 8,  h: 60, dur: 5.2, delay: -0.5 },
-    { x: 65.5, y: 40, h: 54, dur: 6.4, delay: -3.0 },
-    { x: 72.5, y: 0,  h: 48, dur: 4.6, delay: -1.8 },
-    { x: 78.0, y: 48, h: 44, dur: 5.8, delay: -4.2 },
-    { x: 83.5, y: 4,  h: 68, dur: 4.9, delay: -2.2 },
-    { x: 91.0, y: 42, h: 52, dur: 4.9, delay: -5.5 },
-    { x: 94.5, y: -4, h: 54, dur: 6.1, delay: -0.9 },
+    { x: 59.0, y: 8,  h: 60, dur: 13.0, delay: -0.5 },
+    { x: 65.5, y: 40, h: 54, dur: 16.5, delay: -3.0 },
+    { x: 72.5, y: 0,  h: 48, dur: 11.5, delay: -1.8 },
+    { x: 78.0, y: 48, h: 44, dur: 14.5, delay: -4.2 },
+    { x: 83.5, y: 4,  h: 68, dur: 12.5, delay: -2.2 },
+    { x: 91.0, y: 42, h: 52, dur: 12.5, delay: -5.5 },
+    { x: 94.5, y: -4, h: 54, dur: 15.5, delay: -0.9 },
   ],
 }
+
+/** The four routes, dealt round the cluster in order. */
+const SWIM = ["a", "b", "c", "d"]
 
 /** The arrangement every band uses unless it is being compared against another. */
 export const DEFAULT_LAYOUT = "shelf"
@@ -198,7 +193,12 @@ function FloatingObject({
         aria-hidden
         draggable={false}
         className="eg-band-float h-full w-auto max-w-none select-none drop-shadow-[0_10px_16px_rgba(0,0,0,0.32)]"
-        style={{ "--float-dur": `${o.dur}s`, "--float-delay": `${o.delay}s` } as React.CSSProperties}
+        style={{
+          "--float-dur": `${o.dur}s`,
+          "--float-delay": `${o.delay}s`,
+          // One of four routes, so no two objects trace the same shape. See globals.css.
+          "--swim": `eg-swim-${o.swim}`,
+        } as React.CSSProperties}
       />
     </motion.div>
   )
@@ -268,7 +268,7 @@ export function PageBand({
         className="pointer-events-none absolute inset-0 -z-10 hidden select-none sm:block"
       >
         {slots.map((slot, i) => (
-          <FloatingObject key={i} o={{ ...slot, src: objects[i] }} bounds={band} />
+          <FloatingObject key={i} o={{ ...slot, src: objects[i], swim: SWIM[i % SWIM.length] }} bounds={band} />
         ))}
       </div>
     </div>
