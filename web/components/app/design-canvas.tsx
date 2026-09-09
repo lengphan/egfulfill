@@ -2107,8 +2107,28 @@ export function DesignCanvasDialog({
     if (machine.length && !isEmb) {
       notes.push(`${names(machine)} ${machine.length > 1 ? "are embroidery files" : "is an embroidery file"}, and this line is ${item.print_type || "not embroidered"} — there is no machine to run ${machine.length > 1 ? "them" : "it"}. Use a PNG or JPG instead.`)
     }
-    if (images.length > 1) {
-      notes.push(`One artwork per side: ${images[0].name} went on the ${sideName}, and ${names(images.slice(1))} ${images.length > 2 ? "were" : "was"} left out.`)
+    /**
+     * MORE THAN ONE IMAGE FILLS MORE THAN ONE FACE (owner's call, 2026-09-09).
+     *
+     * This kept `images[0]` and REFUSED the rest — "one artwork per side", which is true and
+     * was the wrong conclusion. One artwork per side does not mean one artwork per DROP: a
+     * cap with a front and a back is two files, and dropping both is the obvious gesture.
+     * You could already place them one at a time by switching faces; the drop was the only
+     * thing that insisted on being fed singly.
+     *
+     * The first lands on the face you are looking at, the rest fill the faces AFTER it in
+     * the product's own order (offeredSides, via `faces`) — skipping any that already hold
+     * artwork, because a drop must never silently overwrite work that is already placed.
+     * Anything left over is named, exactly as before.
+     */
+ const openFaces = faces
+      .map((f) => f.side)
+      .filter((sd) => sd !== sideName && !(faceArt ?? {})[sd]?.data)
+ const extras = images.slice(1)
+ const placed = extras.slice(0, openFaces.length)
+ const leftOver = extras.slice(openFaces.length)
+ if (leftOver.length) {
+      notes.push(`${names(leftOver)} ${leftOver.length > 1 ? "were" : "was"} left out — every face on this product already has artwork.`)
     }
 
     // Machine files FIRST and awaited, because attaching one clears the error line on
@@ -2121,7 +2141,31 @@ export function DesignCanvasDialog({
 
     const art = images[0]
     if (!art) { settle(); return }
-    readImageFile(art, (u) => { settle(); setDesignUrl(u); setDesignName(art.name); setDesignSize(art.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
+
+    /* The extras go straight into the per-side store the save path already reads, so they
+       are on their faces before anyone clicks anything — switch to Back and the artwork is
+       there. Read as data URLs because that is what `faceArt` holds and what Save sends. */
+ const landed: string[] = new Array(placed.length).fill("")
+ const refused: string[] = []
+ await Promise.all(placed.map((f, i) => new Promise<void>((done) => {
+ const side = openFaces[i]
+ readImageFile(f, (u) => {
+ setFaceArt((prev) => ({ ...(prev ?? {}), [side]: { data: u, pos: DEFAULT_POS, name: f.name } }))
+ noteArtSource(side, "")
+        /* Written BY INDEX, so the sentence lists them in the order they were dropped
+           rather than in whatever order the readers happened to finish. */
+ landed[i] = `${f.name} → ${side}`
+ done()
+      },
+      /* The reader's refusal carries a real reason — a 30MB PNG says so and says what to do
+         about it. Swallowing it would make an oversized extra file vanish with no trace. */
+      (m) => { refused.push(`${f.name}: ${m}`); done() })
+    })))
+ const ok = landed.filter(Boolean)
+ if (ok.length) notes.push(`Placed ${ok.join(", ")}. Nothing is saved until you press Save.`)
+ if (refused.length) notes.push(refused.join(" "))
+
+ readImageFile(art, (u) => { settle(); setDesignUrl(u); setDesignName(art.name); setDesignSize(art.size); setPos(DEFAULT_POS); noteArtSource(sideName, "") }, setErr)
   }
  const removeArtwork = async () => {
  if (removing) return   // a second click would open a second confirm over the first
