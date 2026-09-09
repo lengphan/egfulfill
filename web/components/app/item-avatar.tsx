@@ -83,8 +83,20 @@ export type ItemAvatarProps = {
  */
 function blankOf(item: OrderItem, catalog?: CatalogProduct[], px?: number): { url: string; missing: boolean; chosen: boolean } {
   const p = catalog?.length ? resolveProduct(item, catalog) : null
+  /**
+   * THE SELLER'S OWN PHOTO WINS, and until now nothing outside the canvas could see it.
+   *
+   * "Use mine" writes order_items.mockups per side and the canvas reads it straight back —
+   * so the photo saved, reopened correctly, and appeared nowhere else. From the order page
+   * that is indistinguishable from a save that failed, which is exactly how it was reported.
+   *
+   * Front, because this tile is the front. It is a BACKDROP, not artwork: the placed design
+   * still composites on top, and a line with a mockup and no design is still a line with no
+   * design here as everywhere else.
+   */
+  const mine = (item.mockups && (item.mockups.front || Object.values(item.mockups).find(Boolean))) || ""
   // No fallback — this is the blank's OWN imagery or nothing.
-  const own = bestMockup(p, item.color, "")
+  const own = mine || bestMockup(p, item.color, "")
   // `chosen` — a blank RESOLVES for this line, so there is a second thing to look at. Kept
   // separate from `url`, which falls back to the listing photo and therefore cannot answer
   // "do we know what we are making yet".

@@ -2,11 +2,10 @@
 
 import { useLabelT } from "@/lib/i18n"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
+import { Plus, Copy, Lock, LockOpen, Trash, UploadSimple, ArrowClockwise, ArrowCounterClockwise, Eraser, X, CircleNotch, Image as ImageIcon, ArrowSquareOut, CaretDown, Check, CheckCircle, Warning, BookmarkSimple, ImageSquare, PaperPlaneTilt } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { ImageLightbox } from "@/components/app/image-lightbox"
 import { useConfirm } from "@/components/app/confirm-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
@@ -1590,7 +1589,6 @@ export function DesignCanvasDialog({
    * same job. A panel you have to type into shows the artwork for longer than a dialog you
    * dismiss, which was the whole argument for the warning.
    */
- const [confirmSend, setConfirmSend] = useState(false)
   /** Seeded from the line, because the line's name is right far more often than not — and a
    *  field you can correct beats one you must fill. */
  const [cardTitle, setCardTitle] = useState("")
@@ -1637,57 +1635,89 @@ export function DesignCanvasDialog({
   }
   /** Click the artwork to see it big. The shared lightbox, never a seventh hand-rolled one. */
  const [zoom, setZoom] = useState<string | null>(null)
+  /**
+   * THE SEND POP-UP IS THE BOARD TAB NOW (owner's call, 2026-09-09).
+   *
+   * This opened a second dialog on top of this one to ask a single question. The tab asks it
+   * beside the answer — which faces have artwork, and which of them you actually want made —
+   * and it is where the card's own state already lives once it has been sent.
+   *
+   * The seeding stays: a width changed on the canvas since last time has to be reflected
+   * rather than the last edit being remembered as if it were the measurement.
+   */
  const openSendPanel = () => {
-    // Re-seeded on every open, so a width changed on the canvas since last time is reflected
-    // rather than the last edit being remembered as if it were the measurement.
  setCardPrefixText(cardPrefix)
  setCardTitle(item.name || item.sku || "Design")
  setCardNote("")
  setCardBand(null)
+ setSkip({})
  setErr(null)
- setConfirmSend(true)
+ setCtxTab("board")
   }
- const sendToBoard = async () => {
- setConfirmSend(false)
+  /**
+   * EVERY FACE THAT HAS ARTWORK, and whether it is going.
+   *
+   * Built from the same two places Save reads — what is on screen for the face you are
+   * looking at, plus `faceArt` for the rest — so the list cannot disagree with what would
+   * be saved. `skip` is the X: excluded faces stay on the line, they simply do not become
+   * cards, because sending a front for digitising does not mean sending the back too.
+   */
+ const sendable = useMemo(() => {
+ const all: Record<string, FaceArt | null> = {
+      ...(faceArt ?? {}),
+ [sideName]: designUrl ? { data: designUrl, pos, name: designName } : null,
+    }
+ return faces
+      .map((f) => ({ side: f.side, art: all[f.side] }))
+      .filter((r): r is { side: string; art: FaceArt } => !!r.art?.data)
+    // faces is the product's own order, so the list reads front, back, sleeve — not
+    // whatever order the drops happened in.
+  }, [faceArt, sideName, designUrl, pos, designName, faces])
+ const [skip, setSkip] = useState<Record<string, boolean>>({})
+ const going = sendable.filter((r) => !skip[r.side])
+
+  /**
+   * ONE CARD PER FACE (owner's call, 2026-09-09).
+   *
+   * A front and a back are two jobs: each needs its own stitch file, each is claimed and
+   * paid separately. One card carrying both would be one payout for two pieces of work, and
+   * a designer who only did one of them.
+   *
+   * Sequential, not Promise.all: each card is created THEN assigned, and a burst of
+   * unattached cards is the failure this ordering exists to avoid — a card on the board with
+   * no order behind it is worse than no card. Slower by a few hundred milliseconds, and the
+   * one that fails says which face it was.
+   */
+ const sendSelected = async () => {
+ if (!going.length) return
  setSending(true); setErr(null)
  try {
+ for (const row of going) {
  const card = await createDesignCard({
- title: fullCardTitle(cardTitle),
+          /* The FACE is in the title, because on a board of cards from one order it is the
+             only thing telling two of them apart. */
+ title: `${fullCardTitle(cardTitle)} · ${row.side}`,
  description: cardNote.trim() || undefined,
-      /* Undefined when nobody picked, never a default: a card priced by omission is how a
-         digitise gets paid at the Easy rate. It arrives on the board wearing the pills. */
  band: cardBand ?? undefined,
- data: designUrl || undefined,
+ data: row.art.data,
  sku: item.sku || undefined,
-        /**
-         * INCOMING. Owner's call, and it reverses what this used to do.
-         *
-         * It filed as `inprogress` on the reasoning that a card handed straight over is not
-         * waiting to be picked up, and sitting in Incoming it reads as unclaimed to the
-         * people whose queue that is. The counter-argument is the stronger one: Incoming is
-         * where a designer LOOKS for new work, and a card that skips it starts in a lane
-         * nobody is watching — arriving already "in progress" with nobody progressing it.
-         *
-         * Kept as a note rather than deleted, because both readings are reasonable and the
-         * next person to wonder should see that it was decided rather than defaulted.
-         */
  col: "incoming",
-      })
- if (card.error) throw new Error(card.error)
-      // Assign separately: creating and attaching are two calls, and a card that exists but
-      // is attached to nothing is worse than no card — it shows on the board with no order.
+        })
+ if (card.error) throw new Error(`${row.side}: ${card.error}`)
  if (card.id) {
  const a = await assignDesignCard(String(card.id), {
  orderId, sku: item.sku || "", lineId: item.line_id || undefined,
-        })
- if (a && (a as { error?: string }).error) throw new Error((a as { error?: string }).error as string)
+          })
+ if (a && (a as { error?: string }).error) throw new Error(`${row.side}: ${(a as { error?: string }).error}`)
+        }
       }
  const cards = await getOrderDesignCards(orderId).catch(() => null)
  if (cards) setBoardCard(cardForLine(cards, { line_id: item.line_id, sku: item.sku }) ?? null)
     } catch (e) {
- setErr(e instanceof Error ? e.message : "Couldn't send this line to the design board.")
+ setErr(e instanceof Error ? e.message : "Couldn't send to the design board.")
     } finally { setSending(false) }
   }
+
 
   /** The designId currently being fetched, so the spinner sits on the row you pressed
    *  rather than on all of them. */
@@ -3508,6 +3538,68 @@ export function DesignCanvasDialog({
  are done, carry the same information without instructing anybody. The marker is
  a dot until then: the card is a state, not a task list. */}
           {ctxTab === "board" && (<>
+          {/**
+            * WHAT WOULD GO, AND WHAT IS GOING — the tab that used to be empty.
+            *
+            * Everything below this was wrapped in `isEmb`, so on a DTG line the Board tab
+            * rendered a header and nothing else: a tab that exists and is blank, which reads
+            * as broken rather than as not-applicable. The digitising apparatus below is still
+            * embroidery-only and correctly so; THIS list is not, because any line can have
+            * artwork that wants a designer.
+            *
+            * It also replaces the send pop-up (owner's call, 2026-09-09). A second window to
+            * ask one question was a window; here the same question sits next to the answer —
+            * which faces have artwork, and which of them you actually want made.
+            */}
+          {sendable.length > 0 && (
+            <div className="flex flex-col gap-2 pb-2">
+              <div className="text-sm font-medium">{tl("canvas", "Send to the design board")}</div>
+              <div className="flex flex-col gap-1.5">
+                {sendable.map((row) => {
+ const off = !!skip[row.side]
+ return (
+                    <div
+ key={row.side}
+ className={"flex items-center gap-2.5 rounded-lg border px-2.5 py-2 transition-colors " +
+                        (off ? "border-border bg-muted/40 opacity-55" : "border-input")}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={row.art.data} alt="" className="size-9 shrink-0 rounded object-contain" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium capitalize">{tl("sides", row.side)}</div>
+                        <div className="truncate text-xs text-muted-foreground">{row.art.name || tl("canvas", "Artwork")}</div>
+                      </div>
+                      {/* THE X EXCLUDES, IT DOES NOT DELETE. The artwork stays on the line and
+                          is still saved — this only decides what becomes a card. Toggling back
+                          is the same button, so a mis-click costs nothing. */}
+                      <button
+ type="button"
+ onClick={() => setSkip((m) => ({ ...m, [row.side]: !off }))}
+ title={off ? tl("canvas", "Include this face") : tl("canvas", "Leave this face out")}
+ aria-pressed={off}
+ className="eg-tap shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {off ? <Plus size={14} weight="bold" /> : <X size={14} weight="bold" />}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              {/* The band rides with them — one choice for this send; each card can be
+                  re-banded on the board if one face turns out harder than the others. */}
+              <div>
+                <div className="mb-1.5 text-xs font-medium text-muted-foreground">{tl("canvas", "Payout band")}</div>
+                <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} size="sm" />
+              </div>
+              <Button size="sm" disabled={sending || !going.length} onClick={() => void sendSelected()}>
+                {sending
+                  ? tl("canvas", "Sending…")
+                  : going.length === 1
+                    ? tl("canvas", "Send 1 design to the board")
+                    : `${tl("canvas", "Send")} ${going.length} ${tl("canvas", "designs to the board")}`}
+              </Button>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             {/* 1 — Design image */}
             {/* ONE GREEN. This step hand-picked emerald-300/50 while step 2 below used the
@@ -3796,72 +3888,10 @@ export function DesignCanvasDialog({
 
         {/* THE CARD, BEFORE IT EXISTS. Title, note, picture — see the note on sendToBoard
             for why this is an editor and not the confirmation it replaced. */}
-        <Dialog open={confirmSend} onOpenChange={(v) => { if (!v) setConfirmSend(false) }}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>{tl("canvas", "Send to the design board")}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="send-card-title" className="mb-1 block text-sm font-medium">{tl("canvas", "Title")}</label>
-                {/* BOTH HALVES ARE FIELDS. The left one is filled in for you and is usually
-                    right; the printed width is the part worth overruling, and it used to be
-                    chrome you could not reach. */}
-                <div className="flex items-center gap-2">
-                  <Input
-                    aria-label={tl("canvas", "Order, design number, side and printed width")}
-                    title={tl("canvas", "Order number · design number on this order · side · printed width. Filled in for you — change the width if you are printing it at a different size.")}
-                    value={cardPrefixText}
-                    onChange={(e) => setCardPrefixText(e.target.value)}
-                    className="w-[14rem] shrink-0 tabular-nums"
-                  />
-                  <Input
-                    id="send-card-title"
-                    value={cardTitle}
-                    onChange={(e) => setCardTitle(e.target.value)}
-                    placeholder={tl("canvas", "What the design is — e.g. Dragon chest")}
-                    className="min-w-0 flex-1"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3">
-                {designUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setZoom(designUrl)}
-                    title={tl("canvas", "See it full size")}
-                    className="size-28 shrink-0 overflow-hidden rounded-lg border border-border bg-muted"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={designUrl} alt="" className="size-full object-contain" />
-                  </button>
-                )}
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <label htmlFor="send-card-note" className="mb-1 text-sm font-medium">{tl("canvas", "Description / notes")}</label>
-                  <textarea
-                    id="send-card-note"
-                    value={cardNote}
-                    onChange={(e) => setCardNote(e.target.value)}
-                    placeholder={tl("canvas", "Notes for this design — placement, colours, personalisation, anything the designer needs. Saved to the card.")}
-                    className="min-h-[7rem] w-full flex-1 resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                  />
-                </div>
-              </div>
-            </div>
-            {/* WHAT IT PAYS. Asked here because this is the moment somebody is looking at the
-                artwork — the one point it can be judged without opening anything. Optional:
-                leaving it unset is an honest answer, and the card lands on the board wearing
-                the same pills so the next person can price it. */}
-            <div>
-              <div className="mb-1.5 text-sm font-medium">{tl("canvas", "Payout band")}</div>
-              <BandPills value={cardBand} onPick={setCardBand} rates={bandRates} flat={bandFlat} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirmSend(false)}>{tl("canvas", "Cancel")}</Button>
-              <Button size="sm" disabled={sending} onClick={() => void sendToBoard()}>
-                {sending ? tl("canvas", "Sending…") : tl("canvas", "Send")}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* THE SEND POP-UP LIVED HERE, and it is the Board tab now (2026-09-09). A second
+            dialog stacked on this one to ask one question — which is a window, for a choice
+            that belongs beside the thing it is about. `sendToBoard` stays as the single-face
+            send; `sendSelected` is what the tab calls. */}
         {/* Above the dialog it opens from — ImageLightbox portals to the body for exactly
             this case (see its own note). */}
         <ImageLightbox src={zoom} label={item.name || item.sku || null} onClose={() => setZoom(null)} />
