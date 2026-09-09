@@ -469,7 +469,7 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  if (r.error || !r.orderID) throw new Error(r.error || "PayPal wouldn't start that payment.")
  const c = await capturePaypalOrder(r.orderID)
  if (!c.ok) throw new Error(c.error || "PayPal didn't confirm the payment.")
- setPhase("paid"); onFunded()
+ setSavedNow(null); setPhase("paid"); onFunded()
     } catch (e) {
  setError(e instanceof Error ? e.message : "Couldn't take that payment.")
     } finally { setBusy(false) }
@@ -483,10 +483,33 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
   // Stable identities: PaypalButton creates the PayPal order inside an effect keyed on these,
   // so a new function each render would tear the order down and mint another one every time
   // the parent re-renders.
- const paid = useCallback(() => { setPhase("paid"); onFunded() }, [onFunded])
+  /**
+   * WAS IT ACTUALLY REMEMBERED? The capture answers, and the answer is shown.
+   *
+   * Vault is a separate enablement on the PayPal account, so ticking the box is a REQUEST,
+   * not an outcome — the order can be captured perfectly and the token simply not arrive.
+   * Saying "saved" either way would promise a seller they will not be asked to sign in
+   * again, and then ask them again next month with no explanation. §4: if a thing can't be
+   * read versus doesn't exist, say which.
+   */
+ const [savedNow, setSavedNow] = useState<string | null>(null)
+ const paid = useCallback((saved: string | null) => { setSavedNow(saved); setPhase("paid"); onFunded() }, [onFunded])
  const failed = useCallback((m: string) => setError(m || null), [])
 
- if (phase === "paid") return <Success title={tl("topup", "Payment received")} sub={tl("topup", "Your PayPal top-up has been credited.")} onDone={onClose} />
+ if (phase === "paid")
+ return (
+      <Success
+ title={tl("topup", "Payment received")}
+        /* The account, never a card: PayPal keeps the funding source and chooses it at
+           charge time, so naming one here would describe something we do not control. */
+ sub={savedNow
+          ? `${tl("topup", "Credited. PayPal is remembered as")} ${savedNow} — ${tl("topup", "next time is one press, with no sign-in.")}`
+          : remember && !account
+ ? tl("topup", "Credited. This account couldn't be remembered, so next time will ask you to sign in again.")
+ : tl("topup", "Your PayPal top-up has been credited.")}
+ onDone={onClose}
+      />
+    )
  if (phase === "pay")
  return (
       <div className="space-y-3">
