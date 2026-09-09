@@ -14,6 +14,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { getOrderDesignStatus, getOrderDesignCards, cardForLine, postItemSetup, addOrderItem, type OrderDesignStatus, type OrderDesignCard } from "@/lib/api"
 import { fileToUploadUrl, firstDroppedFile, MAX_ATTACHMENT_BYTES } from "@/lib/chat-upload"
 import { deleteOrderItem } from "@/lib/api"
+import { refundOrder } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { OrderAdjustPanel } from "@/components/app/order-adjust-panel"
 import { DesignFeeAmount } from "@/components/app/design-charge"
@@ -181,6 +182,8 @@ export default function OrderDetailPage() {
   /** Bumped whenever something that AFFECTS the price changes — see the quote effect. */
  const [quoteNonce, setQuoteNonce] = useState(0)
  const [charges, setCharges] = useState<OrderCharges | null>(null)
+  /** Which adjustment row is being reversed — see reverseFee, below the charge rows. */
+ const [reversing, setReversing] = useState<string | null>(null)
  /** OUR side of the same order — what we spent, from the cost ledger. Staff only;
   *  the route refuses a seller outright, so this stays null for them. */
  const [costs, setCosts] = useState<OrderCosts | null>(null)
@@ -943,6 +946,38 @@ export default function OrderDetailPage() {
    * charged, with the goods at full price and the deduction named underneath. Parts are
    * still what a refund is allocated against — this is only how it reads.
    */
+  /**
+   * REVERSING A WRONG ADJUSTMENT, without editing anything.
+   *
+   * "What if I charge wrong — can I edit it?" No, and the reason is the ledger: a balance is
+   * SUM(delta) over an append-only table, so editing a row silently moves money the seller
+   * has already been told about and rewrites a statement they may have read. Settled records
+   * do not change quietly.
+   *
+   * A reversal is the honest shape of the same fix. It writes a compensating refund against
+   * the `fee` part for exactly that amount, and BOTH rows stay: charged $9 for this reason,
+   * sent back $9 for this reason. To correct a mistake, reverse it and enter it again — two
+   * rows, which is what actually happened.
+   *
+   * Only price adjustments. Every other line here is a real cost we incurred (postage, a
+   * partner's invoice, the goods), and giving those a one-press undo would be offering to
+   * un-buy a label that has already been bought.
+   */
+ const reverseFee = async (line: { amount: number; note?: string | null }, key: string) => {
+ setReversing(key)
+ try {
+      /* Named part and exact amount, so it comes off the adjustment and not off the goods —
+         an unallocated refund is consumed top-down and would have taken the product cost. */
+ const r = await refundOrder(String(id), {
+ amount: { fee: Math.abs(line.amount) },
+ note: `Reversed price adjustment${line.note ? ` — ${line.note}` : ""}`,
+ clientId: `revfee-${id}-${key}`,
+      })
+ if (!r?.error) reloadAll()
+    } catch { /* the row stays; the reload below is what would have changed it */ }
+ finally { setReversing(null) }
+  }
+
  const chargedRows = (
     <>
                     {(charges?.lines ?? []).map((l, i) => (
@@ -954,8 +989,23 @@ export default function OrderDetailPage() {
                         {/* A deduction reads as one: same minus and same green as the quote,
                             so the row a seller checks looks identical either side of the
                             charge. */}
-                        <dd className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
-                          {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
+                        <dd className="flex items-center gap-2">
+                          {/* Staff only, adjustments only, and only while there is something
+                              left on that part to send back. */}
+                          {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
+                            <button
+                              type="button"
+                              onClick={() => void reverseFee(l, `${l.part}-${i}`)}
+                              disabled={reversing === `${l.part}-${i}`}
+                              title="Send this adjustment back. The charge and the reversal both stay on the statement."
+                              className="eg-tap text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50"
+                            >
+                              {reversing === `${l.part}-${i}` ? "…" : "Reverse"}
+                            </button>
+                          )}
+                          <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
+                            {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
+                          </span>
                         </dd>
                       </div>
                     ))}
