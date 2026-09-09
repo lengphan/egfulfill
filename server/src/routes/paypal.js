@@ -12,13 +12,23 @@ import { recordUsage } from '../usage.js';
 
 const cidKey = () => (process.env.PAYPAL_CLIENT_ID || '').trim();
 const secKey = () => (process.env.PAYPAL_SECRET || '').trim();
-const ENV = (process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
-const BASE = ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+/**
+ * SANDBOX OR LIVE, READ AT CALL TIME — like the keys above it, and for the same reason.
+ *
+ * These were module-level constants, which is the pattern the top of this file already warns
+ * about two lines up: keys entered in Settings › Integrations land in process.env while the
+ * process runs, but a `const` captured at import keeps the boot-time value until a redeploy.
+ * The failure it sets up is nasty and quiet — paste LIVE credentials into the UI and they
+ * apply immediately (cidKey/secKey are functions), while the host stays sandbox, so real keys
+ * get sent to the test API and every call fails authentication for no visible reason.
+ */
+const ENV = () => (process.env.PAYPAL_ENV || 'sandbox').trim().toLowerCase();
+const BASE = () => (ENV() === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com');
 
 async function ppToken() {
   if (!cidKey() || !secKey()) throw new Error('Server missing PAYPAL_CLIENT_ID / PAYPAL_SECRET');
   const auth = Buffer.from(cidKey() + ':' + secKey()).toString('base64');
-  const r = await fetch(BASE + '/v1/oauth2/token', {
+  const r = await fetch(BASE() + '/v1/oauth2/token', {
     method: 'POST',
     headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'grant_type=client_credentials'
@@ -156,10 +166,10 @@ export function paypalRoutes(app, requireAuth) {
 
   // The client-id is public (it goes in the PayPal JS SDK URL); the frontend fetches it.
   // `fee` rides along so the dialog can price the top-up before it creates an order.
-  app.get('/api/paypal/config', { preHandler: requireAuth }, async () => ({ clientId: cidKey(), env: ENV, enabled: !!(cidKey() && secKey()), fee: await feeCfg() }));
+  app.get('/api/paypal/config', { preHandler: requireAuth }, async () => ({ clientId: cidKey(), env: ENV(), enabled: !!(cidKey() && secKey()), fee: await feeCfg() }));
 
   app.get('/api/paypal/test', { preHandler: requireAuth }, async () => {
-    try { await ppToken(); return { ok: true, env: ENV }; } catch (e) { return { ok: false, error: e.message }; }
+    try { await ppToken(); return { ok: true, env: ENV() }; } catch (e) { return { ok: false, error: e.message }; }
   });
 
   // 1) Create an order for the entered amount (USD).
@@ -233,7 +243,7 @@ export function paypalRoutes(app, requireAuth) {
           return_url: String(body.returnUrl), cancel_url: String(body.cancelUrl)
         };
       }
-      const r = await fetch(BASE + '/v2/checkout/orders', {
+      const r = await fetch(BASE() + '/v2/checkout/orders', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify(order)
@@ -264,7 +274,7 @@ export function paypalRoutes(app, requireAuth) {
       const id = (req.body || {}).orderID;
       if (!id) { reply.code(400); return { error: 'orderID required' }; }
       const tok = await ppToken();
-      const r = await fetch(BASE + '/v2/checkout/orders/' + encodeURIComponent(id) + '/capture', {
+      const r = await fetch(BASE() + '/v2/checkout/orders/' + encodeURIComponent(id) + '/capture', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }
       });
@@ -435,7 +445,7 @@ export function paypalRoutes(app, requireAuth) {
     let ok = false;
     try {
       const tok = await ppToken();
-      const v = await fetch(BASE + '/v1/notifications/verify-webhook-signature', {
+      const v = await fetch(BASE() + '/v1/notifications/verify-webhook-signature', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -496,7 +506,7 @@ export function paypalRoutes(app, requireAuth) {
     if (!row) { reply.code(404); return { error: 'Not found' }; }
     try {
       const tok = await ppToken();
-      const r = await fetch(BASE + '/v3/vault/payment-tokens/' + encodeURIComponent(row.token_id), {
+      const r = await fetch(BASE() + '/v3/vault/payment-tokens/' + encodeURIComponent(row.token_id), {
         method: 'DELETE', headers: { Authorization: 'Bearer ' + tok },
       });
       recordUsage('paypal', { endpoint: 'vault-delete', ok: r.ok });
@@ -533,7 +543,7 @@ export function paypalRoutes(app, requireAuth) {
       const cfg = await feeCfg();
       const charge = grossUp(amt, cfg);
       const tok = await ppToken();
-      const create = await fetch(BASE + '/v2/checkout/orders', {
+      const create = await fetch(BASE() + '/v2/checkout/orders', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify({

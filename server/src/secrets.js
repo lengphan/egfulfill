@@ -15,7 +15,11 @@ export const SECRET_NAMES = [
   'META_APP_ID', 'META_APP_SECRET',
   'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID',
   'STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY',
-  'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET',
+  /* PAYPAL_ENV and PAYPAL_WEBHOOK_ID are here for the reason the August rebuild taught:
+     app_secrets is inside the nightly dump and .env is not. The webhook id is also the
+     difference between an APPROVED vault save completing and never completing, which is a
+     thing to be able to fix from a browser rather than an SSH session. */
+  'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET', 'PAYPAL_ENV', 'PAYPAL_WEBHOOK_ID',
   'VIETQR_API_USERNAME', 'VIETQR_API_PASSWORD',
   // The rest of the USPS switch. Not secrets in the cryptographic sense — a CRID and an
   // EPS account number are identifiers, and USPS_BASE is a hostname — but this panel is

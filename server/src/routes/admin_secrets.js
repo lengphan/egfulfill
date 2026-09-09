@@ -17,6 +17,14 @@ const SECRET_DEFS = [
   { name: 'STRIPE_PUBLISHABLE_KEY', label: 'Publishable key', integration: 'stripe' },
   { name: 'PAYPAL_CLIENT_ID',      label: 'Client ID',        integration: 'paypal' },
   { name: 'PAYPAL_SECRET',         label: 'Secret',           integration: 'paypal' },
+  /* Not secrets: an environment name and a webhook id. Shown in the clear on purpose —
+     "is the right one in?" is the only question anybody asks of either, and a masked
+     webhook id cannot be compared against the one on PayPal's dashboard. */
+  { name: 'PAYPAL_ENV', label: 'Environment', integration: 'paypal', kind: 'choice', options: [
+    { value: 'sandbox', label: 'Sandbox (test)' },
+    { value: 'live', label: 'Live' },
+  ] },
+  { name: 'PAYPAL_WEBHOOK_ID',     label: 'Webhook ID',       integration: 'paypal', kind: 'text' },
   { name: 'VIETQR_API_USERNAME',   label: 'Username',         integration: 'vietqr' },
   { name: 'VIETQR_API_PASSWORD',   label: 'Password',         integration: 'vietqr' },
   // integration must equal the PANEL CARD's `key`, or the edit fields attach to no card and
