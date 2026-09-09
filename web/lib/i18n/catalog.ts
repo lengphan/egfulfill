@@ -2557,6 +2557,7 @@ const vi: Dict = {
   "canvas.Order, design number, side and printed width": "Số đơn, số thiết kế, mặt in và khổ in",
   "canvas.Order number · design number on this order · side · printed width. Filled in for you — change the width if you are printing it at a different size.": "Số đơn · số thiết kế trên đơn này · mặt in · khổ in. Được điền sẵn — hãy sửa khổ in nếu bạn in ở kích thước khác.",
   "canvas.Outside print area": "Ngoài vùng in",
+  "canvas.Card title": "Tiêu đề thẻ",
   "canvas.Title": "Tiêu đề",
   "canvas.Template name": "Tên mẫu",
   "canvas.Description / notes": "Mô tả / ghi chú",
