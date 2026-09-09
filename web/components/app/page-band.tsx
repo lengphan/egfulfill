@@ -2,6 +2,7 @@
 
 import { useRef, type ReactNode } from "react"
 import { motion } from "motion/react"
+import { useBandRepel } from "@/lib/band-repel"
 import { BandArray } from "@/components/app/band-array"
 import { BandLiquid } from "@/components/app/band-liquid"
 import { BandAura } from "@/components/app/band-aura"
@@ -171,17 +172,19 @@ export const DEFAULT_MOTION = "swim"
 /**
  * WHAT OCCUPIES THE BAND'S EMPTY HALF.
  *
+ *   pool     liquid chrome and lime in a few large lobes
+ *   beads    the same liquid at a finer grain — many small drops
  *   objects  the garment family, floating and draggable
  *   field    a rim-lit array of soft modules with a diagonal wave through it
- *   pool     liquid chrome and lime, merging and pulling apart
+ *   pool     liquid chrome and lime, merging and pulling apart — THE DEFAULT (owner's call)
  *
  * The two abstract ones exist because five objects at arm's length from each other read as
  * five items and a lot of gap, however they were sized, spaced or moved — the eye reads the
  * distance between things. A field and a pool are each ONE body: one composition, one motion,
  * and the whole half of the band is used rather than dotted.
  */
-export const FIGURES = ["objects", "field", "pool", "aura"] as const
-export const DEFAULT_FIGURE = "aura"
+export const FIGURES = ["pool", "beads", "objects", "field", "aura"] as const
+export const DEFAULT_FIGURE = "pool"
 
 /**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
@@ -248,6 +251,9 @@ function FloatingObject({
         * and it is also what makes the two axes run on different clocks, which is the whole
         * difference between drifting and bouncing.
         */}
+      {/* One more nesting level, and the same rule as everywhere else: this span owns the
+          pointer's shove and nothing else, so it cannot fight the swim or the drag. */}
+      <span className="eg-repel block size-full">
       <span
         className="eg-band-swim block size-full"
         style={{
@@ -273,6 +279,7 @@ function FloatingObject({
             "--swim-y-delay": `${o.swim.ey}s`,
           } as React.CSSProperties}
         />
+      </span>
       </span>
     </motion.div>
   )
@@ -302,6 +309,10 @@ export function PageBand({
   figure?: (typeof FIGURES)[number]
 }) {
   const band = useRef<HTMLDivElement>(null)
+  /* Every figure answers the pointer the same way: whatever carries `.eg-repel` gets out of
+     its path. Attached to the BAND, so the shove reaches across the whole stripe rather than
+     starting when you enter some inner box. */
+  useBandRepel(band, { radius: 240, strength: 92 })
   /*
    * A SHORT SET TAKES FEWER SLOTS — it does not wrap.
    *
@@ -332,7 +343,7 @@ export function PageBand({
       </div>
       {children}
 
-      {figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "aura" ? <BandAura /> : (
+      {figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : figure === "beads" ? <BandLiquid dense /> : figure === "aura" ? <BandAura /> : (
       /*
         * THE LAYER IS THE WHOLE BAND, not the right 40%.
         *

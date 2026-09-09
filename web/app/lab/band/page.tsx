@@ -119,8 +119,10 @@ const NOTES: Record<string, string> = {
 }
 
 const FIGURE_NOTES: Record<string, string> = {
+  objects: "the inflated garments, floating and draggable",
   field: "an array of soft modules, rim-lit, a wave passing through on the diagonal",
-  pool: "liquid chrome and lime — one body, merging and pulling apart",
+  pool: "liquid chrome and lime — a few large lobes, merging and pulling apart",
+  beads: "the same liquid at a finer grain — many small drops",
   aura: "lime light only — no body, no outline, additive",
 }
 
@@ -147,7 +149,8 @@ function Column({ dark }: { dark: boolean }) {
           {dark ? "Dark" : "Light"}
         </p>
         <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Figures — what fills the empty half</p>
-        {FIGURES.filter((f) => f !== "objects").map((f) => (
+        <p className="text-xs text-muted-foreground">Every figure repels the pointer — move across a band to see it.</p>
+        {FIGURES.map((f) => (
           <div key={f} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">
               <span className="font-semibold text-foreground">{f}</span> — {FIGURE_NOTES[f]}

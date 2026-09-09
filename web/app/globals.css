@@ -1955,11 +1955,18 @@ td[align="right"] {
   filter: url(#eg-goo);
   will-change: filter;
 }
-.eg-pool-drop {
+.eg-pool-slot {
   position: absolute;
   aspect-ratio: 1;
+  /* The slot is centred on its coordinate AND takes the repulsion; both are transform, and
+     one element may own the property once, so they are written together here. */
+  transform: translate(-50%, -50%) translate3d(var(--rx, 0px), var(--ry, 0px), 0);
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.eg-pool-drop {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
   animation:
     eg-pool-x var(--px, 12s) var(--pd, 0s) ease-in-out infinite alternate,
     eg-pool-y var(--py, 9s) var(--pd, 0s) ease-in-out infinite alternate,
@@ -1970,7 +1977,7 @@ td[align="right"] {
    one property, one owner. */
 @keyframes eg-pool-x { to { margin-left: 9cqw; } }
 @keyframes eg-pool-y { to { margin-top: 5cqh; } }
-@keyframes eg-pool-s { to { transform: translate(-50%, -50%) scale(1.22); } }
+@keyframes eg-pool-s { to { transform: scale(1.22); } }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-force-motion]) .eg-pool-drop { animation: none; }
 }
@@ -2039,4 +2046,22 @@ td[align="right"] {
 @keyframes eg-aura-o { from { opacity: var(--o-min, 0.35); } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   html:not([data-force-motion]) .eg-aura-layer { animation: none; }
+}
+
+/* ── REPULSION — the band's figure gets out of the pointer's way ───────────────
+   The offset is written as two custom properties by lib/band-repel.ts; this is
+   the only thing that reads them. The element owns `transform` and NOTHING else
+   in the file may touch it — every figure nests one of these inside or outside
+   its animated parts for exactly that reason.
+
+   The transition is the whole feel: 420ms out of a soft ease means the shove
+   lands with a little weight and the return drifts rather than snapping, and when
+   the pointer leaves the handler simply stops writing, so the transition carries
+   everything home with no loop left running. */
+.eg-repel {
+  transform: translate3d(var(--rx, 0px), var(--ry, 0px), 0);
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .eg-repel { transition: none; }
 }

@@ -35,16 +35,35 @@ const LIME =
  *  BAND, not by a box of its own, and a body of liquid that stops politely before the frame
  *  is a shape, not a pool. */
 const DROPS: { m: "chrome" | "lime"; x: number; y: number; s: number; dx: number; dy: number; d: number }[] = [
-  { m: "chrome", x: 56, y: 52, s: 108, dx: 13, dy: 9, d: -2 },
-  { m: "lime", x: 64, y: 40, s: 84, dx: 9, dy: 11, d: -5 },
-  { m: "chrome", x: 71, y: 62, s: 96, dx: 16, dy: 7.5, d: -1 },
-  { m: "lime", x: 79, y: 44, s: 116, dx: 11, dy: 13, d: -7 },
-  { m: "chrome", x: 87, y: 60, s: 90, dx: 8.5, dy: 10, d: -3 },
-  { m: "lime", x: 94, y: 42, s: 104, dx: 14, dy: 8, d: -6 },
-  { m: "chrome", x: 101, y: 58, s: 94, dx: 10.5, dy: 12, d: -4 },
+  { m: "chrome", x: 56, y: 50, s: 104, dx: 13, dy: 9, d: -2 },
+  { m: "lime", x: 63, y: 44, s: 88, dx: 9, dy: 11, d: -5 },
+  { m: "chrome", x: 70, y: 56, s: 96, dx: 16, dy: 7.5, d: -1 },
+  { m: "lime", x: 78, y: 46, s: 112, dx: 11, dy: 13, d: -7 },
+  { m: "chrome", x: 86, y: 54, s: 92, dx: 8.5, dy: 10, d: -3 },
+  { m: "lime", x: 93, y: 46, s: 104, dx: 14, dy: 8, d: -6 },
+  { m: "chrome", x: 100, y: 54, s: 96, dx: 10.5, dy: 12, d: -4 },
 ]
 
-export function BandLiquid() {
+/** The same liquid at a different grain: many small beads instead of a few large lobes.
+ *  Generated rather than hand-placed — at this count, placing them by hand would be typing,
+ *  not composing, and the only thing that matters is an even scatter with unequal clocks. */
+const BEADS = Array.from({ length: 22 }, (_, i) => {
+  const t = i / 22
+  return {
+    m: (i % 3 === 0 ? "chrome" : "lime") as "chrome" | "lime",
+    x: 55 + t * 48 + (i % 4) * 1.4,
+    /* Kept to the middle two thirds: a bead near the top or bottom edge is half a bead, and a
+       row of half-beads reads as a clipping bug rather than as a scatter. */
+    y: 34 + ((i * 37) % 34),
+    s: 34 + ((i * 13) % 26),
+    dx: 8 + ((i * 7) % 9),
+    dy: 6 + ((i * 5) % 7),
+    d: -((i * 3) % 11),
+  }
+})
+
+export function BandLiquid({ dense = false }: { dense?: boolean }) {
+  const drops = dense ? BEADS : DROPS
   return (
     <div aria-hidden className="eg-pool-wrap">
       {/* The filter lives with the thing it filters. One per band is fine — ids repeat across
@@ -65,20 +84,25 @@ export function BandLiquid() {
         </defs>
       </svg>
       <div className="eg-pool">
-        {DROPS.map((d, i) => (
+        {drops.map((d, i) => (
+          /* Three elements, three transforms, one owner each: the slot takes the pointer's
+             shove, the drop swells, and the travel is on margins. Collapse any two of them
+             and one animation silently wins. */
           <span
             key={i}
-            className="eg-pool-drop"
-            style={{
-              left: `${d.x}%`,
-              top: `${d.y}%`,
-              height: `${d.s}%`,
-              background: d.m === "chrome" ? CHROME : LIME,
-              "--px": `${d.dx}s`,
-              "--py": `${d.dy}s`,
-              "--pd": `${d.d}s`,
-            } as React.CSSProperties}
-          />
+            className="eg-repel eg-pool-slot"
+            style={{ left: `${d.x}%`, top: `${d.y}%`, height: `${d.s}%` } as React.CSSProperties}
+          >
+            <span
+              className="eg-pool-drop"
+              style={{
+                background: d.m === "chrome" ? CHROME : LIME,
+                "--px": `${d.dx}s`,
+                "--py": `${d.dy}s`,
+                "--pd": `${d.d}s`,
+              } as React.CSSProperties}
+            />
+          </span>
         ))}
       </div>
     </div>
