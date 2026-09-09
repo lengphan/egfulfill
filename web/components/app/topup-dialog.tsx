@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
+import { PaypalButton } from "@/components/app/paypal-button"
 import { createVietqrPayment, vietqrStatus, abandonVietqr, createTopupRequest, getVietqrRate, VN_BANK_NAMES, type VietqrPayment, type TopupConfig } from "@/lib/api"
 import { Dropzone } from "@/components/app/dropzone"
 
@@ -394,11 +395,68 @@ function CardTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: 
   )
 }
 
+// ───────────────────────────── PayPal ─────────────────────────────
+// Amount first, then the real PayPal login. Deliberately the same three phases and the same
+// amount step as the Card tab: they are one flow with two processors, and a seller who has
+// used one should not be learning a second shape.
+function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
+  const tl = useLabelT()
+ const [amount, setAmount] = useState("")
+ const [phase, setPhase] = useState<"amount" | "pay" | "paid">("amount")
+ const [error, setError] = useState<string | null>(null)
+ const { minUsd, small: smallPresets } = amountOptions(cfg)
+ useSeedAmount(cfg, amount, setAmount)
+ const proceed = () => {
+ if (Number(amount) < minUsd) { setError(`Minimum top-up is ${usd0(minUsd)}.`); return }
+ setError(null); setPhase("pay")
+  }
+  // Stable identities: PaypalButton creates the PayPal order inside an effect keyed on these,
+  // so a new function each render would tear the order down and mint another one every time
+  // the parent re-renders.
+ const paid = useCallback(() => { setPhase("paid"); onFunded() }, [onFunded])
+ const failed = useCallback((m: string) => setError(m || null), [])
+
+ if (phase === "paid") return <Success title={tl("topup", "Payment received")} sub={tl("topup", "Your PayPal top-up has been credited.")} onDone={onClose} />
+ if (phase === "pay")
+ return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{tl("topup", "Topping up")}</span>
+          <span className="font-semibold tabular-nums">{usd(Number(amount) || 0)}</span>
+        </div>
+        <PaypalButton amount={Number(amount) || 0} onPaid={paid} onError={failed} />
+        {error && <div className="text-sm text-destructive">{error}</div>}
+        <button onClick={() => setPhase("amount")} className="text-xs text-muted-foreground hover:text-foreground">{tl("topup", "← Change amount")}</button>
+      </div>
+    )
+ return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {smallPresets.map((v) => (
+          <button key={v} onClick={() => setAmount(String(v))}
+ className={"rounded-lg border px-2 py-2 text-center text-sm font-semibold tabular-nums transition-colors " + (Number(amount) === v ? "border-primary bg-primary/5 ring-2 ring-primary/30" : "border-border bg-card hover:border-primary/50 hover:bg-accent/40")}>{usd0(v)}</button>
+        ))}
+      </div>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium">{tl("topup", "Amount (USD)")}</span>
+        <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={String(minUsd)} />
+        <MinHint amount={amount} minUsd={minUsd} />
+      </label>
+      {error && <div className="text-sm text-destructive">{error}</div>}
+      <Button className="w-full" onClick={proceed} disabled={Number(amount) < minUsd}>{tl("topup", "Continue to PayPal")}</Button>
+    </div>
+  )
+}
+
 // ───────────────────────────── Transfer (manual) ─────────────────────────────
+/* PAYPAL IS NOT HERE ANY MORE. It was a third row — send money to an address by hand, attach
+   a screenshot, wait for an admin to agree it arrived — while the Orders v2 integration that
+   does it properly sat in paypal.js with nothing calling it. It has its own tab now, with the
+   real login and the fee priced in. PingPong and LianLian stay manual because they genuinely
+   are: we have no API with either. */
 const PROVIDERS = [
   { key: "PingPong", to: "helennguyen958@gmail.com", hint: "Send to this PingPong account, attach your receipt, then submit." },
   { key: "LianLian", to: "phanmylinh0410@gmail.com", hint: "Send to this LianLian account, attach your receipt, then submit." },
-  { key: "PayPal", to: "admin@embroiderygoods.com", hint: "Send to this PayPal, attach your receipt, then submit — we credit your wallet once it lands." },
 ]
 function TransferTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose: () => void; cfg: TopupConfig | null }) {
   const tl = useLabelT()
@@ -548,16 +606,20 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
           <DialogTitle>{tl("topup", "Add funds")}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="transfer">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="transfer">{tl("topup", "Transfer")}</TabsTrigger>
             <TabsTrigger value="vietqr">{tl("topup", "QR Code")}</TabsTrigger>
             <TabsTrigger value="card">{tl("topup", "Card")}</TabsTrigger>
+            <TabsTrigger value="paypal">{tl("topup", "PayPal")}</TabsTrigger>
           </TabsList>
           <TabsContent value="transfer" className="mt-4">
             <TransferTopUp onFunded={onFunded} onClose={close} cfg={cfg} />
           </TabsContent>
           <TabsContent value="vietqr" className="mt-4">
             <VietqrTopUp onFunded={onFunded} onClose={close} cfg={cfg} />
+          </TabsContent>
+          <TabsContent value="paypal" className="mt-4">
+            <PaypalTopUp onFunded={onFunded} onClose={close} cfg={cfg} />
           </TabsContent>
           <TabsContent value="card" className="mt-4">
             <CardTopUp onFunded={onFunded} onClose={close} cfg={cfg} />

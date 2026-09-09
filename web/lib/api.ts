@@ -588,7 +588,31 @@ export function verifyStripeIntent(id: string) {
   })
 }
 
-// ─────────────────── Wallet top-up: manual transfer request (PayPal/PingPong/…) ───────────────────
+// ─────────────────── Wallet top-up: PayPal (Orders v2, real login) ───────────────────
+/** `fee` is the processing rate the server adds on top of a top-up — see paypal.js. */
+export function getPaypalConfig() {
+  return api<{ clientId: string; env: string; enabled: boolean; fee?: { pct: number; fixed: number } }>(`/api/paypal/config`)
+}
+/** `credit` is what the wallet gets, `charge` is what PayPal is billed; the difference is
+ *  the processor's cut, which the server computes — never the client. */
+export function createPaypalOrder(amount: number) {
+  // `withFee` is the caller asserting it will show the three figures before the button —
+  // the server defaults it off for the legacy wallet page, which cannot. See paypal.js.
+  return api<{ id?: string; approveUrl?: string | null; error?: string; credit?: number; charge?: number; fee?: number; feeCfg?: { pct: number; fixed: number } }>(`/api/paypal/create-order`, {
+    method: "POST",
+    body: JSON.stringify({ amount, withFee: true }),
+  })
+}
+/** `amount` is what was credited; `charged` and `fee` are what actually left the payer —
+ *  `fee` being PayPal's own reported figure, not our estimate of it. */
+export function capturePaypalOrder(orderID: string) {
+  return api<{ ok?: boolean; amount?: number; charged?: number; fee?: number; captureId?: string; status?: string; ref?: string; error?: string }>(`/api/paypal/capture-order`, {
+    method: "POST",
+    body: JSON.stringify({ orderID }),
+  })
+}
+
+// ─────────────────── Wallet top-up: manual transfer request (PingPong / LianLian) ───────────────────
 // Creates a pending topup_request an admin reconciles → wallet credited. Same path
 // the old wallet used for remittance methods; no third-party API needed.
 // The seller's own top-up requests (pending / received / rejected) — surfaced in the

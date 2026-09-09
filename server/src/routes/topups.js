@@ -27,6 +27,24 @@ export function topupsRoutes(app, requireAuth) {
   q(`alter table topup_requests add column if not exists method text`).catch(() => {});
   q(`alter table topup_requests add column if not exists attachment text`).catch(() => {});
   /**
+   * WHAT THE PROCESSOR TOOK, kept beside what we credited.
+   *
+   * `amount_usd` is the wallet credit and always has been. On a gross-up path (Card, PayPal)
+   * the seller is billed MORE than that, so the row on its own could not answer "how much
+   * money actually arrived" — the one question reconciliation asks. These three carry it:
+   * `charged_usd` what the processor took, `fee_usd` its cut, `net_usd` what landed.
+   *
+   * PayPal fills them from the capture's own `seller_receivable_breakdown` — the REAL fee,
+   * not the rate we grossed up by, which is the only way to tell later whether the configured
+   * rate still matches what we are being charged. Null on every manual method, where there is
+   * no processor and the amount asked for is the amount that arrives.
+   */
+  q(`alter table topup_requests add column if not exists charged_usd numeric`).catch(() => {});
+  q(`alter table topup_requests add column if not exists fee_usd numeric`).catch(() => {});
+  q(`alter table topup_requests add column if not exists net_usd numeric`).catch(() => {});
+  /** The PayPal account the money came FROM — not necessarily the seller's login email. */
+  q(`alter table topup_requests add column if not exists payer_email text`).catch(() => {});
+  /**
    * THE QR, KEPT, so an unpaid request can be opened again.
    *
    * A VietQR request is a virtual account minted for one payment. The row recorded the ref
