@@ -67,6 +67,42 @@ export function welcomeEmail(name) {
 }
 
 /**
+ * CONFIRM THE ADDRESS — a six-digit code, not a link.
+ *
+ * A link assumes the mail opens on the same device as the signup, and it usually does not:
+ * people sign up on a laptop and read email on a phone. A code crosses that gap, and it is
+ * the one thing in this message that has to survive being retyped, so it is the largest type
+ * in it and it is spaced.
+ *
+ * NO BUTTON. There is nothing to press — a call to action next to a code is a second thing to
+ * decide about, and the whole message is one instruction.
+ *
+ * It says what happens if they did not ask, because an unexpected confirmation code is how
+ * someone finds out their address is being used by somebody else. Ignoring it IS the right
+ * action here — nothing was created that they own — and saying so is what stops the email
+ * reading like a threat.
+ */
+export function verifyEmail(code, minutes) {
+  const mins = Number(minutes) || 30;
+  const inner =
+    `<p style="margin:0 0 15px;font-size:19px;font-weight:600;color:${BRAND.head}">Confirm your email</p>
+     <p style="margin:0 0 20px">Enter this code to finish setting up your EGFUL account:</p>
+     <p style="margin:0 0 20px;font-size:34px;font-weight:700;letter-spacing:7px;color:${BRAND.head};font-family:${FONT}">${esc(code)}</p>
+     <p style="margin:0 0 15px;font-size:13px;color:${BRAND.muted}">The code expires in ${mins} minutes. If it does, ask for a new one from the app.</p>
+     <p style="margin:0;font-size:13px;color:${BRAND.muted}">Didn't sign up? Ignore this email — nothing has been set up in your name, and the address will not be used again.</p>`;
+  return {
+    subject: `${code} is your EGFUL confirmation code`,
+    text: `Confirm your email\n\nEnter this code to finish setting up your EGFUL account:\n\n`
+      + `    ${code}\n\n`
+      + `The code expires in ${mins} minutes. If it does, ask for a new one from the app.\n\n`
+      + `Didn't sign up? Ignore this email — nothing has been set up in your name.`,
+    /* The code in the PREHEADER too: it is the line an inbox shows beside the subject, so on
+       a phone the whole job can be done without opening anything. */
+    html: transactionalShell(inner, `${code} — your EGFUL confirmation code, good for ${mins} minutes.`),
+  };
+}
+
+/**
  * A seller has a new reply from a HUMAN teammate on their support thread. This is what makes
  * the handoff promise ("a teammate will reply") reach them even when they're not on the app —
  * especially the after-hours case, where they escalated and left. `snippet` is the reply's

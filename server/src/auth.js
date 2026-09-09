@@ -1,4 +1,5 @@
 // Auth: bcrypt password hashing + JWT tokens. Replaces Supabase Auth.
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { q, softQ } from './db.js';
@@ -71,6 +72,100 @@ export function ensureUsernameColumn() {
     .then(() => q('create unique index if not exists users_username_lower_idx on users (lower(username)) where username is not null'))
     .catch((e) => { _usernameReady = null; throw e; });
   return _usernameReady;
+}
+
+/**
+ * EMAIL CONFIRMATION — the columns, the code, and the check.
+ *
+ * WHAT THIS IS FOR, because it is easy to build the wrong thing: confirmation proves the
+ * ADDRESS is deliverable and belongs to the person who typed it. It is not a control on the
+ * account — the password is that. It is a control on the address, and it matters here more
+ * than on most products because a seller's wallet-low warning, payout confirmation and
+ * password reset all go to it. An address with a typo in it fails silently, and the first
+ * anyone hears of it is an order that stopped for want of funds nobody was told about.
+ *
+ * A CODE, NOT A LINK. People sign up on a laptop and read email on a phone; a link assumes
+ * one device and a code crosses the gap.
+ *
+ * HASHED AT REST. A six-digit code is a credential for as long as it lives, and a database
+ * that holds it in the clear hands anyone who reads a backup the ability to confirm any
+ * pending address. bcrypt, the same as the password — the cost is paid once per attempt.
+ *
+ * ATTEMPTS ARE COUNTED. A million codes is nothing to guess against an endpoint that will
+ * answer forever, so five wrong tries burn the code and a new one has to be sent. That is
+ * what makes six digits enough.
+ */
+const VERIFY_TTL_MIN = 30;
+const VERIFY_MAX_TRIES = 5;
+let _verifyReady = null;
+export function ensureEmailVerifyColumns() {
+  if (_verifyReady) return _verifyReady;
+  _verifyReady = q(`alter table users
+      add column if not exists email_verified_at timestamptz,
+      add column if not exists email_code_hash   text,
+      add column if not exists email_code_at     timestamptz,
+      add column if not exists email_code_tries  integer default 0`)
+    .catch((e) => { _verifyReady = null; throw e; });
+  return _verifyReady;
+}
+
+/** Six digits, from the CSPRNG. Math.random() is seeded and predictable, and this is the
+ *  one number standing between an address and being confirmed. Padded, so 000123 is a
+ *  legal code and the space is the full million rather than the 900,000 above 100000. */
+export function newEmailCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+}
+
+/**
+ * Mint a code for a user and store its hash. Returns the PLAINTEXT for the mail to carry —
+ * the only moment it exists outside the person's inbox.
+ *
+ * Resending replaces the previous code and resets the attempt count: the old one stops
+ * working the moment a new one is asked for, so a code read out of an older email cannot be
+ * used to confirm after the address was corrected.
+ */
+export async function issueEmailCode(userId) {
+  await ensureEmailVerifyColumns();
+  const code = newEmailCode();
+  const hash = await bcrypt.hash(code, 10);
+  await q(`update users set email_code_hash=$2, email_code_at=now(), email_code_tries=0 where id=$1`,
+    [userId, hash]);
+  return { code, minutes: VERIFY_TTL_MIN };
+}
+
+/**
+ * Check a code. Every refusal says WHICH problem it is, because they need different actions:
+ * expired and burnt both mean "ask for a new one", wrong means "look again", and already
+ * means "you are done, nothing to do".
+ *
+ * The attempt is counted BEFORE the comparison. Counting after a failed compare is the same
+ * thing right up until the process is killed mid-request, and a counter that can be reset by
+ * hanging up is not a counter.
+ */
+export async function confirmEmailCode(userId, raw) {
+  await ensureEmailVerifyColumns();
+  const code = String(raw || '').trim();
+  if (!/^[0-9]{6}$/.test(code)) return { ok: false, reason: 'bad-code', error: 'Enter the six-digit code from the email.' };
+  const u = await q(`select email_verified_at, email_code_hash, email_code_at, email_code_tries from users where id=$1`, [userId])
+    .then((r) => r.rows[0]).catch(() => null);
+  if (!u) return { ok: false, reason: 'no-user', error: 'No such account.' };
+  if (u.email_verified_at) return { ok: true, already: true };
+  if (!u.email_code_hash) return { ok: false, reason: 'none', error: 'There is no code waiting. Ask for a new one.' };
+  const ageMin = (Date.now() - new Date(u.email_code_at).getTime()) / 60000;
+  if (!(ageMin < VERIFY_TTL_MIN)) return { ok: false, reason: 'expired', error: 'That code has expired. Ask for a new one.' };
+  if (Number(u.email_code_tries) >= VERIFY_MAX_TRIES) {
+    return { ok: false, reason: 'burnt', error: 'Too many tries on this code. Ask for a new one.' };
+  }
+  await q(`update users set email_code_tries = coalesce(email_code_tries,0) + 1 where id=$1`, [userId]).catch(() => {});
+  if (!(await bcrypt.compare(code, u.email_code_hash))) {
+    const left = VERIFY_MAX_TRIES - (Number(u.email_code_tries) + 1);
+    return { ok: false, reason: 'wrong',
+      error: left > 0 ? `That code isn't right — ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'That code isn\'t right, and it has no tries left. Ask for a new one.' };
+  }
+  /* CLEARED, not kept. A confirmed address has no pending code, and leaving the hash behind
+     leaves a credential in the row that nothing will ever check again. */
+  await q(`update users set email_verified_at=now(), email_code_hash=null, email_code_at=null, email_code_tries=0 where id=$1`, [userId]);
+  return { ok: true };
 }
 
 function sign(u) {

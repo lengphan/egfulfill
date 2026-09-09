@@ -97,7 +97,12 @@ export default function SignupPage() {
       if (r.token) {
         setSession(r.token, r.user ?? {})
         const role = (r.user as { role?: string } | undefined)?.role
-        router.push(next ?? landingFor(typeof role === "string" ? role : null))
+        /* STRAIGHT TO THE CODE. A confirmation email that arrives while someone is being shown
+           a dashboard is an email nobody opens — the moment they will act on it is the moment
+           they were told to expect it. Where they were going is carried through, so the skip
+           link and the confirm button both land in the same place. */
+        const land = next ?? landingFor(typeof role === "string" ? role : null)
+        router.push(`/verify-email?next=${encodeURIComponent(land)}`)
       } else {
         router.push(next ? `/login?next=${encodeURIComponent(next)}` : "/login")
       }

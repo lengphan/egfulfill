@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { limited } from './ratelimit.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale, EMAIL_RE } from './auth.js';
+import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn, renewIfStale, EMAIL_RE, issueEmailCode, confirmEmailCode, ensureEmailVerifyColumns } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
 import { orderSheetsRoutes } from './routes/order_sheets.js';
@@ -63,8 +63,8 @@ import { pushRoutes } from './routes/push.js';
 import { adsRoutes } from './routes/ads.js';
 import { broadcastsRoutes } from './routes/broadcasts.js';
 import { siteContentRoutes } from './routes/site_content.js';
-import { sendMail } from './mailer.js';
-import { welcomeEmail } from './emails.js';
+import { sendMail, lastMailError } from './mailer.js';
+import { welcomeEmail, verifyEmail } from './emails.js';
 import { dispatchRoutes } from './routes/dispatch.js';
 import { ssOrderStatus } from './routes/ss.js';
 import { startSupplierPoll } from './supplier-poll.js';
@@ -332,6 +332,23 @@ app.post('/api/auth/signup', async (req, reply) => {
     if (res && res.user && res.user.email) {
       const { subject, text, html } = welcomeEmail(res.user.name);
       sendMail({ to: res.user.email, subject, text, html }).catch(() => {});
+      /**
+       * AND THE CONFIRMATION CODE — awaited, unlike the welcome.
+       *
+       * The welcome is a courtesy and its failure costs nothing. This one is the next thing
+       * the person is asked to do, so a signup that returns before the code is minted lands
+       * them on a screen asking for a number that does not exist yet. Only the MINT is
+       * awaited; the send is still fire-and-forget, because a Brevo timeout must not fail an
+       * account that has already been created.
+       *
+       * It never throws out of here. A mail outage means an unconfirmed account, which is
+       * exactly what the resend route is for — it must not mean no account at all.
+       */
+      try {
+        const { code, minutes } = await issueEmailCode(res.user.id);
+        const m = verifyEmail(code, minutes);
+        sendMail({ to: res.user.email, subject: m.subject, text: m.text, html: m.html }).catch(() => {});
+      } catch (e) { app.log.warn({ err: e.message }, 'could not issue email confirmation code'); }
     }
     return res;
   } catch (e) { reply.code(400); return { error: e.message }; }
@@ -382,6 +399,56 @@ app.post('/api/auth/login', async (req, reply) => {
   catch (e) { reply.code(400); return { error: e.message }; }
 });
 /**
+ * CONFIRM THE ADDRESS. Authenticated — the token from signup is enough, and it has to be:
+ * an unauthenticated verify route would take a user id from the body, which is an oracle for
+ * confirming anyone's address given six digits and patience.
+ *
+ * DELIBERATELY NOT A GATE ON SIGNING IN (owner's call, 2026-09-09). The account works from
+ * the moment it exists; what waits on confirmation is the money and the connections, where a
+ * dead address actually costs something. Blocking the first login instead means anyone whose
+ * code lands in spam is stuck outside an account they cannot ask for help from — a signup
+ * lost to deliverability rather than to the product. `email_verified_at` is on /api/auth/me,
+ * so tightening this later is a check at the surfaces, not a rewrite here.
+ */
+app.post('/api/auth/verify-email', async (req, reply) => {
+  if (!req.user) { reply.code(401); return { error: 'Sign in first.' }; }
+  const stop = authThrottled(req, reply, req.user.sub);
+  if (stop) return stop;
+  const r = await confirmEmailCode(req.user.sub, (req.body || {}).code).catch((e) => ({ ok: false, error: e.message }));
+  if (!r.ok) { reply.code(400); return r; }
+  return { ok: true, already: !!r.already };
+});
+
+/**
+ * A NEW CODE. Rate-limited on the same counters as sign-in, because it SENDS MAIL on demand
+ * against an address the caller chose — without a ceiling that is a way to have our mail
+ * server deliver a message to someone else's inbox, repeatedly, on a free plan with 300
+ * credits a day.
+ *
+ * Answers ok for an already-confirmed account rather than an error: there is nothing wrong,
+ * there is simply nothing to do.
+ */
+app.post('/api/auth/resend-verification', async (req, reply) => {
+  if (!req.user) { reply.code(401); return { error: 'Sign in first.' }; }
+  const stop = authThrottled(req, reply, req.user.sub);
+  if (stop) return stop;
+  await ensureEmailVerifyColumns().catch(() => {});
+  const u = await q('select email, email_verified_at from users where id=$1', [req.user.sub])
+    .then((r) => r.rows[0]).catch(() => null);
+  if (!u || !u.email) { reply.code(404); return { error: 'No address on this account.' }; }
+  if (u.email_verified_at) return { ok: true, already: true };
+  try {
+    const { code, minutes } = await issueEmailCode(req.user.sub);
+    const m = verifyEmail(code, minutes);
+    const sent = await sendMail({ to: u.email, subject: m.subject, text: m.text, html: m.html });
+    /* SAY IT DIDN'T SEND. A silent failure here leaves someone staring at a code box waiting
+       for mail that was never accepted, and the reason is in the mailer. */
+    if (!sent) { reply.code(502); return { error: lastMailError() || 'Couldn\'t send the code. Try again in a moment.' }; }
+    return { ok: true, to: u.email, minutes };
+  } catch (e) { reply.code(500); return { error: e.message }; }
+});
+
+/**
  * WHO IS SIGNED IN — read from the users table, not echoed back off the token.
  *
  * This returned `req.user`, which IS the decoded JWT, and auth.js signs only
@@ -409,7 +476,17 @@ app.get('/api/me', { preHandler: requireAuth }, async (req) => {
     const r = await q('select * from users where id=$1', [req.user.sub]);
     const row = r.rows[0];
     if (!row) return req.user;
-    const { password_hash, ...safe } = row;   // eslint-disable-line no-unused-vars
+    /* EVERY SECRET IN THE ROW, not just the password. This stripped `password_hash` alone,
+       which was complete right up until the row gained a second one: `email_code_hash` is a
+       bcrypt digest of a live six-digit code, and `select *` would have handed it to the
+       browser on every boot. Six digits against an offline hash is seconds of work.
+       A DENY LIST on a `select *` is the shape that keeps failing — it is only ever correct
+       for the columns that existed when it was written — so the rule is written down here:
+       anything ending _hash, plus the code's own bookkeeping, never leaves this function.
+       The tries counter goes too; it is ours, and it tells a caller how much guessing budget
+       is left. */
+    const safe = Object.fromEntries(Object.entries(row).filter(([k]) =>
+      !/_hash$/.test(k) && k !== 'email_code_at' && k !== 'email_code_tries'));
     return { ...req.user, ...safe };
   } catch {
     // A column-shape surprise must not take out the one route every client calls on boot.

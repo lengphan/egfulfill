@@ -4012,6 +4012,24 @@ export function signupUser(body: { email: string; username?: string; password: s
     body: JSON.stringify(body),
   })
 }
+/**
+ * CONFIRM THE ADDRESS with the six-digit code from the email. Authenticated — the session
+ * created at signup is what proves whose address is being confirmed, which is why there is no
+ * user id in the body: one would make this an oracle for confirming anybody's.
+ */
+export function verifyEmailCode(code: string) {
+  return api<{ ok?: boolean; already?: boolean; error?: string; reason?: string }>(`/api/auth/verify-email`, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  })
+}
+/** A fresh code, which retires the previous one. Rate-limited server-side on the same
+ *  counters as sign-in, so the UI does not need its own ceiling — it needs to render the
+ *  refusal when it arrives. */
+export function resendVerification() {
+  return api<{ ok?: boolean; already?: boolean; to?: string; minutes?: number; error?: string }>(
+    `/api/auth/resend-verification`, { method: "POST" })
+}
 export function forgotPassword(email: string) {
   return api<{ ok?: boolean; message?: string; error?: string }>(`/api/auth/forgot`, {
     method: "POST",
