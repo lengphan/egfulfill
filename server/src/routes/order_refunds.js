@@ -130,6 +130,10 @@ const PART_LABELS = {
   // part is the sum of them — "Price adjustment" is what the sum is, where "Fee" invites the
   // reading that there is one of them.
   fee: 'Price adjustment',
+  /* DISPLAY ONLY, and deliberately not in PART_ORDER: a discount is not a thing anybody
+     refunds, it is how the goods line reached the number it did. Giving it a part key would
+     put a negative cap into the refund allocator. */
+  discount: 'Discount',
 };
 
 /**
@@ -143,15 +147,43 @@ const PART_LABELS = {
  * always add up to the charge exactly, whatever drift exists in the item rows.
  */
 async function productionSplit(orderId, charged) {
-  if (charged <= 0) return { product: 0, shipping: 0 };
-  const items = await q('select qty, unit_cost from order_items where order_id=$1', [String(orderId)])
-    .catch(() => ({ rows: [] }));
-  const product = money(items.rows.reduce(
+  if (charged <= 0) return { product: 0, shipping: 0, gross: 0, discount: 0 };
+  const [items, ord] = await Promise.all([
+    q('select qty, unit_cost from order_items where order_id=$1', [String(orderId)]).catch(() => ({ rows: [] })),
+    q('select volume_pct from orders where id=$1', [String(orderId)]).catch(() => ({ rows: [] })),
+  ]);
+  const gross = money(items.rows.reduce(
     (s, it) => s + (Number(it.unit_cost) || 0) * Math.max(1, parseInt(it.qty, 10) || 1), 0));
-  // Clamp: if the frozen costs somehow exceed what was charged, product takes the whole
-  // charge rather than producing a negative shipping part.
-  const p = Math.min(product, charged);
-  return { product: money(p), shipping: money(charged - p) };
+  /**
+   * THE DISCOUNT WAS MISSING FROM THIS SUM, and it collapsed the whole breakdown.
+   *
+   * computeTotals charges `subtotal + shipping − volumeDiscount`, and the discount comes off
+   * the GOODS only. Deriving shipping as `charged − subtotal` therefore understates it by
+   * exactly the discount — and on any order where the discount is worth more than the
+   * postage, the clamp below took the whole charge into `product` and shipping came out 0.
+   * So a summary that showed Base cost, Shipping and a named discount before the charge
+   * showed a single "Base cost" row after it, and the seller lost sight of both the postage
+   * they paid and the discount they earned. That is what "the summary changed after charge"
+   * was.
+   *
+   * Both inputs are FROZEN at charge time — unit_cost per line, volume_pct on the order (see
+   * freezeQuote) — so this reproduces the original arithmetic rather than re-quoting it. A
+   * ladder edited next week cannot move an old order's split.
+   */
+  const pct = Number(ord.rows?.[0]?.volume_pct) || 0;
+  const discount = money(gross * (pct / 100));
+  /* Shipping stays the REMAINDER, which is what keeps the parts summing to the charge
+     exactly whatever drift exists in the item rows — it just has the discount put back
+     first, which is the bug. Floored at 0: a stale unit_cost that overshoots must not mint
+     a negative part. */
+  const shipping = Math.max(0, money(charged - gross + discount));
+  /* The refundable `product` is NET of the discount, because that is the money that
+     actually changed hands for the goods; product + shipping then equals the charge, which
+     the refund caps depend on. The gross figure and the discount ride alongside for display,
+     where the seller needs to see the deduction they earned rather than a quietly smaller
+     number. */
+  const net = Math.max(0, money(charged - shipping));
+  return { product: net, shipping, gross, discount: money(gross - net) };
 }
 
 /**
@@ -199,8 +231,18 @@ export async function orderCharges(orderId) {
       const split = await productionSplit(id, amt);
       chargedBy.product += split.product;
       chargedBy.shipping += split.shipping;
-      lines.push({ part: 'product', label: PART_LABELS.product, amount: split.product, at: r.created_at });
+      /* THE GOODS AT FULL PRICE, then the deduction, then the postage — the same three rows
+         and the same order the quote showed before this was charged. `product` in the parts
+         above stays NET, because that is what a refund may give back; these two describe how
+         that number was reached, which is the thing the seller checks. */
+      lines.push({ part: 'product', label: PART_LABELS.product, amount: split.gross, at: r.created_at });
       if (split.shipping > 0) lines.push({ part: 'shipping', label: PART_LABELS.shipping, amount: split.shipping, at: r.created_at });
+      /* AFTER the two numbers it comes off, which is where the quote puts it and for the
+         reason written there: it applies to the goods, never to shipping or design fees, and
+         a row further down would imply it covered those too. */
+      if (split.discount > 0.005) {
+        lines.push({ part: 'discount', label: PART_LABELS.discount, amount: -split.discount, at: r.created_at });
+      }
       continue;
     }
     const part = kind?.type === 'expedite' ? 'expedite' : 'express';

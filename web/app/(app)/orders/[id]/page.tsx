@@ -694,7 +694,6 @@ export default function OrderDetailPage() {
   // COST is what the seller paid US, read off the ledger — every part, including the ones
   // the quote can't see. Falls back to the quote before submit, when nothing is charged yet.
  const feesGated = !!charges?.gated
- const chargedParts = charges?.parts ?? []
  const cost = charges && charges.charged > 0 ? charges.charged : null
  const refundedTotal = charges?.refunded ?? 0
   // What they actually bear once refunds are returned — refunding $9 of shipping makes the
@@ -931,12 +930,33 @@ export default function OrderDetailPage() {
                     ))}
     </>
   ) : null
+  /**
+   * THE SAME ROWS THE QUOTE SHOWED, after the charge as well as before it.
+   *
+   * This mapped the aggregated PARTS, which exist for refunds: `product` there is net of the
+   * discount and several design fees collapse into one "Design service". So a summary that
+   * read Base cost · Shipping · Volume discount · two named fees before submitting read
+   * "Base cost $96.27" afterwards — the postage and the discount the seller earned both
+   * folded silently into one number, and nothing on screen said where they went.
+   *
+   * `lines` is the itemised record: one row per ledger entry, in the order they were
+   * charged, with the goods at full price and the deduction named underneath. Parts are
+   * still what a refund is allocated against — this is only how it reads.
+   */
  const chargedRows = (
     <>
-                    {chargedParts.map((p) => (
-                      <div key={p.key} className="flex justify-between">
-                        <dt className="text-muted-foreground">{p.label}</dt>
-                        <dd className="tabular-nums">{usd(p.charged)}</dd>
+                    {(charges?.lines ?? []).map((l, i) => (
+                      <div key={`${l.part}-${i}`} className="flex justify-between">
+                        <dt className="text-muted-foreground">
+                          {l.label}
+                          {l.note && <span className="opacity-70"> · {l.note}</span>}
+                        </dt>
+                        {/* A deduction reads as one: same minus and same green as the quote,
+                            so the row a seller checks looks identical either side of the
+                            charge. */}
+                        <dd className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
+                          {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
+                        </dd>
                       </div>
                     ))}
                     {refundedTotal > 0.005 && (
