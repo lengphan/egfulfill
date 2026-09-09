@@ -37,9 +37,21 @@ import {
 } from "@/lib/api"
 
 /** Long enough that typing a street name is one save, short enough to survive a closed tab. */
-const AUTOSAVE_MS = 1200
-/** How long "Saved" stays on screen before the control goes quiet. Long enough to read at a
- *  glance, short enough that it is not a permanent label by another name. */
+/**
+ * FIVE SECONDS, not one point two (owner's call, 2026-09-09).
+ *
+ * A debounce short enough that it always beats you to it makes the Save button decorative —
+ * there is never a moment where pressing it does anything the wait would not have done. At
+ * five seconds a sheet still saves itself while you think, and pressing Save means something.
+ *
+ * THE LONGER WINDOW IS ONLY SAFE BECAUSE OF THE FLUSH BELOW. Four extra seconds is four
+ * extra seconds in which a person can close the tab, and losing a sheet is the one outcome
+ * this screen exists to prevent — so leaving the page sends whatever is still pending
+ * instead of clearing the timer and walking away from it.
+ */
+const AUTOSAVE_MS = 5000
+/** How long "Saved" stays on screen before the button goes back to reading "Save". Long
+ *  enough to read at a glance, short enough not to be a permanent label by another name. */
 const SAVED_MS = 2000
 
 export default function SheetPage() {
@@ -96,7 +108,14 @@ export default function SheetPage() {
   useEffect(() => {
     if (!id) return
     getOrderSheet(id)
-      .then((r) => { setSheet(r.sheet); setName(r.sheet.name || "") })
+      .then((r) => {
+        setSheet(r.sheet)
+        setName(r.sheet.name || "")
+        /* Seeded so Save is pressable the moment the sheet opens. Without this, `latest` is
+           empty until the first keystroke and the button would be a control that does
+           nothing on a page that has just loaded — which is worse than not offering it. */
+        latest.current = { name: r.sheet.name || "", rows: r.sheet.rows ?? [] }
+      })
       .catch(() => setMissing(true))
   }, [id])
 
@@ -115,13 +134,17 @@ export default function SheetPage() {
   /** The edit waiting to go out. Held so Save can send THIS body immediately rather than
    *  re-deriving what changed, and so a retry after a failure re-sends the same thing. */
   const pending = useRef<{ name?: string; rows?: string[][] } | null>(null)
+  /** The last thing the grid told us, pending or not. Save is pressable at any time — with
+   *  nothing outstanding it re-sends the current sheet, which is what a person means by
+   *  pressing Save on a page that looks saved. */
+  const latest = useRef<{ name?: string; rows?: string[][] }>({})
   /** Clears "Saved" back to quiet. A ref so unmount can cancel it — a setState after unmount
    *  is a warning nobody ever fixes because it only appears when you navigate away fast. */
   const quiet = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const send = useCallback(() => {
-    const body = pending.current
-    if (!body) return
+    const body = pending.current ?? latest.current
+    if (!body || (body.name === undefined && body.rows === undefined)) return
     if (timer.current) { clearTimeout(timer.current); timer.current = null }
     pending.current = null
     setSaved("saving")
@@ -147,14 +170,30 @@ export default function SheetPage() {
     /* Merged, not replaced: a rename followed by an edit inside one debounce window would
        otherwise send only the second half. */
     pending.current = { ...(pending.current ?? {}), ...body }
+    latest.current = { ...latest.current, ...body }
     setSaved("dirty")
     timer.current = setTimeout(send, AUTOSAVE_MS)
   }, [send])
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current)
-    if (quiet.current) clearTimeout(quiet.current)
-  }, [])
+  /**
+   * LEAVING FLUSHES. Unmount used to clear the timer, which with a five-second window means
+   * a click on the sidebar could throw away the last thing typed. The request is fired
+   * without touching state — the component is going away, and a setState after unmount is a
+   * warning nobody ever fixes because it only shows up when you navigate quickly.
+   *
+   * `beforeunload` covers the other exit: a browser tab closing gives us no time to finish a
+   * request, so the only honest thing is to let the browser ask.
+   */
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => { if (pending.current) e.preventDefault() }
+    window.addEventListener("beforeunload", warn)
+    return () => {
+      window.removeEventListener("beforeunload", warn)
+      if (timer.current) clearTimeout(timer.current)
+      if (quiet.current) clearTimeout(quiet.current)
+      if (pending.current) saveOrderSheet(id, pending.current).catch(() => {})
+    }
+  }, [id])
 
   const rename = (v: string) => { setName(v); push({ name: v }) }
 
@@ -249,25 +288,30 @@ export default function SheetPage() {
                the page loaded until you closed it, which is how a status stops being read.
                The slot keeps its width so the buttons beside it do not jump as it changes. */
             saveSlot={
-              <div className="flex min-w-[6.25rem] justify-end">
-                {saved !== "idle" && (
-                  <Button
-                    variant={saved === "failed" ? "outline" : "ghost"}
-                    size="sm"
-                    onClick={send}
-                    disabled={saved === "saving" || saved === "saved"}
-                    title={saved === "failed"
-                      ? tl("sheet_[id]", "That change did not reach the server. Press to send it again.")
-                      : tl("sheet_[id]", "Saves on its own — press to send it now")}
-                    className={saved === "failed" ? "border-alert/40 text-alert hover:bg-alert/10" : "text-muted-foreground"}
-                  >
-                    {saved === "saving" ? tl("sheet_[id]", "Saving…")
-                      : saved === "saved" ? tl("sheet_[id]", "Saved")
-                      : saved === "failed" ? tl("sheet_[id]", "Not saved · Retry")
-                      : tl("sheet_[id]", "Save")}
-                  </Button>
-                )}
-              </div>
+              /* ALWAYS THERE (owner's call, 2026-09-09). It hid itself when there was nothing
+                 outstanding, which did two things wrong: the row kept a reserved gap where it
+                 might reappear — so undo and redo sat marooned a hand's width from
+                 everything else — and a page that saves itself had no visible way to be
+                 saved on purpose. It is present at every moment now and pressable at every
+                 moment: with nothing pending it re-sends the current sheet, which is what a
+                 person means by pressing Save on a page that already looks saved.
+                 Ghost, because the autosave is still the guarantee and this is a
+                 reassurance, not the primary action — Complete is (§4's hierarchy). */
+              <Button
+                variant={saved === "failed" ? "outline" : "ghost"}
+                size="sm"
+                onClick={send}
+                disabled={saved === "saving"}
+                title={saved === "failed"
+                  ? tl("sheet_[id]", "That change did not reach the server. Press to send it again.")
+                  : tl("sheet_[id]", "Saves on its own — press to send it now")}
+                className={saved === "failed" ? "border-alert/40 text-alert hover:bg-alert/10" : "text-muted-foreground"}
+              >
+                {saved === "saving" ? tl("sheet_[id]", "Saving…")
+                  : saved === "saved" ? tl("sheet_[id]", "Saved")
+                  : saved === "failed" ? tl("sheet_[id]", "Not saved · Retry")
+                  : tl("sheet_[id]", "Save")}
+              </Button>
             }
           />
         )}
