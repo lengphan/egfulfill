@@ -799,8 +799,12 @@ export default function OrderDetailPage() {
    * orders and inside the staff block on a seller's, because two copies of this list is how
    * the two views come to disagree about what an order cost.
    *
-   * ESTIMATES ARE MARKED ON THE ROW. Blanks are the only estimate here and also the biggest
-   * number, so an unlabelled one would read as a fact. Everything else is a cost we booked.
+   * The "· estimated" tag on Blanks is gone (owner's call). It was there because blanks are
+   * the only figure on this list that is not a booked cost — stock is expensed when a PO is
+   * received and one PO covers many orders, so no honest per-order actual exists. That is
+   * still true and the reasoning is kept here, on the row that has it; what changed is that
+   * the word was riding in the margin of every order forever to say something that is a
+   * property of how we buy stock rather than news about this one.
    */
  const spendRows = (
     <>
@@ -808,7 +812,6 @@ export default function OrderDetailPage() {
         <div className="flex justify-between text-sm">
           <dt className="text-muted-foreground">
             Blanks
-            <span className="text-muted-foreground/70"> · estimated</span>
             {/* A partial figure says so rather than reading as the total. */}
             {quote?.supplierKnown != null && quote?.lines && quote.supplierKnown < quote.lines.length && (
               <span className="text-muted-foreground/70"> · {quote.supplierKnown} of {quote.lines.length} lines</span>
@@ -978,6 +981,40 @@ export default function OrderDetailPage() {
  finally { setReversing(null) }
   }
 
+  /**
+   * WHICH ADJUSTMENT A REVERSAL CANCELLED — matched here, because the ledger cannot say it.
+   *
+   * A reversed adjustment used to leave the charge at full price and a lone "Refunded
+   * −$9.00" at the bottom of the card, with nothing tying the two together. On an order
+   * carrying five adjustments that is unreadable: the money is right, and which of them was
+   * undone is anybody's guess.
+   *
+   * IT CANNOT DISAPPEAR, and that is deliberate. Both movements happened — the wallet went
+   * down and came back up — and the seller's statement shows both. A summary that hid them
+   * would disagree with the wallet, which is worse than a line that reads as settled.
+   *
+   * CONSUMED ONE FOR ONE. Two adjustments can share an amount AND a reason (the same charge
+   * entered twice is exactly how this comes up), so a reversal is claimed by the first line
+   * it matches and then removed from the pool. Matching without consuming would strike both
+   * through for one refund and report money back that never came.
+   */
+ const reversedLines = (() => {
+ const pool = (charges?.refunds ?? []).filter((r) => r.part === "fee").map((r) => ({ ...r, used: false }))
+ const marked = new Set<number>()
+ let claimed = 0
+    ;(charges?.lines ?? []).forEach((l, i) => {
+ if (l.part !== "fee" || l.amount <= 0) return
+ const hit = pool.find((r) => !r.used
+        && Math.abs((Number(r.amount) || 0) - l.amount) < 0.005
+        && (!l.note || String(r.note || "").includes(l.note)))
+ if (!hit) return
+ hit.used = true
+ marked.add(i)
+ claimed += Number(hit.amount) || 0
+    })
+ return { marked, claimed }
+  })()
+
  const chargedRows = (
     <>
                     {(charges?.lines ?? []).map((l, i) => (
@@ -985,12 +1022,17 @@ export default function OrderDetailPage() {
                         <dt className="text-muted-foreground">
                           {l.label}
                           {l.note && <span className="opacity-70"> · {l.note}</span>}
+                          {/* The row says it was undone, so the money below does not have to
+                              be explained twice. */}
+                          {reversedLines.marked.has(i) && <span className="opacity-70"> · reversed</span>}
                         </dt>
                         {/* A deduction reads as one: same minus and same green as the quote,
                             so the row a seller checks looks identical either side of the
                             charge. */}
                         <dd className="flex items-center gap-2">
-                          <span className={"tabular-nums " + (l.amount < 0 ? "text-success" : "")}>
+                          <span className={"tabular-nums "
+                            + (reversedLines.marked.has(i) ? "text-muted-foreground line-through " : "")
+                            + (l.amount < 0 ? "text-success" : "")}>
                             {l.amount < 0 ? `−${usd(Math.abs(l.amount))}` : usd(l.amount)}
                           </span>
                           {/* AFTER THE FIGURE, and a mark rather than a word. "Reverse" ahead
@@ -1000,7 +1042,7 @@ export default function OrderDetailPage() {
                               up and the action reads as belonging to the row it is on.
                               Staff only, adjustments only, and only while that part still has
                               room to send back — so it cannot be pressed twice. */}
-                          {isStaff && l.part === "fee" && l.amount > 0 && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
+                          {isStaff && l.part === "fee" && l.amount > 0 && !reversedLines.marked.has(i) && (charges?.parts ?? []).some((p) => p.key === "fee" && p.refundable >= l.amount - 0.005) && (
                             <button
                               type="button"
                               onClick={() => void reverseFee(l, `${l.part}-${i}`)}
@@ -1017,10 +1059,14 @@ export default function OrderDetailPage() {
                         </dd>
                       </div>
                     ))}
-                    {refundedTotal > 0.005 && (
+                    {/* EVERYTHING ELSE SENT BACK. Reversals are already shown on the rows
+                        they cancelled, so counting them here too would report the same money
+                        twice — once struck through and once as a refund. What is left is a
+                        genuine refund to the seller, which is a different act. */}
+                    {refundedTotal - reversedLines.claimed > 0.005 && (
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">Refunded</dt>
-                        <dd className="tabular-nums text-success">−{usd(refundedTotal)}</dd>
+                        <dd className="tabular-nums text-success">−{usd(refundedTotal - reversedLines.claimed)}</dd>
                       </div>
                     )}
     </>
