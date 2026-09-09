@@ -62,9 +62,14 @@ export function StaffSidebar({ collapsed = false, onToggle }: {
       "fixed inset-y-0 left-0 z-30 hidden flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
       collapsed ? "w-16" : "w-60",
     )}>
-      <div className={cn("flex h-16 shrink-0 items-center gap-2", collapsed ? "justify-center px-0" : "px-5")}>
-        {/* Brand, so it keeps the marketing face — see sidebar.tsx. */}
-        <span className="flex items-center" title="egful">{collapsed ? <WordmarkE className="h-6 w-6" /> : <Wordmark className="h-[22px] w-auto" />}</span>
+      <div className={cn("flex h-16 shrink-0 items-center gap-2", collapsed ? "justify-center px-0" : "px-6")}>
+        {/* Brand, so it keeps the marketing face — see sidebar.tsx.
+            SIZE AND POSITION ARE ONE DECISION (owner's call, 2026-09-09). At 22px in a 20px
+            gutter the mark read as a caption pinned to the edge of the panel; at 30px it is
+            the brand, and px-6 puts its left edge on the same x as the nav icons below it
+            (nav p-3 + item px-3) rather than four pixels outside them. §4: alignment is set
+            once, not per element. */}
+        <span className="flex items-center" title="egful">{collapsed ? <WordmarkE className="h-7 w-7" /> : <Wordmark className="h-[30px] w-auto" />}</span>
         {/* WHICH ROLE YOU ARE IN, not a badge for it. This was a filled pill beside the
             wordmark on every single screen — the loudest thing in the sidebar header, saying
             something nobody needs shouted. Small caps carry it just as clearly and stop it

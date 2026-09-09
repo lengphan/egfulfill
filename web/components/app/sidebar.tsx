@@ -71,7 +71,7 @@ export function Sidebar({ collapsed = false, onToggle }: {
           marketing face, even though every other heading in the app takes `font-title`.
           A logo that changes typeface between the marketing site and the product is two
           companies; the rest of the app staying sans is a UI decision, not a brand one. */}
-      <div className={cn("flex h-16 shrink-0 items-center", collapsed ? "justify-center px-0" : "px-5")}>
+      <div className={cn("flex h-16 shrink-0 items-center", collapsed ? "justify-center px-0" : "px-6")}>
         <Link
           href="/dashboard"
           className="font-display text-2xl font-semibold tracking-tight text-sidebar-foreground"
@@ -79,7 +79,8 @@ export function Sidebar({ collapsed = false, onToggle }: {
         >
           {/* currentColor, so the mark takes the sidebar's own lettering colour rather
               than needing a light copy for the dark panel. */}
-          {collapsed ? <WordmarkE className="h-6 w-6" /> : <Wordmark className="h-[22px] w-auto" />}
+          {/* Same size and gutter as the staff rail — see staff-sidebar.tsx for why. */}
+          {collapsed ? <WordmarkE className="h-7 w-7" /> : <Wordmark className="h-[30px] w-auto" />}
         </Link>
       </div>
 
