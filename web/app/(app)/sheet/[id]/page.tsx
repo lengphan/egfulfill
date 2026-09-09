@@ -72,6 +72,14 @@ export default function SheetPage() {
   const [handoff, setHandoff] = useState<string[][] | null>(null)
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "failed">("idle")
   const [busy, setBusy] = useState(false)
+  /**
+   * The title row's right-hand slot, handed to the grid so it can render its toolbar there.
+   *
+   * STATE, not a ref: a ref's `.current` changing does not re-render, so the grid would be
+   * told `null` on the mount that matters and never told again — the portal would simply
+   * never appear. A callback ref that sets state is what makes the node's arrival a render.
+   */
+  const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -162,17 +170,22 @@ export default function SheetPage() {
           </span>
         )}
 
-        {/* ONE ROW OF CONTROLS, and it is the grid's. Back used to live up here on its own
-            while Complete, Add rows and Undo sat at the BOTTOM of the sheet — under a
-            full-height scroll, so the one thing this screen is for was off-screen until you
-            scrolled past every row. The grid's toolbar carries Back now (see OrderGrid), so
-            they are together and they are all above the data. A completed sheet has no grid
-            to carry it, so there it stays here. */}
-        {done && (
+        {/* ONE ROW OF CONTROLS, AND IT IS THIS ONE.
+            Back used to live up here alone while Complete, Add rows and Undo sat at the
+            BOTTOM of the sheet — under a full-height scroll, so the one thing this screen is
+            for was off-screen until you had scrolled past every row. Moving the grid's
+            toolbar above the data fixed that and put a second row of chrome between this
+            title and the sheet. Now the grid renders its controls INTO this row (the div
+            below is the target), so there is one row, the buttons are where Back always was,
+            and the sheet starts higher. A completed sheet has no grid, so its two controls
+            are still drawn here directly. */}
+        {done ? (
           <div className="ms-auto flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={goBack}>{fromImport ? tl("sheet_[id]", "Back to import") : tl("sheet_[id]", "Back")}</Button>
             <Button size="sm" onClick={copy} disabled={busy}>{tl("sheet_[id]", "Duplicate to edit")}</Button>
           </div>
+        ) : (
+          <div ref={setToolbarEl} className="ms-auto flex items-center gap-2" />
         )}
       </div>
 
@@ -182,6 +195,7 @@ export default function SheetPage() {
         ) : (
           <OrderGrid
             fill
+            toolbarTarget={toolbarEl}
             initialRows={sheet.rows && sheet.rows.length ? sheet.rows : undefined}
             onRowsChange={(rows) => push({ rows })}
             onComplete={complete}

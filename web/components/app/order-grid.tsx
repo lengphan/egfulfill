@@ -23,6 +23,7 @@ import { useLabelT } from "@/lib/i18n"
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { ArrowCounterClockwise, ArrowClockwise } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
@@ -132,9 +133,22 @@ export type OrderGridProps = {
    * produced is the shape CLAUDE.md §2.8 warns about — the one that took a machine down.
    */
   onRowsChange?: (rows: string[][]) => void
+  /**
+   * WHERE THE TOOLBAR GOES, when the page has a better place for it than above the grid.
+   *
+   * The sheet page already draws a title row with an empty right-hand side; the controls
+   * belong there, so the sheet starts one row higher and the buttons sit where Back always
+   * was. A DOM node rather than a render prop on purpose: these controls read this
+   * component's state — undo depth, the valid row count, `busy` — and lifting that to the
+   * page would make the page own a grid's internals in order to draw four buttons.
+   *
+   * Null (the ref has not attached yet, or no page offers one) renders them in place, which
+   * is also what every other caller gets.
+   */
+  toolbarTarget?: HTMLElement | null
 }
 
-export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRows, onRowsChange }: OrderGridProps) {
+export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRows, onRowsChange, toolbarTarget }: OrderGridProps) {
   const tl = useLabelT()
   /**
    * ONE FETCH, ON MOUNT. Deliberately not keyed to anything the fetch itself writes — see
@@ -746,30 +760,31 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
   }
 
   /**
-   * THE CONTROLS SIT ABOVE THE SHEET, not below it.
+   * THE CONTROLS SIT ON THE SHEET'S OWN TITLE ROW (owner's call, 2026-09-09).
    *
-   * They were under the grid, which on a full-height sheet is under a scroll — so Complete,
-   * the one thing this whole screen is for, was off-screen until you scrolled past every
-   * row, and Undo was somewhere you had to go looking for while editing. A toolbar belongs
-   * where the eye starts, and Back is already there.
+   * They were under the grid first — below a full-height scroll, so Complete, the one thing
+   * this screen is for, was off-screen until you had scrolled past every row. Moving them
+   * above the data fixed that and cost a whole row of chrome between the title and the
+   * sheet. `toolbarTarget` lets the page hand over a slot in the row it already has, so the
+   * buttons land at the top right where Back used to be and the grid starts one row higher.
+   * Without a target they render in place, unchanged.
+   *
+   * LEFT TO RIGHT: minor to primary. Undo and Redo, then Add rows, then Back, then Complete
+   * last — the rightmost thing is the one the screen is for, and the eye ends where the
+   * action is (§4's variant hierarchy, read across).
    *
    * Undo and Redo are icon-only: they are the two controls here whose glyph IS the word,
-   * they have the keystroke as the real control, and their labels were the widest part of a
-   * row that had to fit Complete, Add rows and a sentence. The title carries the name and
-   * the shortcut for anyone who needs it (§4: a control explains itself in its label or its
-   * title — not in a line of prose underneath).
+   * they have the keystroke as the real control, and their labels were the widest part of
+   * the row. The title carries the name and the shortcut for anyone who needs it (§4: a
+   * control explains itself in its label or its title — not in prose underneath).
+   *
+   * THE SENTENCE IS GONE. "Complete creates drafts — nothing is charged until you submit
+   * them from Orders" sat at the end of this row: a line of prose beside a control, which
+   * §4 calls a defect outright. It was defended as a warning carrying its reason, and it is
+   * not one — nothing is being warned about, and the button says what it does.
    */
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
-      {onBack && (
-        <Button variant="outline" onClick={onBack} disabled={busy}>
-          {backLabel || tl("orderGrid", "Back")}
-        </Button>
-      )}
-      <Button onClick={complete} disabled={!validCount || busy}>
-        {busy ? tl("orderGrid", "Working…") : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
-      </Button>
-      <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
       {/* THE KEYSTROKE IS THE REAL CONTROL; these say it exists. Ghost, not outline: they
           are minor next to Add rows and Complete, and a disabled one is the honest way to
           say there is nothing to go back to (§4's variant hierarchy). */}
@@ -781,18 +796,25 @@ export function OrderGrid({ onComplete, busy, onBack, backLabel, fill, initialRo
         aria-label={tl("orderGrid", "Redo")} title={tl("orderGrid", "Redo (⇧⌘Z)")}>
         <ArrowClockwise size={15} weight="bold" />
       </Button>
-      {/* THE ONLY SENTENCE ON THIS SCREEN, and it is here because the state is not
-          otherwise readable: a draft and a submitted order look the same from a grid that
-          has just emptied. §4 allows a warning to carry its reason. */}
-      <span className="text-xs text-muted-foreground">
-        {tl("orderGrid", "Complete creates drafts — nothing is charged until you submit them from Orders.")}
-      </span>
+      <Button variant="outline" size="sm" onClick={addRows} disabled={busy}>{tl("orderGrid", "Add rows")}</Button>
+      {onBack && (
+        <Button variant="outline" size="sm" onClick={onBack} disabled={busy}>
+          {backLabel || tl("orderGrid", "Back")}
+        </Button>
+      )}
+      <Button size="sm" onClick={complete} disabled={!validCount || busy}>
+        {busy ? tl("orderGrid", "Working…") : `Complete${validCount ? ` · ${validCount} row${validCount === 1 ? "" : "s"}` : ""}`}
+      </Button>
     </div>
   )
 
   return (
     <div className={fill ? "flex min-h-0 flex-1 flex-col gap-3" : "space-y-3"}>
-      {toolbar}
+      {/* Into the page's title row when it offers one, otherwise here. The target is a DOM
+          node rather than a render prop because the controls read this component's state —
+          undo depth, the valid row count, `busy` — and lifting that out to the page would
+          make the page own a grid's internals to draw four buttons. */}
+      {toolbarTarget ? createPortal(toolbar, toolbarTarget) : toolbar}
       <div
         ref={gridRef}
         /* A SHEET IS WHITE. This inherited the page's muted ground, so every cell was grey
