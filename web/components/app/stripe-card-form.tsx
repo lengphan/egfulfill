@@ -7,11 +7,12 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 import { CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getStripeConfig, createStripeIntent, verifyStripeIntent, chargeSavedCard, quoteStripe } from "@/lib/api"
+import { getUser } from "@/lib/auth"
 
 const usd = (n: number) => `$${(Number(n) || 0).toFixed(2)}`
 
 // Inner form — inside <Elements>, so it can use useStripe/useElements.
-function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () => void; onError: (m: string) => void }) {
+function PayForm({ intentId, email, onPaid, onError }: { intentId: string; email?: string; onPaid: () => void; onError: (m: string) => void }) {
   const tl = useLabelT()
  const stripe = useStripe()
  const elements = useElements()
@@ -58,7 +59,23 @@ function PayForm({ intentId, onPaid, onError }: { intentId: string; onPaid: () =
 
  return (
     <div className="space-y-4">
-      <PaymentElement />
+      {/**
+        * THE SIGNED-IN ADDRESS, HANDED TO LINK ON PURPOSE.
+        *
+        * Link identifies a returning customer by "email address, phone number, or BROWSER
+        * COOKIE", and it autofills a saved card "regardless of whether they initially saved
+        * their information in Link with another business" — Stripe's words. So on a shared
+        * machine the next person to open this form was shown the previous person's Link email
+        * and their card's brand and last four, with nothing about our own accounts involved:
+        * the cookie belongs to the browser, not to the session.
+        *
+        * Seeding the current user's email makes Link look THAT person up rather than falling
+        * back to whoever the browser remembers. It is a mitigation, not a fix — the only
+        * complete answer is turning Link off in the Stripe Dashboard, which also gives up
+        * accelerated checkout for genuine returning customers, and that is an account-level
+        * trade-off for the owner to make rather than something to switch on their behalf.
+        */}
+      <PaymentElement options={email ? { defaultValues: { billingDetails: { email } } } : undefined} />
       <Button className="w-full" onClick={pay} disabled={busy || !stripe}>
         {busy ? tl("stripeCardForm", "Processing…") : tl("stripeCardForm", "Pay now")}
       </Button>
@@ -149,7 +166,7 @@ export function StripeCardForm({ amount, save, onPaid, onError }: { amount: numb
           </div>
         </dl>
       )}
-      <PayForm intentId={intentId} onPaid={onPaid} onError={onError} />
+      <PayForm intentId={intentId} email={getUser()?.email as string | undefined} onPaid={onPaid} onError={onError} />
     </Elements>
   )
 }

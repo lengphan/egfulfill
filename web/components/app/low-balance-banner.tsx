@@ -44,7 +44,31 @@ const TopUpDialog = dynamic(
  * The threshold comes from the server with the balance, so this never decides for itself
  * what "low" means. House accounts get nothing — they're allowed to run negative, which
  * is how a loss stays visible instead of blocking the floor.
+ *
+ * AND IT STOPS ASKING ONCE YOU HAVE PAID (owner, 2026-09-09). A $5 top-up against a $200
+ * floor leaves the balance genuinely low, so the warning was still true and still on screen
+ * the moment it was answered — which reads as not having worked. A notice that survives the
+ * action it asked for is not a warning any more, it is nagging, and the next one gets
+ * ignored too.
+ *
+ * The signal is the BALANCE GOING UP, not a top-up event, because money arrives by several
+ * routes — this banner's own dialog, the wallet page's, an admin confirming a transfer, a
+ * refund — and each would otherwise need to remember to say so. A rise means somebody put
+ * money in; that is the whole condition.
+ *
+ * Snoozed for the TAB (sessionStorage), not for ever: a new session is a new sitting and the
+ * balance is worth mentioning again. And never when BLOCKING — at or below zero nothing can
+ * be submitted at all, which is not advice to be taken once but a description of the account
+ * right now, so it ignores the snooze entirely.
  */
+const SNOOZE_KEY = "eg-lowbal-snoozed"
+const SEEN_KEY = "eg-lowbal-seen"
+/** sessionStorage throws outright in some embedded contexts, so every touch is guarded and
+ *  the fall-back is to behave as though nothing was stored — i.e. to show the banner. */
+function readNum(k: string): number | null {
+  try { const v = sessionStorage.getItem(k); return v == null ? null : Number(v) } catch { return null }
+}
+function write(k: string, v: string) { try { sessionStorage.setItem(k, v) } catch { /* private mode */ } }
 export function LowBalanceBanner() {
   const tl = useLabelT()
  const [w, setW] = useState<{ balance: number; low?: boolean; lowBelow?: number | null } | null>(null)
@@ -57,9 +81,21 @@ export function LowBalanceBanner() {
      it opens here over whatever they were doing and closes back onto it. */
  const [topUpOpen, setTopUpOpen] = useState(false)
 
+  /* Read LAZILY rather than in an effect: sessionStorage is available on the first client
+     render and setting state from an effect is what the lint rule is for. The initialiser
+     runs once, and it is guarded, so a context that refuses storage simply starts unsnoozed. */
+ const [snoozed, setSnoozed] = useState(() => readNum(SNOOZE_KEY) === 1)
+
  const load = useCallback(() => {
  if (!getToken()) return
- getWallet().then((r) => setW({ balance: r.balance, low: r.low, lowBelow: r.lowBelow })).catch(() => setW(null))
+ getWallet().then((r) => {
+ setW({ balance: r.balance, low: r.low, lowBelow: r.lowBelow })
+      // A RISE MEANS THEY PAID. Compared against the last balance this banner saw in this
+      // tab, so the very first read never counts as a rise and never snoozes on arrival.
+ const seen = readNum(SEEN_KEY)
+ if (seen != null && Number(r.balance) > seen) { write(SNOOZE_KEY, "1"); setSnoozed(true) }
+ write(SEEN_KEY, String(Number(r.balance)))
+    }).catch(() => setW(null))
   }, [])
  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
   // Re-read the moment the wallet changes (a top-up funded/approved) so a now-healthy balance
@@ -74,6 +110,9 @@ export function LowBalanceBanner() {
  if (!w || !w.low) return null
   /** Nothing can be submitted at or below zero — see the docblock. */
  const blocking = w.balance <= 0
+ /* Blocking outranks the snooze: "orders cannot be submitted" is not advice somebody can be
+    said to have already taken. */
+ if (snoozed && !blocking) return null
  const negative = w.balance < 0
 
  /**
