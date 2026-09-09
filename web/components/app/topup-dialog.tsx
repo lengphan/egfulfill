@@ -492,11 +492,15 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
  return () => { live = false; clearTimeout(t) }
   }, [phase, account, useSaved, amount])
   /* No window: create against the saved token, then the SAME capture the button uses. */
+  /* A declined instrument is the one failure the saved account cannot fix by itself — the
+     card behind it is out of money and only the payer can pick another. */
+ const [declined, setDeclined] = useState(false)
  const payWithSaved = async () => {
  if (!account) return
- setBusy(true); setError(null)
+ setBusy(true); setError(null); setDeclined(false)
  try {
  const r = await chargeSavedPaypal(Number(amount) || 0, account.id)
+ if (r.declined) { setDeclined(true); setError(r.error || null); return }
  if (r.error || !r.orderID) throw new Error(r.error || "PayPal wouldn't start that payment.")
  const c = await capturePaypalOrder(r.orderID)
  if (!c.ok) throw new Error(c.error || "PayPal didn't confirm the payment.")
@@ -596,8 +600,22 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
             <Button className="w-full" onClick={payWithSaved} disabled={busy || !quote}>
               {busy ? <CircleNotch size={16} className="animate-spin" /> : `${tl("topup", "Pay")} ${usd(quote?.charge ?? (Number(amount) || 0))}`}
             </Button>
-            <button onClick={() => setUseSaved(false)} className="text-xs text-muted-foreground hover:text-foreground">
-              {tl("topup", "Use a different PayPal account")}
+            {/**
+              * CARD CHOICE IS ALWAYS ONE CLICK AWAY.
+              *
+              * The saved account is the FAST path, not the only one. Pressing Pay lets PayPal
+              * charge whichever funding source the payer authorised — we never see their
+              * cards and cannot offer a list — so the way to choose one is PayPal's own
+              * window, and that has to be permanently on offer rather than something you
+              * discover after a decline.
+              *
+              * It used to read "Use a different PayPal account", which describes changing
+              * ACCOUNTS. The thing people actually want is a different CARD on the same
+              * account, and a link that appears to be about something else is a route nobody
+              * takes.
+              */}
+            <button onClick={() => { setDeclined(false); setUseSaved(false) }} className="text-xs text-muted-foreground hover:text-foreground">
+              {tl("topup", "Pay with a different card or account")}
             </button>
           </div>
         ) : (
@@ -611,7 +629,15 @@ function PaypalTopUp({ onFunded, onClose, cfg }: { onFunded: () => void; onClose
             </label>
           </>
         )}
-        {error && <div className="text-sm text-destructive">{error}</div>}
+        {declined ? (
+          /* The refusal carries its reason AND its way out, in one place. */
+          <div className="space-y-2 rounded-lg border border-hold/30 bg-hold/10 p-3">
+            <div className="text-sm text-hold">{tl("topup", "That payment was declined — the card behind your PayPal account wouldn't pay.")}</div>
+            <Button variant="outline" className="w-full" onClick={() => { setDeclined(false); setUseSaved(false) }}>
+              {tl("topup", "Choose another card in PayPal")}
+            </Button>
+          </div>
+        ) : error ? <div className="text-sm text-destructive">{error}</div> : null}
         <button onClick={() => setPhase("amount")} className="text-xs text-muted-foreground hover:text-foreground">{tl("topup", "← Change amount")}</button>
       </div>
     )

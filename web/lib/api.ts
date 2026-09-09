@@ -623,7 +623,7 @@ export function deleteSavedPaypal(id: number) {
 /** Opens no window: the server creates a merchant-initiated order against the saved token
  *  and hands back an orderID for the SAME capture route the interactive path uses. */
 export function chargeSavedPaypal(amount: number, savedId: number) {
-  return api<{ ok?: boolean; orderID?: string; credit?: number; charge?: number; fee?: number; label?: string | null; error?: string }>(`/api/paypal/charge-saved`, {
+  return api<{ ok?: boolean; orderID?: string; credit?: number; charge?: number; fee?: number; label?: string | null; error?: string; issue?: string | null; declined?: boolean }>(`/api/paypal/charge-saved`, {
     method: "POST",
     body: JSON.stringify({ amount, savedId }),
   })

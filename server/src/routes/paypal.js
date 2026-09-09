@@ -637,7 +637,32 @@ export function paypalRoutes(app, requireAuth) {
       });
       const cd = await create.json().catch(() => ({}));
       recordUsage('paypal', { endpoint: 'charge-saved-create', ok: create.ok });
-      if (!create.ok || !cd.id) { reply.code(400); return { error: 'PayPal refused the saved-account payment: ' + JSON.stringify(cd).slice(0, 300) }; }
+      if (!create.ok || !cd.id) {
+        /**
+         * A DECLINE IS NOT AN ERROR MESSAGE, IT IS A FORK IN THE FLOW.
+         *
+         * PayPal answers INSTRUMENT_DECLINED when the funding source behind the saved account
+         * would not pay — no money on the card, a bank refusal, an expired instrument. Its own
+         * guidance for that code is to send the payer back through the approval window, where
+         * they can pick a different card, and that is the ONE thing a one-press payment cannot
+         * do for them.
+         *
+         * So the code is handed to the client rather than buried in a sentence: the dialog
+         * turns it into "choose another card", not "something went wrong". Everything else
+         * stays a plain refusal with PayPal's own description.
+         */
+        app.log.error('paypal charge-saved refused: ' + JSON.stringify(cd));
+        const det = (cd.details && cd.details[0]) || {};
+        const issue = String(det.issue || '');
+        reply.code(400);
+        return {
+          error: det.description || cd.message || ('PayPal refused that payment (HTTP ' + create.status + ')'),
+          issue: issue || null,
+          // The one the dialog acts on. Named rather than left to the client to pattern-match
+          // a string, so a wording change at PayPal cannot silently disable the fallback.
+          declined: /INSTRUMENT_DECLINED|PAYER_ACTION_REQUIRED/.test(issue),
+        };
+      }
 
       /* Hand the order id back to the same capture route the interactive path uses, rather
          than a second copy of the crediting, the fee reading and the notification. One
