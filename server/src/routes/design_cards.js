@@ -320,8 +320,26 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       }
     }
 
-    // A card carries the SAME number as the artwork on it — issued here too, because a
-    // design can reach the board without ever passing through the order upload route.
+    /**
+     * A card carries the SAME number as the artwork on it — issued here too, because a
+     * design can reach the board without ever passing through the order upload route.
+     *
+     * THE HASH IS OFTEN IN THE URL, and this used to miss it. `artHash` is only computed
+     * above when `data` is a `data:` URL — the freshly-dropped case. Artwork ALREADY SAVED
+     * arrives as the address we serve it from, `/api/order_designs/art/<sha256>.png` (see
+     * artUrlOf in orders.js) or the library's `/api/design_library/art/<sha256>`, and those
+     * are content-addressed: the hash IS the filename. So a card sent from a face that was
+     * loaded rather than just dropped got no hash, no number, and turned up on the board
+     * with no DSN badge at all — which is exactly the artwork someone is most likely to be
+     * chasing by number.
+     *
+     * Read off the path rather than re-fetched: the bytes are already identified, and going
+     * back over the network to learn something the string states is a request for nothing.
+     */
+    if (!artHash && data) {
+      const m = /\/api\/(?:order_designs|design_library)\/art\/([0-9a-f]{16,64})/i.exec(String(data));
+      if (m) artHash = m[1].toLowerCase();
+    }
     const designNo = await designNoFor(artHash, null);
     /**
      * THE NOTE, WRITTEN WITH THE CARD.

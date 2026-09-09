@@ -1591,7 +1591,6 @@ export function DesignCanvasDialog({
    */
   /** Seeded from the line, because the line's name is right far more often than not — and a
    *  field you can correct beats one you must fill. */
- const [cardTitle, setCardTitle] = useState("")
  const [cardNote, setCardNote] = useState("")
   /**
    * THE TITLE'S AUTOMATED HALF — `#66-D2 · Front · 11.7"` — and the person types only the
@@ -1628,10 +1627,26 @@ export function DesignCanvasDialog({
    *  asks the same question the same way. */
  const [cardBand, setCardBand] = useState<Band | null>(null)
  const { rates: bandRates, flat: bandFlat } = useBandRates()
- const fullCardTitle = (name: string) => {
- const pre = cardPrefixText.trim()
- const rest = name.trim() || item.name || item.sku || "Design"
- return pre ? `${pre} · ${rest}` : rest
+  /**
+   * THE TITLE IS THE PREFIX, and nothing after it (owner's call, 2026-09-09).
+   *
+   * It read `#48-D2 · Front · 11.7" · Transfer Duffel. 108084 · front` — the product name
+   * and the face, both of which the first three parts already carry, on a card that sits in
+   * a column 260px wide. The blank is on the card's own row on the board and the face is the
+   * second word of the title.
+   *
+   * PER FACE, because a multi-face send makes one card each and they cannot all be called
+   * D2 · Front. The number counts up across the batch and the face is the row's own; the
+   * measured width belongs only to the face actually on the canvas, which is the only one
+   * that was measured.
+   */
+ const titleFor = (side: string, index: number) => {
+ const face = side.charAt(0).toUpperCase() + side.slice(1)
+ if (side === sideName && cardPrefixText.trim()) return cardPrefixText.trim()
+ return [
+      [orderLabel, `D${cardCount + 1 + index}`].filter(Boolean).join("-"),
+ face,
+    ].filter(Boolean).join(" · ")
   }
   /** Click the artwork to see it big. The shared lightbox, never a seventh hand-rolled one. */
  const [zoom, setZoom] = useState<string | null>(null)
@@ -1647,7 +1662,6 @@ export function DesignCanvasDialog({
    */
  const openSendPanel = () => {
  setCardPrefixText(cardPrefix)
- setCardTitle(item.name || item.sku || "Design")
  setCardNote("")
  setCardBand(null)
  setSkip({})
@@ -1706,9 +1720,7 @@ export function DesignCanvasDialog({
  try {
  for (const row of going) {
  const card = await createDesignCard({
-          /* The FACE is in the title, because on a board of cards from one order it is the
-             only thing telling two of them apart. */
- title: `${fullCardTitle(cardTitle)} · ${row.side}`,
+ title: titleFor(row.side, going.indexOf(row)),
  description: cardNote.trim() || undefined,
  band: cardBand ?? undefined,
  data: row.art.data,
