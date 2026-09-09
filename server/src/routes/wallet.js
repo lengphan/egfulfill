@@ -627,16 +627,21 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
    */
   app.get('/api/reports/pnl', { preHandler: requireAuth }, async (req, reply) => {
     if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin only' }; }
-    const days = Math.max(1, Math.min(365, parseInt(req.query?.days, 10) || 30));
+    /* `all` MEANS ALL, the same word the overview takes. Both are read on one screen by one
+       control, so a year here and no bound there would put two different windows behind one
+       set of figures — the P&L card sits directly under the GMV it is qualifying. */
+    const ALL = String(req.query?.days ?? '').toLowerCase() === 'all';
+    const days = ALL ? 0 : Math.max(1, Math.min(365, parseInt(req.query?.days, 10) || 30));
     const r = await q(
       `select type,
               sum(delta) filter (where delta > 0) as income,
               sum(delta) filter (where delta < 0) as cost,
               count(*) as n
          from wallet_ledger
-        where account = 'factory' and created_at >= now() - ($1 || ' days')::interval
+        where account = 'factory'
+          and ($2 or created_at >= now() - ($1 || ' days')::interval)
         group by type`,
-      [String(days)]
+      [String(days), ALL]
     ).catch(() => ({ rows: [] }));
 
     const num = (v) => Number(v || 0);
@@ -648,7 +653,7 @@ export function walletRoutes(app, requireAuth, requireAdmin) {
     }).sort((a, b) => (b.income - b.cost) - (a.income - a.cost));
 
     return {
-      days,
+      days: ALL ? 'all' : days,
       income: Math.round(income * 100) / 100,
       cost: Math.round(cost * 100) / 100,            // negative
       profit: Math.round((income + cost) * 100) / 100,

@@ -36,6 +36,17 @@ const RANGES = [
 ] as const
 type RangeId = (typeof RANGES)[number]["id"]
 
+/**
+ * THE WINDOW AS THE API TAKES IT — one definition, not two copies.
+ *
+ * This was written out twice, once for the overview and once for the P&L, and both spelled
+ * "all" as 365. The route clamped to 365 as well, so "All" was a year in three places at
+ * once and quietly dropped every order older than that — on a floor whose oldest work is
+ * two years old. "all" is a word the route understands now.
+ */
+const daysFor = (id: RangeId): number | "all" =>
+  id === "today" ? 1 : id === "7d" ? 7 : id === "all" ? "all" : 30
+
 
 // Short blurbs for the shortcut tiles. Nav items don't carry descriptions; anything not
 // listed just shows its label, which is self-explanatory for a launcher.
@@ -115,11 +126,12 @@ export function StaffDashboard() {
      * effect has returned.
      */
  if (!getToken()) { queueMicrotask(() => setLoadErr(t("dash.errSignedOut"))); return }
- const days = range === "today" ? 1 : range === "7d" ? 7 : range === "all" ? 365 : 30
- getOverview(days, isAdmin && range !== "all")
+ getOverview(daysFor(range))
       .then((r) => { setOv(r ?? null); setLoadErr(null) })
       .catch((e) => setLoadErr(e instanceof Error ? e.message : t("dash.errServer")))
-  }, [t, range, isAdmin])
+    /* `isAdmin` was a dependency because the request carried `windowLine`, which it decided.
+       The line is never windowed now, so the read no longer differs by role. */
+  }, [t, range])
  useEffect(() => { load() }, [load])
 
   // Time-of-day greeting + today's date. Client component, so `new Date()` is the browser's
@@ -163,7 +175,7 @@ export function StaffDashboard() {
  const [pnl, setPnl] = useState<FactoryPnl | null>(null)
  useEffect(() => {
  if (!isAdmin) return
- const days = rangeMeta.id === "today" ? 1 : rangeMeta.id === "7d" ? 7 : rangeMeta.id === "all" ? 365 : 30
+ const days = daysFor(rangeMeta.id)
     // Nothing here sets state synchronously — the fetch does it in .then() — so it starts
     // now rather than one frame from now. `live` is what stops a stale range's answer from
     // landing after a newer one.
@@ -342,20 +354,13 @@ export function StaffDashboard() {
             ? <><span className="font-medium text-[var(--mk-acid)]">{stats.createdToday}</span> {t("dash.newToday")}</>
             : todayLabel
         }
-      >
-        {/* Money window — admin only, since the money cards are. */}
-        {isAdmin && (
-          <TabBar
-            look="segmented"
-            size="sm"
-            spacing="none"
-            ariaLabel={tl("range", "Date range")}
-            items={RANGES.map((r) => ({ id: r.id, label: tl("range", r.label) }))}
-            value={range}
-            onChange={setRange}
-          />
-        )}
-      </PageBand>
+      />
+      {/* THE RANGE CONTROL IS NOT HERE ANY MORE (2026-09-09).
+          It sat in the page header, where a control reads as governing the page — and it
+          governs the money alone. The bracket below it never moved when you pressed it, so
+          the control looked broken while it was working perfectly on the panel two rows
+          down. It now lives ON that panel, in GmvPanel's `controls` slot, which is where the
+          seller dashboard has always kept its own. A control's scope is its position. */}
 
       {loadErr && (
         <div className="flex items-start gap-2 rounded-lg border border-hold/20 bg-hold/10 px-3.5 py-2 text-xs font-medium text-hold">
@@ -415,6 +420,19 @@ export function StaffDashboard() {
                * second row of figures sits under the headline. It was the GROUND that was
                * wrong, not the composition. */
               title={tl("kpi", "GMV")}
+              /* THE WINDOW BELONGS TO THE MONEY, so it sits on the money. Admin only, like
+                 the figures it moves — every other role reads this panel without it. */
+              controls={isAdmin ? (
+                <TabBar
+                  look="segmented"
+                  size="sm"
+                  spacing="none"
+                  ariaLabel={tl("range", "Date range")}
+                  items={RANGES.map((r) => ({ id: r.id, label: tl("range", r.label) }))}
+                  value={range}
+                  onChange={setRange}
+                />
+              ) : undefined}
               headline={ov === null ? "—" : usd(money.revenue)}
               headlineSub={tl("rangesub", rangeMeta.sub)}
               side={moneySide.map((c) => ({ label: tl("kpi", c.label), value: c.value, sub: c.sub }))}

@@ -59,7 +59,7 @@ export function GmvPanel({
   /** When each column starts, epoch ms. From the server, which owns the slot size. */
   barAt?: number[]
   /** Whether a column is an hour or a day — decides how its start is written. */
-  bucket?: "hour" | "day"
+  bucket?: "hour" | "day" | "month"
   /** Ready-made column labels, for a caller that already has them. The seller's chart
    *  bucketises client-side and its points carry a localised label already, so re-deriving
    *  one from an epoch would be a second answer to a question already answered. Wins over
@@ -156,7 +156,13 @@ export function GmvPanel({
               ?? (when
                 ? new Date(when).toLocaleString(undefined, bucket === "hour"
                     ? { hour: "numeric", minute: "2-digit" }
-                    : { month: "short", day: "numeric" })
+                    /* All time is bucketed by MONTH — ninety daily columns across two years
+                       of trading would be a chart of the last quarter under an all-time
+                       figure. A month column says the month and the year, because at this
+                       span two Septembers are on the same axis. */
+                    : bucket === "month"
+                      ? { month: "short", year: "2-digit" }
+                      : { month: "short", day: "numeric" })
                 : null)
             const money = barValue?.[i]
             const parts = [

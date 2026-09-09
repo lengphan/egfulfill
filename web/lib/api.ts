@@ -2551,8 +2551,9 @@ export function refreshTracking(id: string) {
  * 2,321 KB to render six numbers. This is the same arithmetic done where the rows already
  * are, and it answers in about two kilobytes. See server/src/routes/reports.js.
  *
- * `counts` is the whole floor; `windowed` is the same shape bounded by `days`, because "what
- * is on the line now" and "where did this week's intake go" are different questions.
+ * `counts` is the whole floor, always. It was once accompanied by a `windowed` twin bounded
+ * by `days`; nothing ever read it, and the flag that windowed the production line alongside
+ * it made a tile show an all-time count beside a windowed age. The window is the money's.
  */
 export type OverviewCounts = {
   total: number; draft: number; pending: number; approved: number; working: number
@@ -2562,14 +2563,14 @@ export type OverviewLineRow = { id: string; n: number; oldest: string | null; by
 export type Overview = {
   days: number
   counts: OverviewCounts
-  windowed: OverviewCounts
+
   money: { gmv: number; orders: number; aov: number }
   /** GMV per bucket, scaled 0..1 — the shape of the run, which is all the sparkline draws. */
   gmvBars: number[]
   /** What ONE bar covers: 'hour' on a single-day window, 'day' otherwise. A day bucketed by
    *  day is a single full-height column, so the server switches slot size and says which it
    *  used rather than leaving the panel to infer it from the bar count. */
-  gmvBucket?: "hour" | "day"
+  gmvBucket?: "hour" | "day" | "month"
   /** Orders behind each column — what the shape is actually made of. */
   gmvBarOrders?: number[]
   /** GMV behind each column, unscaled. */
@@ -2599,12 +2600,20 @@ export function getSheetsAppsScript() {
   return api<{ script: string; tab: string; listsTab: string; manifest: string }>(`/api/sheets/apps-script`)
 }
 
-export function getOverview(days = 30, windowLine = false) {
-  return api<Overview>(`/api/reports/overview?days=${days}${windowLine ? "&windowLine=1" : ""}`)
+/**
+ * `days` bounds the MONEY and the bars. The stage counts and the production line in the
+ * answer are always the whole floor — see the route, which used to offer both and no longer
+ * does, because a count from one population beside an age from another is not a reading.
+ *
+ * "all" is a WORD, not a big number: it used to be sent as 365 and clamped to 365, so the
+ * all-time window quietly excluded anything older than a year.
+ */
+export function getOverview(days: number | "all" = 30) {
+  return api<Overview>(`/api/reports/overview?days=${days}`)
 }
 
 export type FactoryPnl = {
-  days: number
+  days: number | "all"
   income: number
   cost: number      // negative
   profit: number
@@ -2612,7 +2621,9 @@ export type FactoryPnl = {
   known: boolean
   byType: { type: string; income: number; cost: number; n: number }[]
 }
-export function getFactoryPnl(days = 30) {
+/** `days` takes the same "all" the overview does — one control drives both, and the P&L card
+ *  sits directly under the GMV it qualifies, so they cannot be looking at different windows. */
+export function getFactoryPnl(days: number | "all" = 30) {
   return api<FactoryPnl>(`/api/reports/pnl?days=${days}`)
 }
 

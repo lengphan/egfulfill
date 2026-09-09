@@ -40,6 +40,25 @@ function stageOf(orderStatus, itemStatuses) {
   return worst;
 }
 
+/**
+ * THE ALL-TIME BAR WINDOW: which calendar months the chart covers, and where a date lands.
+ *
+ * Exported because it is the one piece of this route that is pure arithmetic on dates, and
+ * date arithmetic is where off-by-one lives — months are not a fixed number of milliseconds,
+ * so it cannot be checked by dividing. Driven directly by tools/check-report-window.mjs.
+ *
+ * `span` is capped at 90 columns, the same ceiling the daily windows use, and the window
+ * ENDS at `now`: a floor with more history than that loses its oldest months, never its
+ * newest.
+ */
+export function monthWindow(oldestTs, nowTs) {
+  const monthIndex = (ms) => { const d = new Date(ms); return d.getFullYear() * 12 + d.getMonth(); };
+  const nowMonth = monthIndex(nowTs);
+  const oldest = Number.isFinite(oldestTs) ? monthIndex(oldestTs) : nowMonth;
+  const monthSpan = Math.max(1, Math.min(90, nowMonth - oldest + 1));
+  return { monthIndex, firstMonth: nowMonth - (monthSpan - 1), monthSpan };
+}
+
 const median = (xs) => {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -52,18 +71,29 @@ export function reportsRoutes(app, requireStaff) {
   /**
    * Everything the overview draws, in one answer.
    *
-   * `days` bounds the money and the bars; the production line and the stage counts are
-   * returned BOTH ways — windowed and whole — because the floor's "what is on the line right
-   * now" and the reader's "where did this week's intake go" are different questions and the
-   * dashboard offers a toggle between them.
+   * `days` bounds THE MONEY AND THE BARS, and nothing else.
+   *
+   * The stage counts and the production line are always the whole floor. This used to answer
+   * both ways — a `windowed` count set beside the whole one, and a `windowLine` flag — on the
+   * reading that "what is on the line now" and "where did this week's intake go" are two
+   * questions worth offering. In practice nothing ever read `windowed`, while `windowLine`
+   * WAS being sent: the bracket drew an all-time count next to a windowed age, which is not
+   * either question answered. Both are gone. What is on the floor is what is on the floor.
    */
   app.get('/api/reports/overview', { preHandler: requireStaff }, async (req) => {
-    const days = Math.max(1, Math.min(365, Number(req.query?.days) || 30));
-    const since = Date.now() - days * DAY;
-    // The line follows the window only when the caller asks. A role without the toggle sees
-    // the live floor, and hiding orders behind a filter someone cannot see is worse than
-    // showing all of them.
-    const windowedLine = String(req.query?.windowLine || '') === '1';
+    /**
+     * `all` MEANS ALL, and it used to mean a year.
+     *
+     * The client sent days=365 for "All" and this clamped to 365 anyway, so on a floor
+     * holding two-year-old orders the all-time GMV silently dropped everything older than
+     * twelve months — the one window whose whole promise is that it drops nothing.
+     *
+     * A named window rather than a huge number: `days=all` is unbounded here, and a caller
+     * that means "a year" can still say 365 and get one.
+     */
+    const ALL = String(req.query?.days ?? '').toLowerCase() === 'all';
+    const days = ALL ? 0 : Math.max(1, Math.min(365, Number(req.query?.days) || 30));
+    const since = ALL ? 0 : Date.now() - days * DAY;
 
     /*
      * ONE QUERY, LEAN COLUMNS. `items` is 892 of the 2,671 bytes an order weighs on
@@ -82,7 +112,7 @@ export function reportsRoutes(app, requireStaff) {
 
     const todayStr = new Date().toDateString();
     const counts = { total: 0, draft: 0, pending: 0, approved: 0, working: 0, shipped: 0, onHold: 0, cancelled: 0, refunded: 0, createdToday: 0 };
-    const windowed = { total: 0, draft: 0, pending: 0, approved: 0, working: 0, shipped: 0, onHold: 0, cancelled: 0, refunded: 0 };
+
     const KEY = { '': 'draft', in_review: 'pending', approved: 'approved', working: 'working', shipped: 'shipped', on_hold: 'onHold', cancelled: 'cancelled', refunded: 'refunded' };
 
     let gmv = 0, inWindow = 0;
@@ -99,9 +129,35 @@ export function reportsRoutes(app, requireStaff) {
      * size of a slot and how many there are.
      */
     const HOUR = 36e5;
-    const hourly = days <= 1;
+    const hourly = !ALL && days <= 1;
+    /**
+     * ALL TIME IS BUCKETED BY MONTH, and it has to be.
+     *
+     * Every other window divides evenly into fixed slots, so a bucket is arithmetic on
+     * milliseconds. All time does not: ninety DAILY columns over two years of trading is a
+     * chart of the last quarter with an all-time figure written above it, which is worse
+     * than no chart — the two halves of the panel would be answering different questions.
+     *
+     * Months are not a fixed number of milliseconds, so these buckets are indexed by
+     * calendar arithmetic (monthIndex) rather than by division. The span runs from the
+     * OLDEST order to now, capped at 90 columns — the same ceiling the daily windows use.
+     */
+    const monthly = ALL;
+    const oldestTs = rows.reduce((min, r) => {
+      const t = r.created_at ? new Date(r.created_at).getTime() : NaN;
+      return !isNaN(t) && t < min ? t : min;
+    }, Date.now());
+    /* ANCHORED TO NOW, NOT TO THE OLDEST ORDER — the same end the daily windows are anchored
+       to, and the reason matters. Indexed from the oldest, a floor with more than 90 months
+       of history would number this month past the end of the array and the guard below would
+       silently DROP it: the chart would show the first seven years and lose the current one,
+       which is the worst way for it to be wrong. Anchored to now, the overflow falls off the
+       far end instead, exactly as a 365-day window drops day 366. */
+    const { monthIndex, firstMonth, monthSpan } = monthWindow(oldestTs, Date.now());
     const slot = hourly ? HOUR : DAY;
-    const span = Math.max(1, Math.min(90, hourly ? Math.round((days * DAY) / HOUR) : days));
+    const span = monthly
+      ? monthSpan
+      : Math.max(1, Math.min(90, hourly ? Math.round((days * DAY) / HOUR) : days));
     const bars = new Array(span).fill(0);
     /* WHAT EACH COLUMN IS MADE OF. The scaled height alone cannot answer "when did orders
        come in" — it is a shape with no numbers behind it. Orders and money per bucket, plus
@@ -121,11 +177,11 @@ export function reportsRoutes(app, requireStaff) {
       if (r.created_at && new Date(r.created_at).toDateString() === todayStr) counts.createdToday++;
 
       if (!isNaN(t) && t >= since) {
-        windowed.total++;
-        if (k) windowed[k]++;
         gmv += num(r.total);
         inWindow++;
-        const i = span - 1 - Math.floor((Date.now() - t) / slot);
+        const i = monthly
+          ? monthIndex(t) - firstMonth
+          : span - 1 - Math.floor((Date.now() - t) / slot);
         if (i >= 0 && i < span) { bars[i] += num(r.total); barValue[i] += num(r.total); barOrders[i]++; }
       }
 
@@ -154,7 +210,11 @@ export function reportsRoutes(app, requireStaff) {
     const line = new Map();
     for (const r of rows) {
       const t = r.created_at ? new Date(r.created_at).getTime() : NaN;
-      if (windowedLine && (isNaN(t) || t < since)) continue;
+      /* NO WINDOW ON THE LINE. It used to skip orders outside the money window whenever the
+         caller asked, which is how a bracket tile came to show an ALL-TIME count beside an
+         age computed over the last thirty days — two populations, one row. The line is the
+         live floor; the range control is the money's, and it says so by sitting on the money
+         panel now rather than in the page header. */
       const stage = stageOf(r.factory_status || r.status, r.item_statuses);
       let e = line.get(stage);
       if (!e) { e = { id: stage, n: 0, oldest: null, byPlatform: {} }; line.set(stage, e); }
@@ -168,20 +228,23 @@ export function reportsRoutes(app, requireStaff) {
     return {
       days,
       counts,
-      windowed,
       money: { gmv: Math.round(gmv * 100) / 100, orders: inWindow, aov: inWindow ? Math.round((gmv / inWindow) * 100) / 100 : 0 },
       // Scaled 0..1, which is all the sparkline draws — the figures themselves are above.
       gmvBars: bars.map((v) => v / max),
       /** What one bar covers — 'hour' on a single-day window, 'day' otherwise. Sent so the
        *  panel never has to infer the slot from the bar count. */
-      gmvBucket: hourly ? 'hour' : 'day',
+      gmvBucket: hourly ? 'hour' : monthly ? 'month' : 'day',
       /** Orders and money behind each column, and when each column starts (epoch ms). The
        *  start is SENT rather than recomputed on the client: the index arithmetic here is the
        *  only place that knows the slot size and the window's end, and two derivations of one
        *  timestamp is two chances to be an hour out. */
       gmvBarOrders: barOrders,
       gmvBarValue: barValue.map((v) => Math.round(v * 100) / 100),
-      gmvBarAt: bars.map((_, i) => Date.now() - (span - 1 - i) * slot),
+      /* Each column's start. Months are calendar steps, not a multiple of `slot`, so they
+         are built from the month index rather than by subtracting milliseconds. */
+      gmvBarAt: monthly
+        ? bars.map((_, i) => { const m = firstMonth + i; return new Date(Math.floor(m / 12), m % 12, 1).getTime(); })
+        : bars.map((_, i) => Date.now() - (span - 1 - i) * slot),
       speed: {
         production: { days: round1(median(prod)), n: prod.length },
         transit: { days: round1(median(trans)), n: trans.length },
