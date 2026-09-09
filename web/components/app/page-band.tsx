@@ -2,6 +2,8 @@
 
 import { useRef, type ReactNode } from "react"
 import { motion } from "motion/react"
+import { BandArray } from "@/components/app/band-array"
+import { BandLiquid } from "@/components/app/band-liquid"
 
 /**
  * THE HEADER BAND, AND THE THINGS FLOATING IN IT.
@@ -166,6 +168,21 @@ export const MOTIONS = ["swim", "bob", "orbit", "sway", "breathe"] as const
 export const DEFAULT_MOTION = "swim"
 
 /**
+ * WHAT OCCUPIES THE BAND'S EMPTY HALF.
+ *
+ *   objects  the garment family, floating and draggable
+ *   field    a rim-lit array of soft modules with a diagonal wave through it
+ *   pool     liquid chrome and lime, merging and pulling apart
+ *
+ * The two abstract ones exist because five objects at arm's length from each other read as
+ * five items and a lot of gap, however they were sized, spaced or moved — the eye reads the
+ * distance between things. A field and a pool are each ONE body: one composition, one motion,
+ * and the whole half of the band is used rather than dotted.
+ */
+export const FIGURES = ["objects", "field", "pool"] as const
+export const DEFAULT_FIGURE = "objects"
+
+/**
  * HOW ONE OBJECT SWIMS — an X period, a Y period, and how far it goes on each.
  *
  * `sx` is in `cqw`, a percentage of the BAND, so an object crosses the stripe rather than
@@ -267,6 +284,7 @@ export function PageBand({
   layout = DEFAULT_LAYOUT,
   set = DEFAULT_SET,
   motionStyle = DEFAULT_MOTION,
+  figure = DEFAULT_FIGURE,
 }: {
   title: ReactNode
   sub?: ReactNode
@@ -279,6 +297,8 @@ export function PageBand({
   set?: keyof typeof SETS
   /** How the objects move. Same rule again — the app takes the default. */
   motionStyle?: (typeof MOTIONS)[number]
+  /** What fills the empty half: the objects, or one of the two abstract figures. */
+  figure?: (typeof FIGURES)[number]
 }) {
   const band = useRef<HTMLDivElement>(null)
   /*
@@ -311,7 +331,8 @@ export function PageBand({
       </div>
       {children}
 
-      {/*
+      {figure === "field" ? <BandArray /> : figure === "pool" ? <BandLiquid /> : (
+      /*
         * THE LAYER IS THE WHOLE BAND, not the right 40%.
         *
         * It used to be a 40% block because it held a picture with its own edges. A dragged
@@ -321,7 +342,7 @@ export function PageBand({
         * -z-10 under `isolate`: the objects are BEHIND the type. Haul one across the title
         * and it slides under the words rather than over them, which is the difference between
         * a toy in the header and a bug covering the page name.
-        */}
+        */
       <div
         aria-hidden
         data-motion={motionStyle}
@@ -331,6 +352,7 @@ export function PageBand({
           <FloatingObject key={i} o={{ ...slot, src: objects[i], swim: SWIM[i % SWIM.length] }} bounds={band} />
         ))}
       </div>
+      )}
     </div>
   )
 }

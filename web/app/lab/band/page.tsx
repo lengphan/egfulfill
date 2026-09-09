@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from "react"
-import { PageBand, LAYOUTS, SETS, MOTIONS, DEFAULT_LAYOUT } from "@/components/app/page-band"
+import { PageBand, LAYOUTS, SETS, MOTIONS, FIGURES, DEFAULT_LAYOUT } from "@/components/app/page-band"
 
 /**
  * WHY THIS BANNER EXISTS: "no motion is showing" and "this machine has asked for no motion"
@@ -118,6 +118,11 @@ const NOTES: Record<string, string> = {
   scatter: "the first attempt, kept for comparison",
 }
 
+const FIGURE_NOTES: Record<string, string> = {
+  field: "an array of soft modules, rim-lit, a wave passing through on the diagonal",
+  pool: "liquid chrome and lime — one body, merging and pulling apart",
+}
+
 const MOTION_NOTES: Record<string, string> = {
   swim: "two axes on unequal clocks — suspended in water, never repeats",
   bob: "one axis, in place, out of phase",
@@ -140,7 +145,21 @@ function Column({ dark }: { dark: boolean }) {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {dark ? "Dark" : "Light"}
         </p>
-        <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Motion — same objects, same arrangement</p>
+        <p className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Figures — what fills the empty half</p>
+        {FIGURES.filter((f) => f !== "objects").map((f) => (
+          <div key={f} className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              <span className="font-semibold text-foreground">{f}</span> — {FIGURE_NOTES[f]}
+            </p>
+            <PageBand
+              figure={f}
+              title="Good afternoon, Linh"
+              sub={<><span className="font-medium text-[var(--mk-acid)]">5</span> new today</>}
+            />
+          </div>
+        ))}
+
+        <p className="pt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Motion — same objects, same arrangement</p>
         {MOTIONS.map((m) => (
           <div key={m} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">

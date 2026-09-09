@@ -1855,3 +1855,122 @@ td[align="right"] {
 .ploy-pinned::after { top: 12px; right: 12px; }
 .ploy-pinned > .ploy-pin::before { bottom: 12px; left: 12px; }
 .ploy-pinned > .ploy-pin::after { bottom: 12px; right: 12px; }
+
+/* ── THE BAND'S FIELD — an array of soft modules with a wave through it ─────────
+   The counterpart to the floating objects above, and the answer to the thing they
+   could never fix: five items spread across a stripe read as five items and a lot
+   of gap, however they are sized or spaced. An array is one object made of many,
+   so there is one composition and one motion instead of five of each.
+
+   ISOMETRIC BY TRANSFORM, not by asset. rotateX/rotateZ on the plane and
+   preserve-3d on the cells is the whole illusion; each cell then lifts along Z,
+   which in that rotated plane reads as rising out of the field.
+
+   THE WAVE IS DIAGONAL — the delay is (row + column), so it enters at one corner
+   and leaves at the opposite one. By column alone it is a curtain; by row alone a
+   rolling shutter; both read as a UI transition rather than as weather.
+
+   THE GLOW IS THE ONLY COLOUR, and it sits where §4 allows it: ACID is a fill on
+   the plate, and the band is the plate. The modules stay the colour of a blank. */
+.eg-field-wrap {
+  position: absolute;
+  inset: 0 0 0 46%;
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  container-type: size;
+}
+@media (min-width: 640px) { .eg-field-wrap { display: flex; } }
+/* FLAT, NOT ISOMETRIC. A rotated plane makes a diamond, and a diamond in a 90px stripe is
+   either cropped top and bottom or shrunk to a stamp floating in the middle — I tried both.
+   The band is wide and short, so the figure has to be wide and short: a lattice that runs
+   along the stripe, with the wave doing the work the perspective was supposed to do. */
+.eg-field {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 16), 1fr);
+  gap: 4cqh;
+  width: 100%;
+  padding: 9cqh 0;
+  height: 100%;
+}
+.eg-field-cell {
+  border-radius: 22%;
+  background: linear-gradient(150deg, #ffffff 0%, #e8eaf1 48%, #b9bdcb 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+  /* The wave is a rise AND a light: the module lifts a little and its rim catches the acid as
+     it passes. A lift alone reads as a bar chart twitching; the light is what makes it a wave
+     going through a surface. */
+  animation: eg-field-rise 2400ms var(--d, 0ms) ease-in-out infinite alternate;
+}
+@keyframes eg-field-rise {
+  from {
+    transform: translateY(9%) scale(0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+  to {
+    transform: translateY(-11%) scale(1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 0 8px 1px color-mix(in oklab, var(--mk-acid, #d4f897) 70%, transparent),
+      0 3px 6px rgba(0, 0, 0, 0.45);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-force-motion]) .eg-field-cell { animation: none; }
+}
+
+/* ── THE BAND'S POOL — liquid chrome and lime ──────────────────────────────────
+   The blobs are plain divs; the group carries an SVG filter that blurs and then
+   restores a hard alpha edge, so two shapes within a blur-radius of each other
+   merge into one outline. The merging is a consequence of where they are, not a
+   keyframe pretending — which is why they can pool and separate without anyone
+   choreographing it.
+
+   TWO CLOCKS PER DROP, never a simple ratio, for the same reason the objects
+   above have two: one period returns the whole group to its start on a beat, and
+   a beat is what makes ambient motion read as a mechanism.
+
+   THE FILTER IS THE EXPENSIVE PART. It repaints a blurred region every frame, so
+   it is scoped to the band's right half, capped at seven drops, and the blur stays
+   at 9 — big enough to merge, small enough not to cost a compositor pass on a
+   header that is on screen all day. */
+/* THE WRAP IS THE WHOLE BAND, and the drops simply live in its right half. Clipping it to
+   the right 50% put a hard vertical edge through the leftmost drop — an invisible box cutting
+   a liquid, which is the one thing a liquid must never do. The band's own overflow and radius
+   still contain it, so the only edges are the band's. */
+.eg-pool-wrap {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow: hidden;
+  container-type: size;
+}
+@media (min-width: 640px) { .eg-pool-wrap { display: block; } }
+.eg-pool {
+  position: absolute;
+  inset: -18% -6%;
+  filter: url(#eg-goo);
+  will-change: filter;
+}
+.eg-pool-drop {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation:
+    eg-pool-x var(--px, 12s) var(--pd, 0s) ease-in-out infinite alternate,
+    eg-pool-y var(--py, 9s) var(--pd, 0s) ease-in-out infinite alternate,
+    eg-pool-s calc(var(--px, 12s) * 0.77) var(--pd, 0s) ease-in-out infinite alternate;
+}
+/* Three separate animations on one element would fight over `transform`, so the travel is
+   done with inset properties and only the scale uses a transform. Same rule as the objects:
+   one property, one owner. */
+@keyframes eg-pool-x { to { margin-left: 9cqw; } }
+@keyframes eg-pool-y { to { margin-top: 5cqh; } }
+@keyframes eg-pool-s { to { transform: translate(-50%, -50%) scale(1.22); } }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-force-motion]) .eg-pool-drop { animation: none; }
+}
